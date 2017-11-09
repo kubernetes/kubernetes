@@ -31,6 +31,7 @@ import (
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
@@ -215,38 +216,74 @@ func TestScaleGet(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.StatefulSet.Store.DestroyFunc()
 
-	name := "foo"
+	versions := []string{"v1beta1", "v1beta2", "v1"}
+	for _, version := range versions {
+		name := "foo-" + version
+		var sts apps.StatefulSet
+		ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
+		requestInfo := genericapirequest.RequestInfo{
+			APIGroup:   "apps",
+			APIVersion: version,
+			Resource:   "statefulsets",
+		}
+		ctx = genericapirequest.WithRequestInfo(ctx, &requestInfo)
+		key := "/statefulsets/" + metav1.NamespaceDefault + "/" + name
+		validStatefulSet.Name = name
+		if err := storage.StatefulSet.Storage.Create(ctx, key, &validStatefulSet, &sts, 0); err != nil {
+			t.Fatalf("error setting new statefulset (key: %s) %v: %v", key, validStatefulSet, err)
+		}
 
-	var sts apps.StatefulSet
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
-	key := "/statefulsets/" + metav1.NamespaceDefault + "/" + name
-	if err := storage.StatefulSet.Storage.Create(ctx, key, &validStatefulSet, &sts, 0); err != nil {
-		t.Fatalf("error setting new statefulset (key: %s) %v: %v", key, validStatefulSet, err)
-	}
+		// for apps/v1beta1 and apps/v1beta2
+		wantExtensions := &extensions.Scale{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              name,
+				Namespace:         metav1.NamespaceDefault,
+				UID:               sts.UID,
+				ResourceVersion:   sts.ResourceVersion,
+				CreationTimestamp: sts.CreationTimestamp,
+			},
+			Spec: extensions.ScaleSpec{
+				Replicas: validStatefulSet.Spec.Replicas,
+			},
+			Status: extensions.ScaleStatus{
+				Replicas: validStatefulSet.Status.Replicas,
+				Selector: validStatefulSet.Spec.Selector,
+			},
+		}
+		// for starting apps/v1
+		wantAuto := &autoscaling.Scale{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              name,
+				Namespace:         metav1.NamespaceDefault,
+				UID:               sts.UID,
+				ResourceVersion:   sts.ResourceVersion,
+				CreationTimestamp: sts.CreationTimestamp,
+			},
+			Spec: autoscaling.ScaleSpec{
+				Replicas: validStatefulSet.Spec.Replicas,
+			},
+			Status: autoscaling.ScaleStatus{
+				Replicas: validStatefulSet.Status.Replicas,
+				Selector: labels.SelectorFromSet(validStatefulSet.Spec.Selector.MatchLabels).String(),
+			},
+		}
 
-	want := &extensions.Scale{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              name,
-			Namespace:         metav1.NamespaceDefault,
-			UID:               sts.UID,
-			ResourceVersion:   sts.ResourceVersion,
-			CreationTimestamp: sts.CreationTimestamp,
-		},
-		Spec: extensions.ScaleSpec{
-			Replicas: validStatefulSet.Spec.Replicas,
-		},
-		Status: extensions.ScaleStatus{
-			Replicas: validStatefulSet.Status.Replicas,
-			Selector: validStatefulSet.Spec.Selector,
-		},
-	}
-	obj, err := storage.Scale.Get(ctx, name, &metav1.GetOptions{})
-	got := obj.(*extensions.Scale)
-	if err != nil {
-		t.Fatalf("error fetching scale for %s: %v", name, err)
-	}
-	if !apiequality.Semantic.DeepEqual(got, want) {
-		t.Errorf("unexpected scale: %s", diff.ObjectDiff(got, want))
+		obj, err := storage.Scale.Get(ctx, name, &metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("error fetching scale for %s: %v", name, err)
+		}
+		switch version {
+		case "v1beta1", "v1beta2":
+			got := obj.(*extensions.Scale)
+			if !apiequality.Semantic.DeepEqual(got, wantExtensions) {
+				t.Errorf("unexpected scale: %s", diff.ObjectDiff(got, wantExtensions))
+			}
+		default:
+			got := obj.(*autoscaling.Scale)
+			if !apiequality.Semantic.DeepEqual(got, wantAuto) {
+				t.Errorf("unexpected scale: %s", diff.ObjectDiff(got, wantAuto))
+			}
+		}
 	}
 }
 
@@ -255,43 +292,80 @@ func TestScaleUpdate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.StatefulSet.Store.DestroyFunc()
 
-	name := "foo"
+	versions := []string{"v1beta1", "v1beta2", "v1"}
+	for _, version := range versions {
+		name := "foo-" + version
+		var sts apps.StatefulSet
+		ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
+		requestInfo := genericapirequest.RequestInfo{
+			APIGroup:   "apps",
+			APIVersion: version,
+			Resource:   "statefulsets",
+		}
+		ctx = genericapirequest.WithRequestInfo(ctx, &requestInfo)
+		key := "/statefulsets/" + metav1.NamespaceDefault + "/" + name
+		validStatefulSet.Name = name
+		if err := storage.StatefulSet.Storage.Create(ctx, key, &validStatefulSet, &sts, 0); err != nil {
+			t.Fatalf("error setting new statefulset (key: %s) %v: %v", key, validStatefulSet, err)
+		}
+		replicas := 12
+		extensionsScale := extensions.Scale{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: metav1.NamespaceDefault,
+			},
+			Spec: extensions.ScaleSpec{
+				Replicas: int32(replicas),
+			},
+		}
+		autoScale := autoscaling.Scale{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: metav1.NamespaceDefault,
+			},
+			Spec: autoscaling.ScaleSpec{
+				Replicas: int32(replicas),
+			},
+		}
 
-	var sts apps.StatefulSet
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
-	key := "/statefulsets/" + metav1.NamespaceDefault + "/" + name
-	if err := storage.StatefulSet.Storage.Create(ctx, key, &validStatefulSet, &sts, 0); err != nil {
-		t.Fatalf("error setting new statefulset (key: %s) %v: %v", key, validStatefulSet, err)
-	}
-	replicas := 12
-	update := extensions.Scale{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: metav1.NamespaceDefault,
-		},
-		Spec: extensions.ScaleSpec{
-			Replicas: int32(replicas),
-		},
-	}
+		switch version {
+		case "v1beta1", "v1beta2":
+			if _, _, err := storage.Scale.Update(ctx, extensionsScale.Name, rest.DefaultUpdatedObjectInfo(&extensionsScale), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+				t.Fatalf("error updating scale %v: %v", extensionsScale, err)
+			}
+		default:
+			if _, _, err := storage.Scale.Update(ctx, autoScale.Name, rest.DefaultUpdatedObjectInfo(&autoScale), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+				t.Fatalf("error updating scale %v: %v", autoScale, err)
+			}
+		}
 
-	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
-		t.Fatalf("error updating scale %v: %v", update, err)
-	}
+		obj, err := storage.Scale.Get(ctx, name, &metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("error fetching scale for %s: %v", name, err)
+		}
 
-	obj, err := storage.Scale.Get(ctx, name, &metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("error fetching scale for %s: %v", name, err)
-	}
-	scale := obj.(*extensions.Scale)
-	if scale.Spec.Replicas != int32(replicas) {
-		t.Errorf("wrong replicas count expected: %d got: %d", replicas, scale.Spec.Replicas)
-	}
-
-	update.ResourceVersion = sts.ResourceVersion
-	update.Spec.Replicas = 15
-
-	if _, _, err = storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil && !errors.IsConflict(err) {
-		t.Fatalf("unexpected error, expecting an update conflict but got %v", err)
+		switch version {
+		case "v1beta1", "v1beta2":
+			extensionsScale = *obj.(*extensions.Scale)
+			if extensionsScale.Spec.Replicas != int32(replicas) {
+				t.Errorf("wrong replicas count expected: %d got: %d", replicas, extensionsScale.Spec.Replicas)
+			}
+			extensionsScale.ResourceVersion = sts.ResourceVersion
+			extensionsScale.Spec.Replicas = 15
+			if _, _, err = storage.Scale.Update(ctx, extensionsScale.Name, rest.DefaultUpdatedObjectInfo(&extensionsScale), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil && !errors.IsConflict(err) {
+				t.Fatalf("unexpected error, expecting an update conflict but got %v", err)
+			}
+		default:
+			autoScale = *obj.(*autoscaling.Scale)
+			if autoScale.Spec.Replicas != int32(replicas) {
+				t.Errorf("wrong replicas count expected: %d got: %d", replicas, autoScale.Spec.Replicas)
+			}
+			autoScale.ResourceVersion = sts.ResourceVersion
+			autoScale.Spec.Replicas = 15
+			if _, _, err = storage.Scale.Update(ctx, autoScale.Name, rest.DefaultUpdatedObjectInfo(&autoScale), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil && !errors.IsConflict(err) {
+				t.Fatalf("unexpected error, expecting an update conflict but got %v", err)
+			}
+		}
 	}
 }
 
