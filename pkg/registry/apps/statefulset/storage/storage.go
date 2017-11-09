@@ -21,8 +21,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -30,7 +32,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	appsv1beta2 "k8s.io/kubernetes/pkg/apis/apps/v1beta2"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
+	autovalidation "k8s.io/kubernetes/pkg/apis/autoscaling/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/printers"
@@ -139,7 +143,9 @@ func (r *ScaleREST) GroupVersionKind(containingGV schema.GroupVersion) schema.Gr
 	}
 }
 
-// New creates a new Scale object
+// New creates a new Scale object.
+// There is no way to determine which scale subresource type to be used here.
+// Retain as extensions.Scale to ensure integration and e2e tests are passing.
 func (r *ScaleREST) New() runtime.Object {
 	return &extensions.Scale{}
 }
@@ -149,7 +155,14 @@ func (r *ScaleREST) Get(ctx genericapirequest.Context, name string, options *met
 	if err != nil {
 		return nil, err
 	}
-	scale, err := scaleFromStatefulSet(ss)
+
+	info, ok := request.RequestInfoFrom(ctx)
+	if !ok {
+		return nil, fmt.Errorf("failed to obtain request info from context when getting scaleREST")
+	}
+
+	groupVersion := info.APIGroup + "/" + info.APIVersion
+	scale, err := scaleFromStatefulSet(ss, groupVersion)
 	if err != nil {
 		return nil, errors.NewBadRequest(fmt.Sprintf("%v", err))
 	}
@@ -162,7 +175,13 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 		return nil, false, err
 	}
 
-	oldScale, err := scaleFromStatefulSet(ss)
+	info, ok := request.RequestInfoFrom(ctx)
+	if !ok {
+		return nil, false, fmt.Errorf("failed to obtain request info from context when updating scaleREST")
+	}
+
+	groupVersion := info.APIGroup + "/" + info.APIVersion
+	oldScale, err := scaleFromStatefulSet(ss, groupVersion)
 	if err != nil {
 		return nil, false, err
 	}
@@ -174,45 +193,83 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 	if obj == nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("nil update passed to Scale"))
 	}
-	scale, ok := obj.(*extensions.Scale)
+
+	var autoScale *autoscaling.Scale
+	var extensionsScale *extensions.Scale
+	switch groupVersion {
+	case "apps/v1beta1", "apps/v1beta2":
+		extensionsScale, ok = obj.(*extensions.Scale)
+	default:
+		autoScale, ok = obj.(*autoscaling.Scale)
+	}
 	if !ok {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("wrong object passed to Scale update: %v", obj))
 	}
 
-	if errs := extvalidation.ValidateScale(scale); len(errs) > 0 {
-		return nil, false, errors.NewInvalid(extensions.Kind("Scale"), scale.Name, errs)
+	switch groupVersion {
+	case "apps/v1beta1", "apps/v1beta2":
+		if errs := extvalidation.ValidateScale(extensionsScale); len(errs) > 0 {
+			return nil, false, errors.NewInvalid(extensions.Kind("Scale"), extensionsScale.Name, errs)
+		}
+		ss.Spec.Replicas = extensionsScale.Spec.Replicas
+		ss.ResourceVersion = extensionsScale.ResourceVersion
+	default:
+		if errs := autovalidation.ValidateScale(autoScale); len(errs) > 0 {
+			return nil, false, errors.NewInvalid(extensions.Kind("Scale"), autoScale.Name, errs)
+		}
+		ss.Spec.Replicas = autoScale.Spec.Replicas
+		ss.ResourceVersion = autoScale.ResourceVersion
 	}
 
-	ss.Spec.Replicas = scale.Spec.Replicas
-	ss.ResourceVersion = scale.ResourceVersion
 	ss, err = r.registry.UpdateStatefulSet(ctx, ss, createValidation, updateValidation)
 	if err != nil {
 		return nil, false, err
 	}
-	newScale, err := scaleFromStatefulSet(ss)
+	newScale, err := scaleFromStatefulSet(ss, groupVersion)
 	if err != nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("%v", err))
 	}
 	return newScale, false, err
 }
 
-// scaleFromStatefulSet returns a scale subresource for a statefulset.
-func scaleFromStatefulSet(ss *apps.StatefulSet) (*extensions.Scale, error) {
-	return &extensions.Scale{
-		// TODO: Create a variant of ObjectMeta type that only contains the fields below.
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              ss.Name,
-			Namespace:         ss.Namespace,
-			UID:               ss.UID,
-			ResourceVersion:   ss.ResourceVersion,
-			CreationTimestamp: ss.CreationTimestamp,
-		},
-		Spec: extensions.ScaleSpec{
-			Replicas: ss.Spec.Replicas,
-		},
-		Status: extensions.ScaleStatus{
-			Replicas: ss.Status.Replicas,
-			Selector: ss.Spec.Selector,
-		},
-	}, nil
+// scaleFromStatefulSet returns a scale subresource for a statefulset based on API version.
+func scaleFromStatefulSet(ss *apps.StatefulSet, groupVersion string) (runtime.Object, error) {
+	switch groupVersion {
+	case "apps/v1beta1", "apps/v1beta2":
+		return &extensions.Scale{
+			// TODO: Create a variant of ObjectMeta type that only contains the fields below.
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              ss.Name,
+				Namespace:         ss.Namespace,
+				UID:               ss.UID,
+				ResourceVersion:   ss.ResourceVersion,
+				CreationTimestamp: ss.CreationTimestamp,
+			},
+			Spec: extensions.ScaleSpec{
+				Replicas: ss.Spec.Replicas,
+			},
+			Status: extensions.ScaleStatus{
+				Replicas: ss.Status.Replicas,
+				Selector: ss.Spec.Selector,
+			},
+		}, nil
+	default:
+		return &autoscaling.Scale{
+			// TODO: Create a variant of ObjectMeta type that only contains the fields below.
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              ss.Name,
+				Namespace:         ss.Namespace,
+				UID:               ss.UID,
+				ResourceVersion:   ss.ResourceVersion,
+				CreationTimestamp: ss.CreationTimestamp,
+			},
+			Spec: autoscaling.ScaleSpec{
+				Replicas: ss.Spec.Replicas,
+			},
+			Status: autoscaling.ScaleStatus{
+				Replicas: ss.Status.Replicas,
+				Selector: labels.SelectorFromSet(ss.Spec.Selector.MatchLabels).String(),
+			},
+		}, nil
+	}
 }
