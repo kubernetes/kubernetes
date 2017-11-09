@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validation
+package openapi
 
 import (
 	"path/filepath"
@@ -23,23 +23,16 @@ import (
 	. "github.com/onsi/gomega"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	tst "k8s.io/apimachinery/pkg/util/openapi/testing"
 	"k8s.io/kube-openapi/pkg/util/proto/validation"
-	// This dependency is needed to register API types.
-	_ "k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 )
 
-var fakeSchema = tst.Fake{Path: filepath.Join("..", "..", "..", "..", "..", "..", "api", "openapi-spec", "swagger.json")}
+var fake = &tst.FakeResources{Getter: &tst.Fake{Path: filepath.Join("..", "..", "..", "..", "..", "..", "api", "openapi-spec", "swagger.json")}}
 
 var _ = Describe("resource validation using OpenAPI Schema", func() {
 	var validator *SchemaValidation
 	BeforeEach(func() {
-		s, err := fakeSchema.OpenAPISchema()
-		Expect(err).To(BeNil())
-		resources, err := openapi.NewOpenAPIData(s)
-		Expect(err).To(BeNil())
-		validator = NewSchemaValidation(resources)
+		validator = NewSchemaValidation(fake)
 		Expect(validator).ToNot(BeNil())
 	})
 

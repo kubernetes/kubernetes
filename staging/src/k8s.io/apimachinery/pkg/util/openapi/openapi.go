@@ -35,7 +35,7 @@ type Resources interface {
 const groupVersionKindExtensionKey = "x-kubernetes-group-version-kind"
 
 // document is an implementation of `Resources`. It looks for
-// resources in an openapi Schema.
+// resources in an openapi Schema, by binding GroupVersionKind to model names.
 type document struct {
 	// Maps gvk to model name
 	resources map[schema.GroupVersionKind]string
@@ -44,6 +44,7 @@ type document struct {
 
 var _ Resources = &document{}
 
+// NewOpenAPIData creates a new Resources from a protobuf OpenAPI document.
 func NewOpenAPIData(doc *openapi_v2.Document) (Resources, error) {
 	models, err := proto.NewOpenAPIData(doc)
 	if err != nil {
@@ -68,6 +69,7 @@ func NewOpenAPIData(doc *openapi_v2.Document) (Resources, error) {
 	}, nil
 }
 
+// LookupResource returns the resources found for the given GroupVersionKind
 func (d *document) LookupResource(gvk schema.GroupVersionKind) proto.Schema {
 	modelName, found := d.resources[gvk]
 	if !found {

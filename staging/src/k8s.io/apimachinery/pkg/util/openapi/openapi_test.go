@@ -23,22 +23,15 @@ import (
 	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	tst "k8s.io/apimachinery/pkg/util/openapi/testing"
 	"k8s.io/kube-openapi/pkg/util/proto"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 )
 
-var fakeSchema = tst.Fake{Path: filepath.Join("..", "..", "..", "..", "..", "api", "openapi-spec", "swagger.json")}
+var fake = tst.FakeResources{Getter: &tst.Fake{
+	Path: filepath.Join("..", "..", "..", "..", "..", "..", "..", "api", "openapi-spec", "swagger.json"),
+}}
 
 var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
-	var resources openapi.Resources
-	BeforeEach(func() {
-		s, err := fakeSchema.OpenAPISchema()
-		Expect(err).To(BeNil())
-		resources, err = openapi.NewOpenAPIData(s)
-		Expect(err).To(BeNil())
-	})
-
 	gvk := schema.GroupVersionKind{
 		Kind:    "Deployment",
 		Version: "v1beta1",
@@ -47,7 +40,7 @@ var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
 
 	var schema proto.Schema
 	It("should lookup the Schema by its GroupVersionKind", func() {
-		schema = resources.LookupResource(gvk)
+		schema = fake.LookupResource(gvk)
 		Expect(schema).ToNot(BeNil())
 	})
 
@@ -59,14 +52,6 @@ var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
 })
 
 var _ = Describe("Reading authorization.k8s.io/v1/SubjectAccessReview from openAPIData", func() {
-	var resources openapi.Resources
-	BeforeEach(func() {
-		s, err := fakeSchema.OpenAPISchema()
-		Expect(err).To(BeNil())
-		resources, err = openapi.NewOpenAPIData(s)
-		Expect(err).To(BeNil())
-	})
-
 	gvk := schema.GroupVersionKind{
 		Kind:    "SubjectAccessReview",
 		Version: "v1",
@@ -75,7 +60,7 @@ var _ = Describe("Reading authorization.k8s.io/v1/SubjectAccessReview from openA
 
 	var schema proto.Schema
 	It("should lookup the Schema by its GroupVersionKind", func() {
-		schema = resources.LookupResource(gvk)
+		schema = fake.LookupResource(gvk)
 		Expect(schema).ToNot(BeNil())
 	})
 

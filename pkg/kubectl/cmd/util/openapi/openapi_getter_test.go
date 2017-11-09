@@ -22,21 +22,50 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	oapi "k8s.io/apimachinery/pkg/util/openapi"
+	tst "k8s.io/apimachinery/pkg/util/openapi/testing"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
+
+	"github.com/googleapis/gnostic/OpenAPIv2"
 )
 
+// FakeClient implements a dummy OpenAPISchemaInterface that uses the
+// fake OpenAPI schema given as a parameter, and count the number of
+// call to the function.
+type FakeClient struct {
+	Calls int
+	Err   error
+
+	fake tst.Getter
+}
+
+// NewFakeClient creates a new FakeClient from the given Fake.
+func NewFakeClient(f tst.Getter) *FakeClient {
+	return &FakeClient{fake: f}
+}
+
+// OpenAPISchema returns a OpenAPI Document as returned by the fake, but
+// it also counts the number of calls.
+func (f *FakeClient) OpenAPISchema() (*openapi_v2.Document, error) {
+	f.Calls = f.Calls + 1
+
+	if f.Err != nil {
+		return nil, f.Err
+	}
+
+	return f.fake.OpenAPISchema()
+}
+
 var _ = Describe("Getting the Resources", func() {
-	var client *tst.FakeClient
-	var expectedData openapi.Resources
+	var client *FakeClient
+	var expectedData oapi.Resources
 	var instance openapi.Getter
 
 	BeforeEach(func() {
-		client = tst.NewFakeClient(&fakeSchema)
-		d, err := fakeSchema.OpenAPISchema()
-		Expect(err).To(BeNil())
+		client = NewFakeClient(tst.Empty{})
 
-		expectedData, err = openapi.NewOpenAPIData(d)
+		var err error
+		expectedData, err = oapi.NewOpenAPIData(&openapi_v2.Document{})
 		Expect(err).To(BeNil())
 
 		instance = openapi.NewOpenAPIGetter(client)

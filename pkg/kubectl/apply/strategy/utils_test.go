@@ -26,17 +26,17 @@ import (
 	"github.com/ghodss/yaml"
 
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/openapi"
+	tst "k8s.io/apimachinery/pkg/util/openapi/testing"
 	"k8s.io/kubernetes/pkg/kubectl/apply"
 	"k8s.io/kubernetes/pkg/kubectl/apply/parse"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 )
 
-var fakeResources = tst.NewFakeResources(filepath.Join("..", "..", "..", "..", "api", "openapi-spec", "swagger.json"))
+var fakeResources = tst.FakeResources{Getter: &tst.Fake{Path: filepath.Join("..", "..", "..", "..", "api", "openapi-spec", "swagger.json")}}
 
 // run parses the openapi and runs the tests
 func run(instance apply.Strategy, recorded, local, remote, expected map[string]interface{}) {
-	runWith(instance, recorded, local, remote, expected, fakeResources)
+	runWith(instance, recorded, local, remote, expected, &fakeResources)
 }
 
 func runWith(instance apply.Strategy, recorded, local, remote, expected map[string]interface{}, resources openapi.Resources) {
