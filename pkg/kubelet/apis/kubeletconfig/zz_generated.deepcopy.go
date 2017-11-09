@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	reflect "reflect"
 )
 
@@ -179,7 +179,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 	if in.RegisterWithTaints != nil {
 		in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
-		*out = make([]api.Taint, len(*in))
+		*out = make([]core.Taint, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

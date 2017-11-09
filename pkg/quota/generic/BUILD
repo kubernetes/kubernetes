@@ -14,7 +14,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/quota/generic",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/quota:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",

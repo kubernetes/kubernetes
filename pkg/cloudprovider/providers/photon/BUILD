@@ -11,7 +11,7 @@ go_library(
     srcs = ["photon.go"],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/photon",
     deps = [
-        "//pkg/api/v1/helper:go_default_library",
+        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

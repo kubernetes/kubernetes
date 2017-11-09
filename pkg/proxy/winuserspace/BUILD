@@ -18,8 +18,8 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/proxy/winuserspace",
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/helper:go_default_library",
+        "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/helper:go_default_library",
         "//pkg/proxy:go_default_library",
         "//pkg/util/ipconfig:go_default_library",
         "//pkg/util/netsh:go_default_library",
@@ -42,7 +42,7 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/proxy/winuserspace",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/proxy:go_default_library",
         "//pkg/util/netsh/testing:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

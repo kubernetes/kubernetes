@@ -11,8 +11,6 @@ go_library(
     srcs = ["testapi.go"],
     importpath = "k8s.io/kubernetes/pkg/api/testapi",
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/install:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/admission:go_default_library",
         "//pkg/apis/admission/install:go_default_library",
@@ -30,6 +28,8 @@ go_library(
         "//pkg/apis/certificates:go_default_library",
         "//pkg/apis/certificates/install:go_default_library",
         "//pkg/apis/componentconfig/install:go_default_library",
+        "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/install:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/install:go_default_library",
         "//pkg/apis/imagepolicy:go_default_library",

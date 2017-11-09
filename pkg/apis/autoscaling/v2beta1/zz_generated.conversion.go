@@ -28,7 +28,7 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	unsafe "unsafe"
 )
 
@@ -390,7 +390,7 @@ func Convert_autoscaling_PodsMetricStatus_To_v2beta1_PodsMetricStatus(in *autosc
 }
 
 func autoConvert_v2beta1_ResourceMetricSource_To_autoscaling_ResourceMetricSource(in *v2beta1.ResourceMetricSource, out *autoscaling.ResourceMetricSource, s conversion.Scope) error {
-	out.Name = api.ResourceName(in.Name)
+	out.Name = core.ResourceName(in.Name)
 	out.TargetAverageUtilization = (*int32)(unsafe.Pointer(in.TargetAverageUtilization))
 	out.TargetAverageValue = (*resource.Quantity)(unsafe.Pointer(in.TargetAverageValue))
 	return nil
@@ -414,7 +414,7 @@ func Convert_autoscaling_ResourceMetricSource_To_v2beta1_ResourceMetricSource(in
 }
 
 func autoConvert_v2beta1_ResourceMetricStatus_To_autoscaling_ResourceMetricStatus(in *v2beta1.ResourceMetricStatus, out *autoscaling.ResourceMetricStatus, s conversion.Scope) error {
-	out.Name = api.ResourceName(in.Name)
+	out.Name = core.ResourceName(in.Name)
 	out.CurrentAverageUtilization = (*int32)(unsafe.Pointer(in.CurrentAverageUtilization))
 	out.CurrentAverageValue = in.CurrentAverageValue
 	return nil

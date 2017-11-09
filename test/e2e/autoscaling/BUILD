@@ -18,7 +18,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e/autoscaling",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/instrumentation/monitoring:go_default_library",

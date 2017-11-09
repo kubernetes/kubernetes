@@ -23,7 +23,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/internalinterfaces"
 	internalversion "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
@@ -54,7 +54,7 @@ func NewPersistentVolumeInformer(client internalclientset.Interface, resyncPerio
 				return client.Core().PersistentVolumes().Watch(options)
 			},
 		},
-		&api.PersistentVolume{},
+		&core.PersistentVolume{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,7 +65,7 @@ func defaultPersistentVolumeInformer(client internalclientset.Interface, resyncP
 }
 
 func (f *persistentVolumeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&api.PersistentVolume{}, defaultPersistentVolumeInformer)
+	return f.factory.InformerFor(&core.PersistentVolume{}, defaultPersistentVolumeInformer)
 }
 
 func (f *persistentVolumeInformer) Lister() internalversion.PersistentVolumeLister {

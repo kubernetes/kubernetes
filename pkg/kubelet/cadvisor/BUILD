@@ -26,7 +26,7 @@ go_library(
     }),
     importpath = "k8s.io/kubernetes/pkg/kubelet/cadvisor",
     deps = [
-        "//pkg/api/v1/helper:go_default_library",
+        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
         "//vendor/github.com/google/cadvisor/events:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",

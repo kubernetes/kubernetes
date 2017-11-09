@@ -14,9 +14,9 @@ go_library(
         "//build/visible_to:pkg_kubectl_cmd_testing_CONSUMERS",
     ],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",

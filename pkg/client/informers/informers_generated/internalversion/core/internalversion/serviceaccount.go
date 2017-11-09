@@ -23,7 +23,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/internalinterfaces"
 	internalversion "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
@@ -54,7 +54,7 @@ func NewServiceAccountInformer(client internalclientset.Interface, namespace str
 				return client.Core().ServiceAccounts(namespace).Watch(options)
 			},
 		},
-		&api.ServiceAccount{},
+		&core.ServiceAccount{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,7 +65,7 @@ func defaultServiceAccountInformer(client internalclientset.Interface, resyncPer
 }
 
 func (f *serviceAccountInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&api.ServiceAccount{}, defaultServiceAccountInformer)
+	return f.factory.InformerFor(&core.ServiceAccount{}, defaultServiceAccountInformer)
 }
 
 func (f *serviceAccountInformer) Lister() internalversion.ServiceAccountLister {
