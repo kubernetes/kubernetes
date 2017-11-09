@@ -21,8 +21,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
@@ -32,6 +30,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/kubernetes/pkg/util/print"
 )
 
 type configState struct {
@@ -343,7 +342,7 @@ func checkNodeConfigSource(f *framework.Framework, expect *apiv1.NodeConfigSourc
 		}
 		actual := node.Spec.ConfigSource
 		if !reflect.DeepEqual(expect, actual) {
-			return fmt.Errorf(spew.Sprintf("expected %#v but got %#v", expect, actual))
+			return fmt.Errorf(print.PrettyPrintObject("expected", expect, actual))
 		}
 		return nil
 	}, timeout, interval).Should(BeNil())
@@ -399,7 +398,7 @@ func checkConfig(f *framework.Framework, expect *kubeletconfig.KubeletConfigurat
 			return err
 		}
 		if !reflect.DeepEqual(expect, actual) {
-			return fmt.Errorf(spew.Sprintf("expected %#v but got %#v", expect, actual))
+			return fmt.Errorf(print.PrettyPrintObject("expected", expect, actual))
 		}
 		return nil
 	}, timeout, interval).Should(BeNil())

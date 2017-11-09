@@ -30,6 +30,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	"k8s.io/kubernetes/pkg/util/print"
 )
 
 type LogfFn func(format string, args ...interface{})
@@ -44,7 +45,7 @@ func LogReplicaSetsOfDeployment(deployment *extensions.Deployment, allOldRSs []*
 		logf("All old ReplicaSets of Deployment %q:", deployment.Name)
 	}
 	for i := range allOldRSs {
-		logf(spew.Sprintf("%+v", *allOldRSs[i]))
+		logf(print.PrettyPrintStructObject("", *allOldRSs[i]))
 	}
 }
 

@@ -23,7 +23,7 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/api/v1/endpoints",
     library = ":go_default_library",
     deps = [
-        "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
+        "//pkg/util/print:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
