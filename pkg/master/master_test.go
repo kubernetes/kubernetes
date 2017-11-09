@@ -76,10 +76,9 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, informers.SharedI
 		GenericConfig: genericapiserver.NewConfig(legacyscheme.Codecs),
 		ExtraConfig: ExtraConfig{
 			APIResourceConfigSource: DefaultAPIResourceConfigSource(),
-			APIServerServicePort:    443,
+			KubernetesServicePort:    443,
 			MasterCount:             1,
-			EndpointReconcilerType:  reconcilers.MasterCountReconcilerType,
-		},
+		EndpointReconcilerType:  reconcilers.MasterCountReconcilerType,},
 	}
 
 	resourceEncoding := serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Registry)

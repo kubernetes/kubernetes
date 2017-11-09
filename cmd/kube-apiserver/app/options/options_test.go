@@ -48,6 +48,7 @@ func TestAddFlags(t *testing.T) {
 		"--allow-privileged=false",
 		"--anonymous-auth=false",
 		"--apiserver-count=5",
+		"--apiserver-service-port=443",
 		"--audit-log-maxage=11",
 		"--audit-log-maxbackup=12",
 		"--audit-log-maxsize=13",
@@ -91,10 +92,9 @@ func TestAddFlags(t *testing.T) {
 
 	// This is a snapshot of expected options parsed by args.
 	expected := &ServerRunOptions{
-		ServiceNodePortRange:   kubeoptions.DefaultServiceNodePortRange,
-		MasterCount:            5,
-		EndpointReconcilerType: string(reconcilers.MasterCountReconcilerType),
-		AllowPrivileged:        false,
+		ServiceNodePortRange: kubeoptions.DefaultServiceNodePortRange,
+		MasterCount:          5,EndpointReconcilerType: string(reconcilers.MasterCountReconcilerType),
+		AllowPrivileged:      false,KubernetesServicePort: 443,
 		GenericServerRunOptions: &apiserveroptions.ServerRunOptions{
 			AdvertiseAddress:            net.ParseIP("192.168.10.10"),
 			CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},

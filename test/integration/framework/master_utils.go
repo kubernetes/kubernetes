@@ -359,15 +359,13 @@ func NewMasterConfig() *master.Config {
 	}
 
 	return &master.Config{
-		GenericConfig: genericConfig,
-		ExtraConfig: master.ExtraConfig{
-			APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
-			StorageFactory:          storageFactory,
-			EnableCoreControllers:   true,
-			KubeletClientConfig:     kubeletclient.KubeletClientConfig{Port: 10250},
-			APIServerServicePort:    443,
-			MasterCount:             1,
-		},
+		GenericConfig:           genericConfig,
+		ExtraConfig: master.ExtraConfig{APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
+		StorageFactory:          storageFactory,
+		EnableCoreControllers:   true,
+		KubeletClientConfig:     kubeletclient.KubeletClientConfig{Port: 10250},
+		KubernetesServicePort:    443,
+		MasterCount:             1,},
 	}
 }
 

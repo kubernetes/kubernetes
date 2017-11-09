@@ -287,7 +287,7 @@ func CreateKubeAPIServerConfig(s *options.ServerRunOptions, nodeTunneler tunnele
 		PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,
 	})
 
-	serviceIPRange, apiServerServiceIP, err := master.DefaultServiceIPRange(s.ServiceClusterIPRange)
+	serviceIPRange, kubernetesServiceIP, err := master.DefaultServiceIPRange(s.ServiceClusterIPRange)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
@@ -329,12 +329,11 @@ func CreateKubeAPIServerConfig(s *options.ServerRunOptions, nodeTunneler tunnele
 
 			Tunneler: nodeTunneler,
 
-			ServiceIPRange:       serviceIPRange,
-			APIServerServiceIP:   apiServerServiceIP,
-			APIServerServicePort: 443,
-
+			ServiceIPRange:            serviceIPRange,
 			ServiceNodePortRange:      s.ServiceNodePortRange,
-			KubernetesServiceNodePort: s.KubernetesServiceNodePort,
+			KubernetesServiceIP:       kubernetesServiceIP,
+			KubernetesServicePort:     s.KubernetesServicePort,
+			KubernetesServiceNodePort: s.KubernetesServiceNodePort, KubernetesServiceExternalName: s.KubernetesServiceExternalName,
 
 			EndpointReconcilerType: reconcilers.Type(s.EndpointReconcilerType),
 			MasterCount:            s.MasterCount,

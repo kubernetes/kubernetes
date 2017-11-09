@@ -115,9 +115,9 @@ type ExtraConfig struct {
 	// The range of IPs to be assigned to services with type=ClusterIP or greater
 	ServiceIPRange net.IPNet
 	// The IP address for the GenericAPIServer service (must be inside ServiceIPRange)
-	APIServerServiceIP net.IP
+	KubernetesServiceIP net.IP
 	// Port for the apiserver service.
-	APIServerServicePort int
+	KubernetesServicePort int
 
 	// TODO, we can probably group service related items into a substruct to make it easier to configure
 	// the API server items and `Extra*` fields likely fit nicely together.
@@ -137,6 +137,8 @@ type ExtraConfig struct {
 	ExtraEndpointPorts []api.EndpointPort
 	// If non-zero, the "kubernetes" services uses this port as NodePort.
 	KubernetesServiceNodePort int
+	// If non-empty, the "kubernetes" services uses this name as externalName.
+	KubernetesServiceExternalName string
 
 	// Number of masters running; all masters must be started with the
 	// same value for this field. (Numbers > 1 currently untested.)
@@ -249,13 +251,13 @@ func (cfg *Config) Complete(informers informers.SharedInformerFactory) Completed
 	if c.ExtraConfig.ServiceIPRange.IP == nil {
 		c.ExtraConfig.ServiceIPRange = serviceIPRange
 	}
-	if c.ExtraConfig.APIServerServiceIP == nil {
-		c.ExtraConfig.APIServerServiceIP = apiServerServiceIP
+	if c.ExtraConfig.KubernetesServiceIP == nil {
+		c.ExtraConfig.KubernetesServiceIP = apiServerServiceIP
 	}
 
 	discoveryAddresses := discovery.DefaultAddresses{DefaultAddress: c.GenericConfig.ExternalAddress}
 	discoveryAddresses.CIDRRules = append(discoveryAddresses.CIDRRules,
-		discovery.CIDRRule{IPRange: c.ExtraConfig.ServiceIPRange, Address: net.JoinHostPort(c.ExtraConfig.APIServerServiceIP.String(), strconv.Itoa(c.ExtraConfig.APIServerServicePort))})
+		discovery.CIDRRule{IPRange: c.ExtraConfig.ServiceIPRange, Address: net.JoinHostPort(c.ExtraConfig.KubernetesServiceIP.String(), strconv.Itoa(c.ExtraConfig.KubernetesServicePort))})
 	c.GenericConfig.DiscoveryAddresses = discoveryAddresses
 
 	if c.ExtraConfig.ServiceNodePortRange.Size == 0 {

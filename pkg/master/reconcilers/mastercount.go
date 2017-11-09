@@ -214,7 +214,7 @@ func checkEndpointSubsetFormat(e *api.Endpoints, ip string, ports []api.Endpoint
 // * All apiservers MUST use GetMasterServiceUpdateIfNeeded and only
 //     GetMasterServiceUpdateIfNeeded to manage service attributes
 // * updateMasterService is called periodically from all apiservers.
-func GetMasterServiceUpdateIfNeeded(svc *api.Service, servicePorts []api.ServicePort, serviceType api.ServiceType) (s *api.Service, updated bool) {
+func GetMasterServiceUpdateIfNeeded(svc *api.Service, servicePorts []api.ServicePort, externalName string, serviceType api.ServiceType) (s *api.Service, updated bool) {
 	// Determine if the service is in the format we expect
 	// (servicePorts are present and service type matches)
 	formatCorrect := checkServiceFormat(svc, servicePorts, serviceType)
@@ -223,6 +223,7 @@ func GetMasterServiceUpdateIfNeeded(svc *api.Service, servicePorts []api.Service
 	}
 	svc.Spec.Ports = servicePorts
 	svc.Spec.Type = serviceType
+	svc.Spec.ExternalName = externalName
 	return svc, true
 }
 
