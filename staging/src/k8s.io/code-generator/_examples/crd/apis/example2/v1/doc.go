@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package,register
+// +k8s:deepcopy-gen=package
 // +groupName=example.test2.crd.code-generator.k8s.io
 // +groupGoName=SecondExample
 package v1
