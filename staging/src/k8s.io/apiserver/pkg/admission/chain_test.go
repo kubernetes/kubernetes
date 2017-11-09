@@ -17,46 +17,15 @@ limitations under the License.
 package admission
 
 import (
-	"fmt"
+	"strconv"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-type FakeHandler struct {
-	*Handler
-	name                     string
-	admit, admitCalled       bool
-	validate, validateCalled bool
-}
-
-func (h *FakeHandler) Admit(a Attributes) (err error) {
-	h.admitCalled = true
-	if h.admit {
-		return nil
-	}
-	return fmt.Errorf("Don't admit")
-}
-
-func (h *FakeHandler) Validate(a Attributes) (err error) {
-	h.validateCalled = true
-	if h.validate {
-		return nil
-	}
-	return fmt.Errorf("Don't validate")
-}
-
-func makeHandler(name string, accept bool, ops ...Operation) Interface {
-	return &FakeHandler{
-		name:     name,
-		admit:    accept,
-		validate: accept,
-		Handler:  NewHandler(ops...),
-	}
-}
-
 func TestAdmitAndValidate(t *testing.T) {
-	sysns := "kube-system"
+	sysns := metav1.NamespaceSystem
 	otherns := "default"
 	tests := []struct {
 		name      string
@@ -64,7 +33,6 @@ func TestAdmitAndValidate(t *testing.T) {
 		operation Operation
 		chain     chainAdmissionHandler
 		accept    bool
-		reject    bool
 		calls     map[string]bool
 	}{
 		{
@@ -72,9 +40,9 @@ func TestAdmitAndValidate(t *testing.T) {
 			ns:        sysns,
 			operation: Create,
 			chain: []NamedHandler{
-				makeHandler("a", true, Update, Delete, Create),
-				makeHandler("b", true, Delete, Create),
-				makeHandler("c", true, Create),
+				makeNamedHandler("a", true, Update, Delete, Create),
+				makeNamedHandler("b", true, Delete, Create),
+				makeNamedHandler("c", true, Create),
 			},
 			calls:  map[string]bool{"a": true, "b": true, "c": true},
 			accept: true,
@@ -84,9 +52,9 @@ func TestAdmitAndValidate(t *testing.T) {
 			ns:        otherns,
 			operation: Create,
 			chain: []NamedHandler{
-				makeHandler("a", true, Update, Delete, Create),
-				makeHandler("b", false, Delete),
-				makeHandler("c", true, Create),
+				makeNamedHandler("a", true, Update, Delete, Create),
+				makeNamedHandler("b", false, Delete),
+				makeNamedHandler("c", true, Create),
 			},
 			calls:  map[string]bool{"a": true, "c": true},
 			accept: true,
@@ -96,9 +64,9 @@ func TestAdmitAndValidate(t *testing.T) {
 			ns:        sysns,
 			operation: Connect,
 			chain: []NamedHandler{
-				makeHandler("a", true, Update, Delete, Create),
-				makeHandler("b", false, Delete),
-				makeHandler("c", true, Create),
+				makeNamedHandler("a", true, Update, Delete, Create),
+				makeNamedHandler("b", false, Delete),
+				makeNamedHandler("c", true, Create),
 			},
 			calls:  map[string]bool{},
 			accept: true,
@@ -108,77 +76,112 @@ func TestAdmitAndValidate(t *testing.T) {
 			ns:        otherns,
 			operation: Delete,
 			chain: []NamedHandler{
-				makeHandler("a", true, Update, Delete, Create),
-				makeHandler("b", false, Delete),
-				makeHandler("c", true, Create),
+				makeNamedHandler("a", true, Update, Delete, Create),
+				makeNamedHandler("b", false, Delete),
+				makeNamedHandler("c", true, Create),
 			},
 			calls:  map[string]bool{"a": true, "b": true},
 			accept: false,
-			reject: true,
 		},
 	}
 	for _, test := range tests {
 		Metrics.reset()
 		t.Logf("testcase = %s", test.name)
 		// call admit and check that validate was not called at all
-		err = test.chain.Admit(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", test.operation, nil))
+		err := test.chain.Admit(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, nil))
 		accepted := (err == nil)
 		if accepted != test.accept {
 			t.Errorf("unexpected result of admit call: %v", accepted)
 		}
 		for _, h := range test.chain {
-			fake := h.(*FakeHandler)
-			_, shouldBeCalled := test.calls[fake.name]
+			fake := h.Interface().(*FakeHandler)
+			_, shouldBeCalled := test.calls[h.Name()]
 			if shouldBeCalled != fake.admitCalled {
-				t.Errorf("%s: admit handler %s not called as expected: %v", test.name, fake.name, fake.admitCalled)
+				t.Errorf("admit handler %s not called as expected: %v", h.Name(), fake.admitCalled)
 				continue
 			}
 			if fake.validateCalled {
-				t.Errorf("%s: validate handler %s called during admit", test.name, fake.name)
+				t.Errorf("validate handler %s called during admit", h.Name())
 			}
 
-			// reset value for validation test
+			//  reset value for validation test
 			fake.admitCalled = false
 		}
 
+		labelFilter := map[string]string{
+			"is_system_ns": strconv.FormatBool(test.ns == sysns),
+			"type":         "mutating",
+		}
+
+		checkAdmitAndValidateMetrics(t, labelFilter, test.accept, test.calls)
+		Metrics.reset()
 		// call validate and check that admit was not called at all
-		err = test.chain.Validate(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", test.operation, nil))
+		err = test.chain.Validate(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, nil))
 		accepted = (err == nil)
 		if accepted != test.accept {
-			t.Errorf("%s: unexpected result of validate call: %v\n", test.name, accepted)
+			t.Errorf("unexpected result of validate call: %v\n", accepted)
 		}
 		for _, h := range test.chain {
-			fake := h.(*FakeHandler)
-			_, shouldBeCalled := test.calls[fake.name]
+			fake := h.Interface().(*FakeHandler)
+
+			_, shouldBeCalled := test.calls[h.Name()]
 			if shouldBeCalled != fake.validateCalled {
-				t.Errorf("%s: validate handler %s not called as expected: %v", test.name, fake.name, fake.validateCalled)
+				t.Errorf("validate handler %s not called as expected: %v", h.Name(), fake.validateCalled)
 				continue
 			}
 
 			if fake.admitCalled {
-				t.Errorf("%s: admit handler %s called during admit", test.name, fake.name)
+				t.Errorf("mutating handler unexpectedly called: %s", h.Name())
 			}
 		}
 
-		labels := metricLabels{
-			isSystemNs: test.ns == sysns,
-		}
-		if test.reject {
-			expectCountMetric(t, "apiserver_admission_step_rejected_total", labels, 1)
+		labelFilter = map[string]string{
+			"is_system_ns": strconv.FormatBool(test.ns == sysns),
+			"type":         "validating",
 		}
 
-		if test.accept {
-			expectCountMetric(t, "apiserver_admission_step_total", labels, 1)
-		}
+		checkAdmitAndValidateMetrics(t, labelFilter, test.accept, test.calls)
+	}
+}
 
+func checkAdmitAndValidateMetrics(t *testing.T, labelFilter map[string]string, accept bool, calls map[string]bool) {
+	acceptFilter := map[string]string{"rejected": "false"}
+	for k, v := range labelFilter {
+		acceptFilter[k] = v
+	}
+
+	rejectFilter := map[string]string{"rejected": "true"}
+	for k, v := range labelFilter {
+		rejectFilter[k] = v
+	}
+
+	if accept {
+		// Ensure exactly one admission end-to-end admission accept should have been recorded.
+		expectHistogramCountTotal(t, "apiserver_admission_step_latencies", acceptFilter, 1)
+
+		// Ensure the expected count of admission controllers have been executed.
+		expectHistogramCountTotal(t, "apiserver_admission_controller_latencies", acceptFilter, len(calls))
+	} else {
+		// When not accepted, ensure exactly one end-to-end rejection has been recorded.
+		expectHistogramCountTotal(t, "apiserver_admission_step_latencies", rejectFilter, 1)
+		if len(calls) > 0 {
+			if len(calls) > 1 {
+				// When not accepted, ensure that all but the last controller had been accepted, since
+				// the chain stops execution at the first rejection.
+				expectHistogramCountTotal(t, "apiserver_admission_controller_latencies", acceptFilter, len(calls)-1)
+			}
+
+			// When not accepted, ensure exactly one controller has been rejected.
+			expectHistogramCountTotal(t, "apiserver_admission_controller_latencies", rejectFilter, 1)
+		}
 	}
 }
 
 func TestHandles(t *testing.T) {
 	chain := chainAdmissionHandler{
-		makeHandler("a", true, Update, Delete, Create),
-		makeHandler("b", true, Delete, Create),
-		makeHandler("c", true, Create),
+		makeNamedHandler("a", true, Update, Delete, Create),
+		makeNamedHandler("b", true, Delete, Create),
+		makeNamedHandler("c", true, Create),
 	}
 
 	tests := []struct {

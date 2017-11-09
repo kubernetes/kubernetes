@@ -41,11 +41,15 @@ type Plugins struct {
 
 // pluginHandler associates name with a admission.Interface handler.
 type pluginHandler struct {
-	Interface
+	i    Interface
 	name string
 }
 
-func (h *pluginHandler) GetName() string {
+func (h *pluginHandler) Interface() Interface {
+	return h.i
+}
+
+func (h *pluginHandler) Name() string {
 	return h.name
 }
 
@@ -143,7 +147,7 @@ func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigPro
 			return nil, err
 		}
 		if plugin != nil {
-			handler := &pluginHandler{Interface: plugin, name: pluginName}
+			handler := &pluginHandler{i: plugin, name: pluginName}
 			handlers = append(handlers, handler)
 		}
 	}

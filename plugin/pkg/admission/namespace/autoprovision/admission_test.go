@@ -129,7 +129,6 @@ func TestAdmissionNamespaceExists(t *testing.T) {
 
 // TestIgnoreAdmission validates that a request is ignored if its not a create
 func TestIgnoreAdmission(t *testing.T) {
-	namespace := "test"
 	mockClient := newMockClientForTest([]string{})
 	handler, informerFactory, err := newHandlerForTest(mockClient)
 	if err != nil {
