@@ -147,12 +147,7 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		IncludeUninitialized(includeUninitialized).
 		Flatten()
 
-	if !o.Local {
-		builder = builder.
-			LabelSelectorParam(o.Selector).
-			ResourceTypeOrNameArgs(o.All, o.Resources...).
-			Latest()
-	} else {
+	if o.Local {
 		// if a --local flag was provided, and a resource was specified in the form
 		// <resource>/<name>, fail immediately as --local cannot query the api server
 		// for the specified resource.
@@ -161,6 +156,11 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		}
 
 		builder = builder.Local(f.ClientForMapping)
+	} else {
+		builder = builder.
+			LabelSelectorParam(o.Selector).
+			ResourceTypeOrNameArgs(o.All, o.Resources...).
+			Latest()
 	}
 
 	o.Infos, err = builder.Do().Infos()
