@@ -26,7 +26,7 @@ import (
 // sets.String is a set of strings, implemented via map[string]struct{} for minimal memory consumption.
 type String map[string]Empty
 
-// New creates a String from a list of values.
+// NewString creates a String from a list of values.
 func NewString(items ...string) String {
 	ss := String{}
 	ss.Insert(items...)

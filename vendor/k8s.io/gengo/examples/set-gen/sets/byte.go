@@ -26,7 +26,7 @@ import (
 // sets.Byte is a set of bytes, implemented via map[byte]struct{} for minimal memory consumption.
 type Byte map[byte]Empty
 
-// New creates a Byte from a list of values.
+// NewByte creates a Byte from a list of values.
 func NewByte(items ...byte) Byte {
 	ss := Byte{}
 	ss.Insert(items...)
