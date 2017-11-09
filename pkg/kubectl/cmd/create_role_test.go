@@ -284,6 +284,23 @@ func TestValidate(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		"test-resource-name-with-invalid-verb": {
+			roleOptions: &CreateRoleOptions{
+				Name:  "my-role",
+				Verbs: []string{"list", "create"},
+				Resources: []ResourceOptions{
+					{
+						Resource: "pods",
+					},
+					{
+						Resource: "deployments",
+						Group:    "extensions",
+					},
+				},
+				ResourceNames: []string{"foo"},
+			},
+			expectErr: true,
+		},
 		"test-resource-name-with-multiple-resources": {
 			roleOptions: &CreateRoleOptions{
 				Name:  "my-role",
@@ -304,7 +321,7 @@ func TestValidate(t *testing.T) {
 		"test-valid-case": {
 			roleOptions: &CreateRoleOptions{
 				Name:  "role-binder",
-				Verbs: []string{"get", "list", "bind"},
+				Verbs: []string{"get", "bind"},
 				Resources: []ResourceOptions{
 					{
 						Resource: "roles",
@@ -318,7 +335,7 @@ func TestValidate(t *testing.T) {
 		"test-valid-case-with-subresource": {
 			roleOptions: &CreateRoleOptions{
 				Name:  "my-role",
-				Verbs: []string{"get", "list"},
+				Verbs: []string{"get"},
 				Resources: []ResourceOptions{
 					{
 						Resource:    "replicasets",
