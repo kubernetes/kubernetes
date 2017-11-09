@@ -8,10 +8,7 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "rbac.go",
-        "subject_locator.go",
-    ],
+    srcs = ["rbac.go"],
     importpath = "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac",
     deps = [
         "//pkg/apis/rbac:go_default_library",
@@ -27,10 +24,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "rbac_test.go",
-        "subject_locator_test.go",
-    ],
+    srcs = ["rbac_test.go"],
     importpath = "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac",
     library = ":go_default_library",
     deps = [
