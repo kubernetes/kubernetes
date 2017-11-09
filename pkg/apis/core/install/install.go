@@ -19,13 +19,15 @@ limitations under the License.
 package install
 
 import (
+	externalinstall "k8s.io/api/core/install"
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/v1"
+	internal "k8s.io/kubernetes/pkg/apis/core"
+
+	// ensure conversions and defaulting are imported
+	_ "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 func init() {
@@ -34,34 +36,5 @@ func init() {
 
 // Install registers the API group and adds types to a scheme
 func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
-	if err := announced.NewGroupMetaFactory(
-		&announced.GroupMetaFactoryArgs{
-			GroupName:                  core.GroupName,
-			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version},
-			AddInternalObjectsToScheme: core.AddToScheme,
-			RootScopedKinds: sets.NewString(
-				"Node",
-				"Namespace",
-				"PersistentVolume",
-				"ComponentStatus",
-			),
-			IgnoredKinds: sets.NewString(
-				"ListOptions",
-				"DeleteOptions",
-				"Status",
-				"PodLogOptions",
-				"PodExecOptions",
-				"PodAttachOptions",
-				"PodPortForwardOptions",
-				"PodProxyOptions",
-				"NodeProxyOptions",
-				"ServiceProxyOptions",
-			),
-		},
-		announced.VersionToSchemeFunc{
-			v1.SchemeGroupVersion.Version: v1.AddToScheme,
-		},
-	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
-		panic(err)
-	}
+	externalinstall.InstallWithInternal(groupFactoryRegistry, registry, scheme, internal.AddToScheme)
 }

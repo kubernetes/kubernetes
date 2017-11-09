@@ -14,27 +14,33 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package install installs the experimental API group, making it available as
-// an option to all of the API encoding/decoding machinery.
 package install
 
 import (
-	externalinstall "k8s.io/api/admission/install"
+	"k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	internal "k8s.io/kubernetes/pkg/apis/admission"
-
-	// ensure conversions and defaulting are imported
-	_ "k8s.io/kubernetes/pkg/apis/admission/v1alpha1"
 )
 
-func init() {
-	Install(legacyscheme.GroupFactoryRegistry, legacyscheme.Registry, legacyscheme.Scheme)
+// InstallWithInternal registers the API group with attached internal types and adds both kinds of types to a scheme.
+// This is only used internally by Kubernetes and not needed for the use of the versioned types alone.
+func InstallWithInternal(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme, addInternal announced.SchemeFunc) {
+	if err := announced.NewGroupMetaFactory(
+		&announced.GroupMetaFactoryArgs{
+			GroupName:                  v1.GroupName,
+			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version},
+			AddInternalObjectsToScheme: addInternal,
+		},
+		announced.VersionToSchemeFunc{
+			v1.SchemeGroupVersion.Version: v1.AddToScheme,
+		},
+	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
+		panic(err)
+	}
 }
 
 // Install registers the API group and adds types to a scheme
 func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
-	externalinstall.InstallWithInternal(groupFactoryRegistry, registry, scheme, internal.AddToScheme)
+	InstallWithInternal(groupFactoryRegistry, registry, scheme, nil)
 }

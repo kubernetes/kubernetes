@@ -17,13 +17,15 @@ limitations under the License.
 package install
 
 import (
+	externalinstall "k8s.io/api/admissionregistration/install"
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"
+	internal "k8s.io/kubernetes/pkg/apis/admissionregistration"
+
+	// ensure conversions and defaulting are imported
+	_ "k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"
 )
 
 func init() {
@@ -32,17 +34,5 @@ func init() {
 
 // Install registers the API group and adds types to a scheme
 func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
-	if err := announced.NewGroupMetaFactory(
-		&announced.GroupMetaFactoryArgs{
-			GroupName:                  admissionregistration.GroupName,
-			RootScopedKinds:            sets.NewString("InitializerConfiguration", "ValidatingWebhookConfiguration", "MutatingWebhookConfiguration"),
-			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
-			AddInternalObjectsToScheme: admissionregistration.AddToScheme,
-		},
-		announced.VersionToSchemeFunc{
-			v1alpha1.SchemeGroupVersion.Version: v1alpha1.AddToScheme,
-		},
-	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
-		panic(err)
-	}
+	externalinstall.InstallWithInternal(groupFactoryRegistry, registry, scheme, internal.AddToScheme)
 }

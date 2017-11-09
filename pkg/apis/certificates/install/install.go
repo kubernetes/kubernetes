@@ -19,13 +19,15 @@ limitations under the License.
 package install
 
 import (
+	externalinstall "k8s.io/api/certificates/install"
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/certificates"
-	"k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	internal "k8s.io/kubernetes/pkg/apis/certificates"
+
+	// ensure conversions and defaulting are imported
+	_ "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 )
 
 func init() {
@@ -34,17 +36,5 @@ func init() {
 
 // Install registers the API group and adds types to a scheme
 func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
-	if err := announced.NewGroupMetaFactory(
-		&announced.GroupMetaFactoryArgs{
-			GroupName:                  certificates.GroupName,
-			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version},
-			RootScopedKinds:            sets.NewString("CertificateSigningRequest"),
-			AddInternalObjectsToScheme: certificates.AddToScheme,
-		},
-		announced.VersionToSchemeFunc{
-			v1beta1.SchemeGroupVersion.Version: v1beta1.AddToScheme,
-		},
-	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
-		panic(err)
-	}
+	externalinstall.InstallWithInternal(groupFactoryRegistry, registry, scheme, internal.AddToScheme)
 }
