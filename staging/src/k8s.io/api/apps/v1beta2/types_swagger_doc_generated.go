@@ -59,6 +59,19 @@ func (DaemonSet) SwaggerDoc() map[string]string {
 	return map_DaemonSet
 }
 
+var map_DaemonSetCondition = map[string]string{
+	"":                   "DaemonSetCondition describes the state of a DaemonSet at a certain point.",
+	"type":               "Type of DaemonSet condition.",
+	"status":             "Status of the condition, one of True, False, Unknown.",
+	"lastTransitionTime": "Last time the condition transitioned from one status to another.",
+	"reason":             "The reason for the condition's last transition.",
+	"message":            "A human readable message indicating details about the transition.",
+}
+
+func (DaemonSetCondition) SwaggerDoc() map[string]string {
+	return map_DaemonSetCondition
+}
+
 var map_DaemonSetList = map[string]string{
 	"":         "DaemonSetList is a collection of daemon sets.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
@@ -93,6 +106,7 @@ var map_DaemonSetStatus = map[string]string{
 	"numberAvailable":        "The number of nodes that should be running the daemon pod and have one or more of the daemon pod running and available (ready for at least spec.minReadySeconds)",
 	"numberUnavailable":      "The number of nodes that should be running the daemon pod and have none of the daemon pod running and available (ready for at least spec.minReadySeconds)",
 	"collisionCount":         "Count of hash collisions for the DaemonSet. The DaemonSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
+	"conditions":             "Represents the latest available observations of a DaemonSet's current state.",
 }
 
 func (DaemonSetStatus) SwaggerDoc() map[string]string {
