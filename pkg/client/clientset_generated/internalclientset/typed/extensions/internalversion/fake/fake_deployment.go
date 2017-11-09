@@ -23,6 +23,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
+	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -138,23 +139,23 @@ func (c *FakeDeployments) Patch(name string, pt types.PatchType, data []byte, su
 }
 
 // GetScale takes name of the deployment, and returns the corresponding scale object, and an error if there is any.
-func (c *FakeDeployments) GetScale(deploymentName string, options v1.GetOptions) (result *extensions.Scale, err error) {
+func (c *FakeDeployments) GetScale(deploymentName string, options v1.GetOptions) (result *autoscaling.Scale, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetSubresourceAction(deploymentsResource, c.ns, "scale", deploymentName), &extensions.Scale{})
+		Invokes(testing.NewGetSubresourceAction(deploymentsResource, c.ns, "scale", deploymentName), &autoscaling.Scale{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.Scale), err
+	return obj.(*autoscaling.Scale), err
 }
 
 // UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *FakeDeployments) UpdateScale(deploymentName string, scale *extensions.Scale) (result *extensions.Scale, err error) {
+func (c *FakeDeployments) UpdateScale(deploymentName string, scale *autoscaling.Scale) (result *autoscaling.Scale, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(deploymentsResource, "scale", c.ns, scale), &extensions.Scale{})
+		Invokes(testing.NewUpdateSubresourceAction(deploymentsResource, "scale", c.ns, scale), &autoscaling.Scale{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.Scale), err
+	return obj.(*autoscaling.Scale), err
 }
