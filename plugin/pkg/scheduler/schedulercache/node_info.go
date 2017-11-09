@@ -255,6 +255,11 @@ func (n *NodeInfo) AllocatableResource() Resource {
 	return *n.allocatableResource
 }
 
+// SetAllocatableResource sets the allocatableResource information of given node.
+func (n *NodeInfo) SetAllocatableResource(allocatableResource *Resource) {
+	n.allocatableResource = allocatableResource
+}
+
 func (n *NodeInfo) Clone() *NodeInfo {
 	clone := &NodeInfo{
 		node:                    n.node,
@@ -403,7 +408,11 @@ func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, used bool) {
 			// "0" is explicitly ignored in PodFitsHostPorts,
 			// which is the only function that uses this value.
 			if podPort.HostPort != 0 {
-				n.usedPorts[int(podPort.HostPort)] = used
+				if used {
+					n.usedPorts[int(podPort.HostPort)] = used
+				} else {
+					delete(n.usedPorts, int(podPort.HostPort))
+				}
 			}
 		}
 	}

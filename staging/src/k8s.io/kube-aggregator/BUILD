@@ -15,6 +15,7 @@ go_binary(
         "-extldflags",
         "-static",
     ],
+    importpath = "k8s.io/kube-aggregator",
     library = ":go_default_library",
     x_defs = version_x_defs(),
 )
@@ -22,6 +23,7 @@ go_binary(
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
+    importpath = "k8s.io/kube-aggregator",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",

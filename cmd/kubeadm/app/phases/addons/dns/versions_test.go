@@ -19,6 +19,7 @@ package dns
 import (
 	"testing"
 
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -28,27 +29,31 @@ func TestGetKubeDNSVersion(t *testing.T) {
 	}{
 		{
 			k8sVersion: "v1.7.0",
-			expected:   "1.14.4",
+			expected:   "1.14.5",
 		},
 		{
 			k8sVersion: "v1.7.1",
-			expected:   "1.14.4",
+			expected:   "1.14.5",
 		},
 		{
 			k8sVersion: "v1.7.2",
-			expected:   "1.14.4",
+			expected:   "1.14.5",
 		},
 		{
 			k8sVersion: "v1.7.3",
-			expected:   "1.14.4",
+			expected:   "1.14.5",
 		},
 		{
 			k8sVersion: "v1.8.0-alpha.2",
-			expected:   "1.14.4",
+			expected:   "1.14.5",
 		},
 		{
 			k8sVersion: "v1.8.0",
-			expected:   "1.14.4",
+			expected:   "1.14.5",
+		},
+		{
+			k8sVersion: "v1.9.0",
+			expected:   "1.14.7",
 		},
 	}
 	for _, rt := range tests {
@@ -58,12 +63,63 @@ func TestGetKubeDNSVersion(t *testing.T) {
 			t.Fatalf("couldn't parse kubernetes version %q: %v", rt.k8sVersion, err)
 		}
 
-		actualDNSVersion := GetKubeDNSVersion(k8sVersion)
+		actualDNSVersion := GetDNSVersion(k8sVersion, kubeadmconstants.KubeDNS)
 		if actualDNSVersion != rt.expected {
 			t.Errorf(
-				"failed GetKubeDNSVersion:\n\texpected: %s\n\t  actual: %s",
+				"failed GetDNSVersion:\n\texpected: %s\n\t  actual: %s",
 				rt.expected,
 				actualDNSVersion,
+			)
+		}
+	}
+}
+
+func TestGetKubeDNSProbeType(t *testing.T) {
+	var tests = []struct {
+		k8sVersion, expected string
+	}{
+		{
+			k8sVersion: "v1.7.0",
+			expected:   "A",
+		},
+		{
+			k8sVersion: "v1.7.1",
+			expected:   "A",
+		},
+		{
+			k8sVersion: "v1.7.2",
+			expected:   "A",
+		},
+		{
+			k8sVersion: "v1.7.3",
+			expected:   "A",
+		},
+		{
+			k8sVersion: "v1.8.0-alpha.2",
+			expected:   "A",
+		},
+		{
+			k8sVersion: "v1.8.0",
+			expected:   "A",
+		},
+		{
+			k8sVersion: "v1.9.0",
+			expected:   "SRV",
+		},
+	}
+	for _, rt := range tests {
+
+		k8sVersion, err := version.ParseSemantic(rt.k8sVersion)
+		if err != nil {
+			t.Fatalf("couldn't parse kubernetes version %q: %v", rt.k8sVersion, err)
+		}
+
+		actualDNSProbeType := GetKubeDNSProbeType(k8sVersion)
+		if actualDNSProbeType != rt.expected {
+			t.Errorf(
+				"failed GetKubeDNSProbeType:\n\texpected: %s\n\t  actual: %s",
+				rt.expected,
+				actualDNSProbeType,
 			)
 		}
 	}

@@ -45,15 +45,14 @@ func parseTaint(st string) (v1.Taint, error) {
 
 	parts2 := strings.Split(parts[1], ":")
 
-	effect := v1.TaintEffect(parts2[1])
-
 	errs := validation.IsValidLabelValue(parts2[0])
 	if len(parts2) != 2 || len(errs) != 0 {
 		return taint, fmt.Errorf("invalid taint spec: %v, %s", st, strings.Join(errs, "; "))
 	}
 
-	if effect != v1.TaintEffectNoSchedule && effect != v1.TaintEffectPreferNoSchedule && effect != v1.TaintEffectNoExecute {
-		return taint, fmt.Errorf("invalid taint spec: %v, unsupported taint effect", st)
+	effect := v1.TaintEffect(parts2[1])
+	if err := validateTaintEffect(effect); err != nil {
+		return taint, err
 	}
 
 	taint.Key = parts[0]
@@ -61,6 +60,14 @@ func parseTaint(st string) (v1.Taint, error) {
 	taint.Effect = effect
 
 	return taint, nil
+}
+
+func validateTaintEffect(effect v1.TaintEffect) error {
+	if effect != v1.TaintEffectNoSchedule && effect != v1.TaintEffectPreferNoSchedule && effect != v1.TaintEffectNoExecute {
+		return fmt.Errorf("invalid taint effect: %v, unsupported taint effect", effect)
+	}
+
+	return nil
 }
 
 // NewTaintsVar wraps []api.Taint in a struct that implements flag.Value to allow taints to be
@@ -137,6 +144,14 @@ func ParseTaints(spec []string) ([]v1.Taint, []v1.Taint, error) {
 				parts := strings.Split(taintKey, ":")
 				taintKey = parts[0]
 				effect = v1.TaintEffect(parts[1])
+			}
+
+			// If effect is specified, need to validate it.
+			if len(effect) > 0 {
+				err := validateTaintEffect(effect)
+				if err != nil {
+					return nil, nil, err
+				}
 			}
 			taintsToRemove = append(taintsToRemove, v1.Taint{Key: taintKey, Effect: effect})
 		} else {
@@ -242,11 +257,7 @@ func DeleteTaint(taints []v1.Taint, taintToDelete *v1.Taint) ([]v1.Taint, bool) 
 // RemoveTaint tries to remove a taint from annotations list. Returns a new copy of updated Node and true if something was updated
 // false otherwise.
 func RemoveTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
-	objCopy, err := api.Scheme.DeepCopy(node)
-	if err != nil {
-		return nil, false, err
-	}
-	newNode := objCopy.(*v1.Node)
+	newNode := node.DeepCopy()
 	nodeTaints := newNode.Spec.Taints
 	if len(nodeTaints) == 0 {
 		return newNode, false, nil
@@ -264,11 +275,7 @@ func RemoveTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
 // AddOrUpdateTaint tries to add a taint to annotations list. Returns a new copy of updated Node and true if something was updated
 // false otherwise.
 func AddOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
-	objCopy, err := api.Scheme.DeepCopy(node)
-	if err != nil {
-		return nil, false, err
-	}
-	newNode := objCopy.(*v1.Node)
+	newNode := node.DeepCopy()
 	nodeTaints := newNode.Spec.Taints
 
 	var newTaints []v1.Taint

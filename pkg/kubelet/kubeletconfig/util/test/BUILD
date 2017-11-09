@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["test.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/test",
 )
 
 filegroup(

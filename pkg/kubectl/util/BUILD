@@ -1,6 +1,7 @@
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
@@ -14,6 +15,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/kubectl/util",
     visibility = ["//build/visible_to:pkg_kubectl_util_CONSUMERS"],
     deps = [
         "//vendor/golang.org/x/sys/unix:go_default_library",
@@ -42,4 +44,11 @@ filegroup(
     ],
     tags = ["automanaged"],
     visibility = ["//build/visible_to:pkg_kubectl_util_CONSUMERS"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["util_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/util",
+    library = ":go_default_library",
 )

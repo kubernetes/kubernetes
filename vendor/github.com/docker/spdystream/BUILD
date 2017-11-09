@@ -9,6 +9,7 @@ go_library(
         "stream.go",
         "utils.go",
     ],
+    importpath = "github.com/docker/spdystream",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/docker/spdystream/spdy:go_default_library"],
 )

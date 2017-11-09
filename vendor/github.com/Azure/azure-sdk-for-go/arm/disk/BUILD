@@ -9,6 +9,7 @@ go_library(
         "snapshots.go",
         "version.go",
     ],
+    importpath = "github.com/Azure/azure-sdk-for-go/arm/disk",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",

@@ -56,9 +56,7 @@ import (
 var _ = Describe("[sig-storage] GCP Volumes", func() {
 	f := framework.NewDefaultFramework("gcp-volume")
 
-	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,
 	// note that namespace deletion is handled by delete-namespace flag
-	clean := true
 	// filled in BeforeEach
 	var namespace *v1.Namespace
 	var c clientset.Interface
@@ -76,11 +74,7 @@ var _ = Describe("[sig-storage] GCP Volumes", func() {
 	Describe("NFSv4", func() {
 		It("should be mountable for NFSv4", func() {
 			config, _, serverIP := framework.NewNFSServer(c, namespace.Name, []string{})
-			defer func() {
-				if clean {
-					framework.VolumeTestCleanup(f, config)
-				}
-			}()
+			defer framework.VolumeTestCleanup(f, config)
 
 			tests := []framework.VolumeTest{
 				{
@@ -104,11 +98,7 @@ var _ = Describe("[sig-storage] GCP Volumes", func() {
 	Describe("NFSv3", func() {
 		It("should be mountable for NFSv3", func() {
 			config, _, serverIP := framework.NewNFSServer(c, namespace.Name, []string{})
-			defer func() {
-				if clean {
-					framework.VolumeTestCleanup(f, config)
-				}
-			}()
+			defer framework.VolumeTestCleanup(f, config)
 
 			tests := []framework.VolumeTest{
 				{
@@ -137,11 +127,9 @@ var _ = Describe("[sig-storage] GCP Volumes", func() {
 			config, _, _ := framework.NewGlusterfsServer(c, namespace.Name)
 			name := config.Prefix + "-server"
 			defer func() {
-				if clean {
-					framework.VolumeTestCleanup(f, config)
-					err := c.Core().Endpoints(namespace.Name).Delete(name, nil)
-					Expect(err).NotTo(HaveOccurred(), "defer: Gluster delete endpoints failed")
-				}
+				framework.VolumeTestCleanup(f, config)
+				err := c.CoreV1().Endpoints(namespace.Name).Delete(name, nil)
+				Expect(err).NotTo(HaveOccurred(), "defer: Gluster delete endpoints failed")
 			}()
 
 			tests := []framework.VolumeTest{

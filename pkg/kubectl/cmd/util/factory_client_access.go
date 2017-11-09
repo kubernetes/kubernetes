@@ -34,6 +34,7 @@ import (
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,8 +45,8 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
-	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -211,26 +212,18 @@ func (f *ring0Factory) RESTClient() (*restclient.RESTClient, error) {
 	return restclient.RESTClientFor(clientConfig)
 }
 
-func (f *ring0Factory) FederationClientSetForVersion(version *schema.GroupVersion) (fedclientset.Interface, error) {
-	return f.clientCache.FederationClientSetForVersion(version)
-}
-
-func (f *ring0Factory) FederationClientForVersion(version *schema.GroupVersion) (*restclient.RESTClient, error) {
-	return f.clientCache.FederationClientForVersion(version)
-}
-
 func (f *ring0Factory) Decoder(toInternal bool) runtime.Decoder {
 	var decoder runtime.Decoder
 	if toInternal {
-		decoder = api.Codecs.UniversalDecoder()
+		decoder = legacyscheme.Codecs.UniversalDecoder()
 	} else {
-		decoder = api.Codecs.UniversalDeserializer()
+		decoder = legacyscheme.Codecs.UniversalDeserializer()
 	}
 	return decoder
 }
 
 func (f *ring0Factory) JSONEncoder() runtime.Encoder {
-	return api.Codecs.LegacyCodec(api.Registry.EnabledVersions()...)
+	return legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...)
 }
 
 func (f *ring0Factory) UpdatePodSpecForObject(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error) {
@@ -288,7 +281,7 @@ func (f *ring0Factory) MapBasedSelectorForObject(object runtime.Object) (string,
 		}
 		return kubectl.MakeLabels(t.Spec.Selector.MatchLabels), nil
 	default:
-		gvks, _, err := api.Scheme.ObjectKinds(object)
+		gvks, _, err := legacyscheme.Scheme.ObjectKinds(object)
 		if err != nil {
 			return "", err
 		}
@@ -310,7 +303,7 @@ func (f *ring0Factory) PortsForObject(object runtime.Object) ([]string, error) {
 	case *extensions.ReplicaSet:
 		return getPorts(t.Spec.Template.Spec), nil
 	default:
-		gvks, _, err := api.Scheme.ObjectKinds(object)
+		gvks, _, err := legacyscheme.Scheme.ObjectKinds(object)
 		if err != nil {
 			return nil, err
 		}
@@ -332,7 +325,7 @@ func (f *ring0Factory) ProtocolsForObject(object runtime.Object) (map[string]str
 	case *extensions.ReplicaSet:
 		return getProtocols(t.Spec.Template.Spec), nil
 	default:
-		gvks, _, err := api.Scheme.ObjectKinds(object)
+		gvks, _, err := legacyscheme.Scheme.ObjectKinds(object)
 		if err != nil {
 			return nil, err
 		}
@@ -582,24 +575,30 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 // know.
 func FallbackGeneratorNameIfNecessary(
 	generatorName string,
-	resourcesList []*metav1.APIResourceList,
+	discoveryClient discovery.DiscoveryInterface,
 	cmdErr io.Writer,
-) string {
+) (string, error) {
 	switch generatorName {
 	case DeploymentBasicAppsV1Beta1GeneratorName:
-		if !Contains(resourcesList, appsv1beta1.SchemeGroupVersion.WithResource("deployments")) {
+		hasResource, err := HasResource(discoveryClient, appsv1beta1.SchemeGroupVersion.WithResource("deployments"))
+		if err != nil {
+			return "", err
+		}
+		if !hasResource {
 			warning(cmdErr, DeploymentBasicAppsV1Beta1GeneratorName, DeploymentBasicV1Beta1GeneratorName)
-
-			return DeploymentBasicV1Beta1GeneratorName
+			return DeploymentBasicV1Beta1GeneratorName, nil
 		}
 	case CronJobV2Alpha1GeneratorName:
-		if !Contains(resourcesList, batchv2alpha1.SchemeGroupVersion.WithResource("cronjobs")) {
+		hasResource, err := HasResource(discoveryClient, batchv2alpha1.SchemeGroupVersion.WithResource("cronjobs"))
+		if err != nil {
+			return "", err
+		}
+		if !hasResource {
 			warning(cmdErr, CronJobV2Alpha1GeneratorName, JobV1GeneratorName)
-
-			return JobV1GeneratorName
+			return JobV1GeneratorName, nil
 		}
 	}
-	return generatorName
+	return generatorName, nil
 }
 
 func warning(cmdErr io.Writer, newGeneratorName, oldGeneratorName string) {
@@ -609,6 +608,24 @@ func warning(cmdErr io.Writer, newGeneratorName, oldGeneratorName string) {
 		newGeneratorName,
 		oldGeneratorName,
 	)
+}
+
+func HasResource(client discovery.DiscoveryInterface, resource schema.GroupVersionResource) (bool, error) {
+	resources, err := client.ServerResourcesForGroupVersion(resource.GroupVersion().String())
+	if apierrors.IsNotFound(err) {
+		// entire group is missing
+		return false, nil
+	}
+	if err != nil {
+		// other errors error
+		return false, fmt.Errorf("failed to discover supported resources: %v", err)
+	}
+	for _, serverResource := range resources.APIResources {
+		if serverResource.Name == resource.Resource {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func Contains(resourcesList []*metav1.APIResourceList, resource schema.GroupVersionResource) bool {
@@ -625,7 +642,7 @@ func (f *ring0Factory) Generators(cmdName string) map[string]kubectl.Generator {
 func (f *ring0Factory) CanBeExposed(kind schema.GroupKind) error {
 	switch kind {
 	case api.Kind("ReplicationController"), api.Kind("Service"), api.Kind("Pod"),
-		extensions.Kind("Deployment"), apps.Kind("Deployment"), extensions.Kind("ReplicaSet"):
+		extensions.Kind("Deployment"), apps.Kind("Deployment"), extensions.Kind("ReplicaSet"), apps.Kind("ReplicaSet"):
 		// nothing to do here
 	default:
 		return fmt.Errorf("cannot expose a %s", kind)
@@ -636,7 +653,7 @@ func (f *ring0Factory) CanBeExposed(kind schema.GroupKind) error {
 func (f *ring0Factory) CanBeAutoscaled(kind schema.GroupKind) error {
 	switch kind {
 	case api.Kind("ReplicationController"), extensions.Kind("ReplicaSet"),
-		extensions.Kind("Deployment"), apps.Kind("Deployment"):
+		extensions.Kind("Deployment"), apps.Kind("Deployment"), apps.Kind("ReplicaSet"):
 		// nothing to do here
 	default:
 		return fmt.Errorf("cannot autoscale a %v", kind)

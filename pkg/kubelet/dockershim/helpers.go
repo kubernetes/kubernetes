@@ -223,14 +223,6 @@ func getApparmorSecurityOpts(sc *runtimeapi.LinuxContainerSecurityContext, separ
 	return fmtOpts, nil
 }
 
-func getNetworkNamespace(c *dockertypes.ContainerJSON) (string, error) {
-	if c.State.Pid == 0 {
-		// Docker reports pid 0 for an exited container.
-		return "", fmt.Errorf("Cannot find network namespace for the terminated container %q", c.ID)
-	}
-	return fmt.Sprintf(dockerNetNSFmt, c.State.Pid), nil
-}
-
 // dockerFilter wraps around dockerfilters.Args and provides methods to modify
 // the filter easily.
 type dockerFilter struct {
@@ -391,6 +383,11 @@ func getAppArmorOpts(profile string) ([]dockerOpt, error) {
 	if profile == "" || profile == apparmor.ProfileRuntimeDefault {
 		// The docker applies the default profile by default.
 		return nil, nil
+	}
+
+	// Return unconfined profile explicitly
+	if profile == apparmor.ProfileNameUnconfined {
+		return []dockerOpt{{"apparmor", apparmor.ProfileNameUnconfined, ""}}, nil
 	}
 
 	// Assume validation has already happened.

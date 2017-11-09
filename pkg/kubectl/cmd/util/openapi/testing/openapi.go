@@ -21,6 +21,10 @@ import (
 	"os"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/googleapis/gnostic/OpenAPIv2"
@@ -86,4 +90,34 @@ func (f *FakeClient) OpenAPISchema() (*openapi_v2.Document, error) {
 	}
 
 	return f.fake.OpenAPISchema()
+}
+
+// FakeResources is a wrapper to directly load the openapi schema from a
+// file, and get the schema for given GVK. This is only for test since
+// it's assuming that the file is there and everything will go fine.
+type FakeResources struct {
+	fake Fake
+}
+
+var _ openapi.Resources = &FakeResources{}
+
+// NewFakeResources creates a new FakeResources.
+func NewFakeResources(path string) *FakeResources {
+	return &FakeResources{
+		fake: Fake{Path: path},
+	}
+}
+
+// LookupResource will read the schema, parse it and return the
+// resources. It doesn't return errors and will panic instead.
+func (f *FakeResources) LookupResource(gvk schema.GroupVersionKind) proto.Schema {
+	s, err := f.fake.OpenAPISchema()
+	if err != nil {
+		panic(err)
+	}
+	resources, err := openapi.NewOpenAPIData(s)
+	if err != nil {
+		panic(err)
+	}
+	return resources.LookupResource(gvk)
 }

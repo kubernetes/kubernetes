@@ -18,16 +18,17 @@ package rbd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"reflect"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
-	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -58,41 +59,47 @@ func TestCanSupport(t *testing.T) {
 }
 
 type fakeDiskManager struct {
-	tmpDir string
+	// Make sure we can run tests in parallel.
+	mutex sync.RWMutex
+	// Key format: "<pool>/<image>"
+	rbdImageLocks map[string]bool
+	rbdMapIndex   int
+	rbdDevices    map[string]bool
 }
 
 func NewFakeDiskManager() *fakeDiskManager {
 	return &fakeDiskManager{
-		tmpDir: utiltesting.MkTmpdirOrDie("rbd_test"),
+		rbdImageLocks: make(map[string]bool),
+		rbdMapIndex:   0,
+		rbdDevices:    make(map[string]bool),
 	}
 }
 
-func (fake *fakeDiskManager) Cleanup() {
-	os.RemoveAll(fake.tmpDir)
+func (fake *fakeDiskManager) MakeGlobalPDName(rbd rbd) string {
+	return makePDNameInternal(rbd.plugin.host, rbd.Pool, rbd.Image)
 }
 
-func (fake *fakeDiskManager) MakeGlobalPDName(disk rbd) string {
-	return fake.tmpDir
+func (fake *fakeDiskManager) AttachDisk(b rbdMounter) (string, error) {
+	fake.mutex.Lock()
+	defer fake.mutex.Unlock()
+	fake.rbdMapIndex += 1
+	devicePath := fmt.Sprintf("/dev/rbd%d", fake.rbdMapIndex)
+	fake.rbdDevices[devicePath] = true
+	return devicePath, nil
 }
-func (fake *fakeDiskManager) AttachDisk(b rbdMounter) error {
-	globalPath := b.manager.MakeGlobalPDName(*b.rbd)
-	err := os.MkdirAll(globalPath, 0750)
-	if err != nil {
-		return err
+
+func (fake *fakeDiskManager) DetachDisk(r *rbdPlugin, deviceMountPath string, device string) error {
+	fake.mutex.Lock()
+	defer fake.mutex.Unlock()
+	ok := fake.rbdDevices[device]
+	if !ok {
+		return fmt.Errorf("rbd: failed to detach device %s, it does not exist", device)
 	}
+	delete(fake.rbdDevices, device)
 	return nil
 }
 
-func (fake *fakeDiskManager) DetachDisk(c rbdUnmounter, mntPath string) error {
-	globalPath := c.manager.MakeGlobalPDName(*c.rbd)
-	err := os.RemoveAll(globalPath)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (fake *fakeDiskManager) CreateImage(provisioner *rbdVolumeProvisioner) (r *v1.RBDVolumeSource, volumeSizeGB int, err error) {
+func (fake *fakeDiskManager) CreateImage(provisioner *rbdVolumeProvisioner) (r *v1.RBDPersistentVolumeSource, volumeSizeGB int, err error) {
 	return nil, 0, fmt.Errorf("not implemented")
 }
 
@@ -100,35 +107,111 @@ func (fake *fakeDiskManager) DeleteImage(deleter *rbdVolumeDeleter) error {
 	return fmt.Errorf("not implemented")
 }
 
-func doTestPlugin(t *testing.T, spec *volume.Spec) {
-	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
+func (fake *fakeDiskManager) Fencing(r rbdMounter, nodeName string) error {
+	fake.mutex.Lock()
+	defer fake.mutex.Unlock()
+	key := fmt.Sprintf("%s/%s", r.Pool, r.Image)
+	isLocked, ok := fake.rbdImageLocks[key]
+	if ok && isLocked {
+		// not expected in testing
+		return fmt.Errorf("%s is already locked", key)
 	}
-	defer os.RemoveAll(tmpDir)
+	fake.rbdImageLocks[key] = true
+	return nil
+}
 
+func (fake *fakeDiskManager) Defencing(r rbdMounter, nodeName string) error {
+	fake.mutex.Lock()
+	defer fake.mutex.Unlock()
+	key := fmt.Sprintf("%s/%s", r.Pool, r.Image)
+	isLocked, ok := fake.rbdImageLocks[key]
+	if !ok || !isLocked {
+		// not expected in testing
+		return fmt.Errorf("%s is not locked", key)
+	}
+	delete(fake.rbdImageLocks, key)
+	return nil
+}
+
+func (fake *fakeDiskManager) IsLocked(r rbdMounter, nodeName string) (bool, error) {
+	fake.mutex.RLock()
+	defer fake.mutex.RUnlock()
+	key := fmt.Sprintf("%s/%s", r.Pool, r.Image)
+	isLocked, ok := fake.rbdImageLocks[key]
+	return ok && isLocked, nil
+}
+
+// checkMounterLog checks fakeMounter must have expected logs, and the last action msut equal to expectedAction.
+func checkMounterLog(t *testing.T, fakeMounter *mount.FakeMounter, expected int, expectedAction mount.FakeAction) {
+	if len(fakeMounter.Log) != expected {
+		t.Fatalf("fakeMounter should have %d logs, actual: %d", expected, len(fakeMounter.Log))
+	}
+	lastIndex := len(fakeMounter.Log) - 1
+	lastAction := fakeMounter.Log[lastIndex]
+	if !reflect.DeepEqual(expectedAction, lastAction) {
+		t.Fatalf("fakeMounter.Log[%d] should be %v, not: %v", lastIndex, expectedAction, lastAction)
+	}
+}
+
+func doTestPlugin(t *testing.T, c *testcase) {
+	fakeVolumeHost := volumetest.NewFakeVolumeHost(c.root, nil, nil)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
-
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, fakeVolumeHost)
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/rbd")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
+	fakeMounter := fakeVolumeHost.GetMounter(plug.GetPluginName()).(*mount.FakeMounter)
+	fakeNodeName := types.NodeName("localhost")
 	fdm := NewFakeDiskManager()
-	defer fdm.Cleanup()
-	exec := mount.NewFakeExec(nil)
-	mounter, err := plug.(*rbdPlugin).newMounterInternal(spec, types.UID("poduid"), fdm, &mount.FakeMounter{}, exec, "secrets")
+
+	// attacher
+	attacher, err := plug.(*rbdPlugin).newAttacherInternal(fdm)
+	if err != nil {
+		t.Errorf("Failed to make a new Attacher: %v", err)
+	}
+	deviceAttachPath, err := attacher.Attach(c.spec, fakeNodeName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	devicePath, err := attacher.WaitForAttach(c.spec, deviceAttachPath, c.pod, time.Second*10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if devicePath != c.expectedDevicePath {
+		t.Errorf("Unexpected path, expected %q, not: %q", c.expectedDevicePath, devicePath)
+	}
+	deviceMountPath, err := attacher.GetDeviceMountPath(c.spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deviceMountPath != c.expectedDeviceMountPath {
+		t.Errorf("Unexpected mount path, expected %q, not: %q", c.expectedDeviceMountPath, deviceMountPath)
+	}
+	err = attacher.MountDevice(c.spec, devicePath, deviceMountPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(deviceMountPath); err != nil {
+		if os.IsNotExist(err) {
+			t.Errorf("Attacher.MountDevice() failed, device mount path not created: %s", deviceMountPath)
+		} else {
+			t.Errorf("Attacher.MountDevice() failed: %v", err)
+		}
+	}
+	checkMounterLog(t, fakeMounter, 1, mount.FakeAction{Action: "mount", Target: c.expectedDeviceMountPath, Source: devicePath, FSType: "ext4"})
+
+	// mounter
+	mounter, err := plug.(*rbdPlugin).newMounterInternal(c.spec, c.pod.UID, fdm, "secrets")
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
 	if mounter == nil {
 		t.Error("Got a nil Mounter")
 	}
-
 	path := mounter.GetPath()
-	expectedPath := fmt.Sprintf("%s/pods/poduid/volumes/kubernetes.io~rbd/vol1", tmpDir)
-	if path != expectedPath {
-		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, path)
+	if path != c.expectedPodMountPath {
+		t.Errorf("Unexpected path, expected %q, got: %q", c.expectedPodMountPath, path)
 	}
 
 	if err := mounter.SetUp(nil); err != nil {
@@ -141,8 +224,10 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 			t.Errorf("SetUp() failed: %v", err)
 		}
 	}
+	checkMounterLog(t, fakeMounter, 2, mount.FakeAction{Action: "mount", Target: c.expectedPodMountPath, Source: devicePath, FSType: ""})
 
-	unmounter, err := plug.(*rbdPlugin).newUnmounterInternal("vol1", types.UID("poduid"), fdm, &mount.FakeMounter{}, exec)
+	// unmounter
+	unmounter, err := plug.(*rbdPlugin).newUnmounterInternal(c.spec.Name(), c.pod.UID, fdm)
 	if err != nil {
 		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}
@@ -156,40 +241,100 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if _, err := os.Stat(path); err == nil {
 		t.Errorf("TearDown() failed, volume path still exists: %s", path)
 	} else if !os.IsNotExist(err) {
-		t.Errorf("SetUp() failed: %v", err)
+		t.Errorf("TearDown() failed: %v", err)
+	}
+	checkMounterLog(t, fakeMounter, 3, mount.FakeAction{Action: "unmount", Target: c.expectedPodMountPath, Source: "", FSType: ""})
+
+	// detacher
+	detacher, err := plug.(*rbdPlugin).newDetacherInternal(fdm)
+	if err != nil {
+		t.Errorf("Failed to make a new Attacher: %v", err)
+	}
+	err = detacher.UnmountDevice(deviceMountPath)
+	if err != nil {
+		t.Fatalf("Detacher.UnmountDevice failed to unmount %s", deviceMountPath)
+	}
+	checkMounterLog(t, fakeMounter, 4, mount.FakeAction{Action: "unmount", Target: c.expectedDeviceMountPath, Source: "", FSType: ""})
+	err = detacher.Detach(deviceMountPath, fakeNodeName)
+	if err != nil {
+		t.Fatalf("Detacher.Detach failed to detach %s from %s", deviceMountPath, fakeNodeName)
 	}
 }
 
-func TestPluginVolume(t *testing.T) {
-	vol := &v1.Volume{
-		Name: "vol1",
-		VolumeSource: v1.VolumeSource{
-			RBD: &v1.RBDVolumeSource{
-				CephMonitors: []string{"a", "b"},
-				RBDImage:     "bar",
-				FSType:       "ext4",
-			},
-		},
-	}
-	doTestPlugin(t, volume.NewSpecFromVolume(vol))
+type testcase struct {
+	spec                    *volume.Spec
+	root                    string
+	pod                     *v1.Pod
+	expectedDevicePath      string
+	expectedDeviceMountPath string
+	expectedPodMountPath    string
 }
-func TestPluginPersistentVolume(t *testing.T) {
-	vol := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
+
+func TestPlugin(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	podUID := uuid.NewUUID()
+	var cases []*testcase
+	cases = append(cases, &testcase{
+		spec: volume.NewSpecFromVolume(&v1.Volume{
 			Name: "vol1",
-		},
-		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeSource: v1.PersistentVolumeSource{
+			VolumeSource: v1.VolumeSource{
 				RBD: &v1.RBDVolumeSource{
 					CephMonitors: []string{"a", "b"},
-					RBDImage:     "bar",
+					RBDPool:      "pool1",
+					RBDImage:     "image1",
 					FSType:       "ext4",
 				},
 			},
+		}),
+		root: tmpDir,
+		pod: &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "testpod",
+				Namespace: "testns",
+				UID:       podUID,
+			},
 		},
-	}
+		expectedDevicePath:      "/dev/rbd1",
+		expectedDeviceMountPath: fmt.Sprintf("%s/plugins/kubernetes.io/rbd/rbd/pool1-image-image1", tmpDir),
+		expectedPodMountPath:    fmt.Sprintf("%s/pods/%s/volumes/kubernetes.io~rbd/vol1", tmpDir, podUID),
+	})
+	cases = append(cases, &testcase{
+		spec: volume.NewSpecFromPersistentVolume(&v1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "vol2",
+			},
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					RBD: &v1.RBDPersistentVolumeSource{
+						CephMonitors: []string{"a", "b"},
+						RBDPool:      "pool2",
+						RBDImage:     "image2",
+						FSType:       "ext4",
+					},
+				},
+			},
+		}, false),
+		root: tmpDir,
+		pod: &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "testpod",
+				Namespace: "testns",
+				UID:       podUID,
+			},
+		},
+		expectedDevicePath:      "/dev/rbd1",
+		expectedDeviceMountPath: fmt.Sprintf("%s/plugins/kubernetes.io/rbd/rbd/pool2-image-image2", tmpDir),
+		expectedPodMountPath:    fmt.Sprintf("%s/pods/%s/volumes/kubernetes.io~rbd/vol2", tmpDir, podUID),
+	})
 
-	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false))
+	for i := 0; i < len(cases); i++ {
+		doTestPlugin(t, cases[i])
+	}
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
@@ -205,7 +350,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				RBD: &v1.RBDVolumeSource{
+				RBD: &v1.RBDPersistentVolumeSource{
 					CephMonitors: []string{"a", "b"},
 					RBDImage:     "bar",
 					FSType:       "ext4",
@@ -249,83 +394,34 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	}
 }
 
-func TestPersistAndLoadRBD(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
+func TestGetSecretNameAndNamespace(t *testing.T) {
+	secretName := "test-secret-name"
+	secretNamespace := "test-secret-namespace"
+
+	volSpec := &volume.Spec{
+		PersistentVolume: &v1.PersistentVolume{
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					RBD: &v1.RBDPersistentVolumeSource{
+						CephMonitors: []string{"a", "b"},
+						RBDImage:     "bar",
+						FSType:       "ext4",
+					},
+				},
+			},
+		},
+	}
+
+	secretRef := new(v1.SecretReference)
+	secretRef.Name = secretName
+	secretRef.Namespace = secretNamespace
+	volSpec.PersistentVolume.Spec.PersistentVolumeSource.RBD.SecretRef = secretRef
+
+	foundSecretName, foundSecretNamespace, err := getSecretNameAndNamespace(volSpec, "default")
 	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
+		t.Errorf("getSecretNameAndNamespace failed to get Secret's name and namespace: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
-
-	testcases := []struct {
-		rbdMounter               rbdMounter
-		expectedJSONStr          string
-		expectedLoadedRBDMounter rbdMounter
-	}{
-		{
-			rbdMounter{},
-			`{"Mon":null,"Id":"","Keyring":"","Secret":""}`,
-			rbdMounter{},
-		},
-		{
-			rbdMounter{
-				rbd: &rbd{
-					podUID:          "poduid",
-					Pool:            "kube",
-					Image:           "some-test-image",
-					ReadOnly:        false,
-					MetricsProvider: volume.NewMetricsStatFS("/tmp"),
-				},
-				Mon:     []string{"127.0.0.1"},
-				Id:      "kube",
-				Keyring: "",
-				Secret:  "QVFEcTdKdFp4SmhtTFJBQUNwNDI3UnhGRzBvQ1Y0SUJwLy9pRUE9PQ==",
-			},
-			`
-{
-	"Pool": "kube",
-	"Image": "some-test-image",
-	"ReadOnly": false,
-	"Mon": ["127.0.0.1"],
-	"Id": "kube",
-	"Keyring": "",
-	"Secret": "QVFEcTdKdFp4SmhtTFJBQUNwNDI3UnhGRzBvQ1Y0SUJwLy9pRUE9PQ=="
-}
-			`,
-			rbdMounter{
-				rbd: &rbd{
-					Pool:     "kube",
-					Image:    "some-test-image",
-					ReadOnly: false,
-				},
-				Mon:     []string{"127.0.0.1"},
-				Id:      "kube",
-				Keyring: "",
-				Secret:  "QVFEcTdKdFp4SmhtTFJBQUNwNDI3UnhGRzBvQ1Y0SUJwLy9pRUE9PQ==",
-			},
-		},
-	}
-
-	util := &RBDUtil{}
-	for _, c := range testcases {
-		err = util.persistRBD(c.rbdMounter, tmpDir)
-		if err != nil {
-			t.Errorf("failed to persist rbd: %v, err: %v", c.rbdMounter, err)
-		}
-		jsonFile := filepath.Join(tmpDir, "rbd.json")
-		jsonData, err := ioutil.ReadFile(jsonFile)
-		if err != nil {
-			t.Errorf("failed to read json file %s: %v", jsonFile, err)
-		}
-		if !assert.JSONEq(t, c.expectedJSONStr, string(jsonData)) {
-			t.Errorf("json file does not match expected one: %s, should be %s", string(jsonData), c.expectedJSONStr)
-		}
-		tmpRBDMounter := rbdMounter{}
-		err = util.loadRBD(&tmpRBDMounter, tmpDir)
-		if err != nil {
-			t.Errorf("faild to load rbd: %v", err)
-		}
-		if !reflect.DeepEqual(tmpRBDMounter, c.expectedLoadedRBDMounter) {
-			t.Errorf("loaded rbd does not equal to expected one: %v, should be %v", tmpRBDMounter, c.rbdMounter)
-		}
+	if strings.Compare(secretName, foundSecretName) != 0 || strings.Compare(secretNamespace, foundSecretNamespace) != 0 {
+		t.Errorf("getSecretNameAndNamespace returned incorrect values, expected %s and %s but got %s and %s", secretName, secretNamespace, foundSecretName, foundSecretNamespace)
 	}
 }

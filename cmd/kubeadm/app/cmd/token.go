@@ -70,9 +70,9 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			   and the latter is the Token Secret, which must be kept private at all circumstances.
 			 - The name of the Secret must be named "bootstrap-token-(token-id)".
 
-			You can read more about Bootstrap Tokens in this proposal:
+			You can read more about Bootstrap Tokens here:
 
-			  https://git.k8s.io/community/contributors/design-proposals/bootstrap-discovery.md
+			  https://kubernetes.io/docs/admin/bootstrap-tokens/
 		`),
 
 		// Without this callback, if a user runs just the "token"
@@ -120,7 +120,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	createCmd.Flags().StringSliceVar(&usages,
 		"usages", kubeadmconstants.DefaultTokenUsages, "The ways in which this token can be used. Valid options: [signing,authentication].")
 	createCmd.Flags().StringSliceVar(&extraGroups,
-		"groups", []string{},
+		"groups", []string{kubeadmconstants.NodeBootstrapTokenAuthGroup},
 		fmt.Sprintf("Extra groups that this token will authenticate as when used for authentication. Must match %q.", bootstrapapi.BootstrapGroupPattern))
 	createCmd.Flags().StringVar(&description,
 		"description", "", "A human friendly description of how this token is used.")
@@ -178,7 +178,7 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 			This command will print out a randomly-generated bootstrap token that can be used with
 			the "init" and "join" commands.
 
-			You don't have to use this command in order to generate a token, you can do so
+			You don't have to use this command in order to generate a token. You can do so
 			yourself as long as it's in the format "[a-z0-9]{6}.[a-z0-9]{16}". This
 			command is provided for convenience to generate tokens in that format.
 

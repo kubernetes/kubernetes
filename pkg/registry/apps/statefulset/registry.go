@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
 )
 
@@ -34,8 +33,8 @@ type Registry interface {
 	ListStatefulSets(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*apps.StatefulSetList, error)
 	WatchStatefulSets(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetStatefulSet(ctx genericapirequest.Context, statefulSetID string, options *metav1.GetOptions) (*apps.StatefulSet, error)
-	CreateStatefulSet(ctx genericapirequest.Context, statefulSet *apps.StatefulSet) (*apps.StatefulSet, error)
-	UpdateStatefulSet(ctx genericapirequest.Context, statefulSet *apps.StatefulSet) (*apps.StatefulSet, error)
+	CreateStatefulSet(ctx genericapirequest.Context, statefulSet *apps.StatefulSet, createValidation rest.ValidateObjectFunc) (*apps.StatefulSet, error)
+	UpdateStatefulSet(ctx genericapirequest.Context, statefulSet *apps.StatefulSet, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*apps.StatefulSet, error)
 	DeleteStatefulSet(ctx genericapirequest.Context, statefulSetID string) error
 }
 
@@ -73,16 +72,16 @@ func (s *storage) GetStatefulSet(ctx genericapirequest.Context, statefulSetID st
 	return obj.(*apps.StatefulSet), nil
 }
 
-func (s *storage) CreateStatefulSet(ctx genericapirequest.Context, statefulSet *apps.StatefulSet) (*apps.StatefulSet, error) {
-	obj, err := s.Create(ctx, statefulSet, false)
+func (s *storage) CreateStatefulSet(ctx genericapirequest.Context, statefulSet *apps.StatefulSet, createValidation rest.ValidateObjectFunc) (*apps.StatefulSet, error) {
+	obj, err := s.Create(ctx, statefulSet, rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		return nil, err
 	}
 	return obj.(*apps.StatefulSet), nil
 }
 
-func (s *storage) UpdateStatefulSet(ctx genericapirequest.Context, statefulSet *apps.StatefulSet) (*apps.StatefulSet, error) {
-	obj, _, err := s.Update(ctx, statefulSet.Name, rest.DefaultUpdatedObjectInfo(statefulSet, api.Scheme))
+func (s *storage) UpdateStatefulSet(ctx genericapirequest.Context, statefulSet *apps.StatefulSet, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*apps.StatefulSet, error) {
+	obj, _, err := s.Update(ctx, statefulSet.Name, rest.DefaultUpdatedObjectInfo(statefulSet), createValidation, updateValidation)
 	if err != nil {
 		return nil, err
 	}

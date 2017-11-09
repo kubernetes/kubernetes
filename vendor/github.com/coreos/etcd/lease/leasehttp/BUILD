@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "http.go",
     ],
+    importpath = "github.com/coreos/etcd/lease/leasehttp",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/etcdserver/etcdserverpb:go_default_library",

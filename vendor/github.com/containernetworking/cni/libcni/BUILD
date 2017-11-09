@@ -6,6 +6,7 @@ go_library(
         "api.go",
         "conf.go",
     ],
+    importpath = "github.com/containernetworking/cni/libcni",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/containernetworking/cni/pkg/invoke:go_default_library",

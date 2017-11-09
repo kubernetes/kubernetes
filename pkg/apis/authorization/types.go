@@ -140,8 +140,13 @@ type SelfSubjectAccessReviewSpec struct {
 
 // SubjectAccessReviewStatus
 type SubjectAccessReviewStatus struct {
-	// Allowed is required.  True if the action would be allowed, false otherwise.
+	// Allowed is required. True if the action would be allowed, false otherwise.
 	Allowed bool
+	// Denied is optional. True if the action would be denied, otherwise
+	// false. If both allowed is false and denied is false, then the
+	// authorizer has no opinion on whether to authorize the action. Denied
+	// may not be true if Allowed is true.
+	Denied bool
 	// Reason is optional.  It indicates why a request was allowed or denied.
 	Reason string
 	// EvaluationError is an indication that some error occurred during the authorization check.
@@ -205,7 +210,8 @@ type ResourceRule struct {
 	// APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
 	// the enumerated resources in any API group will be allowed.  "*" means all.
 	APIGroups []string
-	// Resources is a list of resources this rule applies to.  ResourceAll represents all resources.  "*" means all.
+	// Resources is a list of resources this rule applies to.  "*" means all in the specified apiGroups.
+	//  "*/foo" represents the subresource 'foo' for all resources in the specified apiGroups.
 	Resources []string
 	// ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.  "*" means all.
 	ResourceNames []string

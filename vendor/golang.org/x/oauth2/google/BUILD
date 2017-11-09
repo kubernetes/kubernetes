@@ -9,6 +9,7 @@ go_library(
         "jwt.go",
         "sdk.go",
     ],
+    importpath = "golang.org/x/oauth2/google",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/cloud.google.com/go/compute/metadata:go_default_library",

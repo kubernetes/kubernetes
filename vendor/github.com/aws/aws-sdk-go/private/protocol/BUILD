@@ -6,6 +6,7 @@ go_library(
         "idempotency.go",
         "unmarshal.go",
     ],
+    importpath = "github.com/aws/aws-sdk-go/private/protocol",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/aws/aws-sdk-go/aws/request:go_default_library"],
 )
@@ -26,7 +27,6 @@ filegroup(
         "//vendor/github.com/aws/aws-sdk-go/private/protocol/jsonrpc:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/private/protocol/query:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/private/protocol/rest:all-srcs",
-        "//vendor/github.com/aws/aws-sdk-go/private/protocol/restxml:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil:all-srcs",
     ],
     tags = ["automanaged"],

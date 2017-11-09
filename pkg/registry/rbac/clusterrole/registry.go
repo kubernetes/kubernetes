@@ -22,15 +22,14 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
 // Registry is an interface for things that know how to store ClusterRoles.
 type Registry interface {
 	ListClusterRoles(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*rbac.ClusterRoleList, error)
-	CreateClusterRole(ctx genericapirequest.Context, clusterRole *rbac.ClusterRole) error
-	UpdateClusterRole(ctx genericapirequest.Context, clusterRole *rbac.ClusterRole) error
+	CreateClusterRole(ctx genericapirequest.Context, clusterRole *rbac.ClusterRole, createValidation rest.ValidateObjectFunc) error
+	UpdateClusterRole(ctx genericapirequest.Context, clusterRole *rbac.ClusterRole, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
 	GetClusterRole(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*rbac.ClusterRole, error)
 	DeleteClusterRole(ctx genericapirequest.Context, name string) error
 	WatchClusterRoles(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
@@ -56,13 +55,13 @@ func (s *storage) ListClusterRoles(ctx genericapirequest.Context, options *metai
 	return obj.(*rbac.ClusterRoleList), nil
 }
 
-func (s *storage) CreateClusterRole(ctx genericapirequest.Context, clusterRole *rbac.ClusterRole) error {
-	_, err := s.Create(ctx, clusterRole, false)
+func (s *storage) CreateClusterRole(ctx genericapirequest.Context, clusterRole *rbac.ClusterRole, createValidation rest.ValidateObjectFunc) error {
+	_, err := s.Create(ctx, clusterRole, createValidation, false)
 	return err
 }
 
-func (s *storage) UpdateClusterRole(ctx genericapirequest.Context, clusterRole *rbac.ClusterRole) error {
-	_, _, err := s.Update(ctx, clusterRole.Name, rest.DefaultUpdatedObjectInfo(clusterRole, api.Scheme))
+func (s *storage) UpdateClusterRole(ctx genericapirequest.Context, clusterRole *rbac.ClusterRole, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
+	_, _, err := s.Update(ctx, clusterRole.Name, rest.DefaultUpdatedObjectInfo(clusterRole), createValidation, updateValidation)
 	return err
 }
 

@@ -15,6 +15,7 @@ go_binary(
         "-extldflags",
         "-static",
     ],
+    importpath = "k8s.io/kubernetes/cmd/kube-proxy",
     library = ":go_default_library",
     x_defs = version_x_defs(),
 )
@@ -22,6 +23,7 @@ go_binary(
 go_library(
     name = "go_default_library",
     srcs = ["proxy.go"],
+    importpath = "k8s.io/kubernetes/cmd/kube-proxy",
     deps = [
         "//cmd/kube-proxy/app:go_default_library",
         "//pkg/client/metrics/prometheus:go_default_library",

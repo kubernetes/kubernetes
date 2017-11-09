@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["clusterinfo_test.go"],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
@@ -22,6 +23,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["clusterinfo.go"],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo",
     deps = [
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//pkg/apis/rbac/v1:go_default_library",

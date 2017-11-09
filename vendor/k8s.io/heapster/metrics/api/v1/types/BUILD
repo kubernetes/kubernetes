@@ -7,6 +7,7 @@ go_library(
         "model_types.go",
         "types.go",
     ],
+    importpath = "k8s.io/heapster/metrics/api/v1/types",
     visibility = ["//visibility:public"],
 )
 

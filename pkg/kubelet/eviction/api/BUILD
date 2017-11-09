@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["types.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/eviction/api",
     deps = ["//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library"],
 )
 

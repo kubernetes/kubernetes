@@ -4,9 +4,11 @@ go_library(
     name = "go_default_library",
     srcs = [
         "header_rules.go",
+        "options.go",
         "uri_path.go",
         "v4.go",
     ],
+    importpath = "github.com/aws/aws-sdk-go/aws/signer/v4",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",

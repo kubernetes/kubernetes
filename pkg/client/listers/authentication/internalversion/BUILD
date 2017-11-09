@@ -11,10 +11,10 @@ go_library(
         "expansion_generated.go",
         "tokenreview.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/client/listers/authentication/internalversion",
     deps = [
         "//pkg/apis/authentication:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
     ],

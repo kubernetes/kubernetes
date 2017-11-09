@@ -176,6 +176,14 @@ func ValidateCronJob(scheduledJob *batch.CronJob) field.ErrorList {
 	return allErrs
 }
 
+func ValidateCronJobUpdate(job, oldJob *batch.CronJob) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateCronJobSpec(&job.Spec, field.NewPath("spec"))...)
+	// skip the 52-character name validation limit on update validation
+	// to allow old cronjobs with names > 52 chars to be updated/deleted
+	return allErrs
+}
+
 func ValidateCronJobSpec(spec *batch.CronJobSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 

@@ -18,7 +18,9 @@ package predicates
 
 import (
 	"fmt"
+	"os"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -114,25 +116,6 @@ func newResourcePod(usage ...schedulercache.Resource) *v1.Pod {
 	return &v1.Pod{
 		Spec: v1.PodSpec{
 			Containers: containers,
-		},
-	}
-}
-
-func addStorageLimit(pod *v1.Pod, sizeLimit int64, medium v1.StorageMedium) *v1.Pod {
-	return &v1.Pod{
-		Spec: v1.PodSpec{
-			Containers: pod.Spec.Containers,
-			Volumes: []v1.Volume{
-				{
-					Name: "emptyDirVolumeName",
-					VolumeSource: v1.VolumeSource{
-						EmptyDir: &v1.EmptyDirVolumeSource{
-							SizeLimit: resource.NewQuantity(sizeLimit, resource.BinarySI),
-							Medium:    medium,
-						},
-					},
-				},
-			},
 		},
 	}
 }
@@ -682,7 +665,7 @@ func TestGetUsedPorts(t *testing.T) {
 	}
 }
 
-func TestDiskConflicts(t *testing.T) {
+func TestGCEDiskConflicts(t *testing.T) {
 	volState := v1.PodSpec{
 		Volumes: []v1.Volume{
 			{
@@ -1708,6 +1691,26 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 			},
 		},
 	}
+	twoDeletedPVCPod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "deletedPVC",
+						},
+					},
+				},
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "anotherDeletedPVC",
+						},
+					},
+				},
+			},
+		},
+	}
 	deletedPVPod := &v1.Pod{
 		Spec: v1.PodSpec{
 			Volumes: []v1.Volume{
@@ -1721,8 +1724,78 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 			},
 		},
 	}
+	// deletedPVPod2 is a different pod than deletedPVPod but using the same PVC
+	deletedPVPod2 := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "pvcWithDeletedPV",
+						},
+					},
+				},
+			},
+		},
+	}
+	// anotherDeletedPVPod is a different pod than deletedPVPod and uses another PVC
+	anotherDeletedPVPod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "anotherPVCWithDeletedPV",
+						},
+					},
+				},
+			},
+		},
+	}
 	emptyPod := &v1.Pod{
 		Spec: v1.PodSpec{},
+	}
+	unboundPVCPod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "unboundPVC",
+						},
+					},
+				},
+			},
+		},
+	}
+	// Different pod than unboundPVCPod, but using the same unbound PVC
+	unboundPVCPod2 := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "unboundPVC",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// pod with unbound PVC that's different to unboundPVC
+	anotherUnboundPVCPod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "anotherUnboundPVC",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	tests := []struct {
@@ -1811,6 +1884,13 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 		},
 		{
 			newPod:       ebsPVCPod,
+			existingPods: []*v1.Pod{oneVolPod, twoDeletedPVCPod},
+			maxVols:      3,
+			fits:         false,
+			test:         "pod with missing two PVCs is counted towards the PV limit twice",
+		},
+		{
+			newPod:       ebsPVCPod,
 			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
 			maxVols:      2,
 			fits:         false,
@@ -1822,6 +1902,48 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 			maxVols:      3,
 			fits:         true,
 			test:         "pod with missing PV is counted towards the PV limit",
+		},
+		{
+			newPod:       deletedPVPod2,
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			maxVols:      2,
+			fits:         true,
+			test:         "two pods missing the same PV are counted towards the PV limit only once",
+		},
+		{
+			newPod:       anotherDeletedPVPod,
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			maxVols:      2,
+			fits:         false,
+			test:         "two pods missing different PVs are counted towards the PV limit twice",
+		},
+		{
+			newPod:       ebsPVCPod,
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			maxVols:      2,
+			fits:         false,
+			test:         "pod with unbound PVC is counted towards the PV limit",
+		},
+		{
+			newPod:       ebsPVCPod,
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			maxVols:      3,
+			fits:         true,
+			test:         "pod with unbound PVC is counted towards the PV limit",
+		},
+		{
+			newPod:       unboundPVCPod2,
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			maxVols:      2,
+			fits:         true,
+			test:         "the same unbound PVC in multiple pods is counted towards the PV limit only once",
+		},
+		{
+			newPod:       anotherUnboundPVCPod,
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			maxVols:      2,
+			fits:         false,
+			test:         "two different unbound PVCs are counted towards the PV limit as two volumes",
 		},
 	}
 
@@ -1855,26 +1977,25 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "pvcWithDeletedPV"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "pvcWithDeletedPV"},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "anotherPVCWithDeletedPV"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "anotherPVCWithDeletedPV"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "unboundPVC"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "anotherUnboundPVC"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
+		},
 	}
 
-	filter := VolumeFilter{
-		FilterVolume: func(vol *v1.Volume) (string, bool) {
-			if vol.AWSElasticBlockStore != nil {
-				return vol.AWSElasticBlockStore.VolumeID, true
-			}
-			return "", false
-		},
-		FilterPersistentVolume: func(pv *v1.PersistentVolume) (string, bool) {
-			if pv.Spec.AWSElasticBlockStore != nil {
-				return pv.Spec.AWSElasticBlockStore.VolumeID, true
-			}
-			return "", false
-		},
-	}
 	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrMaxVolumeCountExceeded}
 
 	for _, test := range tests {
-		pred := NewMaxPDVolumeCountPredicate(filter, test.maxVols, pvInfo, pvcInfo)
+		os.Setenv(KubeMaxPDVols, strconv.Itoa(test.maxVols))
+		pred := NewMaxPDVolumeCountPredicate(EBSVolumeFilterType, pvInfo, pvcInfo)
 		fits, reasons, err := pred(test.newPod, PredicateMetadata(test.newPod, nil), schedulercache.NewNodeInfo(test.existingPods...))
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
@@ -3759,5 +3880,45 @@ func TestVolumeZonePredicateMultiZone(t *testing.T) {
 			t.Errorf("%s: expected %v got %v", test.Name, test.Fits, fits)
 		}
 
+	}
+}
+
+func TestGetMaxVols(t *testing.T) {
+	previousValue := os.Getenv(KubeMaxPDVols)
+	defaultValue := 39
+
+	tests := []struct {
+		rawMaxVols string
+		expected   int
+		test       string
+	}{
+		{
+			rawMaxVols: "invalid",
+			expected:   defaultValue,
+			test:       "Unable to parse maximum PD volumes value, using default value",
+		},
+		{
+			rawMaxVols: "-2",
+			expected:   defaultValue,
+			test:       "Maximum PD volumes must be a positive value, using default value",
+		},
+		{
+			rawMaxVols: "40",
+			expected:   40,
+			test:       "Parse maximum PD volumes value from env",
+		},
+	}
+
+	for _, test := range tests {
+		os.Setenv(KubeMaxPDVols, test.rawMaxVols)
+		result := getMaxVols(defaultValue)
+		if result != test.expected {
+			t.Errorf("%s: expected %v got %v", test.test, test.expected, result)
+		}
+	}
+
+	os.Unsetenv(KubeMaxPDVols)
+	if previousValue != "" {
+		os.Setenv(KubeMaxPDVols, previousValue)
 	}
 }

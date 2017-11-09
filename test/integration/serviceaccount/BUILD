@@ -12,6 +12,7 @@ go_test(
         "main_test.go",
         "service_account_test.go",
     ],
+    importpath = "k8s.io/kubernetes/test/integration/serviceaccount",
     tags = ["integration"],
     deps = [
         "//pkg/api/testapi:go_default_library",
@@ -20,6 +21,7 @@ go_test(
         "//pkg/controller:go_default_library",
         "//pkg/controller/serviceaccount:go_default_library",
         "//pkg/serviceaccount:go_default_library",
+        "//pkg/util/metrics:go_default_library",
         "//plugin/pkg/admission/serviceaccount:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

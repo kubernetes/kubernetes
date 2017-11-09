@@ -16,6 +16,7 @@ go_library(
         "watcher.go",
         "watcher_group.go",
     ],
+    importpath = "github.com/coreos/etcd/mvcc",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/lease:go_default_library",

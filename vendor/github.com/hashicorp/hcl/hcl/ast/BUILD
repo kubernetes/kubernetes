@@ -6,6 +6,7 @@ go_library(
         "ast.go",
         "walk.go",
     ],
+    importpath = "github.com/hashicorp/hcl/hcl/ast",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/hashicorp/hcl/hcl/token:go_default_library"],
 )

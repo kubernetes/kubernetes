@@ -17,8 +17,10 @@ go_library(
     data = [
         "@com_coreos_etcd//:etcd",
     ],
+    importpath = "k8s.io/kubernetes/test/integration/framework",
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/policy/v1alpha1:go_default_library",

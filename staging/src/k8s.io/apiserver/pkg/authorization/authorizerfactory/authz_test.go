@@ -27,7 +27,7 @@ import (
 // and always return nil.
 func TestNewAlwaysAllowAuthorizer(t *testing.T) {
 	aaa := NewAlwaysAllowAuthorizer()
-	if authorized, _, _ := aaa.Authorize(nil); !authorized {
+	if decision, _, _ := aaa.Authorize(nil); decision != authorizer.DecisionAllow {
 		t.Errorf("AlwaysAllowAuthorizer.Authorize did not authorize successfully.")
 	}
 }
@@ -36,7 +36,7 @@ func TestNewAlwaysAllowAuthorizer(t *testing.T) {
 // and always return an error as everything is forbidden.
 func TestNewAlwaysDenyAuthorizer(t *testing.T) {
 	ada := NewAlwaysDenyAuthorizer()
-	if authorized, _, _ := ada.Authorize(nil); authorized {
+	if decision, _, _ := ada.Authorize(nil); decision == authorizer.DecisionAllow {
 		t.Errorf("AlwaysDenyAuthorizer.Authorize returned nil instead of error.")
 	}
 }
@@ -47,10 +47,10 @@ func TestPrivilegedGroupAuthorizer(t *testing.T) {
 	yes := authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"no", "allow-01"}}}
 	no := authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"no", "deny-01"}}}
 
-	if authorized, _, _ := auth.Authorize(yes); !authorized {
+	if authorized, _, _ := auth.Authorize(yes); authorized != authorizer.DecisionAllow {
 		t.Errorf("failed")
 	}
-	if authorized, _, _ := auth.Authorize(no); authorized {
+	if authorized, _, _ := auth.Authorize(no); authorized == authorizer.DecisionAllow {
 		t.Errorf("failed")
 	}
 }

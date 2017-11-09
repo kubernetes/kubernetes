@@ -281,7 +281,7 @@ func testVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framew
 		}
 	}()
 	By(fmt.Sprintf("Deleting Pod %q", clientPod.Name))
-	err = c.Core().Pods(clientPod.Namespace).Delete(clientPod.Name, &metav1.DeleteOptions{})
+	err = c.CoreV1().Pods(clientPod.Namespace).Delete(clientPod.Name, &metav1.DeleteOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	By("Starting the kubelet and waiting for pod to delete.")
 	kubeletCommand(kStart, c, clientPod)

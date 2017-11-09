@@ -8,6 +8,7 @@ go_library(
         "error.go",
         "soap.go",
     ],
+    importpath = "github.com/vmware/govmomi/vim25/soap",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/vmware/govmomi/vim25/debug:go_default_library",

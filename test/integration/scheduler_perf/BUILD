@@ -12,8 +12,9 @@ go_library(
         "scheduler_perf_types.go",
         "util.go",
     ],
+    importpath = "k8s.io/kubernetes/test/integration/scheduler_perf",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//plugin/pkg/scheduler:go_default_library",
         "//plugin/pkg/scheduler/algorithmprovider:go_default_library",
@@ -37,6 +38,7 @@ go_test(
         "scheduler_bench_test.go",
         "scheduler_test.go",
     ],
+    importpath = "k8s.io/kubernetes/test/integration/scheduler_perf",
     library = ":go_default_library",
     tags = ["integration"],
     deps = [

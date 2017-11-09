@@ -33,7 +33,7 @@ function create-master-instance-with-resources {
     --type "${MASTER_DISK_TYPE}" \
     --size "${MASTER_DISK_SIZE}"
   
-  if [ "${EVENT_PD:-false}" == "true" ]; then
+  if [ "${EVENT_PD:-}" == "true" ]; then
     run-gcloud-compute-with-retries disks create "${MASTER_NAME}-event-pd" \
       ${GCLOUD_COMMON_ARGS} \
       --type "${MASTER_DISK_TYPE}" \
@@ -61,8 +61,8 @@ function create-master-instance-with-resources {
     --image-project="${MASTER_IMAGE_PROJECT}" \
     --image "${MASTER_IMAGE}" \
     --tags "${MASTER_TAG}" \
-    --subnet "${NETWORK}" \
-    --scopes "storage-ro,compute-rw,logging-write" \
+    --subnet "${SUBNETWORK:-${NETWORK}}" \
+    --scopes "storage-ro,logging-write" \
     --boot-disk-size "${MASTER_ROOT_DISK_SIZE}" \
     --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
 
@@ -70,7 +70,7 @@ function create-master-instance-with-resources {
     ${GCLOUD_COMMON_ARGS} \
     --metadata-from-file startup-script="${KUBE_ROOT}/test/kubemark/resources/start-kubemark-master.sh"
   
-  if [ "${EVENT_PD:-false}" == "true" ]; then
+  if [ "${EVENT_PD:-}" == "true" ]; then
     echo "Attaching ${MASTER_NAME}-event-pd to ${MASTER_NAME}"
     run-gcloud-compute-with-retries instances attach-disk "${MASTER_NAME}" \
     ${GCLOUD_COMMON_ARGS} \

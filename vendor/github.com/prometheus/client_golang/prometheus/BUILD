@@ -23,6 +23,7 @@ go_library(
         "value.go",
         "vec.go",
     ],
+    importpath = "github.com/prometheus/client_golang/prometheus",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/beorn7/perks/quantile:go_default_library",

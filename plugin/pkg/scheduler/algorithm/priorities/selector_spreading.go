@@ -171,7 +171,10 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *v1.Pod, nodeNameToInfo map
 		if haveZones {
 			zoneId := utilnode.GetZoneKey(node)
 			if zoneId != "" {
-				zoneScore := float64(schedulerapi.MaxPriority) * ((maxCountByZone - countsByZone[zoneId]) / maxCountByZone)
+				zoneScore := float64(schedulerapi.MaxPriority)
+				if maxCountByZone > 0 {
+					zoneScore = float64(schedulerapi.MaxPriority) * ((maxCountByZone - countsByZone[zoneId]) / maxCountByZone)
+				}
 				fScore = (fScore * (1.0 - zoneWeighting)) + (zoneWeighting * zoneScore)
 			}
 		}

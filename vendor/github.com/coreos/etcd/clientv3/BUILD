@@ -21,6 +21,7 @@ go_library(
         "txn.go",
         "watch.go",
     ],
+    importpath = "github.com/coreos/etcd/clientv3",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/auth/authpb:go_default_library",

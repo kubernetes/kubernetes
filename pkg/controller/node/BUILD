@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["nodecontroller_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/controller/node",
     library = ":go_default_library",
     deps = [
         "//pkg/cloudprovider:go_default_library",
@@ -46,6 +47,7 @@ go_library(
         "metrics.go",
         "node_controller.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/node",
     deps = [
         "//pkg/api/v1/node:go_default_library",
         "//pkg/cloudprovider:go_default_library",
@@ -58,7 +60,6 @@ go_library(
         "//pkg/util/node:go_default_library",
         "//pkg/util/system:go_default_library",
         "//pkg/util/taints:go_default_library",
-        "//pkg/util/version:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",

@@ -30,7 +30,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -98,7 +97,7 @@ func (kl *Kubelet) registerWithAPIServer() {
 // a different externalID value, it attempts to delete that node so that a
 // later attempt can recreate it.
 func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
-	_, err := kl.kubeClient.Core().Nodes().Create(node)
+	_, err := kl.kubeClient.CoreV1().Nodes().Create(node)
 	if err == nil {
 		return true
 	}
@@ -108,7 +107,7 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 		return false
 	}
 
-	existingNode, err := kl.kubeClient.Core().Nodes().Get(string(kl.nodeName), metav1.GetOptions{})
+	existingNode, err := kl.kubeClient.CoreV1().Nodes().Get(string(kl.nodeName), metav1.GetOptions{})
 	if err != nil {
 		glog.Errorf("Unable to register node %q with API server: error getting existing node: %v", kl.nodeName, err)
 		return false
@@ -118,15 +117,9 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 		return false
 	}
 
-	clonedNode, err := conversion.NewCloner().DeepCopy(existingNode)
-	if err != nil {
-		glog.Errorf("Unable to clone %q node object %#v: %v", kl.nodeName, existingNode, err)
-		return false
-	}
-
-	originalNode, ok := clonedNode.(*v1.Node)
-	if !ok || originalNode == nil {
-		glog.Errorf("Unable to cast %q node object %#v to v1.Node", kl.nodeName, clonedNode)
+	originalNode := existingNode.DeepCopy()
+	if originalNode == nil {
+		glog.Errorf("Nil %q node object", kl.nodeName)
 		return false
 	}
 
@@ -153,7 +146,7 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 		"Previously node %q had externalID %q; now it is %q; will delete and recreate.",
 		kl.nodeName, node.Spec.ExternalID, existingNode.Spec.ExternalID,
 	)
-	if err := kl.kubeClient.Core().Nodes().Delete(node.Name, nil); err != nil {
+	if err := kl.kubeClient.CoreV1().Nodes().Delete(node.Name, nil); err != nil {
 		glog.Errorf("Unable to register node %q with API server: error deleting old node: %v", kl.nodeName, err)
 	} else {
 		glog.Infof("Deleted old node object %q", kl.nodeName)
@@ -176,6 +169,10 @@ func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool 
 	var needsUpdate bool = false
 	//Set default labels but make sure to not set labels with empty values
 	for _, label := range defaultLabels {
+		if _, hasInitialValue := initialNode.Labels[label]; !hasInitialValue {
+			continue
+		}
+
 		if existingNode.Labels[label] != initialNode.Labels[label] {
 			existingNode.Labels[label] = initialNode.Labels[label]
 			needsUpdate = true
@@ -279,7 +276,7 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		glog.Infof("Controller attach/detach is disabled for this node; Kubelet will attach and detach volumes")
 	}
 
-	if kl.kubeletConfiguration.KeepTerminatedPodVolumes {
+	if kl.keepTerminatedPodVolumes {
 		if node.Annotations == nil {
 			node.Annotations = make(map[string]string)
 		}
@@ -409,14 +406,9 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
 	}
 
-	clonedNode, err := conversion.NewCloner().DeepCopy(node)
-	if err != nil {
-		return fmt.Errorf("error clone node %q: %v", kl.nodeName, err)
-	}
-
-	originalNode, ok := clonedNode.(*v1.Node)
-	if !ok || originalNode == nil {
-		return fmt.Errorf("failed to cast %q node object %#v to v1.Node", kl.nodeName, clonedNode)
+	originalNode := node.DeepCopy()
+	if originalNode == nil {
+		return fmt.Errorf("nil %q node object", kl.nodeName)
 	}
 
 	kl.updatePodCIDR(node.Spec.PodCIDR)
@@ -453,6 +445,9 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 
 	if kl.externalCloudProvider {
 		if kl.nodeIP != nil {
+			if node.ObjectMeta.Annotations == nil {
+				node.ObjectMeta.Annotations = make(map[string]string)
+			}
 			node.ObjectMeta.Annotations[kubeletapis.AnnotationProvidedIPAddr] = kl.nodeIP.String()
 		}
 		// We rely on the external cloud provider to supply the addresses.
@@ -606,15 +601,6 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 				if v1helper.IsExtendedResourceName(k) {
 					glog.V(2).Infof("Update capacity for %s to %d", k, v.Value())
 					node.Status.Capacity[k] = v
-				}
-			}
-			// Remove stale extended resources.
-			for k := range node.Status.Capacity {
-				if v1helper.IsExtendedResourceName(k) {
-					if _, ok := currentCapacity[k]; !ok {
-						glog.V(2).Infof("delete capacity for %s", k)
-						delete(node.Status.Capacity, k)
-					}
 				}
 			}
 		}

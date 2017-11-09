@@ -12,9 +12,11 @@ go_library(
         "doc.go",
         "strategy.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/registry/core/pod",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/helper/qos:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/pod:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/kubelet/client:go_default_library",
@@ -40,9 +42,11 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["strategy_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/core/pod",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/kubelet/client:go_default_library",

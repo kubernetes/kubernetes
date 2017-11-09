@@ -6,6 +6,7 @@ go_library(
         "size.go",
         "sizetest.go",
     ],
+    importpath = "github.com/gogo/protobuf/plugin/size",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",

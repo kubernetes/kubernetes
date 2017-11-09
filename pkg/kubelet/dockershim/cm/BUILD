@@ -19,6 +19,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim/cm",
     deps = [
         "//pkg/kubelet/dockershim/libdocker:go_default_library",
     ] + select({

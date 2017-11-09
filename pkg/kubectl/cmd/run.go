@@ -214,16 +214,15 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 	if err != nil {
 		return err
 	}
-	resourcesList, err := clientset.Discovery().ServerResources()
-	// ServerResources ignores errors for old servers do not expose discovery
-	if err != nil {
-		return fmt.Errorf("failed to discover supported resources: %v", err)
-	}
 
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
 	schedule := cmdutil.GetFlagString(cmd, "schedule")
 	if len(schedule) != 0 && len(generatorName) == 0 {
-		if cmdutil.Contains(resourcesList, batchv1beta1.SchemeGroupVersion.WithResource("cronjobs")) {
+		hasResource, err := cmdutil.HasResource(clientset.Discovery(), batchv1beta1.SchemeGroupVersion.WithResource("cronjobs"))
+		if err != nil {
+			return err
+		}
+		if hasResource {
 			generatorName = cmdutil.CronJobV1Beta1GeneratorName
 		} else {
 			generatorName = cmdutil.CronJobV2Alpha1GeneratorName
@@ -234,13 +233,21 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 		case api.RestartPolicyAlways:
 			// TODO: we need to deprecate this along with extensions/v1beta1.Deployments
 			// in favor of the new generator for apps/v1beta1.Deployments
-			if cmdutil.Contains(resourcesList, extensionsv1beta1.SchemeGroupVersion.WithResource("deployments")) {
+			hasResource, err := cmdutil.HasResource(clientset.Discovery(), extensionsv1beta1.SchemeGroupVersion.WithResource("deployments"))
+			if err != nil {
+				return err
+			}
+			if hasResource {
 				generatorName = cmdutil.DeploymentV1Beta1GeneratorName
 			} else {
 				generatorName = cmdutil.RunV1GeneratorName
 			}
 		case api.RestartPolicyOnFailure:
-			if cmdutil.Contains(resourcesList, batchv1.SchemeGroupVersion.WithResource("jobs")) {
+			hasResource, err := cmdutil.HasResource(clientset.Discovery(), batchv1.SchemeGroupVersion.WithResource("jobs"))
+			if err != nil {
+				return err
+			}
+			if hasResource {
 				generatorName = cmdutil.JobV1GeneratorName
 			} else {
 				generatorName = cmdutil.RunPodV1GeneratorName
@@ -250,7 +257,10 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 		}
 	}
 
-	generatorName = cmdutil.FallbackGeneratorNameIfNecessary(generatorName, resourcesList, cmdErr)
+	generatorName, err = cmdutil.FallbackGeneratorNameIfNecessary(generatorName, clientset.Discovery(), cmdErr)
+	if err != nil {
+		return err
+	}
 
 	generators := f.Generators("run")
 	generator, found := generators[generatorName]
@@ -326,7 +336,7 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 		leaveStdinOpen := cmdutil.GetFlagBool(cmd, "leave-stdin-open")
 		waitForExitCode := !leaveStdinOpen && restartPolicy == api.RestartPolicyNever
 		if waitForExitCode {
-			pod, err = waitForPodTerminated(clientset.Core(), attachablePod.Namespace, attachablePod.Name)
+			pod, err = waitForPod(clientset.Core(), attachablePod.Namespace, attachablePod.Name, conditions.PodCompleted)
 			if err != nil {
 				return err
 			}
@@ -416,33 +426,17 @@ func waitForPod(podClient coreclient.PodsGetter, ns, name string, exitCondition 
 		}
 		return err
 	})
+
+	// Fix generic not found error.
+	if err != nil && errors.IsNotFound(err) {
+		err = errors.NewNotFound(api.Resource("pods"), name)
+	}
+
 	return result, err
 }
 
-func waitForPodRunning(podClient coreclient.PodsGetter, ns, name string) (*api.Pod, error) {
-	pod, err := waitForPod(podClient, ns, name, conditions.PodRunningAndReady)
-
-	// fix generic not found error with empty name in PodRunningAndReady
-	if err != nil && errors.IsNotFound(err) {
-		return nil, errors.NewNotFound(api.Resource("pods"), name)
-	}
-
-	return pod, err
-}
-
-func waitForPodTerminated(podClient coreclient.PodsGetter, ns, name string) (*api.Pod, error) {
-	pod, err := waitForPod(podClient, ns, name, conditions.PodCompleted)
-
-	// fix generic not found error with empty name in PodCompleted
-	if err != nil && errors.IsNotFound(err) {
-		return nil, errors.NewNotFound(api.Resource("pods"), name)
-	}
-
-	return pod, err
-}
-
 func handleAttachPod(f cmdutil.Factory, podClient coreclient.PodsGetter, ns, name string, opts *AttachOptions) error {
-	pod, err := waitForPodRunning(podClient, ns, name)
+	pod, err := waitForPod(podClient, ns, name, conditions.PodRunningAndReady)
 	if err != nil && err != conditions.ErrPodCompleted {
 		return err
 	}

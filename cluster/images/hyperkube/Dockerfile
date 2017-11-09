@@ -15,23 +15,20 @@
 FROM BASEIMAGE
 
 # Create symlinks for each hyperkube server
-# Also create symlinks to /usr/local/bin/ where the server image binaries live, so the hyperkube image may be 
+# Also create symlinks to /usr/local/bin/ where the server image binaries live, so the hyperkube image may be
 # used instead of gcr.io/google_containers/kube-* without any modifications.
 # TODO: replace manual symlink creation with --make-symlink command once
 # cross-building with qemu supports go binaries. See #28702
 # RUN /hyperkube --make-symlinks
 RUN ln -s /hyperkube /apiserver \
  && ln -s /hyperkube /controller-manager \
- && ln -s /hyperkube /federation-apiserver \
- && ln -s /hyperkube /federation-controller-manager \
  && ln -s /hyperkube /kubectl \
  && ln -s /hyperkube /kubelet \
  && ln -s /hyperkube /proxy \
  && ln -s /hyperkube /scheduler \
+  && ln -s /hyperkube /aggerator \
  && ln -s /hyperkube /usr/local/bin/kube-apiserver \
  && ln -s /hyperkube /usr/local/bin/kube-controller-manager \
- && ln -s /hyperkube /usr/local/bin/federation-apiserver \
- && ln -s /hyperkube /usr/local/bin/federation-controller-manager \
  && ln -s /hyperkube /usr/local/bin/kubectl \
  && ln -s /hyperkube /usr/local/bin/kubelet \
  && ln -s /hyperkube /usr/local/bin/kube-proxy \

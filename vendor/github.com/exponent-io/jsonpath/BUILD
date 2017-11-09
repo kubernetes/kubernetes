@@ -7,6 +7,7 @@ go_library(
         "path.go",
         "pathaction.go",
     ],
+    importpath = "github.com/exponent-io/jsonpath",
     visibility = ["//visibility:public"],
 )
 

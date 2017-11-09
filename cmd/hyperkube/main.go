@@ -46,9 +46,5 @@ func main() {
 	hk.AddServer(NewKubeProxy())
 	hk.AddServer(NewKubeAggregator())
 
-	//Federation servers
-	hk.AddServer(NewFederationAPIServer())
-	hk.AddServer(NewFederationCMServer())
-
 	hk.RunToExit(os.Args)
 }

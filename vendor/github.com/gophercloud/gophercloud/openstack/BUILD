@@ -9,6 +9,7 @@ go_library(
         "endpoint_location.go",
         "errors.go",
     ],
+    importpath = "github.com/gophercloud/gophercloud/openstack",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/gophercloud/gophercloud:go_default_library",
@@ -29,7 +30,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/common/extensions:all-srcs",

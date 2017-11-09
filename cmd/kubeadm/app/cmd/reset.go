@@ -30,17 +30,23 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/util/initsystem"
+	utilsexec "k8s.io/utils/exec"
+)
+
+var (
+	crictlParamsFormat = "%s -r %s sandboxes --quiet | xargs -r %s -r %s rms"
 )
 
 // NewCmdReset returns the "kubeadm reset" command
 func NewCmdReset(out io.Writer) *cobra.Command {
 	var skipPreFlight bool
 	var certsDir string
+	var criSocketPath string
 	cmd := &cobra.Command{
 		Use:   "reset",
 		Short: "Run this to revert any changes made to this host by 'kubeadm init' or 'kubeadm join'.",
 		Run: func(cmd *cobra.Command, args []string) {
-			r, err := NewReset(skipPreFlight, certsDir)
+			r, err := NewReset(skipPreFlight, certsDir, criSocketPath)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(r.Run(out))
 		},
@@ -48,7 +54,7 @@ func NewCmdReset(out io.Writer) *cobra.Command {
 
 	cmd.PersistentFlags().BoolVar(
 		&skipPreFlight, "skip-preflight-checks", false,
-		"Skip preflight checks normally run before modifying the system",
+		"Skip preflight checks normally run before modifying the system.",
 	)
 
 	cmd.PersistentFlags().StringVar(
@@ -56,28 +62,35 @@ func NewCmdReset(out io.Writer) *cobra.Command {
 		"The path to the directory where the certificates are stored. If specified, clean this directory.",
 	)
 
+	cmd.PersistentFlags().StringVar(
+		&criSocketPath, "cri-socket", "/var/run/dockershim.sock",
+		"The path to the CRI socket to use with crictl when cleaning up containers.",
+	)
+
 	return cmd
 }
 
 // Reset defines struct used for kubeadm reset command
 type Reset struct {
-	certsDir string
+	certsDir      string
+	criSocketPath string
 }
 
 // NewReset instantiate Reset struct
-func NewReset(skipPreFlight bool, certsDir string) (*Reset, error) {
+func NewReset(skipPreFlight bool, certsDir, criSocketPath string) (*Reset, error) {
 	if !skipPreFlight {
-		fmt.Println("[preflight] Running pre-flight checks")
+		fmt.Println("[preflight] Running pre-flight checks.")
 
 		if err := preflight.RunRootCheckOnly(); err != nil {
 			return nil, err
 		}
 	} else {
-		fmt.Println("[preflight] Skipping pre-flight checks")
+		fmt.Println("[preflight] Skipping pre-flight checks.")
 	}
 
 	return &Reset{
-		certsDir: certsDir,
+		certsDir:      certsDir,
+		criSocketPath: criSocketPath,
 	}, nil
 }
 
@@ -90,7 +103,7 @@ func (r *Reset) Run(out io.Writer) error {
 		fmt.Println("[reset] WARNING: The kubelet service couldn't be stopped by kubeadm because no supported init system was detected.")
 		fmt.Println("[reset] WARNING: Please ensure kubelet is stopped manually.")
 	} else {
-		fmt.Println("[reset] Stopping the kubelet service")
+		fmt.Println("[reset] Stopping the kubelet service.")
 		if err := initSystem.ServiceStop("kubelet"); err != nil {
 			fmt.Printf("[reset] WARNING: The kubelet service couldn't be stopped by kubeadm: [%v]\n", err)
 			fmt.Println("[reset] WARNING: Please ensure kubelet is stopped manually.")
@@ -105,15 +118,11 @@ func (r *Reset) Run(out io.Writer) error {
 		fmt.Printf("[reset] Failed to unmount mounted directories in /var/lib/kubelet: %s\n", string(umountOutputBytes))
 	}
 
+	fmt.Println("[reset] Removing kubernetes-managed containers.")
 	dockerCheck := preflight.ServiceCheck{Service: "docker", CheckIfActive: true}
-	if _, errors := dockerCheck.Check(); len(errors) == 0 {
-		fmt.Println("[reset] Removing kubernetes-managed containers")
-		if err := exec.Command("sh", "-c", "docker ps -a --filter name=k8s_ -q | xargs -r docker rm --force --volumes").Run(); err != nil {
-			fmt.Println("[reset] Failed to stop the running containers")
-		}
-	} else {
-		fmt.Println("[reset] docker doesn't seem to be running, skipping the removal of running kubernetes containers")
-	}
+	execer := utilsexec.New()
+
+	reset(execer, dockerCheck, r.criSocketPath)
 
 	dirsToClean := []string{"/var/lib/kubelet", "/etc/cni/net.d", "/var/lib/dockershim", "/var/run/kubernetes"}
 
@@ -133,9 +142,45 @@ func (r *Reset) Run(out io.Writer) error {
 	}
 
 	// Remove contents from the config and pki directories
+	if r.certsDir != kubeadmapiext.DefaultCertificatesDir {
+		fmt.Printf("[reset] WARNING: Cleaning a non-default certificates directory: %q\n", r.certsDir)
+	}
 	resetConfigDir(kubeadmconstants.KubernetesDir, r.certsDir)
 
 	return nil
+}
+
+func reset(execer utilsexec.Interface, dockerCheck preflight.Checker, criSocketPath string) {
+	crictlPath, err := execer.LookPath("crictl")
+	if err == nil {
+		resetWithCrictl(execer, dockerCheck, criSocketPath, crictlPath)
+	} else {
+		resetWithDocker(execer, dockerCheck)
+	}
+}
+
+func resetWithDocker(execer utilsexec.Interface, dockerCheck preflight.Checker) {
+	if _, errors := dockerCheck.Check(); len(errors) == 0 {
+		if err := execer.Command("sh", "-c", "docker ps -a --filter name=k8s_ -q | xargs -r docker rm --force --volumes").Run(); err != nil {
+			fmt.Println("[reset] Failed to stop the running containers.")
+		}
+	} else {
+		fmt.Println("[reset] Docker doesn't seem to be running. Skipping the removal of running Kubernetes containers.")
+	}
+}
+
+func resetWithCrictl(execer utilsexec.Interface, dockerCheck preflight.Checker, criSocketPath, crictlPath string) {
+	if criSocketPath != "" {
+		fmt.Printf("[reset] Cleaning up running containers using crictl with socket %s\n", criSocketPath)
+		cmd := fmt.Sprintf(crictlParamsFormat, crictlPath, criSocketPath, crictlPath, criSocketPath)
+		if err := execer.Command("sh", "-c", cmd).Run(); err != nil {
+			fmt.Println("[reset] Failed to stop the running containers using crictl. Trying using docker instead.")
+			resetWithDocker(execer, dockerCheck)
+		}
+	} else {
+		fmt.Println("[reset] CRI socket path not provided for crictl. Trying docker instead.")
+		resetWithDocker(execer, dockerCheck)
+	}
 }
 
 // cleanDir removes everything in a directory, but not the directory itself

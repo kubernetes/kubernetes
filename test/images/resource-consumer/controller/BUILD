@@ -8,12 +8,14 @@ load(
 
 go_binary(
     name = "controller",
+    importpath = "k8s.io/kubernetes/test/images/resource-consumer/controller",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["controller.go"],
+    importpath = "k8s.io/kubernetes/test/images/resource-consumer/controller",
     deps = ["//test/images/resource-consumer/common:go_default_library"],
 )
 

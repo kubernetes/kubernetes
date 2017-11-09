@@ -43,18 +43,25 @@ func (f *fakeHTTP) Get(url string) (*http.Response, error) {
 	return nil, f.err
 }
 
-type fakePodDeletionProvider struct {
-	pods map[types.UID]struct{}
+type fakePodStateProvider struct {
+	existingPods map[types.UID]struct{}
+	runningPods  map[types.UID]struct{}
 }
 
-func newFakePodDeletionProvider() *fakePodDeletionProvider {
-	return &fakePodDeletionProvider{
-		pods: make(map[types.UID]struct{}),
+func newFakePodStateProvider() *fakePodStateProvider {
+	return &fakePodStateProvider{
+		existingPods: make(map[types.UID]struct{}),
+		runningPods:  make(map[types.UID]struct{}),
 	}
 }
 
-func (f *fakePodDeletionProvider) IsPodDeleted(uid types.UID) bool {
-	_, found := f.pods[uid]
+func (f *fakePodStateProvider) IsPodDeleted(uid types.UID) bool {
+	_, found := f.existingPods[uid]
+	return !found
+}
+
+func (f *fakePodStateProvider) IsPodTerminated(uid types.UID) bool {
+	_, found := f.runningPods[uid]
 	return !found
 }
 
@@ -79,7 +86,7 @@ func NewFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		return nil, err
 	}
 
-	kubeRuntimeManager.containerGC = NewContainerGC(runtimeService, newFakePodDeletionProvider(), kubeRuntimeManager)
+	kubeRuntimeManager.containerGC = NewContainerGC(runtimeService, newFakePodStateProvider(), kubeRuntimeManager)
 	kubeRuntimeManager.runtimeName = typedVersion.RuntimeName
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),

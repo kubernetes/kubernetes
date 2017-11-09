@@ -85,18 +85,19 @@ func defaultVersion(versions []Version) Version {
 }
 
 // ToGroupVersionPackages is a helper function used by generators for groups.
-func ToGroupVersionPackages(groups []GroupVersions) []GroupVersionPackage {
+func ToGroupVersionPackages(groups []GroupVersions, groupGoNames map[GroupVersion]string) []GroupVersionPackage {
 	var groupVersionPackages []GroupVersionPackage
 	for _, group := range groups {
 		defaultVersion := defaultVersion(group.Versions)
 		for _, version := range group.Versions {
+			groupGoName := groupGoNames[GroupVersion{Group: group.Group, Version: version}]
 			groupVersionPackages = append(groupVersionPackages, GroupVersionPackage{
-				Group:                 Group(namer.IC(group.Group.NonEmpty())),
-				Version:               Version(namer.IC(version.String())),
-				GroupVersion:          namer.IC(group.Group.NonEmpty()) + namer.IC(version.String()),
-				LowerCaseGroupVersion: namer.IL(group.Group.NonEmpty()) + namer.IC(version.String()),
-				PackageName:           strings.ToLower(group.Group.NonEmpty() + version.NonEmpty()),
-				IsDefaultVersion:      version == defaultVersion && version != "",
+				Group:                Group(namer.IC(group.Group.NonEmpty())),
+				Version:              Version(namer.IC(version.String())),
+				PackageName:          strings.ToLower(group.PackageName + version.NonEmpty()),
+				IsDefaultVersion:     version == defaultVersion && version != "",
+				GroupGoName:          groupGoName,
+				LowerCaseGroupGoName: namer.IL(groupGoName),
 			})
 		}
 	}
@@ -108,7 +109,7 @@ func ToGroupInstallPackages(groups []GroupVersions) []GroupInstallPackage {
 	for _, group := range groups {
 		groupInstallPackages = append(groupInstallPackages, GroupInstallPackage{
 			Group:              Group(namer.IC(group.Group.NonEmpty())),
-			InstallPackageName: strings.ToLower(group.Group.NonEmpty()),
+			InstallPackageName: group.PackageName,
 		})
 	}
 	return groupInstallPackages

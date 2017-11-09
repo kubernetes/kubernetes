@@ -1,0 +1,17 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    run: hostname
+  name: hostname
+spec:
+  template:
+    metadata:
+      labels:
+        run: hostname
+    spec:
+      containers:
+      - image: gcr.io/kubernetes-e2e-test-images/serve-hostname-amd64:1.1
+        imagePullPolicy: IfNotPresent
+        name: hostname
+      terminationGracePeriodSeconds: 120

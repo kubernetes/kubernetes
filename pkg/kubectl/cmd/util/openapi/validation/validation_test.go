@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validation_test
+package validation
 
 import (
 	"path/filepath"
@@ -23,23 +23,23 @@ import (
 	. "github.com/onsi/gomega"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/kube-openapi/pkg/util/proto/validation"
 	// This dependency is needed to register API types.
 	_ "k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation"
 )
 
 var fakeSchema = tst.Fake{Path: filepath.Join("..", "..", "..", "..", "..", "..", "api", "openapi-spec", "swagger.json")}
 
 var _ = Describe("resource validation using OpenAPI Schema", func() {
-	var validator *validation.SchemaValidation
+	var validator *SchemaValidation
 	BeforeEach(func() {
 		s, err := fakeSchema.OpenAPISchema()
 		Expect(err).To(BeNil())
 		resources, err := openapi.NewOpenAPIData(s)
 		Expect(err).To(BeNil())
-		validator = validation.NewSchemaValidation(resources)
+		validator = NewSchemaValidation(resources)
 		Expect(validator).ToNot(BeNil())
 	})
 
@@ -334,5 +334,64 @@ items:
 `))
 
 		Expect(err).To(BeNil())
+	})
+
+	It("fails because apiVersion is not provided", func() {
+		err := validator.ValidateBytes([]byte(`
+kind: Pod
+metadata:
+  name: name
+spec:
+  containers:
+  - name: name
+    image: image
+`))
+		Expect(err.Error()).To(Equal("apiVersion not set"))
+	})
+
+	It("fails because apiVersion type is not string and kind is not provided", func() {
+		err := validator.ValidateBytes([]byte(`
+apiVersion: 1
+metadata:
+  name: name
+spec:
+  containers:
+  - name: name
+    image: image
+`))
+		Expect(err.Error()).To(Equal("[apiVersion isn't string type, kind not set]"))
+	})
+
+	It("fails because List first item is missing kind and second item is missing apiVersion", func() {
+		err := validator.ValidateBytes([]byte(`
+apiVersion: v1
+kind: List
+items:
+- apiVersion: v1
+  metadata:
+    name: name
+  spec:
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          name: name
+      spec:
+        containers:
+        - name: name
+          image: image
+- kind: Service
+  metadata:
+    name: name
+  spec:
+    type: NodePort
+    ports:
+    - port: 123
+      targetPort: 1234
+      name: name
+    selector:
+      name: name
+`))
+		Expect(err.Error()).To(Equal("[kind not set, apiVersion not set]"))
 	})
 })

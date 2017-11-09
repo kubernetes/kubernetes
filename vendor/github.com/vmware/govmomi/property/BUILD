@@ -7,6 +7,7 @@ go_library(
         "filter.go",
         "wait.go",
     ],
+    importpath = "github.com/vmware/govmomi/property",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/vmware/govmomi/vim25:go_default_library",

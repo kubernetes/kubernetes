@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from charms.templating.jinja2 import render
+from charmhelpers.core.templating import render
 from charms.reactive import is_state
 from charmhelpers.core.hookenv import action_get
 from charmhelpers.core.hookenv import action_set

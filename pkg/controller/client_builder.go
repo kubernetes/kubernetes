@@ -35,6 +35,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 
 	"github.com/golang/glog"
@@ -237,7 +238,7 @@ func (b SAControllerClientBuilder) getAuthenticatedConfig(sa *v1.ServiceAccount,
 	// If we couldn't run the token review, the API might be disabled or we might not have permission.
 	// Try to make a request to /apis with the token. If we get a 401 we should consider the token invalid.
 	clientConfigCopy := *clientConfig
-	clientConfigCopy.NegotiatedSerializer = api.Codecs
+	clientConfigCopy.NegotiatedSerializer = legacyscheme.Codecs
 	client, err := restclient.UnversionedRESTClientFor(&clientConfigCopy)
 	if err != nil {
 		return nil, false, err

@@ -12,6 +12,7 @@ go_library(
         "fake_apiregistration_client.go",
         "fake_apiservice.go",
     ],
+    importpath = "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion/fake",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",

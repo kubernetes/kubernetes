@@ -6,6 +6,7 @@ go_library(
         "equal.go",
         "equaltest.go",
     ],
+    importpath = "github.com/gogo/protobuf/plugin/equal",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",

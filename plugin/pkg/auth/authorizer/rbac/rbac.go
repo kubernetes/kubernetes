@@ -69,12 +69,12 @@ func (v *authorizingVisitor) visit(rule *rbac.PolicyRule, err error) bool {
 	return true
 }
 
-func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (bool, string, error) {
+func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
 	ruleCheckingVisitor := &authorizingVisitor{requestAttributes: requestAttributes}
 
 	r.authorizationRuleResolver.VisitRulesFor(requestAttributes.GetUser(), requestAttributes.GetNamespace(), ruleCheckingVisitor.visit)
 	if ruleCheckingVisitor.allowed {
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 	}
 
 	// Build a detailed log of the denial.
@@ -120,7 +120,7 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (boo
 	if len(ruleCheckingVisitor.errors) > 0 {
 		reason = fmt.Sprintf("%v", utilerrors.NewAggregate(ruleCheckingVisitor.errors))
 	}
-	return false, reason, nil
+	return authorizer.DecisionNoOpinion, reason, nil
 }
 
 func (r *RBACAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
@@ -174,14 +174,14 @@ func RulesAllow(requestAttributes authorizer.Attributes, rules ...rbac.PolicyRul
 
 func RuleAllows(requestAttributes authorizer.Attributes, rule *rbac.PolicyRule) bool {
 	if requestAttributes.IsResourceRequest() {
-		resource := requestAttributes.GetResource()
+		combinedResource := requestAttributes.GetResource()
 		if len(requestAttributes.GetSubresource()) > 0 {
-			resource = requestAttributes.GetResource() + "/" + requestAttributes.GetSubresource()
+			combinedResource = requestAttributes.GetResource() + "/" + requestAttributes.GetSubresource()
 		}
 
 		return rbac.VerbMatches(rule, requestAttributes.GetVerb()) &&
 			rbac.APIGroupMatches(rule, requestAttributes.GetAPIGroup()) &&
-			rbac.ResourceMatches(rule, resource) &&
+			rbac.ResourceMatches(rule, combinedResource, requestAttributes.GetSubresource()) &&
 			rbac.ResourceNameMatches(rule, requestAttributes.GetName())
 	}
 

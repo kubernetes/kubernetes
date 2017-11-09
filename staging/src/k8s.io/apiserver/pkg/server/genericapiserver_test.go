@@ -84,7 +84,7 @@ func testGetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi
 
 // setUp is a convience function for setting up for (most) tests.
 func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
-	etcdServer, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, scheme)
+	etcdServer, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 
 	config := NewConfig(codecs)
 	config.PublicAddress = net.ParseIP("192.168.10.4")
@@ -437,9 +437,9 @@ type mockAuthorizer struct {
 	lastURI string
 }
 
-func (authz *mockAuthorizer) Authorize(a authorizer.Attributes) (authorized bool, reason string, err error) {
+func (authz *mockAuthorizer) Authorize(a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	authz.lastURI = a.GetPath()
-	return true, "", nil
+	return authorizer.DecisionAllow, "", nil
 }
 
 type mockAuthenticator struct {

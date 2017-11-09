@@ -34,7 +34,7 @@ fi
 echo "NOTE: $0 has been replaced by 'make test-e2e-node'"
 echo
 echo "This script supports a number of parameters passed as environment variables."
-echo "Please see the Makfile for more details."
+echo "Please see the Makefile for more details."
 echo
 echo "The equivalent of this invocation is: "
 echo "    make test-e2e-node ${ARGHELP}"

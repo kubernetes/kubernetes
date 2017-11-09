@@ -469,31 +469,124 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 			expectedError: `externalAdmissionHooks[0].rules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
 		},
 		{
-			name: "FailurePolicy can only be \"Ignore\"",
+			name: "FailurePolicy can only be \"Ignore\" or \"Fail\"",
 			config: getExternalAdmissionHookConfiguration(
 				[]admissionregistration.ExternalAdmissionHook{
 					{
 						Name: "webhook.k8s.io",
 						FailurePolicy: func() *admissionregistration.FailurePolicyType {
-							r := admissionregistration.Fail
+							r := admissionregistration.FailurePolicyType("other")
 							return &r
 						}(),
 					},
 				}),
-			expectedError: `failurePolicy: Unsupported value: "Fail": supported values: Ignore`,
+			expectedError: `externalAdmissionHooks[0].failurePolicy: Unsupported value: "other": supported values: "Fail", "Ignore"`,
+		},
+		{
+			name: "URLPath must start with slash",
+			config: getExternalAdmissionHookConfiguration(
+				[]admissionregistration.ExternalAdmissionHook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.AdmissionHookClientConfig{
+							URLPath: "foo/",
+						},
+					},
+				}),
+			expectedError: `clientConfig.urlPath: Invalid value: "foo/": must start with a '/'`,
+		},
+		{
+			name: "URLPath accepts slash",
+			config: getExternalAdmissionHookConfiguration(
+				[]admissionregistration.ExternalAdmissionHook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.AdmissionHookClientConfig{
+							URLPath: "/",
+						},
+					},
+				}),
+			expectedError: ``,
+		},
+		{
+			name: "URLPath accepts no trailing slash",
+			config: getExternalAdmissionHookConfiguration(
+				[]admissionregistration.ExternalAdmissionHook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.AdmissionHookClientConfig{
+							URLPath: "/foo",
+						},
+					},
+				}),
+			expectedError: ``,
+		},
+		{
+			name: "URLPath fails //",
+			config: getExternalAdmissionHookConfiguration(
+				[]admissionregistration.ExternalAdmissionHook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.AdmissionHookClientConfig{
+							URLPath: "//",
+						},
+					},
+				}),
+			expectedError: `clientConfig.urlPath: Invalid value: "//": segment[0] may not be empty`,
+		},
+		{
+			name: "URLPath no empty step",
+			config: getExternalAdmissionHookConfiguration(
+				[]admissionregistration.ExternalAdmissionHook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.AdmissionHookClientConfig{
+							URLPath: "/foo//bar/",
+						},
+					},
+				}),
+			expectedError: `clientConfig.urlPath: Invalid value: "/foo//bar/": segment[1] may not be empty`,
+		}, {
+			name: "URLPath no empty step 2",
+			config: getExternalAdmissionHookConfiguration(
+				[]admissionregistration.ExternalAdmissionHook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.AdmissionHookClientConfig{
+							URLPath: "/foo/bar//",
+						},
+					},
+				}),
+			expectedError: `clientConfig.urlPath: Invalid value: "/foo/bar//": segment[2] may not be empty`,
+		},
+		{
+			name: "URLPath no non-subdomain",
+			config: getExternalAdmissionHookConfiguration(
+				[]admissionregistration.ExternalAdmissionHook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.AdmissionHookClientConfig{
+							URLPath: "/apis/foo.bar/v1alpha1/--bad",
+						},
+					},
+				}),
+			expectedError: `clientConfig.urlPath: Invalid value: "/apis/foo.bar/v1alpha1/--bad": segment[3]: a DNS-1123 subdomain`,
 		},
 	}
 	for _, test := range tests {
-		errs := ValidateExternalAdmissionHookConfiguration(test.config)
-		err := errs.ToAggregate()
-		if err != nil {
-			if e, a := test.expectedError, err.Error(); !strings.Contains(a, e) || e == "" {
-				t.Errorf("test case %s, expected to contain %s, got %s", test.name, e, a)
+		t.Run(test.name, func(t *testing.T) {
+			errs := ValidateExternalAdmissionHookConfiguration(test.config)
+			err := errs.ToAggregate()
+			if err != nil {
+				if e, a := test.expectedError, err.Error(); !strings.Contains(a, e) || e == "" {
+					t.Errorf("expected to contain %s, got %s", e, a)
+				}
+			} else {
+				if test.expectedError != "" {
+					t.Errorf("unexpected no error, expected to contain %s", test.expectedError)
+				}
 			}
-		} else {
-			if test.expectedError != "" {
-				t.Errorf("test case %s, unexpected no error, expected to contain %s", test.name, test.expectedError)
-			}
-		}
+		})
+
 	}
 }

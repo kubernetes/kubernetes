@@ -23,6 +23,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/sirupsen/logrus",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/golang.org/x/crypto/ssh/terminal:go_default_library",

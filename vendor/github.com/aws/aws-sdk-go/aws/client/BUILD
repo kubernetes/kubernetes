@@ -5,7 +5,9 @@ go_library(
     srcs = [
         "client.go",
         "default_retryer.go",
+        "logger.go",
     ],
+    importpath = "github.com/aws/aws-sdk-go/aws/client",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",

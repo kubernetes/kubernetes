@@ -16,6 +16,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/onsi/ginkgo/reporters/stenographer/support/go-isatty",
     visibility = ["//visibility:public"],
 )
 

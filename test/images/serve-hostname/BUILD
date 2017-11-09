@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["serve_hostname.go"],
+    importpath = "k8s.io/kubernetes/test/images/serve-hostname",
 )
 
 filegroup(
@@ -26,5 +27,6 @@ filegroup(
 
 go_binary(
     name = "serve-hostname",
+    importpath = "k8s.io/kubernetes/test/images/serve-hostname",
     library = ":go_default_library",
 )

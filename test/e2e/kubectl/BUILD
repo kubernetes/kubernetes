@@ -12,10 +12,10 @@ go_library(
         "kubectl.go",
         "portforward.go",
     ],
+    importpath = "k8s.io/kubernetes/test/e2e/kubectl",
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
-        "//pkg/util/version:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/generated:go_default_library",
         "//test/e2e/scheduling:go_default_library",

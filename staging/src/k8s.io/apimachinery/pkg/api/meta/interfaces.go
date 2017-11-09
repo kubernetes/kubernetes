@@ -75,6 +75,9 @@ type MetadataAccessor interface {
 	Annotations(obj runtime.Object) (map[string]string, error)
 	SetAnnotations(obj runtime.Object, annotations map[string]string) error
 
+	Continue(obj runtime.Object) (string, error)
+	SetContinue(obj runtime.Object, c string) error
+
 	runtime.ResourceVersioner
 }
 

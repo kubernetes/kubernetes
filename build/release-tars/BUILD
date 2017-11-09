@@ -193,7 +193,6 @@ pkg_tar(
     strip_prefix = "//",
     deps = [
         ":_full_server",
-        "//federation:release",
     ],
 )
 

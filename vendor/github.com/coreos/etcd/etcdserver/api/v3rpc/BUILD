@@ -17,6 +17,7 @@ go_library(
         "util.go",
         "watch.go",
     ],
+    importpath = "github.com/coreos/etcd/etcdserver/api/v3rpc",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/auth:go_default_library",

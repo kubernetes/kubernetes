@@ -20,6 +20,7 @@ import (
 	glog "github.com/golang/glog"
 	discovery "k8s.io/client-go/discovery"
 	admissionregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1"
+	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	appsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
 	appsv1beta2 "k8s.io/client-go/kubernetes/typed/apps/v1beta2"
 	authenticationv1 "k8s.io/client-go/kubernetes/typed/authentication/v1"
@@ -54,8 +55,9 @@ type Interface interface {
 	Admissionregistration() admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Interface
 	AppsV1beta1() appsv1beta1.AppsV1beta1Interface
 	AppsV1beta2() appsv1beta2.AppsV1beta2Interface
+	AppsV1() appsv1.AppsV1Interface
 	// Deprecated: please explicitly pick a version if possible.
-	Apps() appsv1beta2.AppsV1beta2Interface
+	Apps() appsv1.AppsV1Interface
 	AuthenticationV1() authenticationv1.AuthenticationV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Authentication() authenticationv1.AuthenticationV1Interface
@@ -112,6 +114,7 @@ type Clientset struct {
 	admissionregistrationV1alpha1 *admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Client
 	appsV1beta1                   *appsv1beta1.AppsV1beta1Client
 	appsV1beta2                   *appsv1beta2.AppsV1beta2Client
+	appsV1                        *appsv1.AppsV1Client
 	authenticationV1              *authenticationv1.AuthenticationV1Client
 	authenticationV1beta1         *authenticationv1beta1.AuthenticationV1beta1Client
 	authorizationV1               *authorizationv1.AuthorizationV1Client
@@ -156,10 +159,15 @@ func (c *Clientset) AppsV1beta2() appsv1beta2.AppsV1beta2Interface {
 	return c.appsV1beta2
 }
 
+// AppsV1 retrieves the AppsV1Client
+func (c *Clientset) AppsV1() appsv1.AppsV1Interface {
+	return c.appsV1
+}
+
 // Deprecated: Apps retrieves the default version of AppsClient.
 // Please explicitly pick a version.
-func (c *Clientset) Apps() appsv1beta2.AppsV1beta2Interface {
-	return c.appsV1beta2
+func (c *Clientset) Apps() appsv1.AppsV1Interface {
+	return c.appsV1
 }
 
 // AuthenticationV1 retrieves the AuthenticationV1Client
@@ -373,6 +381,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.appsV1, err = appsv1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.authenticationV1, err = authenticationv1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -473,6 +485,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.admissionregistrationV1alpha1 = admissionregistrationv1alpha1.NewForConfigOrDie(c)
 	cs.appsV1beta1 = appsv1beta1.NewForConfigOrDie(c)
 	cs.appsV1beta2 = appsv1beta2.NewForConfigOrDie(c)
+	cs.appsV1 = appsv1.NewForConfigOrDie(c)
 	cs.authenticationV1 = authenticationv1.NewForConfigOrDie(c)
 	cs.authenticationV1beta1 = authenticationv1beta1.NewForConfigOrDie(c)
 	cs.authorizationV1 = authorizationv1.NewForConfigOrDie(c)
@@ -505,6 +518,7 @@ func New(c rest.Interface) *Clientset {
 	cs.admissionregistrationV1alpha1 = admissionregistrationv1alpha1.New(c)
 	cs.appsV1beta1 = appsv1beta1.New(c)
 	cs.appsV1beta2 = appsv1beta2.New(c)
+	cs.appsV1 = appsv1.New(c)
 	cs.authenticationV1 = authenticationv1.New(c)
 	cs.authenticationV1beta1 = authenticationv1beta1.New(c)
 	cs.authorizationV1 = authorizationv1.New(c)

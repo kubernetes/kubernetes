@@ -7,6 +7,7 @@ go_library(
         "dirmap.go",
         "file.go",
     ],
+    importpath = "github.com/spf13/afero/mem",
     visibility = ["//visibility:public"],
 )
 

@@ -9,6 +9,7 @@ go_library(
         "pointer.go",
         "types.go",
     ],
+    importpath = "github.com/onsi/gomega/gstruct",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/onsi/gomega/format:go_default_library",

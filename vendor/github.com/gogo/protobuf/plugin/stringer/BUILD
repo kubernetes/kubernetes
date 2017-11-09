@@ -6,6 +6,7 @@ go_library(
         "stringer.go",
         "stringertest.go",
     ],
+    importpath = "github.com/gogo/protobuf/plugin/stringer",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",

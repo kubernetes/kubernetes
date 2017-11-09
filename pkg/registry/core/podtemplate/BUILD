@@ -11,8 +11,10 @@ go_library(
         "doc.go",
         "strategy.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/registry/core/podtemplate",
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/pod:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

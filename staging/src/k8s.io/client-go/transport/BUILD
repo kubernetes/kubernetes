@@ -13,6 +13,7 @@ go_test(
         "round_trippers_test.go",
         "transport_test.go",
     ],
+    importpath = "k8s.io/client-go/transport",
     library = ":go_default_library",
 )
 
@@ -24,6 +25,7 @@ go_library(
         "round_trippers.go",
         "transport.go",
     ],
+    importpath = "k8s.io/client-go/transport",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/gregjones/httpcache:go_default_library",

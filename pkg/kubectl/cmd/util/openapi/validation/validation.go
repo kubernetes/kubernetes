@@ -18,37 +18,40 @@ package validation
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/kubernetes/pkg/api"
-	apiutil "k8s.io/kubernetes/pkg/api/util"
+	"k8s.io/kube-openapi/pkg/util/proto/validation"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
+// SchemaValidation validates the object against an OpenAPI schema.
 type SchemaValidation struct {
 	resources openapi.Resources
 }
 
+// NewSchemaValidation creates a new SchemaValidation that can be used
+// to validate objects.
 func NewSchemaValidation(resources openapi.Resources) *SchemaValidation {
 	return &SchemaValidation{
 		resources: resources,
 	}
 }
 
+// ValidateBytes will validates the object against using the Resources
+// object.
 func (v *SchemaValidation) ValidateBytes(data []byte) error {
 	obj, err := parse(data)
 	if err != nil {
 		return err
 	}
 
-	gvk, err := getObjectKind(obj)
-	if err != nil {
-		return err
+	gvk, errs := getObjectKind(obj)
+	if errs != nil {
+		return utilerrors.NewAggregate(errs)
 	}
 
 	if strings.HasSuffix(gvk.Kind, "List") {
@@ -64,35 +67,25 @@ func (v *SchemaValidation) validateList(object interface{}) []error {
 		return []error{errors.New("invalid object to validate")}
 	}
 
-	errs := []error{}
+	allErrors := []error{}
 	for _, item := range fields["items"].([]interface{}) {
-		if gvk, err := getObjectKind(item); err != nil {
-			errs = append(errs, err)
+		if gvk, errs := getObjectKind(item); errs != nil {
+			allErrors = append(allErrors, errs...)
 		} else {
-			errs = append(errs, v.validateResource(item, gvk)...)
+			allErrors = append(allErrors, v.validateResource(item, gvk)...)
 		}
 	}
-	return errs
+	return allErrors
 }
 
 func (v *SchemaValidation) validateResource(obj interface{}, gvk schema.GroupVersionKind) []error {
-	if !api.Registry.IsEnabledVersion(gvk.GroupVersion()) {
-		// if we don't have this in our scheme, just skip
-		// validation because its an object we don't recognize
+	resource := v.resources.LookupResource(gvk)
+	if resource == nil {
+		// resource is not present, let's just skip validation.
 		return nil
 	}
 
-	resource := v.resources.LookupResource(gvk)
-	if resource == nil {
-		return []error{fmt.Errorf("unknown object type %#v", gvk)}
-	}
-
-	rootValidation, err := itemFactory(openapi.NewPath(gvk.Kind), obj)
-	if err != nil {
-		return []error{err}
-	}
-	resource.Accept(rootValidation)
-	return rootValidation.Errors()
+	return validation.ValidateModel(obj, resource, gvk.Kind)
 }
 
 func parse(data []byte) (interface{}, error) {
@@ -107,26 +100,38 @@ func parse(data []byte) (interface{}, error) {
 	return obj, nil
 }
 
-func getObjectKind(object interface{}) (schema.GroupVersionKind, error) {
+func getObjectKind(object interface{}) (schema.GroupVersionKind, []error) {
+	var listErrors []error
 	fields := object.(map[string]interface{})
 	if fields == nil {
-		return schema.GroupVersionKind{}, errors.New("invalid object to validate")
+		listErrors = append(listErrors, errors.New("invalid object to validate"))
+		return schema.GroupVersionKind{}, listErrors
 	}
+
+	var group string
+	var version string
 	apiVersion := fields["apiVersion"]
 	if apiVersion == nil {
-		return schema.GroupVersionKind{}, errors.New("apiVersion not set")
+		listErrors = append(listErrors, errors.New("apiVersion not set"))
+	} else if _, ok := apiVersion.(string); !ok {
+		listErrors = append(listErrors, errors.New("apiVersion isn't string type"))
+	} else {
+		gv, err := schema.ParseGroupVersion(apiVersion.(string))
+		if err != nil {
+			listErrors = append(listErrors, err)
+		} else {
+			group = gv.Group
+			version = gv.Version
+		}
 	}
-	if _, ok := apiVersion.(string); !ok {
-		return schema.GroupVersionKind{}, errors.New("apiVersion isn't string type")
-	}
-	version := apiutil.GetVersion(apiVersion.(string))
-	group := apiutil.GetGroup(apiVersion.(string))
 	kind := fields["kind"]
 	if kind == nil {
-		return schema.GroupVersionKind{}, errors.New("kind not set")
+		listErrors = append(listErrors, errors.New("kind not set"))
+	} else if _, ok := kind.(string); !ok {
+		listErrors = append(listErrors, errors.New("kind isn't string type"))
 	}
-	if _, ok := kind.(string); !ok {
-		return schema.GroupVersionKind{}, errors.New("kind isn't string type")
+	if listErrors != nil {
+		return schema.GroupVersionKind{}, listErrors
 	}
 
 	return schema.GroupVersionKind{Group: group, Version: version, Kind: kind.(string)}, nil

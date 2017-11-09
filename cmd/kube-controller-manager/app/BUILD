@@ -21,10 +21,11 @@ go_library(
         "plugins.go",
         "policy.go",
     ],
+    importpath = "k8s.io/kubernetes/cmd/kube-controller-manager/app",
     deps = [
         "//cmd/kube-controller-manager/app/options:go_default_library",
-        "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
         "//pkg/apis/authentication/install:go_default_library",
         "//pkg/apis/authorization/install:go_default_library",
@@ -49,6 +50,7 @@ go_library(
         "//pkg/controller:go_default_library",
         "//pkg/controller/bootstrap:go_default_library",
         "//pkg/controller/certificates/approver:go_default_library",
+        "//pkg/controller/certificates/cleaner:go_default_library",
         "//pkg/controller/certificates/signer:go_default_library",
         "//pkg/controller/cronjob:go_default_library",
         "//pkg/controller/daemon:go_default_library",
@@ -75,6 +77,7 @@ go_library(
         "//pkg/controller/volume/expand:go_default_library",
         "//pkg/controller/volume/persistentvolume:go_default_library",
         "//pkg/features:go_default_library",
+        "//pkg/quota/generic:go_default_library",
         "//pkg/quota/install:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//pkg/util/configz:go_default_library",
@@ -121,6 +124,7 @@ go_library(
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
+        "//vendor/k8s.io/client-go/scale:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/k8s.io/client-go/tools/leaderelection:go_default_library",
         "//vendor/k8s.io/client-go/tools/leaderelection/resourcelock:go_default_library",
@@ -150,6 +154,10 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["controller_manager_test.go"],
+    importpath = "k8s.io/kubernetes/cmd/kube-controller-manager/app",
     library = ":go_default_library",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library"],
+    deps = [
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+    ],
 )

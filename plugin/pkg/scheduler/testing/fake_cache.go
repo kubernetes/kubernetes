@@ -18,14 +18,17 @@ package testing
 
 import (
 	"k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 // FakeCache is used for testing
 type FakeCache struct {
-	AssumeFunc func(*v1.Pod)
-	ForgetFunc func(*v1.Pod)
+	AssumeFunc       func(*v1.Pod)
+	ForgetFunc       func(*v1.Pod)
+	IsAssumedPodFunc func(*v1.Pod) bool
+	GetPodFunc       func(*v1.Pod) *v1.Pod
 }
 
 func (f *FakeCache) AssumePod(pod *v1.Pod) error {
@@ -46,6 +49,14 @@ func (f *FakeCache) UpdatePod(oldPod, newPod *v1.Pod) error { return nil }
 
 func (f *FakeCache) RemovePod(pod *v1.Pod) error { return nil }
 
+func (f *FakeCache) IsAssumedPod(pod *v1.Pod) (bool, error) {
+	return f.IsAssumedPodFunc(pod), nil
+}
+
+func (f *FakeCache) GetPod(pod *v1.Pod) (*v1.Pod, error) {
+	return f.GetPodFunc(pod), nil
+}
+
 func (f *FakeCache) AddNode(node *v1.Node) error { return nil }
 
 func (f *FakeCache) UpdateNode(oldNode, newNode *v1.Node) error { return nil }
@@ -54,6 +65,16 @@ func (f *FakeCache) RemoveNode(node *v1.Node) error { return nil }
 
 func (f *FakeCache) UpdateNodeNameToInfoMap(infoMap map[string]*schedulercache.NodeInfo) error {
 	return nil
+}
+
+func (f *FakeCache) AddPDB(pdb *policy.PodDisruptionBudget) error { return nil }
+
+func (f *FakeCache) UpdatePDB(oldPDB, newPDB *policy.PodDisruptionBudget) error { return nil }
+
+func (f *FakeCache) RemovePDB(pdb *policy.PodDisruptionBudget) error { return nil }
+
+func (f *FakeCache) ListPDBs(selector labels.Selector) ([]*policy.PodDisruptionBudget, error) {
+	return nil, nil
 }
 
 func (f *FakeCache) List(s labels.Selector) ([]*v1.Pod, error) { return nil, nil }

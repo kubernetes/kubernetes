@@ -15,6 +15,7 @@ go_library(
         "responses.go",
         "signer.go",
     ],
+    importpath = "github.com/elazarl/goproxy",
     visibility = ["//visibility:public"],
 )
 

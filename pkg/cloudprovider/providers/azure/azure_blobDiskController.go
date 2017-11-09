@@ -184,7 +184,7 @@ func (c *BlobDiskController) createVHDBlobDisk(blobClient azstorage.BlobStorageC
 
 	tags := make(map[string]string)
 	tags["createdby"] = "k8sAzureDataDisk"
-	glog.V(4).Infof("azureDisk - creating page blob %name in container %s account %s", vhdName, containerName, accountName)
+	glog.V(4).Infof("azureDisk - creating page blob %s in container %s account %s", vhdName, containerName, accountName)
 
 	blob := container.GetBlobReference(vhdName)
 	blob.Properties.ContentLength = vhdSize
@@ -471,20 +471,22 @@ func (c *BlobDiskController) ensureDefaultContainer(storageAccountName string) e
 
 			if err != nil {
 				glog.V(4).Infof("azureDisk - GetStorageAccount:%s err %s", storageAccountName, err.Error())
-				return false, err
+				return false, nil // error performing the query - retryable
 			}
 
 			if provisionState == storage.Succeeded {
 				return true, nil
 			}
 
-			glog.V(4).Infof("azureDisk - GetStorageAccount:%s not ready yet", storageAccountName)
-			// leave it for next loop/sync loop
-			return false, fmt.Errorf("azureDisk - Account %s has not been flagged Succeeded by ARM", storageAccountName)
+			glog.V(4).Infof("azureDisk - GetStorageAccount:%s not ready yet (not flagged Succeeded by ARM)", storageAccountName)
+			return false, nil // back off and see if the account becomes ready on next retry
 		})
 		// we have failed to ensure that account is ready for us to create
 		// the default vhd container
 		if err != nil {
+			if err == kwait.ErrWaitTimeout {
+				return fmt.Errorf("azureDisk - timed out waiting for storage account %s to become ready", storageAccountName)
+			}
 			return err
 		}
 	}
@@ -626,7 +628,7 @@ func (c *BlobDiskController) createStorageAccount(storageAccountName string, sto
 		// SA Accounts takes time to be provisioned
 		// so if this account was just created allow it sometime
 		// before polling
-		glog.V(2).Infof("azureDisk - storage account %s was just created, allowing time before polling status")
+		glog.V(2).Infof("azureDisk - storage account %s was just created, allowing time before polling status", storageAccountName)
 		time.Sleep(25 * time.Second) // as observed 25 is the average time for SA to be provisioned
 	}
 

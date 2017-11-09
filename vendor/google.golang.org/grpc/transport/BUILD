@@ -12,6 +12,7 @@ go_library(
         "http_util.go",
         "transport.go",
     ],
+    importpath = "google.golang.org/grpc/transport",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",

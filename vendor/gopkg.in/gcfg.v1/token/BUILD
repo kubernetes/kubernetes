@@ -7,6 +7,7 @@ go_library(
         "serialize.go",
         "token.go",
     ],
+    importpath = "gopkg.in/gcfg.v1/token",
     visibility = ["//visibility:public"],
 )
 

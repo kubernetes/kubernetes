@@ -11,6 +11,7 @@ go_library(
         "metrics.go",
         "peer.go",
     ],
+    importpath = "github.com/coreos/etcd/etcdserver/api/v2http",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/error:go_default_library",

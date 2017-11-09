@@ -368,13 +368,28 @@ func SetDefaults_RBDVolumeSource(obj *v1.RBDVolumeSource) {
 	}
 }
 
+func SetDefaults_RBDPersistentVolumeSource(obj *v1.RBDPersistentVolumeSource) {
+	if obj.RBDPool == "" {
+		obj.RBDPool = "rbd"
+	}
+	if obj.RadosUser == "" {
+		obj.RadosUser = "admin"
+	}
+	if obj.Keyring == "" {
+		obj.Keyring = "/etc/ceph/keyring"
+	}
+}
+
 func SetDefaults_ScaleIOVolumeSource(obj *v1.ScaleIOVolumeSource) {
-	if obj.ProtectionDomain == "" {
-		obj.ProtectionDomain = "default"
+	if obj.StorageMode == "" {
+		obj.StorageMode = "ThinProvisioned"
 	}
-	if obj.StoragePool == "" {
-		obj.StoragePool = "default"
+	if obj.FSType == "" {
+		obj.FSType = "xfs"
 	}
+}
+
+func SetDefaults_ScaleIOPersistentVolumeSource(obj *v1.ScaleIOPersistentVolumeSource) {
 	if obj.StorageMode == "" {
 		obj.StorageMode = "ThinProvisioned"
 	}

@@ -9,14 +9,19 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["plugins.go"],
+    importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider",
     deps = ["//plugin/pkg/scheduler/algorithmprovider/defaults:go_default_library"],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["plugins_test.go"],
+    importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider",
     library = ":go_default_library",
-    deps = ["//plugin/pkg/scheduler/factory:go_default_library"],
+    deps = [
+        "//plugin/pkg/scheduler/factory:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+    ],
 )
 
 filegroup(

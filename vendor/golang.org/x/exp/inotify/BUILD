@@ -8,6 +8,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "golang.org/x/exp/inotify",
     visibility = ["//visibility:public"],
 )
 

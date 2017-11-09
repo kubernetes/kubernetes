@@ -32,6 +32,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -346,6 +347,67 @@ func TestValidatePersistentVolumes(t *testing.T) {
 		}
 	}
 
+}
+
+func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
+	validVolume := testVolume("foo", "", api.PersistentVolumeSpec{
+		Capacity: api.ResourceList{
+			api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+		},
+		AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+		PersistentVolumeSource: api.PersistentVolumeSource{
+			HostPath: &api.HostPathVolumeSource{
+				Path: "/foo",
+				Type: newHostPathType(string(api.HostPathDirectory)),
+			},
+		},
+		StorageClassName: "valid",
+	})
+	validPvSourceNoUpdate := validVolume.DeepCopy()
+	invalidPvSourceUpdateType := validVolume.DeepCopy()
+	invalidPvSourceUpdateType.Spec.PersistentVolumeSource = api.PersistentVolumeSource{
+		FlexVolume: &api.FlexVolumeSource{
+			Driver: "kubernetes.io/blue",
+			FSType: "ext4",
+		},
+	}
+	invalidPvSourceUpdateDeep := validVolume.DeepCopy()
+	invalidPvSourceUpdateDeep.Spec.PersistentVolumeSource = api.PersistentVolumeSource{
+		HostPath: &api.HostPathVolumeSource{
+			Path: "/updated",
+			Type: newHostPathType(string(api.HostPathDirectory)),
+		},
+	}
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		oldVolume         *api.PersistentVolume
+		newVolume         *api.PersistentVolume
+	}{
+		"condition-no-update": {
+			isExpectedFailure: false,
+			oldVolume:         validVolume,
+			newVolume:         validPvSourceNoUpdate,
+		},
+		"condition-update-source-type": {
+			isExpectedFailure: true,
+			oldVolume:         validVolume,
+			newVolume:         invalidPvSourceUpdateType,
+		},
+		"condition-update-source-deep": {
+			isExpectedFailure: true,
+			oldVolume:         validVolume,
+			newVolume:         invalidPvSourceUpdateDeep,
+		},
+	}
+	for name, scenario := range scenarios {
+		errs := ValidatePersistentVolumeUpdate(scenario.newVolume, scenario.oldVolume)
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
 }
 
 func TestValidateLocalVolumes(t *testing.T) {
@@ -3059,12 +3121,12 @@ func TestValidatePorts(t *testing.T) {
 		"invalid protocol case": {
 			[]api.ContainerPort{{ContainerPort: 80, Protocol: "tcp"}},
 			field.ErrorTypeNotSupported,
-			"protocol", "supported values: TCP, UDP",
+			"protocol", `supported values: "TCP", "UDP"`,
 		},
 		"invalid protocol": {
 			[]api.ContainerPort{{ContainerPort: 80, Protocol: "ICMP"}},
 			field.ErrorTypeNotSupported,
-			"protocol", "supported values: TCP, UDP",
+			"protocol", `supported values: "TCP", "UDP"`,
 		},
 		"protocol required": {
 			[]api.ContainerPort{{Name: "abc", ContainerPort: 80}},
@@ -3149,7 +3211,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &api.EnvVarSource{
 				FieldRef: &api.ObjectFieldSelector{
-					APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+					APIVersion: legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 					FieldPath:  "metadata.name",
 				},
 			},
@@ -3158,7 +3220,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &api.EnvVarSource{
 				FieldRef: &api.ObjectFieldSelector{
-					APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+					APIVersion: legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 					FieldPath:  "metadata.namespace",
 				},
 			},
@@ -3167,7 +3229,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &api.EnvVarSource{
 				FieldRef: &api.ObjectFieldSelector{
-					APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+					APIVersion: legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 					FieldPath:  "metadata.uid",
 				},
 			},
@@ -3176,7 +3238,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &api.EnvVarSource{
 				FieldRef: &api.ObjectFieldSelector{
-					APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+					APIVersion: legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 					FieldPath:  "spec.nodeName",
 				},
 			},
@@ -3185,7 +3247,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &api.EnvVarSource{
 				FieldRef: &api.ObjectFieldSelector{
-					APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+					APIVersion: legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 					FieldPath:  "spec.serviceAccountName",
 				},
 			},
@@ -3194,7 +3256,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &api.EnvVarSource{
 				FieldRef: &api.ObjectFieldSelector{
-					APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+					APIVersion: legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 					FieldPath:  "status.hostIP",
 				},
 			},
@@ -3203,7 +3265,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &api.EnvVarSource{
 				FieldRef: &api.ObjectFieldSelector{
-					APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+					APIVersion: legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 					FieldPath:  "status.podIP",
 				},
 			},
@@ -3272,7 +3334,7 @@ func TestValidateEnv(t *testing.T) {
 				Value: "foo",
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
-						APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+						APIVersion: legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 						FieldPath:  "metadata.name",
 					},
 				},
@@ -3293,7 +3355,7 @@ func TestValidateEnv(t *testing.T) {
 				Name: "abc",
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
-						APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+						APIVersion: legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 						FieldPath:  "metadata.name",
 					},
 					SecretKeyRef: &api.SecretKeySelector{
@@ -3312,7 +3374,7 @@ func TestValidateEnv(t *testing.T) {
 				Name: "some_var_name",
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
-						APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+						APIVersion: legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 						FieldPath:  "metadata.name",
 					},
 					ConfigMapKeyRef: &api.ConfigMapKeySelector{
@@ -3331,7 +3393,7 @@ func TestValidateEnv(t *testing.T) {
 				Name: "abc",
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
-						APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+						APIVersion: legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 						FieldPath:  "metadata.name",
 					},
 					SecretKeyRef: &api.SecretKeySelector{
@@ -3384,7 +3446,7 @@ func TestValidateEnv(t *testing.T) {
 				Name: "abc",
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
-						APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+						APIVersion: legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 					},
 				},
 			}},
@@ -3409,7 +3471,7 @@ func TestValidateEnv(t *testing.T) {
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
 						FieldPath:  "metadata.whoops",
-						APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+						APIVersion: legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 					},
 				},
 			}},
@@ -3426,7 +3488,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: metadata.name, metadata.namespace, metadata.uid, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP`,
+			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP"`,
 		},
 		{
 			name: "invalid fieldPath annotations",
@@ -3439,7 +3501,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: metadata.name, metadata.namespace, metadata.uid, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP`,
+			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP"`,
 		},
 		{
 			name: "unsupported fieldPath",
@@ -3448,11 +3510,11 @@ func TestValidateEnv(t *testing.T) {
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
 						FieldPath:  "status.phase",
-						APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+						APIVersion: legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 					},
 				},
 			}},
-			expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: metadata.name, metadata.namespace, metadata.uid, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP`,
+			expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP"`,
 		},
 	}
 	for _, tc := range errorCases {
@@ -5036,7 +5098,7 @@ func TestValidatePod(t *testing.T) {
 				Name:      "pod-forgiveness-invalid",
 				Namespace: "ns",
 			},
-			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "node.alpha.kubernetes.io/notReady", Operator: "Exists", Effect: "NoExecute", TolerationSeconds: &[]int64{-2}[0]}}),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoExecute", TolerationSeconds: &[]int64{-2}[0]}}),
 		},
 		{ // docker default seccomp profile
 			ObjectMeta: metav1.ObjectMeta{
@@ -5594,7 +5656,7 @@ func TestValidatePod(t *testing.T) {
 					Name:      "pod-forgiveness-invalid",
 					Namespace: "ns",
 				},
-				Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "node.alpha.kubernetes.io/notReady", Operator: "Exists", Effect: "NoSchedule", TolerationSeconds: &[]int64{20}[0]}}),
+				Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoSchedule", TolerationSeconds: &[]int64{20}[0]}}),
 			},
 		},
 		"must be a valid pod seccomp profile": {

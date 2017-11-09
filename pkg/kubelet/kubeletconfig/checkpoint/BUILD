@@ -13,6 +13,7 @@ go_test(
         "configmap_test.go",
         "download_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint",
     library = ":go_default_library",
     deps = [
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
@@ -37,8 +38,9 @@ go_library(
         "configmap.go",
         "download.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",
         "//pkg/kubelet/kubeletconfig/status:go_default_library",

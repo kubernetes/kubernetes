@@ -13,9 +13,10 @@ go_test(
         "dynamic_client_test.go",
         "main_test.go",
     ],
+    importpath = "k8s.io/kubernetes/test/integration/client",
     tags = ["integration"],
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/version:go_default_library",
         "//test/e2e/framework:go_default_library",

@@ -76,7 +76,7 @@ var map_ResourceRule = map[string]string{
 	"":              "ResourceRule is the list of actions the subject is allowed to perform on resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
 	"verbs":         "Verb is a list of kubernetes resource API verbs, like: get, list, watch, create, update, delete, proxy.  \"*\" means all.",
 	"apiGroups":     "APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.  \"*\" means all.",
-	"resources":     "Resources is a list of resources this rule applies to.  ResourceAll represents all resources.  \"*\" means all.",
+	"resources":     "Resources is a list of resources this rule applies to.  \"*\" means all in the specified apiGroups.\n \"*/foo\" represents the subresource 'foo' for all resources in the specified apiGroups.",
 	"resourceNames": "ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.  \"*\" means all.",
 }
 
@@ -148,7 +148,8 @@ func (SubjectAccessReviewSpec) SwaggerDoc() map[string]string {
 
 var map_SubjectAccessReviewStatus = map[string]string{
 	"":                "SubjectAccessReviewStatus",
-	"allowed":         "Allowed is required.  True if the action would be allowed, false otherwise.",
+	"allowed":         "Allowed is required. True if the action would be allowed, false otherwise.",
+	"denied":          "Denied is optional. True if the action would be denied, otherwise false. If both allowed is false and denied is false, then the authorizer has no opinion on whether to authorize the action. Denied may not be true if Allowed is true.",
 	"reason":          "Reason is optional.  It indicates why a request was allowed or denied.",
 	"evaluationError": "EvaluationError is an indication that some error occurred during the authorization check. It is entirely possible to get an error and be able to continue determine authorization status in spite of it. For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.",
 }

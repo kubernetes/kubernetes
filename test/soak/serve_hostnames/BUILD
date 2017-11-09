@@ -8,14 +8,16 @@ load(
 
 go_binary(
     name = "serve_hostnames",
+    importpath = "k8s.io/kubernetes/test/soak/serve_hostnames",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["serve_hostnames.go"],
+    importpath = "k8s.io/kubernetes/test/soak/serve_hostnames",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

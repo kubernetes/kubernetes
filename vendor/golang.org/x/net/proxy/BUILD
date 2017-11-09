@@ -8,6 +8,7 @@ go_library(
         "proxy.go",
         "socks5.go",
     ],
+    importpath = "golang.org/x/net/proxy",
     visibility = ["//visibility:public"],
 )
 

@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["proxy.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/core/node/rest",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/capabilities:go_default_library",

@@ -24,13 +24,11 @@ import (
 	"io/ioutil"
 	"net/http"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
-	apiversions_v1 "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/attachinterfaces"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/extensions/trusts"
@@ -52,11 +50,12 @@ import (
 const (
 	ProviderName     = "openstack"
 	AvailabilityZone = "availability_zone"
+	defaultTimeOut   = 60 * time.Second
 )
 
-var ErrNotFound = errors.New("Failed to find object")
-var ErrMultipleResults = errors.New("Multiple results where only one expected")
-var ErrNoAddressFound = errors.New("No address found for host")
+var ErrNotFound = errors.New("failed to find object")
+var ErrMultipleResults = errors.New("multiple results where only one expected")
+var ErrNoAddressFound = errors.New("no address found for host")
 
 // encoding.TextUnmarshaler interface for time.Duration
 type MyDuration struct {
@@ -79,34 +78,42 @@ type LoadBalancer struct {
 }
 
 type LoadBalancerOpts struct {
-	LBVersion            string     `gcfg:"lb-version"`          // overrides autodetection. v1 or v2
+	LBVersion            string     `gcfg:"lb-version"`          // overrides autodetection. Only support v2.
 	SubnetId             string     `gcfg:"subnet-id"`           // overrides autodetection.
 	FloatingNetworkId    string     `gcfg:"floating-network-id"` // If specified, will create floating ip for loadbalancer, or do not create floating ip.
 	LBMethod             string     `gcfg:"lb-method"`           // default to ROUND_ROBIN.
+	LBProvider           string     `gcfg:"lb-provider"`
 	CreateMonitor        bool       `gcfg:"create-monitor"`
 	MonitorDelay         MyDuration `gcfg:"monitor-delay"`
 	MonitorTimeout       MyDuration `gcfg:"monitor-timeout"`
 	MonitorMaxRetries    uint       `gcfg:"monitor-max-retries"`
 	ManageSecurityGroups bool       `gcfg:"manage-security-groups"`
-	NodeSecurityGroupID  string     `gcfg:"node-security-group"`
+	NodeSecurityGroupIDs []string   // Do not specify, get it automatically when enable manage-security-groups. TODO(FengyunPan): move it into cache
 }
 
 type BlockStorageOpts struct {
 	BSVersion       string `gcfg:"bs-version"`        // overrides autodetection. v1 or v2. Defaults to auto
 	TrustDevicePath bool   `gcfg:"trust-device-path"` // See Issue #33128
+	IgnoreVolumeAZ  bool   `gcfg:"ignore-volume-az"`
 }
 
 type RouterOpts struct {
 	RouterId string `gcfg:"router-id"` // required
 }
 
+type MetadataOpts struct {
+	SearchOrder    string     `gcfg:"search-order"`
+	RequestTimeout MyDuration `gcfg:"request-timeout"`
+}
+
 // OpenStack is an implementation of cloud provider Interface for OpenStack.
 type OpenStack struct {
-	provider  *gophercloud.ProviderClient
-	region    string
-	lbOpts    LoadBalancerOpts
-	bsOpts    BlockStorageOpts
-	routeOpts RouterOpts
+	provider     *gophercloud.ProviderClient
+	region       string
+	lbOpts       LoadBalancerOpts
+	bsOpts       BlockStorageOpts
+	routeOpts    RouterOpts
+	metadataOpts MetadataOpts
 	// InstanceID of the server where this OpenStack object is instantiated.
 	localInstanceID string
 }
@@ -128,6 +135,7 @@ type Config struct {
 	LoadBalancer LoadBalancerOpts
 	BlockStorage BlockStorageOpts
 	Route        RouterOpts
+	Metadata     MetadataOpts
 }
 
 func init() {
@@ -172,8 +180,7 @@ func (cfg Config) toAuth3Options() tokens3.AuthOptions {
 
 func readConfig(config io.Reader) (Config, error) {
 	if config == nil {
-		err := fmt.Errorf("no OpenStack cloud provider config file given")
-		return Config{}, err
+		return Config{}, fmt.Errorf("no OpenStack cloud provider config file given")
 	}
 
 	var cfg Config
@@ -181,6 +188,8 @@ func readConfig(config io.Reader) (Config, error) {
 	// Set default values for config params
 	cfg.BlockStorage.BSVersion = "auto"
 	cfg.BlockStorage.TrustDevicePath = false
+	cfg.BlockStorage.IgnoreVolumeAZ = false
+	cfg.Metadata.SearchOrder = fmt.Sprintf("%s,%s", configDriveID, metadataID)
 
 	err := gcfg.ReadInto(&cfg, config)
 	return cfg, err
@@ -198,7 +207,7 @@ func (c *Caller) Call(f func()) {
 	}
 }
 
-func readInstanceID() (string, error) {
+func readInstanceID(searchOrder string) (string, error) {
 	// Try to find instance ID on the local filesystem (created by cloud-init)
 	const instanceIDFile = "/var/lib/cloud/data/instance-id"
 	idBytes, err := ioutil.ReadFile(instanceIDFile)
@@ -212,7 +221,7 @@ func readInstanceID() (string, error) {
 		// Fall through to metadata server lookup
 	}
 
-	md, err := getMetadata()
+	md, err := getMetadata(searchOrder)
 	if err != nil {
 		return "", err
 	}
@@ -239,11 +248,8 @@ func checkOpenStackOpts(openstackOpts *OpenStack) error {
 		}
 	}
 
-	// if enable ManageSecurityGroups, node-security-group should be set.
-	if lbOpts.ManageSecurityGroups {
-		if len(lbOpts.NodeSecurityGroupID) == 0 {
-			return fmt.Errorf("node-security-group not set in cloud provider config")
-		}
+	if err := checkMetadataSearchOrder(openstackOpts.metadataOpts.SearchOrder); err != nil {
+		return err
 	}
 
 	return nil
@@ -279,12 +285,19 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 		return nil, err
 	}
 
+	emptyDuration := MyDuration{}
+	if cfg.Metadata.RequestTimeout == emptyDuration {
+		cfg.Metadata.RequestTimeout.Duration = time.Duration(defaultTimeOut)
+	}
+	provider.HTTPClient.Timeout = cfg.Metadata.RequestTimeout.Duration
+
 	os := OpenStack{
-		provider:  provider,
-		region:    cfg.Global.Region,
-		lbOpts:    cfg.LoadBalancer,
-		bsOpts:    cfg.BlockStorage,
-		routeOpts: cfg.Route,
+		provider:     provider,
+		region:       cfg.Global.Region,
+		lbOpts:       cfg.LoadBalancer,
+		bsOpts:       cfg.BlockStorage,
+		routeOpts:    cfg.Route,
+		metadataOpts: cfg.Metadata,
 	}
 
 	err = checkOpenStackOpts(&os)
@@ -494,39 +507,17 @@ func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 		return nil, false
 	}
 
+	// LBaaS v1 is deprecated in the OpenStack Liberty release.
+	// Currently kubernetes OpenStack cloud provider just support LBaaS v2.
 	lbVersion := os.lbOpts.LBVersion
-	if lbVersion == "" {
-		// No version specified, try newest supported by server
-		netExts, err := networkExtensions(network)
-		if err != nil {
-			glog.Warningf("Failed to list neutron extensions: %v", err)
-			return nil, false
-		}
-
-		if netExts["lbaasv2"] {
-			lbVersion = "v2"
-		} else if netExts["lbaas"] {
-			lbVersion = "v1"
-		} else {
-			glog.Warningf("Failed to find neutron LBaaS extension (v1 or v2)")
-			return nil, false
-		}
-		glog.V(3).Infof("Using LBaaS extension %v", lbVersion)
+	if lbVersion != "" && lbVersion != "v2" {
+		glog.Warningf("Config error: currently only support LBaaS v2, unrecognised lb-version \"%v\"", lbVersion)
+		return nil, false
 	}
 
 	glog.V(1).Info("Claiming to support LoadBalancer")
 
-	if lbVersion == "v2" {
-		return &LbaasV2{LoadBalancer{network, compute, os.lbOpts}}, true
-	} else if lbVersion == "v1" {
-		// Since LBaaS v1 is deprecated in the OpenStack Liberty release, so deprecate LBaaSV1 at V1.8, then remove LBaaSV1 after V1.9.
-		// Reference OpenStack doc:	https://docs.openstack.org/mitaka/networking-guide/config-lbaas.html
-		glog.Warningf("The LBaaS v1 of OpenStack cloud provider has been deprecated, Please use LBaaS v2")
-		return &LbaasV1{LoadBalancer{network, compute, os.lbOpts}}, true
-	} else {
-		glog.Warningf("Config error: unrecognised lb-version \"%v\"", lbVersion)
-		return nil, false
-	}
+	return &LbaasV2{LoadBalancer{network, compute, os.lbOpts}}, true
 }
 
 func isNotFound(err error) bool {
@@ -536,12 +527,11 @@ func isNotFound(err error) bool {
 
 func (os *OpenStack) Zones() (cloudprovider.Zones, bool) {
 	glog.V(1).Info("Claiming to support Zones")
-
 	return os, true
 }
 
 func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
-	md, err := getMetadata()
+	md, err := getMetadata(os.metadataOpts.SearchOrder)
 	if err != nil {
 		return cloudprovider.Zone{}, err
 	}
@@ -550,8 +540,7 @@ func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
 		FailureDomain: md.AvailabilityZone,
 		Region:        os.region,
 	}
-	glog.V(1).Infof("Current zone is %v", zone)
-
+	glog.V(4).Infof("Current zone is %v", zone)
 	return zone, nil
 }
 
@@ -579,7 +568,6 @@ func (os *OpenStack) GetZoneByProviderID(providerID string) (cloudprovider.Zone,
 		Region:        os.region,
 	}
 	glog.V(4).Infof("The instance %s in zone %v", srv.Name, zone)
-
 	return zone, nil
 }
 
@@ -605,7 +593,6 @@ func (os *OpenStack) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Z
 		Region:        os.region,
 	}
 	glog.V(4).Infof("The instance %s in zone %v", srv.Name, zone)
-
 	return zone, nil
 }
 
@@ -640,51 +627,7 @@ func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
 	}
 
 	glog.V(1).Info("Claiming to support Routes")
-
 	return r, true
-}
-
-// Implementation of sort interface for blockstorage version probing
-type APIVersionsByID []apiversions_v1.APIVersion
-
-func (apiVersions APIVersionsByID) Len() int {
-	return len(apiVersions)
-}
-
-func (apiVersions APIVersionsByID) Swap(i, j int) {
-	apiVersions[i], apiVersions[j] = apiVersions[j], apiVersions[i]
-}
-
-func (apiVersions APIVersionsByID) Less(i, j int) bool {
-	return apiVersions[i].ID > apiVersions[j].ID
-}
-
-func autoVersionSelector(apiVersion *apiversions_v1.APIVersion) string {
-	switch strings.ToLower(apiVersion.ID) {
-	case "v2.0":
-		return "v2"
-	case "v1.0":
-		return "v1"
-	default:
-		return ""
-	}
-}
-
-func doBsApiVersionAutodetect(availableApiVersions []apiversions_v1.APIVersion) string {
-	sort.Sort(APIVersionsByID(availableApiVersions))
-	for _, status := range []string{"CURRENT", "SUPPORTED"} {
-		for _, version := range availableApiVersions {
-			if strings.ToUpper(version.Status) == status {
-				if detectedApiVersion := autoVersionSelector(&version); detectedApiVersion != "" {
-					glog.V(3).Infof("Blockstorage API version probing has found a suitable %s api version: %s", status, detectedApiVersion)
-					return detectedApiVersion
-				}
-			}
-		}
-	}
-
-	return ""
-
 }
 
 func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
@@ -701,46 +644,62 @@ func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
 		if err != nil {
 			return nil, err
 		}
+		glog.V(3).Infof("Using Blockstorage API V1")
 		return &VolumesV1{sClient, os.bsOpts}, nil
 	case "v2":
 		sClient, err := os.NewBlockStorageV2()
 		if err != nil {
 			return nil, err
 		}
+		glog.V(3).Infof("Using Blockstorage API V2")
 		return &VolumesV2{sClient, os.bsOpts}, nil
 	case "auto":
-		sClient, err := os.NewBlockStorageV1()
+		// Currently kubernetes just support Cinder v1 and Cinder v2.
+		// Choose Cinder v2 firstly, if kubernetes can't initialize cinder v2 client, try to initialize cinder v1 client.
+		// Return appropriate message when kubernetes can't initialize them.
+		// TODO(FengyunPan): revisit 'auto' after supporting Cinder v3.
+		sClient, err := os.NewBlockStorageV2()
 		if err != nil {
-			return nil, err
-		}
-		availableApiVersions := []apiversions_v1.APIVersion{}
-		err = apiversions_v1.List(sClient).EachPage(func(page pagination.Page) (bool, error) {
-			// returning false from this handler stops page iteration, error is propagated to the upper function
-			apiversions, err := apiversions_v1.ExtractAPIVersions(page)
+			sClient, err = os.NewBlockStorageV1()
 			if err != nil {
-				glog.Errorf("Unable to extract api versions from page: %v", err)
-				return false, err
+				// Nothing suitable found, failed autodetection, just exit with appropriate message
+				err_txt := "BlockStorage API version autodetection failed. " +
+					"Please set it explicitly in cloud.conf in section [BlockStorage] with key `bs-version`"
+				return nil, errors.New(err_txt)
+			} else {
+				glog.V(3).Infof("Using Blockstorage API V1")
+				return &VolumesV1{sClient, os.bsOpts}, nil
 			}
-			availableApiVersions = append(availableApiVersions, apiversions...)
-			return true, nil
-		})
-
-		if err != nil {
-			glog.Errorf("Error when retrieving list of supported blockstorage api versions: %v", err)
-			return nil, err
-		}
-		if autodetectedVersion := doBsApiVersionAutodetect(availableApiVersions); autodetectedVersion != "" {
-			return os.volumeService(autodetectedVersion)
 		} else {
-			// Nothing suitable found, failed autodetection, just exit with appropriate message
-			err_txt := "BlockStorage API version autodetection failed. " +
-				"Please set it explicitly in cloud.conf in section [BlockStorage] with key `bs-version`"
-			return nil, errors.New(err_txt)
+			glog.V(3).Infof("Using Blockstorage API V2")
+			return &VolumesV2{sClient, os.bsOpts}, nil
 		}
-
 	default:
 		err_txt := fmt.Sprintf("Config error: unrecognised bs-version \"%v\"", os.bsOpts.BSVersion)
-		glog.Warningf(err_txt)
 		return nil, errors.New(err_txt)
 	}
+}
+
+func checkMetadataSearchOrder(order string) error {
+	if order == "" {
+		return errors.New("invalid value in section [Metadata] with key `search-order`. Value cannot be empty")
+	}
+
+	elements := strings.Split(order, ",")
+	if len(elements) > 2 {
+		return errors.New("invalid value in section [Metadata] with key `search-order`. Value cannot contain more than 2 elements")
+	}
+
+	for _, id := range elements {
+		id = strings.TrimSpace(id)
+		switch id {
+		case configDriveID:
+		case metadataID:
+		default:
+			return fmt.Errorf("invalid element %q found in section [Metadata] with key `search-order`."+
+				"Supported elements include %q and %q", id, configDriveID, metadataID)
+		}
+	}
+
+	return nil
 }

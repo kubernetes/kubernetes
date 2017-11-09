@@ -6,6 +6,7 @@ go_library(
         "sdnotify.go",
         "watchdog.go",
     ],
+    importpath = "github.com/coreos/go-systemd/daemon",
     visibility = ["//visibility:public"],
 )
 

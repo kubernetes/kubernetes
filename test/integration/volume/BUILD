@@ -13,9 +13,10 @@ go_test(
         "main_test.go",
         "persistent_volumes_test.go",
     ],
+    importpath = "k8s.io/kubernetes/test/integration/volume",
     tags = ["integration"],
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/cloudprovider/providers/fake:go_default_library",
         "//pkg/controller/volume/attachdetach:go_default_library",

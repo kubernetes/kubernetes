@@ -19,10 +19,8 @@ package fake
 import (
 	"fmt"
 
-	"github.com/emicklei/go-restful-swagger12"
 	"github.com/googleapis/gnostic/OpenAPIv2"
 
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
@@ -70,7 +68,44 @@ func (c *FakeDiscovery) ServerPreferredNamespacedResources() ([]*metav1.APIResou
 }
 
 func (c *FakeDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
-	return nil, nil
+	action := testing.ActionImpl{
+		Verb:     "get",
+		Resource: schema.GroupVersionResource{Resource: "group"},
+	}
+	c.Invokes(action, nil)
+
+	groups := map[string]*metav1.APIGroup{}
+
+	for _, res := range c.Resources {
+		gv, err := schema.ParseGroupVersion(res.GroupVersion)
+		if err != nil {
+			return nil, err
+		}
+		group := groups[gv.Group]
+		if group == nil {
+			group = &metav1.APIGroup{
+				Name: gv.Group,
+				PreferredVersion: metav1.GroupVersionForDiscovery{
+					GroupVersion: res.GroupVersion,
+					Version:      gv.Version,
+				},
+			}
+			groups[gv.Group] = group
+		}
+
+		group.Versions = append(group.Versions, metav1.GroupVersionForDiscovery{
+			GroupVersion: res.GroupVersion,
+			Version:      gv.Version,
+		})
+	}
+
+	list := &metav1.APIGroupList{}
+	for _, apiGroup := range groups {
+		list.Groups = append(list.Groups, *apiGroup)
+	}
+
+	return list, nil
+
 }
 
 func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
@@ -85,19 +120,6 @@ func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
 
 	versionInfo := kubeversion.Get()
 	return &versionInfo, nil
-}
-
-func (c *FakeDiscovery) SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error) {
-	action := testing.ActionImpl{}
-	action.Verb = "get"
-	if version == v1.SchemeGroupVersion {
-		action.Resource = schema.GroupVersionResource{Resource: "/swaggerapi/api/" + version.Version}
-	} else {
-		action.Resource = schema.GroupVersionResource{Resource: "/swaggerapi/apis/" + version.Group + "/" + version.Version}
-	}
-
-	c.Invokes(action, nil)
-	return &swagger.ApiDeclaration{}, nil
 }
 
 func (c *FakeDiscovery) OpenAPISchema() (*openapi_v2.Document, error) {

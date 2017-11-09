@@ -7,7 +7,7 @@ from charmhelpers.core.hookenv import (
     action_fail,
     action_name
 )
-from charms.templating.jinja2 import render
+from charmhelpers.core.templating import render
 from subprocess import check_output
 
 

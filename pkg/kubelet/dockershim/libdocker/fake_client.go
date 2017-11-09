@@ -372,9 +372,8 @@ func (f *FakeDockerClient) popError(op string) error {
 	if ok {
 		delete(f.Errors, op)
 		return err
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // ListContainers is a test-spy implementation of Interface.ListContainers.
@@ -451,6 +450,23 @@ func (f *FakeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJS
 	defer f.Unlock()
 	f.appendCalled(calledDetail{name: "inspect_container"})
 	err := f.popError("inspect_container")
+	if container, ok := f.ContainerMap[id]; ok {
+		return container, err
+	}
+	if err != nil {
+		// Use the custom error if it exists.
+		return nil, err
+	}
+	return nil, fmt.Errorf("container %q not found", id)
+}
+
+// InspectContainerWithSize is a test-spy implementation of Interface.InspectContainerWithSize.
+// It adds an entry "inspect" to the internal method call record.
+func (f *FakeDockerClient) InspectContainerWithSize(id string) (*dockertypes.ContainerJSON, error) {
+	f.Lock()
+	defer f.Unlock()
+	f.appendCalled(calledDetail{name: "inspect_container_withsize"})
+	err := f.popError("inspect_container_withsize")
 	if container, ok := f.ContainerMap[id]; ok {
 		return container, err
 	}
@@ -851,4 +867,11 @@ func (f *FakeDockerPuller) GetImageRef(image string) (string, error) {
 		return "", nil
 	}
 	return image, err
+}
+
+func (f *FakeDockerClient) GetContainerStats(id string) (*dockertypes.StatsJSON, error) {
+	f.Lock()
+	defer f.Unlock()
+	f.appendCalled(calledDetail{name: "getContainerStats"})
+	return nil, fmt.Errorf("not implemented")
 }

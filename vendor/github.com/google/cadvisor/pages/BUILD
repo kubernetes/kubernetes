@@ -8,6 +8,7 @@ go_library(
         "pages.go",
         "templates.go",
     ],
+    importpath = "github.com/google/cadvisor/pages",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/abbot/go-http-auth:go_default_library",

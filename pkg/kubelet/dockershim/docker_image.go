@@ -21,6 +21,7 @@ import (
 	"net/http"
 
 	dockertypes "github.com/docker/docker/api/types"
+	dockerfilters "github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/pkg/jsonmessage"
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -33,8 +34,9 @@ import (
 func (ds *dockerService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
 	opts := dockertypes.ImageListOptions{}
 	if filter != nil {
-		if imgSpec := filter.GetImage(); imgSpec != nil {
-			opts.Filters.Add("reference", imgSpec.Image)
+		if filter.GetImage().GetImage() != "" {
+			opts.Filters = dockerfilters.NewArgs()
+			opts.Filters.Add("reference", filter.GetImage().GetImage())
 		}
 	}
 
@@ -131,11 +133,6 @@ func getImageRef(client libdocker.Interface, image string) (string, error) {
 	}
 
 	return img.ID, nil
-}
-
-// ImageFsInfo returns information of the filesystem that is used to store images.
-func (ds *dockerService) ImageFsInfo() ([]*runtimeapi.FilesystemUsage, error) {
-	return nil, fmt.Errorf("not implemented")
 }
 
 func filterHTTPError(err error, image string) error {

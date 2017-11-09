@@ -6,6 +6,7 @@ go_library(
         "lister.go",
         "path.go",
     ],
+    importpath = "github.com/vmware/govmomi/list",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/vmware/govmomi/property:go_default_library",

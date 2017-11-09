@@ -58,11 +58,11 @@ const (
 
 type allowAliceAuthorizer struct{}
 
-func (allowAliceAuthorizer) Authorize(a authorizer.Attributes) (bool, string, error) {
+func (allowAliceAuthorizer) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
 	if a.GetUser() != nil && a.GetUser().GetName() == "alice" {
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 	}
-	return false, "I can't allow that.  Go ask alice.", nil
+	return authorizer.DecisionNoOpinion, "I can't allow that.  Go ask alice.", nil
 }
 
 func testPrefix(t *testing.T, prefix string) {

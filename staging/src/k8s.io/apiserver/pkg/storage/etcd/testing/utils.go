@@ -27,7 +27,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/etcd/etcdtest"
 	"k8s.io/apiserver/pkg/storage/etcd/testing/testingcert"
@@ -311,7 +310,7 @@ func NewUnsecuredEtcdTestClientServer(t *testing.T) *EtcdTestServer {
 }
 
 // NewEtcd3TestClientServer creates a new client and server for testing
-func NewUnsecuredEtcd3TestClientServer(t *testing.T, scheme *runtime.Scheme) (*EtcdTestServer, *storagebackend.Config) {
+func NewUnsecuredEtcd3TestClientServer(t *testing.T) (*EtcdTestServer, *storagebackend.Config) {
 	server := &EtcdTestServer{
 		v3Cluster: integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1}),
 	}
@@ -321,7 +320,6 @@ func NewUnsecuredEtcd3TestClientServer(t *testing.T, scheme *runtime.Scheme) (*E
 		Prefix:                   etcdtest.PathPrefix(),
 		ServerList:               server.V3Client.Endpoints(),
 		DeserializationCacheSize: etcdtest.DeserializationCacheSize,
-		Copier: scheme,
 		Paging: true,
 	}
 	return server, config

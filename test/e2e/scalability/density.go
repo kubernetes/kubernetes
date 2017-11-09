@@ -152,7 +152,7 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 	}
 	constraints["l7-lb-controller"] = framework.ResourceConstraint{
 		CPUConstraint:    0.2 + 0.0001*float64(numNodes),
-		MemoryConstraint: (75 + uint64(math.Ceil(0.6*float64(numNodes)))) * (1024 * 1024),
+		MemoryConstraint: (75 + uint64(math.Ceil(0.8*float64(numNodes)))) * (1024 * 1024),
 	}
 	constraints["influxdb"] = framework.ResourceConstraint{
 		CPUConstraint:    2,
@@ -234,7 +234,7 @@ func runDensityTest(dtc DensityTestConfig) time.Duration {
 
 	// Print some data about Pod to Node allocation
 	By("Printing Pod to Node allocation data")
-	podList, err := dtc.ClientSets[0].Core().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
+	podList, err := dtc.ClientSets[0].CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	pausePodAllocation := make(map[string]int)
 	systemPodAllocation := make(map[string][]string)
@@ -615,12 +615,12 @@ var _ = SIGDescribe("Density", func() {
 						&cache.ListWatch{
 							ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 								options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": additionalPodsPrefix}).String()
-								obj, err := c.Core().Pods(nsName).List(options)
+								obj, err := c.CoreV1().Pods(nsName).List(options)
 								return runtime.Object(obj), err
 							},
 							WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 								options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": additionalPodsPrefix}).String()
-								return c.Core().Pods(nsName).Watch(options)
+								return c.CoreV1().Pods(nsName).Watch(options)
 							},
 						},
 						&v1.Pod{},
@@ -704,7 +704,7 @@ var _ = SIGDescribe("Density", func() {
 						"source":                   v1.DefaultSchedulerName,
 					}.AsSelector().String()
 					options := metav1.ListOptions{FieldSelector: selector}
-					schedEvents, err := c.Core().Events(nsName).List(options)
+					schedEvents, err := c.CoreV1().Events(nsName).List(options)
 					framework.ExpectNoError(err)
 					for k := range createTimes {
 						for _, event := range schedEvents.Items {
@@ -822,7 +822,7 @@ func createRunningPodFromRC(wg *sync.WaitGroup, c clientset.Interface, name, ns,
 		},
 	}
 	for attempt := 1; attempt <= MaxLatencyPodCreationTries; attempt++ {
-		_, err := c.Core().ReplicationControllers(ns).Create(rc)
+		_, err := c.CoreV1().ReplicationControllers(ns).Create(rc)
 		if err == nil || apierrs.IsAlreadyExists(err) {
 			break
 		}

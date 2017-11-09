@@ -18,11 +18,11 @@ package wardleinitializer
 
 import (
 	"k8s.io/apiserver/pkg/admission"
-	informers "k8s.io/sample-apiserver/pkg/client/informers_generated/internalversion"
+	informers "k8s.io/sample-apiserver/pkg/client/informers/internalversion"
 )
 
 // WantsInternalWardleInformerFactory defines a function which sets InformerFactory for admission plugins that need it
 type WantsInternalWardleInformerFactory interface {
 	SetInternalWardleInformerFactory(informers.SharedInformerFactory)
-	admission.Validator
+	admission.InitializationValidator
 }

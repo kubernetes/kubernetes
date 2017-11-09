@@ -19,20 +19,21 @@ package predicates
 import (
 	"errors"
 	"fmt"
-	"math/rand"
+	"os"
 	"strconv"
 	"sync"
-	"time"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/rand"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/util/workqueue"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -47,11 +48,29 @@ import (
 
 const (
 	MatchInterPodAffinity = "MatchInterPodAffinity"
+
+	// DefaultMaxGCEPDVolumes defines the maximum number of PD Volumes for GCE
+	// GCE instances can have up to 16 PD volumes attached.
+	DefaultMaxGCEPDVolumes = 16
+	// DefaultMaxAzureDiskVolumes defines the maximum number of PD Volumes for Azure
+	// Larger Azure VMs can actually have much more disks attached.
+	// TODO We should determine the max based on VM size
+	DefaultMaxAzureDiskVolumes = 16
+
+	// KubeMaxPDVols defines the maximum number of PD Volumes per kubelet
+	KubeMaxPDVols = "KUBE_MAX_PD_VOLS"
+
+	// for EBSVolumeFilter
+	EBSVolumeFilterType = "EBS"
+	// for GCEPDVolumeFilter
+	GCEPDVolumeFilterType = "GCE"
+	// for AzureDiskVolumeFilter
+	AzureDiskVolumeFilterType = "AzureDisk"
 )
 
 // IMPORTANT NOTE for predicate developers:
 // We are using cached predicate result for pods belonging to the same equivalence class.
-// So when updating a existing predicate, you should consider whether your change will introduce new
+// So when updating an existing predicate, you should consider whether your change will introduce new
 // dependency to attributes of any API object like Pod, Node, Service etc.
 // If yes, you are expected to invalidate the cached predicate result for related API object change.
 // For example:
@@ -146,7 +165,7 @@ func isVolumeConflict(volume v1.Volume, pod *v1.Pod) bool {
 			// two RBDs images are the same if they share the same Ceph monitor, are in the same RADOS Pool, and have the same image name
 			// only one read-write mount is permitted for the same RBD image.
 			// same RBD image mounted by multiple Pods conflicts unless all Pods mount the image read-only
-			if haveSame(mon, emon) && pool == epool && image == eimage && !(volume.RBD.ReadOnly && existingVolume.RBD.ReadOnly) {
+			if haveOverlap(mon, emon) && pool == epool && image == eimage && !(volume.RBD.ReadOnly && existingVolume.RBD.ReadOnly) {
 				return true
 			}
 		}
@@ -180,6 +199,11 @@ type MaxPDVolumeCountChecker struct {
 	maxVolumes int
 	pvInfo     PersistentVolumeInfo
 	pvcInfo    PersistentVolumeClaimInfo
+
+	// The string below is generated randomly during the struct's initialization.
+	// It is used to prefix volumeID generated inside the predicate() method to
+	// avoid conflicts with any real volume.
+	randomVolumeIDPrefix string
 }
 
 // VolumeFilter contains information on how to filter PD Volumes when checking PD Volume caps
@@ -190,24 +214,61 @@ type VolumeFilter struct {
 }
 
 // NewMaxPDVolumeCountPredicate creates a predicate which evaluates whether a pod can fit based on the
-// number of volumes which match a filter that it requests, and those that are already present.  The
-// maximum number is configurable to accommodate different systems.
+// number of volumes which match a filter that it requests, and those that are already present.
 //
 // The predicate looks for both volumes used directly, as well as PVC volumes that are backed by relevant volume
 // types, counts the number of unique volumes, and rejects the new pod if it would place the total count over
 // the maximum.
-func NewMaxPDVolumeCountPredicate(filter VolumeFilter, maxVolumes int, pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) algorithm.FitPredicate {
+func NewMaxPDVolumeCountPredicate(filterName string, pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) algorithm.FitPredicate {
+
+	var filter VolumeFilter
+	var maxVolumes int
+
+	switch filterName {
+
+	case EBSVolumeFilterType:
+		filter = EBSVolumeFilter
+		maxVolumes = getMaxVols(aws.DefaultMaxEBSVolumes)
+	case GCEPDVolumeFilterType:
+		filter = GCEPDVolumeFilter
+		maxVolumes = getMaxVols(DefaultMaxGCEPDVolumes)
+	case AzureDiskVolumeFilterType:
+		filter = AzureDiskVolumeFilter
+		maxVolumes = getMaxVols(DefaultMaxAzureDiskVolumes)
+	default:
+		glog.Fatalf("Wrong filterName, Only Support %v %v %v ", EBSVolumeFilterType,
+			GCEPDVolumeFilterType, AzureDiskVolumeFilterType)
+		return nil
+
+	}
 	c := &MaxPDVolumeCountChecker{
-		filter:     filter,
-		maxVolumes: maxVolumes,
-		pvInfo:     pvInfo,
-		pvcInfo:    pvcInfo,
+		filter:               filter,
+		maxVolumes:           maxVolumes,
+		pvInfo:               pvInfo,
+		pvcInfo:              pvcInfo,
+		randomVolumeIDPrefix: rand.String(32),
 	}
 
 	return c.predicate
 }
 
+// getMaxVols checks the max PD volumes environment variable, otherwise returning a default value
+func getMaxVols(defaultVal int) int {
+	if rawMaxVols := os.Getenv(KubeMaxPDVols); rawMaxVols != "" {
+		if parsedMaxVols, err := strconv.Atoi(rawMaxVols); err != nil {
+			glog.Errorf("Unable to parse maximum PD volumes value, using default of %v: %v", defaultVal, err)
+		} else if parsedMaxVols <= 0 {
+			glog.Errorf("Maximum PD volumes must be a positive value, using default of %v", defaultVal)
+		} else {
+			return parsedMaxVols
+		}
+	}
+
+	return defaultVal
+}
+
 func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace string, filteredVolumes map[string]bool) error {
+
 	for i := range volumes {
 		vol := &volumes[i]
 		if id, ok := c.filter.FilterVolume(vol); ok {
@@ -217,40 +278,38 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace s
 			if pvcName == "" {
 				return fmt.Errorf("PersistentVolumeClaim had no name")
 			}
+
+			// Until we know real ID of the volume use namespace/pvcName as substitute
+			// with a random prefix (calculated and stored inside 'c' during initialization)
+			// to avoid conflicts with existing volume IDs.
+			pvId := fmt.Sprintf("%s-%s/%s", c.randomVolumeIDPrefix, namespace, pvcName)
+
 			pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
-			if err != nil {
+			if err != nil || pvc == nil {
 				// if the PVC is not found, log the error and count the PV towards the PV limit
-				// generate a random volume ID since its required for de-dup
 				glog.V(4).Infof("Unable to look up PVC info for %s/%s, assuming PVC matches predicate when counting limits: %v", namespace, pvcName, err)
-				source := rand.NewSource(time.Now().UnixNano())
-				generatedID := "missingPVC" + strconv.Itoa(rand.New(source).Intn(1000000))
-				filteredVolumes[generatedID] = true
-				return nil
+				filteredVolumes[pvId] = true
+				continue
 			}
 
-			if pvc == nil {
-				return fmt.Errorf("PersistentVolumeClaim not found: %q", pvcName)
+			if pvc.Spec.VolumeName == "" {
+				// PVC is not bound. It was either deleted and created again or
+				// it was forcefuly unbound by admin. The pod can still use the
+				// original PV where it was bound to -> log the error and count
+				// the PV towards the PV limit
+				glog.V(4).Infof("PVC %s/%s is not bound, assuming PVC matches predicate when counting limits", namespace, pvcName)
+				filteredVolumes[pvId] = true
+				continue
 			}
 
 			pvName := pvc.Spec.VolumeName
-			if pvName == "" {
-				return fmt.Errorf("PersistentVolumeClaim is not bound: %q", pvcName)
-			}
-
 			pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
-			if err != nil {
+			if err != nil || pv == nil {
 				// if the PV is not found, log the error
 				// and count the PV towards the PV limit
-				// generate a random volume ID since it is required for de-dup
 				glog.V(4).Infof("Unable to look up PV info for %s/%s/%s, assuming PV matches predicate when counting limits: %v", namespace, pvcName, pvName, err)
-				source := rand.NewSource(time.Now().UnixNano())
-				generatedID := "missingPV" + strconv.Itoa(rand.New(source).Intn(1000000))
-				filteredVolumes[generatedID] = true
-				return nil
-			}
-
-			if pv == nil {
-				return fmt.Errorf("PersistentVolume not found: %q", pvName)
+				filteredVolumes[pvId] = true
+				continue
 			}
 
 			if id, ok := c.filter.FilterPersistentVolume(pv); ok {
@@ -852,20 +911,18 @@ func PodFitsHostPorts(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 }
 
 // search two arrays and return true if they have at least one common element; return false otherwise
-func haveSame(a1, a2 []string) bool {
-	m := map[string]int{}
+func haveOverlap(a1, a2 []string) bool {
+	m := map[string]bool{}
 
 	for _, val := range a1 {
-		m[val] = 1
+		m[val] = true
 	}
 	for _, val := range a2 {
-		m[val] = m[val] + 1
-	}
-	for _, val := range m {
-		if val > 1 {
+		if _, ok := m[val]; ok {
 			return true
 		}
 	}
+
 	return false
 }
 

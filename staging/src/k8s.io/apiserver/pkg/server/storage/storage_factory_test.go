@@ -145,7 +145,6 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 		defaultConfig := storagebackend.Config{
 			Prefix:     "/registry",
 			ServerList: defaultEtcdLocation,
-			Copier:     scheme,
 		}
 		storageFactory := NewDefaultStorageFactory(defaultConfig, "", codecs, NewDefaultResourceEncodingConfig(registry), NewResourceConfig(), nil)
 		storageFactory.SetEtcdLocation(test.resource, test.servers)

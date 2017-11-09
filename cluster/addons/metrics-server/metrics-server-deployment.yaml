@@ -35,11 +35,6 @@ spec:
       containers:
       - name: metrics-server
         image: gcr.io/google_containers/metrics-server-amd64:v0.2.0
-        imagePullPolicy: Always
-        # TODO(piosz): revisit resources
-        resources:
-          requests:
-            memory: 100Mi
         command:
         - /metrics-server
         - --source=kubernetes.summary_api:''
@@ -47,6 +42,35 @@ spec:
         - containerPort: 443
           name: https
           protocol: TCP
+      - name: metrics-server-nanny
+        image: gcr.io/google_containers/addon-resizer:1.7
+        resources:
+          limits:
+            cpu: 100m
+            memory: 300Mi
+          requests:
+            cpu: 50m
+            memory: 100Mi
+        env:
+          - name: MY_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: MY_POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        command:
+          - /pod_nanny
+          - --cpu=40m
+          - --extra-cpu=0.5m
+          - --memory=140Mi
+          - --extra-memory=4Mi
+          - --threshold=5
+          - --deployment=metrics-server-v0.2.0
+          - --container=metrics-server
+          - --poll-period=300000
+          - --estimator=exponential
       tolerations:
         - key: "CriticalAddonsOnly"
           operator: "Exists"

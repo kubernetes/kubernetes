@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "mock.go",
     ],
+    importpath = "github.com/stretchr/testify/mock",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",

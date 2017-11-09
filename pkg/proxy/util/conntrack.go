@@ -18,6 +18,7 @@ package util
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 
@@ -28,10 +29,27 @@ import (
 
 const noConnectionToDelete = "0 flow entries have been deleted"
 
-// DeleteServiceConnections uses the conntrack tool to delete the conntrack entries
+func IsIPv6(netIP net.IP) bool {
+	return netIP != nil && netIP.To4() == nil
+}
+
+func IsIPv6String(ip string) bool {
+	netIP := net.ParseIP(ip)
+	return IsIPv6(netIP)
+}
+
+func parametersWithFamily(isIPv6 bool, parameters ...string) []string {
+	if isIPv6 {
+		parameters = append(parameters, "-f", "ipv6")
+	}
+	return parameters
+}
+
+// ClearUDPConntrackForIP uses the conntrack tool to delete the conntrack entries
 // for the UDP connections specified by the given service IP
 func ClearUDPConntrackForIP(execer exec.Interface, ip string) error {
-	err := ExecConntrackTool(execer, "-D", "--orig-dst", ip, "-p", "udp")
+	parameters := parametersWithFamily(IsIPv6String(ip), "-D", "--orig-dst", ip, "-p", "udp")
+	err := ExecConntrackTool(execer, parameters...)
 	if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
 		// TODO: Better handling for deletion failure. When failure occur, stale udp connection may not get flushed.
 		// These stale udp connection will keep black hole traffic. Making this a best effort operation for now, since it
@@ -60,11 +78,12 @@ func ExecConntrackTool(execer exec.Interface, parameters ...string) error {
 // The solution is clearing the conntrack. Known issues:
 // https://github.com/docker/docker/issues/8795
 // https://github.com/kubernetes/kubernetes/issues/31983
-func ClearUDPConntrackForPort(execer exec.Interface, port int) error {
+func ClearUDPConntrackForPort(execer exec.Interface, port int, isIPv6 bool) error {
 	if port <= 0 {
 		return fmt.Errorf("Wrong port number. The port number must be greater than zero")
 	}
-	err := ExecConntrackTool(execer, "-D", "-p", "udp", "--dport", strconv.Itoa(port))
+	parameters := parametersWithFamily(isIPv6, "-D", "-p", "udp", "--dport", strconv.Itoa(port))
+	err := ExecConntrackTool(execer, parameters...)
 	if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
 		return fmt.Errorf("error deleting conntrack entries for UDP port: %d, error: %v", port, err)
 	}
@@ -74,7 +93,8 @@ func ClearUDPConntrackForPort(execer exec.Interface, port int) error {
 // ClearUDPConntrackForPeers uses the conntrack tool to delete the conntrack entries
 // for the UDP connections specified by the {origin, dest} IP pair.
 func ClearUDPConntrackForPeers(execer exec.Interface, origin, dest string) error {
-	err := ExecConntrackTool(execer, "-D", "--orig-dst", origin, "--dst-nat", dest, "-p", "udp")
+	parameters := parametersWithFamily(IsIPv6String(origin), "-D", "--orig-dst", origin, "--dst-nat", dest, "-p", "udp")
+	err := ExecConntrackTool(execer, parameters...)
 	if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
 		// TODO: Better handling for deletion failure. When failure occur, stale udp connection may not get flushed.
 		// These stale udp connection will keep black hole traffic. Making this a best effort operation for now, since it

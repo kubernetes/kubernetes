@@ -8,12 +8,14 @@ load(
 
 go_binary(
     name = "explorer",
+    importpath = "k8s.io/kubernetes/examples/explorer",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["explorer.go"],
+    importpath = "k8s.io/kubernetes/examples/explorer",
     deps = ["//vendor/github.com/davecgh/go-spew/spew:go_default_library"],
 )
 

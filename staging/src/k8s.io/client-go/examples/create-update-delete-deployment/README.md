@@ -22,6 +22,8 @@ go build -o ./app
 Now, run this application on your workstation with your local kubeconfig file:
 
 ```
+./app
+# or specify a kubeconfig file with flag
 ./app -kubeconfig=$HOME/.kube/config
 ```
 
@@ -30,13 +32,19 @@ Running this command will execute the following operations on your cluster:
 1. **Create Deployment:** This will create a 2 replica Deployment. Verify with
    `kubectl get pods`.
 2. **Update Deployment:** This will update the Deployment resource created in
-   previous step to set the replica count to 1 and add annotations. You are
-   encouraged to inspect the retry loop that handles conflicts. Verify the new
-   replica count and `foo=bar` annotation with `kubectl describe deployment
-   demo`.
-3. **List Deployments:** This will retrieve Deployments in the `default`
+   previous step by setting the replica count to 1 and changing the container
+   image to `nginx:1.13`. You are encouraged to inspect the retry loop that
+   handles conflicts. Verify the new replica count and container image with
+   `kubectl describe deployment demo`.
+3. **Rollback Deployment:** This will rollback the Deployment to the last
+   revision. In this case, it's the revision that was created in Step 1.
+   Use `kubectl describe` to verify the container image is now `nginx:1.12`.
+   Also note that the Deployment's replica count is still 1; this is because a
+   Deployment revision is created if and only if the Deployment's pod template
+   (`.spec.template`) is changed.
+4. **List Deployments:** This will retrieve Deployments in the `default`
    namespace and print their names and replica counts.
-4. **Delete Deployment:** This will delete the Deployment object and its
+5. **Delete Deployment:** This will delete the Deployment object and its
    dependent ReplicaSet resource. Verify with `kubectl get deployments`.
 
 Each step is separated by an interactive prompt. You must hit the
@@ -53,6 +61,10 @@ Created deployment "demo-deployment".
 
 Updating deployment...
 Updated deployment...
+-> Press Return key to continue.
+
+Rolling back deployment...
+Rolled back deployment...
 -> Press Return key to continue.
 
 Listing deployments in namespace "default":

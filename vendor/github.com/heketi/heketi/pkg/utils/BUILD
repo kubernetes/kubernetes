@@ -12,6 +12,7 @@ go_library(
         "stringstack.go",
         "uuid.go",
     ],
+    importpath = "github.com/heketi/heketi/pkg/utils",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/lpabon/godbc:go_default_library"],
 )

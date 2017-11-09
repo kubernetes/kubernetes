@@ -10,6 +10,7 @@ go_library(
         "message.go",
         "util.go",
     ],
+    importpath = "github.com/chai2010/gettext-go/gettext/mo",
     visibility = ["//visibility:public"],
 )
 

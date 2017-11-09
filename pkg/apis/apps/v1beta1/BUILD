@@ -16,6 +16,7 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.defaults.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/apis/apps/v1beta1",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
@@ -47,10 +48,12 @@ filegroup(
 go_test(
     name = "go_default_xtest",
     srcs = ["defaults_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/apis/apps/v1beta1_test",
     deps = [
         ":go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

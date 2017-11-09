@@ -31,6 +31,8 @@ import (
 WARNING: this logic is duplicated, with minor changes, in cmd/hyperkube/kubectl.go
 Any salient changes here will need to be manually reflected in that file.
 */
+
+// Run runs the kubectl program (creates and executes a new cobra command).
 func Run() error {
 	logs.InitLogs()
 	defer logs.FlushLogs()

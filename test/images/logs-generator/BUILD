@@ -8,12 +8,14 @@ load(
 
 go_binary(
     name = "logs-generator",
+    importpath = "k8s.io/kubernetes/test/images/logs-generator",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["logs_generator.go"],
+    importpath = "k8s.io/kubernetes/test/images/logs-generator",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/rand:go_default_library",

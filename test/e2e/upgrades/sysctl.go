@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // SecretUpgradeTest tests that a pod with sysctls runs before and after an upgrade. During
@@ -55,13 +54,13 @@ func (t *SysctlUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, u
 	switch upgrade {
 	case MasterUpgrade:
 		By("Checking the safe sysctl pod keeps running on master upgrade")
-		pod, err := f.ClientSet.Core().Pods(t.validPod.Namespace).Get(t.validPod.Name, metav1.GetOptions{})
+		pod, err := f.ClientSet.CoreV1().Pods(t.validPod.Namespace).Get(t.validPod.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pod.Status.Phase).To(Equal(v1.PodRunning))
 	}
 
 	By("Checking the old unsafe sysctl pod was not suddenly started during an upgrade")
-	pod, err := f.ClientSet.Core().Pods(t.invalidPod.Namespace).Get(t.invalidPod.Name, metav1.GetOptions{})
+	pod, err := f.ClientSet.CoreV1().Pods(t.invalidPod.Namespace).Get(t.invalidPod.Name, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		Expect(err).NotTo(HaveOccurred())
 	}
@@ -132,7 +131,7 @@ func sysctlTestPod(name string, sysctls map[string]string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:    "test-container",
-					Image:   imageutils.GetBusyBoxImage(),
+					Image:   "busybox",
 					Command: append([]string{"/bin/sysctl"}, keys...),
 				},
 			},

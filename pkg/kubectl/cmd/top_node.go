@@ -22,10 +22,10 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/metricsutil"
@@ -36,7 +36,7 @@ import (
 type TopNodeOptions struct {
 	ResourceName    string
 	Selector        string
-	NodeClient      coreclient.NodesGetter
+	NodeClient      corev1.CoreV1Interface
 	HeapsterOptions HeapsterTopOptions
 	Client          *metricsutil.HeapsterMetricsClient
 	Printer         *metricsutil.TopCmdPrinter
@@ -118,7 +118,7 @@ func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
 	}
 
-	clientset, err := f.ClientSet()
+	clientset, err := f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
@@ -132,23 +132,14 @@ func (o *TopNodeOptions) Validate() error {
 	if len(o.ResourceName) > 0 && len(o.Selector) > 0 {
 		return errors.New("only one of NAME or --selector can be provided")
 	}
-	if len(o.Selector) > 0 {
-		_, err := labels.Parse(o.Selector)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
 func (o TopNodeOptions) RunTopNode() error {
 	var err error
-	selector := labels.Everything()
+	selector := labels.Everything().String()
 	if len(o.Selector) > 0 {
-		selector, err = labels.Parse(o.Selector)
-		if err != nil {
-			return err
-		}
+		selector = o.Selector
 	}
 	metrics, err := o.Client.GetNodeMetrics(o.ResourceName, selector)
 	if err != nil {
@@ -158,7 +149,7 @@ func (o TopNodeOptions) RunTopNode() error {
 		return errors.New("metrics not available yet")
 	}
 
-	var nodes []api.Node
+	var nodes []v1.Node
 	if len(o.ResourceName) > 0 {
 		node, err := o.NodeClient.Nodes().Get(o.ResourceName, metav1.GetOptions{})
 		if err != nil {
@@ -167,7 +158,7 @@ func (o TopNodeOptions) RunTopNode() error {
 		nodes = append(nodes, *node)
 	} else {
 		nodeList, err := o.NodeClient.Nodes().List(metav1.ListOptions{
-			LabelSelector: selector.String(),
+			LabelSelector: selector,
 		})
 		if err != nil {
 			return err
@@ -175,7 +166,7 @@ func (o TopNodeOptions) RunTopNode() error {
 		nodes = append(nodes, nodeList.Items...)
 	}
 
-	allocatable := make(map[string]api.ResourceList)
+	allocatable := make(map[string]v1.ResourceList)
 
 	for _, n := range nodes {
 		allocatable[n.Name] = n.Status.Allocatable

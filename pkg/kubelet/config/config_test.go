@@ -146,8 +146,10 @@ func TestNewPodAddedInvalidNamespace(t *testing.T) {
 	// see an update
 	podUpdate := CreatePodUpdate(kubetypes.ADD, TestSource, CreateValidPod("foo", ""))
 	channel <- podUpdate
+	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.ADD, TestSource, CreateValidPod("foo", "")))
+
 	config.Sync()
-	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.SET, kubetypes.AllSource))
+	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.SET, kubetypes.AllSource, CreateValidPod("foo", "")))
 }
 
 func TestNewPodAddedDefaultNamespace(t *testing.T) {
@@ -370,16 +372,13 @@ func TestPodUpdateAnnotations(t *testing.T) {
 	pod.Annotations = make(map[string]string, 0)
 	pod.Annotations["kubernetes.io/blah"] = "blah"
 
-	clone, err := scheme.Scheme.DeepCopy(pod)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
+	clone := pod.DeepCopy()
 
-	podUpdate := CreatePodUpdate(kubetypes.SET, TestSource, CreateValidPod("foo1", "new"), clone.(*v1.Pod), CreateValidPod("foo3", "new"))
+	podUpdate := CreatePodUpdate(kubetypes.SET, TestSource, CreateValidPod("foo1", "new"), clone, CreateValidPod("foo3", "new"))
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.ADD, TestSource, CreateValidPod("foo1", "new"), pod, CreateValidPod("foo3", "new")))
 
-	pod.Annotations["kubenetes.io/blah"] = "superblah"
+	pod.Annotations["kubernetes.io/blah"] = "superblah"
 	podUpdate = CreatePodUpdate(kubetypes.SET, TestSource, CreateValidPod("foo1", "new"), pod, CreateValidPod("foo3", "new"))
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.UPDATE, TestSource, pod))
@@ -402,12 +401,9 @@ func TestPodUpdateLabels(t *testing.T) {
 	pod.Labels = make(map[string]string, 0)
 	pod.Labels["key"] = "value"
 
-	clone, err := scheme.Scheme.DeepCopy(pod)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
+	clone := pod.DeepCopy()
 
-	podUpdate := CreatePodUpdate(kubetypes.SET, TestSource, clone.(*v1.Pod))
+	podUpdate := CreatePodUpdate(kubetypes.SET, TestSource, clone)
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.ADD, TestSource, pod))
 

@@ -449,6 +449,23 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			pod: buildPod("", labels1, nil),
 			pods: []*v1.Pod{
 				buildPod(nodeMachine1Zone1, labels2, nil),
+				buildPod(nodeMachine1Zone2, labels2, nil),
+			},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
+			expectedList: []schedulerapi.HostPriority{
+				{Host: nodeMachine1Zone1, Score: schedulerapi.MaxPriority},
+				{Host: nodeMachine1Zone2, Score: schedulerapi.MaxPriority},
+				{Host: nodeMachine2Zone2, Score: schedulerapi.MaxPriority},
+				{Host: nodeMachine1Zone3, Score: schedulerapi.MaxPriority},
+				{Host: nodeMachine2Zone3, Score: schedulerapi.MaxPriority},
+				{Host: nodeMachine3Zone3, Score: schedulerapi.MaxPriority},
+			},
+			test: "two pods, 0 matching",
+		},
+		{
+			pod: buildPod("", labels1, nil),
+			pods: []*v1.Pod{
+				buildPod(nodeMachine1Zone1, labels2, nil),
 				buildPod(nodeMachine1Zone2, labels1, nil),
 			},
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},

@@ -4,9 +4,11 @@ go_library(
     name = "go_default_library",
     srcs = [
         "conntrack.go",
+        "endpoints.go",
         "port.go",
         "utils.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/proxy/util",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/api:go_default_library",
@@ -21,9 +23,11 @@ go_test(
     name = "go_default_test",
     srcs = [
         "conntrack_test.go",
+        "endpoints_test.go",
         "port_test.go",
         "utils_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/proxy/util",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

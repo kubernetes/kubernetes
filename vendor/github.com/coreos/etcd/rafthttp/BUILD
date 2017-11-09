@@ -20,6 +20,7 @@ go_library(
         "urlpick.go",
         "util.go",
     ],
+    importpath = "github.com/coreos/etcd/rafthttp",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/etcdserver/stats:go_default_library",

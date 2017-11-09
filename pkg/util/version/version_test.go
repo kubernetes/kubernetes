@@ -45,13 +45,24 @@ func testOne(v *Version, item, prev testItem) error {
 		if err != nil {
 			return fmt.Errorf("unexpected parse error: %v", err)
 		}
+		rv, err := parse(prev.version, v.semver)
+		if err != nil {
+			return fmt.Errorf("unexpected parse error: %v", err)
+		}
+		rcmp, err := rv.Compare(item.version)
+		if err != nil {
+			return fmt.Errorf("unexpected parse error: %v", err)
+		}
+
 		switch {
 		case cmp == -1:
 			return fmt.Errorf("unexpected ordering %q < %q", item.version, prev.version)
 		case cmp == 0 && !item.equalsPrev:
-			return fmt.Errorf("unexpected comparison %q == %q", item.version, item.version)
+			return fmt.Errorf("unexpected comparison %q == %q", item.version, prev.version)
 		case cmp == 1 && item.equalsPrev:
-			return fmt.Errorf("unexpected comparison %q != %q", item.version, item.version)
+			return fmt.Errorf("unexpected comparison %q != %q", item.version, prev.version)
+		case cmp != -rcmp:
+			return fmt.Errorf("unexpected reverse comparison %q <=> %q %v %v %v %v", item.version, prev.version, cmp, rcmp, v.Components(), rv.Components())
 		}
 	}
 
@@ -76,6 +87,8 @@ func TestSemanticVersions(t *testing.T) {
 		{version: "1.0.0-x.7.z.92"},
 		{version: "1.0.0"},
 		{version: "1.0.0+20130313144700", equalsPrev: true},
+		{version: "1.8.0-alpha.3"},
+		{version: "1.8.0-alpha.3.673+73326ef01d2d7c"},
 		{version: "1.9.0"},
 		{version: "1.10.0"},
 		{version: "1.11.0"},
@@ -187,6 +200,7 @@ func TestGenericVersions(t *testing.T) {
 		{version: "1.2", unparsed: "1.2"},
 		{version: "1.2a.3", unparsed: "1.2", equalsPrev: true},
 		{version: "1.2.3", unparsed: "1.2.3"},
+		{version: "1.2.3.0", unparsed: "1.2.3.0", equalsPrev: true},
 		{version: "1.2.3a", unparsed: "1.2.3", equalsPrev: true},
 		{version: "1.2.3-foo.", unparsed: "1.2.3", equalsPrev: true},
 		{version: "1.2.3-.foo", unparsed: "1.2.3", equalsPrev: true},
@@ -201,8 +215,10 @@ func TestGenericVersions(t *testing.T) {
 		{version: "1.2.3.4b3", unparsed: "1.2.3.4", equalsPrev: true},
 		{version: "1.2.3.4.5", unparsed: "1.2.3.4.5"},
 		{version: "1.9.0", unparsed: "1.9.0"},
+		{version: "1.9.0.0.0.0.0.0", unparsed: "1.9.0.0.0.0.0.0", equalsPrev: true},
 		{version: "1.10.0", unparsed: "1.10.0"},
 		{version: "1.11.0", unparsed: "1.11.0"},
+		{version: "1.11.0.0.5", unparsed: "1.11.0.0.5"},
 		{version: "2.0.0", unparsed: "2.0.0"},
 		{version: "2.1.0", unparsed: "2.1.0"},
 		{version: "2.1.1", unparsed: "2.1.1"},

@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
@@ -56,6 +57,7 @@ func TestNamespaceScopedCRUD(t *testing.T) {
 
 	ns := "not-the-default"
 	testSimpleCRUD(t, ns, noxuDefinition, noxuVersionClient)
+	testFieldSelector(t, ns, noxuDefinition, noxuVersionClient)
 }
 
 func TestClusterScopedCRUD(t *testing.T) {
@@ -73,6 +75,7 @@ func TestClusterScopedCRUD(t *testing.T) {
 
 	ns := ""
 	testSimpleCRUD(t, ns, noxuDefinition, noxuVersionClient)
+	testFieldSelector(t, ns, noxuDefinition, noxuVersionClient)
 }
 
 func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta1.CustomResourceDefinition, noxuVersionClient dynamic.Interface) {
@@ -189,6 +192,149 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 			t.Fatal(err)
 		}
 		if e, a := createdObjectMeta.GetUID(), deletedObjectMeta.GetUID(); e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+
+	case <-time.After(5 * time.Second):
+		t.Errorf("missing watch event")
+	}
+}
+
+func testFieldSelector(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta1.CustomResourceDefinition, noxuVersionClient dynamic.Interface) {
+	noxuResourceClient := NewNamespacedCustomResourceClient(ns, noxuVersionClient, noxuDefinition)
+	initialList, err := noxuResourceClient.List(metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, a := 0, len(initialList.(*unstructured.UnstructuredList).Items); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	initialListTypeMeta, err := meta.TypeAccessor(initialList)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, a := noxuDefinition.Spec.Group+"/"+noxuDefinition.Spec.Version, initialListTypeMeta.GetAPIVersion(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := noxuDefinition.Spec.Names.ListKind, initialListTypeMeta.GetKind(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	initialListListMeta, err := meta.ListAccessor(initialList)
+	if err != nil {
+		t.Fatal(err)
+	}
+	noxuWatch, err := noxuResourceClient.Watch(
+		metav1.ListOptions{
+			ResourceVersion: initialListListMeta.GetResourceVersion(),
+			FieldSelector:   "metadata.name=foo",
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer noxuWatch.Stop()
+
+	_, err = instantiateCustomResource(t, testserver.NewNoxuInstance(ns, "bar"), noxuResourceClient, noxuDefinition)
+	if err != nil {
+		t.Fatalf("unable to create noxu Instance:%v", err)
+	}
+	createdNoxuInstanceFoo, err := instantiateCustomResource(t, testserver.NewNoxuInstance(ns, "foo"), noxuResourceClient, noxuDefinition)
+	if err != nil {
+		t.Fatalf("unable to create noxu Instance:%v", err)
+	}
+
+	select {
+	case watchEvent := <-noxuWatch.ResultChan():
+		if e, a := watch.Added, watchEvent.Type; e != a {
+			t.Errorf("expected %v, got %v", e, a)
+			break
+		}
+		createdObjectMeta, err := meta.Accessor(watchEvent.Object)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// it should have a UUID
+		if len(createdObjectMeta.GetUID()) == 0 {
+			t.Errorf("missing uuid: %#v", watchEvent.Object)
+		}
+		if e, a := ns, createdObjectMeta.GetNamespace(); e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+		if e, a := "foo", createdObjectMeta.GetName(); e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+		createdTypeMeta, err := meta.TypeAccessor(watchEvent.Object)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e, a := noxuDefinition.Spec.Group+"/"+noxuDefinition.Spec.Version, createdTypeMeta.GetAPIVersion(); e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+		if e, a := noxuDefinition.Spec.Names.Kind, createdTypeMeta.GetKind(); e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+
+	case <-time.After(5 * time.Second):
+		t.Errorf("missing watch event")
+	}
+
+	gottenNoxuInstance, err := noxuResourceClient.Get("foo", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, a := createdNoxuInstanceFoo, gottenNoxuInstance; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	listWithItem, err := noxuResourceClient.List(metav1.ListOptions{FieldSelector: "metadata.name=foo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, a := 1, len(listWithItem.(*unstructured.UnstructuredList).Items); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := *createdNoxuInstanceFoo, listWithItem.(*unstructured.UnstructuredList).Items[0]; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	if err := noxuResourceClient.Delete("bar", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := noxuResourceClient.Delete("foo", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	listWithoutItem, err := noxuResourceClient.List(metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, a := 0, len(listWithoutItem.(*unstructured.UnstructuredList).Items); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	select {
+	case watchEvent := <-noxuWatch.ResultChan():
+		if e, a := watch.Deleted, watchEvent.Type; e != a {
+			t.Errorf("expected %v, got %v", e, a)
+			break
+		}
+		deletedObjectMeta, err := meta.Accessor(watchEvent.Object)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// it should have a UUID
+		createdObjectMeta, err := meta.Accessor(createdNoxuInstanceFoo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e, a := createdObjectMeta.GetUID(), deletedObjectMeta.GetUID(); e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+		if e, a := ns, createdObjectMeta.GetNamespace(); e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+		if e, a := "foo", createdObjectMeta.GetName(); e != a {
 			t.Errorf("expected %v, got %v", e, a)
 		}
 
@@ -398,6 +544,69 @@ func TestPreserveInt(t *testing.T) {
 	num2 := num["num2"].(int64)
 	if num1 != 9223372036854775807 || num2 != 1000000 {
 		t.Errorf("Expected %v, got %v, %v", `9223372036854775807, 1000000`, num1, num2)
+	}
+}
+
+func TestPatch(t *testing.T) {
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close(stopCh)
+
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ns := "not-the-default"
+	noxuNamespacedResourceClient := noxuVersionClient.Resource(&metav1.APIResource{
+		Name:       noxuDefinition.Spec.Names.Plural,
+		Namespaced: true,
+	}, ns)
+
+	noxuInstanceToCreate := testserver.NewNoxuInstance(ns, "foo")
+	createdNoxuInstance, err := noxuNamespacedResourceClient.Create(noxuInstanceToCreate)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	patch := []byte(`{"num": {"num2":999}}`)
+	createdNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, patch)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// a patch with no change
+	createdNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, patch)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// an empty patch
+	createdNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, []byte(`{}`))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	originalJSON, err := runtime.Encode(unstructured.UnstructuredJSONScheme, createdNoxuInstance)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	gottenNoxuInstance, err := runtime.Decode(unstructured.UnstructuredJSONScheme, originalJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Check if int is preserved.
+	unstructuredObj := gottenNoxuInstance.(*unstructured.Unstructured).Object
+	num := unstructuredObj["num"].(map[string]interface{})
+	num1 := num["num1"].(int64)
+	num2 := num["num2"].(int64)
+	if num1 != 9223372036854775807 || num2 != 999 {
+		t.Errorf("Expected %v, got %v, %v", `9223372036854775807, 999`, num1, num2)
 	}
 }
 

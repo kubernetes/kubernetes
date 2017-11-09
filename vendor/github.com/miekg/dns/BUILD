@@ -47,6 +47,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/miekg/dns",
     visibility = ["//visibility:public"],
 )
 

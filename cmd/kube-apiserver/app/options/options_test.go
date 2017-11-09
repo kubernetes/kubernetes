@@ -30,6 +30,7 @@ import (
 	utilconfig "k8s.io/apiserver/pkg/util/flag"
 	restclient "k8s.io/client-go/rest"
 	kapi "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
@@ -45,7 +46,6 @@ func TestAddFlags(t *testing.T) {
 		"--admission-control-config-file=/admission-control-config",
 		"--advertise-address=192.168.10.10",
 		"--allow-privileged=false",
-		"--alpha-endpoint-reconciler-type=" + string(reconcilers.MasterCountReconcilerType),
 		"--anonymous-auth=false",
 		"--apiserver-count=5",
 		"--audit-log-maxage=11",
@@ -71,6 +71,7 @@ func TestAddFlags(t *testing.T) {
 		"--enable-aggregator-routing=true",
 		"--enable-logs-handler=false",
 		"--enable-swagger-ui=true",
+		"--endpoint-reconciler-type=" + string(reconcilers.MasterCountReconcilerType),
 		"--etcd-quorum-read=false",
 		"--etcd-keyfile=/var/run/kubernetes/etcd.key",
 		"--etcd-certfile=/var/run/kubernetes/etcdce.crt",
@@ -90,7 +91,7 @@ func TestAddFlags(t *testing.T) {
 
 	// This is a snapshot of expected options parsed by args.
 	expected := &ServerRunOptions{
-		ServiceNodePortRange:   DefaultServiceNodePortRange,
+		ServiceNodePortRange:   kubeoptions.DefaultServiceNodePortRange,
 		MasterCount:            5,
 		EndpointReconcilerType: string(reconcilers.MasterCountReconcilerType),
 		AllowPrivileged:        false,
@@ -103,9 +104,11 @@ func TestAddFlags(t *testing.T) {
 			MinRequestTimeout:           1800,
 		},
 		Admission: &apiserveroptions.AdmissionOptions{
-			PluginNames: []string{"AlwaysDeny"},
-			ConfigFile:  "/admission-control-config",
-			Plugins:     s.Admission.Plugins,
+			RecommendedPluginOrder: []string{"NamespaceLifecycle", "Initializers", "GenericAdmissionWebhook"},
+			DefaultOffPlugins:      []string{"Initializers", "GenericAdmissionWebhook"},
+			PluginNames:            []string{"AlwaysDeny"},
+			ConfigFile:             "/admission-control-config",
+			Plugins:                s.Admission.Plugins,
 		},
 		Etcd: &apiserveroptions.EtcdOptions{
 			StorageConfig: storagebackend.Config{
@@ -113,11 +116,11 @@ func TestAddFlags(t *testing.T) {
 				ServerList: nil,
 				Prefix:     "/registry",
 				DeserializationCacheSize: 0,
-				Copier:   kapi.Scheme,
-				Quorum:   false,
-				KeyFile:  "/var/run/kubernetes/etcd.key",
-				CAFile:   "/var/run/kubernetes/etcdca.crt",
-				CertFile: "/var/run/kubernetes/etcdce.crt",
+				Quorum:             false,
+				KeyFile:            "/var/run/kubernetes/etcd.key",
+				CAFile:             "/var/run/kubernetes/etcdca.crt",
+				CertFile:           "/var/run/kubernetes/etcdce.crt",
+				CompactionInterval: storagebackend.DefaultCompactInterval,
 			},
 			DefaultStorageMediaType: "application/vnd.kubernetes.protobuf",
 			DeleteCollectionWorkers: 1,
@@ -212,8 +215,8 @@ func TestAddFlags(t *testing.T) {
 			CloudProvider:   "azure",
 		},
 		StorageSerialization: &kubeoptions.StorageSerializationOptions{
-			StorageVersions:        kapi.Registry.AllPreferredGroupVersions(),
-			DefaultStorageVersions: kapi.Registry.AllPreferredGroupVersions(),
+			StorageVersions:        legacyscheme.Registry.AllPreferredGroupVersions(),
+			DefaultStorageVersions: legacyscheme.Registry.AllPreferredGroupVersions(),
 		},
 		APIEnablement: &kubeoptions.APIEnablementOptions{
 			RuntimeConfig: utilconfig.ConfigurationMap{},

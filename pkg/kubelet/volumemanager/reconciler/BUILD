@@ -9,8 +9,9 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["reconciler.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler",
     deps = [
-        "//cmd/kubelet/app/options:go_default_library",
+        "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/volumemanager/cache:go_default_library",
         "//pkg/util/file:go_default_library",
         "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
@@ -33,6 +34,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["reconciler_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler",
     library = ":go_default_library",
     deps = [
         "//pkg/kubelet/volumemanager/cache:go_default_library",

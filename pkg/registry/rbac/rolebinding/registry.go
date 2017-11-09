@@ -22,15 +22,14 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
 // Registry is an interface for things that know how to store RoleBindings.
 type Registry interface {
 	ListRoleBindings(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*rbac.RoleBindingList, error)
-	CreateRoleBinding(ctx genericapirequest.Context, roleBinding *rbac.RoleBinding) error
-	UpdateRoleBinding(ctx genericapirequest.Context, roleBinding *rbac.RoleBinding) error
+	CreateRoleBinding(ctx genericapirequest.Context, roleBinding *rbac.RoleBinding, createValidation rest.ValidateObjectFunc) error
+	UpdateRoleBinding(ctx genericapirequest.Context, roleBinding *rbac.RoleBinding, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
 	GetRoleBinding(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*rbac.RoleBinding, error)
 	DeleteRoleBinding(ctx genericapirequest.Context, name string) error
 	WatchRoleBindings(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
@@ -56,14 +55,14 @@ func (s *storage) ListRoleBindings(ctx genericapirequest.Context, options *metai
 	return obj.(*rbac.RoleBindingList), nil
 }
 
-func (s *storage) CreateRoleBinding(ctx genericapirequest.Context, roleBinding *rbac.RoleBinding) error {
+func (s *storage) CreateRoleBinding(ctx genericapirequest.Context, roleBinding *rbac.RoleBinding, createValidation rest.ValidateObjectFunc) error {
 	// TODO(ericchiang): add additional validation
-	_, err := s.Create(ctx, roleBinding, false)
+	_, err := s.Create(ctx, roleBinding, createValidation, false)
 	return err
 }
 
-func (s *storage) UpdateRoleBinding(ctx genericapirequest.Context, roleBinding *rbac.RoleBinding) error {
-	_, _, err := s.Update(ctx, roleBinding.Name, rest.DefaultUpdatedObjectInfo(roleBinding, api.Scheme))
+func (s *storage) UpdateRoleBinding(ctx genericapirequest.Context, roleBinding *rbac.RoleBinding, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
+	_, _, err := s.Update(ctx, roleBinding.Name, rest.DefaultUpdatedObjectInfo(roleBinding), createValidation, updateValidation)
 	return err
 }
 

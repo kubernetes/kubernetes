@@ -6,6 +6,7 @@ go_library(
         "args.go",
         "types.go",
     ],
+    importpath = "github.com/containernetworking/cni/pkg/types",
     visibility = ["//visibility:public"],
 )
 

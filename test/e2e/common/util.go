@@ -35,14 +35,13 @@ import (
 type Suite string
 
 const (
-	E2E           Suite = "e2e"
-	NodeE2E       Suite = "node e2e"
-	FederationE2E Suite = "federation e2e"
+	E2E     Suite = "e2e"
+	NodeE2E Suite = "node e2e"
 )
 
 var (
 	mountImage   = imageutils.GetE2EImage(imageutils.Mounttest)
-	busyboxImage = imageutils.GetBusyBoxImage()
+	busyboxImage = "busybox"
 )
 
 var CurrentSuite Suite
@@ -52,7 +51,7 @@ var CurrentSuite Suite
 // only used by node e2e test.
 // TODO(random-liu): Change the image puller pod to use similar mechanism.
 var CommonImageWhiteList = sets.NewString(
-	imageutils.GetBusyBoxImage(),
+	"busybox",
 	imageutils.GetE2EImage(imageutils.EntrypointTester),
 	imageutils.GetE2EImage(imageutils.Liveness),
 	imageutils.GetE2EImage(imageutils.Mounttest),
@@ -87,14 +86,14 @@ func svcByName(name string, port int) *v1.Service {
 
 func NewSVCByName(c clientset.Interface, ns, name string) error {
 	const testPort = 9376
-	_, err := c.Core().Services(ns).Create(svcByName(name, testPort))
+	_, err := c.CoreV1().Services(ns).Create(svcByName(name, testPort))
 	return err
 }
 
 // NewRCByName creates a replication controller with a selector by name of name.
 func NewRCByName(c clientset.Interface, ns, name string, replicas int32, gracePeriod *int64) (*v1.ReplicationController, error) {
 	By(fmt.Sprintf("creating replication controller %s", name))
-	return c.Core().ReplicationControllers(ns).Create(framework.RcByNamePort(
+	return c.CoreV1().ReplicationControllers(ns).Create(framework.RcByNamePort(
 		name, replicas, framework.ServeHostnameImage, 9376, v1.ProtocolTCP, map[string]string{}, gracePeriod))
 }
 
@@ -102,7 +101,7 @@ func RestartNodes(c clientset.Interface, nodeNames []string) error {
 	// List old boot IDs.
 	oldBootIDs := make(map[string]string)
 	for _, name := range nodeNames {
-		node, err := c.Core().Nodes().Get(name, metav1.GetOptions{})
+		node, err := c.CoreV1().Nodes().Get(name, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("error getting node info before reboot: %s", err)
 		}
@@ -124,7 +123,7 @@ func RestartNodes(c clientset.Interface, nodeNames []string) error {
 	// Wait for their boot IDs to change.
 	for _, name := range nodeNames {
 		if err := wait.Poll(30*time.Second, 5*time.Minute, func() (bool, error) {
-			node, err := c.Core().Nodes().Get(name, metav1.GetOptions{})
+			node, err := c.CoreV1().Nodes().Get(name, metav1.GetOptions{})
 			if err != nil {
 				return false, fmt.Errorf("error getting node info after reboot: %s", err)
 			}

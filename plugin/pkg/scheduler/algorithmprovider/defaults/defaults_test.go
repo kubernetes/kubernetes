@@ -17,51 +17,10 @@ limitations under the License.
 package defaults
 
 import (
-	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"os"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 )
-
-func TestGetMaxVols(t *testing.T) {
-	previousValue := os.Getenv(KubeMaxPDVols)
-	defaultValue := 39
-
-	tests := []struct {
-		rawMaxVols string
-		expected   int
-		test       string
-	}{
-		{
-			rawMaxVols: "invalid",
-			expected:   defaultValue,
-			test:       "Unable to parse maximum PD volumes value, using default value",
-		},
-		{
-			rawMaxVols: "-2",
-			expected:   defaultValue,
-			test:       "Maximum PD volumes must be a positive value, using default value",
-		},
-		{
-			rawMaxVols: "40",
-			expected:   40,
-			test:       "Parse maximum PD volumes value from env",
-		},
-	}
-
-	for _, test := range tests {
-		os.Setenv(KubeMaxPDVols, test.rawMaxVols)
-		result := getMaxVols(defaultValue)
-		if result != test.expected {
-			t.Errorf("%s: expected %v got %v", test.test, test.expected, result)
-		}
-	}
-
-	os.Unsetenv(KubeMaxPDVols)
-	if previousValue != "" {
-		os.Setenv(KubeMaxPDVols, previousValue)
-	}
-}
 
 func TestCopyAndReplace(t *testing.T) {
 	testCases := []struct {
@@ -106,51 +65,22 @@ func TestDefaultPriorities(t *testing.T) {
 }
 
 func TestDefaultPredicates(t *testing.T) {
-	testCases := []struct {
-		actionFunc  func(value string) error
-		actionParam string
-		expected    sets.String
-	}{
-		{
-			actionFunc:  utilfeature.DefaultFeatureGate.Set,
-			actionParam: "TaintNodesByCondition=true",
-			expected: sets.NewString(
-				"NoVolumeZoneConflict",
-				"MaxEBSVolumeCount",
-				"MaxGCEPDVolumeCount",
-				"MaxAzureDiskVolumeCount",
-				"MatchInterPodAffinity",
-				"NoDiskConflict",
-				"GeneralPredicates",
-				"CheckNodeMemoryPressure",
-				"CheckNodeDiskPressure",
-				"NoVolumeNodeConflict",
-				"PodToleratesNodeTaints",
-			),
-		},
-		{
-			actionFunc:  utilfeature.DefaultFeatureGate.Set,
-			actionParam: "TaintNodesByCondition=false",
-			expected: sets.NewString(
-				"NoVolumeZoneConflict",
-				"MaxEBSVolumeCount",
-				"MaxGCEPDVolumeCount",
-				"MaxAzureDiskVolumeCount",
-				"MatchInterPodAffinity",
-				"NoDiskConflict",
-				"GeneralPredicates",
-				"CheckNodeMemoryPressure",
-				"CheckNodeDiskPressure",
-				"NoVolumeNodeConflict",
-				"CheckNodeCondition",
-				"PodToleratesNodeTaints",
-			),
-		},
-	}
-	for _, testCase := range testCases {
-		testCase.actionFunc(testCase.actionParam)
-		if result := defaultPredicates(); !result.Equal(testCase.expected) {
-			t.Errorf("expected %v got %v", testCase.expected, result)
-		}
+	result := sets.NewString(
+		"NoVolumeZoneConflict",
+		"MaxEBSVolumeCount",
+		"MaxGCEPDVolumeCount",
+		"MaxAzureDiskVolumeCount",
+		"MatchInterPodAffinity",
+		"NoDiskConflict",
+		"GeneralPredicates",
+		"CheckNodeMemoryPressure",
+		"CheckNodeDiskPressure",
+		"NoVolumeNodeConflict",
+		"CheckNodeCondition",
+		"PodToleratesNodeTaints",
+	)
+
+	if expected := defaultPredicates(); !result.Equal(expected) {
+		t.Errorf("expected %v got %v", expected, result)
 	}
 }

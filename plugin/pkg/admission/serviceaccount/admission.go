@@ -117,8 +117,8 @@ func (a *serviceAccount) SetInternalKubeInformerFactory(f informers.SharedInform
 	})
 }
 
-// Validate ensures an authorizer is set.
-func (a *serviceAccount) Validate() error {
+// ValidateInitialization ensures an authorizer is set.
+func (a *serviceAccount) ValidateInitialization() error {
 	if a.client == nil {
 		return fmt.Errorf("missing client")
 	}

@@ -86,6 +86,12 @@ grep ^STABLE_BUILD_SCM_REVISION bazel-out/stable-status.txt \
     stamp = 1,
 )
 
+genrule(
+    name = "cni_package_version",
+    outs = ["cni_version"],
+    cmd = "echo 0.5.1 >$@",
+)
+
 release_filegroup(
     name = "docker-artifacts",
     srcs = [":%s.tar" % binary for binary in DOCKERIZED_BINARIES.keys()] +
@@ -97,7 +103,6 @@ release_filegroup(
     name = "client-targets",
     srcs = [
         "//cmd/kubectl",
-        "//federation/cmd/kubefed",
     ],
 )
 
@@ -106,6 +111,7 @@ release_filegroup(
     name = "node-targets",
     srcs = [
         "//cmd/kube-proxy",
+        "//cmd/kubeadm",
         "//cmd/kubelet",
     ],
 )
@@ -120,7 +126,6 @@ release_filegroup(
         "//cmd/hyperkube",
         "//cmd/kube-apiserver",
         "//cmd/kube-controller-manager",
-        "//cmd/kubeadm",
         "//plugin/cmd/kube-scheduler",
         "//vendor/k8s.io/kube-aggregator",
     ],
@@ -137,7 +142,6 @@ filegroup(
         "//cmd/genyaml",
         "//cmd/kubemark",  # TODO: server platforms only
         "//cmd/linkcheck",
-        "//federation/cmd/genfeddocs",
         "//test/e2e:e2e.test",
         "//test/e2e_node:e2e_node.test",  # TODO: server platforms only
         "//vendor/github.com/onsi/ginkgo/ginkgo",
@@ -148,9 +152,7 @@ filegroup(
 filegroup(
     name = "test-portable-targets",
     srcs = [
-        "//federation/develop:all-srcs",
         "//hack:e2e.go",
-        "//hack:federated-ginkgo-e2e.sh",
         "//hack:get-build.sh",
         "//hack:ginkgo-e2e.sh",
         "//hack/e2e-internal:all-srcs",

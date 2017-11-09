@@ -85,8 +85,8 @@ func NewStatefulSetController(
 ) *StatefulSetController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "statefulset"})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "statefulset-controller"})
 
 	ssc := &StatefulSetController{
 		kubeClient: kubeClient,
@@ -400,7 +400,7 @@ func (ssc *StatefulSetController) processNextWorkItem() bool {
 	return true
 }
 
-// worker runs a worker goroutine that invokes processNextWorkItem until the the controller's queue is closed
+// worker runs a worker goroutine that invokes processNextWorkItem until the controller's queue is closed
 func (ssc *StatefulSetController) worker() {
 	for ssc.processNextWorkItem() {
 	}

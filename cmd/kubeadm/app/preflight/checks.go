@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -40,21 +41,24 @@ import (
 
 	"net/url"
 
+	netutil "k8s.io/apimachinery/pkg/util/net"
 	apiservoptions "k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	cmoptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/api/validation"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
+	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	versionutil "k8s.io/kubernetes/pkg/util/version"
 	kubeadmversion "k8s.io/kubernetes/pkg/version"
-	schoptions "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
+	schedulerapp "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
 	"k8s.io/kubernetes/test/e2e_node/system"
 )
 
 const (
 	bridgenf                    = "/proc/sys/net/bridge/bridge-nf-call-iptables"
+	bridgenf6                   = "/proc/sys/net/bridge/bridge-nf-call-ip6tables"
 	externalEtcdRequestTimeout  = time.Duration(10 * time.Second)
 	externalEtcdRequestRetries  = 3
 	externalEtcdRequestInterval = time.Duration(5 * time.Second)
@@ -163,18 +167,8 @@ func (poc PortOpenCheck) Check() (warnings, errors []error) {
 	return nil, errors
 }
 
-// IsRootCheck verifies user is root
-type IsRootCheck struct{}
-
-// Check validates if an user has root privileges.
-func (irc IsRootCheck) Check() (warnings, errors []error) {
-	errors = []error{}
-	if os.Getuid() != 0 {
-		errors = append(errors, fmt.Errorf("user is not running as root"))
-	}
-
-	return nil, errors
-}
+// IsPrivilegedUserCheck verifies user is privileged (linux - root, windows - Administrator)
+type IsPrivilegedUserCheck struct{}
 
 // DirAvailableCheck checks if the given directory either does not exist, or is empty.
 type DirAvailableCheck struct {
@@ -332,6 +326,56 @@ func (hst HTTPProxyCheck) Check() (warnings, errors []error) {
 	return nil, nil
 }
 
+// HTTPProxyCIDRCheck checks if https connection to specific subnet is going
+// to be done directly or over proxy. If proxy detected, it will return warning.
+// Similar to HTTPProxyCheck above, but operates with subnets and uses API
+// machinery transport defaults to simulate kube-apiserver accessing cluster
+// services and pods.
+type HTTPProxyCIDRCheck struct {
+	Proto string
+	CIDR  string
+}
+
+// Check validates http connectivity to first IP address in the CIDR.
+// If it is not directly connected and goes via proxy it will produce warning.
+func (subnet HTTPProxyCIDRCheck) Check() (warnings, errors []error) {
+
+	if len(subnet.CIDR) == 0 {
+		return nil, nil
+	}
+
+	_, cidr, err := net.ParseCIDR(subnet.CIDR)
+	if err != nil {
+		return nil, []error{fmt.Errorf("error parsing CIDR %q: %v", subnet.CIDR, err)}
+	}
+
+	testIP, err := ipallocator.GetIndexedIP(cidr, 1)
+	if err != nil {
+		return nil, []error{fmt.Errorf("unable to get first IP address from the given CIDR (%s): %v", cidr.String(), err)}
+	}
+
+	testIPstring := testIP.String()
+	if len(testIP) == net.IPv6len {
+		testIPstring = fmt.Sprintf("[%s]:1234", testIP)
+	}
+	url := fmt.Sprintf("%s://%s/", subnet.Proto, testIPstring)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, []error{err}
+	}
+
+	// Utilize same transport defaults as it will be used by API server
+	proxy, err := netutil.SetOldTransportDefaults(&http.Transport{}).Proxy(req)
+	if err != nil {
+		return nil, []error{err}
+	}
+	if proxy != nil {
+		return []error{fmt.Errorf("connection to %q uses proxy %q. This may lead to malfunctional cluster setup. Make sure that Pod and Services IP ranges specified correctly as exceptions in proxy configuration", subnet.CIDR, proxy)}, nil
+	}
+	return nil, nil
+}
+
 // ExtraArgsCheck checks if arguments are valid.
 type ExtraArgsCheck struct {
 	APIServerExtraArgs         map[string]string
@@ -365,9 +409,9 @@ func (eac ExtraArgsCheck) Check() (warnings, errors []error) {
 		warnings = append(warnings, argsCheck("kube-controller-manager", eac.ControllerManagerExtraArgs, flags)...)
 	}
 	if len(eac.SchedulerExtraArgs) > 0 {
+		command := schedulerapp.NewSchedulerCommand()
 		flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-		s := schoptions.NewSchedulerServer()
-		s.AddFlags(flags)
+		flags.AddFlagSet(command.Flags())
 		warnings = append(warnings, argsCheck("kube-scheduler", eac.SchedulerExtraArgs, flags)...)
 	}
 	return warnings, nil
@@ -385,12 +429,16 @@ func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 
 	var errs []error
 	var warns []error
-	// All the validators we'd like to run:
+	// All the common validators we'd like to run:
 	var validators = []system.Validator{
-		&system.OSValidator{Reporter: reporter},
 		&system.KernelValidator{Reporter: reporter},
-		&system.CgroupsValidator{Reporter: reporter},
-		&system.DockerValidator{Reporter: reporter},
+		&system.DockerValidator{Reporter: reporter}}
+
+	if runtime.GOOS == "linux" {
+		//add linux validators
+		validators = append(validators,
+			&system.OSValidator{Reporter: reporter},
+			&system.CgroupsValidator{Reporter: reporter})
 	}
 
 	// Run all validators
@@ -447,6 +495,21 @@ func (kubever KubernetesVersionCheck) Check() (warnings, errors []error) {
 	}
 
 	return nil, nil
+}
+
+// KubeletVersionCheck validates installed kubelet version
+type KubeletVersionCheck struct{}
+
+// Check validates kubelet version. It should be not less than minimal supported version
+func (kubever KubeletVersionCheck) Check() (warnings, errors []error) {
+	kubeletVersion, err := GetKubeletVersion()
+	if err != nil {
+		return nil, []error{fmt.Errorf("couldn't get kubelet version: %v", err)}
+	}
+	if kubeletVersion.LessThan(kubeadmconstants.MinimumKubeletVersion) {
+		return nil, []error{fmt.Errorf("Kubelet version %q is lower than kubadm can support. Please upgrade kubelet", kubeletVersion)}
+	}
+	return nil, []error{}
 }
 
 // SwapCheck warns if swap is enabled
@@ -623,8 +686,9 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 	checks := []Checker{
 		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
 		SystemVerificationCheck{},
-		IsRootCheck{},
+		IsPrivilegedUserCheck{},
 		HostnameCheck{nodeName: cfg.NodeName},
+		KubeletVersionCheck{},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		ServiceCheck{Service: "docker", CheckIfActive: true},
 		FirewalldCheck{ports: []int{int(cfg.API.BindPort), 10250}},
@@ -632,9 +696,7 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		PortOpenCheck{port: 10250},
 		PortOpenCheck{port: 10251},
 		PortOpenCheck{port: 10252},
-		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddress, Port: int(cfg.API.BindPort)},
 		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
-		DirAvailableCheck{Path: "/var/lib/kubelet"},
 		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
 		SwapCheck{},
 		InPathCheck{executable: "ip", mandatory: true},
@@ -651,6 +713,9 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 			ControllerManagerExtraArgs: cfg.ControllerManagerExtraArgs,
 			SchedulerExtraArgs:         cfg.SchedulerExtraArgs,
 		},
+		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddress, Port: int(cfg.API.BindPort)},
+		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.ServiceSubnet},
+		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.PodSubnet},
 	}
 
 	if len(cfg.Etcd.Endpoints) == 0 {
@@ -661,6 +726,15 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		)
 	} else {
 		// Only check etcd version when external endpoints are specified
+		if cfg.Etcd.CAFile != "" {
+			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.CAFile})
+		}
+		if cfg.Etcd.CertFile != "" {
+			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.CertFile})
+		}
+		if cfg.Etcd.KeyFile != "" {
+			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.KeyFile})
+		}
 		checks = append(checks,
 			ExternalEtcdVersionCheck{Etcd: cfg.Etcd},
 		)
@@ -676,6 +750,13 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		}
 	}
 
+	if ip := net.ParseIP(cfg.API.AdvertiseAddress); ip != nil {
+		if ip.To4() == nil && ip.To16() != nil {
+			checks = append(checks,
+				FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
+			)
+		}
+	}
 	return RunChecks(checks, os.Stderr)
 }
 
@@ -688,35 +769,48 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 
 	checks := []Checker{
 		SystemVerificationCheck{},
-		IsRootCheck{},
+		IsPrivilegedUserCheck{},
 		HostnameCheck{cfg.NodeName},
+		KubeletVersionCheck{},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		ServiceCheck{Service: "docker", CheckIfActive: true},
 		PortOpenCheck{port: 10250},
 		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
-		DirAvailableCheck{Path: "/var/lib/kubelet"},
 		FileAvailableCheck{Path: cfg.CACertPath},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
-		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
-		SwapCheck{},
-		InPathCheck{executable: "ip", mandatory: true},
-		InPathCheck{executable: "iptables", mandatory: true},
-		InPathCheck{executable: "mount", mandatory: true},
-		InPathCheck{executable: "nsenter", mandatory: true},
-		InPathCheck{executable: "ebtables", mandatory: false},
-		InPathCheck{executable: "ethtool", mandatory: false},
-		InPathCheck{executable: "socat", mandatory: false},
-		InPathCheck{executable: "tc", mandatory: false},
-		InPathCheck{executable: "touch", mandatory: false},
+	}
+	//non-windows checks
+	if runtime.GOOS == "linux" {
+		checks = append(checks,
+			FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
+			SwapCheck{},
+			InPathCheck{executable: "ip", mandatory: true},
+			InPathCheck{executable: "iptables", mandatory: true},
+			InPathCheck{executable: "mount", mandatory: true},
+			InPathCheck{executable: "nsenter", mandatory: true},
+			InPathCheck{executable: "ebtables", mandatory: false},
+			InPathCheck{executable: "ethtool", mandatory: false},
+			InPathCheck{executable: "socat", mandatory: false},
+			InPathCheck{executable: "tc", mandatory: false},
+			InPathCheck{executable: "touch", mandatory: false})
 	}
 
+	if len(cfg.DiscoveryTokenAPIServers) > 0 {
+		if ip := net.ParseIP(cfg.DiscoveryTokenAPIServers[0]); ip != nil {
+			if ip.To4() == nil && ip.To16() != nil {
+				checks = append(checks,
+					FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
+				)
+			}
+		}
+	}
 	return RunChecks(checks, os.Stderr)
 }
 
-// RunRootCheckOnly initializes cheks slice of structs and call RunChecks
+// RunRootCheckOnly initializes checks slice of structs and call RunChecks
 func RunRootCheckOnly() error {
 	checks := []Checker{
-		IsRootCheck{},
+		IsPrivilegedUserCheck{},
 	}
 
 	return RunChecks(checks, os.Stderr)

@@ -98,19 +98,13 @@ func TestValidate(t *testing.T) {
 				},
 			},
 		},
-		"nil security context": {
-			container: &api.Container{
-				SecurityContext: nil,
-			},
-			expectedMsg: "unable to validate nil security context for container",
-		},
 		"nil run as user": {
 			container: &api.Container{
 				SecurityContext: &api.SecurityContext{
 					RunAsUser: nil,
 				},
 			},
-			expectedMsg: "unable to validate nil RunAsUser for container",
+			expectedMsg: "runAsUser: Required",
 		},
 		"invalid id": {
 			container: &api.Container{
@@ -118,7 +112,7 @@ func TestValidate(t *testing.T) {
 					RunAsUser: &invalidID,
 				},
 			},
-			expectedMsg: "does not match required range",
+			expectedMsg: "runAsUser: Invalid",
 		},
 	}
 
@@ -128,7 +122,7 @@ func TestValidate(t *testing.T) {
 			t.Errorf("unexpected error initializing NewMustRunAs for testcase %s: %#v", name, err)
 			continue
 		}
-		errs := mustRunAs.Validate(nil, tc.container)
+		errs := mustRunAs.Validate(nil, nil, nil, tc.container.SecurityContext.RunAsNonRoot, tc.container.SecurityContext.RunAsUser)
 		//should've passed but didn't
 		if len(tc.expectedMsg) == 0 && len(errs) > 0 {
 			t.Errorf("%s expected no errors but received %v", name, errs)

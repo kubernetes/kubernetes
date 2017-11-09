@@ -14,6 +14,7 @@ go_test(
         "maxinflight_test.go",
         "timeout_test.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/server/filters",
     library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -38,6 +39,7 @@ go_library(
         "timeout.go",
         "wrap.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/server/filters",
     deps = [
         "//vendor/github.com/emicklei/go-restful:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

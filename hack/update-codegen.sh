@@ -61,14 +61,12 @@ GV_DIRS_CSV=$(IFS=',';echo "${GV_DIRS[*]// /,}";IFS=$)
 # update- and verify- scripts.
 ${clientgen} "$@"
 ${clientgen} --output-base "${KUBE_ROOT}/vendor" --clientset-path="k8s.io/client-go" --clientset-name="kubernetes" --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="${GV_DIRS_CSV}" "$@"
-# Clientgen for federation clientset.
-${clientgen} --clientset-name=federation_clientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="../../../federation/apis/federation/v1beta1","core/v1","extensions/v1beta1","batch/v1","autoscaling/v1" --included-types-overrides="core/v1/Service,core/v1/Namespace,extensions/v1beta1/ReplicaSet,core/v1/Secret,extensions/v1beta1/Ingress,extensions/v1beta1/Deployment,extensions/v1beta1/DaemonSet,core/v1/ConfigMap,core/v1/Event,batch/v1/Job,autoscaling/v1/HorizontalPodAutoscaler"   "$@"
 
 listergen_internal_apis=(
 pkg/api
 $(
   cd ${KUBE_ROOT}
-  find pkg/apis -maxdepth 2 -name types.go | xargs -n1 dirname | sort 
+  find pkg/apis -maxdepth 2 -name types.go | xargs -n1 dirname | sort
 )
 )
 listergen_internal_apis=(${listergen_internal_apis[@]/#/k8s.io/kubernetes/})
@@ -89,7 +87,7 @@ informergen_internal_apis=(
 pkg/api
 $(
   cd ${KUBE_ROOT}
-  find pkg/apis -maxdepth 2 -name types.go | xargs -n1 dirname | sort 
+  find pkg/apis -maxdepth 2 -name types.go | xargs -n1 dirname | sort
 )
 )
 informergen_internal_apis=(${informergen_internal_apis[@]/#/k8s.io/kubernetes/})
@@ -125,5 +123,6 @@ ${informergen} \
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/code-generator/hack/update-codegen.sh
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/kube-aggregator/hack/update-codegen.sh
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/sample-apiserver/hack/update-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/sample-controller/hack/update-codegen.sh
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/apiextensions-apiserver/hack/update-codegen.sh
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/metrics/hack/update-codegen.sh

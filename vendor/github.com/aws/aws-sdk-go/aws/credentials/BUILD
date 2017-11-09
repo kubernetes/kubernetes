@@ -9,9 +9,11 @@ go_library(
         "shared_credentials_provider.go",
         "static_provider.go",
     ],
+    importpath = "github.com/aws/aws-sdk-go/aws/credentials",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/aws/aws-sdk-go/aws/awserr:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/internal/shareddefaults:go_default_library",
         "//vendor/github.com/go-ini/ini:go_default_library",
     ],
 )

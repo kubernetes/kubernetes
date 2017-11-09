@@ -11,8 +11,10 @@ go_library(
         "daemonsets.go",
         "deployments.go",
         "job.go",
+        "replicasets.go",
         "statefulset.go",
     ],
+    importpath = "k8s.io/kubernetes/test/e2e/upgrades/apps",
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
@@ -28,6 +30,7 @@ go_library(
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
     ],
 )

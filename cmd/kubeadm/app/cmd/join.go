@@ -20,12 +20,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	certutil "k8s.io/client-go/util/cert"
@@ -34,11 +33,10 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
-	kubeadmnode "k8s.io/kubernetes/cmd/kubeadm/app/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -51,20 +49,8 @@ var (
 
 		Run 'kubectl get nodes' on the master to see this machine join.
 		`)
-)
 
-// NewCmdJoin returns "kubeadm join" command.
-func NewCmdJoin(out io.Writer) *cobra.Command {
-	cfg := &kubeadmapiext.NodeConfiguration{}
-	api.Scheme.Default(cfg)
-
-	var skipPreFlight bool
-	var cfgPath string
-
-	cmd := &cobra.Command{
-		Use:   "join <flags> [DiscoveryTokenAPIServers]",
-		Short: "Run this on any machine you wish to join an existing cluster",
-		Long: dedent.Dedent(`
+	joinLongDescription = dedent.Dedent(`
 		When joining a kubeadm initialized cluster, we need to establish
 		bidirectional trust. This is split into discovery (having the Node
 		trust the Kubernetes Master) and TLS bootstrap (having the Kubernetes
@@ -104,13 +90,27 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 
 		Often times the same token is used for both parts. In this case, the
 		--token flag can be used instead of specifying each token individually.
-		`),
+		`)
+)
+
+// NewCmdJoin returns "kubeadm join" command.
+func NewCmdJoin(out io.Writer) *cobra.Command {
+	cfg := &kubeadmapiext.NodeConfiguration{}
+	legacyscheme.Scheme.Default(cfg)
+
+	var skipPreFlight bool
+	var cfgPath string
+
+	cmd := &cobra.Command{
+		Use:   "join [flags]",
+		Short: "Run this on any machine you wish to join an existing cluster",
+		Long:  joinLongDescription,
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg.DiscoveryTokenAPIServers = args
 
-			api.Scheme.Default(cfg)
+			legacyscheme.Scheme.Default(cfg)
 			internalcfg := &kubeadmapi.NodeConfiguration{}
-			api.Scheme.Convert(cfg, internalcfg, nil)
+			legacyscheme.Scheme.Convert(cfg, internalcfg, nil)
 
 			j, err := NewJoin(cfgPath, args, internalcfg, skipPreFlight)
 			kubeadmutil.CheckErr(err)
@@ -119,39 +119,47 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.PersistentFlags().StringVar(
-		&cfgPath, "config", cfgPath,
-		"Path to kubeadm config file")
-
-	cmd.PersistentFlags().StringVar(
-		&cfg.DiscoveryFile, "discovery-file", "",
-		"A file or url from which to load cluster information")
-	cmd.PersistentFlags().StringVar(
-		&cfg.DiscoveryToken, "discovery-token", "",
-		"A token used to validate cluster information fetched from the master")
-	cmd.PersistentFlags().StringVar(
-		&cfg.NodeName, "node-name", "",
-		"Specify the node name")
-	cmd.PersistentFlags().StringVar(
-		&cfg.TLSBootstrapToken, "tls-bootstrap-token", "",
-		"A token used for TLS bootstrapping")
-	cmd.PersistentFlags().StringSliceVar(
-		&cfg.DiscoveryTokenCACertHashes, "discovery-token-ca-cert-hash", []string{},
-		"For token-based discovery, validate that the root CA public key matches this hash (format: \"<type>:<value>\").")
-	cmd.PersistentFlags().BoolVar(
-		&cfg.DiscoveryTokenUnsafeSkipCAVerification, "discovery-token-unsafe-skip-ca-verification", false,
-		"For token-based discovery, allow joining without --discovery-token-ca-cert-hash pinning.")
-
-	cmd.PersistentFlags().StringVar(
-		&cfg.Token, "token", "",
-		"Use this token for both discovery-token and tls-bootstrap-token")
-
-	cmd.PersistentFlags().BoolVar(
-		&skipPreFlight, "skip-preflight-checks", false,
-		"Skip preflight checks normally run before modifying the system",
-	)
+	AddJoinConfigFlags(cmd.PersistentFlags(), cfg)
+	AddJoinOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight)
 
 	return cmd
+}
+
+// AddJoinConfigFlags adds join flags bound to the config to the specified flagset
+func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.NodeConfiguration) {
+	flagSet.StringVar(
+		&cfg.DiscoveryFile, "discovery-file", "",
+		"A file or url from which to load cluster information.")
+	flagSet.StringVar(
+		&cfg.DiscoveryToken, "discovery-token", "",
+		"A token used to validate cluster information fetched from the master.")
+	flagSet.StringVar(
+		&cfg.NodeName, "node-name", "",
+		"Specify the node name.")
+	flagSet.StringVar(
+		&cfg.TLSBootstrapToken, "tls-bootstrap-token", "",
+		"A token used for TLS bootstrapping.")
+	flagSet.StringSliceVar(
+		&cfg.DiscoveryTokenCACertHashes, "discovery-token-ca-cert-hash", []string{},
+		"For token-based discovery, validate that the root CA public key matches this hash (format: \"<type>:<value>\").")
+	flagSet.BoolVar(
+		&cfg.DiscoveryTokenUnsafeSkipCAVerification, "discovery-token-unsafe-skip-ca-verification", false,
+		"For token-based discovery, allow joining without --discovery-token-ca-cert-hash pinning.")
+	flagSet.StringVar(
+		&cfg.Token, "token", "",
+		"Use this token for both discovery-token and tls-bootstrap-token.")
+}
+
+// AddJoinOtherFlags adds join flags that are not bound to a configuration file to the given flagset
+func AddJoinOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight *bool) {
+	flagSet.StringVar(
+		cfgPath, "config", *cfgPath,
+		"Path to kubeadm config file.")
+
+	flagSet.BoolVar(
+		skipPreFlight, "skip-preflight-checks", false,
+		"Skip preflight checks normally run before modifying the system.",
+	)
 }
 
 // Join defines struct used by kubeadm join command
@@ -172,13 +180,13 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 		if err != nil {
 			return nil, fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
 		}
-		if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), b, cfg); err != nil {
+		if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
 			return nil, fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
 		}
 	}
 
 	if !skipPreFlight {
-		fmt.Println("[preflight] Running pre-flight checks")
+		fmt.Println("[preflight] Running pre-flight checks.")
 
 		// Then continue with the others...
 		if err := preflight.RunJoinNodeChecks(cfg); err != nil {
@@ -188,7 +196,7 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 		// Try to start the kubelet service in case it's inactive
 		preflight.TryStartKubelet()
 	} else {
-		fmt.Println("[preflight] Skipping pre-flight checks")
+		fmt.Println("[preflight] Skipping pre-flight checks.")
 	}
 
 	return &Join{cfg: cfg}, nil
@@ -209,29 +217,7 @@ func (j *Join) Run(out io.Writer) error {
 		return err
 	}
 
-	client, err := kubeconfigutil.ToClientSet(cfg)
-	if err != nil {
-		return err
-	}
-	if err := kubeadmnode.ValidateAPIServer(client); err != nil {
-		return err
-	}
-
 	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)
-
-	// Depending on the kubelet version, we might perform the TLS bootstrap or not
-	kubeletVersionBytes, err := exec.Command("sh", "-c", "kubelet --version").Output()
-	// In case the command executed successfully and returned v1.7-something, we'll perform TLS Bootstrapping
-	// Otherwise, just assume v1.8
-	// TODO: In the beginning of the v1.9 cycle, we can remove the logic as we then don't support v1.7 anymore
-	if err == nil && strings.HasPrefix(string(kubeletVersionBytes), "Kubernetes v1.7") {
-		hostname := nodeutil.GetHostname(j.cfg.NodeName)
-		if err := kubeadmnode.PerformTLSBootstrap(cfg, hostname); err != nil {
-			return err
-		}
-		// As we now performed the TLS Bootstrap, change the filepath to be kubelet.conf instead of bootstrap-kubelet.conf
-		kubeconfigFile = filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
-	}
 
 	// Write the bootstrap kubelet config file or the TLS-Boostrapped kubelet config file down to disk
 	if err := kubeconfigutil.WriteToDisk(kubeconfigFile, cfg); err != nil {

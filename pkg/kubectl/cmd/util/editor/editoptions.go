@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/crlf"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -230,7 +231,7 @@ func (o *EditOptions) Run() error {
 			glog.V(4).Infof("User edited:\n%s", string(edited))
 
 			// Apply validation
-			schema, err := o.f.Validator(o.EnableValidation, o.UseOpenAPI, o.SchemaCacheDir)
+			schema, err := o.f.Validator(o.EnableValidation)
 			if err != nil {
 				return preservedFile(err, file, o.ErrOut)
 			}
@@ -547,7 +548,7 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 
 		// Create the versioned struct from the type defined in the mapping
 		// (which is the API version we'll be submitting the patch to)
-		versionedObject, err := api.Scheme.New(info.Mapping.GroupVersionKind)
+		versionedObject, err := scheme.Scheme.New(info.Mapping.GroupVersionKind)
 		var patchType types.PatchType
 		var patch []byte
 		switch {

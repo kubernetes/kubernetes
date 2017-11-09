@@ -6,6 +6,7 @@ go_library(
         "error.go",
         "wait.go",
     ],
+    importpath = "github.com/vmware/govmomi/task",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/vmware/govmomi/property:go_default_library",

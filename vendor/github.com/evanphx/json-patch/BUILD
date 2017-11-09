@@ -6,6 +6,7 @@ go_library(
         "merge.go",
         "patch.go",
     ],
+    importpath = "github.com/evanphx/json-patch",
     visibility = ["//visibility:public"],
 )
 

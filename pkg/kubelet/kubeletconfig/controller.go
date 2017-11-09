@@ -47,7 +47,7 @@ const (
 // - downloads new configuration from the API server
 // - validates configuration
 // - tracks the last-known-good configuration, and rolls-back to last-known-good when necessary
-// For more information, see the proposal: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/dynamic-kubelet-configuration.md
+// For more information, see the proposal: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/dynamic-kubelet-configuration.md
 type Controller struct {
 	// dynamicConfig, if true, indicates that we should sync config from the API server
 	dynamicConfig bool
@@ -248,10 +248,7 @@ func (cc *Controller) StartSync(client clientset.Interface, nodeName string) {
 func (cc *Controller) initialize() error {
 	utillog.Infof("ensuring filesystem is set up correctly")
 	// initialize local checkpoint storage location
-	if err := cc.checkpointStore.Initialize(); err != nil {
-		return err
-	}
-	return nil
+	return cc.checkpointStore.Initialize()
 }
 
 // localConfig returns the initConfig if it is loaded, otherwise returns the defaultConfig.

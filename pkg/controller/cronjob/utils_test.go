@@ -83,20 +83,8 @@ func TestGetJobFromTemplate(t *testing.T) {
 	if len(job.ObjectMeta.Labels) != 1 {
 		t.Errorf("Wrong number of labels")
 	}
-	if len(job.ObjectMeta.Annotations) != 2 {
+	if len(job.ObjectMeta.Annotations) != 1 {
 		t.Errorf("Wrong number of annotations")
-	}
-	v, ok := job.ObjectMeta.Annotations[v1.CreatedByAnnotation]
-	if !ok {
-		t.Errorf("Missing created-by annotation")
-	}
-	expectedCreatedBy := `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"CronJob","namespace":"snazzycats","name":"mycronjob","uid":"1a2b3c","apiVersion":"batch"}}
-`
-	if len(v) != len(expectedCreatedBy) {
-		t.Errorf("Wrong length for created-by annotation, expected %v got %v", len(expectedCreatedBy), len(v))
-	}
-	if v != expectedCreatedBy {
-		t.Errorf("Wrong value for created-by annotation, expected %v got %v", expectedCreatedBy, v)
 	}
 }
 

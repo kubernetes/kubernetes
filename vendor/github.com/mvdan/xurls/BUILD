@@ -9,6 +9,7 @@ go_library(
         "tlds_pseudo.go",
         "xurls.go",
     ],
+    importpath = "github.com/mvdan/xurls",
     visibility = ["//visibility:public"],
 )
 

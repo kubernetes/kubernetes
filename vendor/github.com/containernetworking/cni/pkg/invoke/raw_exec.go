@@ -50,13 +50,9 @@ func pluginErr(err error, output []byte) error {
 	if _, ok := err.(*exec.ExitError); ok {
 		emsg := types.Error{}
 		if perr := json.Unmarshal(output, &emsg); perr != nil {
-			return fmt.Errorf("netplugin failed but error parsing its diagnostic message %q: %v", string(output), perr)
+			emsg.Msg = fmt.Sprintf("netplugin failed but error parsing its diagnostic message %q: %v", string(output), perr)
 		}
-		details := ""
-		if emsg.Details != "" {
-			details = fmt.Sprintf("; %v", emsg.Details)
-		}
-		return fmt.Errorf("%v%v", emsg.Msg, details)
+		return &emsg
 	}
 
 	return err

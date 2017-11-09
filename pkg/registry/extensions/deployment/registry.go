@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -31,8 +30,8 @@ import (
 type Registry interface {
 	ListDeployments(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*extensions.DeploymentList, error)
 	GetDeployment(ctx genericapirequest.Context, deploymentID string, options *metav1.GetOptions) (*extensions.Deployment, error)
-	CreateDeployment(ctx genericapirequest.Context, deployment *extensions.Deployment) (*extensions.Deployment, error)
-	UpdateDeployment(ctx genericapirequest.Context, deployment *extensions.Deployment) (*extensions.Deployment, error)
+	CreateDeployment(ctx genericapirequest.Context, deployment *extensions.Deployment, createValidation rest.ValidateObjectFunc) (*extensions.Deployment, error)
+	UpdateDeployment(ctx genericapirequest.Context, deployment *extensions.Deployment, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*extensions.Deployment, error)
 	DeleteDeployment(ctx genericapirequest.Context, deploymentID string) error
 }
 
@@ -65,16 +64,16 @@ func (s *storage) GetDeployment(ctx genericapirequest.Context, deploymentID stri
 	return obj.(*extensions.Deployment), nil
 }
 
-func (s *storage) CreateDeployment(ctx genericapirequest.Context, deployment *extensions.Deployment) (*extensions.Deployment, error) {
-	obj, err := s.Create(ctx, deployment, false)
+func (s *storage) CreateDeployment(ctx genericapirequest.Context, deployment *extensions.Deployment, createValidation rest.ValidateObjectFunc) (*extensions.Deployment, error) {
+	obj, err := s.Create(ctx, deployment, createValidation, false)
 	if err != nil {
 		return nil, err
 	}
 	return obj.(*extensions.Deployment), nil
 }
 
-func (s *storage) UpdateDeployment(ctx genericapirequest.Context, deployment *extensions.Deployment) (*extensions.Deployment, error) {
-	obj, _, err := s.Update(ctx, deployment.Name, rest.DefaultUpdatedObjectInfo(deployment, api.Scheme))
+func (s *storage) UpdateDeployment(ctx genericapirequest.Context, deployment *extensions.Deployment, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*extensions.Deployment, error) {
+	obj, _, err := s.Update(ctx, deployment.Name, rest.DefaultUpdatedObjectInfo(deployment), createValidation, updateValidation)
 	if err != nil {
 		return nil, err
 	}

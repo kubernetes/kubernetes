@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["perftype.go"],
+    importpath = "k8s.io/kubernetes/test/e2e/perftype",
 )
 
 filegroup(

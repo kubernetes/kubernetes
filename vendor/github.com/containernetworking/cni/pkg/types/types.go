@@ -136,7 +136,11 @@ type Error struct {
 }
 
 func (e *Error) Error() string {
-	return e.Msg
+	details := ""
+	if e.Details != "" {
+		details = fmt.Sprintf("; %v", e.Details)
+	}
+	return fmt.Sprintf("%v%v", e.Msg, details)
 }
 
 func (e *Error) Print() error {

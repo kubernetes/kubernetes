@@ -52,7 +52,10 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSe
 		case util.DeploymentComplete(d, &newStatus):
 			// Update the deployment conditions with a message for the new replica set that
 			// was successfully deployed. If the condition already exists, we ignore this update.
-			msg := fmt.Sprintf("ReplicaSet %q has successfully progressed.", newRS.Name)
+			msg := fmt.Sprintf("Deployment %q has successfully progressed.", d.Name)
+			if newRS != nil {
+				msg = fmt.Sprintf("ReplicaSet %q has successfully progressed.", newRS.Name)
+			}
 			condition := util.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionTrue, util.NewRSAvailableReason, msg)
 			util.SetDeploymentCondition(&newStatus, *condition)
 
@@ -109,7 +112,7 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSe
 
 	newDeployment := d
 	newDeployment.Status = newStatus
-	_, err := dc.client.Extensions().Deployments(newDeployment.Namespace).UpdateStatus(newDeployment)
+	_, err := dc.client.ExtensionsV1beta1().Deployments(newDeployment.Namespace).UpdateStatus(newDeployment)
 	return err
 }
 

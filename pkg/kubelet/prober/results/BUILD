@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["results_manager.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/prober/results",
     deps = [
         "//pkg/kubelet/container:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -19,6 +20,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["results_manager_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/prober/results",
     library = ":go_default_library",
     deps = [
         "//pkg/kubelet/container:go_default_library",

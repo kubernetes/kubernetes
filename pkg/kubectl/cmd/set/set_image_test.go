@@ -26,6 +26,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
@@ -34,7 +35,7 @@ import (
 func TestImageLocal(t *testing.T) {
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
@@ -42,7 +43,7 @@ func TestImageLocal(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion}}
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdImage(f, buf, buf)
@@ -131,5 +132,46 @@ func TestSetImageValidation(t *testing.T) {
 		if err == nil && (testCase.expectErr != "") {
 			t.Errorf("[%s]:expect err:%s got err:%v", testCase.name, testCase.expectErr, err)
 		}
+	}
+}
+
+func TestSetMultiResourcesImageLocal(t *testing.T) {
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
+	tf.Client = &fake.RESTClient{
+		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+			return nil, nil
+		}),
+	}
+	tf.Namespace = "test"
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+
+	buf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdImage(f, buf, buf)
+	cmd.SetOutput(buf)
+	cmd.Flags().Set("output", "name")
+	cmd.Flags().Set("local", "true")
+	mapper, typer := f.Object()
+	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer, Mapper: mapper}
+
+	opts := ImageOptions{FilenameOptions: resource.FilenameOptions{
+		Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
+		Out:   buf,
+		Local: true}
+	err := opts.Complete(f, cmd, []string{"*=thingy"})
+	if err == nil {
+		err = opts.Validate()
+	}
+	if err == nil {
+		err = opts.Run()
+	}
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expectedOut := "replicationcontrollers/first-rc\nreplicationcontrollers/second-rc\n"
+	if buf.String() != expectedOut {
+		t.Errorf("expected out:\n%s\nbut got:\n%s", expectedOut, buf.String())
 	}
 }

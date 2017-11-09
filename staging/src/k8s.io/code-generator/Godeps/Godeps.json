@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/code-generator",
-	"GoVersion": "go1.8",
+	"GoVersion": "go1.9",
 	"GodepVersion": "v79",
 	"Packages": [
 		"./..."
@@ -32,11 +32,11 @@
 		},
 		{
 			"ImportPath": "github.com/go-openapi/spec",
-			"Rev": "6aced65f8501fe1217321abf0749d354824ba2ff"
+			"Rev": "7abd5745472fff5eb3685386d5fb8bf38683154d"
 		},
 		{
 			"ImportPath": "github.com/go-openapi/swag",
-			"Rev": "1d0bd113de87027671077d3c71eb3ac5d7dbba72"
+			"Rev": "f3f9494671f93fcff853e3c6e9e948b3eb71e590"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/gogoproto",
@@ -144,15 +144,15 @@
 		},
 		{
 			"ImportPath": "github.com/mailru/easyjson/buffer",
-			"Rev": "d5b7844b561a7bc640052f1b935f7b800330d7e0"
+			"Rev": "2f5df55504ebc322e4d52d34df6a1f5b503bf26d"
 		},
 		{
 			"ImportPath": "github.com/mailru/easyjson/jlexer",
-			"Rev": "d5b7844b561a7bc640052f1b935f7b800330d7e0"
+			"Rev": "2f5df55504ebc322e4d52d34df6a1f5b503bf26d"
 		},
 		{
 			"ImportPath": "github.com/mailru/easyjson/jwriter",
-			"Rev": "d5b7844b561a7bc640052f1b935f7b800330d7e0"
+			"Rev": "2f5df55504ebc322e4d52d34df6a1f5b503bf26d"
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
@@ -207,52 +207,56 @@
 			"Rev": "b19bf474d317b857955b12035d2c5acb57ce8b01"
 		},
 		{
+			"ImportPath": "gopkg.in/yaml.v2",
+			"Rev": "53feefa2559fb8dfa8d81baad31be332c97d6c77"
+		},
+		{
 			"ImportPath": "k8s.io/gengo/args",
-			"Rev": "9e661e9308f078838e266cca1c673922088c0ea4"
+			"Rev": "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/deepcopy-gen/generators",
-			"Rev": "9e661e9308f078838e266cca1c673922088c0ea4"
+			"Rev": "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/defaulter-gen/generators",
-			"Rev": "9e661e9308f078838e266cca1c673922088c0ea4"
+			"Rev": "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/import-boss/generators",
-			"Rev": "9e661e9308f078838e266cca1c673922088c0ea4"
+			"Rev": "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/set-gen/generators",
-			"Rev": "9e661e9308f078838e266cca1c673922088c0ea4"
+			"Rev": "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/set-gen/sets",
-			"Rev": "9e661e9308f078838e266cca1c673922088c0ea4"
+			"Rev": "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/generator",
-			"Rev": "9e661e9308f078838e266cca1c673922088c0ea4"
+			"Rev": "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/namer",
-			"Rev": "9e661e9308f078838e266cca1c673922088c0ea4"
+			"Rev": "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/parser",
-			"Rev": "9e661e9308f078838e266cca1c673922088c0ea4"
+			"Rev": "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/types",
-			"Rev": "9e661e9308f078838e266cca1c673922088c0ea4"
+			"Rev": "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/common",
-			"Rev": "868f2f29720b192240e18284659231b440f9cda5"
+			"Rev": "39a7bf85c140f972372c2a0d1ee40adbf0c8bfe1"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/generators",
-			"Rev": "868f2f29720b192240e18284659231b440f9cda5"
+			"Rev": "39a7bf85c140f972372c2a0d1ee40adbf0c8bfe1"
 		}
 	]
 }

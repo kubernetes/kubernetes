@@ -176,11 +176,16 @@ func (m *manager) AddContainer(p *v1.Pod, c *v1.Container, containerID string) e
 	cpus := m.state.GetCPUSetOrDefault(containerID)
 	m.Unlock()
 
-	err = m.updateContainerCPUSet(containerID, cpus)
-	if err != nil {
-		glog.Errorf("[cpumanager] AddContainer error: %v", err)
-		return err
+	if !cpus.IsEmpty() {
+		err = m.updateContainerCPUSet(containerID, cpus)
+		if err != nil {
+			glog.Errorf("[cpumanager] AddContainer error: %v", err)
+			return err
+		}
+	} else {
+		glog.V(5).Infof("[cpumanager] update container resources is skipped due to cpu set is empty")
 	}
+
 	return nil
 }
 
@@ -236,7 +241,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 				continue
 			}
 
-			glog.Infof("[cpumanager] reconcileState: updating container (pod: %s, container: %s, container id: %s, cpuset: \"%v\")", pod.Name, container.Name, containerID, cset)
+			glog.V(4).Infof("[cpumanager] reconcileState: updating container (pod: %s, container: %s, container id: %s, cpuset: \"%v\")", pod.Name, container.Name, containerID, cset)
 			err = m.updateContainerCPUSet(containerID, cset)
 			if err != nil {
 				glog.Errorf("[cpumanager] reconcileState: failed to update container (pod: %s, container: %s, container id: %s, cpuset: \"%v\", error: %v)", pod.Name, container.Name, containerID, cset, err)

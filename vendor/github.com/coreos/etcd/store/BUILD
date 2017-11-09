@@ -16,6 +16,7 @@ go_library(
         "watcher.go",
         "watcher_hub.go",
     ],
+    importpath = "github.com/coreos/etcd/store",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/error:go_default_library",

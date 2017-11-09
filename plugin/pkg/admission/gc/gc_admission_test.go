@@ -24,52 +24,54 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 type fakeAuthorizer struct{}
 
-func (fakeAuthorizer) Authorize(a authorizer.Attributes) (bool, string, error) {
+func (fakeAuthorizer) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
 	username := a.GetUser().GetName()
 
 	if username == "non-deleter" {
 		if a.GetVerb() == "delete" {
-			return false, "", nil
+			return authorizer.DecisionNoOpinion, "", nil
 		}
 		if a.GetVerb() == "update" && a.GetSubresource() == "finalizers" {
-			return false, "", nil
+			return authorizer.DecisionNoOpinion, "", nil
 		}
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 	}
 
 	if username == "non-pod-deleter" {
 		if a.GetVerb() == "delete" && a.GetResource() == "pods" {
-			return false, "", nil
+			return authorizer.DecisionNoOpinion, "", nil
 		}
 		if a.GetVerb() == "update" && a.GetResource() == "pods" && a.GetSubresource() == "finalizers" {
-			return false, "", nil
+			return authorizer.DecisionNoOpinion, "", nil
 		}
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 	}
 
 	if username == "non-rc-deleter" {
 		if a.GetVerb() == "delete" && a.GetResource() == "replicationcontrollers" {
-			return false, "", nil
+			return authorizer.DecisionNoOpinion, "", nil
 		}
 		if a.GetVerb() == "update" && a.GetResource() == "replicationcontrollers" && a.GetSubresource() == "finalizers" {
-			return false, "", nil
+			return authorizer.DecisionNoOpinion, "", nil
 		}
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 	}
 
-	return true, "", nil
+	return authorizer.DecisionAllow, "", nil
 }
 
 // newGCPermissionsEnforcement returns the admission controller configured for testing.
-func newGCPermissionsEnforcement() *gcPermissionsEnforcement {
+func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 	// the pods/status endpoint is ignored by this plugin since old kubelets
 	// corrupt them.  the pod status strategy ensures status updates cannot mutate
 	// ownerRef.
@@ -83,9 +85,18 @@ func newGCPermissionsEnforcement() *gcPermissionsEnforcement {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		whiteList: whiteList,
 	}
-	pluginInitializer := kubeadmission.NewPluginInitializer(nil, nil, nil, fakeAuthorizer{}, nil, api.Registry.RESTMapper(), nil)
-	pluginInitializer.Initialize(gcAdmit)
-	return gcAdmit
+
+	genericPluginInitializer, err := initializer.New(nil, nil, fakeAuthorizer{}, nil)
+	if err != nil {
+		return nil, err
+	}
+	pluginInitializer := kubeadmission.NewPluginInitializer(nil, nil, nil, legacyscheme.Registry.RESTMapper(), nil, nil, nil)
+	initializersChain := admission.PluginInitializers{}
+	initializersChain = append(initializersChain, genericPluginInitializer)
+	initializersChain = append(initializersChain, pluginInitializer)
+
+	initializersChain.Initialize(gcAdmit)
+	return gcAdmit, nil
 }
 
 func TestGCAdmission(t *testing.T) {
@@ -245,7 +256,10 @@ func TestGCAdmission(t *testing.T) {
 			checkError: expectNoError,
 		},
 	}
-	gcAdmit := newGCPermissionsEnforcement()
+	gcAdmit, err := newGCPermissionsEnforcement()
+	if err != nil {
+		t.Error(err)
+	}
 
 	for _, tc := range tests {
 		operation := admission.Create
@@ -255,7 +269,7 @@ func TestGCAdmission(t *testing.T) {
 		user := &user.DefaultInfo{Name: tc.username}
 		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, user)
 
-		err := gcAdmit.Admit(attributes)
+		err := gcAdmit.Validate(attributes)
 		if !tc.checkError(err) {
 			t.Errorf("%v: unexpected err: %v", tc.name, err)
 		}
@@ -490,7 +504,10 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 			checkError: expectNoError,
 		},
 	}
-	gcAdmit := newGCPermissionsEnforcement()
+	gcAdmit, err := newGCPermissionsEnforcement()
+	if err != nil {
+		t.Error(err)
+	}
 
 	for _, tc := range tests {
 		operation := admission.Create
@@ -500,7 +517,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		user := &user.DefaultInfo{Name: tc.username}
 		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, user)
 
-		err := gcAdmit.Admit(attributes)
+		err := gcAdmit.Validate(attributes)
 		if !tc.checkError(err) {
 			t.Errorf("%v: unexpected err: %v", tc.name, err)
 		}

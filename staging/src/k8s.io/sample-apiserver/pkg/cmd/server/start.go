@@ -30,8 +30,8 @@ import (
 	"k8s.io/sample-apiserver/pkg/admission/wardleinitializer"
 	"k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	"k8s.io/sample-apiserver/pkg/apiserver"
-	clientset "k8s.io/sample-apiserver/pkg/client/clientset_generated/internalclientset"
-	informers "k8s.io/sample-apiserver/pkg/client/informers_generated/internalversion"
+	clientset "k8s.io/sample-apiserver/pkg/client/clientset/internalversion"
+	informers "k8s.io/sample-apiserver/pkg/client/informers/internalversion"
 )
 
 const defaultEtcdPathPrefix = "/registry/wardle.kubernetes.io"
@@ -46,7 +46,7 @@ type WardleServerOptions struct {
 
 func NewWardleServerOptions(out, errOut io.Writer) *WardleServerOptions {
 	o := &WardleServerOptions{
-		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Scheme, apiserver.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)),
+		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)),
 		Admission:          genericoptions.NewAdmissionOptions(),
 
 		StdOut: out,
@@ -119,7 +119,7 @@ func (o WardleServerOptions) Config() (*apiserver.Config, error) {
 		return nil, err
 	}
 
-	if err := o.Admission.ApplyTo(&serverConfig.Config, serverConfig.SharedInformerFactory, admissionInitializer); err != nil {
+	if err := o.Admission.ApplyTo(&serverConfig.Config, serverConfig.SharedInformerFactory, serverConfig.ClientConfig, apiserver.Scheme, admissionInitializer); err != nil {
 		return nil, err
 	}
 

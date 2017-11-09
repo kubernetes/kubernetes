@@ -125,7 +125,7 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
 
 		// If the namespace has not specified its default tolerations,
 		// fall back to cluster's default tolerations.
-		if len(ts) == 0 {
+		if ts == nil {
 			ts = p.pluginConfig.Default
 		}
 
@@ -157,7 +157,7 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
 
 		// If the namespace has not specified its tolerations whitelist,
 		// fall back to cluster's whitelist of tolerations.
-		if len(whitelist) == 0 {
+		if whitelist == nil {
 			whitelist = p.pluginConfig.Whitelist
 		}
 
@@ -202,7 +202,7 @@ func (p *podTolerationsPlugin) SetInternalKubeInformerFactory(f informers.Shared
 
 }
 
-func (p *podTolerationsPlugin) Validate() error {
+func (p *podTolerationsPlugin) ValidateInitialization() error {
 	if p.namespaceLister == nil {
 		return fmt.Errorf("missing namespaceLister")
 	}
@@ -220,13 +220,32 @@ func (p *podTolerationsPlugin) getNamespaceTolerationsWhitelist(ns *api.Namespac
 	return extractNSTolerations(ns, NSWLTolerations)
 }
 
+// extractNSTolerations extracts default or whitelist of tolerations from
+// following namespace annotations keys: "scheduler.alpha.kubernetes.io/defaultTolerations"
+// and "scheduler.alpha.kubernetes.io/tolerationsWhitelist". If these keys are
+// unset (nil), extractNSTolerations returns nil. If the value to these
+// keys are set to empty, an empty toleration is returned, otherwise
+// configured tolerations are returned.
 func extractNSTolerations(ns *api.Namespace, key string) ([]api.Toleration, error) {
+	// if a namespace does not have any annotations
+	if len(ns.Annotations) == 0 {
+		return nil, nil
+	}
+
+	// if NSWLTolerations or NSDefaultTolerations does not exist
+	if _, ok := ns.Annotations[key]; !ok {
+		return nil, nil
+	}
+
+	// if value is set to empty
+	if len(ns.Annotations[key]) == 0 {
+		return []api.Toleration{}, nil
+	}
+
 	var v1Tolerations []v1.Toleration
-	if len(ns.Annotations) > 0 && ns.Annotations[key] != "" {
-		err := json.Unmarshal([]byte(ns.Annotations[key]), &v1Tolerations)
-		if err != nil {
-			return nil, err
-		}
+	err := json.Unmarshal([]byte(ns.Annotations[key]), &v1Tolerations)
+	if err != nil {
+		return nil, err
 	}
 
 	ts := make([]api.Toleration, len(v1Tolerations))

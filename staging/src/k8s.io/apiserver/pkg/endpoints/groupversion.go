@@ -66,7 +66,6 @@ type APIGroupVersion struct {
 	Typer           runtime.ObjectTyper
 	Creater         runtime.ObjectCreater
 	Convertor       runtime.ObjectConvertor
-	Copier          runtime.ObjectCopier
 	Defaulter       runtime.ObjectDefaulter
 	Linker          runtime.SelfLinker
 	UnsafeConvertor runtime.ObjectConvertor
@@ -75,12 +74,6 @@ type APIGroupVersion struct {
 	Context request.RequestContextMapper
 
 	MinRequestTimeout time.Duration
-
-	// SubresourceGroupVersionKind contains the GroupVersionKind overrides for each subresource that is
-	// accessible from this API group version. The GroupVersionKind is that of the external version of
-	// the subresource. The key of this map should be the path of the subresource. The keys here should
-	// match the keys in the Storage map above for subresources.
-	SubresourceGroupVersionKind map[string]schema.GroupVersionKind
 
 	// EnableAPIResponseCompression indicates whether API Responses should support compression
 	// if the client requests it via Accept-Encoding

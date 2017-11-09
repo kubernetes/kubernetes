@@ -21,6 +21,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,8 +34,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
-	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -42,11 +41,11 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	cloudkms "google.golang.org/api/cloudkms/v1"
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
@@ -104,7 +103,6 @@ type GCECloud struct {
 	serviceBeta              *computebeta.Service
 	serviceAlpha             *computealpha.Service
 	containerService         *container.Service
-	cloudkmsService          *cloudkms.Service
 	client                   clientset.Interface
 	clientBuilder            controller.ControllerClientBuilder
 	eventBroadcaster         record.EventBroadcaster
@@ -114,6 +112,7 @@ type GCECloud struct {
 	localZone                string   // The zone in which we are running
 	managedZones             []string // List of zones we are spanning (for multi-AZ clusters, primarily when running on master)
 	networkURL               string
+	isLegacyNetwork          bool
 	subnetworkURL            string
 	secondaryRangeName       string
 	networkProjectID         string
@@ -192,10 +191,6 @@ type CloudConfig struct {
 	AlphaFeatureGate   *AlphaFeatureGate
 }
 
-// kmsPluginRegisterOnce prevents the cloudprovider from registering its KMS plugin
-// more than once in the KMS plugin registry.
-var kmsPluginRegisterOnce sync.Once
-
 func init() {
 	cloudprovider.RegisterCloudProvider(
 		ProviderName,
@@ -207,11 +202,6 @@ func init() {
 // Raw access to the underlying GCE service, probably should only be used for e2e tests
 func (g *GCECloud) GetComputeService() *compute.Service {
 	return g.service
-}
-
-// Raw access to the cloudkmsService of GCE cloud. Required for encryption of etcd using Google KMS.
-func (g *GCECloud) GetKMSService() *cloudkms.Service {
-	return g.cloudkmsService
 }
 
 // newGCECloud creates a new instance of GCECloud.
@@ -343,6 +333,13 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 // If no tokenSource is specified, uses oauth2.DefaultTokenSource.
 // If managedZones is nil / empty all zones in the region will be managed.
 func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
+	// Remove any pre-release version and build metadata from the semver, leaving only the MAJOR.MINOR.PATCH portion.
+	// See http://semver.org/.
+	version := strings.TrimLeft(strings.Split(strings.Split(version.Get().GitVersion, "-")[0], "+")[0], "v")
+
+	// Create a user-agent header append string to supply to the Google API clients, to identify Kubernetes as the origin of the GCP API calls.
+	userAgent := fmt.Sprintf("Kubernetes/%s (%s %s)", version, runtime.GOOS, runtime.GOARCH)
+
 	// Use ProjectID for NetworkProjectID, if it wasn't explicitly set.
 	if config.NetworkProjectID == "" {
 		config.NetworkProjectID = config.ProjectID
@@ -356,6 +353,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	if err != nil {
 		return nil, err
 	}
+	service.UserAgent = userAgent
 
 	client, err = newOauthClient(config.TokenSource)
 	if err != nil {
@@ -365,6 +363,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	if err != nil {
 		return nil, err
 	}
+	serviceBeta.UserAgent = userAgent
 
 	client, err = newOauthClient(config.TokenSource)
 	if err != nil {
@@ -374,6 +373,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	if err != nil {
 		return nil, err
 	}
+	serviceAlpha.UserAgent = userAgent
 
 	// Expect override api endpoint to always be v1 api and follows the same pattern as prod.
 	// Generate alpha and beta api endpoints based on override v1 api endpoint.
@@ -389,39 +389,53 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	cloudkmsService, err := cloudkms.New(client)
-	if err != nil {
-		return nil, err
-	}
+	containerService.UserAgent = userAgent
 
 	// ProjectID and.NetworkProjectID may be project number or name.
 	projID, netProjID := tryConvertToProjectNames(config.ProjectID, config.NetworkProjectID, service)
-
 	onXPN := projID != netProjID
 
 	var networkURL string
 	var subnetURL string
+	var isLegacyNetwork bool
 
-	if config.NetworkName == "" && config.NetworkURL == "" {
-		// TODO: Stop using this call and return an error.
-		// This function returns the first network in a list of networks for a project. The project
-		// should be set via configuration instead of randomly taking the first.
-		networkName, err := getNetworkNameViaAPICall(service, config.NetworkProjectID)
-		if err != nil {
-			return nil, err
-		}
-		networkURL = gceNetworkURL(config.ApiEndpoint, netProjID, networkName)
-	} else if config.NetworkURL != "" {
+	if config.NetworkURL != "" {
 		networkURL = config.NetworkURL
-	} else {
+	} else if config.NetworkName != "" {
 		networkURL = gceNetworkURL(config.ApiEndpoint, netProjID, config.NetworkName)
+	} else {
+		// Other consumers may use the cloudprovider without utilizing the wrapped GCE API functions
+		// or functions requiring network/subnetwork URLs (e.g. Kubelet).
+		glog.Warningf("No network name or URL specified.")
 	}
 
 	if config.SubnetworkURL != "" {
 		subnetURL = config.SubnetworkURL
 	} else if config.SubnetworkName != "" {
 		subnetURL = gceSubnetworkURL(config.ApiEndpoint, netProjID, config.Region, config.SubnetworkName)
+	} else {
+		// Attempt to determine the subnetwork in case it's an automatic network.
+		// Legacy networks will not have a subnetwork, so subnetworkURL should remain empty.
+		if networkName := lastComponent(networkURL); networkName != "" {
+			if n, err := getNetwork(service, netProjID, networkName); err != nil {
+				// Gracefully fail because kubelet calls CreateGCECloud without any config, and API calls will fail coming from minions.
+				glog.Warningf("Could not retrieve network %q in attempt to determine if legacy network or see list of subnets, err %v", networkURL, err)
+			} else {
+				// Legacy networks have a non-empty IPv4Range
+				if len(n.IPv4Range) > 0 {
+					glog.Infof("Determined network %q is type legacy", networkURL)
+					isLegacyNetwork = true
+				} else {
+					// Try to find the subnet in the list of subnets
+					subnetURL = findSubnetForRegion(n.Subnetworks, config.Region)
+					if len(subnetURL) > 0 {
+						glog.Infof("Using subnet %q within network %q & region %q because none was specified.", subnetURL, n.Name, config.Region)
+					} else {
+						glog.Warningf("Could not find any subnet in region %q within list %v.", config.Region, n.Subnetworks)
+					}
+				}
+			}
+		}
 	}
 
 	if len(config.ManagedZones) == 0 {
@@ -430,7 +444,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 			return nil, err
 		}
 	}
-	if len(config.ManagedZones) != 1 {
+	if len(config.ManagedZones) > 1 {
 		glog.Infof("managing multiple zones: %v", config.ManagedZones)
 	}
 
@@ -441,7 +455,6 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 		serviceAlpha:             serviceAlpha,
 		serviceBeta:              serviceBeta,
 		containerService:         containerService,
-		cloudkmsService:          cloudkmsService,
 		projectID:                projID,
 		networkProjectID:         netProjID,
 		onXPN:                    onXPN,
@@ -449,6 +462,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 		localZone:                config.Zone,
 		managedZones:             config.ManagedZones,
 		networkURL:               networkURL,
+		isLegacyNetwork:          isLegacyNetwork,
 		subnetworkURL:            subnetURL,
 		secondaryRangeName:       config.SecondaryRangeName,
 		nodeTags:                 config.NodeTags,
@@ -459,14 +473,6 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	}
 
 	gce.manager = &gceServiceManager{gce}
-
-	// Registering the KMS plugin only the first time.
-	kmsPluginRegisterOnce.Do(func() {
-		// Register the Google Cloud KMS based service in the KMS plugin registry.
-		encryptionconfig.KMSPluginRegistry.Register(KMSServiceName, func(config io.Reader) (envelope.Service, error) {
-			return gce.getGCPCloudKMSService(config)
-		})
-	})
 
 	return gce, nil
 }
@@ -506,7 +512,7 @@ func (gce *GCECloud) Initialize(clientBuilder controller.ControllerClientBuilder
 
 	if gce.OnXPN() {
 		gce.eventBroadcaster = record.NewBroadcaster()
-		gce.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(gce.client.Core().RESTClient()).Events("")})
+		gce.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(gce.client.CoreV1().RESTClient()).Events("")})
 		gce.eventRecorder = gce.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "gce-cloudprovider"})
 	}
 
@@ -572,6 +578,10 @@ func (gce *GCECloud) SubnetworkURL() string {
 	return gce.subnetworkURL
 }
 
+func (gce *GCECloud) IsLegacyNetwork() bool {
+	return gce.isLegacyNetwork
+}
+
 // Known-useless DNS search path.
 var uselessDNSSearchRE = regexp.MustCompile(`^[0-9]+.google.internal.$`)
 
@@ -615,7 +625,7 @@ func gceSubnetworkURL(apiEndpoint, project, region, subnetwork string) string {
 	return apiEndpoint + strings.Join([]string{"projects", project, "regions", region, "subnetworks", subnetwork}, "/")
 }
 
-// getProjectIDInURL parses typical full resource URLS and shorter URLS
+// getProjectIDInURL parses full resource URLS and shorter URLS
 // https://www.googleapis.com/compute/v1/projects/myproject/global/networks/mycustom
 // projects/myproject/global/networks/mycustom
 // All return "myproject"
@@ -627,6 +637,20 @@ func getProjectIDInURL(urlStr string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("could not find project field in url: %v", urlStr)
+}
+
+// getRegionInURL parses full resource URLS and shorter URLS
+// https://www.googleapis.com/compute/v1/projects/myproject/regions/us-central1/subnetworks/a
+// projects/myproject/regions/us-central1/subnetworks/a
+// All return "us-central1"
+func getRegionInURL(urlStr string) string {
+	fields := strings.Split(urlStr, "/")
+	for i, v := range fields {
+		if v == "regions" && i < len(fields)-1 {
+			return fields[i+1]
+		}
+	}
+	return ""
 }
 
 func getNetworkNameViaMetadata() (string, error) {
@@ -641,18 +665,9 @@ func getNetworkNameViaMetadata() (string, error) {
 	return parts[3], nil
 }
 
-func getNetworkNameViaAPICall(svc *compute.Service, projectID string) (string, error) {
-	// TODO: use PageToken to list all not just the first 500
-	networkList, err := svc.Networks.List(projectID).Do()
-	if err != nil {
-		return "", err
-	}
-
-	if networkList == nil || len(networkList.Items) <= 0 {
-		return "", fmt.Errorf("GCE Network List call returned no networks for project %q", projectID)
-	}
-
-	return networkList.Items[0].Name, nil
+// getNetwork returns a GCP network
+func getNetwork(svc *compute.Service, networkProjectID, networkID string) (*compute.Network, error) {
+	return svc.Networks.Get(networkProjectID, networkID).Do()
 }
 
 // getProjectID returns the project's string ID given a project number or string
@@ -685,6 +700,15 @@ func getZonesForRegion(svc *compute.Service, projectID, region string) ([]string
 		}
 	}
 	return zones, nil
+}
+
+func findSubnetForRegion(subnetURLs []string, region string) string {
+	for _, url := range subnetURLs {
+		if thisRegion := getRegionInURL(url); thisRegion == region {
+			return url
+		}
+	}
+	return ""
 }
 
 func newOauthClient(tokenSource oauth2.TokenSource) (*http.Client, error) {

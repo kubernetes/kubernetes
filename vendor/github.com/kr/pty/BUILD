@@ -24,6 +24,7 @@ go_library(
         "//conditions:default": [],
     }),
     cgo = True,
+    importpath = "github.com/kr/pty",
     visibility = ["//visibility:public"],
 )
 

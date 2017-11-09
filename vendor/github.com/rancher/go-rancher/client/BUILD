@@ -151,6 +151,7 @@ go_library(
         "schemas.go",
         "types.go",
     ],
+    importpath = "github.com/rancher/go-rancher/client",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/gorilla/websocket:go_default_library",

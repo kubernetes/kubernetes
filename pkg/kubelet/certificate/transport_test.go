@@ -19,6 +19,7 @@ package certificate
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -89,13 +90,39 @@ uC6Jo2eLcSV1sSdzTjaaWdM6XeYj6yHOAm8ZBIQs7m6V
 -----END RSA PRIVATE KEY-----`)
 )
 
+type certificateData struct {
+	keyPEM         []byte
+	certificatePEM []byte
+	certificate    *tls.Certificate
+}
+
+func newCertificateData(certificatePEM string, keyPEM string) *certificateData {
+	certificate, err := tls.X509KeyPair([]byte(certificatePEM), []byte(keyPEM))
+	if err != nil {
+		panic(fmt.Sprintf("Unable to initialize certificate: %v", err))
+	}
+	certs, err := x509.ParseCertificates(certificate.Certificate[0])
+	if err != nil {
+		panic(fmt.Sprintf("Unable to initialize certificate leaf: %v", err))
+	}
+	certificate.Leaf = certs[0]
+	return &certificateData{
+		keyPEM:         []byte(keyPEM),
+		certificatePEM: []byte(certificatePEM),
+		certificate:    &certificate,
+	}
+}
+
 type fakeManager struct {
-	cert atomic.Value // Always a *tls.Certificate
+	cert    atomic.Value // Always a *tls.Certificate
+	healthy bool
 }
 
 func (f *fakeManager) SetCertificateSigningRequestClient(certificatesclient.CertificateSigningRequestInterface) error {
 	return nil
 }
+
+func (f *fakeManager) ServerHealthy() bool { return f.healthy }
 
 func (f *fakeManager) Start() {}
 
@@ -160,7 +187,7 @@ func TestRotateShutsDownConnections(t *testing.T) {
 	}
 
 	// Check for a new cert every 10 milliseconds
-	if err := updateTransport(stop, 10*time.Millisecond, c, m); err != nil {
+	if err := updateTransport(stop, 10*time.Millisecond, c, m, false); err != nil {
 		t.Fatal(err)
 	}
 

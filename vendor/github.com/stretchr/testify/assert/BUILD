@@ -11,6 +11,7 @@ go_library(
         "forward_assertions.go",
         "http_assertions.go",
     ],
+    importpath = "github.com/stretchr/testify/assert",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",

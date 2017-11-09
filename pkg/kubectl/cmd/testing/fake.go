@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 	"time"
 
-	swagger "github.com/emicklei/go-restful-swagger12"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -36,8 +35,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -174,7 +173,7 @@ func versionErrIfFalse(b bool) error {
 	return versionErr
 }
 
-var ValidVersion = api.Registry.GroupOrDie(api.GroupName).GroupVersion.Version
+var ValidVersion = legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.Version
 var InternalGV = schema.GroupVersion{Group: "apitest", Version: runtime.APIVersionInternal}
 var UnlikelyGV = schema.GroupVersion{Group: "apitest", Version: "unlikelyversion"}
 var ValidVersionGV = schema.GroupVersion{Group: "apitest", Version: ValidVersion}
@@ -279,7 +278,7 @@ func (f *FakeFactory) FlagSet() *pflag.FlagSet {
 }
 
 func (f *FakeFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
-	return api.Registry.RESTMapper(), f.tf.Typer
+	return legacyscheme.Registry.RESTMapper(), f.tf.Typer
 }
 
 func (f *FakeFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error) {
@@ -331,12 +330,6 @@ func (f *FakeFactory) ClientForMapping(mapping *meta.RESTMapping) (resource.REST
 	return f.tf.Client, f.tf.Err
 }
 
-func (f *FakeFactory) FederationClientSetForVersion(version *schema.GroupVersion) (fedclientset.Interface, error) {
-	return nil, nil
-}
-func (f *FakeFactory) FederationClientForVersion(version *schema.GroupVersion) (*restclient.RESTClient, error) {
-	return nil, nil
-}
 func (f *FakeFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
 	return nil, nil
 }
@@ -415,12 +408,8 @@ func (f *FakeFactory) ResolveImage(name string) (string, error) {
 	return name, nil
 }
 
-func (f *FakeFactory) Validator(validate bool, openapi bool, cacheDir string) (validation.Schema, error) {
+func (f *FakeFactory) Validator(validate bool) (validation.Schema, error) {
 	return f.tf.Validator, f.tf.Err
-}
-
-func (f *FakeFactory) SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDeclaration, error) {
-	return nil, nil
 }
 
 func (f *FakeFactory) OpenAPISchema() (openapi.Resources, error) {
@@ -452,6 +441,10 @@ func (f *FakeFactory) CanBeAutoscaled(schema.GroupKind) error {
 
 func (f *FakeFactory) AttachablePodForObject(ob runtime.Object, timeout time.Duration) (*api.Pod, error) {
 	return nil, nil
+}
+
+func (f *FakeFactory) ApproximatePodTemplateForObject(obj runtime.Object) (*api.PodTemplateSpec, error) {
+	return f.ApproximatePodTemplateForObject(obj)
 }
 
 func (f *FakeFactory) UpdatePodSpecForObject(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error) {
@@ -527,11 +520,11 @@ func (f *fakeMixedFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 			{Group: meta.AnyGroup, Version: "v1", Kind: meta.AnyKind},
 		},
 	}
-	return priorityRESTMapper, runtime.MultiObjectTyper{f.tf.Typer, api.Scheme}
+	return priorityRESTMapper, runtime.MultiObjectTyper{f.tf.Typer, legacyscheme.Scheme}
 }
 
 func (f *fakeMixedFactory) ClientForMapping(m *meta.RESTMapping) (resource.RESTClient, error) {
-	if m.ObjectConvertor == api.Scheme {
+	if m.ObjectConvertor == legacyscheme.Scheme {
 		return f.apiClient, f.tf.Err
 	}
 	if f.tf.ClientForMappingFunc != nil {
@@ -555,7 +548,7 @@ type fakeAPIFactory struct {
 }
 
 func (f *fakeAPIFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
-	return testapi.Default.RESTMapper(), api.Scheme
+	return testapi.Default.RESTMapper(), legacyscheme.Scheme
 }
 
 func (f *fakeAPIFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error) {
@@ -697,7 +690,7 @@ func (f *fakeAPIFactory) LogsForObject(object, options runtime.Object, timeout t
 		}
 		return c.Core().Pods(f.tf.Namespace).GetLogs(t.Name, opts), nil
 	default:
-		fqKinds, _, err := api.Scheme.ObjectKinds(object)
+		fqKinds, _, err := legacyscheme.Scheme.ObjectKinds(object)
 		if err != nil {
 			return nil, err
 		}
@@ -710,7 +703,7 @@ func (f *fakeAPIFactory) AttachablePodForObject(object runtime.Object, timeout t
 	case *api.Pod:
 		return t, nil
 	default:
-		gvks, _, err := api.Scheme.ObjectKinds(object)
+		gvks, _, err := legacyscheme.Scheme.ObjectKinds(object)
 		if err != nil {
 			return nil, err
 		}
@@ -718,7 +711,11 @@ func (f *fakeAPIFactory) AttachablePodForObject(object runtime.Object, timeout t
 	}
 }
 
-func (f *fakeAPIFactory) Validator(validate bool, openapi bool, cacheDir string) (validation.Schema, error) {
+func (f *fakeAPIFactory) ApproximatePodTemplateForObject(obj runtime.Object) (*api.PodTemplateSpec, error) {
+	return f.Factory.ApproximatePodTemplateForObject(obj)
+}
+
+func (f *fakeAPIFactory) Validator(validate bool) (validation.Schema, error) {
 	return f.tf.Validator, f.tf.Err
 }
 
@@ -735,7 +732,7 @@ func (f *fakeAPIFactory) Generators(cmdName string) map[string]kubectl.Generator
 }
 
 func (f *fakeAPIFactory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
-	gvks, _, err := api.Scheme.ObjectKinds(obj)
+	gvks, _, err := legacyscheme.Scheme.ObjectKinds(obj)
 	if err != nil {
 		return err
 	}
@@ -763,10 +760,6 @@ func (f *fakeAPIFactory) NewBuilder() *resource.Builder {
 
 func (f *fakeAPIFactory) SuggestedPodTemplateResources() []schema.GroupResource {
 	return []schema.GroupResource{}
-}
-
-func (f *fakeAPIFactory) SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDeclaration, error) {
-	return nil, nil
 }
 
 func (f *fakeAPIFactory) OpenAPISchema() (openapi.Resources, error) {

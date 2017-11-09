@@ -8,6 +8,7 @@ go_library(
         "helper.go",
         "stats_provider.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/stats",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/kubelet/apis/cri:go_default_library",
@@ -21,6 +22,7 @@ go_library(
         "//pkg/kubelet/server/stats:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/google/cadvisor/fs:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
@@ -51,6 +53,7 @@ go_test(
         "helper_test.go",
         "stats_provider_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/stats",
     library = ":go_default_library",
     deps = [
         "//pkg/kubelet/apis/cri/testing:go_default_library",

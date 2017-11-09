@@ -17,6 +17,8 @@ limitations under the License.
 package storagebackend
 
 import (
+	"time"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage/value"
 )
@@ -25,6 +27,8 @@ const (
 	StorageTypeUnset = ""
 	StorageTypeETCD2 = "etcd2"
 	StorageTypeETCD3 = "etcd3"
+
+	DefaultCompactInterval = 5 * time.Minute
 )
 
 // Config is configuration for creating a storage backend.
@@ -51,19 +55,23 @@ type Config struct {
 	// We will drop the cache once using protobuf.
 	DeserializationCacheSize int
 
-	Codec  runtime.Codec
-	Copier runtime.ObjectCopier
+	Codec runtime.Codec
 	// Transformer allows the value to be transformed prior to persisting into etcd.
 	Transformer value.Transformer
+
+	// CompactionInterval is an interval of requesting compaction from apiserver.
+	// If the value is 0, no compaction will be issued.
+	CompactionInterval time.Duration
 }
 
-func NewDefaultConfig(prefix string, copier runtime.ObjectCopier, codec runtime.Codec) *Config {
+func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
 	return &Config{
 		Prefix: prefix,
 		// Default cache size to 0 - if unset, its size will be set based on target
 		// memory usage.
 		DeserializationCacheSize: 0,
-		Copier: copier,
-		Codec:  codec,
+		Codec:              codec,
+		CompactionInterval: DefaultCompactInterval,
+		Quorum:             true,
 	}
 }

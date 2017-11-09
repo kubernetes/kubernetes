@@ -22,15 +22,14 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
 // Registry is an interface for things that know how to store Roles.
 type Registry interface {
 	ListRoles(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*rbac.RoleList, error)
-	CreateRole(ctx genericapirequest.Context, role *rbac.Role) error
-	UpdateRole(ctx genericapirequest.Context, role *rbac.Role) error
+	CreateRole(ctx genericapirequest.Context, role *rbac.Role, createValidation rest.ValidateObjectFunc) error
+	UpdateRole(ctx genericapirequest.Context, role *rbac.Role, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
 	GetRole(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*rbac.Role, error)
 	DeleteRole(ctx genericapirequest.Context, name string) error
 	WatchRoles(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
@@ -56,13 +55,14 @@ func (s *storage) ListRoles(ctx genericapirequest.Context, options *metainternal
 	return obj.(*rbac.RoleList), nil
 }
 
-func (s *storage) CreateRole(ctx genericapirequest.Context, role *rbac.Role) error {
-	_, err := s.Create(ctx, role, false)
+func (s *storage) CreateRole(ctx genericapirequest.Context, role *rbac.Role, createValidation rest.ValidateObjectFunc) error {
+	_, err := s.Create(ctx, role, createValidation, false)
 	return err
 }
 
-func (s *storage) UpdateRole(ctx genericapirequest.Context, role *rbac.Role) error {
-	_, _, err := s.Update(ctx, role.Name, rest.DefaultUpdatedObjectInfo(role, api.Scheme))
+func (s *storage) UpdateRole(ctx genericapirequest.Context, role *rbac.Role, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
+	// TODO: any admission?
+	_, _, err := s.Update(ctx, role.Name, rest.DefaultUpdatedObjectInfo(role), createValidation, updateValidation)
 	return err
 }
 

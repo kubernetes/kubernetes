@@ -6,6 +6,7 @@ go_library(
         "duration_convert.go",
         "timestamp.go",
     ],
+    importpath = "github.com/docker/docker/api/types/time",
     visibility = ["//visibility:public"],
 )
 

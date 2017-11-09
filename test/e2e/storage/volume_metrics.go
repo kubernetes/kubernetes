@@ -62,10 +62,6 @@ var _ = SIGDescribe("[Serial] Volume metrics", func() {
 		if err != nil {
 			framework.Failf("Error creating metrics grabber : %v", err)
 		}
-
-		if !metricsGrabber.HasRegisteredMaster() {
-			framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
-		}
 	})
 
 	AfterEach(func() {
@@ -74,6 +70,10 @@ var _ = SIGDescribe("[Serial] Volume metrics", func() {
 
 	It("should create prometheus metrics for volume provisioning and attach/detach", func() {
 		var err error
+
+		if !metricsGrabber.HasRegisteredMaster() {
+			framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
+		}
 
 		controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
 
@@ -97,29 +97,9 @@ var _ = SIGDescribe("[Serial] Volume metrics", func() {
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
 		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
 
-		backoff := wait.Backoff{
-			Duration: 10 * time.Second,
-			Factor:   1.2,
-			Steps:    3,
-		}
+		updatedStorageMetrics := waitForDetachAndGrabMetrics(storageOpMetrics, metricsGrabber)
 
-		updatedStorageMetrics := make(map[string]int64)
-
-		waitErr := wait.ExponentialBackoff(backoff, func() (bool, error) {
-			updatedMetrics, err := metricsGrabber.GrabFromControllerManager()
-
-			if err != nil {
-				framework.Logf("Error fetching controller-manager metrics")
-				return false, err
-			}
-			updatedStorageMetrics = getControllerStorageMetrics(updatedMetrics)
-			if len(updatedStorageMetrics) == 0 {
-				framework.Logf("Volume metrics not collected yet, going to retry")
-				return false, nil
-			}
-			return true, nil
-		})
-		Expect(waitErr).NotTo(HaveOccurred(), "Error fetching storage c-m metrics : %v", waitErr)
+		Expect(len(updatedStorageMetrics)).ToNot(Equal(0), "Error fetching c-m updated storage metrics")
 
 		volumeOperations := []string{"volume_provision", "volume_detach", "volume_attach"}
 
@@ -145,16 +125,6 @@ var _ = SIGDescribe("[Serial] Volume metrics", func() {
 		pod, err = c.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
-		// Wait for `VolumeStatsAggPeriod' to grab metrics
-		time.Sleep(1 * time.Minute)
-
-		// Grab kubelet metrics from the node the pod was scheduled on
-		kubeMetrics, err := metricsGrabber.GrabFromKubelet(pod.Spec.NodeName)
-		Expect(err).NotTo(HaveOccurred(), "Error getting kubelet metrics : %v", err)
-
-		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
-		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
-
 		// Verify volume stat metrics were collected for the referenced PVC
 		volumeStatKeys := []string{
 			kubeletmetrics.VolumeStatsUsedBytesKey,
@@ -164,13 +134,79 @@ var _ = SIGDescribe("[Serial] Volume metrics", func() {
 			kubeletmetrics.VolumeStatsInodesFreeKey,
 			kubeletmetrics.VolumeStatsInodesUsedKey,
 		}
+		// Poll kubelet metrics waiting for the volume to be picked up
+		// by the volume stats collector
+		var kubeMetrics metrics.KubeletMetrics
+		waitErr := wait.Poll(30*time.Second, 5*time.Minute, func() (bool, error) {
+			framework.Logf("Grabbing Kubelet metrics")
+			// Grab kubelet metrics from the node the pod was scheduled on
+			var err error
+			kubeMetrics, err = metricsGrabber.GrabFromKubelet(pod.Spec.NodeName)
+			if err != nil {
+				framework.Logf("Error fetching kubelet metrics")
+				return false, err
+			}
+			key := volumeStatKeys[0]
+			kubeletKeyName := fmt.Sprintf("%s_%s", kubeletmetrics.KubeletSubsystem, key)
+			if !findVolumeStatMetric(kubeletKeyName, pvc.Namespace, pvc.Name, kubeMetrics) {
+				return false, nil
+			}
+			return true, nil
+		})
+		Expect(waitErr).NotTo(HaveOccurred(), "Error finding volume metrics : %v", waitErr)
 
 		for _, key := range volumeStatKeys {
 			kubeletKeyName := fmt.Sprintf("%s_%s", kubeletmetrics.KubeletSubsystem, key)
-			verifyVolumeStatMetric(kubeletKeyName, pvc.Namespace, pvc.Name, kubeMetrics)
+			found := findVolumeStatMetric(kubeletKeyName, pvc.Namespace, pvc.Name, kubeMetrics)
+			Expect(found).To(BeTrue(), "PVC %s, Namespace %s not found for %s", pvc.Name, pvc.Namespace, kubeletKeyName)
 		}
+
+		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
+		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
 	})
 })
+
+func waitForDetachAndGrabMetrics(oldMetrics map[string]int64, metricsGrabber *metrics.MetricsGrabber) map[string]int64 {
+	backoff := wait.Backoff{
+		Duration: 10 * time.Second,
+		Factor:   1.2,
+		Steps:    21,
+	}
+
+	updatedStorageMetrics := make(map[string]int64)
+	oldDetachCount, ok := oldMetrics["volume_detach"]
+	if !ok {
+		oldDetachCount = 0
+	}
+
+	verifyMetricFunc := func() (bool, error) {
+		updatedMetrics, err := metricsGrabber.GrabFromControllerManager()
+
+		if err != nil {
+			framework.Logf("Error fetching controller-manager metrics")
+			return false, err
+		}
+
+		updatedStorageMetrics = getControllerStorageMetrics(updatedMetrics)
+		newDetachCount, ok := updatedStorageMetrics["volume_detach"]
+
+		// if detach metrics are not yet there, we need to retry
+		if !ok {
+			return false, nil
+		}
+
+		// if old Detach count is more or equal to new detach count, that means detach
+		// event has not been observed yet.
+		if oldDetachCount >= newDetachCount {
+			return false, nil
+		}
+		return true, nil
+	}
+
+	waitErr := wait.ExponentialBackoff(backoff, verifyMetricFunc)
+	Expect(waitErr).NotTo(HaveOccurred(), "Timeout error fetching storage c-m metrics : %v", waitErr)
+	return updatedStorageMetrics
+}
 
 func verifyMetricCount(oldMetrics map[string]int64, newMetrics map[string]int64, metricName string) {
 	oldCount, ok := oldMetrics[metricName]
@@ -181,8 +217,10 @@ func verifyMetricCount(oldMetrics map[string]int64, newMetrics map[string]int64,
 
 	newCount, ok := newMetrics[metricName]
 	Expect(ok).To(BeTrue(), "Error getting updated metrics for %s", metricName)
-
-	Expect(oldCount + 1).To(Equal(newCount))
+	// It appears that in a busy cluster some spurious detaches are unavoidable
+	// even if the test is run serially.  We really just verify if new count
+	// is greater than old count
+	Expect(newCount).To(BeNumerically(">", oldCount), "New count %d should be more than old count %d for action %s", newCount, oldCount, metricName)
 }
 
 func getControllerStorageMetrics(ms metrics.ControllerManagerMetrics) map[string]int64 {
@@ -202,12 +240,15 @@ func getControllerStorageMetrics(ms metrics.ControllerManagerMetrics) map[string
 	return result
 }
 
-// Verifies the specified metrics are in `kubeletMetrics`
-func verifyVolumeStatMetric(metricKeyName string, namespace string, pvcName string, kubeletMetrics metrics.KubeletMetrics) {
+// Finds the sample in the specified metric from `KubeletMetrics` tagged with
+// the specified namespace and pvc name
+func findVolumeStatMetric(metricKeyName string, namespace string, pvcName string, kubeletMetrics metrics.KubeletMetrics) bool {
 	found := false
 	errCount := 0
+	framework.Logf("Looking for sample in metric `%s` tagged with namespace `%s`, PVC `%s`", metricKeyName, namespace, pvcName)
 	if samples, ok := kubeletMetrics[metricKeyName]; ok {
 		for _, sample := range samples {
+			framework.Logf("Found sample %s", sample.String())
 			samplePVC, ok := sample.Metric["persistentvolumeclaim"]
 			if !ok {
 				framework.Logf("Error getting pvc for metric %s, sample %s", metricKeyName, sample.String())
@@ -226,5 +267,5 @@ func verifyVolumeStatMetric(metricKeyName string, namespace string, pvcName stri
 		}
 	}
 	Expect(errCount).To(Equal(0), "Found invalid samples")
-	Expect(found).To(BeTrue(), "PVC %s, Namespace %s not found for %s", pvcName, namespace, metricKeyName)
+	return found
 }

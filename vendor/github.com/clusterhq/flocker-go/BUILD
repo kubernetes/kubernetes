@@ -7,6 +7,7 @@ go_library(
         "doc.go",
         "util.go",
     ],
+    importpath = "github.com/clusterhq/flocker-go",
     visibility = ["//visibility:public"],
 )
 

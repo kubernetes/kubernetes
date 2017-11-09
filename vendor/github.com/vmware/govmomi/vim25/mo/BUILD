@@ -12,6 +12,7 @@ go_library(
         "retrieve.go",
         "type_info.go",
     ],
+    importpath = "github.com/vmware/govmomi/vim25/mo",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/vmware/govmomi/vim25/methods:go_default_library",

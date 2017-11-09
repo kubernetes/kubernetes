@@ -47,7 +47,7 @@ import (
 		10. Delete storage class.
 */
 
-var _ = SIGDescribe("vsphere volume operations storm", func() {
+var _ = SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-ops-storm")
 	const DEFAULT_VOLUME_OPS_SCALE = 30
 	var (
@@ -99,13 +99,13 @@ var _ = SIGDescribe("vsphere volume operations storm", func() {
 		By("Creating PVCs using the Storage Class")
 		count := 0
 		for count < volume_ops_scale {
-			pvclaims[count], err = framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClassAnnotation(namespace, storageclass))
+			pvclaims[count], err = framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClassAnnotation(namespace, "2Gi", storageclass))
 			Expect(err).NotTo(HaveOccurred())
 			count++
 		}
 
 		By("Waiting for all claims to be in bound phase")
-		persistentvolumes, err = framework.WaitForPVClaimBoundPhase(client, pvclaims)
+		persistentvolumes, err = framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating pod to attach PVs to the node")

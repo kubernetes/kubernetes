@@ -85,7 +85,7 @@ const (
 	// Ports of different e2e services.
 	kubeletPort          = "10250"
 	kubeletReadOnlyPort  = "10255"
-	kubeletRootDirectory = "/var/lib/kubelet"
+	KubeletRootDirectory = "/var/lib/kubelet"
 	// Health check url of kubelet
 	kubeletHealthCheckURL = "http://127.0.0.1:" + kubeletReadOnlyPort + "/healthz"
 )
@@ -110,7 +110,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		return nil, err
 	}
 	e.rmDirs = append(e.rmDirs, manifestPath)
-	err = createRootDirectory(kubeletRootDirectory)
+	err = createRootDirectory(KubeletRootDirectory)
 	if err != nil {
 		return nil, err
 	}
@@ -128,8 +128,9 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, "--slice=runtime.slice", "--remain-after-exit", builder.GetKubeletServerBin())
 		killCommand = exec.Command("systemctl", "kill", unitName)
 		restartCommand = exec.Command("systemctl", "restart", unitName)
-		e.logFiles["kubelet.log"] = logFileData{
-			journalctlCommand: []string{"-u", unitName},
+		e.logs["kubelet.log"] = LogFileData{
+			Name:              "kubelet.log",
+			JournalctlCommand: []string{"-u", unitName},
 		}
 		cmdArgs = append(cmdArgs,
 			"--kubelet-cgroups=/kubelet.slice",
@@ -138,6 +139,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 	} else {
 		cmdArgs = append(cmdArgs, builder.GetKubeletServerBin())
 		cmdArgs = append(cmdArgs,
+			// TODO(random-liu): Get rid of this docker specific thing.
 			"--runtime-cgroups=/docker-daemon",
 			"--kubelet-cgroups=/kubelet",
 			"--cgroup-root=/",
@@ -149,7 +151,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--address", "0.0.0.0",
 		"--port", kubeletPort,
 		"--read-only-port", kubeletReadOnlyPort,
-		"--root-dir", kubeletRootDirectory,
+		"--root-dir", KubeletRootDirectory,
 		"--volume-stats-agg-period", "10s", // Aggregate volumes frequently so tests don't need to wait as long
 		"--allow-privileged", "true",
 		"--serialize-image-pulls", "false",

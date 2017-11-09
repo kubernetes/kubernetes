@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	settings "k8s.io/api/settings/v1alpha1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"
@@ -73,6 +74,9 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		}
 
 		_, err := createPodPreset(f.ClientSet, f.Namespace.Name, pip)
+		if errors.IsNotFound(err) {
+			framework.Skipf("podpresets requires k8s.io/api/settings/v1alpha1 to be enabled")
+		}
 		Expect(err).NotTo(HaveOccurred())
 
 		By("creating the pod")
@@ -178,6 +182,9 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		}
 
 		_, err := createPodPreset(f.ClientSet, f.Namespace.Name, pip)
+		if errors.IsNotFound(err) {
+			framework.Skipf("podpresets requires k8s.io/api/settings/v1alpha1 to be enabled")
+		}
 		Expect(err).NotTo(HaveOccurred())
 
 		By("creating the pod")
@@ -259,17 +266,17 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 })
 
 func getPodPreset(c clientset.Interface, ns, name string) (*settings.PodPreset, error) {
-	return c.Settings().PodPresets(ns).Get(name, metav1.GetOptions{})
+	return c.SettingsV1alpha1().PodPresets(ns).Get(name, metav1.GetOptions{})
 }
 
 func createPodPreset(c clientset.Interface, ns string, job *settings.PodPreset) (*settings.PodPreset, error) {
-	return c.Settings().PodPresets(ns).Create(job)
+	return c.SettingsV1alpha1().PodPresets(ns).Create(job)
 }
 
 func updatePodPreset(c clientset.Interface, ns string, job *settings.PodPreset) (*settings.PodPreset, error) {
-	return c.Settings().PodPresets(ns).Update(job)
+	return c.SettingsV1alpha1().PodPresets(ns).Update(job)
 }
 
 func deletePodPreset(c clientset.Interface, ns, name string) error {
-	return c.Settings().PodPresets(ns).Delete(name, nil)
+	return c.SettingsV1alpha1().PodPresets(ns).Delete(name, nil)
 }

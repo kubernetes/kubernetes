@@ -76,9 +76,6 @@ type GenericStore interface {
 //
 // TODO: make the default exposed methods exactly match a generic RESTStorage
 type Store struct {
-	// Copier is used to make some storage caching decorators work
-	Copier runtime.ObjectCopier
-
 	// NewFunc returns a new instance of the type this registry returns for a
 	// GET of a single object, e.g.:
 	//
@@ -151,11 +148,13 @@ type Store struct {
 	// AfterCreate implements a further operation to run after a resource is
 	// created and before it is decorated, optional.
 	AfterCreate ObjectFunc
+
 	// UpdateStrategy implements resource-specific behavior during updates.
 	UpdateStrategy rest.RESTUpdateStrategy
 	// AfterUpdate implements a further operation to run after a resource is
 	// updated and before it is decorated, optional.
 	AfterUpdate ObjectFunc
+
 	// DeleteStrategy implements resource-specific behavior during deletion.
 	DeleteStrategy rest.RESTDeleteStrategy
 	// AfterDelete implements a further operation to run after a resource is
@@ -306,10 +305,18 @@ func (e *Store) ListPredicate(ctx genericapirequest.Context, p storage.Selection
 }
 
 // Create inserts a new item according to the unique key from the object.
-func (e *Store) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
+func (e *Store) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
 		return nil, err
 	}
+	// at this point we have a fully formed object.  It is time to call the validators that the apiserver
+	// handling chain wants to enforce.
+	if createValidation != nil {
+		if err := createValidation(obj.DeepCopyObject()); err != nil {
+			return nil, err
+		}
+	}
+
 	name, err := e.ObjectNameFunc(obj)
 	if err != nil {
 		return nil, err
@@ -497,7 +504,7 @@ func (e *Store) deleteWithoutFinalizers(ctx genericapirequest.Context, name, key
 // Update performs an atomic update and set of the object. Returns the result of the update
 // or an error. If the registry allows create-on-update, the create flow will be executed.
 // A bool is returned along with the object and any errors, to indicate object creation.
-func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, false, err
@@ -547,10 +554,18 @@ func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.
 			if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
 				return nil, nil, err
 			}
+			// at this point we have a fully formed object.  It is time to call the validators that the apiserver
+			// handling chain wants to enforce.
+			if createValidation != nil {
+				if err := createValidation(obj.DeepCopyObject()); err != nil {
+					return nil, nil, err
+				}
+			}
 			ttl, err := e.calculateTTL(obj, 0, false)
 			if err != nil {
 				return nil, nil, err
 			}
+
 			return obj, &ttl, nil
 		}
 
@@ -584,6 +599,13 @@ func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.
 		}
 		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
 			return nil, nil, err
+		}
+		// at this point we have a fully formed object.  It is time to call the validators that the apiserver
+		// handling chain wants to enforce.
+		if updateValidation != nil {
+			if err := updateValidation(obj.DeepCopyObject(), existing.DeepCopyObject()); err != nil {
+				return nil, nil, err
+			}
 		}
 		if e.shouldDeleteDuringUpdate(ctx, key, obj, existing) {
 			deleteObj = obj
@@ -1331,7 +1353,6 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 
 	if e.Storage == nil {
 		e.Storage, e.DestroyFunc = opts.Decorator(
-			e.Copier,
 			opts.StorageConfig,
 			e.NewFunc(),
 			prefix,

@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
 	utilcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
@@ -71,7 +71,7 @@ func NewRemoteConfigSource(source *apiv1.NodeConfigSource) (RemoteConfigSource, 
 // e.g. the objects stored in the .cur and .lkg files by checkpoint/store/fsstore.go
 func DecodeRemoteConfigSource(data []byte) (RemoteConfigSource, error) {
 	// decode the remote config source
-	obj, err := runtime.Decode(api.Codecs.UniversalDecoder(), data)
+	obj, err := runtime.Decode(legacyscheme.Codecs.UniversalDecoder(), data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode, error: %v", err)
 	}
@@ -81,7 +81,7 @@ func DecodeRemoteConfigSource(data []byte) (RemoteConfigSource, error) {
 
 	// convert it to the external NodeConfigSource type, so we're consistently working with the external type outside of the on-disk representation
 	cs := &apiv1.NodeConfigSource{}
-	err = api.Scheme.Convert(obj, cs, nil)
+	err = legacyscheme.Scheme.Convert(obj, cs, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert decoded object into a v1 NodeConfigSource, error: %v", err)
 	}

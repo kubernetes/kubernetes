@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
+	"k8s.io/kubernetes/pkg/controller/certificates/cleaner"
 	"k8s.io/kubernetes/pkg/controller/certificates/signer"
 )
 
@@ -57,19 +58,21 @@ func startCSRApprovingController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}] {
 		return false, nil
 	}
-	c := ctx.ClientBuilder.ClientOrDie("certificate-controller")
 
-	approver, err := approver.NewCSRApprovingController(
-		c,
+	approver := approver.NewCSRApprovingController(
+		ctx.ClientBuilder.ClientOrDie("certificate-controller"),
 		ctx.InformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
 	)
-	if err != nil {
-		// TODO this is failing consistently in test-cmd and local-up-cluster.sh.  Fix them and make it consistent with all others which
-		// cause a crash loop
-		glog.Errorf("Failed to start certificate controller: %v", err)
-		return false, nil
-	}
 	go approver.Run(1, ctx.Stop)
 
+	return true, nil
+}
+
+func startCSRCleanerController(ctx ControllerContext) (bool, error) {
+	cleaner := cleaner.NewCSRCleanerController(
+		ctx.ClientBuilder.ClientOrDie("certificate-controller").CertificatesV1beta1().CertificateSigningRequests(),
+		ctx.InformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
+	)
+	go cleaner.Run(1, ctx.Stop)
 	return true, nil
 }

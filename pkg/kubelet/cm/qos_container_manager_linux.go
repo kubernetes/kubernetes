@@ -194,9 +194,6 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 
 	// set burstable shares based on current observe state
 	burstableCPUShares := MilliCPUToShares(burstablePodCPURequest)
-	if burstableCPUShares < uint64(MinShares) {
-		burstableCPUShares = uint64(MinShares)
-	}
 	configs[v1.PodQOSBurstable].ResourceParameters.CpuShares = &burstableCPUShares
 	return nil
 }
@@ -317,7 +314,7 @@ func (m *qosContainerManagerImpl) UpdateCgroups() error {
 		}
 	}
 	if updateSuccess {
-		glog.V(2).Infof("[ContainerManager]: Updated QoS cgroup configuration")
+		glog.V(4).Infof("[ContainerManager]: Updated QoS cgroup configuration")
 		return nil
 	}
 
@@ -334,12 +331,12 @@ func (m *qosContainerManagerImpl) UpdateCgroups() error {
 	for _, config := range qosConfigs {
 		err := m.cgroupManager.Update(config)
 		if err != nil {
-			glog.V(2).Infof("[ContainerManager]: Failed to update QoS cgroup configuration")
+			glog.Errorf("[ContainerManager]: Failed to update QoS cgroup configuration")
 			return err
 		}
 	}
 
-	glog.V(2).Infof("[ContainerManager]: Updated QoS cgroup configuration on retry")
+	glog.V(4).Infof("[ContainerManager]: Updated QoS cgroup configuration on retry")
 	return nil
 }
 

@@ -50,6 +50,7 @@ type WebhookAuthorizer struct {
 	authorizedTTL       time.Duration
 	unauthorizedTTL     time.Duration
 	initialBackoff      time.Duration
+	decisionOnError     authorizer.Decision
 }
 
 // NewFromInterface creates a WebhookAuthorizer using the given subjectAccessReview client
@@ -93,6 +94,7 @@ func newWithBackoff(subjectAccessReview authorizationclient.SubjectAccessReviewI
 		authorizedTTL:       authorizedTTL,
 		unauthorizedTTL:     unauthorizedTTL,
 		initialBackoff:      initialBackoff,
+		decisionOnError:     authorizer.DecisionNoOpinion,
 	}, nil
 }
 
@@ -140,7 +142,10 @@ func newWithBackoff(subjectAccessReview authorizationclient.SubjectAccessReviewI
 //       }
 //     }
 //
-func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bool, reason string, err error) {
+// TODO(mikedanese): We should eventually support failing closed when we
+// encounter an error. We are failing open now to preserve backwards compatible
+// behavior.
+func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
 	r := &authorization.SubjectAccessReview{}
 	if user := attr.GetUser(); user != nil {
 		r.Spec = authorization.SubjectAccessReviewSpec{
@@ -169,7 +174,7 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bo
 	}
 	key, err := json.Marshal(r.Spec)
 	if err != nil {
-		return false, "", err
+		return w.decisionOnError, "", err
 	}
 	if entry, ok := w.responseCache.Get(string(key)); ok {
 		r.Status = entry.(authorization.SubjectAccessReviewStatus)
@@ -185,7 +190,7 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bo
 		if err != nil {
 			// An error here indicates bad configuration or an outage. Log for debugging.
 			glog.Errorf("Failed to make webhook authorizer request: %v", err)
-			return false, "", err
+			return w.decisionOnError, "", err
 		}
 		r.Status = result.Status
 		if r.Status.Allowed {
@@ -194,7 +199,17 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bo
 			w.responseCache.Add(string(key), r.Status, w.unauthorizedTTL)
 		}
 	}
-	return r.Status.Allowed, r.Status.Reason, nil
+	switch {
+	case r.Status.Denied && r.Status.Allowed:
+		return authorizer.DecisionDeny, r.Status.Reason, fmt.Errorf("webhook subject access review returned both allow and deny response")
+	case r.Status.Denied:
+		return authorizer.DecisionDeny, r.Status.Reason, nil
+	case r.Status.Allowed:
+		return authorizer.DecisionAllow, r.Status.Reason, nil
+	default:
+		return authorizer.DecisionNoOpinion, r.Status.Reason, nil
+	}
+
 }
 
 //TODO: need to finish the method to get the rules when using webhook mode

@@ -47,28 +47,21 @@ import (
 func main() {
 	arguments := args.Default()
 
-	// Override defaults.
-	arguments.OutputFileBaseName = "conversion_generated"
-	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
-
 	// Custom args.
-	// TODO: make callers pass this in.  It is too opaque here, and any use of
-	// the flag that DOESN'T include these is broken.
 	customArgs := &generators.CustomArgs{
-		ExtraPeerDirs: []string{
-			"k8s.io/kubernetes/pkg/api",
-			"k8s.io/kubernetes/pkg/api/v1",
-			"k8s.io/api/core/v1",
-			"k8s.io/apimachinery/pkg/apis/meta/v1",
-			"k8s.io/apimachinery/pkg/conversion",
-			"k8s.io/apimachinery/pkg/runtime",
-		},
-		SkipUnsafe: false,
+		BasePeerDirs: generators.DefaultBasePeerDirs,
+		SkipUnsafe:   false,
 	}
+	pflag.CommandLine.StringSliceVar(&customArgs.BasePeerDirs, "base-peer-dirs", customArgs.BasePeerDirs,
+		"Comma-separated list of apimachinery import paths which are considered, after tag-specified peers, for conversions. Only change these if you have very good reasons.")
 	pflag.CommandLine.StringSliceVar(&customArgs.ExtraPeerDirs, "extra-peer-dirs", customArgs.ExtraPeerDirs,
-		"Comma-separated list of import paths which are considered, after tag-specified peers, for conversions.")
+		"Application specific comma-separated list of import paths which are considered, after tag-specified peers and base-peer-dirs, for conversions.")
 	pflag.CommandLine.BoolVar(&customArgs.SkipUnsafe, "skip-unsafe", customArgs.SkipUnsafe,
 		"If true, will not generate code using unsafe pointer conversions; resulting code may be slower.")
+
+	// Override defaults.
+	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
+	arguments.OutputFileBaseName = "conversion_generated"
 	arguments.CustomArgs = customArgs
 
 	// Run it.

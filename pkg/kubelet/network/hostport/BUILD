@@ -14,6 +14,7 @@ go_library(
         "hostport_manager.go",
         "hostport_syncer.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/network/hostport",
     deps = [
         "//pkg/proxy/iptables:go_default_library",
         "//pkg/util/iptables:go_default_library",
@@ -30,6 +31,7 @@ go_test(
         "hostport_syncer_test.go",
         "hostport_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/network/hostport",
     library = ":go_default_library",
     deps = [
         "//pkg/util/iptables:go_default_library",

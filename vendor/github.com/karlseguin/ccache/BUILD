@@ -11,6 +11,7 @@ go_library(
         "layeredcache.go",
         "secondarycache.go",
     ],
+    importpath = "github.com/karlseguin/ccache",
     visibility = ["//visibility:public"],
 )
 

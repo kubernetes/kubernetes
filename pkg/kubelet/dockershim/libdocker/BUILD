@@ -12,6 +12,7 @@ go_test(
         "helpers_test.go",
         "kube_docker_client_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker",
     library = ":go_default_library",
     deps = [
         "//vendor/github.com/docker/docker/api/types:go_default_library",
@@ -28,6 +29,7 @@ go_library(
         "instrumented_client.go",
         "kube_docker_client.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker",
     deps = [
         "//pkg/kubelet/dockershim/metrics:go_default_library",
         "//vendor/github.com/docker/distribution/reference:go_default_library",

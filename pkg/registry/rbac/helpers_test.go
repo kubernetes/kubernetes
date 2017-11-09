@@ -128,6 +128,19 @@ func TestIsOnlyMutatingGCFields(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			name: "and nil",
+			obj: func() runtime.Object {
+				obj := newPod()
+				obj.OwnerReferences = append(obj.OwnerReferences, metav1.OwnerReference{Name: "foo"})
+				obj.Spec.RestartPolicy = kapi.RestartPolicyAlways
+				return obj
+			},
+			old: func() runtime.Object {
+				return (*kapi.Pod)(nil)
+			},
+			expected: false,
+		},
 	}
 
 	for _, tc := range tests {

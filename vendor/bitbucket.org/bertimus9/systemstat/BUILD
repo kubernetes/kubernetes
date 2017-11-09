@@ -10,6 +10,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "bitbucket.org/bertimus9/systemstat",
     visibility = ["//visibility:public"],
 )
 

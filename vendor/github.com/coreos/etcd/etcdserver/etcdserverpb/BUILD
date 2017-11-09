@@ -1,5 +1,15 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+filegroup(
+    name = "go_default_library_protos",
+    srcs = [
+        "etcdserver.proto",
+        "raft_internal.proto",
+        "rpc.proto",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 go_library(
     name = "go_default_library",
     srcs = [
@@ -8,6 +18,7 @@ go_library(
         "rpc.pb.go",
         "rpc.pb.gw.go",
     ],
+    importpath = "github.com/coreos/etcd/etcdserver/etcdserverpb",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/auth/authpb:go_default_library",
@@ -20,16 +31,6 @@ go_library(
         "//vendor/google.golang.org/grpc/codes:go_default_library",
         "//vendor/google.golang.org/grpc/grpclog:go_default_library",
     ],
-)
-
-filegroup(
-    name = "go_default_library_protos",
-    srcs = [
-        "etcdserver.proto",
-        "raft_internal.proto",
-        "rpc.proto",
-    ],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(

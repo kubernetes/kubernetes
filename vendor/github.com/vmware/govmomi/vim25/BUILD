@@ -7,6 +7,7 @@ go_library(
         "doc.go",
         "retry.go",
     ],
+    importpath = "github.com/vmware/govmomi/vim25",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/vmware/govmomi/vim25/methods:go_default_library",

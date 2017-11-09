@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["client.go"],
+    importpath = "github.com/google/cadvisor/client/v2",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",

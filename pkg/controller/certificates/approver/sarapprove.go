@@ -44,7 +44,7 @@ type sarApprover struct {
 	recognizers []csrRecognizer
 }
 
-func NewCSRApprovingController(client clientset.Interface, csrInformer certificatesinformers.CertificateSigningRequestInformer) (*certificates.CertificateController, error) {
+func NewCSRApprovingController(client clientset.Interface, csrInformer certificatesinformers.CertificateSigningRequestInformer) *certificates.CertificateController {
 	approver := &sarApprover{
 		client:      client,
 		recognizers: recognizers(),
@@ -106,7 +106,7 @@ func (a *sarApprover) handle(csr *capi.CertificateSigningRequest) error {
 		}
 		if approved {
 			appendApprovalCondition(csr, r.successMessage)
-			_, err = a.client.Certificates().CertificateSigningRequests().UpdateApproval(csr)
+			_, err = a.client.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(csr)
 			if err != nil {
 				return fmt.Errorf("error updating approval for csr: %v", err)
 			}

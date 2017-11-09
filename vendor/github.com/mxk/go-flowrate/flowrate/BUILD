@@ -7,6 +7,7 @@ go_library(
         "io.go",
         "util.go",
     ],
+    importpath = "github.com/mxk/go-flowrate/flowrate",
     visibility = ["//visibility:public"],
 )
 

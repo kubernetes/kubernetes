@@ -8,18 +8,21 @@ load(
 
 go_binary(
     name = "genman",
+    importpath = "k8s.io/kubernetes/cmd/genman",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["gen_kube_man.go"],
+    importpath = "k8s.io/kubernetes/cmd/genman",
     deps = [
         "//cmd/cloud-controller-manager/app:go_default_library",
         "//cmd/genutils:go_default_library",
         "//cmd/kube-apiserver/app:go_default_library",
         "//cmd/kube-controller-manager/app:go_default_library",
         "//cmd/kube-proxy/app:go_default_library",
+        "//cmd/kubeadm/app/cmd:go_default_library",
         "//cmd/kubelet/app:go_default_library",
         "//pkg/kubectl/cmd:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",

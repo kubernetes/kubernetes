@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["storage_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/core/pod/storage",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
@@ -42,6 +43,7 @@ go_library(
         "eviction.go",
         "storage.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/registry/core/pod/storage",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/pod:go_default_library",
@@ -58,6 +60,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",

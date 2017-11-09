@@ -10,6 +10,7 @@ go_library(
         "response_writer.go",
         "static.go",
     ],
+    importpath = "github.com/codegangsta/negroni",
     visibility = ["//visibility:public"],
 )
 

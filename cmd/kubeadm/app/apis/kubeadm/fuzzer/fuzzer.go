@@ -17,8 +17,11 @@ limitations under the License.
 package fuzzer
 
 import (
+	"time"
+
 	"github.com/google/gofuzz"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
@@ -30,6 +33,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			c.FuzzNoCustom(obj)
 			obj.KubernetesVersion = "v10"
 			obj.API.BindPort = 20
+			obj.TokenTTL = &metav1.Duration{Duration: 1 * time.Hour}
 			obj.API.AdvertiseAddress = "foo"
 			obj.Networking.ServiceSubnet = "foo"
 			obj.Networking.DNSDomain = "foo"
@@ -43,6 +47,12 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.CIImageRepository = ""
 			obj.UnifiedControlPlaneImage = "foo"
 			obj.FeatureGates = map[string]bool{}
+			obj.Etcd.SelfHosted = &kubeadm.SelfHostedEtcd{
+				CertificatesDir:    "/etc/kubernetes/pki/etcd",
+				ClusterServiceName: "etcd-cluster",
+				EtcdVersion:        "v0.1.0",
+				OperatorVersion:    "v0.1.0",
+			}
 		},
 		func(obj *kubeadm.NodeConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)

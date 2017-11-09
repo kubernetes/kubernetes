@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "endian.go",
     ],
+    importpath = "github.com/coreos/etcd/pkg/cpuutil",
     visibility = ["//visibility:public"],
 )
 

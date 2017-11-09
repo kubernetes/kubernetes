@@ -16,6 +16,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/onsi/ginkgo/ginkgo/interrupthandler",
     visibility = ["//visibility:public"],
 )
 

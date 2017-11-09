@@ -299,11 +299,11 @@ type configMapsToAttach struct {
 	volumes                []string
 }
 
-func podWithConfigMaps(ns, name string, toAttach configMapsToAttach) *v1.Pod {
+func podWithConfigMaps(ns, podName string, toAttach configMapsToAttach) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
-			Name:      name,
+			Name:      podName,
 		},
 		Spec: v1.PodSpec{},
 	}
@@ -454,6 +454,17 @@ func TestCacheRefcounts(t *testing.T) {
 	manager.RegisterPod(podWithConfigMaps("ns1", "other-name", s2))
 	manager.UnregisterPod(podWithConfigMaps("ns1", "other-name", s2))
 
+	s5 := configMapsToAttach{
+		containerEnvConfigMaps: []envConfigMaps{
+			{envVarNames: []string{"s7"}},
+			{envFromNames: []string{"s70"}},
+		},
+	}
+
+	// Check the no-op update scenario
+	manager.RegisterPod(podWithConfigMaps("ns1", "noop-pod", s5))
+	manager.RegisterPod(podWithConfigMaps("ns1", "noop-pod", s5))
+
 	refs := func(ns, name string) int {
 		store.lock.Lock()
 		defer store.lock.Unlock()
@@ -463,17 +474,18 @@ func TestCacheRefcounts(t *testing.T) {
 		}
 		return item.refCount
 	}
-	assert.Equal(t, refs("ns1", "s1"), 1)
-	assert.Equal(t, refs("ns1", "s10"), 1)
-	assert.Equal(t, refs("ns1", "s2"), 1)
-	assert.Equal(t, refs("ns1", "s3"), 3)
-	assert.Equal(t, refs("ns1", "s30"), 2)
-	assert.Equal(t, refs("ns1", "s4"), 2)
-	assert.Equal(t, refs("ns1", "s5"), 4)
-	assert.Equal(t, refs("ns1", "s50"), 2)
-	assert.Equal(t, refs("ns1", "s6"), 0)
-	assert.Equal(t, refs("ns1", "s60"), 0)
-	assert.Equal(t, refs("ns1", "s7"), 0)
+	assert.Equal(t, 1, refs("ns1", "s1"))
+	assert.Equal(t, 1, refs("ns1", "s10"))
+	assert.Equal(t, 1, refs("ns1", "s2"))
+	assert.Equal(t, 3, refs("ns1", "s3"))
+	assert.Equal(t, 2, refs("ns1", "s30"))
+	assert.Equal(t, 2, refs("ns1", "s4"))
+	assert.Equal(t, 4, refs("ns1", "s5"))
+	assert.Equal(t, 2, refs("ns1", "s50"))
+	assert.Equal(t, 0, refs("ns1", "s6"))
+	assert.Equal(t, 0, refs("ns1", "s60"))
+	assert.Equal(t, 1, refs("ns1", "s7"))
+	assert.Equal(t, 1, refs("ns1", "s70"))
 }
 
 func TestCachingConfigMapManager(t *testing.T) {

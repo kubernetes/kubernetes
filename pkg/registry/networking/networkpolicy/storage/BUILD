@@ -9,8 +9,8 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["storage.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/networking/networkpolicy/storage",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/networking:go_default_library",
         "//pkg/registry/networking/networkpolicy:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -36,6 +36,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["storage_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/networking/networkpolicy/storage",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

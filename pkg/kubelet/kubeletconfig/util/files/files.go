@@ -63,39 +63,53 @@ func EnsureFile(fs utilfs.Filesystem, path string) error {
 	return file.Close()
 }
 
-// ReplaceFile replaces the contents of the file at `path` with `data` by writing to a tmp file in the same
-// dir as `path` and renaming the tmp file over `path`. The file does not have to exist to use ReplaceFile.
-func ReplaceFile(fs utilfs.Filesystem, path string, data []byte) error {
+// WriteTmpFile creates a temporary file at `path`, writes `data` into it, and fsyncs the file
+func WriteTmpFile(fs utilfs.Filesystem, path string, data []byte) (tmpPath string, retErr error) {
 	dir := filepath.Dir(path)
 	prefix := filepath.Base(path)
 
 	// create the tmp file
 	tmpFile, err := fs.TempFile(dir, prefix)
 	if err != nil {
-		return err
+		return "", err
 	}
+	defer func() {
+		// close the file, return the close error only if there haven't been any other errors
+		if err := tmpFile.Close(); retErr == nil {
+			retErr = err
+		}
+		// if there was an error writing, syncing, or closing, delete the temporary file and return the error
+		if retErr != nil {
+			if err := fs.Remove(tmpPath); err != nil {
+				retErr = fmt.Errorf("attempted to remove temporary file %q after error %v, but failed due to error: %v", path, retErr, err)
+			}
+			tmpPath = ""
+		}
+	}()
 
 	// Name() will be an absolute path when using utilfs.DefaultFS, because ioutil.TempFile passes
 	// an absolute path to os.Open, and we ensure similar behavior in utilfs.FakeFS for testing.
-	tmpPath := tmpFile.Name()
+	tmpPath = tmpFile.Name()
 
 	// write data
 	if _, err := tmpFile.Write(data); err != nil {
-		return err
+		return tmpPath, err
 	}
 	// sync file, to ensure it's written in case a hard reset happens
-	if err := tmpFile.Sync(); err != nil {
-		return err
-	}
-	if err := tmpFile.Close(); err != nil {
-		return err
-	}
+	return tmpPath, tmpFile.Sync()
+}
 
-	// rename over existing file
-	if err := fs.Rename(tmpPath, path); err != nil {
+// ReplaceFile replaces the contents of the file at `path` with `data` by writing to a tmp file in the same
+// dir as `path` and renaming the tmp file over `path`. The file does not have to exist to use ReplaceFile.
+// Note ReplaceFile calls fsync.
+func ReplaceFile(fs utilfs.Filesystem, path string, data []byte) error {
+	// write data to a temporary file
+	tmpPath, err := WriteTmpFile(fs, path, data)
+	if err != nil {
 		return err
 	}
-	return nil
+	// rename over existing file
+	return fs.Rename(tmpPath, path)
 }
 
 // DirExists returns true if a directory exists at `path`, false if `path` does not exist, otherwise an error
@@ -121,8 +135,5 @@ func EnsureDir(fs utilfs.Filesystem, path string) error {
 	} // Assert: dir does not exist
 
 	// create the dir
-	if err := fs.MkdirAll(path, defaultPerm); err != nil {
-		return err
-	}
-	return nil
+	return fs.MkdirAll(path, defaultPerm)
 }

@@ -1,23 +1,23 @@
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "27a13726ff8621cfa4592fbef116b253043c2b093c8814265dc4489a0e67d229",
-    strip_prefix = "rules_go-82483596ec203eb9c1849937636f4cbed83733eb",
-    urls = ["https://github.com/bazelbuild/rules_go/archive/82483596ec203eb9c1849937636f4cbed83733eb.tar.gz"],
+    sha256 = "441e560e947d8011f064bd7348d86940d6b6131ae7d7c4425a538e8d9f884274",
+    strip_prefix = "rules_go-c72631a220406c4fae276861ee286aaec82c5af2",
+    urls = ["https://github.com/bazelbuild/rules_go/archive/c72631a220406c4fae276861ee286aaec82c5af2.tar.gz"],
 )
 
 http_archive(
     name = "io_kubernetes_build",
-    sha256 = "ca8fa1ee0928220d77fcaa6bcf40a26c57800c024e21b08c8dd9cc8fbf910236",
-    strip_prefix = "repo-infra-0aafaab9e158d3628804242c6a9c4dd3eb8bce1f",
-    urls = ["https://github.com/kubernetes/repo-infra/archive/0aafaab9e158d3628804242c6a9c4dd3eb8bce1f.tar.gz"],
+    sha256 = "8e49ac066fbaadd475bd63762caa90f81cd1880eba4cc25faa93355ef5fa2739",
+    strip_prefix = "repo-infra-e26fc85d14a1d3dc25569831acc06919673c545a",
+    urls = ["https://github.com/kubernetes/repo-infra/archive/e26fc85d14a1d3dc25569831acc06919673c545a.tar.gz"],
 )
 
-ETCD_VERSION = "3.0.17"
+ETCD_VERSION = "3.1.10"
 
 new_http_archive(
     name = "com_coreos_etcd",
     build_file = "third_party/etcd.BUILD",
-    sha256 = "274c46a7f8d26f7ae99d6880610f54933cbcf7f3beafa19236c52eb5df8c7a0b",
+    sha256 = "2d335f298619c6fb02b1124773a56966e448ad9952b26fea52909da4fe80d2be",
     strip_prefix = "etcd-v%s-linux-amd64" % ETCD_VERSION,
     urls = ["https://github.com/coreos/etcd/releases/download/v%s/etcd-v%s-linux-amd64.tar.gz" % (ETCD_VERSION, ETCD_VERSION)],
 )
@@ -34,24 +34,30 @@ http_archive(
 
 http_archive(
     name = "io_bazel_rules_docker",
-    sha256 = "40d780165c0b9fbb3ddca858df7347381af0e87e430c74863e4ce9d6f6441023",
-    strip_prefix = "rules_docker-8359263f35227a3634ea023ff4ae163189eb4b26",
-    urls = ["https://github.com/bazelbuild/rules_docker/archive/8359263f35227a3634ea023ff4ae163189eb4b26.tar.gz"],
+    sha256 = "c440717ee9b1b2f4a1e9bf5622539feb5aef9db83fc1fa1517818f13c041b0be",
+    strip_prefix = "rules_docker-8bbe2a8abd382641e65ff7127a3700a8530f02ce",
+    urls = ["https://github.com/bazelbuild/rules_docker/archive/8bbe2a8abd382641e65ff7127a3700a8530f02ce.tar.gz"],
 )
 
-load("@io_bazel_rules_go//go:def.bzl", "go_repositories")
+load("@io_kubernetes_build//defs:bazel_version.bzl", "check_version")
+
+check_version("0.6.0")
+
+load("@io_bazel_rules_go//go:def.bzl", "go_rules_dependencies", "go_register_toolchains")
 load("@io_bazel_rules_docker//docker:docker.bzl", "docker_repositories", "docker_pull")
 
-go_repositories(
-    go_version = "1.8.3",
+go_rules_dependencies()
+
+go_register_toolchains(
+    go_version = "1.9.1",
 )
 
 docker_repositories()
 
 http_file(
     name = "kubernetes_cni",
-    sha256 = "05ab3937bc68562e989dc143362ec4d4275262ba9f359338aed720fc914457a5",
-    url = "https://storage.googleapis.com/kubernetes-release/network-plugins/cni-amd64-0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff.tar.gz",
+    sha256 = "f04339a21b8edf76d415e7f17b620e63b8f37a76b2f706671587ab6464411f2d",
+    url = "https://storage.googleapis.com/kubernetes-release/network-plugins/cni-plugins-amd64-v0.6.0.tgz",
 )
 
 docker_pull(
@@ -60,6 +66,14 @@ docker_pull(
     registry = "gcr.io",
     repository = "google-containers/debian-iptables-amd64",
     tag = "v8",  # ignored, but kept here for documentation
+)
+
+docker_pull(
+    name = "debian-hyperkube-base-amd64",
+    digest = "sha256:10546d592e58d5fdb2e25d79f291b8ac62c8d3a3d83337ad7309cca766dbebce",
+    registry = "gcr.io",
+    repository = "google-containers/debian-hyperkube-base-amd64",
+    tag = "0.6",  # ignored, but kept here for documentation
 )
 
 docker_pull(

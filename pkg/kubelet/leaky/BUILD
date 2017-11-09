@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["leaky.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/leaky",
 )
 
 filegroup(

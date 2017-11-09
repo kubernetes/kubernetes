@@ -8,12 +8,14 @@ load(
 
 go_binary(
     name = "nonewprivs",
+    importpath = "k8s.io/kubernetes/test/images/nonewprivs",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["nnp.go"],
+    importpath = "k8s.io/kubernetes/test/images/nonewprivs",
 )
 
 filegroup(

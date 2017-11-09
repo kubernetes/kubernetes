@@ -11,6 +11,7 @@ go_library(
         "well_known_annotations.go",
         "well_known_labels.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/apis",
 )
 
 filegroup(
@@ -25,7 +26,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/kubelet/apis/cri:all-srcs",
-        "//pkg/kubelet/apis/deviceplugin/v1alpha1:all-srcs",
+        "//pkg/kubelet/apis/deviceplugin/v1alpha:all-srcs",
         "//pkg/kubelet/apis/kubeletconfig:all-srcs",
         "//pkg/kubelet/apis/stats/v1alpha1:all-srcs",
     ],

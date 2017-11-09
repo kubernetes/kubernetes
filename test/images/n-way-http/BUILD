@@ -8,12 +8,14 @@ load(
 
 go_binary(
     name = "n-way-http",
+    importpath = "k8s.io/kubernetes/test/images/n-way-http",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["server.go"],
+    importpath = "k8s.io/kubernetes/test/images/n-way-http",
 )
 
 filegroup(

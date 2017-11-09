@@ -65,7 +65,7 @@ func main() {
 
 	// TODO(mtaufen): won't need this this once dynamic config is GA
 	// set feature gates so we can check if dynamic config is enabled
-	if err := utilfeature.DefaultFeatureGate.Set(defaultConfig.FeatureGates); err != nil {
+	if err := utilfeature.DefaultFeatureGate.SetFromMap(defaultConfig.FeatureGates); err != nil {
 		die(err)
 	}
 	// validate the initial KubeletFlags, to make sure the dynamic-config-related flags aren't used unless the feature gate is on
@@ -97,7 +97,7 @@ func main() {
 
 	// start the experimental docker shim, if enabled
 	if kubeletFlags.ExperimentalDockershim {
-		if err := app.RunDockershim(kubeletConfig, &kubeletFlags.ContainerRuntimeOptions); err != nil {
+		if err := app.RunDockershim(kubeletFlags, kubeletConfig); err != nil {
 			die(err)
 		}
 	}

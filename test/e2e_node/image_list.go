@@ -56,6 +56,7 @@ var NodeImageWhiteList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Netexec),
 	imageutils.GetE2EImage(imageutils.Nonewprivs),
 	framework.GetPauseImageNameForHostArch(),
+	framework.GetGPUDevicePluginImage(),
 )
 
 func init() {
@@ -92,8 +93,11 @@ func (rp *remotePuller) Name() string {
 }
 
 func (rp *remotePuller) Pull(image string) ([]byte, error) {
-	// TODO(runcom): should we check if the image is already pulled with ImageStatus?
-	_, err := rp.imageService.PullImage(&runtimeapi.ImageSpec{Image: image}, nil)
+	imageStatus, err := rp.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: image})
+	if err == nil && imageStatus != nil {
+		return nil, nil
+	}
+	_, err = rp.imageService.PullImage(&runtimeapi.ImageSpec{Image: image}, nil)
 	return nil, err
 }
 

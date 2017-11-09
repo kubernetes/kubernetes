@@ -369,6 +369,7 @@ func Convert_authorization_SubjectAccessReviewSpec_To_v1_SubjectAccessReviewSpec
 
 func autoConvert_v1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewStatus(in *v1.SubjectAccessReviewStatus, out *authorization.SubjectAccessReviewStatus, s conversion.Scope) error {
 	out.Allowed = in.Allowed
+	out.Denied = in.Denied
 	out.Reason = in.Reason
 	out.EvaluationError = in.EvaluationError
 	return nil
@@ -381,6 +382,7 @@ func Convert_v1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewSt
 
 func autoConvert_authorization_SubjectAccessReviewStatus_To_v1_SubjectAccessReviewStatus(in *authorization.SubjectAccessReviewStatus, out *v1.SubjectAccessReviewStatus, s conversion.Scope) error {
 	out.Allowed = in.Allowed
+	out.Denied = in.Denied
 	out.Reason = in.Reason
 	out.EvaluationError = in.EvaluationError
 	return nil

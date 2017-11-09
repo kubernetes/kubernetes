@@ -16,6 +16,7 @@ go_library(
         "resize_nodes.go",
         "restart.go",
     ],
+    importpath = "k8s.io/kubernetes/test/e2e/lifecycle",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/kubelet/pod:go_default_library",

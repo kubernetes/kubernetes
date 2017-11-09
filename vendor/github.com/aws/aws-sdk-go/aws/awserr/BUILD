@@ -6,6 +6,7 @@ go_library(
         "error.go",
         "types.go",
     ],
+    importpath = "github.com/aws/aws-sdk-go/aws/awserr",
     visibility = ["//visibility:public"],
 )
 

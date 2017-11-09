@@ -131,7 +131,7 @@ const (
 	DefaultTokenDuration = 24 * time.Hour
 
 	// LabelNodeRoleMaster specifies that a node is a master
-	// It's copied over to kubeadm until it's merged in core: https://github.com/kubernetes/kubernetes/pull/39112
+	// This is a duplicate definition of the constant in pkg/controller/service/service_controller.go
 	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
 
 	// MasterConfigurationConfigMap specifies in what ConfigMap in the kube-system namespace the `kubeadm init` configuration should be stored
@@ -144,7 +144,7 @@ const (
 	MinExternalEtcdVersion = "3.0.14"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.0.17"
+	DefaultEtcdVersion = "3.1.10"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -166,14 +166,16 @@ const (
 	// KubeConfigVolumeName specifies the name for the Volume that is used for injecting the kubeconfig to talk securely to the api server for a control plane component if applicable
 	KubeConfigVolumeName = "kubeconfig"
 
-	// V17NodeBootstrapTokenAuthGroup specifies which group a Node Bootstrap Token should be authenticated in, in v1.7
-	V17NodeBootstrapTokenAuthGroup = "system:bootstrappers"
-
-	// V18NodeBootstrapTokenAuthGroup specifies which group a Node Bootstrap Token should be authenticated in, in v1.8
-	V18NodeBootstrapTokenAuthGroup = "system:bootstrappers:kubeadm:default-node-token"
+	// NodeBootstrapTokenAuthGroup specifies which group a Node Bootstrap Token should be authenticated in
+	NodeBootstrapTokenAuthGroup = "system:bootstrappers:kubeadm:default-node-token"
 
 	// DefaultCIImageRepository points to image registry where CI uploads images from ci-cross build job
 	DefaultCIImageRepository = "gcr.io/kubernetes-ci-images"
+
+	// CoreDNS defines a variable used internally when referring to the CoreDNS addon for a cluster
+	CoreDNS = "CoreDNS"
+	// KubeDNS defines a variable used internally when referring to the kube-dns addon for a cluster
+	KubeDNS = "kube-dns"
 )
 
 var (
@@ -202,15 +204,10 @@ var (
 	MasterComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
-	MinimumControlPlaneVersion = version.MustParseSemantic("v1.7.0")
+	MinimumControlPlaneVersion = version.MustParseSemantic("v1.8.0")
 
-	// MinimumCSRAutoApprovalClusterRolesVersion defines whether kubeadm can rely on the built-in CSR approval ClusterRole or not (note, the binding is always created by kubeadm!)
-	// TODO: Remove this when the v1.9 cycle starts and we bump the minimum supported version to v1.8.0
-	MinimumCSRAutoApprovalClusterRolesVersion = version.MustParseSemantic("v1.8.0-alpha.3")
-
-	// UseEnableBootstrapTokenAuthFlagVersion defines the first version where the API server supports the --enable-bootstrap-token-auth flag instead of the old and deprecated flag.
-	// TODO: Remove this when the v1.9 cycle starts and we bump the minimum supported version to v1.8.0
-	UseEnableBootstrapTokenAuthFlagVersion = version.MustParseSemantic("v1.8.0-beta.0")
+	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
+	MinimumKubeletVersion = version.MustParseSemantic("v1.8.0")
 )
 
 // GetStaticPodDirectory returns the location on the disk where the Static Pod should be present
@@ -245,12 +242,4 @@ func CreateTempDirForKubeadm(dirName string) (string, error) {
 		return "", fmt.Errorf("couldn't create a temporary directory: %v", err)
 	}
 	return tempDir, nil
-}
-
-// GetNodeBootstrapTokenAuthGroup gets the bootstrap token auth group conditionally based on version
-func GetNodeBootstrapTokenAuthGroup(k8sVersion *version.Version) string {
-	if k8sVersion.AtLeast(UseEnableBootstrapTokenAuthFlagVersion) {
-		return V18NodeBootstrapTokenAuthGroup
-	}
-	return V17NodeBootstrapTokenAuthGroup
 }

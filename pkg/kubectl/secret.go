@@ -23,9 +23,10 @@ import (
 	"path"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubectl/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/hash"
 )
 
@@ -128,11 +129,11 @@ func (s SecretGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	if err := s.validate(); err != nil {
 		return nil, err
 	}
-	secret := &api.Secret{}
+	secret := &v1.Secret{}
 	secret.Name = s.Name
 	secret.Data = map[string][]byte{}
 	if len(s.Type) > 0 {
-		secret.Type = api.SecretType(s.Type)
+		secret.Type = v1.SecretType(s.Type)
 	}
 	if len(s.FileSources) > 0 {
 		if err := handleFromFileSources(secret, s.FileSources); err != nil {
@@ -171,9 +172,9 @@ func (s SecretGeneratorV1) validate() error {
 }
 
 // handleFromLiteralSources adds the specified literal source information into the provided secret
-func handleFromLiteralSources(secret *api.Secret, literalSources []string) error {
+func handleFromLiteralSources(secret *v1.Secret, literalSources []string) error {
 	for _, literalSource := range literalSources {
-		keyName, value, err := parseLiteralSource(literalSource)
+		keyName, value, err := util.ParseLiteralSource(literalSource)
 		if err != nil {
 			return err
 		}
@@ -185,9 +186,9 @@ func handleFromLiteralSources(secret *api.Secret, literalSources []string) error
 }
 
 // handleFromFileSources adds the specified file source information into the provided secret
-func handleFromFileSources(secret *api.Secret, fileSources []string) error {
+func handleFromFileSources(secret *v1.Secret, fileSources []string) error {
 	for _, fileSource := range fileSources {
-		keyName, filePath, err := parseFileSource(fileSource)
+		keyName, filePath, err := util.ParseFileSource(fileSource)
 		if err != nil {
 			return err
 		}
@@ -229,7 +230,7 @@ func handleFromFileSources(secret *api.Secret, fileSources []string) error {
 
 // handleFromEnvFileSource adds the specified env file source information
 // into the provided secret
-func handleFromEnvFileSource(secret *api.Secret, envFileSource string) error {
+func handleFromEnvFileSource(secret *v1.Secret, envFileSource string) error {
 	info, err := os.Stat(envFileSource)
 	if err != nil {
 		switch err := err.(type) {
@@ -248,7 +249,7 @@ func handleFromEnvFileSource(secret *api.Secret, envFileSource string) error {
 	})
 }
 
-func addKeyFromFileToSecret(secret *api.Secret, keyName, filePath string) error {
+func addKeyFromFileToSecret(secret *v1.Secret, keyName, filePath string) error {
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return err
@@ -256,7 +257,7 @@ func addKeyFromFileToSecret(secret *api.Secret, keyName, filePath string) error 
 	return addKeyFromLiteralToSecret(secret, keyName, data)
 }
 
-func addKeyFromLiteralToSecret(secret *api.Secret, keyName string, data []byte) error {
+func addKeyFromLiteralToSecret(secret *v1.Secret, keyName string, data []byte) error {
 	if errs := validation.IsConfigMapKey(keyName); len(errs) != 0 {
 		return fmt.Errorf("%q is not a valid key name for a Secret: %s", keyName, strings.Join(errs, ";"))
 	}

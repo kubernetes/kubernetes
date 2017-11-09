@@ -3,6 +3,7 @@ package(default_visibility = ["//visibility:public"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
@@ -13,6 +14,7 @@ go_library(
         "customresource_discovery_controller.go",
         "customresource_handler.go",
     ],
+    importpath = "k8s.io/apiextensions-apiserver/pkg/apiserver",
     deps = [
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/go-openapi/strfmt:go_default_library",
@@ -32,6 +34,7 @@ go_library(
         "//vendor/k8s.io/apiextensions-apiserver/pkg/controller/status:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/registry/customresource:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
@@ -77,4 +80,12 @@ filegroup(
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/validation:all-srcs",
     ],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["customresource_handler_test.go"],
+    importpath = "k8s.io/apiextensions-apiserver/pkg/apiserver",
+    library = ":go_default_library",
+    deps = ["//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library"],
 )

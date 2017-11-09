@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["proxy_server_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/proxy",
     library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/util/proxy:go_default_library",
@@ -19,6 +20,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["proxy_server.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/proxy",
     deps = [
         "//pkg/kubectl/util:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

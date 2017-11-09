@@ -12,6 +12,7 @@ go_library(
         "mirror_client.go",
         "pod_manager.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/pod",
     deps = [
         "//pkg/kubelet/configmap:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -32,6 +33,7 @@ go_test(
         "mirror_client_test.go",
         "pod_manager_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/pod",
     library = ":go_default_library",
     deps = [
         "//pkg/kubelet/configmap:go_default_library",

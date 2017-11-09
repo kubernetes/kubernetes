@@ -12,6 +12,7 @@ go_library(
         "fake_networking_client.go",
         "fake_networkpolicy.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/networking/internalversion/fake",
     deps = [
         "//pkg/apis/networking:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/networking/internalversion:go_default_library",

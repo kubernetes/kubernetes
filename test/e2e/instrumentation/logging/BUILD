@@ -11,12 +11,12 @@ go_library(
         "generic_soak.go",
         "imports.go",
     ],
+    importpath = "k8s.io/kubernetes/test/e2e/instrumentation/logging",
     deps = [
         "//test/e2e/framework:go_default_library",
         "//test/e2e/instrumentation/common:go_default_library",
         "//test/e2e/instrumentation/logging/elasticsearch:go_default_library",
         "//test/e2e/instrumentation/logging/stackdrvier:go_default_library",
-        "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

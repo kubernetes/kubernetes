@@ -22,7 +22,6 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 )
 
@@ -44,28 +43,14 @@ func (kl *Kubelet) defaultPodLimitsForDownwardAPI(pod *v1.Pod, container *v1.Con
 	}
 	allocatable := node.Status.Allocatable
 	glog.Infof("allocatable: %v", allocatable)
-	podCopy, err := scheme.Scheme.Copy(pod)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to perform a deep copy of pod object: %v", err)
-	}
-	outputPod, ok := podCopy.(*v1.Pod)
-	if !ok {
-		return nil, nil, fmt.Errorf("unexpected type returned from deep copy of pod object")
-	}
+	outputPod := pod.DeepCopy()
 	for idx := range outputPod.Spec.Containers {
 		resource.MergeContainerResourceLimits(&outputPod.Spec.Containers[idx], allocatable)
 	}
 
 	var outputContainer *v1.Container
 	if container != nil {
-		containerCopy, err := scheme.Scheme.DeepCopy(container)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to perform a deep copy of container object: %v", err)
-		}
-		outputContainer, ok = containerCopy.(*v1.Container)
-		if !ok {
-			return nil, nil, fmt.Errorf("unexpected type returned from deep copy of container object")
-		}
+		outputContainer = container.DeepCopy()
 		resource.MergeContainerResourceLimits(outputContainer, allocatable)
 	}
 	return outputPod, outputContainer, nil

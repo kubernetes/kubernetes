@@ -9,16 +9,13 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "configmap.go",
         "doc.go",
         "persistent_volume_claims.go",
         "pods.go",
         "registry.go",
-        "replication_controllers.go",
-        "resource_quotas.go",
-        "secrets.go",
         "services.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/quota/evaluator/core",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/helper:go_default_library",
@@ -31,7 +28,6 @@ go_library(
         "//pkg/quota/generic:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
@@ -42,8 +38,6 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/features:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
-        "//vendor/k8s.io/client-go/informers:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
     ],
 )
 
@@ -54,15 +48,17 @@ go_test(
         "pods_test.go",
         "services_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/quota/evaluator/core",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/quota:go_default_library",
+        "//pkg/quota/generic:go_default_library",
         "//pkg/util/node:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
     ],
 )
 

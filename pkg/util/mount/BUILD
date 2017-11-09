@@ -25,12 +25,14 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/util/mount",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "//pkg/util/io:go_default_library",
+            "//pkg/util/nsenter:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
             "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         ],
@@ -52,6 +54,7 @@ go_test(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/util/mount",
     library = ":go_default_library",
     deps = ["//vendor/k8s.io/utils/exec/testing:go_default_library"],
 )

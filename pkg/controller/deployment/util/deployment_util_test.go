@@ -32,9 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -88,7 +88,7 @@ func addUpdatePodsReactor(fakeClient *fake.Clientset) *fake.Clientset {
 func generateRSWithLabel(labels map[string]string, image string) extensions.ReplicaSet {
 	return extensions.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   apiv1.SimpleNameGenerator.GenerateName("replicaset"),
+			Name:   names.SimpleNameGenerator.GenerateName("replicaset"),
 			Labels: labels,
 		},
 		Spec: extensions.ReplicaSetSpec{
@@ -130,7 +130,7 @@ func generateRS(deployment extensions.Deployment) extensions.ReplicaSet {
 	return extensions.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             randomUID(),
-			Name:            apiv1.SimpleNameGenerator.GenerateName("replicaset"),
+			Name:            names.SimpleNameGenerator.GenerateName("replicaset"),
 			Labels:          template.Labels,
 			OwnerReferences: []metav1.OwnerReference{*newDControllerRef(&deployment)},
 		},
@@ -396,11 +396,7 @@ func TestEqualIgnoreHash(t *testing.T) {
 					reverseString = " (reverse order)"
 				}
 				// Run
-				equal, err := EqualIgnoreHash(t1, t2)
-				if err != nil {
-					t.Errorf("%s: unexpected error: %v", err, test.Name)
-					return
-				}
+				equal := EqualIgnoreHash(t1, t2)
 				if equal != test.expected {
 					t.Errorf("%q%s: expected %v", test.Name, reverseString, test.expected)
 					return
@@ -463,8 +459,8 @@ func TestFindNewReplicaSet(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			if rs, err := FindNewReplicaSet(&test.deployment, test.rsList); !reflect.DeepEqual(rs, test.expected) || err != nil {
-				t.Errorf("In test case %q, expected %#v, got %#v: %v", test.Name, test.expected, rs, err)
+			if rs := FindNewReplicaSet(&test.deployment, test.rsList); !reflect.DeepEqual(rs, test.expected) {
+				t.Errorf("In test case %q, expected %#v, got %#v", test.Name, test.expected, rs)
 			}
 		})
 	}
@@ -531,15 +527,15 @@ func TestFindOldReplicaSets(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			requireRS, allRS, err := FindOldReplicaSets(&test.deployment, test.rsList)
+			requireRS, allRS := FindOldReplicaSets(&test.deployment, test.rsList)
 			sort.Sort(controller.ReplicaSetsByCreationTimestamp(allRS))
 			sort.Sort(controller.ReplicaSetsByCreationTimestamp(test.expected))
-			if !reflect.DeepEqual(allRS, test.expected) || err != nil {
-				t.Errorf("In test case %q, expected %#v, got %#v: %v", test.Name, test.expected, allRS, err)
+			if !reflect.DeepEqual(allRS, test.expected) {
+				t.Errorf("In test case %q, expected %#v, got %#v", test.Name, test.expected, allRS)
 			}
 			// RSs are getting filtered correctly by rs.spec.replicas
-			if !reflect.DeepEqual(requireRS, test.expectedRequire) || err != nil {
-				t.Errorf("In test case %q, expected %#v, got %#v: %v", test.Name, test.expectedRequire, requireRS, err)
+			if !reflect.DeepEqual(requireRS, test.expectedRequire) {
+				t.Errorf("In test case %q, expected %#v, got %#v", test.Name, test.expectedRequire, requireRS)
 			}
 		})
 	}

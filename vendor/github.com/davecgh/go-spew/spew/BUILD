@@ -11,6 +11,7 @@ go_library(
         "format.go",
         "spew.go",
     ],
+    importpath = "github.com/davecgh/go-spew/spew",
     visibility = ["//visibility:public"],
 )
 

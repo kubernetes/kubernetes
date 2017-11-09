@@ -8,6 +8,7 @@ go_library(
         "duration.go",
         "timestamp.go",
     ],
+    importpath = "github.com/golang/protobuf/ptypes",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
@@ -30,6 +31,7 @@ filegroup(
         ":package-srcs",
         "//vendor/github.com/golang/protobuf/ptypes/any:all-srcs",
         "//vendor/github.com/golang/protobuf/ptypes/duration:all-srcs",
+        "//vendor/github.com/golang/protobuf/ptypes/struct:all-srcs",
         "//vendor/github.com/golang/protobuf/ptypes/timestamp:all-srcs",
     ],
     tags = ["automanaged"],

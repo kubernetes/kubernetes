@@ -291,7 +291,6 @@ else
 test-cmd: generated_files
 	hack/make-rules/test-kubeadm-cmd.sh
 	hack/make-rules/test-cmd.sh
-	hack/make-rules/test-federation-cmd.sh
 endif
 
 define CLEAN_HELP_INFO
@@ -309,7 +308,7 @@ clean:
 else
 clean: clean_meta
 	build/make-clean.sh
-	git clean -Xdf
+	hack/make-rules/clean.sh
 endif
 
 define CLEAN_META_HELP_INFO
@@ -366,17 +365,23 @@ endif
 
 define RELEASE_HELP_INFO
 # Build a release
+# Use the 'release-in-a-container' target to build the release when already in
+# a container vs. creating a new container to build in using the 'release'
+# target.  Useful for running in GCB.
 #
 # Example:
 #   make release
+#   make release-in-a-container
 endef
-.PHONY: release
+.PHONY: release release-in-a-container
 ifeq ($(PRINT_HELP),y)
-release:
+release release-in-a-container:
 	@echo "$$RELEASE_HELP_INFO"
 else
 release:
 	build/release.sh
+release-in-a-container:
+	build/release-in-a-container.sh
 endif
 
 define RELEASE_SKIP_TESTS_HELP_INFO
@@ -401,19 +406,47 @@ release-skip-tests quick-release:
 	build/release.sh
 endif
 
+define PACKAGE_HELP_INFO
+# Package tarballs
+# Use the 'package-tarballs' target to run the final packaging steps of
+# a release.
+#
+# Example:
+#   make package-tarballs
+endef
+.PHONY: package package-tarballs
+ifeq ($(PRINT_HELP),y)
+package package-tarballs:
+	@echo "$$PACKAGE_HELP_INFO"
+else
+package package-tarballs:
+	build/package-tarballs.sh
+endif
+
 define CROSS_HELP_INFO
 # Cross-compile for all platforms
+# Use the 'cross-in-a-container' target to cross build when already in
+# a container vs. creating a new container to build from (build-image)
+# Useful for running in GCB.
 #
 # Example:
 #   make cross
+#   make cross-in-a-container
 endef
-.PHONY: cross
+.PHONY: cross cross-in-a-container
 ifeq ($(PRINT_HELP),y)
-cross:
+cross cross-in-a-container:
 	@echo "$$CROSS_HELP_INFO"
 else
 cross:
 	hack/make-rules/cross.sh
+cross-in-a-container: KUBE_OUTPUT_SUBPATH = $(OUT_DIR)/dockerized
+cross-in-a-container:
+ifeq (,$(wildcard /.dockerenv))
+	@echo -e "\nThe 'cross-in-a-container' target can only be used from within a docker container.\n"
+else
+	hack/make-rules/cross.sh
+endif
 endif
 
 define CMD_HELP_INFO
@@ -446,21 +479,6 @@ $(notdir $(abspath $(wildcard plugin/cmd/*/))):
 else
 $(notdir $(abspath $(wildcard plugin/cmd/*/))): generated_files
 	hack/make-rules/build.sh plugin/cmd/$@
-endif
-
-define FED_CMD_HELP_INFO
-# Add rules for all directories in federation/cmd/
-#
-# Example:
-#   make federation-apiserver federation-controller-manager
-endef
-.PHONY: $(notdir $(abspath $(wildcard federation/cmd/*/)))
-ifeq ($(PRINT_HELP),y)
-$(notdir $(abspath $(wildcard federation/cmd/*/))):
-	@echo "$$FED_CMD_HELP_INFO"
-else
-$(notdir $(abspath $(wildcard federation/cmd/*/))): generated_files
-	hack/make-rules/build.sh federation/cmd/$@
 endif
 
 define GENERATED_FILES_HELP_INFO

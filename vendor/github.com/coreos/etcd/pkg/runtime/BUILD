@@ -10,6 +10,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/coreos/etcd/pkg/runtime",
     visibility = ["//visibility:public"],
 )
 

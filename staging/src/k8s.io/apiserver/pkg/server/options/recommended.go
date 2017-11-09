@@ -37,9 +37,9 @@ type RecommendedOptions struct {
 	CoreAPI        *CoreAPIOptions
 }
 
-func NewRecommendedOptions(prefix string, copier runtime.ObjectCopier, codec runtime.Codec) *RecommendedOptions {
+func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptions {
 	return &RecommendedOptions{
-		Etcd:           NewEtcdOptions(storagebackend.NewDefaultConfig(prefix, copier, codec)),
+		Etcd:           NewEtcdOptions(storagebackend.NewDefaultConfig(prefix, codec)),
 		SecureServing:  NewSecureServingOptions(),
 		Authentication: NewDelegatingAuthenticationOptions(),
 		Authorization:  NewDelegatingAuthorizationOptions(),

@@ -8,6 +8,7 @@ go_library(
         "option.go",
         "packet.go",
     ],
+    importpath = "github.com/d2g/dhcp4",
     visibility = ["//visibility:public"],
 )
 

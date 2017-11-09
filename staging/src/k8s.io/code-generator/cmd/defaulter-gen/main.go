@@ -54,16 +54,16 @@ import (
 func main() {
 	arguments := args.Default()
 
-	// Override defaults.
-	arguments.OutputFileBaseName = "zz_generated.defaults"
-	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
-
 	// Custom args.
 	customArgs := &generators.CustomArgs{
 		ExtraPeerDirs: []string{},
 	}
 	pflag.CommandLine.StringSliceVar(&customArgs.ExtraPeerDirs, "extra-peer-dirs", customArgs.ExtraPeerDirs,
 		"Comma-separated list of import paths which are considered, after tag-specified peers, for conversions.")
+
+	// Override defaults.
+	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
+	arguments.OutputFileBaseName = "zz_generated.defaults"
 	arguments.CustomArgs = customArgs
 
 	// Run it.

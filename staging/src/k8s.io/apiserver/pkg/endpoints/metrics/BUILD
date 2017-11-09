@@ -9,16 +9,19 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["metrics_test.go"],
+    importpath = "k8s.io/apiserver/pkg/endpoints/metrics",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["metrics.go"],
+    importpath = "k8s.io/apiserver/pkg/endpoints/metrics",
     deps = [
         "//vendor/github.com/emicklei/go-restful:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
     ],
 )
 

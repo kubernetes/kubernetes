@@ -12,9 +12,11 @@ go_library(
         "density_utils.go",
         "deployment.go",
         "pod_store.go",
+        "replicaset.go",
         "runners.go",
         "tmpdir.go",
     ],
+    importpath = "k8s.io/kubernetes/test/utils",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1/pod:go_default_library",

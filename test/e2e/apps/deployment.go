@@ -87,36 +87,22 @@ var _ = SIGDescribe("Deployment", func() {
 	It("deployment should support rollback", func() {
 		testRollbackDeployment(f)
 	})
-	It("deployment should support rollback when there's replica set with no revision", func() {
-		testRollbackDeploymentRSNoRevision(f)
-	})
-	It("deployment should label adopted RSs and pods", func() {
-		testDeploymentLabelAdopted(f)
-	})
 	It("scaled rollout deployment should not block on annotation check", func() {
 		testScaledRolloutDeployment(f)
 	})
-	It("overlapping deployment should not fight with each other", func() {
-		testOverlappingDeployment(f)
-	})
-	It("lack of progress should be reported in the deployment status", func() {
-		testFailedDeployment(f)
-	})
+
 	It("iterative rollouts should eventually progress", func() {
 		testIterativeDeployments(f)
 	})
 	It("test Deployment ReplicaSet orphaning and adoption regarding controllerRef", func() {
 		testDeploymentsControllerRef(f)
 	})
-	It("deployment can avoid hash collisions", func() {
-		testDeploymentHashCollisionAvoidance(f)
-	})
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues
 	// See https://github.com/kubernetes/kubernetes/issues/29229
 })
 
 func failureTrap(c clientset.Interface, ns string) {
-	deployments, err := c.Extensions().Deployments(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
+	deployments, err := c.ExtensionsV1beta1().Deployments(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 	if err != nil {
 		framework.Logf("Could not list Deployments in namespace %q: %v", ns, err)
 		return
@@ -154,7 +140,7 @@ func failureTrap(c clientset.Interface, ns string) {
 			framework.Logf("failed to get selector of ReplicaSet %s: %v", rs.Name, err)
 		}
 		options := metav1.ListOptions{LabelSelector: selector.String()}
-		podList, err := c.Core().Pods(rs.Namespace).List(options)
+		podList, err := c.CoreV1().Pods(rs.Namespace).List(options)
 		for _, pod := range podList.Items {
 			framework.Logf(spew.Sprintf("pod: %q:\n%+v\n", pod.Name, pod))
 		}
@@ -174,32 +160,8 @@ func newDeploymentRollback(name string, annotations map[string]string, revision 
 	}
 }
 
-// checkDeploymentRevision checks if the input deployment's and its new replica set's revision and images are as expected.
-func checkDeploymentRevision(c clientset.Interface, ns, deploymentName, revision, imageName, image string) (*extensions.Deployment, *extensions.ReplicaSet) {
-	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-	// Check revision of the new replica set of this deployment
-	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
-	Expect(err).NotTo(HaveOccurred())
-	Expect(newRS).NotTo(Equal(nilRs))
-	Expect(newRS.Annotations).NotTo(Equal(nil))
-	Expect(newRS.Annotations[deploymentutil.RevisionAnnotation]).Should(Equal(revision))
-	// Check revision of This deployment
-	Expect(deployment.Annotations).NotTo(Equal(nil))
-	Expect(deployment.Annotations[deploymentutil.RevisionAnnotation]).Should(Equal(revision))
-	if len(imageName) > 0 {
-		// Check the image the new replica set creates
-		Expect(newRS.Spec.Template.Spec.Containers[0].Name).Should(Equal(imageName))
-		Expect(newRS.Spec.Template.Spec.Containers[0].Image).Should(Equal(image))
-		// Check the image the deployment creates
-		Expect(deployment.Spec.Template.Spec.Containers[0].Name).Should(Equal(imageName))
-		Expect(deployment.Spec.Template.Spec.Containers[0].Image).Should(Equal(image))
-	}
-	return deployment, newRS
-}
-
 func stopDeployment(c clientset.Interface, internalClient internalclientset.Interface, ns, deploymentName string) {
-	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
+	deployment, err := c.ExtensionsV1beta1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	framework.Logf("Deleting deployment %s", deploymentName)
@@ -211,20 +173,20 @@ func stopDeployment(c clientset.Interface, internalClient internalclientset.Inte
 	Expect(err).NotTo(HaveOccurred())
 
 	framework.Logf("Ensuring deployment %s was deleted", deploymentName)
-	_, err = c.Extensions().Deployments(ns).Get(deployment.Name, metav1.GetOptions{})
+	_, err = c.ExtensionsV1beta1().Deployments(ns).Get(deployment.Name, metav1.GetOptions{})
 	Expect(err).To(HaveOccurred())
 	Expect(errors.IsNotFound(err)).To(BeTrue())
 	framework.Logf("Ensuring deployment %s's RSes were deleted", deploymentName)
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	Expect(err).NotTo(HaveOccurred())
 	options := metav1.ListOptions{LabelSelector: selector.String()}
-	rss, err := c.Extensions().ReplicaSets(ns).List(options)
+	rss, err := c.ExtensionsV1beta1().ReplicaSets(ns).List(options)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(rss.Items).Should(HaveLen(0))
 	framework.Logf("Ensuring deployment %s's Pods were deleted", deploymentName)
 	var pods *v1.PodList
 	if err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {
-		pods, err = c.Core().Pods(ns).List(options)
+		pods, err = c.CoreV1().Pods(ns).List(options)
 		if err != nil {
 			return false, err
 		}
@@ -249,17 +211,17 @@ func testDeleteDeployment(f *framework.Framework) {
 	framework.Logf("Creating simple deployment %s", deploymentName)
 	d := framework.NewDeployment(deploymentName, replicas, podLabels, NginxImageName, NginxImage, extensions.RollingUpdateDeploymentStrategyType)
 	d.Annotations = map[string]string{"test": "should-copy-to-replica-set", v1.LastAppliedConfigAnnotation: "should-not-copy-to-replica-set"}
-	deploy, err := c.Extensions().Deployments(ns).Create(d)
+	deploy, err := c.ExtensionsV1beta1().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Wait for it to be updated to revision 1
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", NginxImage)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = framework.WaitForDeploymentStatusValid(c, deploy)
+	err = framework.WaitForDeploymentComplete(c, deploy)
 	Expect(err).NotTo(HaveOccurred())
 
-	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
+	deployment, err := c.ExtensionsV1beta1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
@@ -285,7 +247,7 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	rs := newRS(rsName, replicas, rsPodLabels, NginxImageName, NginxImage)
 	rs.Annotations = annotations
 	framework.Logf("Creating replica set %q (going to be adopted)", rs.Name)
-	_, err := c.Extensions().ReplicaSets(ns).Create(rs)
+	_, err := c.ExtensionsV1beta1().ReplicaSets(ns).Create(rs)
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
 	err = framework.VerifyPodsRunning(c, ns, "sample-pod", false, replicas)
@@ -295,7 +257,7 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	deploymentName := "test-rolling-update-deployment"
 	framework.Logf("Creating deployment %q", deploymentName)
 	d := framework.NewDeployment(deploymentName, replicas, deploymentPodLabels, RedisImageName, RedisImage, extensions.RollingUpdateDeploymentStrategyType)
-	deploy, err := c.Extensions().Deployments(ns).Create(d)
+	deploy, err := c.ExtensionsV1beta1().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Wait for it to be updated to revision 3546343826724305833.
@@ -304,12 +266,12 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	framework.Logf("Ensuring status for deployment %q is the expected", deploy.Name)
-	err = framework.WaitForDeploymentStatusValid(c, deploy)
+	err = framework.WaitForDeploymentComplete(c, deploy)
 	Expect(err).NotTo(HaveOccurred())
 
 	// There should be 1 old RS (nginx-controller, which is adopted)
 	framework.Logf("Ensuring deployment %q has one old replica set (the one it adopted)", deploy.Name)
-	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
+	deployment, err := c.ExtensionsV1beta1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	_, allOldRSs, err := deploymentutil.GetOldReplicaSets(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
@@ -328,7 +290,7 @@ func testRecreateDeployment(f *framework.Framework) {
 	deploymentName := "test-recreate-deployment"
 	framework.Logf("Creating deployment %q", deploymentName)
 	d := framework.NewDeployment(deploymentName, int32(1), map[string]string{"name": "sample-pod-3"}, RedisImageName, RedisImage, extensions.RecreateDeploymentStrategyType)
-	deployment, err := c.Extensions().Deployments(ns).Create(d)
+	deployment, err := c.ExtensionsV1beta1().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Wait for it to be updated to revision 1
@@ -337,7 +299,7 @@ func testRecreateDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	framework.Logf("Waiting deployment %q to complete", deploymentName)
-	Expect(framework.WaitForDeploymentStatusValid(c, deployment)).NotTo(HaveOccurred())
+	Expect(framework.WaitForDeploymentComplete(c, deployment)).NotTo(HaveOccurred())
 
 	// Update deployment to delete redis pods and bring up nginx pods.
 	framework.Logf("Triggering a new rollout for deployment %q", deploymentName)
@@ -364,7 +326,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	rsName := "test-cleanup-controller"
 	replicas := int32(1)
 	revisionHistoryLimit := utilpointer.Int32Ptr(0)
-	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, rsPodLabels, NginxImageName, NginxImage))
+	_, err := c.ExtensionsV1beta1().ReplicaSets(ns).Create(newRS(rsName, replicas, rsPodLabels, NginxImageName, NginxImage))
 	Expect(err).NotTo(HaveOccurred())
 
 	// Verify that the required pods have come up.
@@ -375,7 +337,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	deploymentName := "test-cleanup-deployment"
 	framework.Logf("Creating deployment %s", deploymentName)
 
-	pods, err := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
+	pods, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 	Expect(err).NotTo(HaveOccurred(), "Failed to query for pods: %v", err)
 
 	options := metav1.ListOptions{
@@ -383,7 +345,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	w, err := c.Core().Pods(ns).Watch(options)
+	w, err := c.CoreV1().Pods(ns).Watch(options)
 	Expect(err).NotTo(HaveOccurred())
 	go func() {
 		// There should be only one pod being created, which is the pod with the redis image.
@@ -413,7 +375,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	}()
 	d := framework.NewDeployment(deploymentName, replicas, deploymentPodLabels, RedisImageName, RedisImage, extensions.RollingUpdateDeploymentStrategyType)
 	d.Spec.RevisionHistoryLimit = revisionHistoryLimit
-	_, err = c.Extensions().Deployments(ns).Create(d)
+	_, err = c.ExtensionsV1beta1().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred())
 
 	By(fmt.Sprintf("Waiting for deployment %s history to be cleaned up", deploymentName))
@@ -435,7 +397,7 @@ func testRolloverDeployment(f *framework.Framework) {
 
 	rsName := "test-rollover-controller"
 	rsReplicas := int32(1)
-	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, rsReplicas, rsPodLabels, NginxImageName, NginxImage))
+	_, err := c.ExtensionsV1beta1().ReplicaSets(ns).Create(newRS(rsName, rsReplicas, rsPodLabels, NginxImageName, NginxImage))
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
 	err = framework.VerifyPodsRunning(c, ns, podName, false, rsReplicas)
@@ -458,24 +420,25 @@ func testRolloverDeployment(f *framework.Framework) {
 		MaxSurge:       intOrStrP(1),
 	}
 	newDeployment.Spec.MinReadySeconds = int32(10)
-	_, err = c.Extensions().Deployments(ns).Create(newDeployment)
+	_, err = c.ExtensionsV1beta1().Deployments(ns).Create(newDeployment)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Verify that the pods were scaled up and down as expected.
-	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
+	deployment, err := c.ExtensionsV1beta1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	framework.Logf("Make sure deployment %q performs scaling operations", deploymentName)
 	// Make sure the deployment starts to scale up and down replica sets by checking if its updated replicas >= 1
 	err = framework.WaitForDeploymentUpdatedReplicasLTE(c, ns, deploymentName, deploymentReplicas, deployment.Generation)
 	// Check if it's updated to revision 1 correctly
 	framework.Logf("Check revision of new replica set for deployment %q", deploymentName)
-	_, newRS := checkDeploymentRevision(c, ns, deploymentName, "1", deploymentImageName, deploymentImage)
+	err = framework.CheckDeploymentRevisionAndImage(c, ns, deploymentName, "1", deploymentImage)
+	Expect(err).NotTo(HaveOccurred())
 
 	framework.Logf("Ensure that both replica sets have 1 created replica")
-	oldRS, err := c.Extensions().ReplicaSets(ns).Get(rsName, metav1.GetOptions{})
+	oldRS, err := c.ExtensionsV1beta1().ReplicaSets(ns).Get(rsName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	ensureReplicas(oldRS, int32(1))
-	newRS, err = c.Extensions().ReplicaSets(ns).Get(newRS.Name, metav1.GetOptions{})
+	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 	ensureReplicas(newRS, int32(1))
 
@@ -499,15 +462,15 @@ func testRolloverDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	framework.Logf("Make sure deployment %q is complete", deploymentName)
-	err = framework.WaitForDeploymentStatus(c, deployment)
+	err = framework.WaitForDeploymentCompleteAndCheckRolling(c, deployment)
 	Expect(err).NotTo(HaveOccurred())
 
 	framework.Logf("Ensure that both old replica sets have no replicas")
-	oldRS, err = c.Extensions().ReplicaSets(ns).Get(rsName, metav1.GetOptions{})
+	oldRS, err = c.ExtensionsV1beta1().ReplicaSets(ns).Get(rsName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	ensureReplicas(oldRS, int32(0))
 	// Not really the new replica set anymore but we GET by name so that's fine.
-	newRS, err = c.Extensions().ReplicaSets(ns).Get(newRS.Name, metav1.GetOptions{})
+	newRS, err = c.ExtensionsV1beta1().ReplicaSets(ns).Get(newRS.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	ensureReplicas(newRS, int32(0))
 }
@@ -519,7 +482,9 @@ func ensureReplicas(rs *extensions.ReplicaSet, replicas int32) {
 
 // testRollbackDeployment tests that a deployment is created (revision 1) and updated (revision 2), and
 // then rollback to revision 1 (should update template to revision 1, and then update revision 1 to 3),
-// and then rollback to last revision.
+// and then rollback to last revision (which is revision 4 that comes from revision 2).
+// Then rollback the deployment to revision 10 (doesn't exist in history) should fail.
+// Finally, rollback current deployment (revision 4) to revision 4 should be no-op.
 func testRollbackDeployment(f *framework.Framework) {
 	ns := f.Namespace.Name
 	c := f.ClientSet
@@ -535,14 +500,14 @@ func testRollbackDeployment(f *framework.Framework) {
 	d := framework.NewDeployment(deploymentName, deploymentReplicas, deploymentPodLabels, deploymentImageName, deploymentImage, deploymentStrategyType)
 	createAnnotation := map[string]string{"action": "create", "author": "node"}
 	d.Annotations = createAnnotation
-	deploy, err := c.Extensions().Deployments(ns).Create(d)
+	deploy, err := c.ExtensionsV1beta1().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Wait for it to be updated to revision 1
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", deploymentImage)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = framework.WaitForDeploymentStatusValid(c, deploy)
+	err = framework.WaitForDeploymentComplete(c, deploy)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Current newRS annotation should be "create"
@@ -568,7 +533,7 @@ func testRollbackDeployment(f *framework.Framework) {
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "2", updatedDeploymentImage)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = framework.WaitForDeploymentStatus(c, deployment)
+	err = framework.WaitForDeploymentCompleteAndCheckRolling(c, deployment)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Current newRS annotation should be "update"
@@ -579,7 +544,7 @@ func testRollbackDeployment(f *framework.Framework) {
 	revision := int64(1)
 	framework.Logf("rolling back deployment %s to revision %d", deploymentName, revision)
 	rollback := newDeploymentRollback(deploymentName, nil, revision)
-	err = c.Extensions().Deployments(ns).Rollback(rollback)
+	err = c.ExtensionsV1beta1().Deployments(ns).Rollback(rollback)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Wait for the deployment to start rolling back
@@ -591,7 +556,7 @@ func testRollbackDeployment(f *framework.Framework) {
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "3", deploymentImage)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = framework.WaitForDeploymentStatus(c, deployment)
+	err = framework.WaitForDeploymentCompleteAndCheckRolling(c, deployment)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Current newRS annotation should be "create", after the rollback
@@ -602,7 +567,7 @@ func testRollbackDeployment(f *framework.Framework) {
 	revision = 0
 	framework.Logf("rolling back deployment %s to last revision", deploymentName)
 	rollback = newDeploymentRollback(deploymentName, nil, revision)
-	err = c.Extensions().Deployments(ns).Rollback(rollback)
+	err = c.ExtensionsV1beta1().Deployments(ns).Rollback(rollback)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = framework.WaitForDeploymentRollbackCleared(c, ns, deploymentName)
@@ -612,125 +577,19 @@ func testRollbackDeployment(f *framework.Framework) {
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "4", updatedDeploymentImage)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = framework.WaitForDeploymentStatus(c, deployment)
+	err = framework.WaitForDeploymentCompleteAndCheckRolling(c, deployment)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Current newRS annotation should be "update", after the rollback
 	err = framework.CheckNewRSAnnotations(c, ns, deploymentName, updateAnnotation)
 	Expect(err).NotTo(HaveOccurred())
-}
-
-// testRollbackDeploymentRSNoRevision tests that deployment supports rollback even when there's old replica set without revision.
-// An old replica set without revision is created, and then a deployment is created (v1). The deployment shouldn't add revision
-// annotation to the old replica set. Then rollback the deployment to last revision, and it should fail.
-// Then update the deployment to v2 and rollback it to v1 should succeed, now the deployment
-// becomes v3. Then rollback the deployment to v10 (doesn't exist in history) should fail.
-// Finally, rollback the deployment (v3) to v3 should be no-op.
-// TODO: When we finished reporting rollback status in deployment status, check the rollback status here in each case.
-func testRollbackDeploymentRSNoRevision(f *framework.Framework) {
-	ns := f.Namespace.Name
-	c := f.ClientSet
-	podName := "nginx"
-	deploymentPodLabels := map[string]string{"name": podName}
-	rsPodLabels := map[string]string{
-		"name": podName,
-		"pod":  NginxImageName,
-	}
-
-	// Create an old RS without revision
-	rsName := "test-rollback-no-revision-controller"
-	rsReplicas := int32(0)
-	rs := newRS(rsName, rsReplicas, rsPodLabels, NginxImageName, NginxImage)
-	rs.Annotations = make(map[string]string)
-	rs.Annotations["make"] = "difference"
-	_, err := c.Extensions().ReplicaSets(ns).Create(rs)
-	Expect(err).NotTo(HaveOccurred())
-
-	// 1. Create a deployment to create nginx pods, which have different template than the replica set created above.
-	deploymentName, deploymentImageName := "test-rollback-no-revision-deployment", NginxImageName
-	deploymentReplicas := int32(1)
-	deploymentImage := NginxImage
-	deploymentStrategyType := extensions.RollingUpdateDeploymentStrategyType
-	framework.Logf("Creating deployment %s", deploymentName)
-	d := framework.NewDeployment(deploymentName, deploymentReplicas, deploymentPodLabels, deploymentImageName, deploymentImage, deploymentStrategyType)
-	deploy, err := c.Extensions().Deployments(ns).Create(d)
-	Expect(err).NotTo(HaveOccurred())
-
-	// Wait for it to be updated to revision 1
-	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", deploymentImage)
-	Expect(err).NotTo(HaveOccurred())
-
-	err = framework.WaitForDeploymentStatusValid(c, deploy)
-	Expect(err).NotTo(HaveOccurred())
-
-	// Check that the replica set we created still doesn't contain revision information
-	rs, err = c.Extensions().ReplicaSets(ns).Get(rsName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-	Expect(rs.Annotations[deploymentutil.RevisionAnnotation]).Should(Equal(""))
-
-	// 2. Update the deploymentRollback to rollback to last revision
-	//    Since there's only 1 revision in history, it should stay as revision 1
-	revision := int64(0)
-	framework.Logf("rolling back deployment %s to last revision", deploymentName)
-	rollback := newDeploymentRollback(deploymentName, nil, revision)
-	err = c.Extensions().Deployments(ns).Rollback(rollback)
-	Expect(err).NotTo(HaveOccurred())
-
-	// Wait for the deployment to start rolling back
-	err = framework.WaitForDeploymentRollbackCleared(c, ns, deploymentName)
-	Expect(err).NotTo(HaveOccurred())
-	// TODO: report RollbackRevisionNotFound in deployment status and check it here
-
-	// The pod template shouldn't change since there's no last revision
-	// Check if the deployment is still revision 1 and still has the old pod template
-	checkDeploymentRevision(c, ns, deploymentName, "1", deploymentImageName, deploymentImage)
-
-	// 3. Update the deployment to create redis pods.
-	updatedDeploymentImage := RedisImage
-	updatedDeploymentImageName := RedisImageName
-	deployment, err := framework.UpdateDeploymentWithRetries(c, ns, d.Name, func(update *extensions.Deployment) {
-		update.Spec.Template.Spec.Containers[0].Name = updatedDeploymentImageName
-		update.Spec.Template.Spec.Containers[0].Image = updatedDeploymentImage
-	})
-	Expect(err).NotTo(HaveOccurred())
-
-	// Use observedGeneration to determine if the controller noticed the pod template update.
-	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
-	Expect(err).NotTo(HaveOccurred())
-
-	// Wait for it to be updated to revision 2
-	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "2", updatedDeploymentImage)
-	Expect(err).NotTo(HaveOccurred())
-
-	err = framework.WaitForDeploymentStatus(c, deployment)
-	Expect(err).NotTo(HaveOccurred())
-
-	// 4. Update the deploymentRollback to rollback to revision 1
-	revision = 1
-	framework.Logf("rolling back deployment %s to revision %d", deploymentName, revision)
-	rollback = newDeploymentRollback(deploymentName, nil, revision)
-	err = c.Extensions().Deployments(ns).Rollback(rollback)
-	Expect(err).NotTo(HaveOccurred())
-
-	// Wait for the deployment to start rolling back
-	err = framework.WaitForDeploymentRollbackCleared(c, ns, deploymentName)
-	Expect(err).NotTo(HaveOccurred())
-	// TODO: report RollbackDone in deployment status and check it here
-
-	// The pod template should be updated to the one in revision 1
-	// Wait for it to be updated to revision 3
-	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "3", deploymentImage)
-	Expect(err).NotTo(HaveOccurred())
-
-	err = framework.WaitForDeploymentStatus(c, deployment)
-	Expect(err).NotTo(HaveOccurred())
 
 	// 5. Update the deploymentRollback to rollback to revision 10
-	//    Since there's no revision 10 in history, it should stay as revision 3
+	//    Since there's no revision 10 in history, it should stay as revision 4
 	revision = 10
 	framework.Logf("rolling back deployment %s to revision %d", deploymentName, revision)
 	rollback = newDeploymentRollback(deploymentName, nil, revision)
-	err = c.Extensions().Deployments(ns).Rollback(rollback)
+	err = c.ExtensionsV1beta1().Deployments(ns).Rollback(rollback)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Wait for the deployment to start rolling back
@@ -739,15 +598,16 @@ func testRollbackDeploymentRSNoRevision(f *framework.Framework) {
 	// TODO: report RollbackRevisionNotFound in deployment status and check it here
 
 	// The pod template shouldn't change since there's no revision 10
-	// Check if it's still revision 3 and still has the old pod template
-	checkDeploymentRevision(c, ns, deploymentName, "3", deploymentImageName, deploymentImage)
+	// Check if it's still revision 4 and still has the old pod template
+	err = framework.CheckDeploymentRevisionAndImage(c, ns, deploymentName, "4", updatedDeploymentImage)
+	Expect(err).NotTo(HaveOccurred())
 
-	// 6. Update the deploymentRollback to rollback to revision 3
-	//    Since it's already revision 3, it should be no-op
-	revision = 3
+	// 6. Update the deploymentRollback to rollback to revision 4
+	//    Since it's already revision 4, it should be no-op
+	revision = 4
 	framework.Logf("rolling back deployment %s to revision %d", deploymentName, revision)
 	rollback = newDeploymentRollback(deploymentName, nil, revision)
-	err = c.Extensions().Deployments(ns).Rollback(rollback)
+	err = c.ExtensionsV1beta1().Deployments(ns).Rollback(rollback)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Wait for the deployment to start rolling back
@@ -755,60 +615,10 @@ func testRollbackDeploymentRSNoRevision(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 	// TODO: report RollbackTemplateUnchanged in deployment status and check it here
 
-	// The pod template shouldn't change since it's already revision 3
-	// Check if it's still revision 3 and still has the old pod template
-	checkDeploymentRevision(c, ns, deploymentName, "3", deploymentImageName, deploymentImage)
-}
-
-func testDeploymentLabelAdopted(f *framework.Framework) {
-	ns := f.Namespace.Name
-	c := f.ClientSet
-	// Create nginx pods.
-	podName := "nginx"
-	podLabels := map[string]string{"name": podName}
-
-	rsName := "test-adopted-controller"
-	replicas := int32(1)
-	image := NginxImage
-	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, podLabels, podName, image))
+	// The pod template shouldn't change since it's already revision 4
+	// Check if it's still revision 4 and still has the old pod template
+	err = framework.CheckDeploymentRevisionAndImage(c, ns, deploymentName, "4", updatedDeploymentImage)
 	Expect(err).NotTo(HaveOccurred())
-	// Verify that the required pods have come up.
-	err = framework.VerifyPodsRunning(c, ns, podName, false, replicas)
-	Expect(err).NotTo(HaveOccurred(), "error in waiting for pods to come up: %v", err)
-
-	// Create a nginx deployment to adopt the old rs.
-	deploymentName := "test-adopted-deployment"
-	framework.Logf("Creating deployment %s", deploymentName)
-	deploy, err := c.Extensions().Deployments(ns).Create(framework.NewDeployment(deploymentName, replicas, podLabels, podName, image, extensions.RollingUpdateDeploymentStrategyType))
-	Expect(err).NotTo(HaveOccurred())
-
-	// Wait for it to be updated to revision 1
-	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", image)
-	Expect(err).NotTo(HaveOccurred())
-
-	// The RS and pods should be relabeled before the status is updated by syncRollingUpdateDeployment
-	err = framework.WaitForDeploymentStatusValid(c, deploy)
-	Expect(err).NotTo(HaveOccurred())
-
-	// There should be no old RSs (overlapping RS)
-	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-	oldRSs, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, c.ExtensionsV1beta1())
-	Expect(err).NotTo(HaveOccurred())
-	Expect(len(oldRSs)).Should(Equal(0))
-	Expect(len(allOldRSs)).Should(Equal(0))
-	// New RS should contain pod-template-hash in its selector, label, and template label
-	err = framework.CheckRSHashLabel(newRS)
-	Expect(err).NotTo(HaveOccurred())
-	// All pods targeted by the deployment should contain pod-template-hash in their labels, and there should be only 3 pods
-	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
-	Expect(err).NotTo(HaveOccurred())
-	options := metav1.ListOptions{LabelSelector: selector.String()}
-	pods, err := c.Core().Pods(ns).List(options)
-	Expect(err).NotTo(HaveOccurred())
-	err = framework.CheckPodHashLabel(pods)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(int32(len(pods.Items))).Should(Equal(replicas))
 }
 
 func testScaledRolloutDeployment(f *framework.Framework) {
@@ -826,7 +636,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	d.Spec.Strategy.RollingUpdate.MaxUnavailable = intOrStrP(2)
 
 	framework.Logf("Creating deployment %q", deploymentName)
-	deployment, err := c.Extensions().Deployments(ns).Create(d)
+	deployment, err := c.ExtensionsV1beta1().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred())
 
 	framework.Logf("Waiting for observed generation %d", deployment.Generation)
@@ -838,7 +648,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred(), "error in waiting for pods to come up: %v", err)
 
 	framework.Logf("Waiting for deployment %q to complete", deployment.Name)
-	Expect(framework.WaitForDeploymentStatusValid(c, deployment)).NotTo(HaveOccurred())
+	Expect(framework.WaitForDeploymentComplete(c, deployment)).NotTo(HaveOccurred())
 
 	first, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
@@ -854,7 +664,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
 	Expect(err).NotTo(HaveOccurred())
 
-	deployment, err = c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
+	deployment, err = c.ExtensionsV1beta1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	if deployment.Status.AvailableReplicas < deploymentutil.MinAvailable(deployment) {
@@ -865,14 +675,14 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	second, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 
-	first, err = c.Extensions().ReplicaSets(first.Namespace).Get(first.Name, metav1.GetOptions{})
+	first, err = c.ExtensionsV1beta1().ReplicaSets(first.Namespace).Get(first.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
-	firstCond := replicaSetHasDesiredReplicas(c.Extensions(), first)
+	firstCond := replicaSetHasDesiredReplicas(c.ExtensionsV1beta1(), first)
 	err = wait.PollImmediate(10*time.Millisecond, 1*time.Minute, firstCond)
 	Expect(err).NotTo(HaveOccurred())
 
-	secondCond := replicaSetHasDesiredReplicas(c.Extensions(), second)
+	secondCond := replicaSetHasDesiredReplicas(c.ExtensionsV1beta1(), second)
 	err = wait.PollImmediate(10*time.Millisecond, 1*time.Minute, secondCond)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -888,7 +698,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	framework.Logf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment))
-	Expect(framework.WaitForDeploymentStatusValid(c, deployment)).NotTo(HaveOccurred())
+	Expect(framework.WaitForDeploymentComplete(c, deployment)).NotTo(HaveOccurred())
 
 	oldRSs, _, rs, err := deploymentutil.GetAllReplicaSets(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
@@ -914,7 +724,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
 	Expect(err).NotTo(HaveOccurred())
 
-	deployment, err = c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
+	deployment, err = c.ExtensionsV1beta1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	if deployment.Status.AvailableReplicas < deploymentutil.MinAvailable(deployment) {
@@ -922,17 +732,17 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	}
 
 	framework.Logf("Checking that the replica sets for %q are synced", deploymentName)
-	oldRs, err := c.Extensions().ReplicaSets(rs.Namespace).Get(rs.Name, metav1.GetOptions{})
+	oldRs, err := c.ExtensionsV1beta1().ReplicaSets(rs.Namespace).Get(rs.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	newRs, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 
-	oldCond := replicaSetHasDesiredReplicas(c.Extensions(), oldRs)
+	oldCond := replicaSetHasDesiredReplicas(c.ExtensionsV1beta1(), oldRs)
 	err = wait.PollImmediate(10*time.Millisecond, 1*time.Minute, oldCond)
 	Expect(err).NotTo(HaveOccurred())
 
-	newCond := replicaSetHasDesiredReplicas(c.Extensions(), newRs)
+	newCond := replicaSetHasDesiredReplicas(c.ExtensionsV1beta1(), newRs)
 	err = wait.PollImmediate(10*time.Millisecond, 1*time.Minute, newCond)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -948,7 +758,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	framework.Logf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment))
-	Expect(framework.WaitForDeploymentStatusValid(c, deployment)).NotTo(HaveOccurred())
+	Expect(framework.WaitForDeploymentComplete(c, deployment)).NotTo(HaveOccurred())
 
 	oldRSs, _, rs, err = deploymentutil.GetAllReplicaSets(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
@@ -962,83 +772,6 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 		err = fmt.Errorf("unexpected desiredReplicas annotation %d for replica set %q", desired, rs.Name)
 		Expect(err).NotTo(HaveOccurred())
 	}
-}
-
-func testOverlappingDeployment(f *framework.Framework) {
-	ns := f.Namespace.Name
-	c := f.ClientSet
-
-	// Create first deployment.
-	deploymentName := "first-deployment"
-	podLabels := map[string]string{"name": RedisImageName}
-	replicas := int32(1)
-	framework.Logf("Creating deployment %q", deploymentName)
-	d := framework.NewDeployment(deploymentName, replicas, podLabels, RedisImageName, RedisImage, extensions.RollingUpdateDeploymentStrategyType)
-	deploy, err := c.Extensions().Deployments(ns).Create(d)
-	Expect(err).NotTo(HaveOccurred(), "Failed creating the first deployment")
-
-	// Wait for it to be updated to revision 1
-	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploy.Name, "1", RedisImage)
-	Expect(err).NotTo(HaveOccurred(), "The first deployment failed to update to revision 1")
-
-	// Create second deployment with overlapping selector.
-	deploymentName = "second-deployment"
-	framework.Logf("Creating deployment %q with overlapping selector", deploymentName)
-	podLabels["other-label"] = "random-label"
-	d = framework.NewDeployment(deploymentName, replicas, podLabels, NginxImageName, NginxImage, extensions.RollingUpdateDeploymentStrategyType)
-	deployOverlapping, err := c.Extensions().Deployments(ns).Create(d)
-	Expect(err).NotTo(HaveOccurred(), "Failed creating the second deployment")
-
-	// Wait for it to be updated to revision 1
-	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deployOverlapping.Name, "1", NginxImage)
-	Expect(err).NotTo(HaveOccurred(), "The second deployment failed to update to revision 1")
-
-	// Both deployments should proceed independently.
-	framework.Logf("Checking each deployment creates its own replica set")
-	options := metav1.ListOptions{}
-	rsList, err := c.Extensions().ReplicaSets(ns).List(options)
-	Expect(err).NotTo(HaveOccurred(), "Failed listing all replica sets in namespace %s", ns)
-	Expect(rsList.Items).To(HaveLen(2))
-}
-
-func testFailedDeployment(f *framework.Framework) {
-	ns := f.Namespace.Name
-	c := f.ClientSet
-
-	podLabels := map[string]string{"name": NginxImageName}
-	replicas := int32(1)
-
-	// Create a nginx deployment.
-	deploymentName := "progress-check"
-	nonExistentImage := "nginx:not-there"
-	ten := int32(10)
-	d := framework.NewDeployment(deploymentName, replicas, podLabels, NginxImageName, nonExistentImage, extensions.RecreateDeploymentStrategyType)
-	d.Spec.ProgressDeadlineSeconds = &ten
-
-	framework.Logf("Creating deployment %q with progressDeadlineSeconds set to %ds and a non-existent image", deploymentName, ten)
-	deployment, err := c.Extensions().Deployments(ns).Create(d)
-	Expect(err).NotTo(HaveOccurred())
-
-	framework.Logf("Waiting for deployment %q new replica set to come up", deploymentName)
-	Expect(framework.WaitForDeploymentUpdatedReplicasLTE(c, ns, deploymentName, replicas, deployment.Generation))
-
-	framework.Logf("Checking deployment %q for a timeout condition", deploymentName)
-	Expect(framework.WaitForDeploymentWithCondition(c, ns, deploymentName, deploymentutil.TimedOutReason, extensions.DeploymentProgressing)).NotTo(HaveOccurred())
-
-	framework.Logf("Updating deployment %q with a good image", deploymentName)
-	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *extensions.Deployment) {
-		update.Spec.Template.Spec.Containers[0].Image = NginxImage
-	})
-	Expect(err).NotTo(HaveOccurred())
-
-	framework.Logf("Waiting for deployment %q new replica set to come up", deploymentName)
-	Expect(framework.WaitForDeploymentUpdatedReplicasLTE(c, ns, deploymentName, replicas, deployment.Generation))
-
-	framework.Logf("Waiting for deployment %q status", deploymentName)
-	Expect(framework.WaitForDeploymentStatusValid(c, deployment)).NotTo(HaveOccurred())
-
-	framework.Logf("Checking deployment %q for a complete condition", deploymentName)
-	Expect(framework.WaitForDeploymentWithCondition(c, ns, deploymentName, deploymentutil.NewRSAvailableReason, extensions.DeploymentProgressing)).NotTo(HaveOccurred())
 }
 
 func randomScale(d *extensions.Deployment, i int) {
@@ -1071,7 +804,7 @@ func testIterativeDeployments(f *framework.Framework) {
 	d.Spec.RevisionHistoryLimit = &two
 	d.Spec.Template.Spec.TerminationGracePeriodSeconds = &zero
 	framework.Logf("Creating deployment %q", deploymentName)
-	deployment, err := c.Extensions().Deployments(ns).Create(d)
+	deployment, err := c.ExtensionsV1beta1().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred())
 
 	iterations := 20
@@ -1132,7 +865,7 @@ func testIterativeDeployments(f *framework.Framework) {
 			selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 			Expect(err).NotTo(HaveOccurred())
 			opts := metav1.ListOptions{LabelSelector: selector.String()}
-			podList, err := c.Core().Pods(ns).List(opts)
+			podList, err := c.CoreV1().Pods(ns).List(opts)
 			Expect(err).NotTo(HaveOccurred())
 			if len(podList.Items) == 0 {
 				framework.Logf("%02d: no deployment pods to delete", i)
@@ -1144,7 +877,7 @@ func testIterativeDeployments(f *framework.Framework) {
 				}
 				name := podList.Items[p].Name
 				framework.Logf("%02d: deleting deployment pod %q", i, name)
-				err := c.Core().Pods(ns).Delete(name, nil)
+				err := c.CoreV1().Pods(ns).Delete(name, nil)
 				if err != nil && !errors.IsNotFound(err) {
 					Expect(err).NotTo(HaveOccurred())
 				}
@@ -1153,7 +886,7 @@ func testIterativeDeployments(f *framework.Framework) {
 	}
 
 	// unpause the deployment if we end up pausing it
-	deployment, err = c.Extensions().Deployments(ns).Get(deployment.Name, metav1.GetOptions{})
+	deployment, err = c.ExtensionsV1beta1().Deployments(ns).Get(deployment.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	if deployment.Spec.Paused {
 		deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *extensions.Deployment) {
@@ -1165,7 +898,7 @@ func testIterativeDeployments(f *framework.Framework) {
 	Expect(framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)).NotTo(HaveOccurred())
 
 	framework.Logf("Waiting for deployment %q status", deploymentName)
-	Expect(framework.WaitForDeploymentStatusValid(c, deployment)).NotTo(HaveOccurred())
+	Expect(framework.WaitForDeploymentComplete(c, deployment)).NotTo(HaveOccurred())
 
 	framework.Logf("Checking deployment %q for a complete condition", deploymentName)
 	Expect(framework.WaitForDeploymentWithCondition(c, ns, deploymentName, deploymentutil.NewRSAvailableReason, extensions.DeploymentProgressing)).NotTo(HaveOccurred())
@@ -1191,9 +924,9 @@ func testDeploymentsControllerRef(f *framework.Framework) {
 	podLabels := map[string]string{"name": NginxImageName}
 	replicas := int32(1)
 	d := framework.NewDeployment(deploymentName, replicas, podLabels, NginxImageName, NginxImage, extensions.RollingUpdateDeploymentStrategyType)
-	deploy, err := c.Extensions().Deployments(ns).Create(d)
+	deploy, err := c.ExtensionsV1beta1().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred())
-	err = framework.WaitForDeploymentStatusValid(c, deploy)
+	err = framework.WaitForDeploymentComplete(c, deploy)
 	Expect(err).NotTo(HaveOccurred())
 
 	framework.Logf("Checking its ReplicaSet has the right controllerRef")
@@ -1211,9 +944,9 @@ func testDeploymentsControllerRef(f *framework.Framework) {
 	deploymentName = "test-adopt-deployment"
 	framework.Logf("Creating Deployment %q to adopt the ReplicaSet", deploymentName)
 	d = framework.NewDeployment(deploymentName, replicas, podLabels, NginxImageName, NginxImage, extensions.RollingUpdateDeploymentStrategyType)
-	deploy, err = c.Extensions().Deployments(ns).Create(d)
+	deploy, err = c.ExtensionsV1beta1().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred())
-	err = framework.WaitForDeploymentStatusValid(c, deploy)
+	err = framework.WaitForDeploymentComplete(c, deploy)
 	Expect(err).NotTo(HaveOccurred())
 
 	framework.Logf("Waiting for the ReplicaSet to have the right controllerRef")
@@ -1258,7 +991,7 @@ func waitDeploymentReplicaSetsOrphaned(c clientset.Interface, ns string, label m
 func listDeploymentReplicaSets(c clientset.Interface, ns string, label map[string]string) *extensions.ReplicaSetList {
 	selector := labels.Set(label).AsSelector()
 	options := metav1.ListOptions{LabelSelector: selector.String()}
-	rsList, err := c.Extensions().ReplicaSets(ns).List(options)
+	rsList, err := c.ExtensionsV1beta1().ReplicaSets(ns).List(options)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(rsList.Items)).To(BeNumerically(">", 0))
 	return rsList
@@ -1268,49 +1001,5 @@ func orphanDeploymentReplicaSets(c clientset.Interface, d *extensions.Deployment
 	trueVar := true
 	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &trueVar}
 	deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(d.UID))
-	return c.Extensions().Deployments(d.Namespace).Delete(d.Name, deleteOptions)
-}
-
-func testDeploymentHashCollisionAvoidance(f *framework.Framework) {
-	ns := f.Namespace.Name
-	c := f.ClientSet
-
-	deploymentName := "test-hash-collision"
-	framework.Logf("Creating Deployment %q", deploymentName)
-	podLabels := map[string]string{"name": NginxImageName}
-	d := framework.NewDeployment(deploymentName, int32(0), podLabels, NginxImageName, NginxImage, extensions.RollingUpdateDeploymentStrategyType)
-	deployment, err := c.Extensions().Deployments(ns).Create(d)
-	Expect(err).NotTo(HaveOccurred())
-	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", NginxImage)
-	Expect(err).NotTo(HaveOccurred())
-
-	// TODO: Switch this to do a non-cascading deletion of the Deployment, mutate the ReplicaSet
-	// once it has no owner reference, then recreate the Deployment if we ever proceed with
-	// https://github.com/kubernetes/kubernetes/issues/44237
-	framework.Logf("Mock a hash collision")
-	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
-	Expect(err).NotTo(HaveOccurred())
-	var nilRs *extensions.ReplicaSet
-	Expect(newRS).NotTo(Equal(nilRs))
-	_, err = framework.UpdateReplicaSetWithRetries(c, ns, newRS.Name, func(update *extensions.ReplicaSet) {
-		*update.Spec.Template.Spec.TerminationGracePeriodSeconds = int64(5)
-	})
-	Expect(err).NotTo(HaveOccurred())
-
-	framework.Logf("Expect deployment collision counter to increment")
-	if err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-		d, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-		if err != nil {
-			framework.Logf("cannot get deployment %q: %v", deploymentName, err)
-			return false, nil
-		}
-		framework.Logf(spew.Sprintf("deployment status: %#v", d.Status))
-		return d.Status.CollisionCount != nil && *d.Status.CollisionCount == int32(1), nil
-	}); err != nil {
-		framework.Failf("Failed to increment collision counter for deployment %q: %v", deploymentName, err)
-	}
-
-	framework.Logf("Expect a new ReplicaSet to be created")
-	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "2", NginxImage)
-	Expect(err).NotTo(HaveOccurred())
+	return c.ExtensionsV1beta1().Deployments(d.Namespace).Delete(d.Name, deleteOptions)
 }

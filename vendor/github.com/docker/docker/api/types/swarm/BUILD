@@ -14,6 +14,7 @@ go_library(
         "swarm.go",
         "task.go",
     ],
+    importpath = "github.com/docker/docker/api/types/swarm",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/docker/docker/api/types/container:go_default_library",

@@ -641,16 +641,16 @@ func TestPodLimitFuncApplyDefault(t *testing.T) {
 		requestCpu := container.Resources.Requests.Cpu().String()
 
 		if limitMemory != "10Mi" {
-			t.Errorf("Unexpected memory value %s", limitMemory)
+			t.Errorf("Unexpected limit memory value %s", limitMemory)
 		}
 		if limitCpu != "75m" {
-			t.Errorf("Unexpected cpu value %s", limitCpu)
+			t.Errorf("Unexpected limit cpu value %s", limitCpu)
 		}
 		if requestMemory != "5Mi" {
-			t.Errorf("Unexpected memory value %s", requestMemory)
+			t.Errorf("Unexpected request memory value %s", requestMemory)
 		}
 		if requestCpu != "50m" {
-			t.Errorf("Unexpected cpu value %s", requestCpu)
+			t.Errorf("Unexpected request cpu value %s", requestCpu)
 		}
 	}
 
@@ -662,16 +662,16 @@ func TestPodLimitFuncApplyDefault(t *testing.T) {
 		requestCpu := container.Resources.Requests.Cpu().String()
 
 		if limitMemory != "10Mi" {
-			t.Errorf("Unexpected memory value %s", limitMemory)
+			t.Errorf("Unexpected limit memory value %s", limitMemory)
 		}
 		if limitCpu != "75m" {
-			t.Errorf("Unexpected cpu value %s", limitCpu)
+			t.Errorf("Unexpected limit cpu value %s", limitCpu)
 		}
 		if requestMemory != "5Mi" {
-			t.Errorf("Unexpected memory value %s", requestMemory)
+			t.Errorf("Unexpected request memory value %s", requestMemory)
 		}
 		if requestCpu != "50m" {
-			t.Errorf("Unexpected cpu value %s", requestCpu)
+			t.Errorf("Unexpected request cpu value %s", requestCpu)
 		}
 	}
 }
@@ -738,15 +738,15 @@ func newMockClientForTest(limitRanges []api.LimitRange) *fake.Clientset {
 }
 
 // newHandlerForTest returns a handler configured for testing.
-func newHandlerForTest(c clientset.Interface) (admission.Interface, informers.SharedInformerFactory, error) {
+func newHandlerForTest(c clientset.Interface) (*LimitRanger, informers.SharedInformerFactory, error) {
 	f := informers.NewSharedInformerFactory(c, 5*time.Minute)
 	handler, err := NewLimitRanger(&DefaultLimitRangerActions{})
 	if err != nil {
 		return nil, f, err
 	}
-	pluginInitializer := kubeadmission.NewPluginInitializer(c, nil, f, nil, nil, nil, nil)
+	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil, nil, nil)
 	pluginInitializer.Initialize(handler)
-	err = admission.Validate(handler)
+	err = admission.ValidateInitialization(handler)
 	return handler, f, err
 }
 

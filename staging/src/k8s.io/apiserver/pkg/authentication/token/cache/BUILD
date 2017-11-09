@@ -12,6 +12,7 @@ go_test(
         "cache_test.go",
         "cached_token_authenticator_test.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/authentication/token/cache",
     library = ":go_default_library",
     deps = [
         "//vendor/github.com/pborman/uuid:go_default_library",
@@ -28,6 +29,7 @@ go_library(
         "cache_striped.go",
         "cached_token_authenticator.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/authentication/token/cache",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/util/cache:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",

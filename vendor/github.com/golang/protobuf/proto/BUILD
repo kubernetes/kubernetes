@@ -15,6 +15,7 @@ go_library(
         "text.go",
         "text_parser.go",
     ],
+    importpath = "github.com/golang/protobuf/proto",
     visibility = ["//visibility:public"],
 )
 

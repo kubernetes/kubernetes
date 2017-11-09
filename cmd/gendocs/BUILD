@@ -8,12 +8,14 @@ load(
 
 go_binary(
     name = "gendocs",
+    importpath = "k8s.io/kubernetes/cmd/gendocs",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["gen_kubectl_docs.go"],
+    importpath = "k8s.io/kubernetes/cmd/gendocs",
     deps = [
         "//cmd/genutils:go_default_library",
         "//pkg/kubectl/cmd:go_default_library",

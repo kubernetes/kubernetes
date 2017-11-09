@@ -29,8 +29,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -64,7 +66,7 @@ func TestServiceAccountLocal(t *testing.T) {
 
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Client = &fake.RESTClient{
-		APIRegistry: api.Registry,
+		GroupVersion: legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
 			return nil, nil
@@ -99,7 +101,7 @@ func TestServiceAccountRemote(t *testing.T) {
 	}{
 		{
 			object: &extensions.ReplicaSet{
-				TypeMeta:   metav1.TypeMeta{Kind: "ReplicaSet", APIVersion: api.Registry.GroupOrDie(extensions.GroupName).GroupVersion.String()},
+				TypeMeta:   metav1.TypeMeta{Kind: "ReplicaSet", APIVersion: legacyscheme.Registry.GroupOrDie(extensions.GroupName).GroupVersion.String()},
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 			},
 			apiPrefix: "/apis", apiGroup: extensions.GroupName,
@@ -107,7 +109,7 @@ func TestServiceAccountRemote(t *testing.T) {
 		},
 		{
 			object: &extensions.DaemonSet{
-				TypeMeta:   metav1.TypeMeta{Kind: "DaemonSet", APIVersion: api.Registry.GroupOrDie(extensions.GroupName).GroupVersion.String()},
+				TypeMeta:   metav1.TypeMeta{Kind: "DaemonSet", APIVersion: legacyscheme.Registry.GroupOrDie(extensions.GroupName).GroupVersion.String()},
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 			},
 			apiPrefix: "/apis", apiGroup: extensions.GroupName,
@@ -115,14 +117,14 @@ func TestServiceAccountRemote(t *testing.T) {
 		},
 		{
 			object: &api.ReplicationController{
-				TypeMeta:   metav1.TypeMeta{Kind: "ReplicationController", APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()},
+				TypeMeta:   metav1.TypeMeta{Kind: "ReplicationController", APIVersion: legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String()},
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 			},
 			apiPrefix: "/api", apiGroup: api.GroupName,
 			args: []string{"replicationcontroller", "nginx", serviceAccount}},
 		{
 			object: &extensions.Deployment{
-				TypeMeta:   metav1.TypeMeta{Kind: "Deployment", APIVersion: api.Registry.GroupOrDie(extensions.GroupName).GroupVersion.String()},
+				TypeMeta:   metav1.TypeMeta{Kind: "Deployment", APIVersion: legacyscheme.Registry.GroupOrDie(extensions.GroupName).GroupVersion.String()},
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 			},
 			apiPrefix: "/apis", apiGroup: extensions.GroupName,
@@ -130,7 +132,7 @@ func TestServiceAccountRemote(t *testing.T) {
 		},
 		{
 			object: &batch.Job{
-				TypeMeta:   metav1.TypeMeta{Kind: "Job", APIVersion: api.Registry.GroupOrDie(batch.GroupName).GroupVersion.String()},
+				TypeMeta:   metav1.TypeMeta{Kind: "Job", APIVersion: legacyscheme.Registry.GroupOrDie(batch.GroupName).GroupVersion.String()},
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 			},
 			apiPrefix: "/apis", apiGroup: batch.GroupName,
@@ -138,7 +140,7 @@ func TestServiceAccountRemote(t *testing.T) {
 		},
 		{
 			object: &apps.StatefulSet{
-				TypeMeta:   metav1.TypeMeta{Kind: "StatefulSet", APIVersion: api.Registry.GroupOrDie(apps.GroupName).GroupVersion.String()},
+				TypeMeta:   metav1.TypeMeta{Kind: "StatefulSet", APIVersion: legacyscheme.Registry.GroupOrDie(apps.GroupName).GroupVersion.String()},
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 			},
 			apiPrefix: "/apis", apiGroup: apps.GroupName,
@@ -147,14 +149,14 @@ func TestServiceAccountRemote(t *testing.T) {
 	}
 	for _, input := range inputs {
 
-		groupVersion := api.Registry.GroupOrDie(input.apiGroup).GroupVersion
+		groupVersion := legacyscheme.Registry.GroupOrDie(input.apiGroup).GroupVersion
 		testapi.Default = testapi.Groups[input.apiGroup]
 		f, tf, codec, _ := cmdtesting.NewAPIFactory()
 		tf.Printer = printers.NewVersionedPrinter(&printers.YAMLPrinter{}, testapi.Default.Converter(), *testapi.Default.GroupVersion())
 		tf.Namespace = "test"
 		tf.CategoryExpander = resource.LegacyCategoryExpander
 		tf.Client = &fake.RESTClient{
-			APIRegistry:          api.Registry,
+			GroupVersion:         legacyscheme.Registry.GroupOrDie(input.apiGroup).GroupVersion,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", tf.Namespace, input.args[1])
@@ -178,7 +180,6 @@ func TestServiceAccountRemote(t *testing.T) {
 				}
 			}),
 			VersionedAPIPath: path.Join(input.apiPrefix, groupVersion.String()),
-			GroupName:        input.apiGroup,
 		}
 		out := new(bytes.Buffer)
 		cmd := NewCmdServiceAccount(f, out, out)
@@ -206,7 +207,7 @@ func TestServiceAccountValidation(t *testing.T) {
 	for _, input := range inputs {
 		f, tf, _, _ := cmdtesting.NewAPIFactory()
 		tf.Client = &fake.RESTClient{
-			APIRegistry: api.Registry,
+			GroupVersion: schema.GroupVersion{Version: "v1"},
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
 				return nil, nil

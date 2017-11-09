@@ -71,8 +71,6 @@ func GetGeneratedDeepCopyFuncs() []conversion.GeneratedDeepCopyFunc {
 func (in *Event) DeepCopyInto(out *Event) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	in.Timestamp.DeepCopyInto(&out.Timestamp)
 	in.User.DeepCopyInto(&out.User)
 	if in.ImpersonatedUser != nil {
 		in, out := &in.ImpersonatedUser, &out.ImpersonatedUser
@@ -124,6 +122,8 @@ func (in *Event) DeepCopyInto(out *Event) {
 			(*in).DeepCopyInto(*out)
 		}
 	}
+	in.RequestReceivedTimestamp.DeepCopyInto(&out.RequestReceivedTimestamp)
+	in.StageTimestamp.DeepCopyInto(&out.StageTimestamp)
 	return
 }
 

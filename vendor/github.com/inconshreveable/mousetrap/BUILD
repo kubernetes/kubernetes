@@ -11,6 +11,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/inconshreveable/mousetrap",
     visibility = ["//visibility:public"],
 )
 

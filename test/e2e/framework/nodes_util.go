@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 func EtcdUpgrade(target_storage, target_version string) error {
@@ -59,7 +58,7 @@ func etcdUpgradeGCE(target_storage, target_version string) error {
 		os.Environ(),
 		"TEST_ETCD_VERSION="+target_version,
 		"STORAGE_BACKEND="+target_storage,
-		"TEST_ETCD_IMAGE=3.0.17")
+		"TEST_ETCD_IMAGE=3.1.10")
 
 	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-l", "-M")
 	return err
@@ -78,7 +77,7 @@ func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
 		env = append(env,
 			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
 			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
-			"TEST_ETCD_IMAGE=3.0.17")
+			"TEST_ETCD_IMAGE=3.1.10")
 	}
 
 	v := "v" + rawV
@@ -114,23 +113,20 @@ func masterUpgradeKubernetesAnywhere(v string) error {
 	backupConfigPath := filepath.Join(kaPath, ".config.bak")
 	updatedConfigPath := filepath.Join(kaPath, fmt.Sprintf(".config-%s", v))
 
-	// backup .config to .config.bak
-	if err := os.Rename(originalConfigPath, backupConfigPath); err != nil {
+	// modify config with specified k8s version
+	if _, _, err := RunCmd("sed",
+		"-i.bak", // writes original to .config.bak
+		fmt.Sprintf(`s/kubernetes_version=.*$/kubernetes_version=%q/`, v),
+		originalConfigPath); err != nil {
 		return err
 	}
+
 	defer func() {
 		// revert .config.bak to .config
 		if err := os.Rename(backupConfigPath, originalConfigPath); err != nil {
 			Logf("Could not rename %s back to %s", backupConfigPath, originalConfigPath)
 		}
 	}()
-
-	// modify config with specified k8s version
-	if _, _, err := RunCmd("sed",
-		fmt.Sprintf(`s/kubernetes_version=.*$/kubernetes_version=%s/`, v),
-		backupConfigPath, ">", originalConfigPath); err != nil {
-		return err
-	}
 
 	// invoke ka upgrade
 	if _, _, err := RunCmd("make", "-C", TestContext.KubernetesAnywherePath,
@@ -237,7 +233,7 @@ func CheckNodesReady(c clientset.Interface, nt time.Duration, expect int) ([]str
 		// A rolling-update (GCE/GKE implementation of restart) can complete before the apiserver
 		// knows about all of the nodes. Thus, we retry the list nodes call
 		// until we get the expected number of nodes.
-		nodeList, errLast = c.Core().Nodes().List(metav1.ListOptions{
+		nodeList, errLast = c.CoreV1().Nodes().List(metav1.ListOptions{
 			FieldSelector: fields.Set{"spec.unschedulable": "false"}.AsSelector().String()})
 		if errLast != nil {
 			return false, nil
@@ -330,7 +326,7 @@ func gceUpgradeScript() string {
 func waitForSSHTunnels() {
 	Logf("Waiting for SSH tunnels to establish")
 	RunKubectl("run", "ssh-tunnel-test",
-		"--image="+imageutils.GetBusyBoxImage(),
+		"--image=busybox",
 		"--restart=Never",
 		"--command", "--",
 		"echo", "Hello")

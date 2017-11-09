@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/golang/glog"
+	policy "k8s.io/api/policy/v1beta1"
 )
 
 var (
@@ -55,6 +56,7 @@ type schedulerCache struct {
 	// a map from pod key to podState.
 	podStates map[string]*podState
 	nodes     map[string]*NodeInfo
+	pdbs      map[string]*policy.PodDisruptionBudget
 }
 
 type podState struct {
@@ -74,6 +76,7 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 		nodes:       make(map[string]*NodeInfo),
 		assumedPods: make(map[string]bool),
 		podStates:   make(map[string]*podState),
+		pdbs:        make(map[string]*policy.PodDisruptionBudget),
 	}
 }
 
@@ -238,6 +241,7 @@ func (cache *schedulerCache) AddPod(pod *v1.Pod) error {
 		}
 		delete(cache.assumedPods, key)
 		cache.podStates[key].deadline = nil
+		cache.podStates[key].pod = pod
 	case !ok:
 		// Pod was expired. We should add it back.
 		cache.addPod(pod)
@@ -307,6 +311,39 @@ func (cache *schedulerCache) RemovePod(pod *v1.Pod) error {
 	return nil
 }
 
+func (cache *schedulerCache) IsAssumedPod(pod *v1.Pod) (bool, error) {
+	key, err := getPodKey(pod)
+	if err != nil {
+		return false, err
+	}
+
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	b, found := cache.assumedPods[key]
+	if !found {
+		return false, nil
+	}
+	return b, nil
+}
+
+func (cache *schedulerCache) GetPod(pod *v1.Pod) (*v1.Pod, error) {
+	key, err := getPodKey(pod)
+	if err != nil {
+		return nil, err
+	}
+
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	podState, ok := cache.podStates[key]
+	if !ok {
+		return nil, fmt.Errorf("pod %v does not exist", key)
+	}
+
+	return podState.pod, nil
+}
+
 func (cache *schedulerCache) AddNode(node *v1.Node) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
@@ -347,6 +384,39 @@ func (cache *schedulerCache) RemoveNode(node *v1.Node) error {
 		delete(cache.nodes, node.Name)
 	}
 	return nil
+}
+
+func (cache *schedulerCache) AddPDB(pdb *policy.PodDisruptionBudget) error {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	// Unconditionally update cache.
+	cache.pdbs[pdb.Name] = pdb
+	return nil
+}
+
+func (cache *schedulerCache) UpdatePDB(oldPDB, newPDB *policy.PodDisruptionBudget) error {
+	return cache.AddPDB(newPDB)
+}
+
+func (cache *schedulerCache) RemovePDB(pdb *policy.PodDisruptionBudget) error {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	delete(cache.pdbs, pdb.Name)
+	return nil
+}
+
+func (cache *schedulerCache) ListPDBs(selector labels.Selector) ([]*policy.PodDisruptionBudget, error) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	var pdbs []*policy.PodDisruptionBudget
+	for _, pdb := range cache.pdbs {
+		if selector.Matches(labels.Set(pdb.Labels)) {
+			pdbs = append(pdbs, pdb)
+		}
+	}
+	return pdbs, nil
 }
 
 func (cache *schedulerCache) run() {

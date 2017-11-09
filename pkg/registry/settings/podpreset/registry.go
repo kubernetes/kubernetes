@@ -22,15 +22,14 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/settings"
 )
 
 // Registry is an interface for things that know how to store PodPresets.
 type Registry interface {
 	ListPodPresets(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*settings.PodPresetList, error)
-	CreatePodPreset(ctx genericapirequest.Context, pp *settings.PodPreset) error
-	UpdatePodPreset(ctx genericapirequest.Context, pp *settings.PodPreset) error
+	CreatePodPreset(ctx genericapirequest.Context, pp *settings.PodPreset, createValidation rest.ValidateObjectFunc) error
+	UpdatePodPreset(ctx genericapirequest.Context, pp *settings.PodPreset, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
 	GetPodPreset(ctx genericapirequest.Context, ppID string, options *metav1.GetOptions) (*settings.PodPreset, error)
 	DeletePodPreset(ctx genericapirequest.Context, ppID string) error
 	WatchPodPresets(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
@@ -56,13 +55,13 @@ func (s *storage) ListPodPresets(ctx genericapirequest.Context, options *metaint
 	return obj.(*settings.PodPresetList), nil
 }
 
-func (s *storage) CreatePodPreset(ctx genericapirequest.Context, pp *settings.PodPreset) error {
-	_, err := s.Create(ctx, pp, false)
+func (s *storage) CreatePodPreset(ctx genericapirequest.Context, pp *settings.PodPreset, createValidation rest.ValidateObjectFunc) error {
+	_, err := s.Create(ctx, pp, createValidation, false)
 	return err
 }
 
-func (s *storage) UpdatePodPreset(ctx genericapirequest.Context, pp *settings.PodPreset) error {
-	_, _, err := s.Update(ctx, pp.Name, rest.DefaultUpdatedObjectInfo(pp, api.Scheme))
+func (s *storage) UpdatePodPreset(ctx genericapirequest.Context, pp *settings.PodPreset, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
+	_, _, err := s.Update(ctx, pp.Name, rest.DefaultUpdatedObjectInfo(pp), createValidation, updateValidation)
 	return err
 }
 

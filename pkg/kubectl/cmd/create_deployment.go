@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -109,17 +108,15 @@ func createDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer,
 	if err != nil {
 		return err
 	}
-	resourcesList, err := clientset.Discovery().ServerResources()
-	// ServerResources ignores errors for old servers do not expose discovery
-	if err != nil {
-		return fmt.Errorf("failed to discover supported resources: %v", err)
-	}
 
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
 
 	// It is possible we have to modify the user-provided generator name if
 	// the server does not have support for the requested generator.
-	generatorName = cmdutil.FallbackGeneratorNameIfNecessary(generatorName, resourcesList, cmdErr)
+	generatorName, err = cmdutil.FallbackGeneratorNameIfNecessary(generatorName, clientset.Discovery(), cmdErr)
+	if err != nil {
+		return err
+	}
 
 	imageNames := cmdutil.GetFlagStringSlice(cmd, "image")
 	generator, ok := generatorFromName(generatorName, imageNames, deploymentName)

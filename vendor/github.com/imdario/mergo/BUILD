@@ -8,6 +8,7 @@ go_library(
         "merge.go",
         "mergo.go",
     ],
+    importpath = "github.com/imdario/mergo",
     visibility = ["//visibility:public"],
 )
 

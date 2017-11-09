@@ -10,6 +10,7 @@ go_library(
         "markdown.go",
         "smartypants.go",
     ],
+    importpath = "github.com/russross/blackfriday",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/shurcooL/sanitized_anchor_name:go_default_library"],
 )

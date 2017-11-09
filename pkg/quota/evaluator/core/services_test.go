@@ -20,14 +20,14 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/quota"
+	"k8s.io/kubernetes/pkg/quota/generic"
 )
 
 func TestServiceEvaluatorMatchesResources(t *testing.T) {
-	kubeClient := fake.NewSimpleClientset()
-	evaluator := NewServiceEvaluator(kubeClient, nil)
+	evaluator := NewServiceEvaluator(nil)
 	// we give a lot of resources
 	input := []api.ResourceName{
 		api.ResourceConfigMaps,
@@ -49,8 +49,7 @@ func TestServiceEvaluatorMatchesResources(t *testing.T) {
 }
 
 func TestServiceEvaluatorUsage(t *testing.T) {
-	kubeClient := fake.NewSimpleClientset()
-	evaluator := NewServiceEvaluator(kubeClient, nil)
+	evaluator := NewServiceEvaluator(nil)
 	testCases := map[string]struct {
 		service *api.Service
 		usage   api.ResourceList
@@ -65,6 +64,7 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 				api.ResourceServicesNodePorts:     resource.MustParse("0"),
 				api.ResourceServicesLoadBalancers: resource.MustParse("1"),
 				api.ResourceServices:              resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
 			},
 		},
 		"loadbalancer_ports": {
@@ -82,6 +82,7 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 				api.ResourceServicesNodePorts:     resource.MustParse("1"),
 				api.ResourceServicesLoadBalancers: resource.MustParse("1"),
 				api.ResourceServices:              resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
 			},
 		},
 		"clusterip": {
@@ -91,9 +92,10 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 				},
 			},
 			usage: api.ResourceList{
-				api.ResourceServices:              resource.MustParse("1"),
-				api.ResourceServicesNodePorts:     resource.MustParse("0"),
-				api.ResourceServicesLoadBalancers: resource.MustParse("0"),
+				api.ResourceServices:                                                                resource.MustParse("1"),
+				api.ResourceServicesNodePorts:                                                       resource.MustParse("0"),
+				api.ResourceServicesLoadBalancers:                                                   resource.MustParse("0"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
 			},
 		},
 		"nodeports": {
@@ -108,9 +110,10 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 				},
 			},
 			usage: api.ResourceList{
-				api.ResourceServices:              resource.MustParse("1"),
-				api.ResourceServicesNodePorts:     resource.MustParse("1"),
-				api.ResourceServicesLoadBalancers: resource.MustParse("0"),
+				api.ResourceServices:                                                                resource.MustParse("1"),
+				api.ResourceServicesNodePorts:                                                       resource.MustParse("1"),
+				api.ResourceServicesLoadBalancers:                                                   resource.MustParse("0"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
 			},
 		},
 		"multi-nodeports": {
@@ -128,9 +131,10 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 				},
 			},
 			usage: api.ResourceList{
-				api.ResourceServices:              resource.MustParse("1"),
-				api.ResourceServicesNodePorts:     resource.MustParse("2"),
-				api.ResourceServicesLoadBalancers: resource.MustParse("0"),
+				api.ResourceServices:                                                                resource.MustParse("1"),
+				api.ResourceServicesNodePorts:                                                       resource.MustParse("2"),
+				api.ResourceServicesLoadBalancers:                                                   resource.MustParse("0"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
 			},
 		},
 	}
@@ -198,8 +202,7 @@ func TestServiceConstraintsFunc(t *testing.T) {
 		},
 	}
 
-	kubeClient := fake.NewSimpleClientset()
-	evaluator := NewServiceEvaluator(kubeClient, nil)
+	evaluator := NewServiceEvaluator(nil)
 	for testName, test := range testCases {
 		err := evaluator.Constraints(test.required, test.service)
 		switch {

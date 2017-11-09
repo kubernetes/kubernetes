@@ -6,6 +6,7 @@ go_library(
         "wait.go",
         "wait_time.go",
     ],
+    importpath = "github.com/coreos/etcd/pkg/wait",
     visibility = ["//visibility:public"],
 )
 

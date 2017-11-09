@@ -36,7 +36,7 @@ func ValidatePolicy(policy schedulerapi.Policy) error {
 
 	binders := 0
 	for _, extender := range policy.ExtenderConfigs {
-		if extender.Weight <= 0 {
+		if len(extender.PrioritizeVerb) > 0 && extender.Weight <= 0 {
 			validationErrors = append(validationErrors, fmt.Errorf("Priority for extender %s should have a positive weight applied to it", extender.URLPrefix))
 		}
 		if extender.BindVerb != "" {

@@ -7,6 +7,7 @@ go_library(
         "percentiles.go",
         "summary.go",
     ],
+    importpath = "github.com/google/cadvisor/summary",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",

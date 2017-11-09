@@ -8,8 +8,9 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["install.go"],
+    importpath = "k8s.io/kubernetes/pkg/apis/authentication/install",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/authentication:go_default_library",
         "//pkg/apis/authentication/v1:go_default_library",
         "//pkg/apis/authentication/v1beta1:go_default_library",

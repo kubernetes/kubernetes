@@ -9,12 +9,14 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["sorted_event_list.go"],
+    importpath = "k8s.io/kubernetes/pkg/api/events",
     deps = ["//pkg/api:go_default_library"],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["sorted_event_list_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/api/events",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

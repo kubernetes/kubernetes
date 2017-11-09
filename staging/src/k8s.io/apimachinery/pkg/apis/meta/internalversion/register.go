@@ -38,9 +38,6 @@ var (
 	AddToScheme        = localSchemeBuilder.AddToScheme
 )
 
-// Copier exposes copying on this scheme.
-var Copier runtime.ObjectCopier = scheme
-
 // Codecs provides access to encoding and decoding for the scheme.
 var Codecs = serializer.NewCodecFactory(scheme)
 

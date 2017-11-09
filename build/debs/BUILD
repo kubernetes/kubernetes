@@ -73,7 +73,7 @@ deb_data(
             "dir": "/usr/bin",
         },
         {
-            "files": ["kubeadm-10.conf"],
+            "files": ["10-kubeadm.conf"],
             "mode": "644",
             "dir": "/etc/systemd/system/kubelet.service.d",
         },
@@ -82,7 +82,7 @@ deb_data(
 
 pkg_tar(
     name = "kubernetes-cni-data",
-    package_dir = "/opt/cni",
+    package_dir = "/opt/cni/bin",
     deps = ["@kubernetes_cni//file"],
 )
 
@@ -132,7 +132,7 @@ k8s_deb(
     name = "kubelet",
     depends = [
         "iptables (>= 1.4.21)",
-        "kubernetes-cni (>= 0.3.0.1)",
+        "kubernetes-cni (>= 0.5.1)",
         "iproute2",
         "socat",
         "util-linux",
@@ -149,8 +149,9 @@ The node agent of Kubernetes, the container cluster manager
 k8s_deb(
     name = "kubeadm",
     depends = [
-        "kubelet (>= 1.4.0)",
-        "kubectl (>= 1.4.0)",
+        "kubelet (>= 1.8.0)",
+        "kubectl (>= 1.8.0)",
+        "kubernetes-cni (>= 0.5.1)",
     ],
     description = """Kubernetes Cluster Bootstrapping Tool
 The Kubernetes command line tool for bootstrapping a Kubernetes cluster.
@@ -163,7 +164,7 @@ k8s_deb(
     description = """Kubernetes Packaging of CNI
 The Container Networking Interface tools for provisioning container networks.
 """,
-    version_file = "//build:os_package_version",
+    version_file = "//build:cni_package_version",
 )
 
 filegroup(

@@ -14,12 +14,11 @@ go_library(
         "restmapper.go",
         "unstructured.go",
     ],
+    importpath = "k8s.io/client-go/discovery",
     deps = [
-        "//vendor/github.com/emicklei/go-restful-swagger12:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -40,8 +39,8 @@ go_test(
         "helper_blackbox_test.go",
         "restmapper_test.go",
     ],
+    importpath = "k8s.io/client-go/discovery_test",
     deps = [
-        "//vendor/github.com/emicklei/go-restful-swagger12:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

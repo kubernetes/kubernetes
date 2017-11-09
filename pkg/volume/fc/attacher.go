@@ -135,7 +135,7 @@ func (plugin *fcPlugin) NewDetacher() (volume.Detacher, error) {
 	}, nil
 }
 
-func (detacher *fcDetacher) Detach(deviceMountPath string, nodeName types.NodeName) error {
+func (detacher *fcDetacher) Detach(volumeName string, nodeName types.NodeName) error {
 	return nil
 }
 

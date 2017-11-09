@@ -8,6 +8,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["api_meta_scheme_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/apimachinery/tests",
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

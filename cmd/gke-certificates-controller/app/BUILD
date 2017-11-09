@@ -13,8 +13,9 @@ go_library(
         "gke_signer.go",
         "options.go",
     ],
+    importpath = "k8s.io/kubernetes/cmd/gke-certificates-controller/app",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/certificates/install:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/certificates:go_default_library",
@@ -52,6 +53,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["gke_signer_test.go"],
+    importpath = "k8s.io/kubernetes/cmd/gke-certificates-controller/app",
     library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/api/certificates/v1beta1:go_default_library",

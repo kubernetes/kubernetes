@@ -18,11 +18,14 @@ package cmd
 
 import (
 	"archive/tar"
+	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -80,7 +83,10 @@ type fileSpec struct {
 	File         string
 }
 
-var errFileSpecDoesntMatchFormat = errors.New("Filespec must match the canonical format: [[namespace/]pod:]file/path")
+var (
+	errFileSpecDoesntMatchFormat = errors.New("Filespec must match the canonical format: [[namespace/]pod:]file/path")
+	errFileCannotBeEmpty         = errors.New("Filepath can not be empty")
+)
 
 func extractFileSpec(arg string) (fileSpec, error) {
 	pieces := strings.Split(arg, ":")
@@ -133,11 +139,47 @@ func runCopy(f cmdutil.Factory, cmd *cobra.Command, out, cmderr io.Writer, args 
 	return cmdutil.UsageErrorf(cmd, "One of src or dest must be a remote file specification")
 }
 
+// checkDestinationIsDir receives a destination fileSpec and
+// determines if the provided destination path exists on the
+// pod. If the destination path does not exist or is _not_ a
+// directory, an error is returned with the exit code received.
+func checkDestinationIsDir(dest fileSpec, f cmdutil.Factory, cmd *cobra.Command) error {
+	options := &ExecOptions{
+		StreamOptions: StreamOptions{
+			Out: bytes.NewBuffer([]byte{}),
+			Err: bytes.NewBuffer([]byte{}),
+
+			Namespace: dest.PodNamespace,
+			PodName:   dest.PodName,
+		},
+
+		Command:  []string{"test", "-d", dest.File},
+		Executor: &DefaultRemoteExecutor{},
+	}
+
+	return execute(f, cmd, options)
+}
+
 func copyToPod(f cmdutil.Factory, cmd *cobra.Command, stdout, stderr io.Writer, src, dest fileSpec) error {
+	if len(src.File) == 0 {
+		return errFileCannotBeEmpty
+	}
 	reader, writer := io.Pipe()
+
+	// strip trailing slash (if any)
+	if strings.HasSuffix(string(dest.File[len(dest.File)-1]), "/") {
+		dest.File = dest.File[:len(dest.File)-1]
+	}
+
+	if err := checkDestinationIsDir(dest, f, cmd); err == nil {
+		// If no error, dest.File was found to be a directory.
+		// Copy specified src into it
+		dest.File = dest.File + "/" + path.Base(src.File)
+	}
+
 	go func() {
 		defer writer.Close()
-		err := makeTar(src.File, writer)
+		err := makeTar(src.File, dest.File, writer)
 		cmdutil.CheckErr(err)
 	}()
 
@@ -166,6 +208,10 @@ func copyToPod(f cmdutil.Factory, cmd *cobra.Command, stdout, stderr io.Writer, 
 }
 
 func copyFromPod(f cmdutil.Factory, cmd *cobra.Command, cmderr io.Writer, src, dest fileSpec) error {
+	if len(src.File) == 0 {
+		return errFileCannotBeEmpty
+	}
+
 	reader, outStream := io.Pipe()
 	options := &ExecOptions{
 		StreamOptions: StreamOptions{
@@ -187,22 +233,23 @@ func copyFromPod(f cmdutil.Factory, cmd *cobra.Command, cmderr io.Writer, src, d
 		execute(f, cmd, options)
 	}()
 	prefix := getPrefix(src.File)
-
+	prefix = path.Clean(prefix)
 	return untarAll(reader, dest.File, prefix)
 }
 
-func makeTar(filepath string, writer io.Writer) error {
+func makeTar(srcPath, destPath string, writer io.Writer) error {
 	// TODO: use compression here?
 	tarWriter := tar.NewWriter(writer)
 	defer tarWriter.Close()
 
-	filepath = path.Clean(filepath)
-	return recursiveTar(path.Dir(filepath), path.Base(filepath), tarWriter)
+	srcPath = path.Clean(srcPath)
+	destPath = path.Clean(destPath)
+	return recursiveTar(path.Dir(srcPath), path.Base(srcPath), path.Dir(destPath), path.Base(destPath), tarWriter)
 }
 
-func recursiveTar(base, file string, tw *tar.Writer) error {
-	filepath := path.Join(base, file)
-	stat, err := os.Stat(filepath)
+func recursiveTar(srcBase, srcFile, destBase, destFile string, tw *tar.Writer) error {
+	filepath := path.Join(srcBase, srcFile)
+	stat, err := os.Lstat(filepath)
 	if err != nil {
 		return err
 	}
@@ -211,31 +258,60 @@ func recursiveTar(base, file string, tw *tar.Writer) error {
 		if err != nil {
 			return err
 		}
+		if len(files) == 0 {
+			//case empty directory
+			hdr, _ := tar.FileInfoHeader(stat, filepath)
+			hdr.Name = destFile
+			if err := tw.WriteHeader(hdr); err != nil {
+				return err
+			}
+		}
 		for _, f := range files {
-			if err := recursiveTar(base, path.Join(file, f.Name()), tw); err != nil {
+			if err := recursiveTar(srcBase, path.Join(srcFile, f.Name()), destBase, path.Join(destFile, f.Name()), tw); err != nil {
 				return err
 			}
 		}
 		return nil
-	}
-	hdr, err := tar.FileInfoHeader(stat, filepath)
-	if err != nil {
+	} else if stat.Mode()&os.ModeSymlink != 0 {
+		//case soft link
+		hdr, _ := tar.FileInfoHeader(stat, filepath)
+		target, err := os.Readlink(filepath)
+		if err != nil {
+			return err
+		}
+
+		hdr.Linkname = target
+		hdr.Name = destFile
+		if err := tw.WriteHeader(hdr); err != nil {
+			return err
+		}
+	} else {
+		//case regular file or other file type like pipe
+		hdr, err := tar.FileInfoHeader(stat, filepath)
+		if err != nil {
+			return err
+		}
+		hdr.Name = destFile
+
+		if err := tw.WriteHeader(hdr); err != nil {
+			return err
+		}
+
+		f, err := os.Open(filepath)
+		if err != nil {
+			return err
+		}
+
+		defer f.Close()
+		_, err = io.Copy(tw, f)
 		return err
 	}
-	hdr.Name = file
-	if err := tw.WriteHeader(hdr); err != nil {
-		return err
-	}
-	f, err := os.Open(filepath)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	_, err = io.Copy(tw, f)
-	return err
+	return nil
 }
 
 func untarAll(reader io.Reader, destFile, prefix string) error {
+	entrySeq := -1
+
 	// TODO: use compression here?
 	tarReader := tar.NewReader(reader)
 	for {
@@ -246,25 +322,51 @@ func untarAll(reader io.Reader, destFile, prefix string) error {
 			}
 			break
 		}
+		entrySeq++
+		mode := header.FileInfo().Mode()
 		outFileName := path.Join(destFile, header.Name[len(prefix):])
 		baseName := path.Dir(outFileName)
 		if err := os.MkdirAll(baseName, 0755); err != nil {
 			return err
 		}
 		if header.FileInfo().IsDir() {
-			os.MkdirAll(outFileName, 0755)
+
+			if err := os.MkdirAll(outFileName, 0755); err != nil {
+				return err
+			}
 			continue
 		}
-		outFile, err := os.Create(outFileName)
-		if err != nil {
-			return err
+
+		// handle coping remote file into local directory
+		if entrySeq == 0 && !header.FileInfo().IsDir() {
+			exists, err := dirExists(outFileName)
+			if err != nil {
+				return err
+			}
+			if exists {
+				outFileName = filepath.Join(outFileName, path.Base(header.Name))
+			}
 		}
-		if _, err := io.Copy(outFile, tarReader); err != nil {
-			return err
+
+		if mode&os.ModeSymlink != 0 {
+			err := os.Symlink(header.Linkname, outFileName)
+			if err != nil {
+				return err
+			}
+		} else {
+			outFile, err := os.Create(outFileName)
+			if err != nil {
+				return err
+			}
+			defer outFile.Close()
+			io.Copy(outFile, tarReader)
 		}
-		if err := outFile.Close(); err != nil {
-			return err
-		}
+	}
+
+	if entrySeq == -1 {
+		//if no file was copied
+		errInfo := fmt.Sprintf("error: %s no such file or directory", prefix)
+		return errors.New(errInfo)
 	}
 	return nil
 }
@@ -311,4 +413,16 @@ func execute(f cmdutil.Factory, cmd *cobra.Command, options *ExecOptions) error 
 		return err
 	}
 	return nil
+}
+
+// dirExists checks if a path exists and is a directory.
+func dirExists(path string) (bool, error) {
+	fi, err := os.Stat(path)
+	if err == nil && fi.IsDir() {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
 }

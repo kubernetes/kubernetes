@@ -106,12 +106,12 @@
     "description": "get information of a group"
    },
    {
-    "path": "/apis/rbac.authorization.k8s.io/v1beta1",
-    "description": "API at /apis/rbac.authorization.k8s.io/v1beta1"
-   },
-   {
     "path": "/apis/rbac.authorization.k8s.io/v1",
     "description": "API at /apis/rbac.authorization.k8s.io/v1"
+   },
+   {
+    "path": "/apis/rbac.authorization.k8s.io/v1beta1",
+    "description": "API at /apis/rbac.authorization.k8s.io/v1beta1"
    },
    {
     "path": "/apis/rbac.authorization.k8s.io/v1alpha1",
@@ -156,6 +156,10 @@
    {
     "path": "/apis/apps/v1beta2",
     "description": "API at /apis/apps/v1beta2"
+   },
+   {
+    "path": "/apis/apps/v1",
+    "description": "API at /apis/apps/v1"
    },
    {
     "path": "/apis/apps",

@@ -10,6 +10,7 @@ go_library(
         "instrument_client_1_8.go",
         "instrument_server.go",
     ],
+    importpath = "github.com/prometheus/client_golang/prometheus/promhttp",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",

@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
@@ -31,7 +31,7 @@ import (
 )
 
 func init() {
-	Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	Install(legacyscheme.GroupFactoryRegistry, legacyscheme.Registry, legacyscheme.Scheme)
 }
 
 // Install registers the API group and adds types to a scheme
@@ -40,16 +40,9 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName: rbac.GroupName,
 			// Rollout plan:
-			// 1.8:
-			// * announce deprecation of v1alpha1 (people should use v1beta1 or v1)
-			// 1.9 (once all version-skewed API servers in an HA cluster are capable of reading/writing v1 to etcd):
-			// * move v1 to the beginning
-			// * add RBAC objects to update-storage-objects.sh
-			// * update TestEtcdStoragePath to expect objects to be stored in v1
-			// * document that RBAC storage objects should be migrated to ensure storage is a v1-level (via update-storage-objects.sh or otherwise)
 			// 1.10 (once all stored objects are at v1):
-			// * remove v1alpha1
-			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version, v1.SchemeGroupVersion.Version, v1alpha1.SchemeGroupVersion.Version},
+			// * remove v1alpha1 (announced deprecated in 1.8)
+			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version, v1beta1.SchemeGroupVersion.Version, v1alpha1.SchemeGroupVersion.Version},
 			RootScopedKinds:            sets.NewString("ClusterRole", "ClusterRoleBinding"),
 			AddInternalObjectsToScheme: rbac.AddToScheme,
 		},

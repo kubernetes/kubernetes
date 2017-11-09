@@ -8,12 +8,14 @@ load(
 
 go_binary(
     name = "rollback",
+    importpath = "k8s.io/kubernetes/cluster/images/etcd/rollback",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["rollback.go"],
+    importpath = "k8s.io/kubernetes/cluster/images/etcd/rollback",
     deps = [
         "//third_party/forked/etcd221/wal:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver:go_default_library",

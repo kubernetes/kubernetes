@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-// Env returns an environment variable or a default value if not specified.
+// Env returns an environment variable if not nil, or a default value.
 func Env(key string, defaultValue string) string {
 	val := os.Getenv(key)
 	if len(val) == 0 {
@@ -37,7 +37,7 @@ func Env(key string, defaultValue string) string {
 	return val
 }
 
-// GetEnv returns an environment value if specified
+// GetEnv returns an environment value if not nil, and an ok boolean.
 func GetEnv(key string) (string, bool) {
 	val := os.Getenv(key)
 	if len(val) == 0 {
@@ -49,17 +49,18 @@ func GetEnv(key string) (string, bool) {
 var argumentEnvironment = regexp.MustCompile("(?ms)^(.+)\\=(.*)$")
 var validArgumentEnvironment = regexp.MustCompile("(?ms)^(\\w+)\\=(.*)$")
 
-// IsEnvironmentArgument check str is env args
+// IsEnvironmentArgument checks whether a string is an environment argument, that is, whether it matches the "anycharacters=anycharacters" pattern.
 func IsEnvironmentArgument(s string) bool {
 	return argumentEnvironment.MatchString(s)
 }
 
-// IsValidEnvironmentArgument check str is valid env
+// IsValidEnvironmentArgument checks whether a string is a valid environment argument, that is, whether it matches the "wordcharacters=anycharacters" pattern. Word characters can be letters, numbers, and underscores.
 func IsValidEnvironmentArgument(s string) bool {
 	return validArgumentEnvironment.MatchString(s)
 }
 
-// SplitEnvironmentFromResources returns resources and envargs
+// SplitEnvironmentFromResources separates resources from environment arguments.
+// Resources must come first. Arguments may have the "DASH-" syntax.
 func SplitEnvironmentFromResources(args []string) (resources, envArgs []string, ok bool) {
 	first := true
 	for _, s := range args {
@@ -123,7 +124,8 @@ func parseIntoEnvVar(spec []string, defaultReader io.Reader, envVarType string) 
 	return env, remove, nil
 }
 
-// ParseEnv parse env from reader
+// ParseEnv parses the elements of the first argument looking for environment variables in key=value form and, if one of those values is "-", it also scans the reader.
+// The same environment variable cannot be both modified and removed in the same command.
 func ParseEnv(spec []string, defaultReader io.Reader) ([]api.EnvVar, []string, error) {
 	return parseIntoEnvVar(spec, defaultReader, "environment variable")
 }

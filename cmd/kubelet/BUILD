@@ -9,6 +9,7 @@ load("//pkg/version:def.bzl", "version_x_defs")
 
 go_binary(
     name = "kubelet",
+    importpath = "k8s.io/kubernetes/cmd/kubelet",
     library = ":go_default_library",
     x_defs = version_x_defs(),
 )
@@ -16,6 +17,7 @@ go_binary(
 go_library(
     name = "go_default_library",
     srcs = ["kubelet.go"],
+    importpath = "k8s.io/kubernetes/cmd/kubelet",
     deps = [
         "//cmd/kubelet/app:go_default_library",
         "//cmd/kubelet/app/options:go_default_library",

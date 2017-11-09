@@ -19,13 +19,13 @@ limitations under the License.
 package cm
 
 import (
-	"bufio"
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,8 +45,10 @@ import (
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/deviceplugin"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
@@ -55,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/procfs"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 const (
@@ -125,7 +128,7 @@ type containerManagerImpl struct {
 	// Interface for QoS cgroup management
 	qosContainerManager QOSContainerManager
 	// Interface for exporting and allocating devices reported by device plugins.
-	devicePluginHandler DevicePluginHandler
+	devicePluginHandler deviceplugin.Handler
 	// Interface for CPU affinity management.
 	cpuManager cpumanager.Manager
 }
@@ -197,31 +200,17 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	}
 
 	// Check whether swap is enabled. The Kubelet does not support running with swap enabled.
-	cmd := exec.Command("cat", "/proc/swaps")
-	stdout, err := cmd.StdoutPipe()
+	swapData, err := ioutil.ReadFile("/proc/swaps")
 	if err != nil {
 		return nil, err
 	}
-	if err := cmd.Start(); err != nil {
-		return nil, err
-	}
-	var buf []string
-	scanner := bufio.NewScanner(stdout)
-	for scanner.Scan() { // Splits on newlines by default
-		buf = append(buf, scanner.Text())
-	}
-	if err := cmd.Wait(); err != nil { // Clean up
-		return nil, err
-	}
+	swapData = bytes.TrimSpace(swapData) // extra trailing \n
+	swapLines := strings.Split(string(swapData), "\n")
 
-	// Running with swap enabled should be considered an error, but in order to maintain legacy
-	// behavior we have to require an opt-in to this error for a period of time.
 	// If there is more than one line (table headers) in /proc/swaps, swap is enabled and we should
 	// error out unless --fail-swap-on is set to false.
-	if len(buf) > 1 {
-		if failSwapOn {
-			return nil, fmt.Errorf("Running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false. /proc/swaps contained: %v", buf)
-		}
+	if failSwapOn && len(swapLines) > 1 {
+		return nil, fmt.Errorf("Running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false. /proc/swaps contained: %v", swapLines)
 	}
 	var capacity = v1.ResourceList{}
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
@@ -250,7 +239,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 			return nil, fmt.Errorf("invalid configuration: cgroup-root %q doesn't exist: %v", cgroupRoot, err)
 		}
 		glog.Infof("container manager verified user specified cgroup-root exists: %v", cgroupRoot)
-		// Include the the top level cgroup for enforcing node allocatable into cgroup-root.
+		// Include the top level cgroup for enforcing node allocatable into cgroup-root.
 		// This way, all sub modules can avoid having to understand the concept of node allocatable.
 		cgroupRoot = path.Join(cgroupRoot, defaultNodeAllocatableCgroupName)
 	}
@@ -287,9 +276,9 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 
 	glog.Infof("Creating device plugin handler: %t", devicePluginEnabled)
 	if devicePluginEnabled {
-		cm.devicePluginHandler, err = NewDevicePluginHandlerImpl(updateDeviceCapacityFunc)
+		cm.devicePluginHandler, err = deviceplugin.NewHandlerImpl(updateDeviceCapacityFunc)
 	} else {
-		cm.devicePluginHandler, err = NewDevicePluginHandlerStub()
+		cm.devicePluginHandler, err = deviceplugin.NewHandlerStub()
 	}
 	if err != nil {
 		return nil, err
@@ -607,7 +596,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	}, time.Second, stopChan)
 
 	// Starts device plugin manager.
-	if err := cm.devicePluginHandler.Start(); err != nil {
+	if err := cm.devicePluginHandler.Start(deviceplugin.ActivePodsFunc(activePods)); err != nil {
 		return err
 	}
 	return nil
@@ -628,73 +617,22 @@ func (cm *containerManagerImpl) setFsCapacity() error {
 }
 
 // TODO: move the GetResources logic to PodContainerManager.
-func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Container, activePods []*v1.Pod) (*kubecontainer.RunContainerOptions, error) {
+func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
 	opts := &kubecontainer.RunContainerOptions{}
-	// Gets devices, mounts, and envs from device plugin handler.
-	glog.V(3).Infof("Calling devicePluginHandler AllocateDevices")
-	// Maps to detect duplicate settings.
-	devsMap := make(map[string]string)
-	mountsMap := make(map[string]string)
-	envsMap := make(map[string]string)
-	allocResps, err := cm.devicePluginHandler.Allocate(pod, container, activePods)
-	if err != nil {
-		return opts, err
+	// Allocate should already be called during predicateAdmitHandler.Admit(),
+	// just try to fetch device runtime information from cached state here
+	devOpts := cm.devicePluginHandler.GetDeviceRunContainerOptions(pod, container)
+	if devOpts == nil {
+		return opts, nil
 	}
-	// Loops through AllocationResponses of all required extended resources.
-	for _, resp := range allocResps {
-		// Loops through runtime spec of all devices of the given resource.
-		for _, devRuntime := range resp.Spec {
-			// Updates RunContainerOptions.Devices.
-			for _, dev := range devRuntime.Devices {
-				if d, ok := devsMap[dev.ContainerPath]; ok {
-					glog.V(3).Infof("skip existing device %s %s", dev.ContainerPath, dev.HostPath)
-					if d != dev.HostPath {
-						glog.Errorf("Container device %s has conflicting mapping host devices: %s and %s",
-							dev.ContainerPath, d, dev.HostPath)
-					}
-					continue
-				}
-				devsMap[dev.ContainerPath] = dev.HostPath
-				opts.Devices = append(opts.Devices, kubecontainer.DeviceInfo{
-					PathOnHost:      dev.HostPath,
-					PathInContainer: dev.ContainerPath,
-					Permissions:     dev.Permissions,
-				})
-			}
-			// Updates RunContainerOptions.Mounts.
-			for _, mount := range devRuntime.Mounts {
-				if m, ok := mountsMap[mount.ContainerPath]; ok {
-					glog.V(3).Infof("skip existing mount %s %s", mount.ContainerPath, mount.HostPath)
-					if m != mount.HostPath {
-						glog.Errorf("Container mount %s has conflicting mapping host mounts: %s and %s",
-							mount.ContainerPath, m, mount.HostPath)
-					}
-					continue
-				}
-				mountsMap[mount.ContainerPath] = mount.HostPath
-				opts.Mounts = append(opts.Mounts, kubecontainer.Mount{
-					Name:           mount.ContainerPath,
-					ContainerPath:  mount.ContainerPath,
-					HostPath:       mount.HostPath,
-					ReadOnly:       mount.ReadOnly,
-					SELinuxRelabel: false,
-				})
-			}
-			// Updates RunContainerOptions.Envs.
-			for k, v := range devRuntime.Envs {
-				if e, ok := envsMap[k]; ok {
-					glog.V(3).Infof("skip existing envs %s %s", k, v)
-					if e != v {
-						glog.Errorf("Environment variable %s has conflicting setting: %s and %s", k, e, v)
-					}
-					continue
-				}
-				envsMap[k] = v
-				opts.Envs = append(opts.Envs, kubecontainer.EnvVar{Name: k, Value: v})
-			}
-		}
-	}
+	opts.Devices = append(opts.Devices, devOpts.Devices...)
+	opts.Mounts = append(opts.Mounts, devOpts.Mounts...)
+	opts.Envs = append(opts.Envs, devOpts.Envs...)
 	return opts, nil
+}
+
+func (cm *containerManagerImpl) UpdatePluginResources(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
+	return cm.devicePluginHandler.Allocate(node, attrs)
 }
 
 func (cm *containerManagerImpl) SystemCgroupsLimit() v1.ResourceList {

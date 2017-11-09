@@ -57,7 +57,7 @@ if param_error:
 context['ingress'] = action_get('ingress')
 
 # Declare a kubectl template when invoking kubectl
-kubectl = ['kubectl', '--kubeconfig=/root/cdk/kubeconfig']
+kubectl = ['kubectl', '--kubeconfig=/root/.kube/config']
 
 # Remove deployment if requested
 if deletion:

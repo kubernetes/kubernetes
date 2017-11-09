@@ -12,6 +12,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/docker/engine-api/types/container",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/docker/engine-api/types/blkiodev:go_default_library",

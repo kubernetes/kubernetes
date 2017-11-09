@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/exec"
 	"k8s.io/kubernetes/plugin/pkg/admission/gc"
 	"k8s.io/kubernetes/plugin/pkg/admission/imagepolicy"
-	"k8s.io/kubernetes/plugin/pkg/admission/initialization"
 	"k8s.io/kubernetes/plugin/pkg/admission/initialresources"
 	"k8s.io/kubernetes/plugin/pkg/admission/limitranger"
 	"k8s.io/kubernetes/plugin/pkg/admission/namespace/autoprovision"
@@ -51,7 +50,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/plugin/pkg/admission/storageclass/setdefault"
-	"k8s.io/kubernetes/plugin/pkg/admission/webhook"
 )
 
 // RegisterAllAdmissionPlugins registers all admission plugins
@@ -65,7 +63,6 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	exec.Register(plugins)
 	gc.Register(plugins)
 	imagepolicy.Register(plugins)
-	initialization.Register(plugins)
 	initialresources.Register(plugins)
 	limitranger.Register(plugins)
 	autoprovision.Register(plugins)
@@ -81,6 +78,5 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	scdeny.Register(plugins)
 	serviceaccount.Register(plugins)
 	setdefault.Register(plugins)
-	webhook.Register(plugins)
 	resize.Register(plugins)
 }

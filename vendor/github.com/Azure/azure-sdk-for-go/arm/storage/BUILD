@@ -6,9 +6,12 @@ go_library(
         "accounts.go",
         "client.go",
         "models.go",
+        "operations.go",
+        "skus.go",
         "usage.go",
         "version.go",
     ],
+    importpath = "github.com/Azure/azure-sdk-for-go/arm/storage",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",

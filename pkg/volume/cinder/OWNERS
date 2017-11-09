@@ -2,16 +2,12 @@ approvers:
 - jsafrane
 - anguslees
 - dims
+- FengyunPan
 reviewers:
 - anguslees
-- justinsb
 - rootfs
-- brendandburns
-- thockin
-- smarterclayton
-- derekwaynecarr
-- pmorie
 - saad-ali
 - jsafrane
 - jingxu97
 - msau42
+- FengyunPan

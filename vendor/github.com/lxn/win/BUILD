@@ -40,6 +40,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/lxn/win",
     visibility = ["//visibility:public"],
 )
 

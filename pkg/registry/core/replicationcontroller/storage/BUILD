@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["storage_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
@@ -31,10 +32,13 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["storage.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
+        "//pkg/apis/autoscaling/v1:go_default_library",
         "//pkg/apis/autoscaling/validation:go_default_library",
+        "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
         "//pkg/printers/storage:go_default_library",

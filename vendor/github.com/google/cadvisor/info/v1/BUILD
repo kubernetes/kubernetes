@@ -8,6 +8,7 @@ go_library(
         "machine.go",
         "metric.go",
     ],
+    importpath = "github.com/google/cadvisor/info/v1",
     visibility = ["//visibility:public"],
 )
 

@@ -16,9 +16,11 @@ go_test(
         "node_test.go",
         "rbac_test.go",
     ],
+    importpath = "k8s.io/kubernetes/test/integration/auth",
     tags = ["integration"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/apis/authorization:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",

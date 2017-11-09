@@ -31,7 +31,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// CloudControllerMangerServer is the main context object for the controller manager.
+// CloudControllerManagerServer is the main context object for the controller manager.
 type CloudControllerManagerServer struct {
 	componentconfig.KubeControllerManagerConfiguration
 

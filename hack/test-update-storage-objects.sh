@@ -32,9 +32,6 @@ KUBE_NEW_API_VERSION=${KUBE_NEW_API_VERSION:-"v1"}
 KUBE_OLD_STORAGE_VERSIONS=${KUBE_OLD_STORAGE_VERSIONS:-""}
 KUBE_NEW_STORAGE_VERSIONS=${KUBE_NEW_STORAGE_VERSIONS:-""}
 
-STORAGE_BACKEND_ETCD2="etcd2"
-STORAGE_BACKEND_ETCD3="etcd3"
-
 KUBE_STORAGE_MEDIA_TYPE_JSON="application/json"
 KUBE_STORAGE_MEDIA_TYPE_PROTOBUF="application/vnd.kubernetes.protobuf"
 
@@ -51,11 +48,9 @@ KUBECTL="${KUBE_OUTPUT_HOSTBIN}/kubectl"
 UPDATE_ETCD_OBJECTS_SCRIPT="${KUBE_ROOT}/cluster/update-storage-objects.sh"
 
 function startApiServer() {
-  local storage_backend=${1:-"${STORAGE_BACKEND_ETCD2}"}
-  local storage_versions=${2:-""}
-  local storage_media_type=${3:-""}
+  local storage_versions=${1:-""}
+  local storage_media_type=${2:-""}
   kube::log::status "Starting kube-apiserver with KUBE_API_VERSIONS: ${KUBE_API_VERSIONS}"
-  kube::log::status "                           and storage-backend: ${storage_backend}"
   kube::log::status "                        and storage-media-type: ${storage_media_type}"
   kube::log::status "                            and runtime-config: ${RUNTIME_CONFIG}"
   kube::log::status "                 and storage-version overrides: ${storage_versions}"
@@ -65,7 +60,7 @@ function startApiServer() {
     --insecure-bind-address="${API_HOST}" \
     --bind-address="${API_HOST}" \
     --insecure-port="${API_PORT}" \
-    --storage-backend="${storage_backend}" \
+    --storage-backend="etcd3" \
     --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
     --etcd-prefix="/${ETCD_PREFIX}" \
     --runtime-config="${RUNTIME_CONFIG}" \
@@ -103,7 +98,7 @@ make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
 make -C "${KUBE_ROOT}" WHAT=cluster/images/etcd/attachlease
 
 kube::etcd::start
-echo "${ETCD_VERSION}/${STORAGE_BACKEND_ETCD2}" > "${ETCD_DIR}/version.txt"
+echo "${ETCD_VERSION}" > "${ETCD_DIR}/version.txt"
 
 ### BEGIN TEST DEFINITION CUSTOMIZATION ###
 
@@ -126,7 +121,7 @@ KUBE_NEW_STORAGE_VERSIONS="storage.k8s.io/v1"
 #######################################################
 KUBE_API_VERSIONS="v1,${KUBE_OLD_API_VERSION},${KUBE_NEW_API_VERSION}"
 RUNTIME_CONFIG="api/all=false,api/v1=true,${KUBE_OLD_API_VERSION}=true,${KUBE_NEW_API_VERSION}=true"
-startApiServer ${STORAGE_BACKEND_ETCD2} ${KUBE_OLD_STORAGE_VERSIONS} ${KUBE_STORAGE_MEDIA_TYPE_JSON}
+startApiServer ${KUBE_OLD_STORAGE_VERSIONS} ${KUBE_STORAGE_MEDIA_TYPE_JSON}
 
 
 # Create object(s)
@@ -147,38 +142,21 @@ for test in ${tests[@]}; do
     namespace="${namespace}/"
   fi
   kube::log::status "Verifying ${resource}/${namespace}${name} has storage version ${old_storage_version} in etcd"
-  curl -s http://${ETCD_HOST}:${ETCD_PORT}/v2/keys/${ETCD_PREFIX}/${resource}/${namespace}${name} | grep ${old_storage_version}
+  ETCDCTL_API=3 ${ETCDCTL} --endpoints="http://${ETCD_HOST}:${ETCD_PORT}" get "/${ETCD_PREFIX}/${resource}/${namespace}${name}" | grep ${old_storage_version}
 done
 
 killApiServer
 
 
 #######################################################
-# Step 2: Perform etcd2 -> etcd3 migration.
-# We always perform offline migration, so we need to stop etcd.
-#######################################################
-
-kube::etcd::stop
-TARGET_STORAGE="etcd3" \
-  TARGET_VERSION="3.0.17" \
-  DATA_DIRECTORY="${ETCD_DIR}" \
-  ETCD=$(which etcd) \
-  ETCDCTL=$(which etcdctl) \
-  ATTACHLEASE="${KUBE_OUTPUT_HOSTBIN}/attachlease" \
-  DO_NOT_MOVE_BINARIES="true" \
-  ${KUBE_ROOT}/cluster/images/etcd/migrate-if-needed.sh
-kube::etcd::start
-
-
-#######################################################
-# Step 3: Start a server which supports both the old and new api versions,
+# Step 2: Start a server which supports both the old and new api versions,
 # but KUBE_NEW_API_VERSION is the latest (storage) version.
 # Still use KUBE_STORAGE_MEDIA_TYPE_JSON for storage encoding.
 #######################################################
 
 KUBE_API_VERSIONS="v1,${KUBE_NEW_API_VERSION},${KUBE_OLD_API_VERSION}"
 RUNTIME_CONFIG="api/all=false,api/v1=true,${KUBE_OLD_API_VERSION}=true,${KUBE_NEW_API_VERSION}=true"
-startApiServer ${STORAGE_BACKEND_ETCD3} ${KUBE_NEW_STORAGE_VERSIONS} ${KUBE_STORAGE_MEDIA_TYPE_JSON}
+startApiServer ${KUBE_NEW_STORAGE_VERSIONS} ${KUBE_STORAGE_MEDIA_TYPE_JSON}
 
 # Update etcd objects, so that will now be stored in the new api version.
 kube::log::status "Updating storage versions in etcd"
@@ -196,14 +174,14 @@ for test in ${tests[@]}; do
     namespace="${namespace}/"
   fi
   kube::log::status "Verifying ${resource}/${namespace}${name} has updated storage version ${new_storage_version} in etcd"
-  ETCDCTL_API=3 ${ETCDCTL} --endpoints="${ETCD_HOST}:${ETCD_PORT}" get "/${ETCD_PREFIX}/${resource}/${namespace}${name}" | grep ${new_storage_version}
+  ETCDCTL_API=3 ${ETCDCTL} --endpoints="http://${ETCD_HOST}:${ETCD_PORT}" get "/${ETCD_PREFIX}/${resource}/${namespace}${name}" | grep ${new_storage_version}
 done
 
 killApiServer
 
 
 #######################################################
-# Step 4 : Start a server which supports only the new api version.
+# Step 3 : Start a server which supports only the new api version.
 # However, change storage encoding to KUBE_STORAGE_MEDIA_TYPE_PROTOBUF.
 #######################################################
 
@@ -212,7 +190,7 @@ RUNTIME_CONFIG="api/all=false,api/v1=true,${KUBE_NEW_API_VERSION}=true"
 
 # This seems to reduce flakiness.
 sleep 1
-startApiServer ${STORAGE_BACKEND_ETCD3} ${KUBE_NEW_STORAGE_VERSIONS} ${KUBE_STORAGE_MEDIA_TYPE_PROTOBUF}
+startApiServer ${KUBE_NEW_STORAGE_VERSIONS} ${KUBE_STORAGE_MEDIA_TYPE_PROTOBUF}
 
 for test in ${tests[@]}; do
   IFS=',' read -ra test_data <<<"$test"

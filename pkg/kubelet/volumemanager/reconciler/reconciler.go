@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/cmd/kubelet/app/options"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
@@ -495,7 +495,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 
 func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*reconstructedVolume) error {
 	// Get the node status to retrieve volume device path information.
-	node, fetchErr := rc.kubeClient.Core().Nodes().Get(string(rc.nodeName), metav1.GetOptions{})
+	node, fetchErr := rc.kubeClient.CoreV1().Nodes().Get(string(rc.nodeName), metav1.GetOptions{})
 	if fetchErr != nil {
 		glog.Errorf("updateStates in reconciler: could not get node status with error %v", fetchErr)
 	} else {
@@ -574,7 +574,7 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 		}
 		podName := podsDirInfo[i].Name()
 		podDir := path.Join(podDir, podName)
-		volumesDir := path.Join(podDir, options.DefaultKubeletVolumesDirName)
+		volumesDir := path.Join(podDir, config.DefaultKubeletVolumesDirName)
 		volumesDirInfo, err := ioutil.ReadDir(volumesDir)
 		if err != nil {
 			glog.Errorf("Could not read volume directory %q: %v", volumesDir, err)

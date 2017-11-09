@@ -15,6 +15,7 @@ go_library(
         "types.go",
         "wait.go",
     ],
+    importpath = "k8s.io/kubernetes/test/e2e/instrumentation/logging/utils",
     deps = [
         "//pkg/api:go_default_library",
         "//test/e2e/framework:go_default_library",

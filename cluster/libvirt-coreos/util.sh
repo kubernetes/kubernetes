@@ -217,10 +217,7 @@ function initialize-pool {
   mkdir -p "$POOL_PATH/kubernetes/addons"
   if [[ "$ENABLE_CLUSTER_DNS" == "true" ]]; then
       render-template "$ROOT/namespace.yaml" > "$POOL_PATH/kubernetes/addons/namespace.yaml"
-      render-template "$ROOT/kubedns-svc.yaml" > "$POOL_PATH/kubernetes/addons/kubedns-svc.yaml"
-      render-template "$ROOT/kubedns-controller.yaml"  > "$POOL_PATH/kubernetes/addons/kubedns-controller.yaml"
-      render-template "$ROOT/kubedns-sa.yaml"  > "$POOL_PATH/kubernetes/addons/kubedns-sa.yaml"
-      render-template "$ROOT/kubedns-cm.yaml"  > "$POOL_PATH/kubernetes/addons/kubedns-cm.yaml"
+      render-template "$ROOT/kube-dns.yaml" > "$POOL_PATH/kubernetes/addons/kube-dns.yaml"
   fi
 
   virsh pool-refresh $POOL

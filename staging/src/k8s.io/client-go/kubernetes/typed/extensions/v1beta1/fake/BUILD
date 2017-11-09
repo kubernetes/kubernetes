@@ -18,8 +18,8 @@ go_library(
         "fake_replicaset.go",
         "fake_scale.go",
         "fake_scale_expansion.go",
-        "fake_thirdpartyresource.go",
     ],
+    importpath = "k8s.io/client-go/kubernetes/typed/extensions/v1beta1/fake",
     deps = [
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

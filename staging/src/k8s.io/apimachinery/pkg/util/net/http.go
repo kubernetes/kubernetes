@@ -256,8 +256,11 @@ func isDefault(transportProxier func(*http.Request) (*url.URL, error)) bool {
 // NewProxierWithNoProxyCIDR constructs a Proxier function that respects CIDRs in NO_PROXY and delegates if
 // no matching CIDRs are found
 func NewProxierWithNoProxyCIDR(delegate func(req *http.Request) (*url.URL, error)) func(req *http.Request) (*url.URL, error) {
-	// we wrap the default method, so we only need to perform our check if the NO_PROXY envvar has a CIDR in it
+	// we wrap the default method, so we only need to perform our check if the NO_PROXY (or no_proxy) envvar has a CIDR in it
 	noProxyEnv := os.Getenv("NO_PROXY")
+	if noProxyEnv == "" {
+		noProxyEnv = os.Getenv("no_proxy")
+	}
 	noProxyRules := strings.Split(noProxyEnv, ",")
 
 	cidrs := []*net.IPNet{}
@@ -273,17 +276,7 @@ func NewProxierWithNoProxyCIDR(delegate func(req *http.Request) (*url.URL, error
 	}
 
 	return func(req *http.Request) (*url.URL, error) {
-		host := req.URL.Host
-		// for some urls, the Host is already the host, not the host:port
-		if net.ParseIP(host) == nil {
-			var err error
-			host, _, err = net.SplitHostPort(req.URL.Host)
-			if err != nil {
-				return delegate(req)
-			}
-		}
-
-		ip := net.ParseIP(host)
+		ip := net.ParseIP(req.URL.Hostname())
 		if ip == nil {
 			return delegate(req)
 		}

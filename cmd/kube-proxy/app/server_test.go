@@ -17,7 +17,6 @@ limitations under the License.
 package app
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -28,11 +27,9 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8sRuntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
+	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/iptables"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
@@ -138,54 +135,17 @@ func Test_getProxyMode(t *testing.T) {
 	}
 }
 
-// TestNewOptionsFailures tests failure modes for NewOptions()
-func TestNewOptionsFailures(t *testing.T) {
-
-	// Create a fake scheme builder that generates an error
-	errString := fmt.Sprintf("Simulated error")
-	genError := func(scheme *k8sRuntime.Scheme) error {
-		return errors.New(errString)
-	}
-	fakeSchemeBuilder := k8sRuntime.NewSchemeBuilder(genError)
-
-	simulatedErrorTest := func(target string) {
-		var addToScheme *func(s *k8sRuntime.Scheme) error
-		if target == "componentconfig" {
-			addToScheme = &componentconfig.AddToScheme
-		} else {
-			addToScheme = &v1alpha1.AddToScheme
-		}
-		restoreValue := *addToScheme
-		restore := func() {
-			*addToScheme = restoreValue
-		}
-		defer restore()
-		*addToScheme = fakeSchemeBuilder.AddToScheme
-		_, err := NewOptions()
-		assert.Error(t, err, fmt.Sprintf("Simulated error in component %s", target))
-	}
-
-	// Simulate errors in calls to AddToScheme()
-	faultTargets := []string{"componentconfig", "v1alpha1"}
-	for _, target := range faultTargets {
-		simulatedErrorTest(target)
-	}
-}
-
 // This test verifies that NewProxyServer does not crash when CleanupAndExit is true.
 func TestProxyServerWithCleanupAndExit(t *testing.T) {
 	// Each bind address below is a separate test case
 	bindAddresses := []string{
 		"0.0.0.0",
-		"2001:db8::1",
+		"::",
 	}
 	for _, addr := range bindAddresses {
-		options, err := NewOptions()
-		if err != nil {
-			t.Fatalf("Unexpected error with address %s: %v", addr, err)
-		}
+		options := NewOptions()
 
-		options.config = &componentconfig.KubeProxyConfiguration{
+		options.config = &kubeproxyconfig.KubeProxyConfiguration{
 			BindAddress: addr,
 		}
 		options.CleanupAndExit = true
@@ -198,7 +158,7 @@ func TestProxyServerWithCleanupAndExit(t *testing.T) {
 		assert.True(t, proxyserver.CleanupAndExit, "false CleanupAndExit, addr: %s", addr)
 
 		// Clean up config for next test case
-		configz.Delete("componentconfig")
+		configz.Delete(kubeproxyconfig.GroupName)
 	}
 }
 
@@ -242,7 +202,7 @@ func TestGetConntrackMax(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		cfg := componentconfig.KubeProxyConntrackConfiguration{
+		cfg := kubeproxyconfig.KubeProxyConntrackConfiguration{
 			Min:        tc.min,
 			Max:        tc.max,
 			MaxPerCore: tc.maxPerCore,
@@ -263,7 +223,7 @@ func TestGetConntrackMax(t *testing.T) {
 // TestLoadConfig tests proper operation of loadConfig()
 func TestLoadConfig(t *testing.T) {
 
-	yamlTemplate := `apiVersion: componentconfig/v1alpha1
+	yamlTemplate := `apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: %s
 clientConnection:
   acceptContentTypes: "abc"
@@ -308,12 +268,53 @@ udpTimeoutMilliseconds: 123ms
 		metricsBindAddress string
 	}{
 		{
-			name:               "iptables mode, IPv4 config",
+			name:               "iptables mode, IPv4 all-zeros bind address",
+			mode:               "iptables",
+			bindAddress:        "0.0.0.0",
+			clusterCIDR:        "1.2.3.0/24",
+			healthzBindAddress: "1.2.3.4:12345",
+			metricsBindAddress: "2.3.4.5:23456",
+		},
+		{
+			name:               "iptables mode, non-zeros IPv4 config",
 			mode:               "iptables",
 			bindAddress:        "9.8.7.6",
 			clusterCIDR:        "1.2.3.0/24",
 			healthzBindAddress: "1.2.3.4:12345",
 			metricsBindAddress: "2.3.4.5:23456",
+		},
+		{
+			// Test for 'bindAddress: "::"' (IPv6 all-zeros) in kube-proxy
+			// config file. The user will need to put quotes around '::' since
+			// 'bindAddress: ::' is invalid yaml syntax.
+			name:               "iptables mode, IPv6 \"::\" bind address",
+			mode:               "iptables",
+			bindAddress:        "\"::\"",
+			clusterCIDR:        "fd00:1::0/64",
+			healthzBindAddress: "[fd00:1::5]:12345",
+			metricsBindAddress: "[fd00:2::5]:23456",
+		},
+		{
+			// Test for 'bindAddress: "[::]"' (IPv6 all-zeros in brackets)
+			// in kube-proxy config file. The user will need to use
+			// surrounding quotes here since 'bindAddress: [::]' is invalid
+			// yaml syntax.
+			name:               "iptables mode, IPv6 \"[::]\" bind address",
+			mode:               "iptables",
+			bindAddress:        "\"[::]\"",
+			clusterCIDR:        "fd00:1::0/64",
+			healthzBindAddress: "[fd00:1::5]:12345",
+			metricsBindAddress: "[fd00:2::5]:23456",
+		},
+		{
+			// Test for 'bindAddress: ::0' (another form of IPv6 all-zeros).
+			// No surrounding quotes are required around '::0'.
+			name:               "iptables mode, IPv6 ::0 bind address",
+			mode:               "iptables",
+			bindAddress:        "::0",
+			clusterCIDR:        "fd00:1::0/64",
+			healthzBindAddress: "[fd00:1::5]:12345",
+			metricsBindAddress: "[fd00:2::5]:23456",
 		},
 		{
 			name:               "ipvs mode, IPv6 config",
@@ -326,9 +327,14 @@ udpTimeoutMilliseconds: 123ms
 	}
 
 	for _, tc := range testCases {
-		expected := &componentconfig.KubeProxyConfiguration{
-			BindAddress: tc.bindAddress,
-			ClientConnection: componentconfig.ClientConnectionConfiguration{
+		expBindAddr := tc.bindAddress
+		if tc.bindAddress[0] == '"' {
+			// Surrounding double quotes will get stripped by the yaml parser.
+			expBindAddr = expBindAddr[1 : len(tc.bindAddress)-1]
+		}
+		expected := &kubeproxyconfig.KubeProxyConfiguration{
+			BindAddress: expBindAddr,
+			ClientConnection: kubeproxyconfig.ClientConnectionConfiguration{
 				AcceptContentTypes: "abc",
 				Burst:              100,
 				ContentType:        "content-type",
@@ -337,7 +343,7 @@ udpTimeoutMilliseconds: 123ms
 			},
 			ClusterCIDR:      tc.clusterCIDR,
 			ConfigSyncPeriod: metav1.Duration{Duration: 15 * time.Second},
-			Conntrack: componentconfig.KubeProxyConntrackConfiguration{
+			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				Max:                   4,
 				MaxPerCore:            2,
 				Min:                   1,
@@ -347,26 +353,25 @@ udpTimeoutMilliseconds: 123ms
 			FeatureGates:       "all",
 			HealthzBindAddress: tc.healthzBindAddress,
 			HostnameOverride:   "foo",
-			IPTables: componentconfig.KubeProxyIPTablesConfiguration{
+			IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
 				MasqueradeAll: true,
 				MasqueradeBit: utilpointer.Int32Ptr(17),
 				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
 				SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
 			},
-			IPVS: componentconfig.KubeProxyIPVSConfiguration{
+			IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
 				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
 				SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
 			},
 			MetricsBindAddress: tc.metricsBindAddress,
-			Mode:               componentconfig.ProxyMode(tc.mode),
+			Mode:               kubeproxyconfig.ProxyMode(tc.mode),
 			OOMScoreAdj:        utilpointer.Int32Ptr(17),
 			PortRange:          "2-7",
 			ResourceContainer:  "/foo",
 			UDPIdleTimeout:     metav1.Duration{Duration: 123 * time.Millisecond},
 		}
 
-		options, err := NewOptions()
-		assert.NoError(t, err, "unexpected error for %s: %v", tc.name, err)
+		options := NewOptions()
 
 		yaml := fmt.Sprintf(
 			yamlTemplate, tc.bindAddress, tc.clusterCIDR,
@@ -374,7 +379,7 @@ udpTimeoutMilliseconds: 123ms
 		config, err := options.loadConfig([]byte(yaml))
 		assert.NoError(t, err, "unexpected error for %s: %v", tc.name, err)
 		if !reflect.DeepEqual(expected, config) {
-			t.Fatalf("unexpected config for %s test, diff = %s", tc.name, diff.ObjectDiff(config, expected))
+			t.Fatalf("unexpected config for %s, diff = %s", tc.name, diff.ObjectDiff(config, expected))
 		}
 	}
 }
@@ -394,12 +399,17 @@ func TestLoadConfigFailures(t *testing.T) {
 		{
 			name:   "Bad config type test",
 			config: "kind: KubeSchedulerConfiguration",
-			expErr: "unexpected config type",
+			expErr: "no kind",
+		},
+		{
+			name:   "Missing quotes around :: bindAddress",
+			config: "bindAddress: ::",
+			expErr: "mapping values are not allowed in this context",
 		},
 	}
-	version := "apiVersion: componentconfig/v1alpha1"
+	version := "apiVersion: kubeproxy.config.k8s.io/v1alpha1"
 	for _, tc := range testCases {
-		options, _ := NewOptions()
+		options := NewOptions()
 		config := fmt.Sprintf("%s\n%s", version, tc.config)
 		_, err := options.loadConfig([]byte(config))
 		if assert.Error(t, err, tc.name) {

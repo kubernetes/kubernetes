@@ -80,7 +80,6 @@ func (q *queryParser) parseStruct(v url.Values, value reflect.Value, prefix stri
 			continue
 		}
 
-
 		if protocol.CanSetIdempotencyToken(value.Field(i), field) {
 			token := protocol.GetIdempotencyToken()
 			elemValue = reflect.ValueOf(token)
@@ -122,9 +121,17 @@ func (q *queryParser) parseList(v url.Values, value reflect.Value, prefix string
 		return nil
 	}
 
+	if _, ok := value.Interface().([]byte); ok {
+		return q.parseScalar(v, value, prefix, tag)
+	}
+
 	// check for unflattened list member
 	if !q.isEC2 && tag.Get("flattened") == "" {
-		prefix += ".member"
+		if listName := tag.Get("locationNameList"); listName == "" {
+			prefix += ".member"
+		} else {
+			prefix += "." + listName
+		}
 	}
 
 	for i := 0; i < value.Len(); i++ {

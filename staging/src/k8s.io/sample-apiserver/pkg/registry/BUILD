@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["registry.go"],
+    importpath = "k8s.io/sample-apiserver/pkg/registry",
     deps = [
         "//vendor/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",

@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	"k8s.io/kubernetes/test/e2e/framework"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // Sanity check for vSphere testing.  Verify the persistent disk attached to the node.
@@ -207,7 +206,7 @@ func getVSphereStorageClassSpec(name string, scParameters map[string]string) *st
 	return sc
 }
 
-func getVSphereClaimSpecWithStorageClassAnnotation(ns string, storageclass *storage.StorageClass) *v1.PersistentVolumeClaim {
+func getVSphereClaimSpecWithStorageClassAnnotation(ns string, diskSize string, storageclass *storage.StorageClass) *v1.PersistentVolumeClaim {
 	scAnnotation := make(map[string]string)
 	scAnnotation[v1.BetaStorageClassAnnotation] = storageclass.Name
 
@@ -223,7 +222,7 @@ func getVSphereClaimSpecWithStorageClassAnnotation(ns string, storageclass *stor
 			},
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceStorage): resource.MustParse("2Gi"),
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse(diskSize),
 				},
 			},
 		},
@@ -245,7 +244,7 @@ func getVSpherePodSpecWithClaim(claimName string, nodeSelectorKV map[string]stri
 			Containers: []v1.Container{
 				{
 					Name:    "volume-tester",
-					Image:   imageutils.GetBusyBoxImage(),
+					Image:   "busybox",
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", command},
 					VolumeMounts: []v1.VolumeMount{
@@ -310,7 +309,7 @@ func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[st
 			Containers: []v1.Container{
 				{
 					Name:         "vsphere-e2e-container-" + string(uuid.NewUUID()),
-					Image:        imageutils.GetBusyBoxImage(),
+					Image:        "busybox",
 					Command:      commands,
 					VolumeMounts: volumeMounts,
 				},
@@ -354,4 +353,13 @@ func verifyVSphereVolumesAccessible(pod *v1.Pod, persistentvolumes []*v1.Persist
 		_, err = framework.LookForStringInPodExec(namespace, pod.Name, []string{"/bin/touch", filepath}, "", time.Minute)
 		Expect(err).NotTo(HaveOccurred())
 	}
+}
+
+// Get vSphere Volume Path from PVC
+func getvSphereVolumePathFromClaim(client clientset.Interface, namespace string, claimName string) string {
+	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Get(claimName, metav1.GetOptions{})
+	Expect(err).NotTo(HaveOccurred())
+	pv, err := client.CoreV1().PersistentVolumes().Get(pvclaim.Spec.VolumeName, metav1.GetOptions{})
+	Expect(err).NotTo(HaveOccurred())
+	return pv.Spec.VsphereVolume.VolumePath
 }

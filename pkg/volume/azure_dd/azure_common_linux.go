@@ -77,6 +77,19 @@ func findDiskByLunWithConstraint(lun int, io ioHandler, azureDisks []string) (st
 			if len(arr) < 4 {
 				continue
 			}
+			if len(azureDisks) == 0 {
+				glog.V(4).Infof("/dev/disk/azure is not populated, now try to parse %v directly", name)
+				target, err := strconv.Atoi(arr[0])
+				if err != nil {
+					glog.Errorf("failed to parse target from %v (%v), err %v", arr[0], name, err)
+					continue
+				}
+				// as observed, targets 0-3 are used by OS disks. Skip them
+				if target <= 3 {
+					continue
+				}
+			}
+
 			// extract LUN from the path.
 			// LUN is the last index of the array, i.e. 1 in /sys/bus/scsi/devices/3:0:0:1
 			l, err := strconv.Atoi(arr[3])
@@ -150,9 +163,10 @@ func formatIfNotFormatted(disk string, fstype string, exec mount.Exec) {
 		_, err := exec.Run("mkfs."+fstype, args...)
 		if err == nil {
 			// the disk has been formatted successfully try to mount it again.
-			glog.Infof("azureDisk - Disk successfully formatted (mkfs): %s - %s %s", fstype, disk, "tt")
+			glog.Infof("azureDisk - Disk successfully formatted with 'mkfs.%s %v'", fstype, args)
+		} else {
+			glog.Warningf("azureDisk - Error formatting volume with 'mkfs.%s %v': %v", fstype, args, err)
 		}
-		glog.Warningf("azureDisk - format of disk %q failed: type:(%q) target:(%q) options:(%q)error:(%v)", disk, fstype, "tt", "o", err)
 	} else {
 		if err != nil {
 			glog.Warningf("azureDisk - Failed to check if the disk %s formatted with error %s, will attach anyway", disk, err)

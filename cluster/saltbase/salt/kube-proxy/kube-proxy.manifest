@@ -32,7 +32,7 @@
  {% set feature_gates = "--feature-gates=" + grains.feature_gates -%}
 {% endif -%}
 
-{% set throttles = "--iptables-sync-period=1m --iptables-min-sync-period=10s" -%}
+{% set throttles = "--iptables-sync-period=1m --iptables-min-sync-period=10s --ipvs-sync-period=1m --ipvs-min-sync-period=10s" -%}
 
 {% set pod_priority = "" -%}
 {% if pillar.get('enable_pod_priority', '').lower() == 'true' -%}
@@ -65,16 +65,6 @@ metadata:
 spec:
   {{pod_priority}}
   hostNetwork: true
-  initContainers:
-  - name: touch-lock
-    image: busybox
-    command: ['/bin/touch', '/run/xtables.lock']
-    securityContext:
-      privileged: true
-    volumeMounts:
-    - mountPath: /run
-      name: run
-      readOnly: false
   containers:
   - name: kube-proxy
     image: {{pillar['kube_docker_registry']}}/kube-proxy:{{pillar['kube-proxy_docker_tag']}}
@@ -84,7 +74,7 @@ spec:
     command:
     - /bin/sh
     - -c
-    - echo -998 > /proc/$$$/oom_score_adj && kube-proxy {{api_servers_with_port}} {{kubeconfig}} {{cluster_cidr}} --resource-container="" {{params}} 1>>/var/log/kube-proxy.log 2>&1
+    - kube-proxy {{api_servers_with_port}} {{kubeconfig}} {{cluster_cidr}} --resource-container="" --oom-score-adj=-998 {{params}} 1>>/var/log/kube-proxy.log 2>&1
     {{container_env}}
     {{kube_cache_mutation_detector_env_name}}
       {{kube_cache_mutation_detector_env_value}}
@@ -106,6 +96,9 @@ spec:
     - mountPath: /run/xtables.lock
       name: iptableslock
       readOnly: false
+    - mountPath: /lib/modules
+      name: lib-modules
+      readOnly: true
   volumes:
   - hostPath:
       path: /usr/share/ca-certificates
@@ -121,9 +114,9 @@ spec:
       path: /var/log
     name: varlog
   - hostPath:
-      path: /run
-    name: run
-  - hostPath:
       path: /run/xtables.lock
       type: FileOrCreate
     name: iptableslock
+  - name: lib-modules
+    hostPath:
+      path: /lib/modules

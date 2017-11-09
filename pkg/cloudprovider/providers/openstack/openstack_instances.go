@@ -17,7 +17,6 @@ limitations under the License.
 package openstack
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 
@@ -32,6 +31,7 @@ import (
 
 type Instances struct {
 	compute *gophercloud.ServiceClient
+	opts    MetadataOpts
 }
 
 // Instances returns an implementation of Instances for OpenStack.
@@ -45,13 +45,16 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 
 	glog.V(1).Info("Claiming to support Instances")
 
-	return &Instances{compute}, true
+	return &Instances{
+		compute: compute,
+		opts:    os.metadataOpts,
+	}, true
 }
 
 // Implementation of Instances.CurrentNodeName
 // Note this is *not* necessarily the same as hostname.
 func (i *Instances) CurrentNodeName(hostname string) (types.NodeName, error) {
-	md, err := getMetadata()
+	md, err := getMetadata(i.opts.SearchOrder)
 	if err != nil {
 		return "", err
 	}
@@ -59,7 +62,7 @@ func (i *Instances) CurrentNodeName(hostname string) (types.NodeName, error) {
 }
 
 func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
-	return errors.New("unimplemented")
+	return cloudprovider.NotImplemented
 }
 
 func (i *Instances) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
@@ -113,13 +116,31 @@ func (i *Instances) ExternalID(name types.NodeName) (string, error) {
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (i *Instances) InstanceExistsByProviderID(providerID string) (bool, error) {
-	return false, errors.New("unimplemented")
+	instanceID, err := instanceIDFromProviderID(providerID)
+	if err != nil {
+		return false, err
+	}
+
+	server, err := servers.Get(i.compute, instanceID).Extract()
+	if err != nil {
+		if isNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	if server.Status != "ACTIVE" {
+		glog.Warningf("the instance %s is not active", instanceID)
+		return false, nil
+	}
+
+	return true, nil
 }
 
 // InstanceID returns the kubelet's cloud provider ID.
 func (os *OpenStack) InstanceID() (string, error) {
 	if len(os.localInstanceID) == 0 {
-		id, err := readInstanceID()
+		id, err := readInstanceID(os.metadataOpts.SearchOrder)
 		if err != nil {
 			return "", err
 		}

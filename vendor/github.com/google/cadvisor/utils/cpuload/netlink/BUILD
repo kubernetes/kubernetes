@@ -9,6 +9,7 @@ go_library(
         "reader.go",
     ],
     cgo = True,
+    importpath = "github.com/google/cadvisor/utils/cpuload/netlink",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",

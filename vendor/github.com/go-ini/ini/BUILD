@@ -3,9 +3,14 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "error.go",
         "ini.go",
+        "key.go",
+        "parser.go",
+        "section.go",
         "struct.go",
     ],
+    importpath = "github.com/go-ini/ini",
     visibility = ["//visibility:public"],
 )
 

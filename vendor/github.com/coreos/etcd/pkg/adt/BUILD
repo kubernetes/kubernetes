@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "interval_tree.go",
     ],
+    importpath = "github.com/coreos/etcd/pkg/adt",
     visibility = ["//visibility:public"],
 )
 

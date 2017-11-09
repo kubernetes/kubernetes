@@ -19,10 +19,12 @@ package reconcilers
 
 import (
 	"net"
+	"sync"
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/endpoints"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
@@ -31,8 +33,10 @@ import (
 // masterCountEndpointReconciler reconciles endpoints based on a specified expected number of
 // masters. masterCountEndpointReconciler implements EndpointReconciler.
 type masterCountEndpointReconciler struct {
-	masterCount    int
-	endpointClient coreclient.EndpointsGetter
+	masterCount           int
+	endpointClient        coreclient.EndpointsGetter
+	stopReconcilingCalled bool
+	reconcilingLock       sync.Mutex
 }
 
 // NewMasterCountEndpointReconciler creates a new EndpointReconciler that reconciles based on a
@@ -57,6 +61,13 @@ func NewMasterCountEndpointReconciler(masterCount int, endpointClient coreclient
 //      to be running (c.masterCount).
 //  * ReconcileEndpoints is called periodically from all apiservers.
 func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
+	r.reconcilingLock.Lock()
+	defer r.reconcilingLock.Unlock()
+
+	if r.stopReconcilingCalled {
+		return nil
+	}
+
 	e, err := r.endpointClient.Endpoints(metav1.NamespaceDefault).Get(serviceName, metav1.GetOptions{})
 	if err != nil {
 		e = &api.Endpoints{
@@ -123,6 +134,36 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 	}
 	glog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
 	_, err = r.endpointClient.Endpoints(metav1.NamespaceDefault).Update(e)
+	return err
+}
+
+func (r *masterCountEndpointReconciler) StopReconciling(serviceName string, ip net.IP, endpointPorts []api.EndpointPort) error {
+	r.reconcilingLock.Lock()
+	defer r.reconcilingLock.Unlock()
+	r.stopReconcilingCalled = true
+
+	e, err := r.endpointClient.Endpoints(metav1.NamespaceDefault).Get(serviceName, metav1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Endpoint doesn't exist
+			return nil
+		}
+		return err
+	}
+
+	// Remove our IP from the list of addresses
+	new := []api.EndpointAddress{}
+	for _, addr := range e.Subsets[0].Addresses {
+		if addr.IP != ip.String() {
+			new = append(new, addr)
+		}
+	}
+	e.Subsets[0].Addresses = new
+	e.Subsets = endpoints.RepackSubsets(e.Subsets)
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		_, err := r.endpointClient.Endpoints(metav1.NamespaceDefault).Update(e)
+		return err
+	})
 	return err
 }
 

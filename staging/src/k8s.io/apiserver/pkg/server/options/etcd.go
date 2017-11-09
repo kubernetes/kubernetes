@@ -144,10 +144,15 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 		"SSL Certificate Authority file used to secure etcd communication.")
 
 	fs.BoolVar(&s.StorageConfig.Quorum, "etcd-quorum-read", s.StorageConfig.Quorum,
-		"If true, enable quorum read.")
+		"If true, enable quorum read. It defaults to true and is strongly recommended not setting to false.")
+	fs.MarkDeprecated("etcd-quorum-read", "This flag is deprecated and the ability to switch off quorum read will be removed in a future release.")
 
 	fs.StringVar(&s.EncryptionProviderConfigFilepath, "experimental-encryption-provider-config", s.EncryptionProviderConfigFilepath,
 		"The file containing configuration for encryption providers to be used for storing secrets in etcd")
+
+	fs.DurationVar(&s.StorageConfig.CompactionInterval, "etcd-compaction-interval", s.StorageConfig.CompactionInterval,
+		"The interval of compaction requests. If 0, the compaction request from apiserver is disabled.")
+
 }
 
 func (s *EtcdOptions) ApplyTo(c *server.Config) error {

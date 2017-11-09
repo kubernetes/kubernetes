@@ -17,6 +17,7 @@ go_library(
         "int64.go",
         "string.go",
     ],
+    importpath = "k8s.io/apimachinery/pkg/util/sets",
 )
 
 go_genrule(
@@ -50,6 +51,7 @@ $(location //vendor/k8s.io/code-generator/cmd/set-gen) \
 go_test(
     name = "go_default_test",
     srcs = ["set_test.go"],
+    importpath = "k8s.io/apimachinery/pkg/util/sets",
     library = ":go_default_library",
 )
 

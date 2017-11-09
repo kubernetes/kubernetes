@@ -8,11 +8,12 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["registry.go"],
+    importpath = "k8s.io/kubernetes/pkg/quota/install",
     deps = [
         "//pkg/quota:go_default_library",
         "//pkg/quota/evaluator/core:go_default_library",
-        "//vendor/k8s.io/client-go/informers:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//pkg/quota/generic:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
 )
 

@@ -8,8 +8,9 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["storage_batch.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/batch/rest",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/registry/batch/cronjob/storage:go_default_library",
         "//pkg/registry/batch/job/storage:go_default_library",

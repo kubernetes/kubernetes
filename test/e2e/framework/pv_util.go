@@ -494,25 +494,22 @@ func testPodSuccessOrFail(c clientset.Interface, ns string, pod *v1.Pod) error {
 // Deletes the passed-in pod and waits for the pod to be terminated. Resilient to the pod
 // not existing.
 func DeletePodWithWait(f *Framework, c clientset.Interface, pod *v1.Pod) error {
+	const maxWait = 5 * time.Minute
 	if pod == nil {
 		return nil
 	}
-	Logf("Deleting pod %v", pod.Name)
+	Logf("Deleting pod %q in namespace %q", pod.Name, pod.Namespace)
 	err := c.CoreV1().Pods(pod.Namespace).Delete(pod.Name, nil)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
-			return nil // assume pod was deleted already
+			return nil // assume pod was already deleted
 		}
-		return fmt.Errorf("pod Get API error: %v", err)
+		return fmt.Errorf("pod Delete API error: %v", err)
 	}
-
-	// wait for pod to terminate
-	err = f.WaitForPodTerminated(pod.Name, "")
-	if err != nil && !apierrs.IsNotFound(err) {
-		return fmt.Errorf("error deleting pod %q: %v", pod.Name, err)
-	}
-	if apierrs.IsNotFound(err) {
-		Logf("Ignore \"not found\" error above. Pod %q successfully deleted", pod.Name)
+	Logf("Wait up to %v for pod %q to be fully deleted", maxWait, pod.Name)
+	err = f.WaitForPodNotFound(pod.Name, maxWait)
+	if err != nil {
+		return fmt.Errorf("pod %q was not deleted: %v", pod.Name, err)
 	}
 	return nil
 }
@@ -935,11 +932,11 @@ func CreateClientPod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeC
 }
 
 // wait until all pvcs phase set to bound
-func WaitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*v1.PersistentVolumeClaim) ([]*v1.PersistentVolume, error) {
+func WaitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*v1.PersistentVolumeClaim, timeout time.Duration) ([]*v1.PersistentVolume, error) {
 	persistentvolumes := make([]*v1.PersistentVolume, len(pvclaims))
 
 	for index, claim := range pvclaims {
-		err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, Poll, ClaimProvisionTimeout)
+		err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, Poll, timeout)
 		if err != nil {
 			return persistentvolumes, err
 		}
