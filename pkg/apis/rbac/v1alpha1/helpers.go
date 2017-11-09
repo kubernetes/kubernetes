@@ -102,7 +102,7 @@ func NewClusterBinding(clusterRoleName string) *ClusterRoleBindingBuilder {
 		ClusterRoleBinding: rbacv1alpha1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName},
 			RoleRef: rbacv1alpha1.RoleRef{
-				APIGroup: GroupName,
+				APIGroup: rbacv1alpha1.GroupName,
 				Kind:     "ClusterRole",
 				Name:     clusterRoleName,
 			},

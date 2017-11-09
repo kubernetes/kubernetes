@@ -22,13 +22,13 @@ import (
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 
+	. "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
-	. "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )

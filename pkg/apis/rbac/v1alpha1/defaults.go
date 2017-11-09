@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -27,12 +28,12 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 
 func SetDefaults_ClusterRoleBinding(obj *rbacv1alpha1.ClusterRoleBinding) {
 	if len(obj.RoleRef.APIGroup) == 0 {
-		obj.RoleRef.APIGroup = GroupName
+		obj.RoleRef.APIGroup = rbac.GroupName
 	}
 }
 func SetDefaults_RoleBinding(obj *rbacv1alpha1.RoleBinding) {
 	if len(obj.RoleRef.APIGroup) == 0 {
-		obj.RoleRef.APIGroup = GroupName
+		obj.RoleRef.APIGroup = rbac.GroupName
 	}
 }
 func SetDefaults_Subject(obj *rbacv1alpha1.Subject) {
@@ -41,9 +42,9 @@ func SetDefaults_Subject(obj *rbacv1alpha1.Subject) {
 		case rbacv1alpha1.ServiceAccountKind:
 			obj.APIVersion = "v1"
 		case rbacv1alpha1.UserKind:
-			obj.APIVersion = SchemeGroupVersion.String()
+			obj.APIVersion = rbacv1alpha1.SchemeGroupVersion.String()
 		case rbacv1alpha1.GroupKind:
-			obj.APIVersion = SchemeGroupVersion.String()
+			obj.APIVersion = rbacv1alpha1.SchemeGroupVersion.String()
 		}
 	}
 }

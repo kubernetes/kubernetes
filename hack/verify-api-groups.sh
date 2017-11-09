@@ -28,7 +28,7 @@ prefix="${KUBE_ROOT%"k8s.io/kubernetes"}"
 register_files=()
 while IFS= read -d $'\0' -r file ; do
 	register_files+=("${file}")
-done < <(find "${KUBE_ROOT}"/pkg/apis -name register.go -print0)
+done < <(find "${KUBE_ROOT}"/pkg/apis -name register.go -print0 && find -H "${KUBE_ROOT}"/vendor/k8s.io/api -name register.go -print0)
 
 # every register file should contain a GroupName.  Gather the different representations.
 # 1. group directory name for client gen
@@ -38,11 +38,19 @@ group_dirnames=()
 external_group_versions=()
 expected_install_packages=()
 for register_file in "${register_files[@]}"; do
-	package="${register_file#"${prefix}"}"
-	package="${package%"/register.go"}"
+	package_path="${register_file%"/register.go"}"
+	package="${package_path#"${prefix}"}"
+
+	if [ ! -f "${package_path}/types.go" ]; then
+        echo "Skipping non-types package ${package}/types.go"
+	    continue
+	fi
+
 	group_dirname="${package#"k8s.io/kubernetes/pkg/apis/"}"
+	group_dirname="${group_dirname#"k8s.io/kubernetes/vendor/k8s.io/api/"}"
 	group_dirname="${group_dirname%%"/*"}"
 	group_name=""
+
 	if grep -q 'GroupName = "' "${register_file}"; then
 		group_name=$(grep -q 'GroupName = "' "${register_file}" | cut -d\" -f2 -)
 	else
@@ -67,9 +75,9 @@ done
 # them.  This happens for types that aren't served from the API server
 groups_without_codegen=(
 	"abac"
+	"admission"
 	"componentconfig"
 	"imagepolicy"
-	"admission"
 )
 client_gen_file="${KUBE_ROOT}/vendor/k8s.io/code-generator/cmd/client-gen/main.go"
 

@@ -22,6 +22,7 @@ import (
 	fuzz "github.com/google/gofuzz"
 
 	"k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
 	genericfuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
@@ -37,7 +38,6 @@ import (
 	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsfuzzer "k8s.io/kubernetes/pkg/apis/extensions/fuzzer"
-	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	networkingfuzzer "k8s.io/kubernetes/pkg/apis/networking/fuzzer"
 	policyfuzzer "k8s.io/kubernetes/pkg/apis/policy/fuzzer"
 	rbacfuzzer "k8s.io/kubernetes/pkg/apis/rbac/fuzzer"

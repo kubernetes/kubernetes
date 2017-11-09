@@ -23,6 +23,7 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 
 	"k8s.io/api/core/v1"
+	. "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +33,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
-	. "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 func TestSetDefaultDaemonSetSpec(t *testing.T) {

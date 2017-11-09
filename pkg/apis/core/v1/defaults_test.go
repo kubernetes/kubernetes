@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+	. "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,7 +35,7 @@ import (
 )
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
-	codec := legacyscheme.Codecs.LegacyCodec(corev1.SchemeGroupVersion)
+	codec := legacyscheme.Codecs.LegacyCodec(SchemeGroupVersion)
 	data, err := runtime.Encode(codec, obj)
 	if err != nil {
 		t.Errorf("%v\n %#v", err, obj)
