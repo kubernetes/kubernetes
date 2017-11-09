@@ -258,7 +258,7 @@ func (o *Options) loadConfigFromFile(file string) (*componentconfig.KubeSchedule
 	return o.loadConfig(data)
 }
 
-// loadConfig decodes data as a KubeProxyConfiguration object.
+// loadConfig decodes data as a KubeSchedulerConfiguration object.
 func (o *Options) loadConfig(data []byte) (*componentconfig.KubeSchedulerConfiguration, error) {
 	configObj, gvk, err := o.codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
