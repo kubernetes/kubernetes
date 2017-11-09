@@ -9399,6 +9399,43 @@
       "type": "integer",
       "format": "int32",
       "description": "collisionCount is the count of hash collisions for the StatefulSet. The StatefulSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision."
+     },
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta2.StatefulSetCondition"
+      },
+      "description": "Represents the latest available observations of a statefulset's current state."
+     }
+    }
+   },
+   "v1beta2.StatefulSetCondition": {
+    "id": "v1beta2.StatefulSetCondition",
+    "description": "StatefulSetCondition describes the state of a statefulset at a certain point.",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type of statefulset condition."
+     },
+     "status": {
+      "type": "string",
+      "description": "Status of the condition, one of True, False, Unknown."
+     },
+     "lastTransitionTime": {
+      "type": "string",
+      "description": "Last time the condition transitioned from one status to another."
+     },
+     "reason": {
+      "type": "string",
+      "description": "The reason for the condition's last transition."
+     },
+     "message": {
+      "type": "string",
+      "description": "A human readable message indicating details about the transition."
      }
     }
    },
