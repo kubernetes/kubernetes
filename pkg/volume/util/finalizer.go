@@ -20,6 +20,11 @@ import (
 	"k8s.io/api/core/v1"
 )
 
+const (
+	// Name of finalizer on PVCs that have a running pod.
+	PVCProtectionFinalizer = "kubernetes.io/pvc-protection"
+)
+
 // IsPVCBeingDeleted returns:
 // true: in case PVC is being deleted, i.e. ObjectMeta.DeletionTimestamp is set
 // false: in case PVC is not being deleted, i.e. ObjectMeta.DeletionTimestamp is nil
