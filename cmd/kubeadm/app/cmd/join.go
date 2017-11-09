@@ -38,6 +38,7 @@ import (
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	utilsexec "k8s.io/utils/exec"
 )
 
 var (
@@ -100,6 +101,7 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 
 	var skipPreFlight bool
 	var cfgPath string
+	var criSocket string
 
 	cmd := &cobra.Command{
 		Use:   "join [flags]",
@@ -112,7 +114,7 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 			internalcfg := &kubeadmapi.NodeConfiguration{}
 			legacyscheme.Scheme.Convert(cfg, internalcfg, nil)
 
-			j, err := NewJoin(cfgPath, args, internalcfg, skipPreFlight)
+			j, err := NewJoin(cfgPath, args, internalcfg, skipPreFlight, criSocket)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(j.Validate(cmd))
 			kubeadmutil.CheckErr(j.Run(out))
@@ -120,7 +122,7 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 	}
 
 	AddJoinConfigFlags(cmd.PersistentFlags(), cfg)
-	AddJoinOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight)
+	AddJoinOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &criSocket)
 
 	return cmd
 }
@@ -151,7 +153,7 @@ func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.NodeConfigurat
 }
 
 // AddJoinOtherFlags adds join flags that are not bound to a configuration file to the given flagset
-func AddJoinOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight *bool) {
+func AddJoinOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight *bool, criSocket *string) {
 	flagSet.StringVar(
 		cfgPath, "config", *cfgPath,
 		"Path to kubeadm config file.")
@@ -159,6 +161,10 @@ func AddJoinOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight *bo
 	flagSet.BoolVar(
 		skipPreFlight, "skip-preflight-checks", false,
 		"Skip preflight checks normally run before modifying the system.",
+	)
+	flagSet.StringVar(
+		criSocket, "cri-socket", "/var/run/dockershim.sock",
+		`Specify the CRI socket to connect to.`,
 	)
 }
 
@@ -168,7 +174,7 @@ type Join struct {
 }
 
 // NewJoin instantiates Join struct with given arguments
-func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, skipPreFlight bool) (*Join, error) {
+func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, skipPreFlight bool, criSocket string) (*Join, error) {
 	fmt.Println("[kubeadm] WARNING: kubeadm is in beta, please do not use it for production clusters.")
 
 	if cfg.NodeName == "" {
@@ -189,7 +195,7 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 		fmt.Println("[preflight] Running pre-flight checks.")
 
 		// Then continue with the others...
-		if err := preflight.RunJoinNodeChecks(cfg); err != nil {
+		if err := preflight.RunJoinNodeChecks(utilsexec.New(), cfg, criSocket); err != nil {
 			return nil, err
 		}
 
