@@ -47,7 +47,7 @@ type Configuration struct {
 
 type DataSourceInfo struct {
 	// Data source used by InitialResources. Supported options: influxdb, gcm, hawkular
-	DataSource string `json:"datasource,omitempty"`
+	DataSource DataSourceType `json:"datasource,omitempty"`
 
 	// Address of InfluxDB which contains metrics required by InitialResources
 	InfluxdbHost string `json:"influxdbhost,omitempty"`

@@ -66,6 +66,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//plugin/pkg/admission/initialresources/apis/initialresources:all-srcs",
+    ],
     tags = ["automanaged"],
 )
