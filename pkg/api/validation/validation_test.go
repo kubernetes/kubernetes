@@ -207,7 +207,7 @@ func TestValidatePersistentVolumes(t *testing.T) {
 		},
 		"too-many-sources": {
 			isExpectedFailure: true,
-			volume: testVolume("", "", api.PersistentVolumeSpec{
+			volume: testVolume("foo", "", api.PersistentVolumeSpec{
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
 				},
