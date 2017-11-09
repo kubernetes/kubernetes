@@ -26,6 +26,10 @@ func TestLibcontainerAdapterAdaptToSystemd(t *testing.T) {
 		expected string
 	}{
 		{
+			input:    "",
+			expected: "-.slice",
+		},
+		{
 			input:    "/",
 			expected: "-.slice",
 		},
@@ -70,7 +74,7 @@ func TestLibcontainerAdapterAdaptToSystemd(t *testing.T) {
 	}
 }
 
-func TestLibcontainerAdapterAdaptToSystemdAsCgroupFs(t *testing.T) {
+func TestCgroupManagerGetCgroupFsNameForSystemd(t *testing.T) {
 	testCases := []struct {
 		input    string
 		expected string
@@ -88,13 +92,47 @@ func TestLibcontainerAdapterAdaptToSystemdAsCgroupFs(t *testing.T) {
 			expected: "Burstable.slice/Burstable-pod_123.slice/",
 		},
 		{
+			input:    "Burstable/pod_123",
+			expected: "Burstable.slice/Burstable-pod_123.slice/",
+		},
+		{
 			input:    "/BestEffort/pod_6c1a4e95-6bb6-11e6-bc26-28d2444e470d",
 			expected: "BestEffort.slice/BestEffort-pod_6c1a4e95_6bb6_11e6_bc26_28d2444e470d.slice/",
 		},
 	}
 	for _, testCase := range testCases {
-		f := newLibcontainerAdapter(libcontainerSystemd)
-		if actual := f.adaptName(CgroupName(testCase.input), true); actual != testCase.expected {
+		cm := NewCgroupManager(&CgroupSubsystems{}, string(libcontainerSystemd))
+		if actual := cm.Name(CgroupName(testCase.input)); actual != testCase.expected {
+			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
+		}
+	}
+}
+
+func TestCgroupManagerGetCgroupNameForSystemd(t *testing.T) {
+	testCases := []struct {
+		input    string
+		expected string
+	}{
+		{
+			input:    "/",
+			expected: "/",
+		},
+		{
+			input:    "Burstable.slice/",
+			expected: "Burstable",
+		},
+		{
+			input:    "Burstable.slice/Burstable-pod_123.slice/",
+			expected: "Burstable/pod-123",
+		},
+		{
+			input:    "BestEffort.slice/BestEffort-pod_6c1a4e95_6bb6_11e6_bc26_28d2444e470d.slice/",
+			expected: "BestEffort/pod-6c1a4e95-6bb6-11e6-bc26-28d2444e470d",
+		},
+	}
+	for _, testCase := range testCases {
+		cm := NewCgroupManager(&CgroupSubsystems{}, string(libcontainerSystemd))
+		if actual := cm.CgroupName(testCase.input); string(actual) != testCase.expected {
 			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
 		}
 	}
