@@ -37,7 +37,7 @@ func GenManTree(cmd *cobra.Command, header *GenManHeader, dir string) error {
 	return GenManTreeFromOpts(cmd, GenManTreeOptions{
 		Header:           header,
 		Path:             dir,
-		CommandSeparator: "_",
+		CommandSeparator: "-",
 	})
 }
 
@@ -49,7 +49,7 @@ func GenManTreeFromOpts(cmd *cobra.Command, opts GenManTreeOptions) error {
 		header = &GenManHeader{}
 	}
 	for _, c := range cmd.Commands() {
-		if !c.IsAvailableCommand() || c.IsHelpCommand() {
+		if !c.IsAvailableCommand() || c.IsAdditionalHelpTopicCommand() {
 			continue
 		}
 		if err := GenManTreeFromOpts(c, opts); err != nil {
@@ -66,7 +66,7 @@ func GenManTreeFromOpts(cmd *cobra.Command, opts GenManTreeOptions) error {
 		separator = opts.CommandSeparator
 	}
 	basename := strings.Replace(cmd.CommandPath(), " ", separator, -1)
-	filename := filepath.Join(opts.Path, basename + "." + section)
+	filename := filepath.Join(opts.Path, basename+"."+section)
 	f, err := os.Create(filename)
 	if err != nil {
 		return err
@@ -216,7 +216,7 @@ func genMan(cmd *cobra.Command, header *GenManHeader) []byte {
 		children := cmd.Commands()
 		sort.Sort(byName(children))
 		for _, c := range children {
-			if !c.IsAvailableCommand() || c.IsHelpCommand() {
+			if !c.IsAvailableCommand() || c.IsAdditionalHelpTopicCommand() {
 				continue
 			}
 			seealso := fmt.Sprintf("**%s-%s(%s)**", dashCommandName, c.Name(), header.Section)

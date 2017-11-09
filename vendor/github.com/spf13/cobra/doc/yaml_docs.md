@@ -1,6 +1,6 @@
-# Generating Markdown Docs For Your Own cobra.Command
+# Generating Yaml Docs For Your Own cobra.Command
 
-Generating man pages from a cobra command is incredibly easy. An example is as follows:
+Generating yaml files from a cobra command is incredibly easy. An example is as follows:
 
 ```go
 package main
@@ -15,13 +15,13 @@ func main() {
 		Use:   "test",
 		Short: "my test program",
 	}
-	doc.GenMarkdownTree(cmd, "/tmp")
+	doc.GenYamlTree(cmd, "/tmp")
 }
 ```
 
-That will get you a Markdown document `/tmp/test.md`
+That will get you a Yaml document `/tmp/test.yaml`
 
-## Generate markdown docs for the entire command tree
+## Generate yaml docs for the entire command tree
 
 This program can actually generate docs for the kubectl command in the kubernetes project
 
@@ -40,40 +40,40 @@ import (
 
 func main() {
 	kubectl := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, ioutil.Discard, ioutil.Discard)
-	doc.GenMarkdownTree(kubectl, "./")
+	doc.GenYamlTree(kubectl, "./")
 }
 ```
 
 This will generate a whole series of files, one for each command in the tree, in the directory specified (in this case "./")
 
-## Generate markdown docs for a single command
+## Generate yaml docs for a single command
 
-You may wish to have more control over the output, or only generate for a single command, instead of the entire command tree. If this is the case you may prefer to `GenMarkdown` instead of `GenMarkdownTree`
+You may wish to have more control over the output, or only generate for a single command, instead of the entire command tree. If this is the case you may prefer to `GenYaml` instead of `GenYamlTree`
 
 ```go
 	out := new(bytes.Buffer)
-	doc.GenMarkdown(cmd, out)
+	doc.GenYaml(cmd, out)
 ```
 
-This will write the markdown doc for ONLY "cmd" into the out, buffer.
+This will write the yaml doc for ONLY "cmd" into the out, buffer.
 
 ## Customize the output
 
-Both `GenMarkdown` and `GenMarkdownTree` have alternate versions with callbacks to get some control of the output:
+Both `GenYaml` and `GenYamlTree` have alternate versions with callbacks to get some control of the output:
 
 ```go
-func GenMarkdownTreeCustom(cmd *Command, dir string, filePrepender, linkHandler func(string) string) error {
+func GenYamlTreeCustom(cmd *Command, dir string, filePrepender, linkHandler func(string) string) error {
 	//...
 }
 ```
 
 ```go
-func GenMarkdownCustom(cmd *Command, out *bytes.Buffer, linkHandler func(string) string) error {
+func GenYamlCustom(cmd *Command, out *bytes.Buffer, linkHandler func(string) string) error {
 	//...
 }
 ```
 
-The `filePrepender` will prepend the return value given the full filepath to the rendered Markdown file. A common use case is to add front matter to use the generated documentation with [Hugo](http://gohugo.io/):
+The `filePrepender` will prepend the return value given the full filepath to the rendered Yaml file. A common use case is to add front matter to use the generated documentation with [Hugo](http://gohugo.io/):
 
 ```go
 const fmTemplate = `---

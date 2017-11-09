@@ -119,7 +119,7 @@ func GenMarkdownCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string)
 		sort.Sort(byName(children))
 
 		for _, child := range children {
-			if !child.IsAvailableCommand() || child.IsHelpCommand() {
+			if !child.IsAvailableCommand() || child.IsAdditionalHelpTopicCommand() {
 				continue
 			}
 			cname := name + " " + child.Name()
@@ -149,7 +149,7 @@ func GenMarkdownTree(cmd *cobra.Command, dir string) error {
 
 func GenMarkdownTreeCustom(cmd *cobra.Command, dir string, filePrepender, linkHandler func(string) string) error {
 	for _, c := range cmd.Commands() {
-		if !c.IsAvailableCommand() || c.IsHelpCommand() {
+		if !c.IsAvailableCommand() || c.IsAdditionalHelpTopicCommand() {
 			continue
 		}
 		if err := GenMarkdownTreeCustom(c, dir, filePrepender, linkHandler); err != nil {
