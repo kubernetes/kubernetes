@@ -9,7 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["util.go"],
-    importpath = "k8s.io/kubernetes/pkg/api/pod",
+    importpath = "k8s.io/kubernetes/pkg/apis/core/helper/pod",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
@@ -35,7 +35,7 @@ go_test(
     name = "go_default_test",
     srcs = ["util_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/api/pod",
+    importpath = "k8s.io/kubernetes/pkg/apis/core/helper/pod",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",

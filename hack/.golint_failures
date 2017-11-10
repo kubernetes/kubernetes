@@ -19,7 +19,6 @@ pkg/api/testing
 pkg/api/testing/compat
 pkg/api/unversioned
 pkg/api/v1/endpoints
-pkg/api/v1/pod
 pkg/api/v1/resource
 pkg/apis/abac
 pkg/apis/abac/latest
@@ -52,6 +51,7 @@ pkg/apis/core/helper
 pkg/apis/core/helper/qos
 pkg/apis/core/v1/helper
 pkg/apis/core/v1/helper/qos
+pkg/apis/core/v1/helper/pod
 pkg/apis/core/v1/validation
 pkg/apis/core/validation
 pkg/apis/events
