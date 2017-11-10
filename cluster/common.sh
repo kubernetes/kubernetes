@@ -1091,16 +1091,26 @@ function generate-certs {
       --req-cn=kubecfg --req-org=system:masters \
       --req-c= --req-st= --req-city= --req-email= --req-ou= \
       build-client-full kubecfg nopass) &>${cert_create_debug_output} || true
-  if [ ! -s "${CERT_DIR}/pki/private/ca.key" \
-    -o ! -s "${CERT_DIR}/pki/ca.crt" \
-    -o ! -s "${CERT_DIR}/pki/issued/${MASTER_NAME}.crt" \
-    -o ! -s "${CERT_DIR}/pki/private/${MASTER_NAME}.key" \
-    -o ! -s "${CERT_DIR}/pki/issued/kubelet.crt" \
-    -o ! -s "${CERT_DIR}/pki/private/kubelet.key" \
-    -o ! -s "${CERT_DIR}/pki/issued/kubecfg.crt" \
-    -o ! -s "${CERT_DIR}/pki/private/kubecfg.key" \
-    -o ! -s "${CERT_DIR}/pki/issued/kube-apiserver.crt" \
-    -o ! -s "${CERT_DIR}/pki/private/kube-apiserver.key" ]; then
+  local output_file_missing=0
+  local output_file
+  for output_file in \
+    "${CERT_DIR}/pki/private/ca.key" \
+    "${CERT_DIR}/pki/ca.crt" \
+    "${CERT_DIR}/pki/issued/${MASTER_NAME}.crt" \
+    "${CERT_DIR}/pki/private/${MASTER_NAME}.key" \
+    "${CERT_DIR}/pki/issued/kubelet.crt" \
+    "${CERT_DIR}/pki/private/kubelet.key" \
+    "${CERT_DIR}/pki/issued/kubecfg.crt" \
+    "${CERT_DIR}/pki/private/kubecfg.key" \
+    "${CERT_DIR}/pki/issued/kube-apiserver.crt" \
+    "${CERT_DIR}/pki/private/kube-apiserver.key"
+  do
+    if [[ ! -s "${output_file}" ]]; then
+      echo "Expected file ${output_file} not created" >&2
+      output_file_missing=1
+    fi
+  done
+  if (( $output_file_missing )); then
     # TODO(roberthbailey,porridge): add better error handling here,
     # see https://github.com/kubernetes/kubernetes/issues/55229
     cat "${cert_create_debug_output}" >&2
@@ -1146,11 +1156,20 @@ function generate-aggregator-certs {
       --req-cn=proxy-clientcfg --req-org=system:aggregator \
       --req-c= --req-st= --req-city= --req-email= --req-ou= \
       build-client-full proxy-clientcfg nopass) &>${cert_create_debug_output} || true
-
-  if [ ! -s  "${AGGREGATOR_CERT_DIR}/pki/private/ca.key" \
-    -o ! -s  "${AGGREGATOR_CERT_DIR}/pki/ca.crt" \
-    -o ! -s  "${AGGREGATOR_CERT_DIR}/pki/issued/proxy-client.crt" \
-    -o ! -s  "${AGGREGATOR_CERT_DIR}/pki/private/proxy-client.key" ]; then
+  local output_file_missing=0
+  local output_file
+  for output_file in \
+    "${AGGREGATOR_CERT_DIR}/pki/private/ca.key" \
+    "${AGGREGATOR_CERT_DIR}/pki/ca.crt" \
+    "${AGGREGATOR_CERT_DIR}/pki/issued/proxy-client.crt" \
+    "${AGGREGATOR_CERT_DIR}/pki/private/proxy-client.key"
+  do
+    if [[ ! -s "${output_file}" ]]; then
+      echo "Expected file ${output_file} not created" >&2
+      output_file_missing=1
+    fi
+  done
+  if (( $output_file_missing )); then
     # TODO(roberthbailey,porridge): add better error handling here,
     # see https://github.com/kubernetes/kubernetes/issues/55229
     cat "${cert_create_debug_output}" >&2
