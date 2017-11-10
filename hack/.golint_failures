@@ -50,8 +50,9 @@ pkg/apis/core
 pkg/apis/core/helper
 pkg/apis/core/helper/qos
 pkg/apis/core/v1/helper
-pkg/apis/core/v1/helper/qos
+pkg/apis/core/v1/helper/endpoints
 pkg/apis/core/v1/helper/pod
+pkg/apis/core/v1/helper/qos
 pkg/apis/core/v1/validation
 pkg/apis/core/validation
 pkg/apis/events
