@@ -8,7 +8,7 @@
                 "k8s.io/kubernetes/pkg/api/pod",
                 "k8s.io/kubernetes/pkg/api/ref",
                 "k8s.io/kubernetes/pkg/api/resource",
-                "k8s.io/kubernetes/pkg/api/service",
+                "k8s.io/kubernetes/pkg/apis/core/helper/service",
                 "k8s.io/kubernetes/pkg/api/v1/pod",
                 "k8s.io/kubernetes/pkg/api/v1/service",
                 "k8s.io/kubernetes/pkg/apis/admissionregistration",
