@@ -44,6 +44,7 @@ go_library(
         "//vendor/github.com/aws/aws-sdk-go/service/autoscaling:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/service/ec2:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/service/elb:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/service/elbv2:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/service/kms:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",

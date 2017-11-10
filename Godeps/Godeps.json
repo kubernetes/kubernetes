@@ -310,6 +310,11 @@
 			"Rev": "760741802ad40f49ae9fc4a69ef6706d2527d62e"
 		},
 		{
+			"ImportPath": "github.com/aws/aws-sdk-go/service/elbv2",
+			"Comment": "v1.12.7",
+			"Rev": "760741802ad40f49ae9fc4a69ef6706d2527d62e"
+		},
+		{
 			"ImportPath": "github.com/aws/aws-sdk-go/service/kms",
 			"Comment": "v1.12.7",
 			"Rev": "760741802ad40f49ae9fc4a69ef6706d2527d62e"
