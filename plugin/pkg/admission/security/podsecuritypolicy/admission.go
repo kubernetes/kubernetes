@@ -281,25 +281,20 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 	errs = append(errs, provider.ValidatePodSecurityContext(pod, field.NewPath("spec", "securityContext"))...)
 
 	for i := range pod.Spec.InitContainers {
-		sc, scAnnotations, err := provider.CreateContainerSecurityContext(pod, &pod.Spec.InitContainers[i])
+		err := provider.DefaultContainerSecurityContext(pod, &pod.Spec.InitContainers[i])
 		if err != nil {
 			errs = append(errs, field.Invalid(field.NewPath("spec", "initContainers").Index(i).Child("securityContext"), "", err.Error()))
 			continue
 		}
-		pod.Spec.InitContainers[i].SecurityContext = sc
-		pod.Annotations = scAnnotations
 		errs = append(errs, provider.ValidateContainerSecurityContext(pod, &pod.Spec.InitContainers[i], field.NewPath("spec", "initContainers").Index(i).Child("securityContext"))...)
 	}
 
 	for i := range pod.Spec.Containers {
-		sc, scAnnotations, err := provider.CreateContainerSecurityContext(pod, &pod.Spec.Containers[i])
+		err := provider.DefaultContainerSecurityContext(pod, &pod.Spec.Containers[i])
 		if err != nil {
 			errs = append(errs, field.Invalid(field.NewPath("spec", "containers").Index(i).Child("securityContext"), "", err.Error()))
 			continue
 		}
-
-		pod.Spec.Containers[i].SecurityContext = sc
-		pod.Annotations = scAnnotations
 		errs = append(errs, provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[i], field.NewPath("spec", "containers").Index(i).Child("securityContext"))...)
 	}
 

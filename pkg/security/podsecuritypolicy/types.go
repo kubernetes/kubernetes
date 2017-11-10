@@ -35,9 +35,9 @@ type Provider interface {
 	// DefaultPodSecurityContext sets the default values of the required but not filled fields.
 	// It modifies the SecurityContext and annotations of the provided pod.
 	DefaultPodSecurityContext(pod *api.Pod) error
-	// Create a container SecurityContext based on the given constraints. Also returns an updated set
-	// of Pod annotations for alpha feature support.
-	CreateContainerSecurityContext(pod *api.Pod, container *api.Container) (*api.SecurityContext, map[string]string, error)
+	// DefaultContainerSecurityContext sets the default values of the required but not filled fields.
+	// It modifies the SecurityContext of the container and annotations of the pod.
+	DefaultContainerSecurityContext(pod *api.Pod, container *api.Container) error
 	// Ensure a pod's SecurityContext is in compliance with the given constraints.
 	ValidatePodSecurityContext(pod *api.Pod, fldPath *field.Path) field.ErrorList
 	// Ensure a container's SecurityContext is in compliance with the given constraints
