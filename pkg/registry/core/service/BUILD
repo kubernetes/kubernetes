@@ -18,9 +18,9 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/core/service",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/service:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/helper:go_default_library",
+        "//pkg/apis/core/helper/service:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/features:go_default_library",
@@ -53,9 +53,9 @@ go_test(
     embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/registry/core/service",
     deps = [
-        "//pkg/api/service:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/helper:go_default_library",
+        "//pkg/apis/core/helper/service:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/registry/core/service/portallocator:go_default_library",

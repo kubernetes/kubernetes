@@ -46,6 +46,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/apis/core/helper/qos:all-srcs",
+        "//pkg/apis/core/helper/service:all-srcs",
     ],
     tags = ["automanaged"],
 )
