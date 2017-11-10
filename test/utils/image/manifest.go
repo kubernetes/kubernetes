@@ -77,7 +77,7 @@ var (
 	Porter             = ImageConfig{e2eRegistry, "porter", "1.0"}
 	PortForwardTester  = ImageConfig{e2eRegistry, "port-forward-tester", "1.0"}
 	Redis              = ImageConfig{e2eRegistry, "redis", "1.0"}
-	ResourceConsumer   = ImageConfig{e2eRegistry, "resource-consumer", "1.1"}
+	ResourceConsumer   = ImageConfig{e2eRegistry, "resource-consumer", "1.3"}
 	ResourceController = ImageConfig{e2eRegistry, "resource-consumer/controller", "1.0"}
 	ServeHostname      = ImageConfig{e2eRegistry, "serve-hostname", "1.0"}
 	TestWebserver      = ImageConfig{e2eRegistry, "test-webserver", "1.0"}
