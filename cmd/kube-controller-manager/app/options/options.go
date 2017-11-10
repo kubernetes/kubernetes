@@ -62,7 +62,7 @@ func NewCMServer() *CMServer {
 			Port:                                            ports.ControllerManagerPort,
 			Address:                                         "0.0.0.0",
 			ConcurrentEndpointSyncs:                         5,
-			ConcurrentServiceSyncs:                          1,
+			ConcurrentServiceSyncs:                          5,
 			ConcurrentRCSyncs:                               5,
 			ConcurrentRSSyncs:                               5,
 			ConcurrentDaemonSetSyncs:                        2,
