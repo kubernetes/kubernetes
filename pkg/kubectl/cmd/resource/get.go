@@ -61,6 +61,8 @@ type GetOptions struct {
 	Namespace         string
 	ExplicitNamespace bool
 
+	TabularResponse bool
+
 	IgnoreNotFound bool
 	ShowKind       bool
 	LabelColumns   []string
@@ -115,6 +117,7 @@ var (
 
 const (
 	useOpenAPIPrintColumnFlagLabel = "experimental-use-openapi-print-columns"
+	useServerPrintColumns          = "experimental-use-server-print-columns"
 )
 
 // NewCmdGet creates a command object for the generic "get" action, which
@@ -164,6 +167,7 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	addOpenAPIPrintColumnFlags(cmd)
+	addServerPrintColumnFlags(cmd)
 	cmd.Flags().BoolVar(&options.ShowKind, "show-kind", options.ShowKind, "If present, list the resource type for the requested object(s).")
 	cmd.Flags().StringSliceVarP(&options.LabelColumns, "label-columns", "L", options.LabelColumns, "Accepts a comma separated list of labels that are going to be presented as columns. Names are case-sensitive. You can also use multiple flag options like -L label1 -L label2...")
 	cmd.Flags().BoolVar(&options.Export, "export", options.Export, "If true, use 'export' for the resources.  Exported resources are stripped of cluster-specific information.")
@@ -180,6 +184,8 @@ func (options *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 		}
 		return nil
 	}
+
+	options.TabularResponse = cmdutil.GetFlagBool(cmd, useServerPrintColumns)
 
 	var err error
 	options.Namespace, options.ExplicitNamespace, err = f.DefaultNamespace()
@@ -233,6 +239,7 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 		FieldSelectorParam(options.FieldSelector).
 		ExportParam(options.Export).
 		RequestChunksOf(options.ChunkSize).
+		TabularResponse(options.TabularResponse).
 		IncludeUninitialized(cmdutil.ShouldIncludeUninitialized(cmd, false)). // TODO: this needs to be better factored
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
@@ -644,6 +651,12 @@ func addOpenAPIPrintColumnFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool(useOpenAPIPrintColumnFlagLabel, false, "If true, use x-kubernetes-print-column metadata (if present) from the OpenAPI schema for displaying a resource.")
 	// marking it deprecated so that it is hidden from usage/help text.
 	cmd.Flags().MarkDeprecated(useOpenAPIPrintColumnFlagLabel, "This flag is experimental and may be removed in the future.")
+}
+
+func addServerPrintColumnFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool(useServerPrintColumns, false, "If true, use the server to generate tabular, human-readable information for displaying a resource.")
+	// marking it deprecated so that it is hidden from usage/help text.
+	cmd.Flags().MarkDeprecated(useServerPrintColumns, "This flag is experimental and may be removed in the future.")
 }
 
 func shouldGetNewPrinterForMapping(printer printers.ResourcePrinter, lastMapping, mapping *meta.RESTMapping) bool {

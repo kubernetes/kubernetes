@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -63,7 +64,7 @@ func (m *Helper) Get(namespace, name string, export bool) (runtime.Object, error
 	return req.Do().Get()
 }
 
-func (m *Helper) List(namespace, apiVersion string, export bool, options *metav1.ListOptions) (runtime.Object, error) {
+func (m *Helper) List(namespace, apiVersion string, export, requestTable bool, options *metav1.ListOptions) (runtime.Object, error) {
 	req := m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
@@ -72,6 +73,15 @@ func (m *Helper) List(namespace, apiVersion string, export bool, options *metav1
 		// TODO: I should be part of ListOptions
 		req.Param("export", strconv.FormatBool(export))
 	}
+
+	if requestTable {
+		req = req.SetHeader("Accept", "application/json;as=Table;v=v1alpha1;g=meta.k8s.io")
+
+		table := &metav1alpha1.Table{}
+		err := req.Do().Into(table)
+		return table, err
+	}
+
 	return req.Do().Get()
 }
 
