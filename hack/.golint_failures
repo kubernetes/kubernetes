@@ -12,7 +12,6 @@ cmd/kubelet/app
 cmd/kubelet/app/options
 cmd/kubemark
 examples/guestbook-go
-pkg/api/ref
 pkg/api/testapi
 pkg/api/testing
 pkg/api/testing/compat
@@ -47,6 +46,7 @@ pkg/apis/core
 pkg/apis/core/helper
 pkg/apis/core/helper/endpoints
 pkg/apis/core/helper/qos
+pkg/apis/core/helper/ref
 pkg/apis/core/v1/helper
 pkg/apis/core/v1/helper/endpoints
 pkg/apis/core/v1/helper/pod
