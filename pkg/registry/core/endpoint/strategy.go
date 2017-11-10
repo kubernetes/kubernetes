@@ -21,9 +21,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
-	endptspkg "k8s.io/kubernetes/pkg/api/endpoints"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	endptspkg "k8s.io/kubernetes/pkg/apis/core/helper/endpoints"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
