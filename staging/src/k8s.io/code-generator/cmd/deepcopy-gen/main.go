@@ -30,11 +30,6 @@ limitations under the License.
 // one file, of the form:
 //   // +k8s:deepcopy-gen=package
 //
-// Packages can request that the generated DeepCopy functions be registered
-// with an `init()` function call to `Scheme.AddGeneratedDeepCopyFuncs()` by
-// changing the tag to:
-//   // +k8s:deepcopy-gen=package,register
-//
 // DeepCopy functions can be generated for individual types, rather than the
 // entire package by specifying a comment on the type definion of the form:
 //   // +k8s:deepcopy-gen=true

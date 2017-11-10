@@ -369,60 +369,7 @@ func argsFromType(ts ...*types.Type) generator.Args {
 }
 
 func (g *genDeepCopy) Init(c *generator.Context, w io.Writer) error {
-	glog.V(5).Infof("Registering types in pkg %q", g.targetPackage)
-
-	// the legacy restration will go away when the cloner is removed from Kubernetes, replaced
-	// with static function calls to the DeepCopy methods.
-	return g.legacyRegistration(c, w)
-}
-
-func (g *genDeepCopy) legacyRegistration(c *generator.Context, w io.Writer) error {
-	conversionPackagePath := "k8s.io/apimachinery/pkg/conversion"
-	runtimePackagePath := "k8s.io/apimachinery/pkg/runtime"
-
-	cloner := c.Universe.Type(types.Name{Package: conversionPackagePath, Name: "Cloner"})
-	g.imports.AddType(cloner)
-	if !g.registerTypes {
-		sw := generator.NewSnippetWriter(w, c, "$", "$")
-		sw.Do("// GetGeneratedDeepCopyFuncs returns the generated funcs, since we aren't registering them.\n", nil)
-		sw.Do("//\n", nil)
-		sw.Do("// Deprecated: deepcopy registration will go away when static deepcopy is fully implemented.\n", nil)
-		sw.Do("func GetGeneratedDeepCopyFuncs() []conversion.GeneratedDeepCopyFunc{\n", nil)
-		sw.Do("return []conversion.GeneratedDeepCopyFunc{\n", nil)
-		for _, t := range g.typesForInit {
-			args := argsFromType(t).
-				With("typeof", c.Universe.Package("reflect").Function("TypeOf"))
-			sw.Do("{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {in.(*$.type|raw$).DeepCopyInto(out.(*$.type|raw$)); return nil}, InType: $.typeof|raw$(&$.type|raw${})},\n", args)
-		}
-		sw.Do("}\n", nil)
-		sw.Do("}\n\n", nil)
-		return sw.Error()
-	}
-
-	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	sw.Do("func init() {\n", nil)
-	sw.Do("SchemeBuilder.Register(RegisterDeepCopies)\n", nil)
-	sw.Do("}\n\n", nil)
-
-	scheme := c.Universe.Type(types.Name{Package: runtimePackagePath, Name: "Scheme"})
-	schemePtr := &types.Type{
-		Kind: types.Pointer,
-		Elem: scheme,
-	}
-	sw.Do("// RegisterDeepCopies adds deep-copy functions to the given scheme. Public\n", nil)
-	sw.Do("// to allow building arbitrary schemes.\n", nil)
-	sw.Do("//\n", nil)
-	sw.Do("// Deprecated: deepcopy registration will go away when static deepcopy is fully implemented.\n", nil)
-	sw.Do("func RegisterDeepCopies(scheme $.|raw$) error {\n", schemePtr)
-	sw.Do("return scheme.AddGeneratedDeepCopyFuncs(\n", nil)
-	for _, t := range g.typesForInit {
-		args := argsFromType(t).
-			With("typeof", c.Universe.Package("reflect").Function("TypeOf"))
-		sw.Do("conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {in.(*$.type|raw$).DeepCopyInto(out.(*$.type|raw$)); return nil}, InType: $.typeof|raw$(&$.type|raw${})},\n", args)
-	}
-	sw.Do(")\n", nil)
-	sw.Do("}\n\n", nil)
-	return sw.Error()
+	return nil
 }
 
 func (g *genDeepCopy) needsGeneration(t *types.Type) bool {

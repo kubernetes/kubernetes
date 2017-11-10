@@ -16,7 +16,4 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package
 
-// Package scheme contains a runtime.Scheme to be used for serializing
-// and deserializing different versions of Scale, and for converting
-// in between them.
-package scheme
+package spec

@@ -68,10 +68,6 @@ type Scheme struct {
 	// converter stores all registered conversion functions. It also has
 	// default coverting behavior.
 	converter *conversion.Converter
-
-	// cloner stores all registered copy functions. It also has default
-	// deep copy behavior.
-	cloner *conversion.Cloner
 }
 
 // Function to convert a field selector to internal representation.
@@ -80,11 +76,10 @@ type FieldLabelConversionFunc func(label, value string) (internalLabel, internal
 // NewScheme creates a new Scheme. This scheme is pluggable by default.
 func NewScheme() *Scheme {
 	s := &Scheme{
-		gvkToType:        map[schema.GroupVersionKind]reflect.Type{},
-		typeToGVK:        map[reflect.Type][]schema.GroupVersionKind{},
-		unversionedTypes: map[reflect.Type]schema.GroupVersionKind{},
-		unversionedKinds: map[string]reflect.Type{},
-		cloner:           conversion.NewCloner(),
+		gvkToType:                 map[schema.GroupVersionKind]reflect.Type{},
+		typeToGVK:                 map[reflect.Type][]schema.GroupVersionKind{},
+		unversionedTypes:          map[reflect.Type]schema.GroupVersionKind{},
+		unversionedKinds:          map[string]reflect.Type{},
 		fieldLabelConversionFuncs: map[string]map[string]FieldLabelConversionFunc{},
 		defaulterFuncs:            map[reflect.Type]func(interface{}){},
 	}
@@ -348,29 +343,6 @@ func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
 func (s *Scheme) AddGeneratedConversionFuncs(conversionFuncs ...interface{}) error {
 	for _, f := range conversionFuncs {
 		if err := s.converter.RegisterGeneratedConversionFunc(f); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// AddDeepCopyFuncs adds a function to the list of deep-copy functions.
-// For the expected format of deep-copy function, see the comment for
-// Copier.RegisterDeepCopyFunction.
-func (s *Scheme) AddDeepCopyFuncs(deepCopyFuncs ...interface{}) error {
-	for _, f := range deepCopyFuncs {
-		if err := s.cloner.RegisterDeepCopyFunc(f); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// Similar to AddDeepCopyFuncs, but registers deep-copy functions that were
-// automatically generated.
-func (s *Scheme) AddGeneratedDeepCopyFuncs(deepCopyFuncs ...conversion.GeneratedDeepCopyFunc) error {
-	for _, fn := range deepCopyFuncs {
-		if err := s.cloner.RegisterGeneratedDeepCopyFunc(fn); err != nil {
 			return err
 		}
 	}
