@@ -368,6 +368,10 @@ func (d *deploymentTester) updateReplicaSet(name string, applyUpdate testutil.Up
 	return testutil.UpdateReplicaSetWithRetries(d.c, d.deployment.Namespace, name, applyUpdate, d.t.Logf, pollInterval, pollTimeout)
 }
 
+func (d *deploymentTester) updateReplicaSetStatus(name string, applyStatusUpdate testutil.UpdateReplicaSetFunc) (*v1beta1.ReplicaSet, error) {
+	return testutil.UpdateReplicaSetStatusWithRetries(d.c, d.deployment.Namespace, name, applyStatusUpdate, d.t.Logf, pollInterval, pollTimeout)
+}
+
 // waitForDeploymentRollbackCleared waits for deployment either started rolling back or doesn't need to rollback.
 func (d *deploymentTester) waitForDeploymentRollbackCleared() error {
 	return testutil.WaitForDeploymentRollbackCleared(d.c, d.deployment.Namespace, d.deployment.Name, pollInterval, pollTimeout)
@@ -415,4 +419,27 @@ func (d *deploymentTester) listUpdatedPods() ([]v1.Pod, error) {
 
 func (d *deploymentTester) waitRSStable(replicaset *v1beta1.ReplicaSet) error {
 	return testutil.WaitRSStable(d.t, d.c, replicaset, pollInterval, pollTimeout)
+}
+
+func (d *deploymentTester) scaleDeployment(newReplicas int32) error {
+	var err error
+	d.deployment, err = d.updateDeployment(func(update *v1beta1.Deployment) {
+		update.Spec.Replicas = &newReplicas
+	})
+	if err != nil {
+		return fmt.Errorf("failed updating deployment %q: %v", d.deployment.Name, err)
+	}
+
+	if err := d.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
+		return err
+	}
+
+	rs, err := d.expectNewReplicaSet()
+	if err != nil {
+		return err
+	}
+	if *rs.Spec.Replicas != newReplicas {
+		return fmt.Errorf("expected new replicaset replicas = %d, got %d", newReplicas, *rs.Spec.Replicas)
+	}
+	return nil
 }
