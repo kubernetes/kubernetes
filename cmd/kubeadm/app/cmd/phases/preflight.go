@@ -42,7 +42,7 @@ func NewCmdPreFlight() *cobra.Command {
 func NewCmdPreFlightMaster() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "master",
-		Short: "Run master pre-flight checks",
+		Short: "Run master pre-flight checks.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := &kubeadmapi.MasterConfiguration{}
 			criSocket := ""
@@ -57,7 +57,7 @@ func NewCmdPreFlightMaster() *cobra.Command {
 func NewCmdPreFlightNode() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "node",
-		Short: "Run node pre-flight checks",
+		Short: "Run node pre-flight checks.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := &kubeadmapi.NodeConfiguration{}
 			criSocket := ""

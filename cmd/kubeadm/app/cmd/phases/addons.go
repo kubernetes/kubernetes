@@ -79,7 +79,7 @@ func getAddonsSubCommands() []*cobra.Command {
 	}{
 		{
 			use:     "all",
-			short:   "Install all addons to a Kubernetes cluster",
+			short:   "Install all addons to a Kubernetes cluster.",
 			cmdFunc: EnsureAllAddons,
 		},
 		{
@@ -103,15 +103,15 @@ func getAddonsSubCommands() []*cobra.Command {
 		}
 
 		// Add flags to the command
-		cmd.Flags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use for talking to the cluster")
-		cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)")
+		cmd.Flags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use when talking to the cluster")
+		cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to a kubeadm config file. WARNING: Usage of a configuration file is experimental!")
 		cmd.Flags().StringVar(&cfg.KubernetesVersion, "kubernetes-version", cfg.KubernetesVersion, `Choose a specific Kubernetes version for the control plane.`)
 		cmd.Flags().StringVar(&cfg.ImageRepository, "image-repository", cfg.ImageRepository, `Choose a container registry to pull control plane images from.`)
 
 		if properties.use == "all" || properties.use == "kube-proxy" {
-			cmd.Flags().StringVar(&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress, `The IP address the API Server will advertise it's listening on. 0.0.0.0 means the default network interface's address.`)
+			cmd.Flags().StringVar(&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress, `The IP address the API Server will advertise it's listening on. Specify '0.0.0.0' to use the address of the default network interface.`)
 			cmd.Flags().Int32Var(&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort, `Port for the API Server to bind to.`)
-			cmd.Flags().StringVar(&cfg.Networking.PodSubnet, "pod-network-cidr", cfg.Networking.PodSubnet, `Specify range of IP addresses for the pod network; if set, the control plane will automatically allocate CIDRs for every node.`)
+			cmd.Flags().StringVar(&cfg.Networking.PodSubnet, "pod-network-cidr", cfg.Networking.PodSubnet, `Specify range of IP addresses for the pod network. If set, the control plane will automatically allocate CIDRs for every node.`)
 		}
 
 		if properties.use == "all" || properties.use == "kube-dns" {

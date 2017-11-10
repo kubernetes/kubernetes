@@ -35,12 +35,12 @@ func NewCmdBootstrapToken() *cobra.Command {
 	var kubeConfigFile string
 	cmd := &cobra.Command{
 		Use:     "bootstrap-token",
-		Short:   "Manage kubeadm-specific Bootstrap Token functions.",
+		Short:   "Manage kubeadm-specific bootstrap token functions.",
 		Aliases: []string{"bootstraptoken"},
 		RunE:    cmdutil.SubCmdRunE("bootstrap-token"),
 	}
 
-	cmd.PersistentFlags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use for talking to the cluster")
+	cmd.PersistentFlags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use when talking to the cluster.")
 
 	// Add subcommands
 	cmd.AddCommand(NewSubCmdClusterInfo(&kubeConfigFile))
@@ -53,7 +53,7 @@ func NewCmdBootstrapToken() *cobra.Command {
 func NewSubCmdClusterInfo(kubeConfigFile *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "cluster-info <clusterinfo-file>",
-		Short:   "Uploads and exposes the cluster-info ConfigMap publicly from the given cluster-info file",
+		Short:   "Uploads and exposes the cluster-info ConfigMap publicly from the given cluster-info file.",
 		Aliases: []string{"clusterinfo"},
 		Run: func(cmd *cobra.Command, args []string) {
 			err := cmdutil.ValidateExactArgNumber(args, []string{"clusterinfo-file"})
@@ -80,7 +80,7 @@ func NewSubCmdClusterInfo(kubeConfigFile *string) *cobra.Command {
 func NewSubCmdNodeBootstrapToken(kubeConfigFile *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "node",
-		Short:   "Manages Node Bootstrap Tokens",
+		Short:   "Manages node bootstrap tokens.",
 		Aliases: []string{"clusterinfo"},
 		RunE:    cmdutil.SubCmdRunE("node"),
 	}
@@ -95,7 +95,7 @@ func NewSubCmdNodeBootstrapToken(kubeConfigFile *string) *cobra.Command {
 func NewSubCmdNodeBootstrapTokenPostCSRs(kubeConfigFile *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "allow-post-csrs",
-		Short: "Configure RBAC to allow Node Bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials",
+		Short: "Configure RBAC to allow node bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials.",
 		Run: func(cmd *cobra.Command, args []string) {
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 			kubeadmutil.CheckErr(err)
@@ -114,7 +114,7 @@ func NewSubCmdNodeBootstrapTokenPostCSRs(kubeConfigFile *string) *cobra.Command 
 func NewSubCmdNodeBootstrapTokenAutoApprove(kubeConfigFile *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "allow-auto-approve",
-		Short: "Configure RBAC rules to allow the csrapprover controller automatically approve CSRs from a Node Bootstrap Token",
+		Short: "Configure RBAC rules to allow the csrapprover controller automatically approve CSRs from a node bootstrap token.",
 		Run: func(cmd *cobra.Command, args []string) {
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 			kubeadmutil.CheckErr(err)
