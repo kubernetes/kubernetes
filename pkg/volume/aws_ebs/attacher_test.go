@@ -340,3 +340,7 @@ func (testcase *testcase) GetVolumeLabels(volumeName aws.KubernetesVolumeID) (ma
 func (testcase *testcase) GetDiskPath(volumeName aws.KubernetesVolumeID) (string, error) {
 	return "", errors.New("Not implemented")
 }
+
+func (testcase *testcase) GetBulkVolumeStatus(volumes []aws.KubernetesVolumeID) (map[aws.KubernetesVolumeID]aws.VolumeStatus, error) {
+	return nil, errors.New("Not implemented")
+}

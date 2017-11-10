@@ -143,6 +143,47 @@ func (attacher *awsElasticBlockStoreAttacher) BulkVerifyVolumes(volumesByNode ma
 	return volumesAttachedCheck, nil
 }
 
+func (attacher *awsElasticBlockStoreAttacher) GetBulkVolumeStatus(volumeSpecs map[*volume.Spec]v1.UniqueVolumeName) (map[v1.UniqueVolumeName]volume.VolumeStatus, error) {
+	idToName := make(map[aws.KubernetesVolumeID]v1.UniqueVolumeName)
+
+	var volumeIDs []aws.KubernetesVolumeID
+	for volumeSpec, volumeName := range volumeSpecs {
+		volumeSource, _, err := getVolumeSource(volumeSpec)
+		if err != nil {
+			glog.Errorf("Error getting volume (%q) source : %v", volumeSpec.Name(), err)
+			continue
+		}
+
+		volumeID := aws.KubernetesVolumeID(volumeSource.VolumeID)
+
+		idToName[volumeID] = volumeName
+		volumeIDs = append(volumeIDs, volumeID)
+	}
+
+	statuses, err := attacher.awsVolumes.GetBulkVolumeStatus(volumeIDs)
+	if err != nil {
+		glog.Errorf("Error checking volume statuses: %v", err)
+		return nil, err
+	}
+
+	opStatuses := make(map[v1.UniqueVolumeName]volume.VolumeStatus)
+	for volumeID, status := range statuses {
+		volumeName := idToName[volumeID]
+		if volumeName == "" {
+			return nil, fmt.Errorf("unknown volume returned %q", volumeID)
+		}
+		opStatus := volume.VolumeStatus{
+			DevicePath: status.DevicePath,
+		}
+		if status.NodeName != "" {
+			opStatus.AttachedToNodes = append(opStatus.AttachedToNodes, status.NodeName)
+		}
+		opStatuses[volumeName] = opStatus
+	}
+
+	return opStatuses, nil
+}
+
 func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, devicePath string, _ *v1.Pod, timeout time.Duration) (string, error) {
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
