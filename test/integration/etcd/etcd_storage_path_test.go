@@ -480,7 +480,8 @@ var ephemeralWhiteList = createEphemeralWhiteList(
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/admission/v1alpha1
-	gvr("admission.k8s.io", "v1alpha1", "admissionreviews"), // not stored in etcd, call out to webhooks.
+	gvr("admission.k8s.io", "v1alpha1", "admissionreviewresponses"), // not stored in etcd, call out to webhooks.
+	gvr("admission.k8s.io", "v1alpha1", "admissionreviewrequests"),  // not stored in etcd, call out to webhooks.
 	// --
 )
 

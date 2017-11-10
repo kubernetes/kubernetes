@@ -436,12 +436,12 @@ func (a *GenericAdmissionWebhook) shouldCallHook(h *v1alpha1.Webhook, attr admis
 
 func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.Webhook, attr admission.Attributes) error {
 	// Make the webhook request
-	request := createAdmissionReview(attr)
+	request := createAdmissionReviewRequest(attr)
 	client, err := a.hookClient(h)
 	if err != nil {
 		return &ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
-	response := &admissionv1alpha1.AdmissionResponse{}
+	response := &admissionv1alpha1.AdmissionReviewResponse{}
 	if err := client.Post().Context(ctx).Body(&request).Do().Into(response); err != nil {
 		return &ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}

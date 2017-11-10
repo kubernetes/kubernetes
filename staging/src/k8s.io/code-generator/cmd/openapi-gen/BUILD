@@ -35,3 +35,9 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
+
+go_binary(
+    name = "openapi-gen.bak",
+    importpath = "k8s.io/code-generator/cmd/openapi-gen.bak",
+    library = ":go_default_library",
+)

@@ -30,31 +30,43 @@ import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1alpha1";
 
-// AdmissionRequest describes an admission request.
-message AdmissionRequest {
-  // Spec describes the attributes for the admission request.
-  // Since this admission controller is non-mutating the webhook should avoid setting this in its response to avoid the
-  // cost of deserializing it.
-  // +optional
-  optional AdmissionReviewSpec spec = 1;
-}
+// AdmissionReviewMetadata contains information about the request, including a UID to identify the request instance.
+message AdmissionReviewMetadata {
+  // UID is an identifier for the individual request. It allows us to distinguish instances of requests which are
+  // otherwise identical (parallel requests, requests when earlier requests did not modify etc)
+  optional string uid = 1;
 
-// AdmissionResponse describes an admission response.
-message AdmissionResponse {
-  // Status is filled in by the webhook and indicates whether the admission
-  // request should be permitted.
-  // +optional
-  optional AdmissionReviewStatus status = 1;
-
-  // The json-patch body. Must be in compliance with RFC 6902.
-  // +optional
-  optional bytes patchBody = 2;
-}
-
-// AdmissionReviewSpec describes the admission.Attributes for the admission request.
-message AdmissionReviewSpec {
   // Kind is the type of object being manipulated.  For example: Pod
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.GroupVersionKind kind = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.GroupVersionKind kind = 2;
+
+  // Name is the name of the object as presented in the request.  On a CREATE operation, the client may omit name and
+  // rely on the server to generate the name.  If that is the case, this method will return the empty string.
+  optional string name = 3;
+
+  // Namespace is the namespace associated with the request (if any).
+  optional string namespace = 4;
+
+  // Operation is the operation being performed
+  optional string operation = 5;
+
+  // Resource is the name of the resource being requested.  This is not the kind.  For example: pods
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.GroupVersionResource resource = 6;
+
+  // SubResource is the name of the subresource being requested.  This is a different resource, scoped to the parent
+  // resource, but it may have a different kind. For instance, /pods has the resource "pods" and the kind "Pod", while
+  // /pods/foo/status has the resource "pods", the sub resource "status", and the kind "Pod" (because status operates on
+  // pods). The binding resource for a pod though may be /pods/foo/binding, which has resource "pods", subresource
+  // "binding", and kind "Binding".
+  optional string subResource = 7;
+
+  // UserInfo is information about the requesting user
+  optional k8s.io.api.authentication.v1.UserInfo userInfo = 8;
+}
+
+// AdmissionReviewRequest describes an admission request.
+message AdmissionReviewRequest {
+  // Metadata contains metadata about the request including the UID for the Request.
+  optional AdmissionReviewMetadata metadata = 1;
 
   // Object is the object from the incoming request prior to default values being applied
   optional k8s.io.apimachinery.pkg.runtime.RawExtension object = 2;
@@ -62,32 +74,24 @@ message AdmissionReviewSpec {
   // OldObject is the existing object. Only populated for UPDATE requests.
   // +optional
   optional k8s.io.apimachinery.pkg.runtime.RawExtension oldObject = 3;
+}
 
-  // Operation is the operation being performed
-  optional string operation = 4;
+// AdmissionReviewResponse describes an admission response.
+message AdmissionReviewResponse {
+  // Metadata contains metadata about the request including the UID from the Request.
+  optional AdmissionReviewMetadata metadata = 1;
 
-  // Name is the name of the object as presented in the request.  On a CREATE operation, the client may omit name and
-  // rely on the server to generate the name.  If that is the case, this method will return the empty string.
+  // Status is filled in by the webhook and indicates whether the admission
+  // request should be permitted.
   // +optional
-  optional string name = 5;
+  optional AdmissionReviewStatus status = 2;
 
-  // Namespace is the namespace associated with the request (if any).
+  // The patch body. Currently we only support "JSONPatch" which implements RFC 6902.
   // +optional
-  optional string namespace = 6;
+  optional bytes patch = 3;
 
-  // Resource is the name of the resource being requested.  This is not the kind.  For example: pods
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.GroupVersionResource resource = 7;
-
-  // SubResource is the name of the subresource being requested.  This is a different resource, scoped to the parent
-  // resource, but it may have a different kind. For instance, /pods has the resource "pods" and the kind "Pod", while
-  // /pods/foo/status has the resource "pods", the sub resource "status", and the kind "Pod" (because status operates on
-  // pods). The binding resource for a pod though may be /pods/foo/binding, which has resource "pods", subresource
-  // "binding", and kind "Binding".
-  // +optional
-  optional string subResource = 8;
-
-  // UserInfo is information about the requesting user
-  optional k8s.io.api.authentication.v1.UserInfo userInfo = 9;
+  // The type of Patch. Currently we only allow "JSONPatch".
+  optional string patchType = 4;
 }
 
 // AdmissionReviewStatus describes the status of the admission request.

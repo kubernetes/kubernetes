@@ -120,7 +120,7 @@ func admitConfigMaps(ar v1alpha1.AdmissionReviewRequest) *v1alpha1.AdmissionRevi
 	return &reviewStatus
 }
 
-func admitCRD(ar v1alpha1.AdmissionReview) *v1alpha1.AdmissionReviewStatus {
+func admitCRD(ar v1alpha1.AdmissionReviewRequest) *v1alpha1.AdmissionReviewStatus {
 	glog.V(2).Info("admitting crd")
 	cr := struct {
 		metav1.ObjectMeta
@@ -147,7 +147,7 @@ func admitCRD(ar v1alpha1.AdmissionReview) *v1alpha1.AdmissionReviewStatus {
 	return &reviewStatus
 }
 
-type admitFunc func(v1alpha1.AdmissionReview) *v1alpha1.AdmissionReviewStatus
+type admitFunc func(v1alpha1.AdmissionReviewRequest) *v1alpha1.AdmissionReviewStatus
 
 func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	var body []byte
@@ -173,11 +173,13 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	} else {
 		reviewStatus = admit(ar)
 	}
+
+	arr := v1alpha1.AdmissionReviewResponse{}
 	if reviewStatus != nil {
-		ar.Status = *reviewStatus
+		arr.Status = *reviewStatus
 	}
 
-	resp, err := json.Marshal(ar)
+	resp, err := json.Marshal(arr)
 	if err != nil {
 		glog.Error(err)
 	}
