@@ -43,7 +43,7 @@ import (
 	v1listers "k8s.io/client-go/listers/core/v1"
 	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
+	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsinternalv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"

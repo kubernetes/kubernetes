@@ -21,8 +21,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // StatefulSetListerExpansion allows custom methods to be added to

@@ -12,7 +12,7 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/registry/core/resourcequota/storage",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
@@ -32,7 +32,7 @@ go_library(
     srcs = ["storage.go"],
     importpath = "k8s.io/kubernetes/pkg/registry/core/resourcequota/storage",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/registry/core/resourcequota:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

@@ -22,8 +22,8 @@ import (
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	apivalidation "k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 func ValidateScale(scale *autoscaling.Scale) field.ErrorList {

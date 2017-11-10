@@ -37,7 +37,7 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/kubelet/server/streaming",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/server/portforward:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

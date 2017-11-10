@@ -18,15 +18,26 @@ package fuzzer
 
 import (
 	fuzz "github.com/google/gofuzz"
+
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // Funcs returns the fuzzer functions for the autoscaling api group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
+		func(s *autoscaling.ScaleStatus, c fuzz.Continue) {
+			c.FuzzNoCustom(s) // fuzz self without calling this function again
+
+			// ensure we have a valid selector
+			metaSelector := &metav1.LabelSelector{}
+			c.Fuzz(metaSelector)
+			labelSelector, _ := metav1.LabelSelectorAsSelector(metaSelector)
+			s.Selector = labelSelector.String()
+		},
 		func(s *autoscaling.HorizontalPodAutoscalerSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
 			minReplicas := int32(c.Rand.Int31())

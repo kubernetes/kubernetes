@@ -23,7 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"

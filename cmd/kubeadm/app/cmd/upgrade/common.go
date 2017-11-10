@@ -99,11 +99,11 @@ func printConfiguration(cfg *kubeadmapiext.MasterConfiguration, w io.Writer) {
 // runPreflightChecks runs the root preflight check
 func runPreflightChecks(skipPreFlight bool) error {
 	if skipPreFlight {
-		fmt.Println("[preflight] Skipping pre-flight checks")
+		fmt.Println("[preflight] Skipping pre-flight checks.")
 		return nil
 	}
 
-	fmt.Println("[preflight] Running pre-flight checks")
+	fmt.Println("[preflight] Running pre-flight checks.")
 	return preflight.RunRootCheckOnly()
 }
 

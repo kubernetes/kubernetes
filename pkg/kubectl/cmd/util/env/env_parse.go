@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // Env returns an environment variable if not nil, or a default value.

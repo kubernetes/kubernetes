@@ -21,7 +21,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
@@ -33,15 +33,15 @@ type ServicesGetter interface {
 
 // ServiceInterface has methods to work with Service resources.
 type ServiceInterface interface {
-	Create(*api.Service) (*api.Service, error)
-	Update(*api.Service) (*api.Service, error)
-	UpdateStatus(*api.Service) (*api.Service, error)
+	Create(*core.Service) (*core.Service, error)
+	Update(*core.Service) (*core.Service, error)
+	UpdateStatus(*core.Service) (*core.Service, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*api.Service, error)
-	List(opts v1.ListOptions) (*api.ServiceList, error)
+	Get(name string, options v1.GetOptions) (*core.Service, error)
+	List(opts v1.ListOptions) (*core.ServiceList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Service, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Service, err error)
 	ServiceExpansion
 }
 
@@ -60,8 +60,8 @@ func newServices(c *CoreClient, namespace string) *services {
 }
 
 // Get takes name of the service, and returns the corresponding service object, and an error if there is any.
-func (c *services) Get(name string, options v1.GetOptions) (result *api.Service, err error) {
-	result = &api.Service{}
+func (c *services) Get(name string, options v1.GetOptions) (result *core.Service, err error) {
+	result = &core.Service{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("services").
@@ -73,8 +73,8 @@ func (c *services) Get(name string, options v1.GetOptions) (result *api.Service,
 }
 
 // List takes label and field selectors, and returns the list of Services that match those selectors.
-func (c *services) List(opts v1.ListOptions) (result *api.ServiceList, err error) {
-	result = &api.ServiceList{}
+func (c *services) List(opts v1.ListOptions) (result *core.ServiceList, err error) {
+	result = &core.ServiceList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("services").
@@ -95,8 +95,8 @@ func (c *services) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a service and creates it.  Returns the server's representation of the service, and an error, if there is any.
-func (c *services) Create(service *api.Service) (result *api.Service, err error) {
-	result = &api.Service{}
+func (c *services) Create(service *core.Service) (result *core.Service, err error) {
+	result = &core.Service{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("services").
@@ -107,8 +107,8 @@ func (c *services) Create(service *api.Service) (result *api.Service, err error)
 }
 
 // Update takes the representation of a service and updates it. Returns the server's representation of the service, and an error, if there is any.
-func (c *services) Update(service *api.Service) (result *api.Service, err error) {
-	result = &api.Service{}
+func (c *services) Update(service *core.Service) (result *core.Service, err error) {
+	result = &core.Service{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("services").
@@ -122,8 +122,8 @@ func (c *services) Update(service *api.Service) (result *api.Service, err error)
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *services) UpdateStatus(service *api.Service) (result *api.Service, err error) {
-	result = &api.Service{}
+func (c *services) UpdateStatus(service *core.Service) (result *core.Service, err error) {
+	result = &core.Service{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("services").
@@ -158,8 +158,8 @@ func (c *services) DeleteCollection(options *v1.DeleteOptions, listOptions v1.Li
 }
 
 // Patch applies the patch and returns the patched service.
-func (c *services) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Service, err error) {
-	result = &api.Service{}
+func (c *services) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Service, err error) {
+	result = &core.Service{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("services").

@@ -18,8 +18,8 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/controller/bootstrap",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/helper:go_default_library",
+        "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/helper:go_default_library",
         "//pkg/bootstrap/api:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
@@ -42,7 +42,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/bootstrap",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/bootstrap/api:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

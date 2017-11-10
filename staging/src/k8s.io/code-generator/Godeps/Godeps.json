@@ -212,43 +212,43 @@
 		},
 		{
 			"ImportPath": "k8s.io/gengo/args",
-			"Rev": "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
+			"Rev": "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/deepcopy-gen/generators",
-			"Rev": "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
+			"Rev": "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/defaulter-gen/generators",
-			"Rev": "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
+			"Rev": "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/import-boss/generators",
-			"Rev": "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
+			"Rev": "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/set-gen/generators",
-			"Rev": "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
+			"Rev": "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/set-gen/sets",
-			"Rev": "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
+			"Rev": "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/generator",
-			"Rev": "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
+			"Rev": "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/namer",
-			"Rev": "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
+			"Rev": "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/parser",
-			"Rev": "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
+			"Rev": "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/types",
-			"Rev": "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
+			"Rev": "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/common",

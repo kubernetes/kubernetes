@@ -31,7 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 type DeploymentV1Beta1 struct{}
@@ -102,8 +102,6 @@ func (DeploymentV1Beta1) Generate(genericParams map[string]interface{}) (runtime
 		return nil, err
 	}
 
-	// TODO: use versioned types for generators so that we don't need to
-	// set default values manually (see issue #17384)
 	count32 := int32(count)
 	deployment := extensionsv1beta1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{

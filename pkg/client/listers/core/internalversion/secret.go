@@ -22,13 +22,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // SecretLister helps list Secrets.
 type SecretLister interface {
 	// List lists all Secrets in the indexer.
-	List(selector labels.Selector) (ret []*api.Secret, err error)
+	List(selector labels.Selector) (ret []*core.Secret, err error)
 	// Secrets returns an object that can list and get Secrets.
 	Secrets(namespace string) SecretNamespaceLister
 	SecretListerExpansion
@@ -45,9 +45,9 @@ func NewSecretLister(indexer cache.Indexer) SecretLister {
 }
 
 // List lists all Secrets in the indexer.
-func (s *secretLister) List(selector labels.Selector) (ret []*api.Secret, err error) {
+func (s *secretLister) List(selector labels.Selector) (ret []*core.Secret, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.Secret))
+		ret = append(ret, m.(*core.Secret))
 	})
 	return ret, err
 }
@@ -60,9 +60,9 @@ func (s *secretLister) Secrets(namespace string) SecretNamespaceLister {
 // SecretNamespaceLister helps list and get Secrets.
 type SecretNamespaceLister interface {
 	// List lists all Secrets in the indexer for a given namespace.
-	List(selector labels.Selector) (ret []*api.Secret, err error)
+	List(selector labels.Selector) (ret []*core.Secret, err error)
 	// Get retrieves the Secret from the indexer for a given namespace and name.
-	Get(name string) (*api.Secret, error)
+	Get(name string) (*core.Secret, error)
 	SecretNamespaceListerExpansion
 }
 
@@ -74,21 +74,21 @@ type secretNamespaceLister struct {
 }
 
 // List lists all Secrets in the indexer for a given namespace.
-func (s secretNamespaceLister) List(selector labels.Selector) (ret []*api.Secret, err error) {
+func (s secretNamespaceLister) List(selector labels.Selector) (ret []*core.Secret, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.Secret))
+		ret = append(ret, m.(*core.Secret))
 	})
 	return ret, err
 }
 
 // Get retrieves the Secret from the indexer for a given namespace and name.
-func (s secretNamespaceLister) Get(name string) (*api.Secret, error) {
+func (s secretNamespaceLister) Get(name string) (*core.Secret, error) {
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(api.Resource("secret"), name)
+		return nil, errors.NewNotFound(core.Resource("secret"), name)
 	}
-	return obj.(*api.Secret), nil
+	return obj.(*core.Secret), nil
 }

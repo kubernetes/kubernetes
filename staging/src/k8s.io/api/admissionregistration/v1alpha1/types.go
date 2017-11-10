@@ -120,37 +120,65 @@ const (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ExternalAdmissionHookConfiguration describes the configuration of initializers.
-type ExternalAdmissionHookConfiguration struct {
+// ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.
+type ValidatingWebhookConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	// ExternalAdmissionHooks is a list of external admission webhooks and the
-	// affected resources and operations.
+	// Webhooks is a list of webhooks and the affected resources and operations.
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge
-	ExternalAdmissionHooks []ExternalAdmissionHook `json:"externalAdmissionHooks,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=externalAdmissionHooks"`
+	Webhooks []Webhook `json:"webhooks,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=Webhooks"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ExternalAdmissionHookConfigurationList is a list of ExternalAdmissionHookConfiguration.
-type ExternalAdmissionHookConfigurationList struct {
+// ValidatingWebhookConfigurationList is a list of ValidatingWebhookConfiguration.
+type ValidatingWebhookConfigurationList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	// List of ExternalAdmissionHookConfiguration.
-	Items []ExternalAdmissionHookConfiguration `json:"items" protobuf:"bytes,2,rep,name=items"`
+	// List of ValidatingWebhookConfiguration.
+	Items []ValidatingWebhookConfiguration `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// ExternalAdmissionHook describes an external admission webhook and the
-// resources and operations it applies to.
-type ExternalAdmissionHook struct {
-	// The name of the external admission webhook.
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.
+type MutatingWebhookConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	// Webhooks is a list of webhooks and the affected resources and operations.
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	Webhooks []Webhook `json:"webhooks,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=Webhooks"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// MutatingWebhookConfigurationList is a list of MutatingWebhookConfiguration.
+type MutatingWebhookConfigurationList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	// List of MutatingWebhookConfiguration.
+	Items []MutatingWebhookConfiguration `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// Webhook describes an admission webhook and the resources and operations it applies to.
+type Webhook struct {
+	// The name of the admission webhook.
 	// Name should be fully qualified, e.g., imagepolicy.kubernetes.io, where
 	// "imagepolicy" is the name of the webhook, and kubernetes.io is the name
 	// of the organization.
@@ -159,7 +187,7 @@ type ExternalAdmissionHook struct {
 
 	// ClientConfig defines how to communicate with the hook.
 	// Required
-	ClientConfig AdmissionHookClientConfig `json:"clientConfig" protobuf:"bytes,2,opt,name=clientConfig"`
+	ClientConfig WebhookClientConfig `json:"clientConfig" protobuf:"bytes,2,opt,name=clientConfig"`
 
 	// Rules describes what operations on what resources/subresources the webhook cares about.
 	// The webhook cares about an operation if it matches _any_ Rule.
@@ -195,9 +223,9 @@ const (
 	Connect      OperationType = "CONNECT"
 )
 
-// AdmissionHookClientConfig contains the information to make a TLS
+// WebhookClientConfig contains the information to make a TLS
 // connection with the webhook
-type AdmissionHookClientConfig struct {
+type WebhookClientConfig struct {
 	// Service is a reference to the service for this webhook. If there is only
 	// one port open for the service, that port will be used. If there are multiple
 	// ports open, port 443 will be used if it is open, otherwise it is an error.

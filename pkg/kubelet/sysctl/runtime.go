@@ -19,7 +19,7 @@ package sysctl
 import (
 	"fmt"
 
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )

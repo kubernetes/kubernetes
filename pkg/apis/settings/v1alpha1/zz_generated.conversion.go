@@ -25,7 +25,7 @@ import (
 	v1alpha1 "k8s.io/api/settings/v1alpha1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	settings "k8s.io/kubernetes/pkg/apis/settings"
 	unsafe "unsafe"
 )
@@ -117,11 +117,11 @@ func Convert_settings_PodPresetList_To_v1alpha1_PodPresetList(in *settings.PodPr
 
 func autoConvert_v1alpha1_PodPresetSpec_To_settings_PodPresetSpec(in *v1alpha1.PodPresetSpec, out *settings.PodPresetSpec, s conversion.Scope) error {
 	out.Selector = in.Selector
-	out.Env = *(*[]api.EnvVar)(unsafe.Pointer(&in.Env))
-	out.EnvFrom = *(*[]api.EnvFromSource)(unsafe.Pointer(&in.EnvFrom))
+	out.Env = *(*[]core.EnvVar)(unsafe.Pointer(&in.Env))
+	out.EnvFrom = *(*[]core.EnvFromSource)(unsafe.Pointer(&in.EnvFrom))
 	if in.Volumes != nil {
 		in, out := &in.Volumes, &out.Volumes
-		*out = make([]api.Volume, len(*in))
+		*out = make([]core.Volume, len(*in))
 		for i := range *in {
 			// TODO: Inefficient conversion - can we improve it?
 			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
@@ -131,7 +131,7 @@ func autoConvert_v1alpha1_PodPresetSpec_To_settings_PodPresetSpec(in *v1alpha1.P
 	} else {
 		out.Volumes = nil
 	}
-	out.VolumeMounts = *(*[]api.VolumeMount)(unsafe.Pointer(&in.VolumeMounts))
+	out.VolumeMounts = *(*[]core.VolumeMount)(unsafe.Pointer(&in.VolumeMounts))
 	return nil
 }
 

@@ -26,7 +26,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/kuberuntime",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/v1/helper:go_default_library",
+        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubelet/apis/cri:go_default_library",
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",

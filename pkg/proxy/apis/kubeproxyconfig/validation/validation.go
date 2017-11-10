@@ -24,7 +24,7 @@ import (
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	apivalidation "k8s.io/kubernetes/pkg/api/validation"
+	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 )
 

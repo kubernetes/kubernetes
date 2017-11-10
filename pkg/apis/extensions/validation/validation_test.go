@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
@@ -1746,70 +1746,6 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
 				t.Errorf("unexpected error: %q, expected: %q", err, k)
 			}
-		}
-	}
-}
-
-func TestValidateScale(t *testing.T) {
-	successCases := []extensions.Scale{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "frontend",
-				Namespace: metav1.NamespaceDefault,
-			},
-			Spec: extensions.ScaleSpec{
-				Replicas: 1,
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "frontend",
-				Namespace: metav1.NamespaceDefault,
-			},
-			Spec: extensions.ScaleSpec{
-				Replicas: 10,
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "frontend",
-				Namespace: metav1.NamespaceDefault,
-			},
-			Spec: extensions.ScaleSpec{
-				Replicas: 0,
-			},
-		},
-	}
-
-	for _, successCase := range successCases {
-		if errs := ValidateScale(&successCase); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
-	}
-
-	errorCases := []struct {
-		scale extensions.Scale
-		msg   string
-	}{
-		{
-			scale: extensions.Scale{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "frontend",
-					Namespace: metav1.NamespaceDefault,
-				},
-				Spec: extensions.ScaleSpec{
-					Replicas: -1,
-				},
-			},
-			msg: "must be greater than or equal to 0",
-		},
-	}
-
-	for _, c := range errorCases {
-		if errs := ValidateScale(&c.scale); len(errs) == 0 {
-			t.Errorf("expected failure for %s", c.msg)
-		} else if !strings.Contains(errs[0].Error(), c.msg) {
-			t.Errorf("unexpected error: %v, expected: %s", errs[0], c.msg)
 		}
 	}
 }

@@ -44,6 +44,6 @@ func NewCmdMarkMaster() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use for talking to the cluster")
+	cmd.Flags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use when talking to the cluster")
 	return cmd
 }

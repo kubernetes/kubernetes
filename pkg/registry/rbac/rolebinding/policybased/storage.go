@@ -23,7 +23,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	kapihelper "k8s.io/kubernetes/pkg/api/helper"
+	kapihelper "k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"

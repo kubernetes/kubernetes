@@ -38,8 +38,8 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 
 	jsonpatch "github.com/evanphx/json-patch"

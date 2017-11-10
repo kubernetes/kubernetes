@@ -19,12 +19,12 @@ package apps
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // +genclient
-// +genclient:method=GetScale,verb=get,subresource=scale,result=k8s.io/kubernetes/pkg/apis/extensions.Scale
-// +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/kubernetes/pkg/apis/extensions.Scale,result=k8s.io/kubernetes/pkg/apis/extensions.Scale
+// +genclient:method=GetScale,verb=get,subresource=scale,result=k8s.io/kubernetes/pkg/apis/autoscaling.Scale
+// +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/kubernetes/pkg/apis/autoscaling.Scale,result=k8s.io/kubernetes/pkg/apis/autoscaling.Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // StatefulSet represents a set of pods with consistent identities.
@@ -195,6 +195,27 @@ type StatefulSetStatus struct {
 	// newest ControllerRevision.
 	// +optional
 	CollisionCount *int32
+
+	// Represents the latest available observations of a statefulset's current state.
+	Conditions []StatefulSetCondition
+}
+
+type StatefulSetConditionType string
+
+// TODO: Add valid condition types for Statefulsets.
+
+// StatefulSetCondition describes the state of a statefulset at a certain point.
+type StatefulSetCondition struct {
+	// Type of statefulset condition.
+	Type StatefulSetConditionType
+	// Status of the condition, one of True, False, Unknown.
+	Status api.ConditionStatus
+	// The last time this condition was updated.
+	LastTransitionTime metav1.Time
+	// The reason for the condition's last transition.
+	Reason string
+	// A human readable message indicating details about the transition.
+	Message string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

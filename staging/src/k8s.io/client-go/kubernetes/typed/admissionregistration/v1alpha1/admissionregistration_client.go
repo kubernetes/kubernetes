@@ -25,8 +25,9 @@ import (
 
 type AdmissionregistrationV1alpha1Interface interface {
 	RESTClient() rest.Interface
-	ExternalAdmissionHookConfigurationsGetter
 	InitializerConfigurationsGetter
+	MutatingWebhookConfigurationsGetter
+	ValidatingWebhookConfigurationsGetter
 }
 
 // AdmissionregistrationV1alpha1Client is used to interact with features provided by the admissionregistration.k8s.io group.
@@ -34,12 +35,16 @@ type AdmissionregistrationV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *AdmissionregistrationV1alpha1Client) ExternalAdmissionHookConfigurations() ExternalAdmissionHookConfigurationInterface {
-	return newExternalAdmissionHookConfigurations(c)
-}
-
 func (c *AdmissionregistrationV1alpha1Client) InitializerConfigurations() InitializerConfigurationInterface {
 	return newInitializerConfigurations(c)
+}
+
+func (c *AdmissionregistrationV1alpha1Client) MutatingWebhookConfigurations() MutatingWebhookConfigurationInterface {
+	return newMutatingWebhookConfigurations(c)
+}
+
+func (c *AdmissionregistrationV1alpha1Client) ValidatingWebhookConfigurations() ValidatingWebhookConfigurationInterface {
+	return newValidatingWebhookConfigurations(c)
 }
 
 // NewForConfig creates a new AdmissionregistrationV1alpha1Client for the given config.

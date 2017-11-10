@@ -21,7 +21,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
@@ -33,14 +33,14 @@ type PodTemplatesGetter interface {
 
 // PodTemplateInterface has methods to work with PodTemplate resources.
 type PodTemplateInterface interface {
-	Create(*api.PodTemplate) (*api.PodTemplate, error)
-	Update(*api.PodTemplate) (*api.PodTemplate, error)
+	Create(*core.PodTemplate) (*core.PodTemplate, error)
+	Update(*core.PodTemplate) (*core.PodTemplate, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*api.PodTemplate, error)
-	List(opts v1.ListOptions) (*api.PodTemplateList, error)
+	Get(name string, options v1.GetOptions) (*core.PodTemplate, error)
+	List(opts v1.ListOptions) (*core.PodTemplateList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.PodTemplate, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.PodTemplate, err error)
 	PodTemplateExpansion
 }
 
@@ -59,8 +59,8 @@ func newPodTemplates(c *CoreClient, namespace string) *podTemplates {
 }
 
 // Get takes name of the podTemplate, and returns the corresponding podTemplate object, and an error if there is any.
-func (c *podTemplates) Get(name string, options v1.GetOptions) (result *api.PodTemplate, err error) {
-	result = &api.PodTemplate{}
+func (c *podTemplates) Get(name string, options v1.GetOptions) (result *core.PodTemplate, err error) {
+	result = &core.PodTemplate{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("podtemplates").
@@ -72,8 +72,8 @@ func (c *podTemplates) Get(name string, options v1.GetOptions) (result *api.PodT
 }
 
 // List takes label and field selectors, and returns the list of PodTemplates that match those selectors.
-func (c *podTemplates) List(opts v1.ListOptions) (result *api.PodTemplateList, err error) {
-	result = &api.PodTemplateList{}
+func (c *podTemplates) List(opts v1.ListOptions) (result *core.PodTemplateList, err error) {
+	result = &core.PodTemplateList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("podtemplates").
@@ -94,8 +94,8 @@ func (c *podTemplates) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a podTemplate and creates it.  Returns the server's representation of the podTemplate, and an error, if there is any.
-func (c *podTemplates) Create(podTemplate *api.PodTemplate) (result *api.PodTemplate, err error) {
-	result = &api.PodTemplate{}
+func (c *podTemplates) Create(podTemplate *core.PodTemplate) (result *core.PodTemplate, err error) {
+	result = &core.PodTemplate{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("podtemplates").
@@ -106,8 +106,8 @@ func (c *podTemplates) Create(podTemplate *api.PodTemplate) (result *api.PodTemp
 }
 
 // Update takes the representation of a podTemplate and updates it. Returns the server's representation of the podTemplate, and an error, if there is any.
-func (c *podTemplates) Update(podTemplate *api.PodTemplate) (result *api.PodTemplate, err error) {
-	result = &api.PodTemplate{}
+func (c *podTemplates) Update(podTemplate *core.PodTemplate) (result *core.PodTemplate, err error) {
+	result = &core.PodTemplate{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("podtemplates").
@@ -141,8 +141,8 @@ func (c *podTemplates) DeleteCollection(options *v1.DeleteOptions, listOptions v
 }
 
 // Patch applies the patch and returns the patched podTemplate.
-func (c *podTemplates) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.PodTemplate, err error) {
-	result = &api.PodTemplate{}
+func (c *podTemplates) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.PodTemplate, err error) {
+	result = &core.PodTemplate{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("podtemplates").

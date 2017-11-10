@@ -22,13 +22,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // PodTemplateLister helps list PodTemplates.
 type PodTemplateLister interface {
 	// List lists all PodTemplates in the indexer.
-	List(selector labels.Selector) (ret []*api.PodTemplate, err error)
+	List(selector labels.Selector) (ret []*core.PodTemplate, err error)
 	// PodTemplates returns an object that can list and get PodTemplates.
 	PodTemplates(namespace string) PodTemplateNamespaceLister
 	PodTemplateListerExpansion
@@ -45,9 +45,9 @@ func NewPodTemplateLister(indexer cache.Indexer) PodTemplateLister {
 }
 
 // List lists all PodTemplates in the indexer.
-func (s *podTemplateLister) List(selector labels.Selector) (ret []*api.PodTemplate, err error) {
+func (s *podTemplateLister) List(selector labels.Selector) (ret []*core.PodTemplate, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.PodTemplate))
+		ret = append(ret, m.(*core.PodTemplate))
 	})
 	return ret, err
 }
@@ -60,9 +60,9 @@ func (s *podTemplateLister) PodTemplates(namespace string) PodTemplateNamespaceL
 // PodTemplateNamespaceLister helps list and get PodTemplates.
 type PodTemplateNamespaceLister interface {
 	// List lists all PodTemplates in the indexer for a given namespace.
-	List(selector labels.Selector) (ret []*api.PodTemplate, err error)
+	List(selector labels.Selector) (ret []*core.PodTemplate, err error)
 	// Get retrieves the PodTemplate from the indexer for a given namespace and name.
-	Get(name string) (*api.PodTemplate, error)
+	Get(name string) (*core.PodTemplate, error)
 	PodTemplateNamespaceListerExpansion
 }
 
@@ -74,21 +74,21 @@ type podTemplateNamespaceLister struct {
 }
 
 // List lists all PodTemplates in the indexer for a given namespace.
-func (s podTemplateNamespaceLister) List(selector labels.Selector) (ret []*api.PodTemplate, err error) {
+func (s podTemplateNamespaceLister) List(selector labels.Selector) (ret []*core.PodTemplate, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.PodTemplate))
+		ret = append(ret, m.(*core.PodTemplate))
 	})
 	return ret, err
 }
 
 // Get retrieves the PodTemplate from the indexer for a given namespace and name.
-func (s podTemplateNamespaceLister) Get(name string) (*api.PodTemplate, error) {
+func (s podTemplateNamespaceLister) Get(name string) (*core.PodTemplate, error) {
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(api.Resource("podtemplate"), name)
+		return nil, errors.NewNotFound(core.Resource("podtemplate"), name)
 	}
-	return obj.(*api.PodTemplate), nil
+	return obj.(*core.PodTemplate), nil
 }

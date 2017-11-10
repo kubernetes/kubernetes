@@ -72,10 +72,12 @@ func (f *genericInformer) Lister() cache.GenericLister {
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=admissionregistration.k8s.io, Version=v1alpha1
-	case v1alpha1.SchemeGroupVersion.WithResource("externaladmissionhookconfigurations"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Admissionregistration().V1alpha1().ExternalAdmissionHookConfigurations().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("initializerconfigurations"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Admissionregistration().V1alpha1().InitializerConfigurations().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("mutatingwebhookconfigurations"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Admissionregistration().V1alpha1().MutatingWebhookConfigurations().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("validatingwebhookconfigurations"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Admissionregistration().V1alpha1().ValidatingWebhookConfigurations().Informer()}, nil
 
 		// Group=apps, Version=v1
 	case v1.SchemeGroupVersion.WithResource("controllerrevisions"):

@@ -39,8 +39,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/api"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 
@@ -112,23 +112,24 @@ type RunObjectConfig interface {
 }
 
 type RCConfig struct {
-	Affinity       *v1.Affinity
-	Client         clientset.Interface
-	InternalClient internalclientset.Interface
-	Image          string
-	Command        []string
-	Name           string
-	Namespace      string
-	PollInterval   time.Duration
-	Timeout        time.Duration
-	PodStatusFile  *os.File
-	Replicas       int
-	CpuRequest     int64 // millicores
-	CpuLimit       int64 // millicores
-	MemRequest     int64 // bytes
-	MemLimit       int64 // bytes
-	ReadinessProbe *v1.Probe
-	DNSPolicy      *v1.DNSPolicy
+	Affinity          *v1.Affinity
+	Client            clientset.Interface
+	InternalClient    internalclientset.Interface
+	Image             string
+	Command           []string
+	Name              string
+	Namespace         string
+	PollInterval      time.Duration
+	Timeout           time.Duration
+	PodStatusFile     *os.File
+	Replicas          int
+	CpuRequest        int64 // millicores
+	CpuLimit          int64 // millicores
+	MemRequest        int64 // bytes
+	MemLimit          int64 // bytes
+	ReadinessProbe    *v1.Probe
+	DNSPolicy         *v1.DNSPolicy
+	PriorityClassName string
 
 	// Env vars, set the same for every pod.
 	Env map[string]string
@@ -539,6 +540,7 @@ func (config *RCConfig) create() error {
 					DNSPolicy:                     *config.DNSPolicy,
 					NodeSelector:                  config.NodeSelector,
 					TerminationGracePeriodSeconds: &one,
+					PriorityClassName:             config.PriorityClassName,
 				},
 			},
 		},
@@ -614,6 +616,9 @@ func (config *RCConfig) applyTo(template *v1.PodTemplateSpec) {
 	}
 	if len(config.VolumeMounts) > 0 {
 		template.Spec.Containers[0].VolumeMounts = config.VolumeMounts
+	}
+	if config.PriorityClassName != "" {
+		template.Spec.PriorityClassName = config.PriorityClassName
 	}
 }
 

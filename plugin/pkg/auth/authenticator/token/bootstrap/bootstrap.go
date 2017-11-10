@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 	"k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 )

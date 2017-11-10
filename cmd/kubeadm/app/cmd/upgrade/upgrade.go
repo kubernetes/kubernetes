@@ -50,12 +50,12 @@ func NewCmdUpgrade(out io.Writer) *cobra.Command {
 		RunE:  cmdutil.SubCmdRunE("upgrade"),
 	}
 
-	cmd.PersistentFlags().StringVar(&flags.kubeConfigPath, "kubeconfig", flags.kubeConfigPath, "The KubeConfig file to use for talking to the cluster.")
-	cmd.PersistentFlags().StringVar(&flags.cfgPath, "config", flags.cfgPath, "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental).")
+	cmd.PersistentFlags().StringVar(&flags.kubeConfigPath, "kubeconfig", flags.kubeConfigPath, "The KubeConfig file to use when talking to the cluster.")
+	cmd.PersistentFlags().StringVar(&flags.cfgPath, "config", flags.cfgPath, "Path to kubeadm config file. WARNING: Usage of a configuration file is experimental!")
 	cmd.PersistentFlags().BoolVar(&flags.allowExperimentalUpgrades, "allow-experimental-upgrades", flags.allowExperimentalUpgrades, "Show unstable versions of Kubernetes as an upgrade alternative and allow upgrading to an alpha/beta/release candidate versions of Kubernetes.")
 	cmd.PersistentFlags().BoolVar(&flags.allowRCUpgrades, "allow-release-candidate-upgrades", flags.allowRCUpgrades, "Show release candidate versions of Kubernetes as an upgrade alternative and allow upgrading to a release candidate versions of Kubernetes.")
-	cmd.PersistentFlags().BoolVar(&flags.printConfig, "print-config", flags.printConfig, "Whether the configuration file that will be used in the upgrade should be printed or not.")
-	cmd.PersistentFlags().BoolVar(&flags.skipPreFlight, "skip-preflight-checks", flags.skipPreFlight, "Skip preflight checks normally run before modifying the system")
+	cmd.PersistentFlags().BoolVar(&flags.printConfig, "print-config", flags.printConfig, "Specifies whether the configuration file that will be used in the upgrade should be printed or not.")
+	cmd.PersistentFlags().BoolVar(&flags.skipPreFlight, "skip-preflight-checks", flags.skipPreFlight, "Skip preflight checks that normally run before modifying the system.")
 
 	cmd.AddCommand(NewCmdApply(flags))
 	cmd.AddCommand(NewCmdPlan(flags))

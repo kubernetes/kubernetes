@@ -231,25 +231,27 @@ func TestValidateInitializerConfiguration(t *testing.T) {
 	}
 }
 
-func getExternalAdmissionHookConfiguration(hooks []admissionregistration.ExternalAdmissionHook) *admissionregistration.ExternalAdmissionHookConfiguration {
-	return &admissionregistration.ExternalAdmissionHookConfiguration{
+func newValidatingWebhookConfiguration(hooks []admissionregistration.Webhook) *admissionregistration.ValidatingWebhookConfiguration {
+	return &admissionregistration.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "config",
 		},
-		ExternalAdmissionHooks: hooks,
+		Webhooks: hooks,
 	}
 }
 
-func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
+// TODO: Add TestValidateMutatingWebhookConfiguration to test validation for mutating webhooks.
+
+func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 	tests := []struct {
 		name          string
-		config        *admissionregistration.ExternalAdmissionHookConfiguration
+		config        *admissionregistration.ValidatingWebhookConfiguration
 		expectedError string
 	}{
 		{
-			name: "all ExternalAdmissionHook must have a fully qualified name",
-			config: getExternalAdmissionHookConfiguration(
-				[]admissionregistration.ExternalAdmissionHook{
+			name: "all Webhooks must have a fully qualified name",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
 					},
@@ -260,12 +262,12 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 						Name: "",
 					},
 				}),
-			expectedError: `externalAdmissionHooks[1].name: Invalid value: "k8s.io": should be a domain with at least three segments separated by dots, externalAdmissionHooks[2].name: Required value`,
+			expectedError: `webhooks[1].name: Invalid value: "k8s.io": should be a domain with at least three segments separated by dots, webhooks[2].name: Required value`,
 		},
 		{
 			name: "Operations must not be empty or nil",
-			config: getExternalAdmissionHookConfiguration(
-				[]admissionregistration.ExternalAdmissionHook{
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
 						Rules: []admissionregistration.RuleWithOperations{
@@ -288,12 +290,12 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 						},
 					},
 				}),
-			expectedError: `externalAdmissionHooks[0].rules[0].operations: Required value, externalAdmissionHooks[0].rules[1].operations: Required value`,
+			expectedError: `webhooks[0].rules[0].operations: Required value, webhooks[0].rules[1].operations: Required value`,
 		},
 		{
 			name: "\"\" is NOT a valid operation",
-			config: getExternalAdmissionHookConfiguration(
-				[]admissionregistration.ExternalAdmissionHook{
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
 						Rules: []admissionregistration.RuleWithOperations{
@@ -312,8 +314,8 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 		},
 		{
 			name: "operation must be either create/update/delete/connect",
-			config: getExternalAdmissionHookConfiguration(
-				[]admissionregistration.ExternalAdmissionHook{
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
 						Rules: []admissionregistration.RuleWithOperations{
@@ -332,8 +334,8 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 		},
 		{
 			name: "wildcard operation cannot be mixed with other strings",
-			config: getExternalAdmissionHookConfiguration(
-				[]admissionregistration.ExternalAdmissionHook{
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
 						Rules: []admissionregistration.RuleWithOperations{
@@ -352,8 +354,8 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 		},
 		{
 			name: `resource "*" can co-exist with resources that have subresources`,
-			config: getExternalAdmissionHookConfiguration(
-				[]admissionregistration.ExternalAdmissionHook{
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
 						Rules: []admissionregistration.RuleWithOperations{
@@ -371,8 +373,8 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 		},
 		{
 			name: `resource "*" cannot mix with resources that don't have subresources`,
-			config: getExternalAdmissionHookConfiguration(
-				[]admissionregistration.ExternalAdmissionHook{
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
 						Rules: []admissionregistration.RuleWithOperations{
@@ -391,8 +393,8 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 		},
 		{
 			name: "resource a/* cannot mix with a/x",
-			config: getExternalAdmissionHookConfiguration(
-				[]admissionregistration.ExternalAdmissionHook{
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
 						Rules: []admissionregistration.RuleWithOperations{
@@ -407,12 +409,12 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 						},
 					},
 				}),
-			expectedError: `externalAdmissionHooks[0].rules[0].resources[1]: Invalid value: "a/x": if 'a/*' is present, must not specify a/x`,
+			expectedError: `webhooks[0].rules[0].resources[1]: Invalid value: "a/x": if 'a/*' is present, must not specify a/x`,
 		},
 		{
 			name: "resource a/* can mix with a",
-			config: getExternalAdmissionHookConfiguration(
-				[]admissionregistration.ExternalAdmissionHook{
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
 						Rules: []admissionregistration.RuleWithOperations{
@@ -430,8 +432,8 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 		},
 		{
 			name: "resource */a cannot mix with x/a",
-			config: getExternalAdmissionHookConfiguration(
-				[]admissionregistration.ExternalAdmissionHook{
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
 						Rules: []admissionregistration.RuleWithOperations{
@@ -446,12 +448,12 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 						},
 					},
 				}),
-			expectedError: `externalAdmissionHooks[0].rules[0].resources[1]: Invalid value: "x/a": if '*/a' is present, must not specify x/a`,
+			expectedError: `webhooks[0].rules[0].resources[1]: Invalid value: "x/a": if '*/a' is present, must not specify x/a`,
 		},
 		{
 			name: "resource */* cannot mix with other resources",
-			config: getExternalAdmissionHookConfiguration(
-				[]admissionregistration.ExternalAdmissionHook{
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
 						Rules: []admissionregistration.RuleWithOperations{
@@ -466,12 +468,12 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 						},
 					},
 				}),
-			expectedError: `externalAdmissionHooks[0].rules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
+			expectedError: `webhooks[0].rules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
 		},
 		{
 			name: "FailurePolicy can only be \"Ignore\" or \"Fail\"",
-			config: getExternalAdmissionHookConfiguration(
-				[]admissionregistration.ExternalAdmissionHook{
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
 						FailurePolicy: func() *admissionregistration.FailurePolicyType {
@@ -480,15 +482,15 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 						}(),
 					},
 				}),
-			expectedError: `externalAdmissionHooks[0].failurePolicy: Unsupported value: "other": supported values: "Fail", "Ignore"`,
+			expectedError: `webhooks[0].failurePolicy: Unsupported value: "other": supported values: "Fail", "Ignore"`,
 		},
 		{
 			name: "URLPath must start with slash",
-			config: getExternalAdmissionHookConfiguration(
-				[]admissionregistration.ExternalAdmissionHook{
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
-						ClientConfig: admissionregistration.AdmissionHookClientConfig{
+						ClientConfig: admissionregistration.WebhookClientConfig{
 							URLPath: "foo/",
 						},
 					},
@@ -497,11 +499,11 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 		},
 		{
 			name: "URLPath accepts slash",
-			config: getExternalAdmissionHookConfiguration(
-				[]admissionregistration.ExternalAdmissionHook{
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
-						ClientConfig: admissionregistration.AdmissionHookClientConfig{
+						ClientConfig: admissionregistration.WebhookClientConfig{
 							URLPath: "/",
 						},
 					},
@@ -510,11 +512,11 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 		},
 		{
 			name: "URLPath accepts no trailing slash",
-			config: getExternalAdmissionHookConfiguration(
-				[]admissionregistration.ExternalAdmissionHook{
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
-						ClientConfig: admissionregistration.AdmissionHookClientConfig{
+						ClientConfig: admissionregistration.WebhookClientConfig{
 							URLPath: "/foo",
 						},
 					},
@@ -523,11 +525,11 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 		},
 		{
 			name: "URLPath fails //",
-			config: getExternalAdmissionHookConfiguration(
-				[]admissionregistration.ExternalAdmissionHook{
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
-						ClientConfig: admissionregistration.AdmissionHookClientConfig{
+						ClientConfig: admissionregistration.WebhookClientConfig{
 							URLPath: "//",
 						},
 					},
@@ -536,11 +538,11 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 		},
 		{
 			name: "URLPath no empty step",
-			config: getExternalAdmissionHookConfiguration(
-				[]admissionregistration.ExternalAdmissionHook{
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
-						ClientConfig: admissionregistration.AdmissionHookClientConfig{
+						ClientConfig: admissionregistration.WebhookClientConfig{
 							URLPath: "/foo//bar/",
 						},
 					},
@@ -548,11 +550,11 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 			expectedError: `clientConfig.urlPath: Invalid value: "/foo//bar/": segment[1] may not be empty`,
 		}, {
 			name: "URLPath no empty step 2",
-			config: getExternalAdmissionHookConfiguration(
-				[]admissionregistration.ExternalAdmissionHook{
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
-						ClientConfig: admissionregistration.AdmissionHookClientConfig{
+						ClientConfig: admissionregistration.WebhookClientConfig{
 							URLPath: "/foo/bar//",
 						},
 					},
@@ -561,11 +563,11 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 		},
 		{
 			name: "URLPath no non-subdomain",
-			config: getExternalAdmissionHookConfiguration(
-				[]admissionregistration.ExternalAdmissionHook{
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
-						ClientConfig: admissionregistration.AdmissionHookClientConfig{
+						ClientConfig: admissionregistration.WebhookClientConfig{
 							URLPath: "/apis/foo.bar/v1alpha1/--bad",
 						},
 					},
@@ -575,7 +577,7 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			errs := ValidateExternalAdmissionHookConfiguration(test.config)
+			errs := ValidateValidatingWebhookConfiguration(test.config)
 			err := errs.ToAggregate()
 			if err != nil {
 				if e, a := test.expectedError, err.Error(); !strings.Contains(a, e) || e == "" {

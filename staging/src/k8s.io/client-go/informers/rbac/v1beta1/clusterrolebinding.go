@@ -38,19 +38,33 @@ type ClusterRoleBindingInformer interface {
 }
 
 type clusterRoleBindingInformer struct {
-	factory internalinterfaces.SharedInformerFactory
+	factory          internalinterfaces.SharedInformerFactory
+	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
 // NewClusterRoleBindingInformer constructs a new informer for ClusterRoleBinding type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewClusterRoleBindingInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredClusterRoleBindingInformer(client, resyncPeriod, indexers, nil)
+}
+
+// NewFilteredClusterRoleBindingInformer constructs a new informer for ClusterRoleBinding type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewFilteredClusterRoleBindingInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
 				return client.RbacV1beta1().ClusterRoleBindings().List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
 				return client.RbacV1beta1().ClusterRoleBindings().Watch(options)
 			},
 		},
@@ -60,12 +74,12 @@ func NewClusterRoleBindingInformer(client kubernetes.Interface, resyncPeriod tim
 	)
 }
 
-func defaultClusterRoleBindingInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewClusterRoleBindingInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+func (f *clusterRoleBindingInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredClusterRoleBindingInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *clusterRoleBindingInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&rbac_v1beta1.ClusterRoleBinding{}, defaultClusterRoleBindingInformer)
+	return f.factory.InformerFor(&rbac_v1beta1.ClusterRoleBinding{}, f.defaultInformer)
 }
 
 func (f *clusterRoleBindingInformer) Lister() v1beta1.ClusterRoleBindingLister {

@@ -18,20 +18,18 @@ package selfhosting
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"time"
 
 	apps "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -59,7 +57,7 @@ func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubea
 	// Adjust the timeout slightly to something self-hosting specific
 	waiter.SetTimeout(selfHostingWaitTimeout)
 
-	// Here the map of different mutators to use for the control plane's podspec is stored
+	// Here the map of different mutators to use for the control plane's PodSpec is stored
 	mutators := GetMutatorsFromFeatureGates(cfg.FeatureGates)
 
 	// Some extra work to be done if we should store the control plane certificates in Secrets
@@ -85,10 +83,11 @@ func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubea
 		}
 
 		// Load the Static Pod file in order to be able to create a self-hosted variant of that file
-		podSpec, err := loadPodSpecFromFile(manifestPath)
+		pod, err := volumeutil.LoadPodFromFile(manifestPath)
 		if err != nil {
 			return err
 		}
+		podSpec := &pod.Spec
 
 		// Build a DaemonSet object from the loaded PodSpec
 		ds := BuildDaemonSet(componentName, podSpec, mutators)
@@ -154,22 +153,6 @@ func BuildDaemonSet(name string, podSpec *v1.PodSpec, mutators map[string][]PodS
 			},
 		},
 	}
-}
-
-// loadPodSpecFromFile reads and decodes a file containing a specification of a Pod
-// TODO: Consider using "k8s.io/kubernetes/pkg/volume/util".LoadPodFromFile(filename string) in the future instead.
-func loadPodSpecFromFile(manifestPath string) (*v1.PodSpec, error) {
-	podBytes, err := ioutil.ReadFile(manifestPath)
-	if err != nil {
-		return nil, err
-	}
-
-	staticPod := &v1.Pod{}
-	if err := kuberuntime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), podBytes, staticPod); err != nil {
-		return nil, fmt.Errorf("unable to decode static pod %v", err)
-	}
-
-	return &staticPod.Spec, nil
 }
 
 // BuildSelfhostedComponentLabels returns the labels for a self-hosted component

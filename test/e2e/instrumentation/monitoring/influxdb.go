@@ -39,6 +39,7 @@ var _ = instrumentation.SIGDescribe("Monitoring", func() {
 
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce")
+		framework.SkipUnlessClusterMonitoringModeIs("influxdb")
 	})
 
 	It("should verify monitoring pods and all cluster nodes are available on influxdb using heapster.", func() {
