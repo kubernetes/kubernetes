@@ -74,7 +74,7 @@ fi
 # Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
 CVM_VERSION=${CVM_VERSION:-container-vm-v20170627}
-GCI_VERSION=${KUBE_GCI_VERSION:-cos-stable-60-9592-90-0}
+GCI_VERSION=${KUBE_GCI_VERSION:-cos-stable-61-9765-66-0}
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
 NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
@@ -260,7 +260,7 @@ if [[ -n "${GCE_ALPHA_FEATURES:-}" ]]; then
 fi
 
 # Disable Docker live-restore.
-if [[ -n "${DISABLE_DOCKER_LIVE_RESTORE:-}" ]]; then
+if [[ -n "${DISABLE_DOCKER_LIVE_RESTORE:-true}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} DISABLE_DOCKER_LIVE_RESTORE"
 fi
 
