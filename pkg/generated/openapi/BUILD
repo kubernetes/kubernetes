@@ -66,12 +66,16 @@ openapi_library(
         "k8s.io/apiserver/pkg/apis/example2/v1",
         "k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1",
         "k8s.io/client-go/pkg/version",
+        "k8s.io/code-generator/_examples/apiserver/apis/example/v1",
+        "k8s.io/code-generator/_examples/crd/apis/example/v1",
+        "k8s.io/code-generator/_examples/crd/apis/example2/v1",
         "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1",
         "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1",
         "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1",
         "k8s.io/metrics/pkg/apis/external_metrics/v1beta1",
         "k8s.io/metrics/pkg/apis/metrics/v1alpha1",
         "k8s.io/metrics/pkg/apis/metrics/v1beta1",
+        "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1",
     ],
 )
 
