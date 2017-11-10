@@ -19,13 +19,15 @@ package webhook
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/url"
-	"path"
 	"sync"
 
 	"github.com/golang/glog"
+	lru "github.com/hashicorp/golang-lru"
 
 	admissionv1alpha1 "k8s.io/api/admission/v1alpha1"
 	"k8s.io/api/admissionregistration/v1alpha1"
@@ -45,7 +47,8 @@ import (
 
 const (
 	// Name of admission plug-in
-	PluginName = "GenericAdmissionWebhook"
+	PluginName       = "GenericAdmissionWebhook"
+	defaultCacheSize = 200
 )
 
 type ErrCallingWebhook struct {
@@ -96,6 +99,11 @@ func NewGenericAdmissionWebhook(configFile io.Reader) (*GenericAdmissionWebhook,
 		return nil, err
 	}
 
+	cache, err := lru.New(defaultCacheSize)
+	if err != nil {
+		return nil, err
+	}
+
 	return &GenericAdmissionWebhook{
 		Handler: admission.NewHandler(
 			admission.Connect,
@@ -105,6 +113,7 @@ func NewGenericAdmissionWebhook(configFile io.Reader) (*GenericAdmissionWebhook,
 		),
 		authInfoResolver: authInfoResolver,
 		serviceResolver:  defaultServiceResolver{},
+		cache:            cache,
 	}, nil
 }
 
@@ -116,6 +125,7 @@ type GenericAdmissionWebhook struct {
 	negotiatedSerializer runtime.NegotiatedSerializer
 
 	authInfoResolver AuthenticationInfoResolver
+	cache            *lru.Cache
 }
 
 // serviceResolver knows how to convert a service reference into an actual location.
@@ -300,23 +310,48 @@ func toStatusErr(name string, result *metav1.Status) *apierrors.StatusError {
 }
 
 func (a *GenericAdmissionWebhook) hookClient(h *v1alpha1.Webhook) (*rest.RESTClient, error) {
-	serverName := h.ClientConfig.Service.Name + "." + h.ClientConfig.Service.Namespace + ".svc"
-	u, err := a.serviceResolver.ResolveEndpoint(h.ClientConfig.Service.Namespace, h.ClientConfig.Service.Name)
+	cacheKey, err := json.Marshal(h.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
+	if client, ok := a.cache.Get(string(cacheKey)); ok {
+		return client.(*rest.RESTClient), nil
+	}
 
-	// TODO: cache these instead of constructing one each time
+	serverName := h.ClientConfig.Service.Name + "." + h.ClientConfig.Service.Namespace + ".svc"
 	restConfig, err := a.authInfoResolver.ClientConfigFor(serverName)
 	if err != nil {
 		return nil, err
 	}
+
 	cfg := rest.CopyConfig(restConfig)
-	cfg.Host = u.Host
-	cfg.APIPath = path.Join(u.Path, h.ClientConfig.URLPath)
+	host := serverName + ":443"
+	cfg.Host = "https://" + host
+	cfg.APIPath = h.ClientConfig.URLPath
 	cfg.TLSClientConfig.ServerName = serverName
 	cfg.TLSClientConfig.CAData = h.ClientConfig.CABundle
 	cfg.ContentConfig.NegotiatedSerializer = a.negotiatedSerializer
 	cfg.ContentConfig.ContentType = runtime.ContentTypeJSON
-	return rest.UnversionedRESTClientFor(cfg)
+
+	delegateDialer := cfg.Dial
+	if delegateDialer == nil {
+		delegateDialer = net.Dial
+	}
+
+	cfg.Dial = func(network, addr string) (net.Conn, error) {
+		if addr == host {
+			u, err := a.serviceResolver.ResolveEndpoint(h.ClientConfig.Service.Namespace, h.ClientConfig.Service.Name)
+			if err != nil {
+				return nil, err
+			}
+			addr = u.Host
+		}
+		return delegateDialer(network, addr)
+	}
+
+	client, err := rest.UnversionedRESTClientFor(cfg)
+	if err == nil {
+		a.cache.Add(string(cacheKey), client)
+	}
+	return client, err
 }
