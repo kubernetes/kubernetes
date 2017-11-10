@@ -36,8 +36,8 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	endptspkg "k8s.io/kubernetes/pkg/apis/core/v1/helper/endpoints"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	endptspkg "k8s.io/kubernetes/pkg/apis/core/v1/helper/endpoints"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
