@@ -45,6 +45,7 @@ import (
 	cmoptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -769,8 +770,17 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 		// Only do etcd related checks when no external endpoints were specified
 		checks = append(checks,
 			PortOpenCheck{port: 2379},
+			PortOpenCheck{port: 2380},
 			DirAvailableCheck{Path: cfg.Etcd.DataDir},
 		)
+		if features.Enabled(cfg.FeatureGates, features.HighAvailability) {
+			checks = append(checks,
+				PortOpenCheck{port: 12379},
+				PortOpenCheck{port: 12380},
+				DirAvailableCheck{Path: "/var/etcd"},
+				DirAvailableCheck{Path: cfg.Etcd.SelfHosted.CertificatesDir},
+			)
+		}
 	} else {
 		// Only check etcd version when external endpoints are specified
 		if cfg.Etcd.CAFile != "" {

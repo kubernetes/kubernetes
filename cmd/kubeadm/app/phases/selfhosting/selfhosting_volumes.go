@@ -24,7 +24,9 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
@@ -34,101 +36,127 @@ type tlsKeyPair struct {
 	key  string
 }
 
-func apiServerCertificatesVolumeSource() v1.VolumeSource {
-	return v1.VolumeSource{
-		Projected: &v1.ProjectedVolumeSource{
-			Sources: []v1.VolumeProjection{
-				{
-					Secret: &v1.SecretProjection{
-						LocalObjectReference: v1.LocalObjectReference{
-							Name: kubeadmconstants.CACertAndKeyBaseName,
-						},
-						Items: []v1.KeyToPath{
-							{
-								Key:  v1.TLSCertKey,
-								Path: kubeadmconstants.CACertName,
-							},
-						},
-					},
+func apiServerCertificatesVolumeSource(cfg *kubeadmapi.MasterConfiguration) v1.VolumeSource {
+	sources := []v1.VolumeProjection{
+		{
+			Secret: &v1.SecretProjection{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: kubeadmconstants.CACertAndKeyBaseName,
 				},
-				{
-					Secret: &v1.SecretProjection{
-						LocalObjectReference: v1.LocalObjectReference{
-							Name: kubeadmconstants.APIServerCertAndKeyBaseName,
-						},
-						Items: []v1.KeyToPath{
-							{
-								Key:  v1.TLSCertKey,
-								Path: kubeadmconstants.APIServerCertName,
-							},
-							{
-								Key:  v1.TLSPrivateKeyKey,
-								Path: kubeadmconstants.APIServerKeyName,
-							},
-						},
-					},
-				},
-				{
-					Secret: &v1.SecretProjection{
-						LocalObjectReference: v1.LocalObjectReference{
-							Name: kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName,
-						},
-						Items: []v1.KeyToPath{
-							{
-								Key:  v1.TLSCertKey,
-								Path: kubeadmconstants.APIServerKubeletClientCertName,
-							},
-							{
-								Key:  v1.TLSPrivateKeyKey,
-								Path: kubeadmconstants.APIServerKubeletClientKeyName,
-							},
-						},
-					},
-				},
-				{
-					Secret: &v1.SecretProjection{
-						LocalObjectReference: v1.LocalObjectReference{
-							Name: kubeadmconstants.ServiceAccountKeyBaseName,
-						},
-						Items: []v1.KeyToPath{
-							{
-								Key:  v1.TLSCertKey,
-								Path: kubeadmconstants.ServiceAccountPublicKeyName,
-							},
-						},
-					},
-				},
-				{
-					Secret: &v1.SecretProjection{
-						LocalObjectReference: v1.LocalObjectReference{
-							Name: kubeadmconstants.FrontProxyCACertAndKeyBaseName,
-						},
-						Items: []v1.KeyToPath{
-							{
-								Key:  v1.TLSCertKey,
-								Path: kubeadmconstants.FrontProxyCACertName,
-							},
-						},
-					},
-				},
-				{
-					Secret: &v1.SecretProjection{
-						LocalObjectReference: v1.LocalObjectReference{
-							Name: kubeadmconstants.FrontProxyClientCertAndKeyBaseName,
-						},
-						Items: []v1.KeyToPath{
-							{
-								Key:  v1.TLSCertKey,
-								Path: kubeadmconstants.FrontProxyClientCertName,
-							},
-							{
-								Key:  v1.TLSPrivateKeyKey,
-								Path: kubeadmconstants.FrontProxyClientKeyName,
-							},
-						},
+				Items: []v1.KeyToPath{
+					{
+						Key:  v1.TLSCertKey,
+						Path: kubeadmconstants.CACertName,
 					},
 				},
 			},
+		},
+		{
+			Secret: &v1.SecretProjection{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: kubeadmconstants.APIServerCertAndKeyBaseName,
+				},
+				Items: []v1.KeyToPath{
+					{
+						Key:  v1.TLSCertKey,
+						Path: kubeadmconstants.APIServerCertName,
+					},
+					{
+						Key:  v1.TLSPrivateKeyKey,
+						Path: kubeadmconstants.APIServerKeyName,
+					},
+				},
+			},
+		},
+		{
+			Secret: &v1.SecretProjection{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName,
+				},
+				Items: []v1.KeyToPath{
+					{
+						Key:  v1.TLSCertKey,
+						Path: kubeadmconstants.APIServerKubeletClientCertName,
+					},
+					{
+						Key:  v1.TLSPrivateKeyKey,
+						Path: kubeadmconstants.APIServerKubeletClientKeyName,
+					},
+				},
+			},
+		},
+		{
+			Secret: &v1.SecretProjection{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: kubeadmconstants.ServiceAccountKeyBaseName,
+				},
+				Items: []v1.KeyToPath{
+					{
+						Key:  v1.TLSCertKey,
+						Path: kubeadmconstants.ServiceAccountPublicKeyName,
+					},
+				},
+			},
+		},
+		{
+			Secret: &v1.SecretProjection{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: kubeadmconstants.FrontProxyCACertAndKeyBaseName,
+				},
+				Items: []v1.KeyToPath{
+					{
+						Key:  v1.TLSCertKey,
+						Path: kubeadmconstants.FrontProxyCACertName,
+					},
+				},
+			},
+		},
+		{
+			Secret: &v1.SecretProjection{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: kubeadmconstants.FrontProxyClientCertAndKeyBaseName,
+				},
+				Items: []v1.KeyToPath{
+					{
+						Key:  v1.TLSCertKey,
+						Path: kubeadmconstants.FrontProxyClientCertName,
+					},
+					{
+						Key:  v1.TLSPrivateKeyKey,
+						Path: kubeadmconstants.FrontProxyClientKeyName,
+					},
+				},
+			},
+		},
+	}
+
+	if features.Enabled(cfg.FeatureGates, features.HighAvailability) {
+		sources = append(sources, v1.VolumeProjection{
+			Secret: &v1.SecretProjection{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: kubeadmconstants.KubeAPIServerEtcdTLSSecret,
+				},
+				Items: []v1.KeyToPath{
+					{
+						Key:  kubeadmconstants.EtcdClientCertAndKeyBaseName + "-" + kubeadmconstants.CACertName,
+						Path: "etcd/" + kubeadmconstants.CACertName,
+					},
+					{
+						Key:  kubeadmconstants.EtcdClientCertName,
+						Path: "etcd/" + kubeadmconstants.EtcdClientCertName,
+					},
+					{
+						Key:  kubeadmconstants.EtcdClientKeyName,
+						Path: "etcd/" + kubeadmconstants.EtcdClientKeyName,
+					},
+				},
+			},
+		})
+	}
+
+	return v1.VolumeSource{
+		Projected: &v1.ProjectedVolumeSource{
+			Sources: sources,
 		},
 	}
 }

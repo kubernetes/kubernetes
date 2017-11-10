@@ -80,7 +80,14 @@ type EtcdClusterList struct {
 type EtcdCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              ClusterSpec `json:"spec"`
+	Spec              ClusterSpec   `json:"spec"`
+	Status            ClusterStatus `json:"status"`
+}
+
+// ClusterStatus represents the cluster status
+type ClusterStatus struct {
+	// Phase is the cluster running phase
+	Phase string `json:"phase"`
 }
 
 // ClusterSpec represents a cluster spec

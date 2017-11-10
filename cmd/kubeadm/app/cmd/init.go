@@ -324,8 +324,13 @@ func (i *Init) Run(out io.Writer) error {
 	if err := controlplanephase.CreateInitStaticPodManifestFiles(manifestDir, i.cfg); err != nil {
 		return fmt.Errorf("error creating init static pod manifest files: %v", err)
 	}
-	// Add etcd static pod spec only if external etcd is not configured
+
+	// PHASE 4: Bootstrap local etcd
 	if len(i.cfg.Etcd.Endpoints) == 0 {
+		// Now provision etcd in static pods. If the user wants to use HA, the static pods will
+		// act as the bootstrap datastore. After the operator is deployed, it will begin a pivot
+		// procedure where it migrates data from the static pods into its own managed etcd cluster.
+		// If the user does not want to use HA, these static pods will remain permanently.
 		if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(manifestDir, i.cfg); err != nil {
 			return fmt.Errorf("error creating local etcd static pod manifest file: %v", err)
 		}
@@ -368,12 +373,12 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error uploading configuration: %v", err)
 	}
 
-	// PHASE 4: Mark the master with the right label/taint
+	// PHASE 5: Mark the master with the right label/taint
 	if err := markmasterphase.MarkMaster(client, i.cfg.NodeName); err != nil {
 		return fmt.Errorf("error marking master: %v", err)
 	}
 
-	// PHASE 5: Set up the node bootstrap tokens
+	// PHASE 6: Set up the node bootstrap tokens
 	if !i.skipTokenPrint {
 		fmt.Printf("[bootstraptoken] Using token: %s\n", i.cfg.Token)
 	}
@@ -405,6 +410,7 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error creating clusterinfo RBAC rules: %v", err)
 	}
 
+	// PHASE 7: Addons
 	if err := dnsaddonphase.EnsureDNSAddon(i.cfg, client); err != nil {
 		return fmt.Errorf("error ensuring dns addon: %v", err)
 	}
@@ -413,13 +419,32 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error ensuring proxy addon: %v", err)
 	}
 
-	// PHASE 7: Make the control plane self-hosted if feature gate is enabled
+	// PHASE 8: Make the control plane self-hosted if feature gate is enabled
 	if features.Enabled(i.cfg.FeatureGates, features.SelfHosting) {
+		if features.Enabled(i.cfg.FeatureGates, features.HighAvailability) {
+			fmt.Println("[self-hosted] Deploying etcd-operator...")
+			if err := etcdphase.DeployEtcdOperator(i.cfg, client, waiter); err != nil {
+				return err
+			}
+
+			fmt.Println("[self-hosted] Setting up etcd cluster...")
+			if err := etcdphase.SetupEtcdCluster(i.cfg, client); err != nil {
+				return err
+			}
+		}
+
 		// Temporary control plane is up, now we create our self hosted control
 		// plane components and remove the static manifests:
 		fmt.Println("[self-hosted] Creating self-hosted control plane...")
 		if err := selfhostingphase.CreateSelfHostedControlPlane(manifestDir, kubeConfigDir, i.cfg, client, waiter); err != nil {
 			return fmt.Errorf("error creating self hosted control plane: %v", err)
+		}
+
+		if features.Enabled(i.cfg.FeatureGates, features.HighAvailability) {
+			fmt.Println("[self-hosted] Deleting bootstrap etcd...")
+			if err := etcdphase.DeleteBootstrapEtcd(manifestDir, i.cfg, waiter); err != nil {
+				return err
+			}
 		}
 	}
 
