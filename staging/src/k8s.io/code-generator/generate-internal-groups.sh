@@ -25,7 +25,7 @@ if [ "$#" -lt 5 ] || [ "${1}" == "--help" ]; then
   cat <<EOF
 Usage: $(basename $0) <generators> <output-package> <internal-apis-package> <extensiona-apis-package> <groups-versions> ...
 
-  <generators>        the generators comma separated to run (deepcopy,defaulter,conversion,client,lister,informer) or "all".
+  <generators>        the generators comma separated to run (deepcopy,defaulter,conversion,client,lister,informer,openapi) or "all".
   <output-package>    the output package name (e.g. github.com/example/project/pkg/generated).
   <int-apis-package>  the internal types dir (e.g. github.com/example/project/pkg/apis).
   <ext-apis-package>  the external types dir (e.g. github.com/example/project/pkg/apis or githubcom/example/apis).
@@ -47,7 +47,7 @@ EXT_APIS_PKG="$4"
 GROUPS_WITH_VERSIONS="$5"
 shift 5
 
-go install ./$(dirname "${0}")/cmd/{defaulter-gen,conversion-gen,client-gen,lister-gen,informer-gen,deepcopy-gen}
+go install ./$(dirname "${0}")/cmd/{defaulter-gen,conversion-gen,client-gen,lister-gen,informer-gen,deepcopy-gen,openapi-gen}
 function codegen::join() { local IFS="$1"; shift; echo "$*"; }
 
 # enumerate group versions
@@ -106,4 +106,9 @@ if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
            --listers-package ${OUTPUT_PKG}/listers \
            --output-package ${OUTPUT_PKG}/informers \
            "$@"
+fi
+
+if [ "${GENS}" = "all" ] || grep -qw "openapi" <<<"${GENS}"; then
+  echo "Generating openapi spec at ${OUTPUT_PKG}/openapi"
+  ${GOPATH}/bin/openapi-gen --input-dirs $(codegen::join , "${EXT_FQ_APIS[@]}") --output-package ${OUTPUT_PKG}/openapi "$@"
 fi

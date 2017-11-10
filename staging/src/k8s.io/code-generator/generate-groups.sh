@@ -25,7 +25,7 @@ if [ "$#" -lt 4 ] || [ "${1}" == "--help" ]; then
   cat <<EOF
 Usage: $(basename $0) <generators> <output-package> <apis-package> <groups-versions> ...
 
-  <generators>        the generators comma separated to run (deepcopy,defaulter,client,lister,informer) or "all".
+  <generators>        the generators comma separated to run (deepcopy,defaulter,client,lister,informer,openapi) or "all".
   <output-package>    the output package name (e.g. github.com/example/project/pkg/generated).
   <apis-package>      the external types dir (e.g. github.com/example/api or github.com/example/project/pkg/apis).
   <groups-versions>   the groups and their versions in the format "groupA:v1,v2 groupB:v1 groupC:v2", relative
@@ -46,7 +46,7 @@ APIS_PKG="$3"
 GROUPS_WITH_VERSIONS="$4"
 shift 4
 
-go install ./$(dirname "${0}")/cmd/{defaulter-gen,client-gen,lister-gen,informer-gen,deepcopy-gen}
+go install ./$(dirname "${0}")/cmd/{defaulter-gen,client-gen,lister-gen,informer-gen,deepcopy-gen,openapi-gen}
 function codegen::join() { local IFS="$1"; shift; echo "$*"; }
 
 # enumerate group versions
@@ -83,4 +83,9 @@ if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
            --listers-package ${OUTPUT_PKG}/listers \
            --output-package ${OUTPUT_PKG}/informers \
            "$@"
+fi
+
+if [ "${GENS}" = "all" ] || grep -qw "openapi" <<<"${GENS}"; then
+  echo "Generating openapi spec at ${OUTPUT_PKG}/openapi"
+  ${GOPATH}/bin/openapi-gen --input-dirs $(codegen::join , "${FQ_APIS[@]}") --output-package ${OUTPUT_PKG}/openapi "$@"
 fi
