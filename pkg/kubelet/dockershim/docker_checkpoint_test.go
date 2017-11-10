@@ -21,6 +21,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/errors"
 	utilstore "k8s.io/kubernetes/pkg/kubelet/dockershim/testing"
 )
 
@@ -96,7 +98,7 @@ func TestPersistentCheckpointHandler(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, keys, []string{"id2"})
 
-	// Test Get NonExisted Checkpoint
+	// Test getting a non-existent checkpoint.
 	_, err = handler.GetCheckpoint("id1")
-	assert.Error(t, err)
+	assert.Equal(t, errors.CheckpointNotFoundError, err)
 }
