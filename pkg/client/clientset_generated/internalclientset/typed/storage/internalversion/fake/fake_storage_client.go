@@ -30,6 +30,10 @@ func (c *FakeStorage) StorageClasses() internalversion.StorageClassInterface {
 	return &FakeStorageClasses{c}
 }
 
+func (c *FakeStorage) VolumeAttachments() internalversion.VolumeAttachmentInterface {
+	return &FakeVolumeAttachments{c}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeStorage) RESTClient() rest.Interface {
