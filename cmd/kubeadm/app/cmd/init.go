@@ -388,7 +388,7 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// PHASE 4: Mark the master with the right label/taint
-	if err := markmasterphase.MarkMaster(client, i.cfg.NodeName); err != nil {
+	if err := markmasterphase.MarkMaster(client, i.cfg.NodeName, !i.cfg.NoTaintMaster); err != nil {
 		return fmt.Errorf("error marking master: %v", err)
 	}
 

@@ -50,6 +50,10 @@ type MasterConfiguration struct {
 	// If not specified, defaults to Node and RBAC, meaning both the node
 	// authorizer and RBAC are enabled.
 	AuthorizationModes []string
+	// NoTaintMaster will, if set, suppress the tainting of the
+	// master node allowing workloads to be run on it (e.g. in
+	// single node configurations).
+	NoTaintMaster bool
 
 	// Mark the controller and api server pods as privileged as some cloud
 	// controllers like openstack need escalated privileges under some conditions
