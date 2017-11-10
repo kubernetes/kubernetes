@@ -158,8 +158,18 @@ type ExtenderArgs struct {
 	NodeNames *[]string `json:"nodenames,omitempty"`
 }
 
-// FailedNodesMap represents the filtered out nodes, with node names and failure messages
-type FailedNodesMap map[string]string
+// FailureInfo represents a failure from scheduler includes:
+// 1. Failure message
+// 2. If this failure is unresolvable by preemption
+//   For example, ErrNodeSelectorNotMatch can not be fixed by preempting pods from this node.
+//   So it is a unresolvable failure.
+type FailureInfo struct {
+	FailureMsg                 string `json:"failureMsg,omitempty"`
+	IsUnResolvableByPreemption bool   `json:"isUnResolvableByPreemption,omitempty"`
+}
+
+// FailedNodesMap represents the filtered out nodes, with node names and failure information
+type FailedNodesMap map[string]FailureInfo
 
 // ExtenderFilterResult represents the results of a filter call to an extender
 type ExtenderFilterResult struct {
@@ -169,7 +179,7 @@ type ExtenderFilterResult struct {
 	// Filtered set of nodes where the pod can be scheduled; to be populated
 	// only if ExtenderConfig.NodeCacheCapable == true
 	NodeNames *[]string `json:"nodenames,omitempty"`
-	// Filtered out nodes where the pod can't be scheduled and the failure messages
+	// Filtered out nodes where the pod can't be scheduled and the failure information
 	FailedNodes FailedNodesMap `json:"failedNodes,omitempty"`
 	// Error message indicating failure
 	Error string `json:"error,omitempty"`

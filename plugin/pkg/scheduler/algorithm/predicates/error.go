@@ -32,24 +32,24 @@ var (
 	// failure error in nodesWherePreemptionMightHelp() in scheduler/core/generic_scheduler.go
 	ErrDiskConflict                          = newPredicateFailureError("NoDiskConflict")
 	ErrVolumeZoneConflict                    = newPredicateFailureError("NoVolumeZoneConflict")
-	ErrNodeSelectorNotMatch                  = newPredicateFailureError("MatchNodeSelector")
+	ErrNodeSelectorNotMatch                  = newPredicateFailureErrorWithUnResolvableFlag("MatchNodeSelector", true)
 	ErrPodAffinityNotMatch                   = newPredicateFailureError("MatchInterPodAffinity")
 	ErrPodAffinityRulesNotMatch              = newPredicateFailureError("PodAffinityRulesNotMatch")
 	ErrPodAntiAffinityRulesNotMatch          = newPredicateFailureError("PodAntiAffinityRulesNotMatch")
 	ErrExistingPodsAntiAffinityRulesNotMatch = newPredicateFailureError("ExistingPodsAntiAffinityRulesNotMatch")
-	ErrTaintsTolerationsNotMatch             = newPredicateFailureError("PodToleratesNodeTaints")
-	ErrPodNotMatchHostName                   = newPredicateFailureError("HostName")
+	ErrTaintsTolerationsNotMatch             = newPredicateFailureErrorWithUnResolvableFlag("PodToleratesNodeTaints", true)
+	ErrPodNotMatchHostName                   = newPredicateFailureErrorWithUnResolvableFlag("HostName", true)
 	ErrPodNotFitsHostPorts                   = newPredicateFailureError("PodFitsHostPorts")
-	ErrNodeLabelPresenceViolated             = newPredicateFailureError("CheckNodeLabelPresence")
+	ErrNodeLabelPresenceViolated             = newPredicateFailureErrorWithUnResolvableFlag("CheckNodeLabelPresence", true)
 	ErrServiceAffinityViolated               = newPredicateFailureError("CheckServiceAffinity")
 	ErrMaxVolumeCountExceeded                = newPredicateFailureError("MaxVolumeCount")
 	ErrNodeUnderMemoryPressure               = newPredicateFailureError("NodeUnderMemoryPressure")
 	ErrNodeUnderDiskPressure                 = newPredicateFailureError("NodeUnderDiskPressure")
 	ErrNodeOutOfDisk                         = newPredicateFailureError("NodeOutOfDisk")
-	ErrNodeNotReady                          = newPredicateFailureError("NodeNotReady")
-	ErrNodeNetworkUnavailable                = newPredicateFailureError("NodeNetworkUnavailable")
-	ErrNodeUnschedulable                     = newPredicateFailureError("NodeUnschedulable")
-	ErrNodeUnknownCondition                  = newPredicateFailureError("NodeUnknownCondition")
+	ErrNodeNotReady                          = newPredicateFailureErrorWithUnResolvableFlag("NodeNotReady", true)
+	ErrNodeNetworkUnavailable                = newPredicateFailureErrorWithUnResolvableFlag("NodeNetworkUnavailable", true)
+	ErrNodeUnschedulable                     = newPredicateFailureErrorWithUnResolvableFlag("NodeUnschedulable", true)
+	ErrNodeUnknownCondition                  = newPredicateFailureErrorWithUnResolvableFlag("NodeUnknownCondition", true)
 	ErrVolumeNodeConflict                    = newPredicateFailureError("NoVolumeNodeConflict")
 	// ErrFakePredicate is used for test only. The fake predicates returning false also returns error
 	// as ErrFakePredicate.
@@ -60,10 +60,11 @@ var (
 // hit and caused the unfitting failure.
 type InsufficientResourceError struct {
 	// resourceName is the name of the resource that is insufficient
-	ResourceName v1.ResourceName
-	requested    int64
-	used         int64
-	capacity     int64
+	ResourceName               v1.ResourceName
+	requested                  int64
+	used                       int64
+	capacity                   int64
+	isUnResolvableByPreemption bool
 }
 
 func NewInsufficientResourceError(resourceName v1.ResourceName, requested, used, capacity int64) *InsufficientResourceError {
@@ -72,7 +73,13 @@ func NewInsufficientResourceError(resourceName v1.ResourceName, requested, used,
 		requested:    requested,
 		used:         used,
 		capacity:     capacity,
+		// Insufficient resource is able to be resolved by preemption.
+		isUnResolvableByPreemption: false,
 	}
+}
+
+func (e *InsufficientResourceError) IsUnResolvableByPreemption() bool {
+	return e.isUnResolvableByPreemption
 }
 
 func (e *InsufficientResourceError) Error() string {
@@ -89,11 +96,24 @@ func (e *InsufficientResourceError) GetInsufficientAmount() int64 {
 }
 
 type PredicateFailureError struct {
-	PredicateName string
+	PredicateName              string
+	isUnResolvableByPreemption bool
 }
 
 func newPredicateFailureError(predicateName string) *PredicateFailureError {
-	return &PredicateFailureError{PredicateName: predicateName}
+	// By default, the failure is assumed to be resolvable by preemption.
+	// So we set isUnResolvableByPreemption to false.
+	return newPredicateFailureErrorWithUnResolvableFlag(predicateName, false)
+}
+
+func newPredicateFailureErrorWithUnResolvableFlag(
+	predicateName string,
+	isUnResolvableByPreemption bool,
+) *PredicateFailureError {
+	return &PredicateFailureError{
+		PredicateName:              predicateName,
+		isUnResolvableByPreemption: isUnResolvableByPreemption,
+	}
 }
 
 func (e *PredicateFailureError) Error() string {
@@ -104,14 +124,26 @@ func (e *PredicateFailureError) GetReason() string {
 	return e.PredicateName
 }
 
-type FailureReason struct {
-	reason string
+func (e *PredicateFailureError) IsUnResolvableByPreemption() bool {
+	return e.isUnResolvableByPreemption
 }
 
-func NewFailureReason(msg string) *FailureReason {
-	return &FailureReason{reason: msg}
+type FailureReason struct {
+	reason                     string
+	isUnResolvableByPreemption bool
+}
+
+func NewFailureReason(msg string, isUnResolvable bool) *FailureReason {
+	return &FailureReason{
+		reason: msg,
+		isUnResolvableByPreemption: isUnResolvable,
+	}
 }
 
 func (e *FailureReason) GetReason() string {
 	return e.reason
+}
+
+func (e *FailureReason) IsUnResolvableByPreemption() bool {
+	return e.isUnResolvableByPreemption
 }

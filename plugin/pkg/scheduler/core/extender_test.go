@@ -130,7 +130,10 @@ func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[
 		if fits {
 			filtered = append(filtered, node)
 		} else {
-			failedNodesMap[node.Name] = "FakeExtender failed"
+			failedNodesMap[node.Name] = schedulerapi.FailureInfo{
+				FailureMsg:                 "FakeExtender failed",
+				IsUnResolvableByPreemption: false,
+			}
 		}
 	}
 
