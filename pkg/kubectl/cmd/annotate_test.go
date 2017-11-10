@@ -25,10 +25,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	restclient "k8s.io/client-go/rest"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
@@ -118,8 +117,8 @@ func TestParseAnnotations(t *testing.T) {
 			expectErr:      false,
 		},
 		{
-			annotations:    []string{"url=" + testURL, api.CreatedByAnnotation + "=" + testJSON},
-			expected:       map[string]string{"url": testURL, api.CreatedByAnnotation: testJSON},
+			annotations:    []string{"url=" + testURL, "fake.kubernetes.io/annotation=" + testJSON},
+			expected:       map[string]string{"url": testURL, "fake.kubernetes.io/annotation": testJSON},
 			expectedRemove: []string{},
 			scenario:       "add annotations with special characters",
 			expectErr:      false,
@@ -419,7 +418,7 @@ func TestAnnotateErrors(t *testing.T) {
 		f, tf, _, _ := cmdtesting.NewAPIFactory()
 		tf.Printer = &testPrinter{}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+		tf.ClientConfig = defaultClientConfig()
 
 		buf := bytes.NewBuffer([]byte{})
 		cmd := NewCmdAnnotate(f, buf)
@@ -452,7 +451,7 @@ func TestAnnotateObject(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
+		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
@@ -479,7 +478,7 @@ func TestAnnotateObject(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+	tf.ClientConfig = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdAnnotate(f, buf)
@@ -503,7 +502,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
+		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
@@ -530,7 +529,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+	tf.ClientConfig = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdAnnotate(f, buf)
@@ -552,7 +551,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 func TestAnnotateLocal(t *testing.T) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
+		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
@@ -560,7 +559,7 @@ func TestAnnotateLocal(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+	tf.ClientConfig = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdAnnotate(f, buf)
@@ -585,7 +584,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
+		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
@@ -614,7 +613,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+	tf.ClientConfig = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdAnnotate(f, buf)

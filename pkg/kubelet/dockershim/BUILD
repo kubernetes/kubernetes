@@ -9,7 +9,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "checkpoint_store.go",
         "convert.go",
         "doc.go",
         "docker_checkpoint.go",
@@ -61,7 +60,9 @@ go_library(
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/cache:go_default_library",
         "//pkg/kubelet/util/ioutils:go_default_library",
+        "//pkg/kubelet/util/store:go_default_library",
         "//pkg/security/apparmor:go_default_library",
+        "//pkg/util/filesystem:go_default_library",
         "//pkg/util/hash:go_default_library",
         "//pkg/util/parsers:go_default_library",
         "//vendor/github.com/armon/circbuf:go_default_library",
@@ -84,7 +85,6 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "checkpoint_store_test.go",
         "convert_test.go",
         "docker_checkpoint_test.go",
         "docker_container_test.go",
@@ -111,7 +111,6 @@ go_test(
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
-        "//pkg/kubelet/dockershim/errors:go_default_library",
         "//pkg/kubelet/dockershim/libdocker:go_default_library",
         "//pkg/kubelet/dockershim/testing:go_default_library",
         "//pkg/kubelet/network:go_default_library",

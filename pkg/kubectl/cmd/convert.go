@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	scheme "k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -52,7 +52,7 @@ var (
 		kubectl convert -f pod.yaml
 
 		# Convert the live state of the resource specified by 'pod.yaml' to the latest version
-		# and print to stdout in json format.
+		# and print to stdout in JSON format.
 		kubectl convert -f pod.yaml --local -o json
 
 		# Convert all files under current directory to latest version and create them all.
@@ -119,12 +119,12 @@ func outputVersion(cmd *cobra.Command, defaultVersion *schema.GroupVersion) (sch
 
 // Complete collects information required to run Convert command from command line.
 func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) (err error) {
-	o.outputVersion, err = outputVersion(cmd, &legacyscheme.Registry.EnabledVersionsForGroup(api.GroupName)[0])
+	o.outputVersion, err = outputVersion(cmd, &scheme.Registry.EnabledVersionsForGroup(api.GroupName)[0])
 	if err != nil {
 		return err
 	}
-	if !legacyscheme.Registry.IsEnabledVersion(o.outputVersion) {
-		cmdutil.UsageErrorf(cmd, "'%s' is not a registered version.", o.outputVersion)
+	if !scheme.Registry.IsEnabledVersion(o.outputVersion) {
+		return cmdutil.UsageErrorf(cmd, "'%s' is not a registered version.", o.outputVersion)
 	}
 
 	// build the builder
@@ -204,18 +204,18 @@ func (o *ConvertOptions) RunConvert() error {
 	return o.printer.PrintObj(objects, o.out)
 }
 
-// ObjectListToVersionedObject receives a list of api objects and a group version
+// objectListToVersionedObject receives a list of api objects and a group version
 // and squashes the list's items into a single versioned runtime.Object.
 func objectListToVersionedObject(objects []runtime.Object, version schema.GroupVersion) (runtime.Object, error) {
 	objectList := &api.List{Items: objects}
-	converted, err := tryConvert(legacyscheme.Scheme, objectList, version, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion)
+	converted, err := tryConvert(scheme.Scheme, objectList, version, scheme.Registry.GroupOrDie(api.GroupName).GroupVersion)
 	if err != nil {
 		return nil, err
 	}
 	return converted, nil
 }
 
-// AsVersionedObject converts a list of infos into a single object - either a List containing
+// asVersionedObject converts a list of infos into a single object - either a List containing
 // the objects as children, or if only a single Object is present, as that object. The provided
 // version will be preferred as the conversion target, but the Object's mapping version will be
 // used if that version is not present.
@@ -230,7 +230,7 @@ func asVersionedObject(infos []*resource.Info, forceList bool, version schema.Gr
 		object = objects[0]
 	} else {
 		object = &api.List{Items: objects}
-		converted, err := tryConvert(legacyscheme.Scheme, object, version, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion)
+		converted, err := tryConvert(scheme.Scheme, object, version, scheme.Registry.GroupOrDie(api.GroupName).GroupVersion)
 		if err != nil {
 			return nil, err
 		}
@@ -248,7 +248,7 @@ func asVersionedObject(infos []*resource.Info, forceList bool, version schema.Gr
 	return object, nil
 }
 
-// AsVersionedObjects converts a list of infos into versioned objects. The provided
+// asVersionedObjects converts a list of infos into versioned objects. The provided
 // version will be preferred as the conversion target, but the Object's mapping version will be
 // used if that version is not present.
 func asVersionedObjects(infos []*resource.Info, version schema.GroupVersion, encoder runtime.Encoder) ([]runtime.Object, error) {
@@ -261,7 +261,7 @@ func asVersionedObjects(infos []*resource.Info, version schema.GroupVersion, enc
 		// objects that are not part of api.Scheme must be converted to JSON
 		// TODO: convert to map[string]interface{}, attach to runtime.Unknown?
 		if !version.Empty() {
-			if _, _, err := legacyscheme.Scheme.ObjectKinds(info.Object); runtime.IsNotRegisteredError(err) {
+			if _, _, err := scheme.Scheme.ObjectKinds(info.Object); runtime.IsNotRegisteredError(err) {
 				// TODO: ideally this would encode to version, but we don't expose multiple codecs here.
 				data, err := runtime.Encode(encoder, info.Object)
 				if err != nil {

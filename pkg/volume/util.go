@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 type RecycleEventRecorder func(eventtype, message string)
@@ -188,15 +187,15 @@ type realRecyclerClient struct {
 }
 
 func (c *realRecyclerClient) CreatePod(pod *v1.Pod) (*v1.Pod, error) {
-	return c.client.Core().Pods(pod.Namespace).Create(pod)
+	return c.client.CoreV1().Pods(pod.Namespace).Create(pod)
 }
 
 func (c *realRecyclerClient) GetPod(name, namespace string) (*v1.Pod, error) {
-	return c.client.Core().Pods(namespace).Get(name, metav1.GetOptions{})
+	return c.client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
 }
 
 func (c *realRecyclerClient) DeletePod(name, namespace string) error {
-	return c.client.Core().Pods(namespace).Delete(name, nil)
+	return c.client.CoreV1().Pods(namespace).Delete(name, nil)
 }
 
 func (c *realRecyclerClient) Event(eventtype, message string) {
@@ -213,13 +212,13 @@ func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan s
 		Watch:         true,
 	}
 
-	podWatch, err := c.client.Core().Pods(namespace).Watch(options)
+	podWatch, err := c.client.CoreV1().Pods(namespace).Watch(options)
 	if err != nil {
 		return nil, err
 	}
 
 	eventSelector, _ := fields.ParseSelector("involvedObject.name=" + name)
-	eventWatch, err := c.client.Core().Events(namespace).Watch(metav1.ListOptions{
+	eventWatch, err := c.client.CoreV1().Events(namespace).Watch(metav1.ListOptions{
 		FieldSelector: eventSelector.String(),
 		Watch:         true,
 	})
@@ -423,13 +422,6 @@ func getPVCNameHashAndIndexOffset(pvcName string) (hash uint32, index uint32) {
 // to empty_dir
 func UnmountViaEmptyDir(dir string, host VolumeHost, volName string, volSpec Spec, podUID types.UID) error {
 	glog.V(3).Infof("Tearing down volume %v for pod %v at %v", volName, podUID, dir)
-
-	if pathExists, pathErr := volutil.PathExists(dir); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
-	} else if !pathExists {
-		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
-		return nil
-	}
 
 	// Wrap EmptyDir, let it do the teardown.
 	wrapped, err := host.NewWrapperUnmounter(volName, volSpec, podUID)

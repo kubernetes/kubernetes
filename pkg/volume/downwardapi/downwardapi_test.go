@@ -287,7 +287,7 @@ func (test *downwardAPITest) tearDown() {
 	if _, err := os.Stat(test.volumePath); err == nil {
 		test.t.Errorf("TearDown() failed, volume path still exists: %s", test.volumePath)
 	} else if !os.IsNotExist(err) {
-		test.t.Errorf("SetUp() failed: %v", err)
+		test.t.Errorf("TearDown() failed: %v", err)
 	}
 	os.RemoveAll(test.rootDir)
 }

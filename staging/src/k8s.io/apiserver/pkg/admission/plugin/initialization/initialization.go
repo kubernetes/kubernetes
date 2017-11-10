@@ -74,7 +74,8 @@ func NewInitializer() admission.Interface {
 	return &initializer{}
 }
 
-func (i *initializer) Validate() error {
+// ValidateInitialization implements the InitializationValidator interface.
+func (i *initializer) ValidateInitialization() error {
 	if i.config == nil {
 		return fmt.Errorf("the Initializer admission plugin requires a Kubernetes client to be provided")
 	}
@@ -94,10 +95,12 @@ func (i *initializer) Validate() error {
 	return nil
 }
 
+// SetExternalKubeClientSet implements the WantsExternalKubeClientSet interface.
 func (i *initializer) SetExternalKubeClientSet(client clientset.Interface) {
 	i.config = configuration.NewInitializerConfigurationManager(client.Admissionregistration().InitializerConfigurations())
 }
 
+// SetAuthorizer implements the WantsAuthorizer interface.
 func (i *initializer) SetAuthorizer(a authorizer.Authorizer) {
 	i.authorizer = a
 }
@@ -276,6 +279,8 @@ func (i *initializer) canInitialize(a admission.Attributes, message string) erro
 	return nil
 }
 
+// Handles returns true if this admission controller can handle the given operation
+// where operation can be one of CREATE, UPDATE, DELETE, or CONNECT
 func (i *initializer) Handles(op admission.Operation) bool {
 	return op == admission.Create || op == admission.Update
 }

@@ -36,7 +36,6 @@ import (
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
@@ -55,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/expand"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/quota/generic"
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
@@ -76,20 +76,22 @@ func startServiceController(ctx ControllerContext) (bool, error) {
 }
 
 func startNodeController(ctx ControllerContext) (bool, error) {
-	var clusterCIDR *net.IPNet
-	var err error
-	if len(strings.TrimSpace(ctx.Options.ClusterCIDR)) != 0 {
-		_, clusterCIDR, err = net.ParseCIDR(ctx.Options.ClusterCIDR)
-		if err != nil {
-			glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.Options.ClusterCIDR, err)
+	var clusterCIDR *net.IPNet = nil
+	var serviceCIDR *net.IPNet = nil
+	if ctx.Options.AllocateNodeCIDRs {
+		var err error
+		if len(strings.TrimSpace(ctx.Options.ClusterCIDR)) != 0 {
+			_, clusterCIDR, err = net.ParseCIDR(ctx.Options.ClusterCIDR)
+			if err != nil {
+				glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.Options.ClusterCIDR, err)
+			}
 		}
-	}
 
-	var serviceCIDR *net.IPNet
-	if len(strings.TrimSpace(ctx.Options.ServiceCIDR)) != 0 {
-		_, serviceCIDR, err = net.ParseCIDR(ctx.Options.ServiceCIDR)
-		if err != nil {
-			glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", ctx.Options.ServiceCIDR, err)
+		if len(strings.TrimSpace(ctx.Options.ServiceCIDR)) != 0 {
+			_, serviceCIDR, err = net.ParseCIDR(ctx.Options.ServiceCIDR)
+			if err != nil {
+				glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", ctx.Options.ServiceCIDR, err)
+			}
 		}
 	}
 
@@ -124,10 +126,6 @@ func startNodeController(ctx ControllerContext) (bool, error) {
 }
 
 func startRouteController(ctx ControllerContext) (bool, error) {
-	_, clusterCIDR, err := net.ParseCIDR(ctx.Options.ClusterCIDR)
-	if err != nil {
-		glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.Options.ClusterCIDR, err)
-	}
 	if !ctx.Options.AllocateNodeCIDRs || !ctx.Options.ConfigureCloudRoutes {
 		glog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", ctx.Options.AllocateNodeCIDRs, ctx.Options.ConfigureCloudRoutes)
 		return false, nil
@@ -140,6 +138,10 @@ func startRouteController(ctx ControllerContext) (bool, error) {
 	if !ok {
 		glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		return false, nil
+	}
+	_, clusterCIDR, err := net.ParseCIDR(ctx.Options.ClusterCIDR)
+	if err != nil {
+		glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.Options.ClusterCIDR, err)
 	}
 	routeController := routecontroller.New(routes, ctx.ClientBuilder.ClientOrDie("route-controller"), ctx.InformerFactory.Core().V1().Nodes(), ctx.Options.ClusterName, clusterCIDR)
 	go routeController.Run(ctx.Stop, ctx.Options.RouteReconciliationPeriod.Duration)
@@ -240,31 +242,34 @@ func startPodGCController(ctx ControllerContext) (bool, error) {
 
 func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 	resourceQuotaControllerClient := ctx.ClientBuilder.ClientOrDie("resourcequota-controller")
-	resourceQuotaRegistry := quotainstall.NewRegistry(resourceQuotaControllerClient, ctx.InformerFactory)
-	groupKindsToReplenish := []schema.GroupKind{
-		api.Kind("Pod"),
-		api.Kind("Service"),
-		api.Kind("ReplicationController"),
-		api.Kind("PersistentVolumeClaim"),
-		api.Kind("Secret"),
-		api.Kind("ConfigMap"),
-	}
+	discoveryFunc := resourceQuotaControllerClient.Discovery().ServerPreferredNamespacedResources
+	listerFuncForResource := generic.ListerFuncForResourceFunc(ctx.InformerFactory.ForResource)
+	quotaConfiguration := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
+
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
-		QuotaClient:               resourceQuotaControllerClient.Core(),
+		QuotaClient:               resourceQuotaControllerClient.CoreV1(),
 		ResourceQuotaInformer:     ctx.InformerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.StaticResyncPeriodFunc(ctx.Options.ResourceQuotaSyncPeriod.Duration),
-		Registry:                  resourceQuotaRegistry,
-		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(ctx.InformerFactory),
+		InformerFactory:           ctx.InformerFactory,
 		ReplenishmentResyncPeriod: ResyncPeriod(&ctx.Options),
-		GroupKindsToReplenish:     groupKindsToReplenish,
+		DiscoveryFunc:             discoveryFunc,
+		IgnoredResourcesFunc:      quotaConfiguration.IgnoredResources,
+		InformersStarted:          ctx.InformersStarted,
+		Registry:                  generic.NewRegistry(quotaConfiguration.Evaluators()),
 	}
-	if resourceQuotaControllerClient.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.Core().RESTClient().GetRateLimiter())
+	if resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 
-	go resourcequotacontroller.NewResourceQuotaController(
-		resourceQuotaControllerOptions,
-	).Run(int(ctx.Options.ConcurrentResourceQuotaSyncs), ctx.Stop)
+	resourceQuotaController, err := resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions)
+	if err != nil {
+		return false, err
+	}
+	go resourceQuotaController.Run(int(ctx.Options.ConcurrentResourceQuotaSyncs), ctx.Stop)
+
+	// Periodically the quota controller to detect new resource types
+	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, ctx.Stop)
+
 	return true, nil
 }
 

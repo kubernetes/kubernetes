@@ -43,11 +43,11 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		podName := "pod-1"
 		framework.Logf("Creating pod %s", podName)
 
-		_, err := c.Core().Pods(ns).Create(newTablePod(podName))
+		_, err := c.CoreV1().Pods(ns).Create(newTablePod(podName))
 		Expect(err).NotTo(HaveOccurred())
 
 		table := &metav1alpha1.Table{}
-		err = c.Core().RESTClient().Get().Resource("pods").Namespace(ns).Name(podName).SetHeader("Accept", "application/json;as=Table;v=v1alpha1;g=meta.k8s.io").Do().Into(table)
+		err = c.CoreV1().RESTClient().Get().Resource("pods").Namespace(ns).Name(podName).SetHeader("Accept", "application/json;as=Table;v=v1alpha1;g=meta.k8s.io").Do().Into(table)
 		Expect(err).NotTo(HaveOccurred())
 		framework.Logf("Table: %#v", table)
 
@@ -67,7 +67,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		c := f.ClientSet
 
 		table := &metav1alpha1.Table{}
-		err := c.Core().RESTClient().Get().Resource("nodes").SetHeader("Accept", "application/json;as=Table;v=v1alpha1;g=meta.k8s.io").Do().Into(table)
+		err := c.CoreV1().RESTClient().Get().Resource("nodes").SetHeader("Accept", "application/json;as=Table;v=v1alpha1;g=meta.k8s.io").Do().Into(table)
 		Expect(err).NotTo(HaveOccurred())
 		framework.Logf("Table: %#v", table)
 
@@ -85,7 +85,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		c := f.ClientSet
 
 		table := &metav1alpha1.Table{}
-		err := c.Core().RESTClient().Get().Resource("services").SetHeader("Accept", "application/json;as=Table;v=v1alpha1;g=meta.k8s.io").Do().Into(table)
+		err := c.CoreV1().RESTClient().Get().Resource("services").SetHeader("Accept", "application/json;as=Table;v=v1alpha1;g=meta.k8s.io").Do().Into(table)
 		Expect(err).To(HaveOccurred())
 		Expect(err.(errors.APIStatus).Status().Code).To(Equal(int32(406)))
 	})

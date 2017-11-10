@@ -18,6 +18,14 @@ limitations under the License.
 
 package v1
 
+// ControllerRevisionListerExpansion allows custom methods to be added to
+// ControllerRevisionLister.
+type ControllerRevisionListerExpansion interface{}
+
+// ControllerRevisionNamespaceListerExpansion allows custom methods to be added to
+// ControllerRevisionNamespaceLister.
+type ControllerRevisionNamespaceListerExpansion interface{}
+
 // DaemonSetListerExpansion allows custom methods to be added to
 // DaemonSetLister.
 type DaemonSetListerExpansion interface{}
@@ -25,3 +33,27 @@ type DaemonSetListerExpansion interface{}
 // DaemonSetNamespaceListerExpansion allows custom methods to be added to
 // DaemonSetNamespaceLister.
 type DaemonSetNamespaceListerExpansion interface{}
+
+// DeploymentListerExpansion allows custom methods to be added to
+// DeploymentLister.
+type DeploymentListerExpansion interface{}
+
+// DeploymentNamespaceListerExpansion allows custom methods to be added to
+// DeploymentNamespaceLister.
+type DeploymentNamespaceListerExpansion interface{}
+
+// ReplicaSetListerExpansion allows custom methods to be added to
+// ReplicaSetLister.
+type ReplicaSetListerExpansion interface{}
+
+// ReplicaSetNamespaceListerExpansion allows custom methods to be added to
+// ReplicaSetNamespaceLister.
+type ReplicaSetNamespaceListerExpansion interface{}
+
+// StatefulSetListerExpansion allows custom methods to be added to
+// StatefulSetLister.
+type StatefulSetListerExpansion interface{}
+
+// StatefulSetNamespaceListerExpansion allows custom methods to be added to
+// StatefulSetNamespaceLister.
+type StatefulSetNamespaceListerExpansion interface{}

@@ -69,8 +69,8 @@ var _ = SIGDescribe("Pod Disks", func() {
 		cs = f.ClientSet
 		ns = f.Namespace.Name
 
-		podClient = cs.Core().Pods(ns)
-		nodeClient = cs.Core().Nodes()
+		podClient = cs.CoreV1().Pods(ns)
+		nodeClient = cs.CoreV1().Nodes()
 		nodes = framework.GetReadySchedulableNodesOrDie(cs)
 		Expect(len(nodes.Items)).To(BeNumerically(">=", minNodes), fmt.Sprintf("Requires at least %d nodes", minNodes))
 		host0Name = types.NodeName(nodes.Items[0].ObjectMeta.Name)

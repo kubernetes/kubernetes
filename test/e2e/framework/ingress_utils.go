@@ -312,14 +312,14 @@ func createIngressTLSSecret(kubeClient clientset.Interface, ing *extensions.Ingr
 		},
 	}
 	var s *v1.Secret
-	if s, err = kubeClient.Core().Secrets(ing.Namespace).Get(tls.SecretName, metav1.GetOptions{}); err == nil {
+	if s, err = kubeClient.CoreV1().Secrets(ing.Namespace).Get(tls.SecretName, metav1.GetOptions{}); err == nil {
 		// TODO: Retry the update. We don't really expect anything to conflict though.
 		Logf("Updating secret %v in ns %v with hosts %v for ingress %v", secret.Name, secret.Namespace, host, ing.Name)
 		s.Data = secret.Data
-		_, err = kubeClient.Core().Secrets(ing.Namespace).Update(s)
+		_, err = kubeClient.CoreV1().Secrets(ing.Namespace).Update(s)
 	} else {
 		Logf("Creating secret %v in ns %v with hosts %v for ingress %v", secret.Name, secret.Namespace, host, ing.Name)
-		_, err = kubeClient.Core().Secrets(ing.Namespace).Create(secret)
+		_, err = kubeClient.CoreV1().Secrets(ing.Namespace).Create(secret)
 	}
 	return host, cert, key, err
 }
@@ -1065,7 +1065,7 @@ func (j *IngressTestJig) pollServiceNodePort(ns, name string, port int) {
 func (j *IngressTestJig) GetIngressNodePorts(includeDefaultBackend bool) []string {
 	nodePorts := []string{}
 	if includeDefaultBackend {
-		defaultSvc, err := j.Client.Core().Services(metav1.NamespaceSystem).Get(defaultBackendName, metav1.GetOptions{})
+		defaultSvc, err := j.Client.CoreV1().Services(metav1.NamespaceSystem).Get(defaultBackendName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		nodePorts = append(nodePorts, strconv.Itoa(int(defaultSvc.Spec.Ports[0].NodePort)))
 	}
@@ -1080,7 +1080,7 @@ func (j *IngressTestJig) GetIngressNodePorts(includeDefaultBackend bool) []strin
 		}
 	}
 	for _, svcName := range backendSvcs {
-		svc, err := j.Client.Core().Services(j.Ingress.Namespace).Get(svcName, metav1.GetOptions{})
+		svc, err := j.Client.CoreV1().Services(j.Ingress.Namespace).Get(svcName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		nodePorts = append(nodePorts, strconv.Itoa(int(svc.Spec.Ports[0].NodePort)))
 	}
@@ -1128,7 +1128,7 @@ func (j *IngressTestJig) GetDistinctResponseFromIngress() (sets.String, error) {
 
 func (cont *GCEIngressController) getL7AddonUID() (string, error) {
 	Logf("Retrieving UID from config map: %v/%v", metav1.NamespaceSystem, uidConfigMap)
-	cm, err := cont.Client.Core().ConfigMaps(metav1.NamespaceSystem).Get(uidConfigMap, metav1.GetOptions{})
+	cm, err := cont.Client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(uidConfigMap, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -1172,14 +1172,14 @@ func (cont *NginxIngressController) Init() {
 	Logf("initializing nginx ingress controller")
 	RunKubectlOrDie("create", "-f", mkpath("rc.yaml"), fmt.Sprintf("--namespace=%v", cont.Ns))
 
-	rc, err := cont.Client.Core().ReplicationControllers(cont.Ns).Get("nginx-ingress-controller", metav1.GetOptions{})
+	rc, err := cont.Client.CoreV1().ReplicationControllers(cont.Ns).Get("nginx-ingress-controller", metav1.GetOptions{})
 	ExpectNoError(err)
 	cont.rc = rc
 
 	Logf("waiting for pods with label %v", rc.Spec.Selector)
 	sel := labels.SelectorFromSet(labels.Set(rc.Spec.Selector))
 	ExpectNoError(testutils.WaitForPodsWithLabelRunning(cont.Client, cont.Ns, sel))
-	pods, err := cont.Client.Core().Pods(cont.Ns).List(metav1.ListOptions{LabelSelector: sel.String()})
+	pods, err := cont.Client.CoreV1().Pods(cont.Ns).List(metav1.ListOptions{LabelSelector: sel.String()})
 	ExpectNoError(err)
 	if len(pods.Items) == 0 {
 		Failf("Failed to find nginx ingress controller pods with selector %v", sel)

@@ -19,7 +19,6 @@ go_library(
         "replicaset.go",
         "replicaset_expansion.go",
         "scale.go",
-        "thirdpartyresource.go",
     ],
     importpath = "k8s.io/client-go/listers/extensions/v1beta1",
     deps = [

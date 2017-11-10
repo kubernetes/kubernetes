@@ -87,7 +87,7 @@ func TestCreateSetsFields(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	ctx := genericapirequest.NewDefaultContext()
 	resourcequota := validNewResourceQuota()
-	_, err := storage.Create(genericapirequest.NewDefaultContext(), resourcequota, false)
+	_, err := storage.Create(genericapirequest.NewDefaultContext(), resourcequota, rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -191,7 +191,7 @@ func TestUpdateStatus(t *testing.T) {
 		},
 	}
 
-	_, _, err = status.Update(ctx, resourcequotaIn.Name, rest.DefaultUpdatedObjectInfo(resourcequotaIn))
+	_, _, err = status.Update(ctx, resourcequotaIn.Name, rest.DefaultUpdatedObjectInfo(resourcequotaIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

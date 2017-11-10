@@ -288,11 +288,11 @@ func setup(t *testing.T, workerCount int) *testContext {
 
 func createNamespaceOrDie(name string, c clientset.Interface, t *testing.T) *v1.Namespace {
 	ns := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
-	if _, err := c.Core().Namespaces().Create(ns); err != nil {
+	if _, err := c.CoreV1().Namespaces().Create(ns); err != nil {
 		t.Fatalf("failed to create namespace: %v", err)
 	}
 	falseVar := false
-	_, err := c.Core().ServiceAccounts(ns.Name).Create(&v1.ServiceAccount{
+	_, err := c.CoreV1().ServiceAccounts(ns.Name).Create(&v1.ServiceAccount{
 		ObjectMeta:                   metav1.ObjectMeta{Name: "default"},
 		AutomountServiceAccountToken: &falseVar,
 	})
@@ -305,7 +305,7 @@ func createNamespaceOrDie(name string, c clientset.Interface, t *testing.T) *v1.
 func deleteNamespaceOrDie(name string, c clientset.Interface, t *testing.T) {
 	zero := int64(0)
 	background := metav1.DeletePropagationBackground
-	err := c.Core().Namespaces().Delete(name, &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
+	err := c.CoreV1().Namespaces().Delete(name, &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
 	if err != nil {
 		t.Fatalf("failed to delete namespace %q: %v", name, err)
 	}
@@ -321,8 +321,8 @@ func TestCascadingDeletion(t *testing.T) {
 	ns := createNamespaceOrDie("gc-cascading-deletion", clientSet, t)
 	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
 
-	rcClient := clientSet.Core().ReplicationControllers(ns.Name)
-	podClient := clientSet.Core().Pods(ns.Name)
+	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
+	podClient := clientSet.CoreV1().Pods(ns.Name)
 
 	toBeDeletedRC, err := rcClient.Create(newOwnerRC(toBeDeletedRCName, ns.Name))
 	if err != nil {
@@ -408,7 +408,7 @@ func TestCreateWithNonExistentOwner(t *testing.T) {
 	ns := createNamespaceOrDie("gc-non-existing-owner", clientSet, t)
 	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
 
-	podClient := clientSet.Core().Pods(ns.Name)
+	podClient := clientSet.CoreV1().Pods(ns.Name)
 
 	pod := newPod(garbageCollectedPodName, ns.Name, []metav1.OwnerReference{{UID: "doesn't matter", Name: toBeDeletedRCName}})
 	_, err := podClient.Create(pod)
@@ -432,8 +432,8 @@ func TestCreateWithNonExistentOwner(t *testing.T) {
 
 func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet clientset.Interface, nameSuffix, namespace string, initialFinalizers []string, options *metav1.DeleteOptions, wg *sync.WaitGroup, rcUIDs chan types.UID) {
 	defer wg.Done()
-	rcClient := clientSet.Core().ReplicationControllers(namespace)
-	podClient := clientSet.Core().Pods(namespace)
+	rcClient := clientSet.CoreV1().ReplicationControllers(namespace)
+	podClient := clientSet.CoreV1().Pods(namespace)
 	// create rc.
 	rcName := "test.rc." + nameSuffix
 	rc := newOwnerRC(rcName, namespace)
@@ -468,8 +468,8 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 }
 
 func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespace string, rcNum, podNum int) (bool, error) {
-	rcClient := clientSet.Core().ReplicationControllers(namespace)
-	podClient := clientSet.Core().Pods(namespace)
+	rcClient := clientSet.CoreV1().ReplicationControllers(namespace)
+	podClient := clientSet.CoreV1().Pods(namespace)
 	pods, err := podClient.List(metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list pods: %v", err)
@@ -530,7 +530,7 @@ func TestStressingCascadingDeletion(t *testing.T) {
 	t.Logf("number of remaining replication controllers and pods are as expected")
 
 	// verify the remaining pods all have "orphan" in their names.
-	podClient := clientSet.Core().Pods(ns.Name)
+	podClient := clientSet.CoreV1().Pods(ns.Name)
 	pods, err := podClient.List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -561,8 +561,8 @@ func TestOrphaning(t *testing.T) {
 	ns := createNamespaceOrDie("gc-orphaning", clientSet, t)
 	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
 
-	podClient := clientSet.Core().Pods(ns.Name)
-	rcClient := clientSet.Core().ReplicationControllers(ns.Name)
+	podClient := clientSet.CoreV1().Pods(ns.Name)
+	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
 	// create the RC with the orphan finalizer set
 	toBeDeletedRC := newOwnerRC(toBeDeletedRCName, ns.Name)
 	toBeDeletedRC, err := rcClient.Create(toBeDeletedRC)
@@ -631,8 +631,8 @@ func TestSolidOwnerDoesNotBlockWaitingOwner(t *testing.T) {
 	ns := createNamespaceOrDie("gc-foreground1", clientSet, t)
 	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
 
-	podClient := clientSet.Core().Pods(ns.Name)
-	rcClient := clientSet.Core().ReplicationControllers(ns.Name)
+	podClient := clientSet.CoreV1().Pods(ns.Name)
+	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
 	// create the RC with the orphan finalizer set
 	toBeDeletedRC, err := rcClient.Create(newOwnerRC(toBeDeletedRCName, ns.Name))
 	if err != nil {
@@ -691,8 +691,8 @@ func TestNonBlockingOwnerRefDoesNotBlock(t *testing.T) {
 	ns := createNamespaceOrDie("gc-foreground2", clientSet, t)
 	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
 
-	podClient := clientSet.Core().Pods(ns.Name)
-	rcClient := clientSet.Core().ReplicationControllers(ns.Name)
+	podClient := clientSet.CoreV1().Pods(ns.Name)
+	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
 	// create the RC with the orphan finalizer set
 	toBeDeletedRC, err := rcClient.Create(newOwnerRC(toBeDeletedRCName, ns.Name))
 	if err != nil {
@@ -756,8 +756,8 @@ func TestBlockingOwnerRefDoesBlock(t *testing.T) {
 	ns := createNamespaceOrDie("foo", clientSet, t)
 	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
 
-	podClient := clientSet.Core().Pods(ns.Name)
-	rcClient := clientSet.Core().ReplicationControllers(ns.Name)
+	podClient := clientSet.CoreV1().Pods(ns.Name)
+	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
 	// create the RC with the orphan finalizer set
 	toBeDeletedRC, err := rcClient.Create(newOwnerRC(toBeDeletedRCName, ns.Name))
 	if err != nil {
@@ -879,7 +879,7 @@ func TestMixedRelationships(t *testing.T) {
 
 	ns := createNamespaceOrDie("crd-mixed", clientSet, t)
 
-	configMapClient := clientSet.Core().ConfigMaps(ns.Name)
+	configMapClient := clientSet.CoreV1().ConfigMaps(ns.Name)
 
 	definition, resourceClient := createRandomCustomResourceDefinition(t, apiExtensionClient, clientPool, ns.Name)
 
@@ -977,7 +977,7 @@ func TestCRDDeletionCascading(t *testing.T) {
 
 	ns := createNamespaceOrDie("crd-mixed", clientSet, t)
 
-	configMapClient := clientSet.Core().ConfigMaps(ns.Name)
+	configMapClient := clientSet.CoreV1().ConfigMaps(ns.Name)
 
 	definition, resourceClient := createRandomCustomResourceDefinition(t, apiExtensionClient, clientPool, ns.Name)
 

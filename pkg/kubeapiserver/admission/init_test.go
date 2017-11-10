@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 )
 
 type doNothingAdmission struct{}
@@ -40,7 +41,7 @@ func (self *WantsCloudConfigAdmissionPlugin) SetCloudConfig(cloudConfig []byte) 
 
 func TestCloudConfigAdmissionPlugin(t *testing.T) {
 	cloudConfig := []byte("cloud-configuration")
-	initializer := NewPluginInitializer(nil, nil, cloudConfig, nil, nil)
+	initializer := NewPluginInitializer(nil, nil, cloudConfig, nil, nil, nil, nil)
 	wantsCloudConfigAdmission := &WantsCloudConfigAdmissionPlugin{}
 	initializer.Initialize(wantsCloudConfigAdmission)
 
@@ -60,13 +61,13 @@ type serviceWanter struct {
 	got ServiceResolver
 }
 
-func (s *serviceWanter) SetServiceResolver(sr ServiceResolver) { s.got = sr }
+func (s *serviceWanter) SetServiceResolver(sr webhook.ServiceResolver) { s.got = sr }
 
 func TestWantsServiceResolver(t *testing.T) {
 	sw := &serviceWanter{}
 	fsr := &fakeServiceResolver{}
-	i := &PluginInitializer{}
-	i.SetServiceResolver(fsr).Initialize(sw)
+	i := NewPluginInitializer(nil, nil, nil, nil, nil, nil, fsr)
+	i.Initialize(sw)
 	if got, ok := sw.got.(*fakeServiceResolver); !ok || got != fsr {
 		t.Errorf("plumbing fail - %v %v#", ok, got)
 	}

@@ -75,8 +75,8 @@ var (
 // NewEndpointController returns a new *EndpointController.
 func NewEndpointController(podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
 	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface) *EndpointController {
-	if client != nil && client.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.Core().RESTClient().GetRateLimiter())
+	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.CoreV1().RESTClient().GetRateLimiter())
 	}
 	e := &EndpointController{
 		client:           client,
@@ -144,7 +144,7 @@ type EndpointController struct {
 	workerLoopPeriod time.Duration
 }
 
-// Runs e; will not return until stopCh is closed. workers determines how many
+// Run will not return until stopCh is closed. workers determines how many
 // endpoints will be handled in parallel.
 func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
@@ -215,6 +215,10 @@ func podToEndpointAddress(pod *v1.Pod) *v1.EndpointAddress {
 }
 
 func podChanged(oldPod, newPod *v1.Pod) bool {
+	// If the pod's deletion timestamp is set, remove endpoint from ready address.
+	if newPod.DeletionTimestamp != oldPod.DeletionTimestamp {
+		return true
+	}
 	// If the pod's readiness has changed, the associated endpoint address
 	// will move from the unready endpoints set to the ready endpoints.
 	// So for the purposes of an endpoint, a readiness change on a pod
@@ -395,7 +399,7 @@ func (e *EndpointController) syncService(key string) error {
 		// service is deleted. However, if we're down at the time when
 		// the service is deleted, we will miss that deletion, so this
 		// doesn't completely solve the problem. See #6877.
-		err = e.client.Core().Endpoints(namespace).Delete(name, nil)
+		err = e.client.CoreV1().Endpoints(namespace).Delete(name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -508,10 +512,10 @@ func (e *EndpointController) syncService(key string) error {
 	glog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, totalReadyEps, totalNotReadyEps)
 	if createEndpoints {
 		// No previous endpoints, create them
-		_, err = e.client.Core().Endpoints(service.Namespace).Create(newEndpoints)
+		_, err = e.client.CoreV1().Endpoints(service.Namespace).Create(newEndpoints)
 	} else {
 		// Pre-existing
-		_, err = e.client.Core().Endpoints(service.Namespace).Update(newEndpoints)
+		_, err = e.client.CoreV1().Endpoints(service.Namespace).Update(newEndpoints)
 	}
 	if err != nil {
 		if createEndpoints && errors.IsForbidden(err) {

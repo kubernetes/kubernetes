@@ -148,7 +148,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 	out.FileCheckFrequency = in.FileCheckFrequency
 	out.HTTPCheckFrequency = in.HTTPCheckFrequency
 	out.ManifestURL = in.ManifestURL
-	out.ManifestURLHeader = in.ManifestURLHeader
+	out.ManifestURLHeader = *(*map[string][]string)(unsafe.Pointer(&in.ManifestURLHeader))
 	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableServer, &out.EnableServer, s); err != nil {
 		return err
 	}
@@ -211,14 +211,12 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 	out.VolumePluginDir = in.VolumePluginDir
 	out.KubeletCgroups = in.KubeletCgroups
-	out.RuntimeCgroups = in.RuntimeCgroups
 	out.SystemCgroups = in.SystemCgroups
 	out.CgroupRoot = in.CgroupRoot
 	if err := v1.Convert_Pointer_bool_To_bool(&in.CgroupsPerQOS, &out.CgroupsPerQOS, s); err != nil {
 		return err
 	}
 	out.CgroupDriver = in.CgroupDriver
-	out.ContainerRuntime = in.ContainerRuntime
 	out.CPUManagerPolicy = in.CPUManagerPolicy
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
@@ -288,7 +286,7 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 	out.FileCheckFrequency = in.FileCheckFrequency
 	out.HTTPCheckFrequency = in.HTTPCheckFrequency
 	out.ManifestURL = in.ManifestURL
-	out.ManifestURLHeader = in.ManifestURLHeader
+	out.ManifestURLHeader = *(*map[string][]string)(unsafe.Pointer(&in.ManifestURLHeader))
 	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableServer, &out.EnableServer, s); err != nil {
 		return err
 	}
@@ -355,10 +353,8 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 		return err
 	}
 	out.CgroupDriver = in.CgroupDriver
-	out.RuntimeCgroups = in.RuntimeCgroups
 	out.SystemCgroups = in.SystemCgroups
 	out.CgroupRoot = in.CgroupRoot
-	out.ContainerRuntime = in.ContainerRuntime
 	out.CPUManagerPolicy = in.CPUManagerPolicy
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout

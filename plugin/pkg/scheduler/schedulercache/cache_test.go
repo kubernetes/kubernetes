@@ -228,7 +228,7 @@ func TestExpirePod(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[1]},
-			usedPorts:           map[int]bool{80: false, 8080: true},
+			usedPorts:           map[int]bool{8080: true},
 		},
 	}}
 
@@ -277,7 +277,7 @@ func TestAddPodWillConfirm(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[0]},
-			usedPorts:           map[int]bool{80: true, 8080: false},
+			usedPorts:           map[int]bool{80: true},
 		},
 	}}
 

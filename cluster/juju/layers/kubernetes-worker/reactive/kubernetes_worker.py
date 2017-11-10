@@ -848,6 +848,16 @@ def missing_kube_control():
             hookenv.service_name()))
 
 
+@when('docker.ready')
+def fix_iptables_for_docker_1_13():
+    """ Fix iptables FORWARD policy for Docker >=1.13
+    https://github.com/kubernetes/kubernetes/issues/40182
+    https://github.com/kubernetes/kubernetes/issues/39823
+    """
+    cmd = ['iptables', '-w', '300', '-P', 'FORWARD', 'ACCEPT']
+    check_call(cmd)
+
+
 def _systemctl_is_active(application):
     ''' Poll systemctl to determine if the application is running '''
     cmd = ['systemctl', 'is-active', application]

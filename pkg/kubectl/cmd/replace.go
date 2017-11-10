@@ -233,7 +233,7 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	if timeout == 0 {
 		timeout = kubectl.Timeout
 	}
-	r.Visit(func(info *resource.Info, err error) error {
+	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
@@ -245,6 +245,9 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			return true, nil
 		})
 	})
+	if err != nil {
+		return err
+	}
 
 	r = f.NewBuilder().
 		Unstructured(f.UnstructuredClientForMapping, mapper, typer).

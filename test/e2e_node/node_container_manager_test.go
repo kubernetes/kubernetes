@@ -176,7 +176,7 @@ func runTest(f *framework.Framework) error {
 		return fmt.Errorf("Expected Node Allocatable Cgroup Does not exist")
 	}
 	// TODO: Update cgroupManager to expose a Status interface to get current Cgroup Settings.
-	nodeList, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}

@@ -18,12 +18,9 @@ package apimachinery
 
 import (
 	"crypto/rand"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/big"
-	"os"
 	"strings"
 	"time"
 
@@ -38,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/util/cert"
 	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
@@ -47,12 +43,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 )
-
-type aggregatorContext struct {
-	apiserverCert        []byte
-	apiserverKey         []byte
-	apiserverSigningCert []byte
-}
 
 var serverAggregatorVersion = utilversion.MustParseSemantic("v1.7.0")
 
@@ -88,62 +78,6 @@ func cleanTest(f *framework.Framework) {
 	_ = client.RbacV1beta1().ClusterRoleBindings().Delete("wardler:"+namespace+":anonymous", nil)
 }
 
-func setupSampleAPIServerCert(namespaceName, serviceName string) *aggregatorContext {
-	aggregatorCertDir, err := ioutil.TempDir("", "test-e2e-aggregator")
-	if err != nil {
-		framework.Failf("Failed to create a temp dir for cert generation %v", err)
-	}
-	defer os.RemoveAll(aggregatorCertDir)
-	apiserverSigningKey, err := cert.NewPrivateKey()
-	if err != nil {
-		framework.Failf("Failed to create CA private key for apiserver %v", err)
-	}
-	apiserverSigningCert, err := cert.NewSelfSignedCACert(cert.Config{CommonName: "e2e-sampleapiserver-ca"}, apiserverSigningKey)
-	if err != nil {
-		framework.Failf("Failed to create CA cert for apiserver %v", err)
-	}
-	apiserverCACertFile, err := ioutil.TempFile(aggregatorCertDir, "apiserver-ca.crt")
-	if err != nil {
-		framework.Failf("Failed to create a temp file for ca cert generation %v", err)
-	}
-	if err := ioutil.WriteFile(apiserverCACertFile.Name(), cert.EncodeCertPEM(apiserverSigningCert), 0644); err != nil {
-		framework.Failf("Failed to write CA cert for apiserver %v", err)
-	}
-	apiserverKey, err := cert.NewPrivateKey()
-	if err != nil {
-		framework.Failf("Failed to create private key for apiserver %v", err)
-	}
-	apiserverCert, err := cert.NewSignedCert(
-		cert.Config{
-			CommonName: serviceName + "." + namespaceName + ".svc",
-			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		},
-		apiserverKey, apiserverSigningCert, apiserverSigningKey,
-	)
-	if err != nil {
-		framework.Failf("Failed to create cert for apiserver %v", err)
-	}
-	apiserverCertFile, err := ioutil.TempFile(aggregatorCertDir, "apiserver.crt")
-	if err != nil {
-		framework.Failf("Failed to create a temp file for cert generation %v", err)
-	}
-	apiserverKeyFile, err := ioutil.TempFile(aggregatorCertDir, "apiserver.key")
-	if err != nil {
-		framework.Failf("Failed to create a temp file for key generation %v", err)
-	}
-	if err := ioutil.WriteFile(apiserverCertFile.Name(), cert.EncodeCertPEM(apiserverCert), 0600); err != nil {
-		framework.Failf("Failed to write cert file for apiserver %v", err)
-	}
-	if err := ioutil.WriteFile(apiserverKeyFile.Name(), cert.EncodePrivateKeyPEM(apiserverKey), 0644); err != nil {
-		framework.Failf("Failed to write key file for apiserver %v", err)
-	}
-	return &aggregatorContext{
-		apiserverCert:        cert.EncodeCertPEM(apiserverCert),
-		apiserverKey:         cert.EncodePrivateKeyPEM(apiserverKey),
-		apiserverSigningCert: cert.EncodeCertPEM(apiserverSigningCert),
-	}
-}
-
 // A basic test if the sample-apiserver code from 1.7 and compiled against 1.7
 // will work on the current Aggregator/API-Server.
 func TestSampleAPIServer(f *framework.Framework, image string) {
@@ -154,7 +88,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	aggrclient := f.AggregatorClient
 
 	namespace := f.Namespace.Name
-	context := setupSampleAPIServerCert(namespace, "sample-api")
+	context := setupServerCert(namespace, "sample-api")
 	if framework.ProviderIs("gke") {
 		// kubectl create clusterrolebinding user-cluster-admin-binding --clusterrole=cluster-admin --user=user@domain.com
 		authenticated := rbacv1beta1.Subject{Kind: rbacv1beta1.GroupKind, Name: user.AllAuthenticated}
@@ -172,8 +106,8 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 		},
 		Type: v1.SecretTypeOpaque,
 		Data: map[string][]byte{
-			"tls.crt": context.apiserverCert,
-			"tls.key": context.apiserverKey,
+			"tls.crt": context.cert,
+			"tls.key": context.key,
 		},
 	}
 	_, err := client.CoreV1().Secrets(namespace).Create(secret)
@@ -349,7 +283,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 			},
 			Group:                "wardle.k8s.io",
 			Version:              "v1alpha1",
-			CABundle:             context.apiserverSigningCert,
+			CABundle:             context.signingCert,
 			GroupPriorityMinimum: 2000,
 			VersionPriority:      200,
 		},

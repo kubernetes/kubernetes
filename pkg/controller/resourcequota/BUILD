@@ -10,8 +10,8 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
-        "replenishment_controller.go",
         "resource_quota_controller.go",
+        "resource_quota_monitor.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/resourcequota",
     deps = [
@@ -20,6 +20,7 @@ go_library(
         "//pkg/controller:go_default_library",
         "//pkg/quota:go_default_library",
         "//pkg/quota/evaluator/core:go_default_library",
+        "//pkg/quota/generic:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
@@ -27,11 +28,12 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//vendor/k8s.io/client-go/discovery:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/informers/core/v1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
@@ -43,15 +45,12 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "replenishment_controller_test.go",
-        "resource_quota_controller_test.go",
-    ],
+    srcs = ["resource_quota_controller_test.go"],
     importpath = "k8s.io/kubernetes/pkg/controller/resourcequota",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/controller:go_default_library",
+        "//pkg/quota:go_default_library",
         "//pkg/quota/generic:go_default_library",
         "//pkg/quota/install:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -59,12 +58,12 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//vendor/k8s.io/client-go/testing:go_default_library",
+        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
 

@@ -118,10 +118,29 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 	version := appsapiv1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("deployments")) {
+		deploymentStorage := deploymentstore.NewStorage(restOptionsGetter)
+		storage["deployments"] = deploymentStorage.Deployment
+		storage["deployments/status"] = deploymentStorage.Status
+	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("statefulsets")) {
+		statefulSetStorage := statefulsetstore.NewStorage(restOptionsGetter)
+		storage["statefulsets"] = statefulSetStorage.StatefulSet
+		storage["statefulsets/status"] = statefulSetStorage.Status
+	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("daemonsets")) {
 		daemonSetStorage, daemonSetStatusStorage := daemonsetstore.NewREST(restOptionsGetter)
 		storage["daemonsets"] = daemonSetStorage
 		storage["daemonsets/status"] = daemonSetStatusStorage
+	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("replicasets")) {
+		replicaSetStorage := replicasetstore.NewStorage(restOptionsGetter)
+		storage["replicasets"] = replicaSetStorage.ReplicaSet
+		storage["replicasets/status"] = replicaSetStorage.Status
+	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("controllerrevisions")) {
+		historyStorage := controllerrevisionsstore.NewREST(restOptionsGetter)
+		storage["controllerrevisions"] = historyStorage
 	}
 	return storage
 }

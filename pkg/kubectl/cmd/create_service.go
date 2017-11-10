@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -98,7 +98,7 @@ func CreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comm
 		generator = &kubectl.ServiceCommonGeneratorV1{
 			Name:      name,
 			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
-			Type:      api.ServiceTypeClusterIP,
+			Type:      v1.ServiceTypeClusterIP,
 			ClusterIP: cmdutil.GetFlagString(cmd, "clusterip"),
 		}
 	default:
@@ -154,7 +154,7 @@ func CreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comma
 		generator = &kubectl.ServiceCommonGeneratorV1{
 			Name:      name,
 			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
-			Type:      api.ServiceTypeNodePort,
+			Type:      v1.ServiceTypeNodePort,
 			ClusterIP: "",
 			NodePort:  cmdutil.GetFlagInt(cmd, "node-port"),
 		}
@@ -210,7 +210,7 @@ func CreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.C
 		generator = &kubectl.ServiceCommonGeneratorV1{
 			Name:      name,
 			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
-			Type:      api.ServiceTypeLoadBalancer,
+			Type:      v1.ServiceTypeLoadBalancer,
 			ClusterIP: "",
 		}
 	default:
@@ -270,7 +270,7 @@ func CreateExternalNameService(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.C
 	case cmdutil.ServiceExternalNameGeneratorV1Name:
 		generator = &kubectl.ServiceCommonGeneratorV1{
 			Name:         name,
-			Type:         api.ServiceTypeExternalName,
+			Type:         v1.ServiceTypeExternalName,
 			ExternalName: cmdutil.GetFlagString(cmd, "external-name"),
 			ClusterIP:    "",
 		}

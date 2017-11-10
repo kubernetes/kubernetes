@@ -39,11 +39,9 @@ go_library(
     srcs = [
         "e2e.go",
         "events.go",
-        "example_cluster_dns.go",
         "examples.go",
         "gke_local_ssd.go",
         "gke_node_pools.go",
-        "network_partition.go",
         "pod_gc.go",
         "pods.go",
         "pre_stop.go",
@@ -51,13 +49,10 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e",
     deps = [
-        "//federation/test/e2e:go_default_library",
-        "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/cloudprovider/providers/azure:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
-        "//pkg/controller/node:go_default_library",
         "//pkg/kubectl/util/logs:go_default_library",
         "//pkg/version:go_default_library",
         "//test/e2e/common:go_default_library",
@@ -79,7 +74,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
@@ -87,7 +81,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
-        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
 

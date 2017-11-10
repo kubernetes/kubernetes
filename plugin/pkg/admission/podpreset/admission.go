@@ -69,7 +69,7 @@ func NewPlugin() *podPresetPlugin {
 	}
 }
 
-func (plugin *podPresetPlugin) Validate() error {
+func (plugin *podPresetPlugin) ValidateInitialization() error {
 	if plugin.client == nil {
 		return fmt.Errorf("%s requires a client", pluginName)
 	}

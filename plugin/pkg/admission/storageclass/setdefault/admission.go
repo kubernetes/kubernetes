@@ -69,8 +69,8 @@ func (a *claimDefaulterPlugin) SetInternalKubeInformerFactory(f informers.Shared
 	a.SetReadyFunc(informer.Informer().HasSynced)
 }
 
-// Validate ensures lister is set.
-func (a *claimDefaulterPlugin) Validate() error {
+// ValidateInitialization ensures lister is set.
+func (a *claimDefaulterPlugin) ValidateInitialization() error {
 	if a.lister == nil {
 		return fmt.Errorf("missing lister")
 	}

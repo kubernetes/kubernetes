@@ -38,6 +38,7 @@ func Validate(config *componentconfig.KubeProxyConfiguration) field.ErrorList {
 	allErrs = append(allErrs, validateKubeProxyConntrackConfiguration(config.Conntrack, newPath.Child("KubeProxyConntrackConfiguration"))...)
 	allErrs = append(allErrs, validateProxyMode(config.Mode, newPath.Child("Mode"))...)
 	allErrs = append(allErrs, validateClientConnectionConfiguration(config.ClientConnection, newPath.Child("ClientConnection"))...)
+	allErrs = append(allErrs, validateIPVSSchedulerMethod(componentconfig.IPVSSchedulerMethod(config.IPVS.Scheduler), newPath.Child("KubeProxyIPVSConfiguration").Child("Scheduler"))...)
 
 	if config.OOMScoreAdj != nil && (*config.OOMScoreAdj < -1000 || *config.OOMScoreAdj > 1000) {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("OOMScoreAdj"), *config.OOMScoreAdj, "must be within the range [-1000, 1000]"))
@@ -155,5 +156,35 @@ func validateHostPort(input string, fldPath *field.Path) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(fldPath, port, "must be a valid port"))
 	}
 
+	return allErrs
+}
+
+func validateIPVSSchedulerMethod(scheduler componentconfig.IPVSSchedulerMethod, fldPath *field.Path) field.ErrorList {
+	supportedMethod := []componentconfig.IPVSSchedulerMethod{
+		componentconfig.RoundRobin,
+		componentconfig.WeightedRoundRobin,
+		componentconfig.LeastConnection,
+		componentconfig.WeightedLeastConnection,
+		componentconfig.LocalityBasedLeastConnection,
+		componentconfig.LocalityBasedLeastConnectionWithReplication,
+		componentconfig.SourceHashing,
+		componentconfig.DestinationHashing,
+		componentconfig.ShortestExpectedDelay,
+		componentconfig.NeverQueue,
+		"",
+	}
+	allErrs := field.ErrorList{}
+	var found bool
+	for i := range supportedMethod {
+		if scheduler == supportedMethod[i] {
+			found = true
+			break
+		}
+	}
+	// Not found
+	if !found {
+		errMsg := fmt.Sprintf("must be in %v, blank means the default algorithm method (currently rr)", supportedMethod)
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("Scheduler"), string(scheduler), errMsg))
+	}
 	return allErrs
 }

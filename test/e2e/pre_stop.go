@@ -54,13 +54,13 @@ func testPreStop(c clientset.Interface, ns string) {
 		},
 	}
 	By(fmt.Sprintf("Creating server pod %s in namespace %s", podDescr.Name, ns))
-	podDescr, err := c.Core().Pods(ns).Create(podDescr)
+	podDescr, err := c.CoreV1().Pods(ns).Create(podDescr)
 	framework.ExpectNoError(err, fmt.Sprintf("creating pod %s", podDescr.Name))
 
 	// At the end of the test, clean up by removing the pod.
 	defer func() {
 		By("Deleting the server pod")
-		c.Core().Pods(ns).Delete(podDescr.Name, nil)
+		c.CoreV1().Pods(ns).Delete(podDescr.Name, nil)
 	}()
 
 	By("Waiting for pods to come up.")
@@ -69,7 +69,7 @@ func testPreStop(c clientset.Interface, ns string) {
 
 	val := "{\"Source\": \"prestop\"}"
 
-	podOut, err := c.Core().Pods(ns).Get(podDescr.Name, metav1.GetOptions{})
+	podOut, err := c.CoreV1().Pods(ns).Get(podDescr.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "getting pod info")
 
 	preStopDescr := &v1.Pod{
@@ -97,7 +97,7 @@ func testPreStop(c clientset.Interface, ns string) {
 	}
 
 	By(fmt.Sprintf("Creating tester pod %s in namespace %s", preStopDescr.Name, ns))
-	preStopDescr, err = c.Core().Pods(ns).Create(preStopDescr)
+	preStopDescr, err = c.CoreV1().Pods(ns).Create(preStopDescr)
 	framework.ExpectNoError(err, fmt.Sprintf("creating pod %s", preStopDescr.Name))
 	deletePreStop := true
 
@@ -105,7 +105,7 @@ func testPreStop(c clientset.Interface, ns string) {
 	defer func() {
 		if deletePreStop {
 			By("Deleting the tester pod")
-			c.Core().Pods(ns).Delete(preStopDescr.Name, nil)
+			c.CoreV1().Pods(ns).Delete(preStopDescr.Name, nil)
 		}
 	}()
 
@@ -114,41 +114,27 @@ func testPreStop(c clientset.Interface, ns string) {
 
 	// Delete the pod with the preStop handler.
 	By("Deleting pre-stop pod")
-	if err := c.Core().Pods(ns).Delete(preStopDescr.Name, nil); err == nil {
+	if err := c.CoreV1().Pods(ns).Delete(preStopDescr.Name, nil); err == nil {
 		deletePreStop = false
 	}
 	framework.ExpectNoError(err, fmt.Sprintf("deleting pod: %s", preStopDescr.Name))
 
 	// Validate that the server received the web poke.
 	err = wait.Poll(time.Second*5, time.Second*60, func() (bool, error) {
-		subResourceProxyAvailable, err := framework.ServerVersionGTE(framework.SubResourcePodProxyVersion, c.Discovery())
-		if err != nil {
-			return false, err
-		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
 		defer cancel()
 
 		var body []byte
-		if subResourceProxyAvailable {
-			body, err = c.Core().RESTClient().Get().
-				Context(ctx).
-				Namespace(ns).
-				Resource("pods").
-				SubResource("proxy").
-				Name(podDescr.Name).
-				Suffix("read").
-				DoRaw()
-		} else {
-			body, err = c.Core().RESTClient().Get().
-				Context(ctx).
-				Prefix("proxy").
-				Namespace(ns).
-				Resource("pods").
-				Name(podDescr.Name).
-				Suffix("read").
-				DoRaw()
-		}
+		body, err = c.CoreV1().RESTClient().Get().
+			Context(ctx).
+			Namespace(ns).
+			Resource("pods").
+			SubResource("proxy").
+			Name(podDescr.Name).
+			Suffix("read").
+			DoRaw()
+
 		if err != nil {
 			if ctx.Err() != nil {
 				framework.Failf("Error validating prestop: %v", err)
@@ -175,7 +161,12 @@ func testPreStop(c clientset.Interface, ns string) {
 var _ = framework.KubeDescribe("PreStop", func() {
 	f := framework.NewDefaultFramework("prestop")
 
-	It("should call prestop when killing a pod [Conformance]", func() {
+	/*
+		    Testname: pods-prestop-handler-invoked
+		    Description: Makes sure a pod's preStop handler is successfully
+			invoked immediately before a container is terminated.
+	*/
+	framework.ConformanceIt("should call prestop when killing a pod ", func() {
 		testPreStop(f.ClientSet, f.Namespace.Name)
 	})
 })

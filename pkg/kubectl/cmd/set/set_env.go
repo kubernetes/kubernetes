@@ -428,7 +428,10 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		}
 
 		if len(o.Output) > 0 {
-			return o.PrintObject(o.Cmd, o.Local, o.Mapper, obj, o.Out)
+			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, obj, o.Out); err != nil {
+				return err
+			}
+			continue
 		}
 
 		cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, false, "env updated")

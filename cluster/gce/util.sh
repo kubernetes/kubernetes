@@ -84,7 +84,8 @@ if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
   fi
 fi
 
-NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
+NODE_INSTANCE_PREFIX=${NODE_INSTANCE_PREFIX:-"${INSTANCE_PREFIX}-minion"}
+
 NODE_TAGS="${NODE_TAG}"
 
 ALLOCATE_NODE_CIDRS=true
@@ -1506,8 +1507,6 @@ function check-cluster() {
 
    # Update the user's kubeconfig to include credentials for this apiserver.
    create-kubeconfig
-
-   create-kubeconfig-for-federation
   )
 
   # ensures KUBECONFIG is set
@@ -2190,13 +2189,6 @@ function prepare-e2e() {
 # easiest way to buy us a little more room.
 function prepare-startup-script() {
   # Find a standard sed instance (and ensure that the command works as expected on a Mac).
-  SED=sed
-  if which gsed &>/dev/null; then
-    SED=gsed
-  fi
-  if ! ($SED --version 2>&1 | grep -q GNU); then
-    echo "!!! GNU sed is required.  If on OS X, use 'brew install gnu-sed'."
-    exit 1
-  fi
-  $SED '/^\s*#\([^!].*\)*$/ d' ${KUBE_ROOT}/cluster/gce/configure-vm.sh > ${KUBE_TEMP}/configure-vm.sh
+  kube::util::ensure-gnu-sed
+  ${SED} '/^\s*#\([^!].*\)*$/ d' ${KUBE_ROOT}/cluster/gce/configure-vm.sh > ${KUBE_TEMP}/configure-vm.sh
 }

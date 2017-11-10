@@ -71,8 +71,8 @@ func NewTokenCleaner(cl clientset.Interface, options TokenCleanerOptions) *Token
 		client:               cl,
 		tokenSecretNamespace: options.TokenSecretNamespace,
 	}
-	if cl.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("token_cleaner", cl.Core().RESTClient().GetRateLimiter())
+	if cl.CoreV1().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("token_cleaner", cl.CoreV1().RESTClient().GetRateLimiter())
 	}
 
 	secretSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(bootstrapapi.SecretTypeBootstrapToken)})
@@ -80,11 +80,11 @@ func NewTokenCleaner(cl clientset.Interface, options TokenCleanerOptions) *Token
 		&cache.ListWatch{
 			ListFunc: func(lo metav1.ListOptions) (runtime.Object, error) {
 				lo.FieldSelector = secretSelector.String()
-				return e.client.Core().Secrets(e.tokenSecretNamespace).List(lo)
+				return e.client.CoreV1().Secrets(e.tokenSecretNamespace).List(lo)
 			},
 			WatchFunc: func(lo metav1.ListOptions) (watch.Interface, error) {
 				lo.FieldSelector = secretSelector.String()
-				return e.client.Core().Secrets(e.tokenSecretNamespace).Watch(lo)
+				return e.client.CoreV1().Secrets(e.tokenSecretNamespace).Watch(lo)
 			},
 		},
 		&v1.Secret{},
@@ -118,7 +118,7 @@ func (tc *TokenCleaner) evalSecret(o interface{}) {
 		if len(secret.UID) > 0 {
 			options = &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &secret.UID}}
 		}
-		err := tc.client.Core().Secrets(secret.Namespace).Delete(secret.Name, options)
+		err := tc.client.CoreV1().Secrets(secret.Namespace).Delete(secret.Name, options)
 		// NotFound isn't a real error (it's already been deleted)
 		// Conflict isn't a real error (the UID precondition failed)
 		if err != nil && !apierrors.IsConflict(err) && !apierrors.IsNotFound(err) {

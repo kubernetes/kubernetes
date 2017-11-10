@@ -47,7 +47,7 @@ var _ = framework.KubeDescribe("Pods Extended", func() {
 			podClient = f.PodClient()
 		})
 		// Flaky issue #36821.
-		It("should be submitted and removed [Conformance] [Flaky]", func() {
+		framework.ConformanceIt("should be submitted and removed  [Flaky]", func() {
 			By("creating the pod")
 			name := "pod-submit-remove-" + string(uuid.NewUUID())
 			value := strconv.Itoa(time.Now().Nanosecond())
@@ -199,7 +199,7 @@ var _ = framework.KubeDescribe("Pods Extended", func() {
 		BeforeEach(func() {
 			podClient = f.PodClient()
 		})
-		It("should be submitted and removed [Conformance]", func() {
+		framework.ConformanceIt("should be submitted and removed ", func() {
 			By("creating the pod")
 			name := "pod-qos-class-" + string(uuid.NewUUID())
 			pod := &v1.Pod{

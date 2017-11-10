@@ -69,7 +69,7 @@ func (p *nodePlugin) SetInternalKubeClientSet(f internalclientset.Interface) {
 	p.podsGetter = f.Core()
 }
 
-func (p *nodePlugin) Validate() error {
+func (p *nodePlugin) ValidateInitialization() error {
 	if p.nodeIdentifier == nil {
 		return fmt.Errorf("%s requires a node identifier", PluginName)
 	}

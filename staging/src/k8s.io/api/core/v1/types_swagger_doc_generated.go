@@ -392,7 +392,7 @@ var map_DeleteOptions = map[string]string{
 	"gracePeriodSeconds": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
 	"preconditions":      "Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be returned.",
 	"orphanDependents":   "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
-	"PropagationPolicy":  "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+	"PropagationPolicy":  "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
 }
 
 func (DeleteOptions) SwaggerDoc() map[string]string {
@@ -1748,15 +1748,33 @@ func (SELinuxOptions) SwaggerDoc() map[string]string {
 	return map_SELinuxOptions
 }
 
+var map_ScaleIOPersistentVolumeSource = map[string]string{
+	"":                 "ScaleIOPersistentVolumeSource represents a persistent ScaleIO volume",
+	"gateway":          "The host address of the ScaleIO API Gateway.",
+	"system":           "The name of the storage system as configured in ScaleIO.",
+	"secretRef":        "SecretRef references to the secret for ScaleIO user and other sensitive information. If this is not provided, Login operation will fail.",
+	"sslEnabled":       "Flag to enable/disable SSL communication with Gateway, default false",
+	"protectionDomain": "The name of the ScaleIO Protection Domain for the configured storage.",
+	"storagePool":      "The ScaleIO Storage Pool associated with the protection domain.",
+	"storageMode":      "Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.",
+	"volumeName":       "The name of a volume already created in the ScaleIO system that is associated with this volume source.",
+	"fsType":           "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+	"readOnly":         "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+}
+
+func (ScaleIOPersistentVolumeSource) SwaggerDoc() map[string]string {
+	return map_ScaleIOPersistentVolumeSource
+}
+
 var map_ScaleIOVolumeSource = map[string]string{
 	"":                 "ScaleIOVolumeSource represents a persistent ScaleIO volume",
 	"gateway":          "The host address of the ScaleIO API Gateway.",
 	"system":           "The name of the storage system as configured in ScaleIO.",
 	"secretRef":        "SecretRef references to the secret for ScaleIO user and other sensitive information. If this is not provided, Login operation will fail.",
 	"sslEnabled":       "Flag to enable/disable SSL communication with Gateway, default false",
-	"protectionDomain": "The name of the Protection Domain for the configured storage (defaults to \"default\").",
-	"storagePool":      "The Storage Pool associated with the protection domain (defaults to \"default\").",
-	"storageMode":      "Indicates whether the storage for a volume should be thick or thin (defaults to \"thin\").",
+	"protectionDomain": "The name of the ScaleIO Protection Domain for the configured storage.",
+	"storagePool":      "The ScaleIO Storage Pool associated with the protection domain.",
+	"storageMode":      "Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.",
 	"volumeName":       "The name of a volume already created in the ScaleIO system that is associated with this volume source.",
 	"fsType":           "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
 	"readOnly":         "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",

@@ -94,6 +94,48 @@ func TestPrintConfiguration(t *testing.T) {
 	unifiedControlPlaneImage: ""
 `),
 		},
+		{
+			cfg: &kubeadmapiext.MasterConfiguration{
+				KubernetesVersion: "v1.7.1",
+				Etcd: kubeadmapiext.Etcd{
+					SelfHosted: &kubeadmapiext.SelfHostedEtcd{
+						CertificatesDir:    "/var/foo",
+						ClusterServiceName: "foo",
+						EtcdVersion:        "v0.1.0",
+						OperatorVersion:    "v0.1.0",
+					},
+				},
+			},
+			expectedBytes: []byte(`[upgrade/config] Configuration used:
+	api:
+	  advertiseAddress: ""
+	  bindPort: 0
+	certificatesDir: ""
+	cloudProvider: ""
+	etcd:
+	  caFile: ""
+	  certFile: ""
+	  dataDir: ""
+	  endpoints: null
+	  image: ""
+	  keyFile: ""
+	  selfHosted:
+	    certificatesDir: /var/foo
+	    clusterServiceName: foo
+	    etcdVersion: v0.1.0
+	    operatorVersion: v0.1.0
+	imageRepository: ""
+	kubernetesVersion: v1.7.1
+	networking:
+	  dnsDomain: ""
+	  podSubnet: ""
+	  serviceSubnet: ""
+	nodeName: ""
+	token: ""
+	tokenTTL: 0s
+	unifiedControlPlaneImage: ""
+`),
+		},
 	}
 	for _, rt := range tests {
 		rt.buf = bytes.NewBufferString("")

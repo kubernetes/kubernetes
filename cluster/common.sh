@@ -160,20 +160,6 @@ function clear-kubeconfig() {
   echo "Cleared config for ${CONTEXT} from ${KUBECONFIG}"
 }
 
-# Creates a kubeconfig file with the credentials for only the current-context
-# cluster. This is used by federation to create secrets in test setup.
-function create-kubeconfig-for-federation() {
-  if [[ "${FEDERATION:-}" == "true" ]]; then
-    echo "creating kubeconfig for federation secret"
-    local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-    local cc=$("${kubectl}" config view -o jsonpath='{.current-context}')
-    KUBECONFIG_DIR=$(dirname ${KUBECONFIG:-$DEFAULT_KUBECONFIG})
-    KUBECONFIG_PATH="${KUBECONFIG_DIR}/federation/kubernetes-apiserver/${cc}"
-    mkdir -p "${KUBECONFIG_PATH}"
-    "${kubectl}" config view --minify --flatten > "${KUBECONFIG_PATH}/kubeconfig"
-  fi
-}
-
 function tear_down_alive_resources() {
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
   "${kubectl}" delete deployments --all || true
@@ -647,6 +633,7 @@ KUBE_PROXY_DAEMONSET: $(yaml-quote ${KUBE_PROXY_DAEMONSET:-false})
 KUBE_PROXY_TOKEN: $(yaml-quote ${KUBE_PROXY_TOKEN:-})
 NODE_PROBLEM_DETECTOR_TOKEN: $(yaml-quote ${NODE_PROBLEM_DETECTOR_TOKEN:-})
 ADMISSION_CONTROL: $(yaml-quote ${ADMISSION_CONTROL:-})
+ENABLE_POD_SECURITY_POLICY: $(yaml-quote ${ENABLE_POD_SECURITY_POLICY:-})
 MASTER_IP_RANGE: $(yaml-quote ${MASTER_IP_RANGE})
 RUNTIME_CONFIG: $(yaml-quote ${RUNTIME_CONFIG})
 CA_CERT: $(yaml-quote ${CA_CERT_BASE64:-})
@@ -679,6 +666,9 @@ PROMETHEUS_TO_SD_ENDPOINT: $(yaml-quote ${PROMETHEUS_TO_SD_ENDPOINT:-})
 PROMETHEUS_TO_SD_PREFIX: $(yaml-quote ${PROMETHEUS_TO_SD_PREFIX:-})
 ENABLE_PROMETHEUS_TO_SD: $(yaml-quote ${ENABLE_PROMETHEUS_TO_SD:-false})
 ENABLE_POD_PRIORITY: $(yaml-quote ${ENABLE_POD_PRIORITY:-})
+CONTAINER_RUNTIME: $(yaml-quote ${CONTAINER_RUNTIME:-})
+CONTAINER_RUNTIME_ENDPOINT: $(yaml-quote ${CONTAINER_RUNTIME_ENDPOINT:-})
+LOAD_IMAGE_COMMAND: $(yaml-quote ${LOAD_IMAGE_COMMAND:-})
 EOF
   if [ -n "${KUBELET_PORT:-}" ]; then
     cat >>$file <<EOF
@@ -750,16 +740,6 @@ EOF
   if [ -n "${ENABLE_CUSTOM_METRICS:-}" ]; then
     cat >>$file <<EOF
 ENABLE_CUSTOM_METRICS: $(yaml-quote ${ENABLE_CUSTOM_METRICS})
-EOF
-  fi
-  if [ -n "${ENABLE_METADATA_PROXY:-}" ]; then
-    cat >>$file <<EOF
-ENABLE_METADATA_PROXY: $(yaml-quote ${ENABLE_METADATA_PROXY})
-EOF
-  fi
-  if [ -n "${KUBE_FIREWALL_METADATA_SERVER:-}" ]; then
-    cat >>$file <<EOF
-KUBE_FIREWALL_METADATA_SERVER: $(yaml-quote ${KUBE_FIREWALL_METADATA_SERVER})
 EOF
   fi
   if [ -n "${FEATURE_GATES:-}" ]; then
@@ -922,12 +902,17 @@ EOF
       cat >>$file <<EOF
 NODE_LABELS: $(yaml-quote ${NODE_LABELS})
 EOF
-    fi
+  fi
+  if [ -n "${NON_MASTER_NODE_LABELS:-}" ]; then
+    cat >>$file <<EOF
+NON_MASTER_NODE_LABELS: $(yaml-quote ${NON_MASTER_NODE_LABELS})
+EOF
+  fi
   if [ -n "${EVICTION_HARD:-}" ]; then
       cat >>$file <<EOF
 EVICTION_HARD: $(yaml-quote ${EVICTION_HARD})
 EOF
-    fi
+  fi
   if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "container-linux" ]] || \
      [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "container-linux" ]]; then
     # Container-Linux-only env vars. TODO(yifan): Make them available on other distros.
@@ -946,17 +931,6 @@ AUTOSCALER_EXPANDER_CONFIG: $(yaml-quote ${AUTOSCALER_EXPANDER_CONFIG})
 EOF
   fi
 
-  # Federation specific environment variables.
-  if [[ -n "${FEDERATION:-}" ]]; then
-    cat >>$file <<EOF
-FEDERATION: $(yaml-quote ${FEDERATION})
-EOF
-  fi
-  if [ -n "${FEDERATION_NAME:-}" ]; then
-    cat >>$file <<EOF
-FEDERATION_NAME: $(yaml-quote ${FEDERATION_NAME})
-EOF
-  fi
   if [ -n "${DNS_ZONE_NAME:-}" ]; then
     cat >>$file <<EOF
 DNS_ZONE_NAME: $(yaml-quote ${DNS_ZONE_NAME})

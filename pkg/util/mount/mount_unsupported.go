@@ -43,6 +43,12 @@ func (mounter *Mounter) Unmount(target string) error {
 	return nil
 }
 
+// GetMountRefs finds all other references to the device referenced
+// by mountPath; returns a list of paths.
+func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
+	return []string{}, nil
+}
+
 func (mounter *Mounter) List() ([]MountPoint, error) {
 	return []MountPoint{}, nil
 }
@@ -60,6 +66,10 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 }
 
 func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
+	return "", nil
+}
+
+func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (string, error) {
 	return "", nil
 }
 

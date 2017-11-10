@@ -95,27 +95,22 @@ func AutoApproveNodeBootstrapTokens(client clientset.Interface, k8sVersion *vers
 
 // AutoApproveNodeCertificateRotation creates RBAC rules in a way that makes Node certificate rotation CSR auto-approved by the csrapprover controller
 func AutoApproveNodeCertificateRotation(client clientset.Interface, k8sVersion *version.Version) error {
+	fmt.Println("[bootstraptoken] Configured RBAC rules to allow certificate rotation for all node client certificates in the cluster")
 
-	// Create autorotation cluster role binding only if we deploying or upgrading to version that supports it.
-	if k8sVersion.AtLeast(constants.MinimumCSRAutoApprovalClusterRolesVersion) {
-		fmt.Println("[bootstraptoken] Configured RBAC rules to allow certificate rotation for all node client certificates in the cluster")
-
-		return apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: NodeAutoApproveCertificateRotationClusterRoleBinding,
+	return apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: NodeAutoApproveCertificateRotationClusterRoleBinding,
+		},
+		RoleRef: rbac.RoleRef{
+			APIGroup: rbac.GroupName,
+			Kind:     "ClusterRole",
+			Name:     NodeSelfCSRAutoApprovalClusterRoleName,
+		},
+		Subjects: []rbac.Subject{
+			{
+				Kind: "Group",
+				Name: constants.NodesGroup,
 			},
-			RoleRef: rbac.RoleRef{
-				APIGroup: rbac.GroupName,
-				Kind:     "ClusterRole",
-				Name:     NodeSelfCSRAutoApprovalClusterRoleName,
-			},
-			Subjects: []rbac.Subject{
-				{
-					Kind: "Group",
-					Name: constants.NodesGroup,
-				},
-			},
-		})
-	}
-	return nil
+		},
+	})
 }

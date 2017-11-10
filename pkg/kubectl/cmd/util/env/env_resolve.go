@@ -27,13 +27,13 @@ import (
 	"k8s.io/kubernetes/pkg/fieldpath"
 )
 
-// ResourceStore defines a new resource store data structure
+// ResourceStore defines a new resource store data structure.
 type ResourceStore struct {
 	SecretStore    map[string]*api.Secret
 	ConfigMapStore map[string]*api.ConfigMap
 }
 
-// NewResourceStore returns a pointer to a new resource store data structure
+// NewResourceStore returns a pointer to a new resource store data structure.
 func NewResourceStore() *ResourceStore {
 	return &ResourceStore{
 		SecretStore:    make(map[string]*api.Secret),
@@ -86,7 +86,7 @@ func getResourceFieldRef(from *api.EnvVarSource, c *api.Container) (string, erro
 	return resource.ExtractContainerResourceValue(from.ResourceFieldRef, c)
 }
 
-// GetEnvVarRefValue returns the value referenced by the supplied envvarsource given the other supplied information
+// GetEnvVarRefValue returns the value referenced by the supplied EnvVarSource given the other supplied information.
 func GetEnvVarRefValue(kc clientset.Interface, ns string, store *ResourceStore, from *api.EnvVarSource, obj runtime.Object, c *api.Container) (string, error) {
 	if from.SecretKeyRef != nil {
 		return getSecretRefValue(kc, ns, store, from.SecretKeyRef)
@@ -107,7 +107,7 @@ func GetEnvVarRefValue(kc clientset.Interface, ns string, store *ResourceStore, 
 	return "", fmt.Errorf("invalid valueFrom")
 }
 
-// GetEnvVarRefString returns a text description of the supplied envvarsource
+// GetEnvVarRefString returns a text description of whichever field is set within the supplied EnvVarSource argument.
 func GetEnvVarRefString(from *api.EnvVarSource) string {
 	if from.ConfigMapKeyRef != nil {
 		return fmt.Sprintf("configmap %s, key %s", from.ConfigMapKeyRef.Name, from.ConfigMapKeyRef.Key)

@@ -86,11 +86,11 @@ func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 		whiteList: whiteList,
 	}
 
-	genericPluginInitializer, err := initializer.New(nil, nil, fakeAuthorizer{}, nil, nil)
+	genericPluginInitializer, err := initializer.New(nil, nil, fakeAuthorizer{}, nil)
 	if err != nil {
 		return nil, err
 	}
-	pluginInitializer := kubeadmission.NewPluginInitializer(nil, nil, nil, legacyscheme.Registry.RESTMapper(), nil)
+	pluginInitializer := kubeadmission.NewPluginInitializer(nil, nil, nil, legacyscheme.Registry.RESTMapper(), nil, nil, nil)
 	initializersChain := admission.PluginInitializers{}
 	initializersChain = append(initializersChain, genericPluginInitializer)
 	initializersChain = append(initializersChain, pluginInitializer)
@@ -269,7 +269,7 @@ func TestGCAdmission(t *testing.T) {
 		user := &user.DefaultInfo{Name: tc.username}
 		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, user)
 
-		err := gcAdmit.Admit(attributes)
+		err := gcAdmit.Validate(attributes)
 		if !tc.checkError(err) {
 			t.Errorf("%v: unexpected err: %v", tc.name, err)
 		}
@@ -517,7 +517,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		user := &user.DefaultInfo{Name: tc.username}
 		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, user)
 
-		err := gcAdmit.Admit(attributes)
+		err := gcAdmit.Validate(attributes)
 		if !tc.checkError(err) {
 			t.Errorf("%v: unexpected err: %v", tc.name, err)
 		}

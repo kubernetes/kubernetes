@@ -25,12 +25,20 @@ import (
 
 type FakeHandler struct {
 	*Handler
-	name        string
-	admit       bool
-	admitCalled bool
+	name                     string
+	admit, admitCalled       bool
+	validate, validateCalled bool
 }
 
 func (h *FakeHandler) Admit(a Attributes) (err error) {
+	h.admitCalled = true
+	if h.admit {
+		return nil
+	}
+	return fmt.Errorf("Don't admit")
+}
+
+func (h *FakeHandler) Validate(a Attributes) (err error) {
 	h.admitCalled = true
 	if h.admit {
 		return nil

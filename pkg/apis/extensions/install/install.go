@@ -38,7 +38,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  extensions.GroupName,
 			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version},
-			RootScopedKinds:            sets.NewString("PodSecurityPolicy", "ThirdPartyResource"),
+			RootScopedKinds:            sets.NewString("PodSecurityPolicy"),
 			AddInternalObjectsToScheme: extensions.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{

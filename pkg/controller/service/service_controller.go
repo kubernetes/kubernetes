@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -40,6 +41,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
@@ -69,7 +71,7 @@ const (
 
 	// LabelNodeRoleExcludeBalancer specifies that the node should be
 	// exclude from load balancers created by a cloud provider.
-	LabelNodeRoleExcludeBalancer = "alpha.node.role.kubernetes.io/exclude-balancer"
+	LabelNodeRoleExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
 )
 
 type cachedService struct {
@@ -113,11 +115,11 @@ func New(
 ) (*ServiceController, error) {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartLogging(glog.Infof)
-	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
+	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
 
-	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("service_controller", kubeClient.Core().RESTClient().GetRateLimiter())
+	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("service_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 
 	s := &ServiceController{
@@ -327,7 +329,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 func (s *ServiceController) persistUpdate(service *v1.Service) error {
 	var err error
 	for i := 0; i < clientRetryCount; i++ {
-		_, err = s.kubeClient.Core().Services(service.Namespace).UpdateStatus(service)
+		_, err = s.kubeClient.CoreV1().Services(service.Namespace).UpdateStatus(service)
 		if err == nil {
 			return nil
 		}
@@ -613,8 +615,10 @@ func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
 			return false
 		}
 
-		if _, hasExcludeBalancerLabel := node.Labels[LabelNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
-			return false
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ServiceNodeExclusion) {
+			if _, hasExcludeBalancerLabel := node.Labels[LabelNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
+				return false
+			}
 		}
 
 		// If we have no info, don't accept

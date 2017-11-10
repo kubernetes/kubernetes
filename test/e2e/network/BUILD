@@ -12,6 +12,7 @@ go_library(
         "dns_common.go",
         "dns_configmap.go",
         "doc.go",
+        "example_cluster_dns.go",
         "firewall.go",
         "framework.go",
         "ingress.go",

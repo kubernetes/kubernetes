@@ -598,6 +598,9 @@ function start-kubelet {
   if [[ -n "${NODE_LABELS:-}" ]]; then
     node_labels="${node_labels:+${node_labels},}${NODE_LABELS}"
   fi
+  if [[ -n "${NON_MASTER_NODE_LABELS:-}" && "${KUBERNETES_MASTER:-}" != "true" ]]; then
+    node_labels="${node_labels:+${node_labels},}${NON_MASTER_NODE_LABELS}"
+  fi
   if [[ -n "${node_labels:-}" ]]; then
     flags+=" --node-labels=${node_labels}"
   fi
@@ -1345,6 +1348,11 @@ EOF
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"
   fi
+  if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]]; then
+    setup-addon-manifests "addons" "metadata-proxy/gce"
+    local -r metadata_proxy_yaml="${dst_dir}/metadata-proxy/gce/metadata-proxy.yaml"
+    update-prometheus-to-sd-parameters ${metadata_proxy_yaml}
+  fi
 
   # Place addon manager pod manifest.
   cp "${src_dir}/kube-addon-manager.yaml" /etc/kubernetes/manifests
@@ -1494,7 +1502,7 @@ else
   fi
 fi
 
-if [[ "${CONTAINER_RUNTIME:-}" == "rkt" ]]; then
+if [[ "${KUBERNETES_CONTAINER_RUNTIME:-}" == "rkt" ]]; then
   systemctl stop docker
   systemctl disable docker
   setup-rkt

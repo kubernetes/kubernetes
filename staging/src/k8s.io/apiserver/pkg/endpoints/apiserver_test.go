@@ -519,7 +519,7 @@ func (storage *SimpleRESTStorage) NewList() runtime.Object {
 	return &genericapitesting.SimpleList{}
 }
 
-func (storage *SimpleRESTStorage) Create(ctx request.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Create(ctx request.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	storage.created = obj.(*genericapitesting.Simple)
 	if err := storage.errors["create"]; err != nil {
@@ -532,7 +532,7 @@ func (storage *SimpleRESTStorage) Create(ctx request.Context, obj runtime.Object
 	return obj, err
 }
 
-func (storage *SimpleRESTStorage) Update(ctx request.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+func (storage *SimpleRESTStorage) Update(ctx request.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	storage.checkContext(ctx)
 	obj, err := objInfo.UpdatedObject(ctx, &storage.item)
 	if err != nil {
@@ -714,7 +714,7 @@ type NamedCreaterRESTStorage struct {
 	createdName string
 }
 
-func (storage *NamedCreaterRESTStorage) Create(ctx request.Context, name string, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
+func (storage *NamedCreaterRESTStorage) Create(ctx request.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	storage.created = obj.(*genericapitesting.Simple)
 	storage.createdName = name
@@ -3867,7 +3867,8 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 }
 
 type SimpleXGSubresourceRESTStorage struct {
-	item genericapitesting.SimpleXGSubresource
+	item    genericapitesting.SimpleXGSubresource
+	itemGVK schema.GroupVersionKind
 }
 
 func (storage *SimpleXGSubresourceRESTStorage) New() runtime.Object {
@@ -3876,6 +3877,12 @@ func (storage *SimpleXGSubresourceRESTStorage) New() runtime.Object {
 
 func (storage *SimpleXGSubresourceRESTStorage) Get(ctx request.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	return storage.item.DeepCopyObject(), nil
+}
+
+var _ = rest.GroupVersionKindProvider(&SimpleXGSubresourceRESTStorage{})
+
+func (storage *SimpleXGSubresourceRESTStorage) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
+	return storage.itemGVK
 }
 
 func TestXGSubresource(t *testing.T) {
@@ -3888,6 +3895,7 @@ func TestXGSubresource(t *testing.T) {
 		item: genericapitesting.SimpleXGSubresource{
 			SubresourceInfo: "foo",
 		},
+		itemGVK: testGroup2Version.WithKind("SimpleXGSubresource"),
 	}
 	storage := map[string]rest.Storage{
 		"simple":           &SimpleRESTStorage{},
@@ -3913,10 +3921,6 @@ func TestXGSubresource(t *testing.T) {
 		GroupVersion:           testGroupVersion,
 		OptionsExternalVersion: &testGroupVersion,
 		Serializer:             codecs,
-
-		SubresourceGroupVersionKind: map[string]schema.GroupVersionKind{
-			"simple/subsimple": testGroup2Version.WithKind("SimpleXGSubresource"),
-		},
 	}
 
 	if err := (&group).InstallREST(container); err != nil {

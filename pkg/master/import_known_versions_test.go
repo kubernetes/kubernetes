@@ -41,12 +41,11 @@ func TestGroupVersions(t *testing.T) {
 		"batch",
 		"componentconfig",
 		"extensions",
-		"federation",
 		"policy",
 	)
 
 	// No new groups should be added to the legacyUnsuffixedGroups exclusion list
-	if len(legacyUnsuffixedGroups) != 8 {
+	if len(legacyUnsuffixedGroups) != 7 {
 		t.Errorf("No additional unnamespaced groups should be created")
 	}
 

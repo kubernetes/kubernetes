@@ -171,6 +171,9 @@
   {% set kube_proxy_ds_label = "beta.kubernetes.io/kube-proxy-ds-ready=true," %}
 {% endif %}
 {% set node_labels = kube_proxy_ds_label + pillar['node_labels'] %}
+{% if grains['roles'][0] != 'kubernetes-master' and pillar['non_master_node_labels'] is defined -%}
+  {% set node_labels = pillar['non_master_node_labels'] + "," + node_labels %}
+{% endif %}
 {% if node_labels != "" %}
   {% set node_labels="--node-labels=" + node_labels %}
 {% endif %}

@@ -233,7 +233,7 @@ func CheckNodesReady(c clientset.Interface, nt time.Duration, expect int) ([]str
 		// A rolling-update (GCE/GKE implementation of restart) can complete before the apiserver
 		// knows about all of the nodes. Thus, we retry the list nodes call
 		// until we get the expected number of nodes.
-		nodeList, errLast = c.Core().Nodes().List(metav1.ListOptions{
+		nodeList, errLast = c.CoreV1().Nodes().List(metav1.ListOptions{
 			FieldSelector: fields.Set{"spec.unschedulable": "false"}.AsSelector().String()})
 		if errLast != nil {
 			return false, nil

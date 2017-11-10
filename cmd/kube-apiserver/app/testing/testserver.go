@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/registry/generic/registry"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -46,8 +47,15 @@ type TearDownFunc func()
 func StartTestServer(t *testing.T) (result *restclient.Config, tearDownForCaller TearDownFunc, err error) {
 	var tmpDir string
 	var etcdServer *etcdtesting.EtcdTestServer
+
+	// TODO : Remove TrackStorageCleanup below when PR
+	// https://github.com/kubernetes/kubernetes/pull/50690
+	// merges as that shuts down storage properly
+	registry.TrackStorageCleanup()
+
 	stopCh := make(chan struct{})
 	tearDown := func() {
+		registry.CleanupStorage()
 		close(stopCh)
 		if etcdServer != nil {
 			etcdServer.Terminate(t)

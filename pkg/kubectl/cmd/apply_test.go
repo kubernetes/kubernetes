@@ -33,10 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
@@ -63,15 +61,17 @@ func validateApplyArgs(cmd *cobra.Command, args []string) error {
 }
 
 const (
-	filenameRC             = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.yaml"
-	filenameRCNoAnnotation = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-no-annotation.yaml"
-	filenameRCLASTAPPLIED  = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-lastapplied.yaml"
-	filenameSVC            = "../../../test/fixtures/pkg/kubectl/cmd/apply/service.yaml"
-	filenameRCSVC          = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-service.yaml"
-	filenameNoExistRC      = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-noexist.yaml"
-	filenameRCPatchTest    = "../../../test/fixtures/pkg/kubectl/cmd/apply/patch.json"
-	dirName                = "../../../test/fixtures/pkg/kubectl/cmd/apply/testdir"
-	filenameRCJSON         = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.json"
+	filenameRC                = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.yaml"
+	filenameRCArgs            = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-args.yaml"
+	filenameRCLastAppliedArgs = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-lastapplied-args.yaml"
+	filenameRCNoAnnotation    = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-no-annotation.yaml"
+	filenameRCLASTAPPLIED     = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-lastapplied.yaml"
+	filenameSVC               = "../../../test/fixtures/pkg/kubectl/cmd/apply/service.yaml"
+	filenameRCSVC             = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-service.yaml"
+	filenameNoExistRC         = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-noexist.yaml"
+	filenameRCPatchTest       = "../../../test/fixtures/pkg/kubectl/cmd/apply/patch.json"
+	dirName                   = "../../../test/fixtures/pkg/kubectl/cmd/apply/testdir"
+	filenameRCJSON            = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.json"
 
 	filenameWidgetClientside = "../../../test/fixtures/pkg/kubectl/cmd/apply/widget-clientside.yaml"
 	filenameWidgetServerside = "../../../test/fixtures/pkg/kubectl/cmd/apply/widget-serverside.yaml"
@@ -229,6 +229,7 @@ func walkMapPath(t *testing.T, start map[string]interface{}, path []string) map[
 
 func TestRunApplyViewLastApplied(t *testing.T) {
 	_, rcBytesWithConfig := readReplicationController(t, filenameRCLASTAPPLIED)
+	_, rcBytesWithArgs := readReplicationController(t, filenameRCLastAppliedArgs)
 	nameRC, rcBytes := readReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
@@ -246,6 +247,16 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 			selector:     "",
 			args:         []string{},
 			respBytes:    rcBytesWithConfig,
+		},
+		{
+			name:         "test with file include `%s` in arguments",
+			filePath:     filenameRCArgs,
+			outputFormat: "",
+			expectedErr:  "",
+			expectedOut:  "args: -random_flag=%s@domain.com\n",
+			selector:     "",
+			args:         []string{},
+			respBytes:    rcBytesWithArgs,
 		},
 		{
 			name:         "view with file json format",
@@ -358,7 +369,6 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -403,7 +413,6 @@ func TestApplyObject(t *testing.T) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -460,7 +469,6 @@ func TestApplyObjectOutput(t *testing.T) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &printers.YAMLPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -505,7 +513,6 @@ func TestApplyRetry(t *testing.T) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -559,7 +566,6 @@ func TestApplyNonExistObject(t *testing.T) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -592,6 +598,75 @@ func TestApplyNonExistObject(t *testing.T) {
 	}
 }
 
+func TestApplyEmptyPatch(t *testing.T) {
+	initTestErrorHandler(t)
+	nameRC, _ := readAndAnnotateReplicationController(t, filenameRC)
+	pathRC := "/namespaces/test/replicationcontrollers"
+	pathNameRC := pathRC + "/" + nameRC
+
+	verifyPost := false
+
+	var body []byte
+
+	f, tf, _, _ := cmdtesting.NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.UnstructuredClient = &fake.RESTClient{
+		GroupVersion:         schema.GroupVersion{Version: "v1"},
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/api/v1/namespaces/test" && m == "GET":
+				return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader(nil))}, nil
+			case p == pathNameRC && m == "GET":
+				if body == nil {
+					return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader(nil))}, nil
+				}
+				bodyRC := ioutil.NopCloser(bytes.NewReader(body))
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+			case p == pathRC && m == "POST":
+				body, _ = ioutil.ReadAll(req.Body)
+				verifyPost = true
+				bodyRC := ioutil.NopCloser(bytes.NewReader(body))
+				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: bodyRC}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+
+	// 1. apply non exist object
+	buf := bytes.NewBuffer([]byte{})
+	errBuf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdApply("kubectl", f, buf, errBuf)
+	cmd.Flags().Set("filename", filenameRC)
+	cmd.Flags().Set("output", "name")
+	cmd.Run(cmd, []string{})
+
+	expectRC := "replicationcontroller/" + nameRC + "\n"
+	if buf.String() != expectRC {
+		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
+	}
+	if !verifyPost {
+		t.Fatal("No server-side post call detected")
+	}
+
+	// 2. test apply already exist object, will not send empty patch request
+	buf = bytes.NewBuffer([]byte{})
+	errBuf = bytes.NewBuffer([]byte{})
+
+	cmd = NewCmdApply("kubectl", f, buf, errBuf)
+	cmd.Flags().Set("filename", filenameRC)
+	cmd.Flags().Set("output", "name")
+	cmd.Run(cmd, []string{})
+
+	if buf.String() != expectRC {
+		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
+	}
+}
+
 func TestApplyMultipleObjectsAsList(t *testing.T) {
 	testApplyMultipleObjects(t, true)
 }
@@ -610,7 +685,6 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -688,7 +762,6 @@ func TestApplyNULLPreservation(t *testing.T) {
 
 	f, tf, _, _ := cmdtesting.NewTestFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -757,7 +830,6 @@ func TestUnstructuredApply(t *testing.T) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -821,7 +893,6 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -1035,7 +1106,6 @@ func TestForceApply(t *testing.T) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -1093,7 +1163,7 @@ func TestForceApply(t *testing.T) {
 		}),
 	}
 	tf.Client = tf.UnstructuredClient
-	tf.ClientConfig = &restclient.Config{}
+	tf.ClientConfig = defaultClientConfig()
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})

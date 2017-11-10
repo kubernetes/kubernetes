@@ -738,15 +738,15 @@ func newMockClientForTest(limitRanges []api.LimitRange) *fake.Clientset {
 }
 
 // newHandlerForTest returns a handler configured for testing.
-func newHandlerForTest(c clientset.Interface) (admission.Interface, informers.SharedInformerFactory, error) {
+func newHandlerForTest(c clientset.Interface) (*LimitRanger, informers.SharedInformerFactory, error) {
 	f := informers.NewSharedInformerFactory(c, 5*time.Minute)
 	handler, err := NewLimitRanger(&DefaultLimitRangerActions{})
 	if err != nil {
 		return nil, f, err
 	}
-	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil)
+	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil, nil, nil)
 	pluginInitializer.Initialize(handler)
-	err = admission.Validate(handler)
+	err = admission.ValidateInitialization(handler)
 	return handler, f, err
 }
 

@@ -221,7 +221,7 @@ func initConfigz(kc *kubeletconfiginternal.KubeletConfiguration) error {
 	return nil
 }
 
-// makeEventRecorder sets up kubeDeps.Recorder if its nil. Its a no-op otherwise.
+// makeEventRecorder sets up kubeDeps.Recorder if it's nil. It's a no-op otherwise.
 func makeEventRecorder(kubeDeps *kubelet.Dependencies, nodeName types.NodeName) {
 	if kubeDeps.Recorder != nil {
 		return
@@ -653,7 +653,7 @@ func addChaosToClientConfig(s *options.KubeletServer, config *restclient.Config)
 // Eventually, #2 will be replaced with instances of #3
 func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, runOnce bool) error {
 	hostname := nodeutil.GetHostname(kubeFlags.HostnameOverride)
-	// Query the cloud provider for our node name, default to hostname if kcfg.Cloud == nil
+	// Query the cloud provider for our node name, default to hostname if kubeDeps.Cloud == nil
 	nodeName, err := getNodeName(kubeDeps.Cloud, hostname)
 	if err != nil {
 		return err
@@ -702,6 +702,8 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 	k, err := builder(kubeCfg,
 		kubeDeps,
 		&kubeFlags.ContainerRuntimeOptions,
+		kubeFlags.ContainerRuntime,
+		kubeFlags.RuntimeCgroups,
 		kubeFlags.HostnameOverride,
 		kubeFlags.NodeIP,
 		kubeFlags.ProviderID,
@@ -769,6 +771,8 @@ func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubele
 func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	kubeDeps *kubelet.Dependencies,
 	crOptions *config.ContainerRuntimeOptions,
+	containerRuntime string,
+	runtimeCgroups string,
 	hostnameOverride string,
 	nodeIP string,
 	providerID string,
@@ -796,6 +800,8 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	k, err = kubelet.NewMainKubelet(kubeCfg,
 		kubeDeps,
 		crOptions,
+		containerRuntime,
+		runtimeCgroups,
 		hostnameOverride,
 		nodeIP,
 		providerID,
@@ -920,7 +926,7 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 	}
 
 	ds, err := dockershim.NewDockerService(dockerClient, r.PodSandboxImage, streamingConfig, &pluginSettings,
-		c.RuntimeCgroups, c.CgroupDriver, r.DockershimRootDirectory, r.DockerDisableSharedPID)
+		f.RuntimeCgroups, c.CgroupDriver, r.DockershimRootDirectory, r.DockerDisableSharedPID)
 	if err != nil {
 		return err
 	}

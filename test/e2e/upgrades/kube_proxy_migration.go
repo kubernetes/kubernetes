@@ -210,7 +210,7 @@ func waitForKubeProxyDaemonSetDisappear(c clientset.Interface) error {
 func getKubeProxyStaticPods(c clientset.Interface) (*v1.PodList, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{clusterComponentKey: kubeProxyLabelName}))
 	listOpts := metav1.ListOptions{LabelSelector: label.String()}
-	return c.Core().Pods(metav1.NamespaceSystem).List(listOpts)
+	return c.CoreV1().Pods(metav1.NamespaceSystem).List(listOpts)
 }
 
 func getKubeProxyDaemonSet(c clientset.Interface) (*extensions.DaemonSetList, error) {

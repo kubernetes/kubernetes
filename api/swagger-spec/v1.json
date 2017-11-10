@@ -827,7 +827,7 @@
         "type": "string",
         "paramType": "query",
         "name": "propagationPolicy",
-        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
         "required": false,
         "allowMultiple": false
        },
@@ -1799,7 +1799,7 @@
         "type": "string",
         "paramType": "query",
         "name": "propagationPolicy",
-        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
         "required": false,
         "allowMultiple": false
        },
@@ -2771,7 +2771,7 @@
         "type": "string",
         "paramType": "query",
         "name": "propagationPolicy",
-        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
         "required": false,
         "allowMultiple": false
        },
@@ -3743,7 +3743,7 @@
         "type": "string",
         "paramType": "query",
         "name": "propagationPolicy",
-        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
         "required": false,
         "allowMultiple": false
        },
@@ -4564,7 +4564,7 @@
         "type": "string",
         "paramType": "query",
         "name": "propagationPolicy",
-        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
         "required": false,
         "allowMultiple": false
        },
@@ -5462,7 +5462,7 @@
         "type": "string",
         "paramType": "query",
         "name": "propagationPolicy",
-        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
         "required": false,
         "allowMultiple": false
        },
@@ -7222,7 +7222,7 @@
         "type": "string",
         "paramType": "query",
         "name": "propagationPolicy",
-        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
         "required": false,
         "allowMultiple": false
        },
@@ -8308,7 +8308,7 @@
         "type": "string",
         "paramType": "query",
         "name": "propagationPolicy",
-        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
         "required": false,
         "allowMultiple": false
        },
@@ -9204,7 +9204,7 @@
         "type": "string",
         "paramType": "query",
         "name": "propagationPolicy",
-        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
         "required": false,
         "allowMultiple": false
        },
@@ -12076,7 +12076,7 @@
         "type": "string",
         "paramType": "query",
         "name": "propagationPolicy",
-        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
         "required": false,
         "allowMultiple": false
        },
@@ -13048,7 +13048,7 @@
         "type": "string",
         "paramType": "query",
         "name": "propagationPolicy",
-        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
         "required": false,
         "allowMultiple": false
        },
@@ -14360,7 +14360,7 @@
         "type": "string",
         "paramType": "query",
         "name": "propagationPolicy",
-        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
         "required": false,
         "allowMultiple": false
        },
@@ -15502,7 +15502,7 @@
         "type": "string",
         "paramType": "query",
         "name": "propagationPolicy",
-        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
         "required": false,
         "allowMultiple": false
        },
@@ -16474,7 +16474,7 @@
         "type": "string",
         "paramType": "query",
         "name": "propagationPolicy",
-        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
         "required": false,
         "allowMultiple": false
        },
@@ -19022,7 +19022,7 @@
      },
      "deletionTimestamp": {
       "type": "string",
-      "description": "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource is expected to be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard termination signal (SIGKILL) to the container and after cleanup, remove the pod from the API. In the presence of network partitions, this object may still exist after this timestamp, until an administrator or automated process can determine the resource is fully terminated. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata"
+      "description": "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource is expected to be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field, once the finalizers list is empty. As long as the finalizers list contains items, deletion is blocked. Once the deletionTimestamp is set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard termination signal (SIGKILL) to the container and after cleanup, remove the pod from the API. In the presence of network partitions, this object may still exist after this timestamp, until an administrator or automated process can determine the resource is fully terminated. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata"
      },
      "deletionGracePeriodSeconds": {
       "type": "integer",
@@ -19449,7 +19449,7 @@
      },
      "propagationPolicy": {
       "$ref": "v1.DeletionPropagation",
-      "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy."
+      "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground."
      }
     }
    },
@@ -20581,7 +20581,7 @@
       "description": "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine"
      },
      "scaleIO": {
-      "$ref": "v1.ScaleIOVolumeSource",
+      "$ref": "v1.ScaleIOPersistentVolumeSource",
       "description": "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes."
      },
      "local": {
@@ -21160,9 +21160,9 @@
      }
     }
    },
-   "v1.ScaleIOVolumeSource": {
-    "id": "v1.ScaleIOVolumeSource",
-    "description": "ScaleIOVolumeSource represents a persistent ScaleIO volume",
+   "v1.ScaleIOPersistentVolumeSource": {
+    "id": "v1.ScaleIOPersistentVolumeSource",
+    "description": "ScaleIOPersistentVolumeSource represents a persistent ScaleIO volume",
     "required": [
      "gateway",
      "system",
@@ -21178,7 +21178,7 @@
       "description": "The name of the storage system as configured in ScaleIO."
      },
      "secretRef": {
-      "$ref": "v1.LocalObjectReference",
+      "$ref": "v1.SecretReference",
       "description": "SecretRef references to the secret for ScaleIO user and other sensitive information. If this is not provided, Login operation will fail."
      },
      "sslEnabled": {
@@ -21187,15 +21187,15 @@
      },
      "protectionDomain": {
       "type": "string",
-      "description": "The name of the Protection Domain for the configured storage (defaults to \"default\")."
+      "description": "The name of the ScaleIO Protection Domain for the configured storage."
      },
      "storagePool": {
       "type": "string",
-      "description": "The Storage Pool associated with the protection domain (defaults to \"default\")."
+      "description": "The ScaleIO Storage Pool associated with the protection domain."
      },
      "storageMode": {
       "type": "string",
-      "description": "Indicates whether the storage for a volume should be thick or thin (defaults to \"thin\")."
+      "description": "Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned."
      },
      "volumeName": {
       "type": "string",
@@ -21976,6 +21976,57 @@
      "optional": {
       "type": "boolean",
       "description": "Specify whether the ConfigMap or it's keys must be defined"
+     }
+    }
+   },
+   "v1.ScaleIOVolumeSource": {
+    "id": "v1.ScaleIOVolumeSource",
+    "description": "ScaleIOVolumeSource represents a persistent ScaleIO volume",
+    "required": [
+     "gateway",
+     "system",
+     "secretRef"
+    ],
+    "properties": {
+     "gateway": {
+      "type": "string",
+      "description": "The host address of the ScaleIO API Gateway."
+     },
+     "system": {
+      "type": "string",
+      "description": "The name of the storage system as configured in ScaleIO."
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "SecretRef references to the secret for ScaleIO user and other sensitive information. If this is not provided, Login operation will fail."
+     },
+     "sslEnabled": {
+      "type": "boolean",
+      "description": "Flag to enable/disable SSL communication with Gateway, default false"
+     },
+     "protectionDomain": {
+      "type": "string",
+      "description": "The name of the ScaleIO Protection Domain for the configured storage."
+     },
+     "storagePool": {
+      "type": "string",
+      "description": "The ScaleIO Storage Pool associated with the protection domain."
+     },
+     "storageMode": {
+      "type": "string",
+      "description": "Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned."
+     },
+     "volumeName": {
+      "type": "string",
+      "description": "The name of a volume already created in the ScaleIO system that is associated with this volume source."
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
      }
     }
    },

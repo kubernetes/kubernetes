@@ -200,41 +200,43 @@ func (d *deploymentTester) waitForDeploymentRevisionAndImage(revision, image str
 	return nil
 }
 
-// markAllPodsReady manually updates all Deployment pods status to ready
-func (d *deploymentTester) markAllPodsReady() {
+func markPodReady(c clientset.Interface, ns string, pod *v1.Pod) error {
+	addPodConditionReady(pod, metav1.Now())
+	_, err := c.Core().Pods(ns).UpdateStatus(pod)
+	return err
+}
+
+// markUpdatedPodsReady manually marks updated Deployment pods status to ready
+func (d *deploymentTester) markUpdatedPodsReady() {
 	ns := d.deployment.Namespace
-	selector, err := metav1.LabelSelectorAsSelector(d.deployment.Spec.Selector)
-	if err != nil {
-		d.t.Fatalf("failed to parse Deployment selector: %v", err)
-	}
 	var readyPods int32
-	err = wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		readyPods = 0
-		pods, err := d.c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: selector.String()})
+		pods, err := d.listUpdatedPods()
 		if err != nil {
-			d.t.Logf("failed to list Deployment pods, will retry later: %v", err)
+			d.t.Log(err)
 			return false, nil
 		}
-		for i := range pods.Items {
-			pod := pods.Items[i]
+		if len(pods) != int(*d.deployment.Spec.Replicas) {
+			d.t.Logf("%d/%d of deployment pods are created", len(pods), *d.deployment.Spec.Replicas)
+			return false, nil
+		}
+		for i := range pods {
+			pod := pods[i]
 			if podutil.IsPodReady(&pod) {
 				readyPods++
 				continue
 			}
-			addPodConditionReady(&pod, metav1.Now())
-			if _, err = d.c.Core().Pods(ns).UpdateStatus(&pod); err != nil {
+			if err = markPodReady(d.c, ns, &pod); err != nil {
 				d.t.Logf("failed to update Deployment pod %s, will retry later: %v", pod.Name, err)
 			} else {
 				readyPods++
 			}
 		}
-		if readyPods >= *d.deployment.Spec.Replicas {
-			return true, nil
-		}
-		return false, nil
+		return readyPods >= *d.deployment.Spec.Replicas, nil
 	})
 	if err != nil {
-		d.t.Fatalf("failed to mark all Deployment pods to ready: %v", err)
+		d.t.Fatalf("failed to mark updated Deployment pods to ready: %v", err)
 	}
 }
 
@@ -252,11 +254,11 @@ func (d *deploymentTester) waitForDeploymentComplete() error {
 }
 
 // waitForDeploymentCompleteAndCheckRollingAndMarkPodsReady waits for the Deployment to complete
-// while marking all Deployment pods as ready at the same time.
+// while marking updated Deployment pods as ready at the same time.
 // Uses hard check to make sure rolling update strategy is not violated at any times.
 func (d *deploymentTester) waitForDeploymentCompleteAndCheckRollingAndMarkPodsReady() error {
-	// Manually mark all Deployment pods as ready in a separate goroutine
-	go d.markAllPodsReady()
+	// Manually mark updated Deployment pods as ready in a separate goroutine
+	go d.markUpdatedPodsReady()
 
 	// Wait for the Deployment status to complete while Deployment pods are becoming ready
 	err := d.waitForDeploymentCompleteAndCheckRolling()
@@ -267,10 +269,10 @@ func (d *deploymentTester) waitForDeploymentCompleteAndCheckRollingAndMarkPodsRe
 }
 
 // waitForDeploymentCompleteAndMarkPodsReady waits for the Deployment to complete
-// while marking all Deployment pods as ready at the same time.
+// while marking updated Deployment pods as ready at the same time.
 func (d *deploymentTester) waitForDeploymentCompleteAndMarkPodsReady() error {
-	// Manually mark all Deployment pods as ready in a separate goroutine
-	go d.markAllPodsReady()
+	// Manually mark updated Deployment pods as ready in a separate goroutine
+	go d.markUpdatedPodsReady()
 
 	// Wait for the Deployment status to complete using soft check, while Deployment pods are becoming ready
 	err := d.waitForDeploymentComplete()
@@ -292,7 +294,11 @@ func (d *deploymentTester) waitForObservedDeployment(desiredGeneration int64) er
 }
 
 func (d *deploymentTester) getNewReplicaSet() (*v1beta1.ReplicaSet, error) {
-	rs, err := deploymentutil.GetNewReplicaSet(d.deployment, d.c.ExtensionsV1beta1())
+	deployment, err := d.c.ExtensionsV1beta1().Deployments(d.deployment.Namespace).Get(d.deployment.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving deployment %s: %v", d.deployment.Name, err)
+	}
+	rs, err := deploymentutil.GetNewReplicaSet(deployment, d.c.ExtensionsV1beta1())
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving new replicaset of deployment %s: %v", d.deployment.Name, err)
 	}
@@ -333,4 +339,39 @@ func (d *deploymentTester) waitForDeploymentRollbackCleared() error {
 // checkDeploymentRevisionAndImage checks if the input deployment's and its new replica set's revision and image are as expected.
 func (d *deploymentTester) checkDeploymentRevisionAndImage(revision, image string) error {
 	return testutil.CheckDeploymentRevisionAndImage(d.c, d.deployment.Namespace, d.deployment.Name, revision, image)
+}
+
+func (d *deploymentTester) waitForDeploymentUpdatedReplicasLTE(minUpdatedReplicas int32) error {
+	return testutil.WaitForDeploymentUpdatedReplicasLTE(d.c, d.deployment.Namespace, d.deployment.Name, minUpdatedReplicas, d.deployment.Generation, pollInterval, pollTimeout)
+}
+
+func (d *deploymentTester) waitForDeploymentWithCondition(reason string, condType v1beta1.DeploymentConditionType) error {
+	return testutil.WaitForDeploymentWithCondition(d.c, d.deployment.Namespace, d.deployment.Name, reason, condType, d.t.Logf, pollInterval, pollTimeout)
+}
+
+func (d *deploymentTester) listUpdatedPods() ([]v1.Pod, error) {
+	selector, err := metav1.LabelSelectorAsSelector(d.deployment.Spec.Selector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse deployment selector: %v", err)
+	}
+	pods, err := d.c.CoreV1().Pods(d.deployment.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list deployment pods, will retry later: %v", err)
+	}
+	newRS, err := d.getNewReplicaSet()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get new replicaset of deployment %q: %v", d.deployment.Name, err)
+	}
+	if newRS == nil {
+		return nil, fmt.Errorf("unable to find new replicaset of deployment %q", d.deployment.Name)
+	}
+
+	var ownedPods []v1.Pod
+	for _, pod := range pods.Items {
+		rs := metav1.GetControllerOf(&pod)
+		if rs.UID == newRS.UID {
+			ownedPods = append(ownedPods, pod)
+		}
+	}
+	return ownedPods, nil
 }

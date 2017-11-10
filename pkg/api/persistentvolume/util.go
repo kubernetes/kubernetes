@@ -76,8 +76,14 @@ func VisitPVSecretNames(pv *api.PersistentVolume, visitor Visitor) bool {
 			}
 		}
 	case source.ScaleIO != nil:
-		if source.ScaleIO.SecretRef != nil && !visitor(getClaimRefNamespace(pv), source.ScaleIO.SecretRef.Name) {
-			return false
+		if source.ScaleIO.SecretRef != nil {
+			ns := getClaimRefNamespace(pv)
+			if source.ScaleIO.SecretRef != nil && len(source.ScaleIO.SecretRef.Namespace) > 0 {
+				ns = source.ScaleIO.SecretRef.Namespace
+			}
+			if !visitor(ns, source.ScaleIO.SecretRef.Name) {
+				return false
+			}
 		}
 	case source.ISCSI != nil:
 		if source.ISCSI.SecretRef != nil && !visitor(getClaimRefNamespace(pv), source.ISCSI.SecretRef.Name) {

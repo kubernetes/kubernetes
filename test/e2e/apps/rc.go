@@ -38,7 +38,7 @@ import (
 var _ = SIGDescribe("ReplicationController", func() {
 	f := framework.NewDefaultFramework("replication-controller")
 
-	It("should serve a basic image on each replica with a public image [Conformance]", func() {
+	framework.ConformanceIt("should serve a basic image on each replica with a public image ", func() {
 		TestReplicationControllerServeImageOrFail(f, "basic", framework.ServeHostnameImage)
 	})
 
@@ -103,7 +103,7 @@ func TestReplicationControllerServeImageOrFail(f *framework.Framework, test stri
 	By(fmt.Sprintf("Creating replication controller %s", name))
 	newRC := newRC(name, replicas, map[string]string{"name": name}, name, image)
 	newRC.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 9376}}
-	_, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(newRC)
+	_, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(newRC)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Check that pods for the new RC were created.
@@ -121,7 +121,7 @@ func TestReplicationControllerServeImageOrFail(f *framework.Framework, test stri
 		}
 		err = f.WaitForPodRunning(pod.Name)
 		if err != nil {
-			updatePod, getErr := f.ClientSet.Core().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
+			updatePod, getErr := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
 			if getErr == nil {
 				err = fmt.Errorf("Pod %q never run (phase: %s, conditions: %+v): %v", updatePod.Name, updatePod.Status.Phase, updatePod.Status.Conditions, err)
 			} else {
@@ -160,11 +160,11 @@ func testReplicationControllerConditionCheck(f *framework.Framework) {
 
 	framework.Logf("Creating quota %q that allows only two pods to run in the current namespace", name)
 	quota := newPodQuota(name, "2")
-	_, err := c.Core().ResourceQuotas(namespace).Create(quota)
+	_, err := c.CoreV1().ResourceQuotas(namespace).Create(quota)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		quota, err = c.Core().ResourceQuotas(namespace).Get(name, metav1.GetOptions{})
+		quota, err = c.CoreV1().ResourceQuotas(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -179,14 +179,14 @@ func testReplicationControllerConditionCheck(f *framework.Framework) {
 
 	By(fmt.Sprintf("Creating rc %q that asks for more than the allowed pod quota", name))
 	rc := newRC(name, 3, map[string]string{"name": name}, NginxImageName, NginxImage)
-	rc, err = c.Core().ReplicationControllers(namespace).Create(rc)
+	rc, err = c.CoreV1().ReplicationControllers(namespace).Create(rc)
 	Expect(err).NotTo(HaveOccurred())
 
 	By(fmt.Sprintf("Checking rc %q has the desired failure condition set", name))
 	generation := rc.Generation
 	conditions := rc.Status.Conditions
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		rc, err = c.Core().ReplicationControllers(namespace).Get(name, metav1.GetOptions{})
+		rc, err = c.CoreV1().ReplicationControllers(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -215,7 +215,7 @@ func testReplicationControllerConditionCheck(f *framework.Framework) {
 	generation = rc.Generation
 	conditions = rc.Status.Conditions
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		rc, err = c.Core().ReplicationControllers(namespace).Get(name, metav1.GetOptions{})
+		rc, err = c.CoreV1().ReplicationControllers(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -258,12 +258,12 @@ func testRCAdoptMatchingOrphans(f *framework.Framework) {
 	replicas := int32(1)
 	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, NginxImageName)
 	rcSt.Spec.Selector = map[string]string{"name": name}
-	rc, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(rcSt)
+	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(rcSt)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Then the orphan pod is adopted")
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		p2, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
+		p2, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
 		// The Pod p should either be adopted or deleted by the RC
 		if errors.IsNotFound(err) {
 			return true, nil
@@ -287,7 +287,7 @@ func testRCReleaseControlledNotMatching(f *framework.Framework) {
 	replicas := int32(1)
 	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, NginxImageName)
 	rcSt.Spec.Selector = map[string]string{"name": name}
-	rc, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(rcSt)
+	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(rcSt)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("When the matched label of one of its pods change")
@@ -296,11 +296,11 @@ func testRCReleaseControlledNotMatching(f *framework.Framework) {
 
 	p := pods.Items[0]
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		pod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
+		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		pod.Labels = map[string]string{"name": "not-matching-name"}
-		_, err = f.ClientSet.Core().Pods(f.Namespace.Name).Update(pod)
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(pod)
 		if err != nil && errors.IsConflict(err) {
 			return false, nil
 		}
@@ -313,7 +313,7 @@ func testRCReleaseControlledNotMatching(f *framework.Framework) {
 
 	By("Then the pod is released")
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		p2, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
+		p2, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		for _, owner := range p2.OwnerReferences {
 			if *owner.Controller && owner.UID == rc.UID {

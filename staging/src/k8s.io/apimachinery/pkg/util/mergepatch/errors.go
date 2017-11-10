@@ -29,6 +29,7 @@ var (
 	ErrBadPatchFormatForRetainKeys          = errors.New("invalid patch format of retainKeys")
 	ErrBadPatchFormatForSetElementOrderList = errors.New("invalid patch format of setElementOrder list")
 	ErrPatchContentNotMatchRetainKeys       = errors.New("patch content doesn't match retainKeys list")
+	ErrUnsupportedStrategicMergePatchFormat = errors.New("strategic merge patch format is not supported")
 )
 
 func ErrNoMergeKey(m map[string]interface{}, k string) error {

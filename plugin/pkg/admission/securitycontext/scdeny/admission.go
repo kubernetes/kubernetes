@@ -32,19 +32,22 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
-type plugin struct {
+// Plugin implements admission.Interface.
+type Plugin struct {
 	*admission.Handler
 }
 
+var _ admission.ValidationInterface = &Plugin{}
+
 // NewSecurityContextDeny creates a new instance of the SecurityContextDeny admission controller
-func NewSecurityContextDeny() admission.Interface {
-	return &plugin{
+func NewSecurityContextDeny() *Plugin {
+	return &Plugin{
 		Handler: admission.NewHandler(admission.Create, admission.Update),
 	}
 }
 
-// Admit will deny any pod that defines SELinuxOptions or RunAsUser.
-func (p *plugin) Admit(a admission.Attributes) (err error) {
+// Validate will deny any pod that defines SELinuxOptions or RunAsUser.
+func (p *Plugin) Validate(a admission.Attributes) (err error) {
 	if a.GetSubresource() != "" || a.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}

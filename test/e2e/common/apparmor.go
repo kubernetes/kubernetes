@@ -40,6 +40,10 @@ const (
 // AppArmorDistros are distros with AppArmor support
 var AppArmorDistros = []string{"gci", "ubuntu"}
 
+func IsAppArmorSupported() bool {
+	return framework.NodeOSDistroIs(AppArmorDistros...)
+}
+
 func SkipIfAppArmorNotSupported() {
 	framework.SkipUnlessNodeOSDistroIs(AppArmorDistros...)
 }
@@ -160,7 +164,7 @@ profile %s flags=(attach_disconnected) {
 			profileName: profile,
 		},
 	}
-	_, err := f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(cm)
+	_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(cm)
 	framework.ExpectNoError(err, "Failed to create apparmor-profiles ConfigMap")
 }
 
@@ -228,7 +232,7 @@ func createAppArmorProfileLoader(f *framework.Framework) {
 			},
 		},
 	}
-	_, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(loader)
+	_, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(loader)
 	framework.ExpectNoError(err, "Failed to create apparmor-loader ReplicationController")
 
 	// Wait for loader to be ready.

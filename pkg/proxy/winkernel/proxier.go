@@ -93,7 +93,7 @@ type serviceInfo struct {
 	targetPort               int
 	loadBalancerStatus       api.LoadBalancerStatus
 	sessionAffinityType      api.ServiceAffinity
-	stickyMaxAgeMinutes      int
+	stickyMaxAgeSeconds      int
 	externalIPs              []*externalIPInfo
 	loadBalancerIngressIPs   []*loadBalancerIngressInfo
 	loadBalancerSourceRanges []string
@@ -165,6 +165,12 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *api.ServicePort, se
 		onlyNodeLocalEndpoints = true
 	}
 
+	// set default session sticky max age 180min=10800s
+	stickyMaxAgeSeconds := 10800
+	if service.Spec.SessionAffinity == api.ServiceAffinityClientIP {
+		// Kube-apiserver side guarantees SessionAffinityConfig won't be nil when session affinity type is ClientIP
+		stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
+	}
 	info := &serviceInfo{
 		clusterIP:  net.ParseIP(service.Spec.ClusterIP),
 		port:       int(port.Port),
@@ -174,7 +180,7 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *api.ServicePort, se
 		// Deep-copy in case the service instance changes
 		loadBalancerStatus:       *helper.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer),
 		sessionAffinityType:      service.Spec.SessionAffinity,
-		stickyMaxAgeMinutes:      180, // TODO: paramaterize this in the API.
+		stickyMaxAgeSeconds:      stickyMaxAgeSeconds,
 		loadBalancerSourceRanges: make([]string, len(service.Spec.LoadBalancerSourceRanges)),
 		onlyNodeLocalEndpoints:   onlyNodeLocalEndpoints,
 	}
