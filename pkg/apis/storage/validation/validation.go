@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"strings"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -28,6 +29,14 @@ import (
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/features"
+)
+
+const (
+	maxProvisionerParameterSize = 256 * (1 << 10) // 256 kB
+	maxProvisionerParameterLen  = 512
+
+	maxAttachedVolumeMetadataSize = 256 * (1 << 10) // 256 kB
+	maxVolumeErrorMessageSize     = 1024
 )
 
 // ValidateStorageClass validates a StorageClass.
@@ -72,9 +81,6 @@ func validateProvisioner(provisioner string, fldPath *field.Path) field.ErrorLis
 	return allErrs
 }
 
-const maxProvisionerParameterSize = 256 * (1 << 10) // 256 kB
-const maxProvisionerParameterLen = 512
-
 // validateParameters tests that keys are qualified names and that provisionerParameter are < 256kB.
 func validateParameters(params map[string]string, fldPath *field.Path) field.ErrorList {
 	var totalSize int64
@@ -118,6 +124,97 @@ func validateAllowVolumeExpansion(allowExpand *bool, fldPath *field.Path) field.
 	allErrs := field.ErrorList{}
 	if allowExpand != nil && !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
 		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate ExpandPersistentVolumes"))
+	}
+	return allErrs
+}
+
+// ValidateVolumeAttachment validates a VolumeAttachment.
+func ValidateVolumeAttachment(volumeAttachment *storage.VolumeAttachment) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&volumeAttachment.ObjectMeta, false, apivalidation.ValidateClassName, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateVolumeAttachmentSpec(&volumeAttachment.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validateVolumeAttachmentStatus(&volumeAttachment.Status, field.NewPath("status"))...)
+	return allErrs
+}
+
+// ValidateVolumeAttachmentSpec tests that the specified VolumeAttachmentSpec
+// has valid data.
+func validateVolumeAttachmentSpec(
+	spec *storage.VolumeAttachmentSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, validateAttacher(spec.Attacher, fldPath.Child("attacher"))...)
+	allErrs = append(allErrs, validateVolumeAttachmentSource(&spec.Source, fldPath.Child("source"))...)
+	allErrs = append(allErrs, validateNodeName(spec.NodeName, fldPath.Child("nodeName"))...)
+	return allErrs
+}
+
+// validateAttacher tests if attacher is a valid qualified name.
+func validateAttacher(attacher string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(attacher) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, attacher))
+	}
+	return allErrs
+}
+
+// validateSource tests if the source is valid for VolumeAttachment.
+func validateVolumeAttachmentSource(source *storage.VolumeAttachmentSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if source.PersistentVolumeName == nil || len(*source.PersistentVolumeName) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+	}
+	return allErrs
+}
+
+// validateNodeName tests if the nodeName is valid for VolumeAttachment.
+func validateNodeName(nodeName string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, msg := range apivalidation.ValidateNodeName(nodeName, false /* prefix */) {
+		allErrs = append(allErrs, field.Invalid(fldPath, nodeName, msg))
+	}
+	return allErrs
+}
+
+// validaVolumeAttachmentStatus tests if volumeAttachmentStatus is valid.
+func validateVolumeAttachmentStatus(status *storage.VolumeAttachmentStatus, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, validateAttachmentMetadata(status.AttachmentMetadata, fldPath.Child("attachmentMetadata"))...)
+	allErrs = append(allErrs, validateVolumeError(status.AttachError, fldPath.Child("attachError"))...)
+	allErrs = append(allErrs, validateVolumeError(status.DetachError, fldPath.Child("detachError"))...)
+	return allErrs
+}
+
+func validateAttachmentMetadata(metadata map[string]string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	var size int64
+	for k, v := range metadata {
+		size += (int64)(len(k)) + (int64)(len(v))
+	}
+	if size > maxAttachedVolumeMetadataSize {
+		allErrs = append(allErrs, field.TooLong(fldPath, metadata, maxAttachedVolumeMetadataSize))
+	}
+	return allErrs
+}
+
+func validateVolumeError(e *storage.VolumeError, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if e == nil {
+		return allErrs
+	}
+	if len(e.Message) > maxVolumeErrorMessageSize {
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), e.Message, maxAttachedVolumeMetadataSize))
+	}
+	return allErrs
+}
+
+// ValidateVolumeAttachmentUpdate validates a VolumeAttachment.
+func ValidateVolumeAttachmentUpdate(new, old *storage.VolumeAttachment) field.ErrorList {
+	allErrs := ValidateVolumeAttachment(new)
+
+	// Spec is read-only
+	if !apiequality.Semantic.DeepEqual(old.Spec, new.Spec) {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec"), new.Spec, "field is immutable"))
 	}
 	return allErrs
 }

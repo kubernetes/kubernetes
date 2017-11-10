@@ -64,6 +64,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/networking"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -556,7 +557,10 @@ func BuildStorageFactory(s *options.ServerRunOptions) (*serverstorage.DefaultSto
 		s.Etcd.StorageConfig, s.Etcd.DefaultStorageMediaType, legacyscheme.Codecs,
 		serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Registry), storageGroupsToEncodingVersion,
 		// FIXME (soltysh): this GroupVersionResource override should be configurable
-		[]schema.GroupVersionResource{batch.Resource("cronjobs").WithVersion("v1beta1")},
+		[]schema.GroupVersionResource{
+			batch.Resource("cronjobs").WithVersion("v1beta1"),
+			storage.Resource("volumeattachments").WithVersion("v1alpha1"),
+		},
 		master.DefaultAPIResourceConfigSource(), s.APIEnablement.RuntimeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error in initializing storage factory: %s", err)

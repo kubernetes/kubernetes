@@ -13,6 +13,7 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//pkg/registry/storage/storageclass/storage:go_default_library",
+        "//pkg/registry/storage/volumeattachment/storage:go_default_library",
         "//vendor/k8s.io/api/storage/v1:go_default_library",
         "//vendor/k8s.io/api/storage/v1beta1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",
