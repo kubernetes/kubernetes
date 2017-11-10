@@ -163,15 +163,23 @@ func ValidateInitializerConfigurationUpdate(newIC, oldIC *admissionregistration.
 	return ValidateInitializerConfiguration(newIC)
 }
 
-func ValidateExternalAdmissionHookConfiguration(e *admissionregistration.ExternalAdmissionHookConfiguration) field.ErrorList {
+func ValidateValidatingWebhookConfiguration(e *admissionregistration.ValidatingWebhookConfiguration) field.ErrorList {
 	allErrors := genericvalidation.ValidateObjectMeta(&e.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
-	for i, hook := range e.ExternalAdmissionHooks {
-		allErrors = append(allErrors, validateExternalAdmissionHook(&hook, field.NewPath("externalAdmissionHooks").Index(i))...)
+	for i, hook := range e.Webhooks {
+		allErrors = append(allErrors, validateWebhook(&hook, field.NewPath("webhooks").Index(i))...)
 	}
 	return allErrors
 }
 
-func validateExternalAdmissionHook(hook *admissionregistration.ExternalAdmissionHook, fldPath *field.Path) field.ErrorList {
+func ValidateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebhookConfiguration) field.ErrorList {
+	allErrors := genericvalidation.ValidateObjectMeta(&e.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	for i, hook := range e.Webhooks {
+		allErrors = append(allErrors, validateWebhook(&hook, field.NewPath("webhooks").Index(i))...)
+	}
+	return allErrors
+}
+
+func validateWebhook(hook *admissionregistration.Webhook, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 	// hook.Name must be fully qualified
 	allErrors = append(allErrors, validation.IsFullyQualifiedName(fldPath.Child("name"), hook.Name)...)
@@ -263,6 +271,10 @@ func validateRuleWithOperations(ruleWithOperations *admissionregistration.RuleWi
 	return allErrors
 }
 
-func ValidateExternalAdmissionHookConfigurationUpdate(newC, oldC *admissionregistration.ExternalAdmissionHookConfiguration) field.ErrorList {
-	return ValidateExternalAdmissionHookConfiguration(newC)
+func ValidateValidatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.ValidatingWebhookConfiguration) field.ErrorList {
+	return ValidateValidatingWebhookConfiguration(newC)
+}
+
+func ValidateMutatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.MutatingWebhookConfiguration) field.ErrorList {
+	return ValidateMutatingWebhookConfiguration(newC)
 }

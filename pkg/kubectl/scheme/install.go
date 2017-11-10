@@ -106,7 +106,7 @@ func init() {
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:              admissionregistrationv1alpha1.GroupName,
-			RootScopedKinds:        sets.NewString("InitializerConfiguration", "ExternalAdmissionHookConfiguration"),
+			RootScopedKinds:        sets.NewString("InitializerConfiguration", "ValidatingWebhookConfiguration", "MutatingWebhookConfiguration"),
 			VersionPreferenceOrder: []string{admissionregistrationv1alpha1.SchemeGroupVersion.Version},
 		},
 		announced.VersionToSchemeFunc{

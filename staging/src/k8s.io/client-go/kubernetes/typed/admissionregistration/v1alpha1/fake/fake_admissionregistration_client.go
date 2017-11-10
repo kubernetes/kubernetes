@@ -26,12 +26,16 @@ type FakeAdmissionregistrationV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeAdmissionregistrationV1alpha1) ExternalAdmissionHookConfigurations() v1alpha1.ExternalAdmissionHookConfigurationInterface {
-	return &FakeExternalAdmissionHookConfigurations{c}
-}
-
 func (c *FakeAdmissionregistrationV1alpha1) InitializerConfigurations() v1alpha1.InitializerConfigurationInterface {
 	return &FakeInitializerConfigurations{c}
+}
+
+func (c *FakeAdmissionregistrationV1alpha1) MutatingWebhookConfigurations() v1alpha1.MutatingWebhookConfigurationInterface {
+	return &FakeMutatingWebhookConfigurations{c}
+}
+
+func (c *FakeAdmissionregistrationV1alpha1) ValidatingWebhookConfigurations() v1alpha1.ValidatingWebhookConfigurationInterface {
+	return &FakeValidatingWebhookConfigurations{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

@@ -35,7 +35,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  admissionregistration.GroupName,
-			RootScopedKinds:            sets.NewString("InitializerConfiguration", "ExternalAdmissionHookConfiguration"),
+			RootScopedKinds:            sets.NewString("InitializerConfiguration", "ValidatingWebhookConfiguration", "MutatingWebhookConfiguration"),
 			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
 			AddInternalObjectsToScheme: admissionregistration.AddToScheme,
 		},

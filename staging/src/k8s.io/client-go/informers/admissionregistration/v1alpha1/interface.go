@@ -24,10 +24,12 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// ExternalAdmissionHookConfigurations returns a ExternalAdmissionHookConfigurationInformer.
-	ExternalAdmissionHookConfigurations() ExternalAdmissionHookConfigurationInformer
 	// InitializerConfigurations returns a InitializerConfigurationInformer.
 	InitializerConfigurations() InitializerConfigurationInformer
+	// MutatingWebhookConfigurations returns a MutatingWebhookConfigurationInformer.
+	MutatingWebhookConfigurations() MutatingWebhookConfigurationInformer
+	// ValidatingWebhookConfigurations returns a ValidatingWebhookConfigurationInformer.
+	ValidatingWebhookConfigurations() ValidatingWebhookConfigurationInformer
 }
 
 type version struct {
@@ -41,12 +43,17 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// ExternalAdmissionHookConfigurations returns a ExternalAdmissionHookConfigurationInformer.
-func (v *version) ExternalAdmissionHookConfigurations() ExternalAdmissionHookConfigurationInformer {
-	return &externalAdmissionHookConfigurationInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
 // InitializerConfigurations returns a InitializerConfigurationInformer.
 func (v *version) InitializerConfigurations() InitializerConfigurationInformer {
 	return &initializerConfigurationInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// MutatingWebhookConfigurations returns a MutatingWebhookConfigurationInformer.
+func (v *version) MutatingWebhookConfigurations() MutatingWebhookConfigurationInformer {
+	return &mutatingWebhookConfigurationInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// ValidatingWebhookConfigurations returns a ValidatingWebhookConfigurationInformer.
+func (v *version) ValidatingWebhookConfigurations() ValidatingWebhookConfigurationInformer {
+	return &validatingWebhookConfigurationInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
