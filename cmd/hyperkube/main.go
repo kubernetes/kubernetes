@@ -49,8 +49,5 @@ func main() {
 	// Alpha servers
 	hk.AddAlphaServer(NewCloudControllerManager())
 
-	// Alpha servers
-	hk.AddAlphaServer(NewCloudControllerManager())
-
 	hk.RunToExit(os.Args)
 }
