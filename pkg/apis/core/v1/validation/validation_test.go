@@ -19,8 +19,11 @@ package validation
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -176,4 +179,110 @@ func TestValidateResourceRequirements(t *testing.T) {
 			t.Errorf("%q expected error", tc.Name)
 		}
 	}
+}
+
+func TestValidatePodLogOptions(t *testing.T) {
+	getInt64Point := func(value int64) *int64 { return &value }
+	successCase := []struct {
+		Name          string
+		podLogOptions v1.PodLogOptions
+	}{
+		{
+			Name:          "All pointer members are nil",
+			podLogOptions: v1.PodLogOptions{},
+		},
+		{
+			Name: "Valid TailLines",
+			podLogOptions: v1.PodLogOptions{
+				TailLines: getInt64Point(0),
+			},
+		},
+		{
+			Name: "Valid LimitBytes",
+			podLogOptions: v1.PodLogOptions{
+				LimitBytes: getInt64Point(1),
+			},
+		},
+		{
+			Name: "Valid SinceSeconds",
+			podLogOptions: v1.PodLogOptions{
+				SinceSeconds: getInt64Point(1),
+			},
+		},
+		{
+			Name: "Valid SinceTime",
+			podLogOptions: v1.PodLogOptions{
+				SinceTime: &metav1.Time{},
+			},
+		},
+	}
+	for _, tc := range successCase {
+		if errs := ValidatePodLogOptions(&tc.podLogOptions); len(errs) != 0 {
+			t.Errorf("%q unexpected error", tc.Name)
+		}
+	}
+
+	errorCase := []struct {
+		Name          string
+		podLogOptions v1.PodLogOptions
+	}{
+
+		{
+			Name: "Invalid TailLines",
+			podLogOptions: v1.PodLogOptions{
+				TailLines: getInt64Point(-1),
+			},
+		},
+		{
+			Name: "Invalid LimitBytes",
+			podLogOptions: v1.PodLogOptions{
+				LimitBytes: getInt64Point(0),
+			},
+		},
+		{
+			Name: "Invalid SinceSeconds",
+			podLogOptions: v1.PodLogOptions{
+				SinceSeconds: getInt64Point(0),
+			},
+		},
+		{
+			Name: "Set SinceSeconds and SinceTime the same time",
+			podLogOptions: v1.PodLogOptions{
+				SinceSeconds: getInt64Point(1),
+				SinceTime:    &metav1.Time{},
+			},
+		},
+	}
+	for _, tc := range errorCase {
+		if errs := ValidatePodLogOptions(&tc.podLogOptions); len(errs) == 0 {
+			t.Errorf("%q expected error", tc.Name)
+		}
+	}
+}
+
+func TestAccumulateUniqueHostPorts(t *testing.T) {
+	containers := []v1.Container{
+		{
+			Name: "container-1",
+			Ports: []v1.ContainerPort{
+				{HostPort: 111},
+			},
+		},
+		{
+			Name: "container-2",
+			Ports: []v1.ContainerPort{
+				{HostPort: 333},
+			},
+		},
+		{
+			Name: "container-3",
+			Ports: []v1.ContainerPort{
+				{HostPort: 111},
+			},
+		},
+	}
+	accumulator := sets.NewString()
+	errs := AccumulateUniqueHostPorts(containers, &accumulator, field.NewPath("spec", "containers"))
+	assert.Len(t, errs, 1)
+	assert.Contains(t, errs[0].Error(), "111", "Expect contains 111")
 }
