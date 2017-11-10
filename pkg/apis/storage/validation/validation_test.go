@@ -478,7 +478,7 @@ func TestValidateVolumeBindingMode(t *testing.T) {
 	cases := map[string]bindingTest{
 		"no mode": {
 			class:         makeClassWithBinding(nil),
-			shouldSucceed: true,
+			shouldSucceed: false,
 		},
 		"immediate mode": {
 			class:         makeClassWithBinding(&immediateMode1),

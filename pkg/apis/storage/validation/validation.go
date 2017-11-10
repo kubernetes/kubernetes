@@ -227,13 +227,14 @@ var supportedVolumeBindingModes = sets.NewString(string(storage.VolumeBindingImm
 // validateVolumeBindingMode tests that VolumeBindingMode specifies valid values.
 func validateVolumeBindingMode(mode *storage.VolumeBindingMode, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if mode != nil {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-			allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate VolumeScheduling"))
-		}
-		if !supportedVolumeBindingModes.Has(string(*mode)) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		if mode == nil {
+			allErrs = append(allErrs, field.Required(fldPath, ""))
+		} else if !supportedVolumeBindingModes.Has(string(*mode)) {
 			allErrs = append(allErrs, field.NotSupported(fldPath, mode, supportedVolumeBindingModes.List()))
 		}
+	} else if mode != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate VolumeScheduling"))
 	}
 
 	return allErrs

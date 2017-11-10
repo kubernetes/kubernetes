@@ -3,17 +3,13 @@ package(default_visibility = ["//visibility:public"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
-    "go_test",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["helpers.go"],
     importpath = "k8s.io/kubernetes/pkg/apis/storage/v1/util",
-    deps = [
-        "//vendor/k8s.io/api/storage/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-    ],
+    deps = ["//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library"],
 )
 
 filegroup(
@@ -27,12 +23,4 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["helpers_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/apis/storage/v1/util",
-    library = ":go_default_library",
-    deps = ["//vendor/k8s.io/api/storage/v1:go_default_library"],
 )
