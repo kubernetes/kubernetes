@@ -15,9 +15,9 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/batch/cronjob",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/pod:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/batch/validation:go_default_library",
+        "//pkg/registry/core/pod/helpers:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",

@@ -27,10 +27,11 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	pvutil "k8s.io/kubernetes/pkg/api/persistentvolume"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	volumevalidation "k8s.io/kubernetes/pkg/volume/validation"
 )
 
@@ -53,7 +54,7 @@ func (persistentvolumeStrategy) PrepareForCreate(ctx genericapirequest.Context, 
 	pv := obj.(*api.PersistentVolume)
 	pv.Status = api.PersistentVolumeStatus{}
 
-	pvutil.DropDisabledAlphaFields(&pv.Spec)
+	dropDisabledPersistentVolumeSpecAlphaFields(&pv.Spec)
 }
 
 func (persistentvolumeStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
@@ -76,8 +77,8 @@ func (persistentvolumeStrategy) PrepareForUpdate(ctx genericapirequest.Context, 
 	oldPv := old.(*api.PersistentVolume)
 	newPv.Status = oldPv.Status
 
-	pvutil.DropDisabledAlphaFields(&newPv.Spec)
-	pvutil.DropDisabledAlphaFields(&oldPv.Spec)
+	dropDisabledPersistentVolumeSpecAlphaFields(&newPv.Spec)
+	dropDisabledPersistentVolumeSpecAlphaFields(&oldPv.Spec)
 }
 
 func (persistentvolumeStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
@@ -134,4 +135,12 @@ func PersistentVolumeToSelectableFields(persistentvolume *api.PersistentVolume) 
 		"name": persistentvolume.Name,
 	}
 	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
+}
+
+// dropDisabledPersistentVolumeSpecAlphaFields removes disabled fields from the pv spec.
+// This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pv spec.
+func dropDisabledPersistentVolumeSpecAlphaFields(pvSpec *api.PersistentVolumeSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.BlockVolume) {
+		pvSpec.VolumeMode = nil
+	}
 }

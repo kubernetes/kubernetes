@@ -16,10 +16,10 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/core/replicationcontroller",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/pod:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/helper:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
+        "//pkg/registry/core/pod/helpers:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/internalversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

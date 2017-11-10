@@ -27,9 +27,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
+	podhelpers "k8s.io/kubernetes/pkg/registry/core/pod/helpers"
 )
 
 // statefulSetStrategy implements verification logic for Replication StatefulSets.
@@ -69,7 +69,7 @@ func (statefulSetStrategy) PrepareForCreate(ctx genericapirequest.Context, obj r
 
 	statefulSet.Generation = 1
 
-	pod.DropDisabledAlphaFields(&statefulSet.Spec.Template.Spec)
+	podhelpers.DropDisabledPodSpecAlphaFields(&statefulSet.Spec.Template.Spec)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -79,8 +79,8 @@ func (statefulSetStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, 
 	// Update is not allowed to set status
 	newStatefulSet.Status = oldStatefulSet.Status
 
-	pod.DropDisabledAlphaFields(&newStatefulSet.Spec.Template.Spec)
-	pod.DropDisabledAlphaFields(&oldStatefulSet.Spec.Template.Spec)
+	podhelpers.DropDisabledPodSpecAlphaFields(&newStatefulSet.Spec.Template.Spec)
+	podhelpers.DropDisabledPodSpecAlphaFields(&oldStatefulSet.Spec.Template.Spec)
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.
