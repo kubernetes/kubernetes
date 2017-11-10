@@ -18,7 +18,6 @@ limitations under the License.
 package winstats
 
 import (
-	"regexp"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -134,12 +133,4 @@ func (c *statsClient) createRootContainerInfo() (*cadvisorapiv2.ContainerInfo, e
 	}
 
 	return &rootInfo, nil
-}
-
-// extractVersionNumber gets the version number from the full version string on Windows
-// e.g. extracts "10.0.14393" from "Microsoft Windows [Version 10.0.14393]"
-func extractVersionNumber(fullVersion string) string {
-	re := regexp.MustCompile("[^0-9.]")
-	version := re.ReplaceAllString(fullVersion, "")
-	return version
 }

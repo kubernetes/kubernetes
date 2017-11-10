@@ -116,13 +116,6 @@ func TestWinVersionInfo(t *testing.T) {
 		KernelVersion: "v42"})
 }
 
-func TestExtractVersionNumber(t *testing.T) {
-	fullVersion := "Microsoft Windows [Version 10.0.14393]"
-	versionNumber := extractVersionNumber(fullVersion)
-	expected := "10.0.14393"
-	assert.Equal(t, expected, versionNumber)
-}
-
 func getClient(t *testing.T) Client {
 	f := fakeWinNodeStatsClient{}
 	c, err := newClient(f)

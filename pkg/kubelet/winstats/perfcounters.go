@@ -24,7 +24,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/JeffAshton/win_pdh"
 )
 
 const (
@@ -37,31 +37,31 @@ const (
 )
 
 type perfCounter struct {
-	queryHandle   win.PDH_HQUERY
-	counterHandle win.PDH_HCOUNTER
+	queryHandle   win_pdh.PDH_HQUERY
+	counterHandle win_pdh.PDH_HCOUNTER
 }
 
 func newPerfCounter(counter string) (*perfCounter, error) {
-	var queryHandle win.PDH_HQUERY
-	var counterHandle win.PDH_HCOUNTER
+	var queryHandle win_pdh.PDH_HQUERY
+	var counterHandle win_pdh.PDH_HCOUNTER
 
-	ret := win.PdhOpenQuery(0, 0, &queryHandle)
-	if ret != win.ERROR_SUCCESS {
+	ret := win_pdh.PdhOpenQuery(0, 0, &queryHandle)
+	if ret != win_pdh.ERROR_SUCCESS {
 		return nil, errors.New("unable to open query through DLL call")
 	}
 
-	ret = win.PdhValidatePath(counter)
-	if ret != win.ERROR_SUCCESS {
+	ret = win_pdh.PdhValidatePath(counter)
+	if ret != win_pdh.ERROR_SUCCESS {
 		return nil, fmt.Errorf("unable to valid path to counter. Error code is %x", ret)
 	}
 
-	ret = win.PdhAddEnglishCounter(queryHandle, counter, 0, &counterHandle)
-	if ret != win.ERROR_SUCCESS {
+	ret = win_pdh.PdhAddEnglishCounter(queryHandle, counter, 0, &counterHandle)
+	if ret != win_pdh.ERROR_SUCCESS {
 		return nil, fmt.Errorf("unable to add process counter. Error code is %x", ret)
 	}
 
-	ret = win.PdhCollectQueryData(queryHandle)
-	if ret != win.ERROR_SUCCESS {
+	ret = win_pdh.PdhCollectQueryData(queryHandle)
+	if ret != win_pdh.ERROR_SUCCESS {
 		return nil, fmt.Errorf("unable to collect data from counter. Error code is %x", ret)
 	}
 
@@ -72,24 +72,24 @@ func newPerfCounter(counter string) (*perfCounter, error) {
 }
 
 func (p *perfCounter) getData() (uint64, error) {
-	ret := win.PdhCollectQueryData(p.queryHandle)
-	if ret != win.ERROR_SUCCESS {
+	ret := win_pdh.PdhCollectQueryData(p.queryHandle)
+	if ret != win_pdh.ERROR_SUCCESS {
 		return 0, fmt.Errorf("unable to collect data from counter. Error code is %x", ret)
 	}
 
 	var bufSize, bufCount uint32
-	var size = uint32(unsafe.Sizeof(win.PDH_FMT_COUNTERVALUE_ITEM_DOUBLE{}))
-	var emptyBuf [1]win.PDH_FMT_COUNTERVALUE_ITEM_DOUBLE // need at least 1 addressable null ptr.
+	var size = uint32(unsafe.Sizeof(win_pdh.PDH_FMT_COUNTERVALUE_ITEM_DOUBLE{}))
+	var emptyBuf [1]win_pdh.PDH_FMT_COUNTERVALUE_ITEM_DOUBLE // need at least 1 addressable null ptr.
 	var data uint64
 
-	ret = win.PdhGetFormattedCounterArrayDouble(p.counterHandle, &bufSize, &bufCount, &emptyBuf[0])
-	if ret != win.PDH_MORE_DATA {
+	ret = win_pdh.PdhGetFormattedCounterArrayDouble(p.counterHandle, &bufSize, &bufCount, &emptyBuf[0])
+	if ret != win_pdh.PDH_MORE_DATA {
 		return 0, fmt.Errorf("unable to collect data from counter. Error code is %x", ret)
 	}
 
-	filledBuf := make([]win.PDH_FMT_COUNTERVALUE_ITEM_DOUBLE, bufCount*size)
-	ret = win.PdhGetFormattedCounterArrayDouble(p.counterHandle, &bufSize, &bufCount, &filledBuf[0])
-	if ret != win.ERROR_SUCCESS {
+	filledBuf := make([]win_pdh.PDH_FMT_COUNTERVALUE_ITEM_DOUBLE, bufCount*size)
+	ret = win_pdh.PdhGetFormattedCounterArrayDouble(p.counterHandle, &bufSize, &bufCount, &filledBuf[0])
+	if ret != win_pdh.ERROR_SUCCESS {
 		return 0, fmt.Errorf("unable to collect data from counter. Error code is %x", ret)
 	}
 
