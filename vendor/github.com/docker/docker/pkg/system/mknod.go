@@ -18,5 +18,5 @@ func Mknod(path string, mode uint32, dev int) error {
 // They are, from low to high: the lower 8 bits of the minor, then 12 bits of the major,
 // then the top 12 bits of the minor.
 func Mkdev(major int64, minor int64) uint32 {
-	return uint32(((minor & 0xfff00) << 12) | ((major & 0xfff) << 8) | (minor & 0xff))
+	return uint32(unix.Mkdev(uint32(major), uint32(minor)))
 }

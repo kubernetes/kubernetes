@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"golang.org/x/net/context"
 
@@ -29,6 +30,9 @@ func (cli *Client) ImagePull(ctx context.Context, refStr string, options types.I
 	query.Set("fromImage", reference.FamiliarName(ref))
 	if !options.All {
 		query.Set("tag", getAPITagFromNamedRef(ref))
+	}
+	if options.Platform != "" {
+		query.Set("platform", strings.ToLower(options.Platform))
 	}
 
 	resp, err := cli.tryImageCreate(ctx, query, options.RegistryAuth)

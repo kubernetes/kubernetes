@@ -3,6 +3,7 @@ package client
 import (
 	"io"
 	"net/url"
+	"strings"
 
 	"golang.org/x/net/context"
 
@@ -25,6 +26,9 @@ func (cli *Client) ImageImport(ctx context.Context, source types.ImageImportSour
 	query.Set("repo", ref)
 	query.Set("tag", options.Tag)
 	query.Set("message", options.Message)
+	if options.Platform != "" {
+		query.Set("platform", strings.ToLower(options.Platform))
+	}
 	for _, change := range options.Changes {
 		query.Add("changes", change)
 	}

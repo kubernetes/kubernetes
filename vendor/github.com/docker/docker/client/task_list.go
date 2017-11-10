@@ -15,7 +15,7 @@ func (cli *Client) TaskList(ctx context.Context, options types.TaskListOptions) 
 	query := url.Values{}
 
 	if options.Filters.Len() > 0 {
-		filterJSON, err := filters.ToParam(options.Filters)
+		filterJSON, err := filters.ToJSON(options.Filters)
 		if err != nil {
 			return nil, err
 		}

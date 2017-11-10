@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
-	"net/http"
 
 	"github.com/docker/docker/api/types/swarm"
 	"golang.org/x/net/context"
@@ -14,10 +13,7 @@ import (
 func (cli *Client) NodeInspectWithRaw(ctx context.Context, nodeID string) (swarm.Node, []byte, error) {
 	serverResp, err := cli.get(ctx, "/nodes/"+nodeID, nil, nil)
 	if err != nil {
-		if serverResp.statusCode == http.StatusNotFound {
-			return swarm.Node{}, nil, nodeNotFoundError{nodeID}
-		}
-		return swarm.Node{}, nil, err
+		return swarm.Node{}, nil, wrapResponseError(err, serverResp, "node", nodeID)
 	}
 	defer ensureReaderClosed(serverResp)
 

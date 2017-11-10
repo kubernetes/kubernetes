@@ -203,7 +203,7 @@ func (cli *Client) checkResponseErr(serverResp serverResponse) error {
 		return err
 	}
 	if len(body) == 0 {
-		return fmt.Errorf("Error: request returned %s for API route and version %s, check if the server supports the requested API version", http.StatusText(serverResp.statusCode), serverResp.reqURL)
+		return fmt.Errorf("request returned %s for API route and version %s, check if the server supports the requested API version", http.StatusText(serverResp.statusCode), serverResp.reqURL)
 	}
 
 	var ct string

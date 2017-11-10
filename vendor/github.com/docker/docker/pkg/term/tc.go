@@ -1,5 +1,4 @@
 // +build !windows
-// +build !solaris !cgo
 
 package term
 

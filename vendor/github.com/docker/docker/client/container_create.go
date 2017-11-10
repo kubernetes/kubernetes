@@ -45,7 +45,7 @@ func (cli *Client) ContainerCreate(ctx context.Context, config *container.Config
 	serverResp, err := cli.post(ctx, "/containers/create", query, body, nil)
 	if err != nil {
 		if serverResp.statusCode == 404 && strings.Contains(err.Error(), "No such image") {
-			return response, imageNotFoundError{config.Image}
+			return response, objectNotFoundError{object: "image", id: config.Image}
 		}
 		return response, err
 	}

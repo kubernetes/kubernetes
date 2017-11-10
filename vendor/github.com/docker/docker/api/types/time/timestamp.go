@@ -29,10 +29,8 @@ func GetTimestamp(value string, reference time.Time) (string, error) {
 	}
 
 	var format string
-	var parseInLocation bool
-
 	// if the string has a Z or a + or three dashes use parse otherwise use parseinlocation
-	parseInLocation = !(strings.ContainsAny(value, "zZ+") || strings.Count(value, "-") == 3)
+	parseInLocation := !(strings.ContainsAny(value, "zZ+") || strings.Count(value, "-") == 3)
 
 	if strings.Contains(value, ".") {
 		if parseInLocation {
