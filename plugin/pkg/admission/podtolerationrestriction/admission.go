@@ -57,6 +57,8 @@ const (
 	NSWLTolerations      string = "scheduler.alpha.kubernetes.io/tolerationsWhitelist"
 )
 
+var _ admission.MutationInterface = &podTolerationsPlugin{}
+var _ admission.ValidationInterface = &podTolerationsPlugin{}
 var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&podTolerationsPlugin{})
 
 type podTolerationsPlugin struct {

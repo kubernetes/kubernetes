@@ -55,6 +55,8 @@ type Plugin struct {
 	*admission.Handler
 }
 
+var _ admission.MutationInterface = &Plugin{}
+
 // NewDefaultTolerationSeconds creates a new instance of the DefaultTolerationSeconds admission controller
 func NewDefaultTolerationSeconds() *Plugin {
 	return &Plugin{
