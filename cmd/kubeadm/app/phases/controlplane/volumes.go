@@ -57,7 +57,7 @@ func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.MasterConfiguration) c
 
 	// If external etcd is specified, mount the directories needed for accessing the CA/serving certs and the private key
 	if len(cfg.Etcd.Endpoints) != 0 {
-		etcdVols, etcdVolMounts := getEtcdCertVolumes(cfg.Etcd)
+		etcdVols, etcdVolMounts := getEtcdCertVolumes(cfg.Etcd, cfg.CertificatesDir)
 		mounts.AddHostPathMounts(kubeadmconstants.KubeAPIServer, etcdVols, etcdVolMounts)
 	}
 
@@ -121,14 +121,15 @@ func (c *controlPlaneHostPathMounts) GetVolumeMounts(component string) []v1.Volu
 }
 
 // getEtcdCertVolumes returns the volumes/volumemounts needed for talking to an external etcd cluster
-func getEtcdCertVolumes(etcdCfg kubeadmapi.Etcd) ([]v1.Volume, []v1.VolumeMount) {
+func getEtcdCertVolumes(etcdCfg kubeadmapi.Etcd, k8sCertificatesDir string) ([]v1.Volume, []v1.VolumeMount) {
 	certPaths := []string{etcdCfg.CAFile, etcdCfg.CertFile, etcdCfg.KeyFile}
 	certDirs := sets.NewString()
 	for _, certPath := range certPaths {
 		certDir := filepath.Dir(certPath)
 		// Ignore ".", which is the result of passing an empty path.
-		// Also ignore the cert directories that already may be mounted; /etc/ssl/certs and /etc/pki. If the etcd certs are in there, it's okay, we don't have to do anything
-		if certDir == "." || strings.HasPrefix(certDir, caCertsVolumePath) || strings.HasPrefix(certDir, caCertsPkiVolumePath) {
+		// Also ignore the cert directories that already may be mounted; /etc/ssl/certs, /etc/pki or Kubernetes CertificatesDir
+		// If the etcd certs are in there, it's okay, we don't have to do anything
+		if certDir == "." || strings.HasPrefix(certDir, caCertsVolumePath) || strings.HasPrefix(certDir, caCertsPkiVolumePath) || strings.HasPrefix(certDir, k8sCertificatesDir) {
 			continue
 		}
 		// Filter out any existing hostpath mounts in the list that contains a subset of the path
