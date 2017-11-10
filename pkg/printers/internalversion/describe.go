@@ -591,7 +591,7 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings printe
 			selector := eventsInterface.GetFieldSelector(&name, &namespace, nil, nil)
 			options := metav1.ListOptions{FieldSelector: selector.String()}
 			events, err2 := eventsInterface.List(options)
-			if describerSettings.ShowEvents && err2 == nil && len(events.Items) > 0 {
+			if err2 == nil && len(events.Items) > 0 {
 				return tabbedString(func(out io.Writer) error {
 					w := NewPrefixWriter(out)
 					w.Write(LEVEL_0, "Pod '%v': error '%v', but found events.\n", name, err)
