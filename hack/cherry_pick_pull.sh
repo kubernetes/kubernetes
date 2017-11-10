@@ -32,6 +32,7 @@ DRY_RUN=${DRY_RUN:-""}
 REGENERATE_DOCS=${REGENERATE_DOCS:-""}
 UPSTREAM_REMOTE=${UPSTREAM_REMOTE:-upstream}
 FORK_REMOTE=${FORK_REMOTE:-origin}
+IS_COMMIT=${IS_COMMIT:-""}
 
 if [[ -z ${GITHUB_USER:-} ]]; then
   echo "Please export GITHUB_USER=<your-user> (or GH organization, if that's where your fork lives)"
@@ -77,9 +78,16 @@ declare -r BRANCH="$1"
 shift 1
 declare -r PULLS=( "$@" )
 
+separator=${separator:-"#"}
+basepatchurl=${basepatchurl:-"pr.k8s.io"}
+if [[ -n ${IS_COMMIT} ]]; then
+  separator=""
+  basepatchurl="github.com/kubernetes/kubernetes/commit"
+fi
+
 function join { local IFS="$1"; shift; echo "$*"; }
-declare -r PULLDASH=$(join - "${PULLS[@]/#/#}") # Generates something like "#12345-#56789"
-declare -r PULLSUBJ=$(join " " "${PULLS[@]/#/#}") # Generates something like "#12345 #56789"
+declare -r PULLDASH=$(join - "${PULLS[@]/${separator}/${separator}}") # Generates something like "#12345-#56789"
+declare -r PULLSUBJ=$(join " " "${PULLS[@]/${separator}/${separator}}") # Generates something like "#12345 #56789"
 
 echo "+++ Updating remotes..."
 git remote update "${UPSTREAM_REMOTE}" "${FORK_REMOTE}"
@@ -148,7 +156,7 @@ cleanbranch="${NEWBRANCHUNIQ}"
 gitamcleanup=true
 for pull in "${PULLS[@]}"; do
   echo "+++ Downloading patch to /tmp/${pull}.patch (in case you need to do this again)"
-  curl -o "/tmp/${pull}.patch" -sSL "http://pr.k8s.io/${pull}.patch"
+  curl -o "/tmp/${pull}.patch" -sSL "http://${basepatchurl}/${pull}.patch"
   echo
   echo "+++ About to attempt cherry pick of PR. To reattempt:"
   echo "  $ git am -3 /tmp/${pull}.patch"
@@ -180,7 +188,7 @@ for pull in "${PULLS[@]}"; do
 
   # set the subject
   subject=$(grep -m 1 "^Subject" "/tmp/${pull}.patch" | sed -e 's/Subject: \[PATCH//g' | sed 's/.*] //')
-  SUBJECTS+=("#${pull}: ${subject}")
+  SUBJECTS+=("${separator}${pull}: ${subject}")
 
   # remove the patch file from /tmp
   rm -f "/tmp/${pull}.patch"
