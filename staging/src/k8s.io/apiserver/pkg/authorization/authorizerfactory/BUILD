@@ -8,7 +8,7 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["authz_test.go"],
+    srcs = ["builtin_test.go"],
     importpath = "k8s.io/apiserver/pkg/authorization/authorizerfactory",
     library = ":go_default_library",
     deps = [
