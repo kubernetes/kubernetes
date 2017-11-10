@@ -102,8 +102,6 @@ func (DeploymentV1Beta1) Generate(genericParams map[string]interface{}) (runtime
 		return nil, err
 	}
 
-	// TODO: use versioned types for generators so that we don't need to
-	// set default values manually (see issue #17384)
 	count32 := int32(count)
 	deployment := extensionsv1beta1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
