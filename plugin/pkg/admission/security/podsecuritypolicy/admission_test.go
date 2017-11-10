@@ -329,6 +329,11 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 	changedPod := unprivilegedRunAsAnyPod.DeepCopy()
 	changedPod.Spec.Containers[0].Image = "myimage2"
 
+	podWithSC := unprivilegedRunAsAnyPod.DeepCopy()
+	podWithSC.Annotations = map[string]string{psputil.ValidatedPSPAnnotation: privilegedPSP.Name}
+	changedPodWithSC := changedPod.DeepCopy()
+	changedPodWithSC.Annotations = map[string]string{psputil.ValidatedPSPAnnotation: privilegedPSP.Name}
+
 	gcChangedPod := unprivilegedRunAsAnyPod.DeepCopy()
 	gcChangedPod.OwnerReferences = []metav1.OwnerReference{{Kind: "Foo", Name: "bar"}}
 	gcChangedPod.Finalizers = []string{"foo"}
@@ -336,7 +341,7 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 	tests := map[string]struct {
 		operation             kadmission.Operation
 		pod                   *kapi.Pod
-		oldPod                *kapi.Pod
+		podBeforeUpdate       *kapi.Pod
 		psps                  []*extensions.PodSecurityPolicy
 		shouldPassAdmit       bool
 		shouldPassValidate    bool
@@ -380,8 +385,8 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 		},
 		"pod should prefer non-mutating PSP on update": {
 			operation:             kadmission.Update,
-			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
-			oldPod:                changedPod.DeepCopy(),
+			pod:                   changedPodWithSC.DeepCopy(),
+			podBeforeUpdate:       podWithSC.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1, privilegedPSP},
 			shouldPassAdmit:       true,
 			shouldPassValidate:    true,
@@ -390,12 +395,12 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			expectedContainerUser: nil,
 			expectedPSP:           privilegedPSP.Name,
 		},
-		"pod should not allow mutation on update": {
+		"pod should not mutate on update, but fail validation": {
 			operation:             kadmission.Update,
-			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
-			oldPod:                changedPod.DeepCopy(),
+			pod:                   changedPod.DeepCopy(),
+			podBeforeUpdate:       unprivilegedRunAsAnyPod.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1},
-			shouldPassAdmit:       false,
+			shouldPassAdmit:       true,
 			shouldPassValidate:    false,
 			expectMutation:        false,
 			expectedPodUser:       nil,
@@ -405,7 +410,7 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 		"pod should be allowed if completely unchanged on update": {
 			operation:             kadmission.Update,
 			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
-			oldPod:                unprivilegedRunAsAnyPod.DeepCopy(),
+			podBeforeUpdate:       unprivilegedRunAsAnyPod.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1},
 			shouldPassAdmit:       true,
 			shouldPassValidate:    true,
@@ -416,8 +421,8 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 		},
 		"pod should be allowed if unchanged on update except finalizers,ownerrefs": {
 			operation:             kadmission.Update,
-			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
-			oldPod:                gcChangedPod.DeepCopy(),
+			pod:                   gcChangedPod.DeepCopy(),
+			podBeforeUpdate:       unprivilegedRunAsAnyPod.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1},
 			shouldPassAdmit:       true,
 			shouldPassValidate:    true,
@@ -429,7 +434,7 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		testPSPAdmitAdvanced(k, v.operation, v.psps, v.pod, v.oldPod, v.shouldPassAdmit, v.shouldPassValidate, v.expectMutation, v.expectedPSP, t)
+		testPSPAdmitAdvanced(k, v.operation, v.psps, v.pod, v.podBeforeUpdate, v.shouldPassAdmit, v.shouldPassValidate, v.expectMutation, v.expectedPSP, t)
 
 		if v.shouldPassAdmit {
 			actualPodUser := (*int64)(nil)

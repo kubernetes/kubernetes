@@ -119,11 +119,16 @@ func (c *PodSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 		return nil
 	}
 
+	// only mutate if this is a CREATE request. On updates we only validate.
+	// TODO(liggitt): allow spec mutation during initializing updates?
+	if a.GetOperation() != admission.Create {
+		return nil
+	}
+
 	pod := a.GetObject().(*api.Pod)
 
-	// compute the context. If the current security context is valid, this call won't change it.
-	allowMutation := a.GetOperation() == admission.Create // TODO(liggitt): allow spec mutation during initializing updates?
-	allowedPod, pspName, validationErrs, err := c.computeSecurityContext(a, pod, allowMutation)
+	// compute the context
+	allowedPod, pspName, validationErrs, err := c.computeSecurityContext(a, pod, true)
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
@@ -134,10 +139,6 @@ func (c *PodSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 		if pod.ObjectMeta.Annotations == nil {
 			pod.ObjectMeta.Annotations = map[string]string{}
 		}
-		// set annotation to mark this as passed. Note, that the actual value is not important, the
-		// validating PSP might even change later-on. Also not that pspName can be the empty string
-		// if failOnNoPolicies is false.
-		// TODO: if failOnNoPolicies is toggled from false to true, we will never update the annotation anymore. Is this desired?
 		pod.ObjectMeta.Annotations[psputil.ValidatedPSPAnnotation] = pspName
 		return nil
 	}
@@ -156,7 +157,7 @@ func (c *PodSecurityPolicyPlugin) Validate(a admission.Attributes) error {
 
 	pod := a.GetObject().(*api.Pod)
 
-	// compute the context. If the current security context is valid, this call won't change it.
+	// compute the context. Mutation is not allowed.
 	allowedPod, _, validationErrs, err := c.computeSecurityContext(a, pod, false)
 	if err != nil {
 		return admission.NewForbidden(a, err)
