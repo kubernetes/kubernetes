@@ -33,15 +33,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/core"
 	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
-
-	// enforce that all types are installed
-	_ "k8s.io/kubernetes/pkg/api/testapi"
 )
 
 func TestPodLogOptions(t *testing.T) {
@@ -81,7 +77,7 @@ func TestPodLogOptions(t *testing.T) {
 		"limitBytes":   {"3"},
 	}
 
-	codec := runtime.NewParameterCodec(legacyscheme.Scheme)
+	codec := runtime.NewParameterCodec(scheme)
 
 	// unversioned -> query params
 	{
@@ -141,7 +137,7 @@ func TestPodSpecConversion(t *testing.T) {
 		ServiceAccountName: name,
 	}
 	v := v1.PodSpec{}
-	if err := legacyscheme.Scheme.Convert(i, &v, nil); err != nil {
+	if err := scheme.Convert(i, &v, nil); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if v.ServiceAccountName != name {
@@ -166,7 +162,7 @@ func TestPodSpecConversion(t *testing.T) {
 	}
 	for k, v := range testCases {
 		got := core.PodSpec{}
-		err := legacyscheme.Scheme.Convert(v, &got, nil)
+		err := scheme.Convert(v, &got, nil)
 		if err != nil {
 			t.Fatalf("unexpected error for case %d: %v", k, err)
 		}
@@ -225,7 +221,7 @@ func TestResourceListConversion(t *testing.T) {
 		// perform that step explicitly.
 		corev1.SetDefaults_ResourceList(&test.input)
 
-		err := legacyscheme.Scheme.Convert(&test.input, &output, nil)
+		err := scheme.Convert(&test.input, &output, nil)
 		if err != nil {
 			t.Fatalf("unexpected error for case %d: %v", i, err)
 		}
@@ -281,7 +277,7 @@ func TestReplicationControllerConversion(t *testing.T) {
 	}
 
 	// Add some fuzzed RCs.
-	apiObjectFuzzer := fuzzer.FuzzerFor(fuzzer.MergeFuzzerFuncs(metafuzzer.Funcs, corefuzzer.Funcs), rand.NewSource(152), legacyscheme.Codecs)
+	apiObjectFuzzer := fuzzer.FuzzerFor(fuzzer.MergeFuzzerFuncs(metafuzzer.Funcs, corefuzzer.Funcs), rand.NewSource(152), codecs)
 	for i := 0; i < 100; i++ {
 		rc := &v1.ReplicationController{}
 		apiObjectFuzzer.Fuzz(rc)
@@ -327,7 +323,7 @@ func TestReplicationControllerConversion(t *testing.T) {
 }
 
 func roundTripRS(t *testing.T, rs *extensions.ReplicaSet) *extensions.ReplicaSet {
-	codec := legacyscheme.Codecs.LegacyCodec(extensionsv1beta1.SchemeGroupVersion)
+	codec := codecs.LegacyCodec(extensionsv1beta1.SchemeGroupVersion)
 	data, err := runtime.Encode(codec, rs)
 	if err != nil {
 		t.Errorf("%v\n %#v", err, rs)
@@ -339,7 +335,7 @@ func roundTripRS(t *testing.T, rs *extensions.ReplicaSet) *extensions.ReplicaSet
 		return nil
 	}
 	obj3 := &extensions.ReplicaSet{}
-	err = legacyscheme.Scheme.Convert(obj2, obj3, nil)
+	err = scheme.Convert(obj2, obj3, nil)
 	if err != nil {
 		t.Errorf("%v\nSource: %#v", err, obj2)
 		return nil
