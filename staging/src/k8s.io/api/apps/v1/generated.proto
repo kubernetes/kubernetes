@@ -555,6 +555,27 @@ message StatefulSet {
   optional StatefulSetStatus status = 3;
 }
 
+// StatefulSetCondition describes the state of a statefulset at a certain point.
+message StatefulSetCondition {
+  // Type of statefulset condition.
+  optional string type = 1;
+
+  // Status of the condition, one of True, False, Unknown.
+  optional string status = 2;
+
+  // Last time the condition transitioned from one status to another.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+
+  // The reason for the condition's last transition.
+  // +optional
+  optional string reason = 4;
+
+  // A human readable message indicating details about the transition.
+  // +optional
+  optional string message = 5;
+}
+
 // StatefulSetList is a collection of StatefulSets.
 message StatefulSetList {
   // +optional
@@ -659,6 +680,12 @@ message StatefulSetStatus {
   // newest ControllerRevision.
   // +optional
   optional int32 collisionCount = 9;
+
+  // Represents the latest available observations of a statefulset's current state.
+  // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  repeated StatefulSetCondition conditions = 10;
 }
 
 // StatefulSetUpdateStrategy indicates the strategy that the StatefulSet
