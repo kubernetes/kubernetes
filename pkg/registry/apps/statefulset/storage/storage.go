@@ -30,9 +30,10 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	appsv1beta2 "k8s.io/kubernetes/pkg/apis/apps/v1beta2"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
+	autoscalingvalidation "k8s.io/kubernetes/pkg/apis/autoscaling/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
@@ -141,7 +142,7 @@ func (r *ScaleREST) GroupVersionKind(containingGV schema.GroupVersion) schema.Gr
 
 // New creates a new Scale object
 func (r *ScaleREST) New() runtime.Object {
-	return &extensions.Scale{}
+	return &autoscaling.Scale{}
 }
 
 func (r *ScaleREST) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
@@ -174,12 +175,12 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 	if obj == nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("nil update passed to Scale"))
 	}
-	scale, ok := obj.(*extensions.Scale)
+	scale, ok := obj.(*autoscaling.Scale)
 	if !ok {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("wrong object passed to Scale update: %v", obj))
 	}
 
-	if errs := extvalidation.ValidateScale(scale); len(errs) > 0 {
+	if errs := autoscalingvalidation.ValidateScale(scale); len(errs) > 0 {
 		return nil, false, errors.NewInvalid(extensions.Kind("Scale"), scale.Name, errs)
 	}
 
@@ -197,8 +198,12 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 }
 
 // scaleFromStatefulSet returns a scale subresource for a statefulset.
-func scaleFromStatefulSet(ss *apps.StatefulSet) (*extensions.Scale, error) {
-	return &extensions.Scale{
+func scaleFromStatefulSet(ss *apps.StatefulSet) (*autoscaling.Scale, error) {
+	selector, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
+	return &autoscaling.Scale{
 		// TODO: Create a variant of ObjectMeta type that only contains the fields below.
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              ss.Name,
@@ -207,12 +212,12 @@ func scaleFromStatefulSet(ss *apps.StatefulSet) (*extensions.Scale, error) {
 			ResourceVersion:   ss.ResourceVersion,
 			CreationTimestamp: ss.CreationTimestamp,
 		},
-		Spec: extensions.ScaleSpec{
+		Spec: autoscaling.ScaleSpec{
 			Replicas: ss.Spec.Replicas,
 		},
-		Status: extensions.ScaleStatus{
+		Status: autoscaling.ScaleStatus{
 			Replicas: ss.Status.Replicas,
-			Selector: ss.Spec.Selector,
+			Selector: selector.String(),
 		},
 	}, nil
 }

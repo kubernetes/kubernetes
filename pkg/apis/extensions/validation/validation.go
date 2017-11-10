@@ -522,17 +522,6 @@ func validateIngressBackend(backend *extensions.IngressBackend, fldPath *field.P
 	return allErrs
 }
 
-func ValidateScale(scale *extensions.Scale) field.ErrorList {
-	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&scale.ObjectMeta, true, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
-
-	if scale.Spec.Replicas < 0 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "replicas"), scale.Spec.Replicas, "must be greater than or equal to 0"))
-	}
-
-	return allErrs
-}
-
 // ValidateReplicaSetName can be used to check whether the given ReplicaSet
 // name is valid.
 // Prefix indicates this name will be used as part of generation, in which case

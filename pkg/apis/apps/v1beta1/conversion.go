@@ -23,9 +23,11 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -44,8 +46,8 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		// extensions
 		// TODO: below conversions should be dropped in favor of auto-generated
 		// ones, see https://github.com/kubernetes/kubernetes/issues/39865
-		Convert_v1beta1_ScaleStatus_To_extensions_ScaleStatus,
-		Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus,
+		Convert_v1beta1_ScaleStatus_To_autoscaling_ScaleStatus,
+		Convert_autoscaling_ScaleStatus_To_v1beta1_ScaleStatus,
 		Convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec,
 		Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec,
 		Convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy,
@@ -178,48 +180,35 @@ func Convert_apps_StatefulSetUpdateStrategy_To_v1beta1_StatefulSetUpdateStrategy
 	return nil
 }
 
-func Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.ScaleStatus, out *appsv1beta1.ScaleStatus, s conversion.Scope) error {
+func Convert_autoscaling_ScaleStatus_To_v1beta1_ScaleStatus(in *autoscaling.ScaleStatus, out *appsv1beta1.ScaleStatus, s conversion.Scope) error {
 	out.Replicas = int32(in.Replicas)
+	out.TargetSelector = in.Selector
 
 	out.Selector = nil
-	out.TargetSelector = ""
-	if in.Selector != nil {
-		if in.Selector.MatchExpressions == nil || len(in.Selector.MatchExpressions) == 0 {
-			out.Selector = in.Selector.MatchLabels
-		}
-
-		selector, err := metav1.LabelSelectorAsSelector(in.Selector)
-		if err != nil {
-			return fmt.Errorf("invalid label selector: %v", err)
-		}
-		out.TargetSelector = selector.String()
+	selector, err := metav1.ParseToLabelSelector(in.Selector)
+	if err != nil {
+		return fmt.Errorf("failed to parse selector: %v", err)
 	}
+	if len(selector.MatchExpressions) == 0 {
+		out.Selector = selector.MatchLabels
+	}
+
 	return nil
 }
 
-func Convert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *appsv1beta1.ScaleStatus, out *extensions.ScaleStatus, s conversion.Scope) error {
+func Convert_v1beta1_ScaleStatus_To_autoscaling_ScaleStatus(in *appsv1beta1.ScaleStatus, out *autoscaling.ScaleStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 
-	// Normally when 2 fields map to the same internal value we favor the old field, since
-	// old clients can't be expected to know about new fields but clients that know about the
-	// new field can be expected to know about the old field (though that's not quite true, due
-	// to kubectl apply). However, these fields are readonly, so any non-nil value should work.
 	if in.TargetSelector != "" {
-		labelSelector, err := metav1.ParseToLabelSelector(in.TargetSelector)
-		if err != nil {
-			out.Selector = nil
-			return fmt.Errorf("failed to parse target selector: %v", err)
-		}
-		out.Selector = labelSelector
+		out.Selector = in.TargetSelector
 	} else if in.Selector != nil {
-		out.Selector = new(metav1.LabelSelector)
-		selector := make(map[string]string)
+		set := labels.Set{}
 		for key, val := range in.Selector {
-			selector[key] = val
+			set[key] = val
 		}
-		out.Selector.MatchLabels = selector
+		out.Selector = labels.SelectorFromSet(set).String()
 	} else {
-		out.Selector = nil
+		out.Selector = ""
 	}
 	return nil
 }

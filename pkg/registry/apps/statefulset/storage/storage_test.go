@@ -30,8 +30,8 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
@@ -224,7 +224,11 @@ func TestScaleGet(t *testing.T) {
 		t.Fatalf("error setting new statefulset (key: %s) %v: %v", key, validStatefulSet, err)
 	}
 
-	want := &extensions.Scale{
+	selector, err := metav1.LabelSelectorAsSelector(validStatefulSet.Spec.Selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &autoscaling.Scale{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              name,
 			Namespace:         metav1.NamespaceDefault,
@@ -232,16 +236,16 @@ func TestScaleGet(t *testing.T) {
 			ResourceVersion:   sts.ResourceVersion,
 			CreationTimestamp: sts.CreationTimestamp,
 		},
-		Spec: extensions.ScaleSpec{
+		Spec: autoscaling.ScaleSpec{
 			Replicas: validStatefulSet.Spec.Replicas,
 		},
-		Status: extensions.ScaleStatus{
+		Status: autoscaling.ScaleStatus{
 			Replicas: validStatefulSet.Status.Replicas,
-			Selector: validStatefulSet.Spec.Selector,
+			Selector: selector.String(),
 		},
 	}
 	obj, err := storage.Scale.Get(ctx, name, &metav1.GetOptions{})
-	got := obj.(*extensions.Scale)
+	got := obj.(*autoscaling.Scale)
 	if err != nil {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
 	}
@@ -264,12 +268,12 @@ func TestScaleUpdate(t *testing.T) {
 		t.Fatalf("error setting new statefulset (key: %s) %v: %v", key, validStatefulSet, err)
 	}
 	replicas := 12
-	update := extensions.Scale{
+	update := autoscaling.Scale{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: extensions.ScaleSpec{
+		Spec: autoscaling.ScaleSpec{
 			Replicas: int32(replicas),
 		},
 	}
@@ -282,7 +286,7 @@ func TestScaleUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
 	}
-	scale := obj.(*extensions.Scale)
+	scale := obj.(*autoscaling.Scale)
 	if scale.Spec.Replicas != int32(replicas) {
 		t.Errorf("wrong replicas count expected: %d got: %d", replicas, scale.Spec.Replicas)
 	}

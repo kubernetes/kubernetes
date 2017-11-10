@@ -23,8 +23,8 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
+	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	core "k8s.io/kubernetes/pkg/apis/core"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 // FakeReplicationControllers implements ReplicationControllerInterface
@@ -139,23 +139,23 @@ func (c *FakeReplicationControllers) Patch(name string, pt types.PatchType, data
 }
 
 // GetScale takes name of the replicationController, and returns the corresponding scale object, and an error if there is any.
-func (c *FakeReplicationControllers) GetScale(replicationControllerName string, options v1.GetOptions) (result *extensions.Scale, err error) {
+func (c *FakeReplicationControllers) GetScale(replicationControllerName string, options v1.GetOptions) (result *autoscaling.Scale, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetSubresourceAction(replicationcontrollersResource, c.ns, "scale", replicationControllerName), &extensions.Scale{})
+		Invokes(testing.NewGetSubresourceAction(replicationcontrollersResource, c.ns, "scale", replicationControllerName), &autoscaling.Scale{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.Scale), err
+	return obj.(*autoscaling.Scale), err
 }
 
 // UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *FakeReplicationControllers) UpdateScale(replicationControllerName string, scale *extensions.Scale) (result *extensions.Scale, err error) {
+func (c *FakeReplicationControllers) UpdateScale(replicationControllerName string, scale *autoscaling.Scale) (result *autoscaling.Scale, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(replicationcontrollersResource, "scale", c.ns, scale), &extensions.Scale{})
+		Invokes(testing.NewUpdateSubresourceAction(replicationcontrollersResource, "scale", c.ns, scale), &autoscaling.Scale{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.Scale), err
+	return obj.(*autoscaling.Scale), err
 }

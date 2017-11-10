@@ -28,7 +28,6 @@ type ExtensionsInterface interface {
 	IngressesGetter
 	PodSecurityPoliciesGetter
 	ReplicaSetsGetter
-	ScalesGetter
 }
 
 // ExtensionsClient is used to interact with features provided by the extensions group.
@@ -54,10 +53,6 @@ func (c *ExtensionsClient) PodSecurityPolicies() PodSecurityPolicyInterface {
 
 func (c *ExtensionsClient) ReplicaSets(namespace string) ReplicaSetInterface {
 	return newReplicaSets(c, namespace)
-}
-
-func (c *ExtensionsClient) Scales(namespace string) ScaleInterface {
-	return newScales(c, namespace)
 }
 
 // NewForConfig creates a new ExtensionsClient for the given config.
