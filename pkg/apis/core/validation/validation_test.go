@@ -99,6 +99,51 @@ func TestValidatePersistentVolumes(t *testing.T) {
 						Type: newHostPathType(string(core.HostPathDirectory)),
 					},
 				},
+			}),
+		},
+		"good-volume-with-capacity-unit": {
+			isExpectedFailure: false,
+			volume: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10Gi"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+			}),
+		},
+		"good-volume-without-capacity-unit": {
+			isExpectedFailure: false,
+			volume: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+			}),
+		},
+		"good-volume-with-storage-class": {
+			isExpectedFailure: false,
+			volume: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
 				StorageClassName: "valid",
 			}),
 		},
@@ -164,6 +209,15 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 			}),
 		},
+		"missing-volume-source": {
+			isExpectedFailure: true,
+			volume: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+			}),
+		},
 		"bad-name": {
 			isExpectedFailure: true,
 			volume: testVolume("123*Bad(Name", "unexpected-namespace", core.PersistentVolumeSpec{
@@ -186,11 +240,25 @@ func TestValidatePersistentVolumes(t *testing.T) {
 					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 				},
 				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
 			}),
 		},
 		"missing-capacity": {
 			isExpectedFailure: true,
-			volume:            testVolume("foo", "", core.PersistentVolumeSpec{}),
+			volume: testVolume("foo", "", core.PersistentVolumeSpec{
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+			}),
 		},
 		"missing-accessmodes": {
 			isExpectedFailure: true,
@@ -208,7 +276,7 @@ func TestValidatePersistentVolumes(t *testing.T) {
 		},
 		"too-many-sources": {
 			isExpectedFailure: true,
-			volume: testVolume("", "", core.PersistentVolumeSpec{
+			volume: testVolume("foo", "", core.PersistentVolumeSpec{
 				Capacity: core.ResourceList{
 					core.ResourceName(core.ResourceStorage): resource.MustParse("5G"),
 				},
