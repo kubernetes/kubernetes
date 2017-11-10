@@ -36,7 +36,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/api/v1/endpoints"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper/endpoints"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	podutil "k8s.io/kubernetes/pkg/apis/core/v1/helper/pod"
 	"k8s.io/kubernetes/pkg/controller"
