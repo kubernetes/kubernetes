@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
+	serviceapi "k8s.io/kubernetes/pkg/apis/core/v1/helper/service"
 
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/go-autorest/autorest/to"

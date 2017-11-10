@@ -10,7 +10,7 @@
                 "k8s.io/kubernetes/pkg/api/resource",
                 "k8s.io/kubernetes/pkg/apis/core/helper/service",
                 "k8s.io/kubernetes/pkg/api/v1/pod",
-                "k8s.io/kubernetes/pkg/api/v1/service",
+                "k8s.io/kubernetes/pkg/apis/core/v1/helper/service",
                 "k8s.io/kubernetes/pkg/apis/admissionregistration",
                 "k8s.io/kubernetes/pkg/apis/admissionregistration/install",
                 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1",
