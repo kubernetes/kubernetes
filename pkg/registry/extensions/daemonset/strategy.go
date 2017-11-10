@@ -28,9 +28,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 // daemonSetStrategy implements verification logic for daemon sets.
@@ -72,7 +72,7 @@ func (daemonSetStrategy) PrepareForCreate(ctx genericapirequest.Context, obj run
 		daemonSet.Spec.TemplateGeneration = 1
 	}
 
-	pod.DropDisabledAlphaFields(&daemonSet.Spec.Template.Spec)
+	kubefeatures.DropDisabledPodSpecAlphaFields(&daemonSet.Spec.Template.Spec)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -80,8 +80,8 @@ func (daemonSetStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, ol
 	newDaemonSet := obj.(*extensions.DaemonSet)
 	oldDaemonSet := old.(*extensions.DaemonSet)
 
-	pod.DropDisabledAlphaFields(&newDaemonSet.Spec.Template.Spec)
-	pod.DropDisabledAlphaFields(&oldDaemonSet.Spec.Template.Spec)
+	kubefeatures.DropDisabledPodSpecAlphaFields(&newDaemonSet.Spec.Template.Spec)
+	kubefeatures.DropDisabledPodSpecAlphaFields(&oldDaemonSet.Spec.Template.Spec)
 
 	// update is not allowed to set status
 	newDaemonSet.Status = oldDaemonSet.Status

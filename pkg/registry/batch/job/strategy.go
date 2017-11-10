@@ -31,9 +31,9 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 // jobStrategy implements verification logic for Replication Controllers.
@@ -61,7 +61,7 @@ func (jobStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.O
 	job := obj.(*batch.Job)
 	job.Status = batch.JobStatus{}
 
-	pod.DropDisabledAlphaFields(&job.Spec.Template.Spec)
+	kubefeatures.DropDisabledPodSpecAlphaFields(&job.Spec.Template.Spec)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -70,8 +70,8 @@ func (jobStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runt
 	oldJob := old.(*batch.Job)
 	newJob.Status = oldJob.Status
 
-	pod.DropDisabledAlphaFields(&newJob.Spec.Template.Spec)
-	pod.DropDisabledAlphaFields(&oldJob.Spec.Template.Spec)
+	kubefeatures.DropDisabledPodSpecAlphaFields(&newJob.Spec.Template.Spec)
+	kubefeatures.DropDisabledPodSpecAlphaFields(&oldJob.Spec.Template.Spec)
 }
 
 // Validate validates a new job.

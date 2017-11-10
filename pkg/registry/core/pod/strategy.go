@@ -42,10 +42,10 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 )
 
@@ -72,7 +72,7 @@ func (podStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.O
 		QOSClass: qos.GetPodQOS(pod),
 	}
 
-	podutil.DropDisabledAlphaFields(&pod.Spec)
+	kubefeatures.DropDisabledPodSpecAlphaFields(&pod.Spec)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -81,8 +81,8 @@ func (podStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runt
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
 
-	podutil.DropDisabledAlphaFields(&newPod.Spec)
-	podutil.DropDisabledAlphaFields(&oldPod.Spec)
+	kubefeatures.DropDisabledPodSpecAlphaFields(&newPod.Spec)
+	kubefeatures.DropDisabledPodSpecAlphaFields(&oldPod.Spec)
 }
 
 // Validate validates a new pod.
