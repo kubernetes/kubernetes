@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
+	nodeutil "k8s.io/kubernetes/pkg/apis/core/v1/helper/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"

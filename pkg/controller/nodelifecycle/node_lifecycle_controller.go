@@ -39,7 +39,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
-	v1node "k8s.io/kubernetes/pkg/api/v1/node"
+	v1node "k8s.io/kubernetes/pkg/apis/core/v1/helper/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
@@ -52,9 +52,10 @@ import (
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 
 	"fmt"
-	"github.com/golang/glog"
 	"sync"
 	"time"
+
+	"github.com/golang/glog"
 )
 
 func init() {
