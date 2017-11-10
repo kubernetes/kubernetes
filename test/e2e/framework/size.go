@@ -45,9 +45,9 @@ func ResizeGroup(group string, size int32) error {
 			group, fmt.Sprintf("--size=%v", size),
 			"--project="+TestContext.CloudConfig.ProjectID, "--zone="+TestContext.CloudConfig.Zone).CombinedOutput()
 		if err != nil {
-			Logf("Failed to resize node instance group: %v", string(output))
+			return fmt.Errorf("Failed to resize node instance group: %s", output)
 		}
-		return err
+		return nil
 	} else if TestContext.Provider == "aws" {
 		client := autoscaling.New(session.New())
 		return awscloud.ResizeInstanceGroup(client, group, int(size))
@@ -66,8 +66,7 @@ func GetGroupNodes(group string) ([]string, error) {
 			"list-instances", group, "--project="+TestContext.CloudConfig.ProjectID,
 			"--zone="+TestContext.CloudConfig.Zone).CombinedOutput()
 		if err != nil {
-			Logf("Failed to get nodes in instance group: %v", string(output))
-			return nil, err
+			return nil, fmt.Errorf("Failed to get nodes in instance group: %s", output)
 		}
 		re := regexp.MustCompile(".*RUNNING")
 		lines := re.FindAllString(string(output), -1)
@@ -90,7 +89,7 @@ func GroupSize(group string) (int, error) {
 			"list-instances", group, "--project="+TestContext.CloudConfig.ProjectID,
 			"--zone="+TestContext.CloudConfig.Zone).CombinedOutput()
 		if err != nil {
-			return -1, err
+			return -1, fmt.Errorf("Failed to get nodes in instance group: %s", output)
 		}
 		re := regexp.MustCompile("RUNNING")
 		return len(re.FindAllString(string(output), -1)), nil
