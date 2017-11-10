@@ -38,13 +38,13 @@ func New(
 	extInformers informers.SharedInformerFactory,
 	authz authorizer.Authorizer,
 	scheme *runtime.Scheme,
-) (pluginInitializer, error) {
+) pluginInitializer {
 	return pluginInitializer{
 		externalClient:    extClientset,
 		externalInformers: extInformers,
 		authorizer:        authz,
 		scheme:            scheme,
-	}, nil
+	}
 }
 
 // Initialize checks the initialization interfaces implemented by a plugin

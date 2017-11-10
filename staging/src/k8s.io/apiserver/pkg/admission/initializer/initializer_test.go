@@ -33,10 +33,7 @@ import (
 // the WantsScheme interface is implemented by a plugin.
 func TestWantsScheme(t *testing.T) {
 	scheme := runtime.NewScheme()
-	target, err := initializer.New(nil, nil, nil, scheme)
-	if err != nil {
-		t.Fatal(err)
-	}
+	target := initializer.New(nil, nil, nil, scheme)
 	wantSchemeAdmission := &WantSchemeAdmission{}
 	target.Initialize(wantSchemeAdmission)
 	if wantSchemeAdmission.scheme != scheme {
@@ -47,10 +44,7 @@ func TestWantsScheme(t *testing.T) {
 // TestWantsAuthorizer ensures that the authorizer is injected
 // when the WantsAuthorizer interface is implemented by a plugin.
 func TestWantsAuthorizer(t *testing.T) {
-	target, err := initializer.New(nil, nil, &TestAuthorizer{}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	target := initializer.New(nil, nil, &TestAuthorizer{}, nil)
 	wantAuthorizerAdmission := &WantAuthorizerAdmission{}
 	target.Initialize(wantAuthorizerAdmission)
 	if wantAuthorizerAdmission.auth == nil {
@@ -62,10 +56,7 @@ func TestWantsAuthorizer(t *testing.T) {
 // when the WantsExternalKubeClientSet interface is implemented by a plugin.
 func TestWantsExternalKubeClientSet(t *testing.T) {
 	cs := &fake.Clientset{}
-	target, err := initializer.New(cs, nil, &TestAuthorizer{}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	target := initializer.New(cs, nil, &TestAuthorizer{}, nil)
 	wantExternalKubeClientSet := &WantExternalKubeClientSet{}
 	target.Initialize(wantExternalKubeClientSet)
 	if wantExternalKubeClientSet.cs != cs {
@@ -78,10 +69,7 @@ func TestWantsExternalKubeClientSet(t *testing.T) {
 func TestWantsExternalKubeInformerFactory(t *testing.T) {
 	cs := &fake.Clientset{}
 	sf := informers.NewSharedInformerFactory(cs, time.Duration(1)*time.Second)
-	target, err := initializer.New(cs, sf, &TestAuthorizer{}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	target := initializer.New(cs, sf, &TestAuthorizer{}, nil)
 	wantExternalKubeInformerFactory := &WantExternalKubeInformerFactory{}
 	target.Initialize(wantExternalKubeInformerFactory)
 	if wantExternalKubeInformerFactory.sf != sf {
