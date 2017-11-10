@@ -627,22 +627,34 @@ Depending on the enclosing object, subresources might not be allowed. Required.<
 </thead>
 <tbody>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">url</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>url</code> gives the location of the webhook, in standard URL form (<code>[scheme://]host:port/path</code>). Exactly one of <code>url</code> or <code>service</code> must be specified.<br>
+<br>
+The <code>host</code> should not refer to a service running in the cluster; use the <code>service</code> field instead. The host might be resolved via external DNS in some apiservers (e.g., <code>kube-apiserver</code> cannot resolve in-cluster DNS as that would be a layering violation). <code>host</code> may also be an IP address.<br>
+<br>
+Please note that using <code>localhost</code> or <code>127.0.0.1</code> as a <code>host</code> is risky unless you take great care to run this webhook on all hosts which run an apiserver which might need to make calls to this webhook. Such installs are likely to be non-portable, i.e., not easy to turn up in a new cluster.<br>
+<br>
+If the scheme is present, it must be "https://".<br>
+<br>
+A path is optional, and if present may be any string permissible in a URL. You may use the path to pass an arbitrary string to the webhook, for example, a cluster identifier.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">service</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Service is a reference to the service for this webhook. If there is only one port open for the service, that port will be used. If there are multiple ports open, port 443 will be used if it is open, otherwise it is an error. Required</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>service</code> is a reference to the service for this webhook. Either <code>service</code> or <code>url</code> must be specified.<br>
+<br>
+If the webhook is running within the cluster, then you should use <code>service</code>.<br>
+<br>
+If there is only one port open for the service, that port will be used. If there are multiple ports open, port 443 will be used if it is open, otherwise it is an error.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1alpha1_servicereference">v1alpha1.ServiceReference</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">urlPath</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">URLPath is an optional field that specifies the URL path to use when posting the AdmissionReview object.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">caBundle</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">CABundle is a PEM encoded CA bundle which will be used to validate webhook&#8217;s server certificate. Required</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>caBundle</code> is a PEM encoded CA bundle which will be used to validate the webhook&#8217;s server certificate. Required.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1070,15 +1082,22 @@ Depending on the enclosing object, subresources might not be allowed. Required.<
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Namespace is the namespace of the service Required</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>namespace</code> is the namespace of the service. Required</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Name is the name of the service Required</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>name</code> is the name of the service. Required</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">path</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>path</code> is an optional URL path which will be sent in any request to this service.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>

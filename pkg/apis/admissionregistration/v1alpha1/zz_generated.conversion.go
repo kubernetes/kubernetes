@@ -227,6 +227,7 @@ func Convert_admissionregistration_RuleWithOperations_To_v1alpha1_RuleWithOperat
 func autoConvert_v1alpha1_ServiceReference_To_admissionregistration_ServiceReference(in *v1alpha1.ServiceReference, out *admissionregistration.ServiceReference, s conversion.Scope) error {
 	out.Namespace = in.Namespace
 	out.Name = in.Name
+	out.Path = (*string)(unsafe.Pointer(in.Path))
 	return nil
 }
 
@@ -238,6 +239,7 @@ func Convert_v1alpha1_ServiceReference_To_admissionregistration_ServiceReference
 func autoConvert_admissionregistration_ServiceReference_To_v1alpha1_ServiceReference(in *admissionregistration.ServiceReference, out *v1alpha1.ServiceReference, s conversion.Scope) error {
 	out.Namespace = in.Namespace
 	out.Name = in.Name
+	out.Path = (*string)(unsafe.Pointer(in.Path))
 	return nil
 }
 
@@ -323,10 +325,8 @@ func Convert_admissionregistration_Webhook_To_v1alpha1_Webhook(in *admissionregi
 }
 
 func autoConvert_v1alpha1_WebhookClientConfig_To_admissionregistration_WebhookClientConfig(in *v1alpha1.WebhookClientConfig, out *admissionregistration.WebhookClientConfig, s conversion.Scope) error {
-	if err := Convert_v1alpha1_ServiceReference_To_admissionregistration_ServiceReference(&in.Service, &out.Service, s); err != nil {
-		return err
-	}
-	out.URLPath = in.URLPath
+	out.URL = (*string)(unsafe.Pointer(in.URL))
+	out.Service = (*admissionregistration.ServiceReference)(unsafe.Pointer(in.Service))
 	out.CABundle = *(*[]byte)(unsafe.Pointer(&in.CABundle))
 	return nil
 }
@@ -337,10 +337,8 @@ func Convert_v1alpha1_WebhookClientConfig_To_admissionregistration_WebhookClient
 }
 
 func autoConvert_admissionregistration_WebhookClientConfig_To_v1alpha1_WebhookClientConfig(in *admissionregistration.WebhookClientConfig, out *v1alpha1.WebhookClientConfig, s conversion.Scope) error {
-	if err := Convert_admissionregistration_ServiceReference_To_v1alpha1_ServiceReference(&in.Service, &out.Service, s); err != nil {
-		return err
-	}
-	out.URLPath = in.URLPath
+	out.URL = (*string)(unsafe.Pointer(in.URL))
+	out.Service = (*v1alpha1.ServiceReference)(unsafe.Pointer(in.Service))
 	out.CABundle = *(*[]byte)(unsafe.Pointer(&in.CABundle))
 	return nil
 }

@@ -99,8 +99,9 @@ func (RuleWithOperations) SwaggerDoc() map[string]string {
 
 var map_ServiceReference = map[string]string{
 	"":          "ServiceReference holds a reference to Service.legacy.k8s.io",
-	"namespace": "Namespace is the namespace of the service Required",
-	"name":      "Name is the name of the service Required",
+	"namespace": "`namespace` is the namespace of the service. Required",
+	"name":      "`name` is the name of the service. Required",
+	"path":      "`path` is an optional URL path which will be sent in any request to this service.",
 }
 
 func (ServiceReference) SwaggerDoc() map[string]string {
@@ -142,9 +143,9 @@ func (Webhook) SwaggerDoc() map[string]string {
 
 var map_WebhookClientConfig = map[string]string{
 	"":         "WebhookClientConfig contains the information to make a TLS connection with the webhook",
-	"service":  "Service is a reference to the service for this webhook. If there is only one port open for the service, that port will be used. If there are multiple ports open, port 443 will be used if it is open, otherwise it is an error. Required",
-	"urlPath":  "URLPath is an optional field that specifies the URL path to use when posting the AdmissionReview object.",
-	"caBundle": "CABundle is a PEM encoded CA bundle which will be used to validate webhook's server certificate. Required",
+	"url":      "`url` gives the location of the webhook, in standard URL form (`[scheme://]host:port/path`). Exactly one of `url` or `service` must be specified.\n\nThe `host` should not refer to a service running in the cluster; use the `service` field instead. The host might be resolved via external DNS in some apiservers (e.g., `kube-apiserver` cannot resolve in-cluster DNS as that would be a layering violation). `host` may also be an IP address.\n\nPlease note that using `localhost` or `127.0.0.1` as a `host` is risky unless you take great care to run this webhook on all hosts which run an apiserver which might need to make calls to this webhook. Such installs are likely to be non-portable, i.e., not easy to turn up in a new cluster.\n\nIf the scheme is present, it must be \"https://\".\n\nA path is optional, and if present may be any string permissible in a URL. You may use the path to pass an arbitrary string to the webhook, for example, a cluster identifier.",
+	"service":  "`service` is a reference to the service for this webhook. Either `service` or `url` must be specified.\n\nIf the webhook is running within the cluster, then you should use `service`.\n\nIf there is only one port open for the service, that port will be used. If there are multiple ports open, port 443 will be used if it is open, otherwise it is an error.",
+	"caBundle": "`caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate. Required.",
 }
 
 func (WebhookClientConfig) SwaggerDoc() map[string]string {

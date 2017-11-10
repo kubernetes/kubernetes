@@ -295,7 +295,7 @@ type WebhookClientConfig struct {
 	// webhook, for example, a cluster identifier.
 	//
 	// +optional
-	URL *string `json:"url,omitempty"`
+	URL *string `json:"url,omitempty" protobuf:"bytes,3,opt,name=url"`
 
 	// `service` is a reference to the service for this webhook. Either
 	// `service` or `url` must be specified.
@@ -327,5 +327,5 @@ type ServiceReference struct {
 	// `path` is an optional URL path which will be sent in any request to
 	// this service.
 	// +optional
-	Path *string `json:"path,omitempty"`
+	Path *string `json:"path,omitempty" protobuf:"bytes,3,opt,name=path"`
 }
