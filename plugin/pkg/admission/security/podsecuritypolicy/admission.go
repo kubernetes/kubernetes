@@ -273,12 +273,10 @@ func (c *PodSecurityPolicyPlugin) computeSecurityContext(a admission.Attributes,
 func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.Path) field.ErrorList {
 	errs := field.ErrorList{}
 
-	psc, pscAnnotations, err := provider.CreatePodSecurityContext(pod)
+	err := provider.DefaultPodSecurityContext(pod)
 	if err != nil {
 		errs = append(errs, field.Invalid(field.NewPath("spec", "securityContext"), pod.Spec.SecurityContext, err.Error()))
 	}
-	pod.Spec.SecurityContext = psc
-	pod.Annotations = pscAnnotations
 
 	errs = append(errs, provider.ValidatePodSecurityContext(pod, field.NewPath("spec", "securityContext"))...)
 

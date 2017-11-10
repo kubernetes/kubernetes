@@ -64,17 +64,16 @@ func NewSimpleProvider(psp *extensions.PodSecurityPolicy, namespace string, stra
 	}, nil
 }
 
-// Create a PodSecurityContext based on the given constraints.  If a setting is already set
-// on the PodSecurityContext it will not be changed.  Validate should be used after the context
-// is created to ensure it complies with the required restrictions.
-func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurityContext, map[string]string, error) {
+// DefaultPodSecurityContext sets the default values of the required but not filled fields.
+// It modifies the SecurityContext and annotations of the provided pod. Validation should be
+// used after the context is defaulted to ensure it complies with the required restrictions.
+func (s *simpleProvider) DefaultPodSecurityContext(pod *api.Pod) error {
 	sc := securitycontext.NewPodSecurityContextMutator(pod.Spec.SecurityContext)
-	annotations := maps.CopySS(pod.Annotations)
 
 	if sc.SupplementalGroups() == nil {
 		supGroups, err := s.strategies.SupplementalGroupStrategy.Generate(pod)
 		if err != nil {
-			return nil, nil, err
+			return err
 		}
 		sc.SetSupplementalGroups(supGroups)
 	}
@@ -82,7 +81,7 @@ func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurit
 	if sc.FSGroup() == nil {
 		fsGroup, err := s.strategies.FSGroupStrategy.GenerateSingle(pod)
 		if err != nil {
-			return nil, nil, err
+			return err
 		}
 		sc.SetFSGroup(fsGroup)
 	}
@@ -90,24 +89,27 @@ func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurit
 	if sc.SELinuxOptions() == nil {
 		seLinux, err := s.strategies.SELinuxStrategy.Generate(pod, nil)
 		if err != nil {
-			return nil, nil, err
+			return err
 		}
 		sc.SetSELinuxOptions(seLinux)
 	}
 
 	// This is only generated on the pod level.  Containers inherit the pod's profile.  If the
 	// container has a specific profile set then it will be caught in the validation step.
-	seccompProfile, err := s.strategies.SeccompStrategy.Generate(annotations, pod)
+	seccompProfile, err := s.strategies.SeccompStrategy.Generate(pod.Annotations, pod)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 	if seccompProfile != "" {
-		if annotations == nil {
-			annotations = map[string]string{}
+		if pod.Annotations == nil {
+			pod.Annotations = map[string]string{}
 		}
-		annotations[api.SeccompPodAnnotationKey] = seccompProfile
+		pod.Annotations[api.SeccompPodAnnotationKey] = seccompProfile
 	}
-	return sc.PodSecurityContext(), annotations, nil
+
+	pod.Spec.SecurityContext = sc.PodSecurityContext()
+
+	return nil
 }
 
 // Create a SecurityContext based on the given constraints.  If a setting is already set on the

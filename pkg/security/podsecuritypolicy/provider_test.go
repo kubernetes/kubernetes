@@ -38,7 +38,7 @@ import (
 
 const defaultContainerName = "test-c"
 
-func TestCreatePodSecurityContextNonmutating(t *testing.T) {
+func TestDefaultPodSecurityContextNonmutating(t *testing.T) {
 	// Create a pod with a security context that needs filling in
 	createPod := func() *api.Pod {
 		return &api.Pod{
@@ -82,7 +82,7 @@ func TestCreatePodSecurityContextNonmutating(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to create provider %v", err)
 	}
-	_, _, err = provider.CreatePodSecurityContext(pod)
+	err = provider.DefaultPodSecurityContext(pod)
 	if err != nil {
 		t.Fatalf("unable to create psc %v", err)
 	}
@@ -91,10 +91,10 @@ func TestCreatePodSecurityContextNonmutating(t *testing.T) {
 	// since all the strategies were permissive
 	if !reflect.DeepEqual(createPod(), pod) {
 		diffs := diff.ObjectDiff(createPod(), pod)
-		t.Errorf("pod was mutated by CreatePodSecurityContext. diff:\n%s", diffs)
+		t.Errorf("pod was mutated by DefaultPodSecurityContext. diff:\n%s", diffs)
 	}
 	if !reflect.DeepEqual(createPSP(), psp) {
-		t.Error("psp was mutated by CreatePodSecurityContext")
+		t.Error("psp was mutated by DefaultPodSecurityContext")
 	}
 }
 
