@@ -2050,7 +2050,7 @@ fi
 
 override-kubectl
 # Run the containerized mounter once to pre-cache the container image.
-if [[ "${CONTAINER_RUNTIME:-}" == "docker" ]]; then
+if [[ "${CONTAINER_RUNTIME:-docker}" == "docker" ]]; then
   assemble-docker-flags
 fi
 start-kubelet
