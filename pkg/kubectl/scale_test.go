@@ -323,7 +323,7 @@ func TestJobScaleRetry(t *testing.T) {
 	scaleFunc = ScaleCondition(&scaler, &preconditions, namespace, name, count, nil)
 	pass, err = scaleFunc()
 	if err == nil {
-		t.Errorf("Expected error on precondition failure")
+		t.Error("Expected error on precondition failure")
 	}
 }
 
@@ -349,7 +349,7 @@ func TestJobScale(t *testing.T) {
 		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", actions)
 	}
 	if action, ok := actions[0].(testcore.GetAction); !ok || action.GetResource().GroupResource() != batch.Resource("jobs") || action.GetName() != name {
-		t.Errorf("unexpected action: %v, expected get-replicationController %s", actions[0], name)
+		t.Errorf("unexpected action: %v, expected get-job %s", actions[0], name)
 	}
 	if action, ok := actions[1].(testcore.UpdateAction); !ok || action.GetResource().GroupResource() != batch.Resource("jobs") || *action.GetObject().(*batch.Job).Spec.Parallelism != int32(count) {
 		t.Errorf("unexpected action %v, expected update-job with parallelism = %d", actions[1], count)
@@ -585,7 +585,7 @@ func TestDeploymentScaleRetry(t *testing.T) {
 	scaleFunc = ScaleCondition(scaler, preconditions, namespace, name, count, nil)
 	pass, err = scaleFunc()
 	if err == nil {
-		t.Errorf("Expected error on precondition failure")
+		t.Error("Expected error on precondition failure")
 	}
 }
 
@@ -611,7 +611,7 @@ func TestDeploymentScale(t *testing.T) {
 		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", actions)
 	}
 	if action, ok := actions[0].(testcore.GetAction); !ok || action.GetResource().GroupResource() != extensions.Resource("deployments") || action.GetName() != name {
-		t.Errorf("unexpected action: %v, expected get-replicationController %s", actions[0], name)
+		t.Errorf("unexpected action: %v, expected get-deployment %s", actions[0], name)
 	}
 	if action, ok := actions[1].(testcore.UpdateAction); !ok || action.GetResource().GroupResource() != extensions.Resource("deployments") || action.GetObject().(*extensions.Deployment).Spec.Replicas != int32(count) {
 		t.Errorf("unexpected action %v, expected update-deployment with replicas = %d", actions[1], count)
