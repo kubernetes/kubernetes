@@ -494,7 +494,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 	pvs := make([]*v1.PersistentVolume, maxPVs)
 	for i := 0; i < maxPVs; i++ {
 		// This PV will be claimed, released, and deleted
-		pvs[i] = createPV("pv-"+strconv.Itoa(i), "/tmp/foo"+strconv.Itoa(i), strconv.Itoa(i)+"G",
+		pvs[i] = createPV("pv-"+strconv.Itoa(i), "/tmp/foo"+strconv.Itoa(i), strconv.Itoa(i+1)+"G",
 			[]v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, v1.PersistentVolumeReclaimRetain)
 	}
 
