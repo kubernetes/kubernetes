@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/kubectl"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
@@ -86,6 +87,30 @@ func TestValidateAnnotationOverwrites(t *testing.T) {
 				"b": "B",
 			},
 			scenario: "no annotations",
+		},
+		{
+			meta: &metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"a": "A",
+					"c": "C",
+				},
+			},
+			annotations: map[string]string{
+				"b": "A",
+			},
+			scenario: "share value is ok",
+		},
+		{
+			meta: &metav1.ObjectMeta{
+				Annotations: map[string]string{
+					kubectl.ChangeCauseAnnotation: "A",
+					"c": "C",
+				},
+			},
+			annotations: map[string]string{
+				kubectl.ChangeCauseAnnotation: "B",
+			},
+			scenario: "cover the exception for overwrite",
 		},
 	}
 	for _, test := range tests {
