@@ -22,6 +22,7 @@ package v1alpha1
 
 import (
 	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	admissionregistration "k8s.io/kubernetes/pkg/apis/admissionregistration"
@@ -296,6 +297,7 @@ func autoConvert_v1alpha1_Webhook_To_admissionregistration_Webhook(in *v1alpha1.
 	}
 	out.Rules = *(*[]admissionregistration.RuleWithOperations)(unsafe.Pointer(&in.Rules))
 	out.FailurePolicy = (*admissionregistration.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
+	out.NamespaceSelector = (*v1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
 	return nil
 }
 
@@ -311,6 +313,7 @@ func autoConvert_admissionregistration_Webhook_To_v1alpha1_Webhook(in *admission
 	}
 	out.Rules = *(*[]v1alpha1.RuleWithOperations)(unsafe.Pointer(&in.Rules))
 	out.FailurePolicy = (*v1alpha1.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
+	out.NamespaceSelector = (*v1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
 	return nil
 }
 

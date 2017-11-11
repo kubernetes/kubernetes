@@ -197,6 +197,52 @@ type Webhook struct {
 	// allowed values are Ignore or Fail. Defaults to Ignore.
 	// +optional
 	FailurePolicy *FailurePolicyType `json:"failurePolicy,omitempty" protobuf:"bytes,4,opt,name=failurePolicy,casttype=FailurePolicyType"`
+
+	// NamespaceSelector decides whether to run the webhook on an object based
+	// on whether the namespace for that object matches the selector. If the
+	// object itself is a namespace, the matching is performed on
+	// object.metadata.labels. If the object is other cluster scoped resource,
+	// it is not subjected to the webhook.
+	//
+	// For example, to run the webhook on any objects whose namespace is not
+	// associated with "runlevel" of "0" or "1";  you will set the selector as
+	// follows:
+	// "namespaceSelector": {
+	//   "matchExpressions": [
+	//     {
+	//       "key": "runlevel",
+	//       "operator": "NotIn",
+	//       "values": [
+	//         "0",
+	//         "1"
+	//       ]
+	//     }
+	//   ]
+	// }
+	//
+	// If instead you want to only run the webhook on any objects whose
+	// namespace is associated with the "environment" of "prod" or "staging";
+	// you will set the selector as follows:
+	// "namespaceSelector": {
+	//   "matchExpressions": [
+	//     {
+	//       "key": "environment",
+	//       "operator": "In",
+	//       "values": [
+	//         "prod",
+	//         "staging"
+	//       ]
+	//     }
+	//   ]
+	// }
+	//
+	// See
+	// https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+	// for more examples of label selectors.
+	//
+	// Default to the empty LabelSelector, which matches everything.
+	// +optional
+	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,5,opt,name=namespaceSelector"`
 }
 
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make
