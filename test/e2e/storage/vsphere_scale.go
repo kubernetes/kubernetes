@@ -114,8 +114,11 @@ var _ = SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 		Remove labels from all the nodes
 	*/
 	framework.AddCleanupAction(func() {
-		for _, node := range nodes.Items {
-			framework.RemoveLabelOffNode(client, node.Name, NodeLabelKey)
+		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
+		if len(namespace) > 0 {
+			for _, node := range nodes.Items {
+				framework.RemoveLabelOffNode(client, node.Name, NodeLabelKey)
+			}
 		}
 	})
 
