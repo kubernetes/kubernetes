@@ -125,8 +125,13 @@ func (f *ring2Factory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta
 	if err != nil {
 		return err
 	}
+	// Prefer the existing external version if specified
+	var preferredVersion []string
+	if gvks[0].Version != "" && gvks[0].Version != runtime.APIVersionInternal {
+		preferredVersion = []string{gvks[0].Version}
+	}
 
-	mapping, err := mapper.RESTMapping(gvks[0].GroupKind())
+	mapping, err := mapper.RESTMapping(gvks[0].GroupKind(), preferredVersion...)
 	if err != nil {
 		return err
 	}
