@@ -15,7 +15,7 @@ func main() {
 		Use:   "test",
 		Short: "my test program",
 	}
-	header := &cobra.GenManHeader{
+	header := &doc.GenManHeader{
 		Title: "MINE",
 		Section: "3",
 	}
@@ -23,4 +23,4 @@ func main() {
 }
 ```
 
-That will get you a man page `/tmp/test.1`
+That will get you a man page `/tmp/test.3`
