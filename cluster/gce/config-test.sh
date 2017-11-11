@@ -264,6 +264,11 @@ if [[ -n "${DISABLE_DOCKER_LIVE_RESTORE:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} DISABLE_DOCKER_LIVE_RESTORE"
 fi
 
+# Override default docker storage driver.
+if [[ -n "${DOCKER_STORAGE_DRIVER:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} DOCKER_STORAGE_DRIVER"
+fi
+
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
 
