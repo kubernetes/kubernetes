@@ -321,6 +321,15 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	return p
 }
 
+func hasSessionAffinityRule(rules []iptablestest.Rule) bool {
+	for _, r := range rules {
+		if _, ok := r[iptablestest.Recent]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 func hasJump(rules []iptablestest.Rule, destChain, destIP string, destPort int) bool {
 	destPortStr := strconv.Itoa(destPort)
 	match := false
@@ -765,6 +774,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
 	}
+	svcSessionAffinityTimeout := int32(10800)
 
 	makeServiceMap(fp,
 		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *api.Service) {
@@ -780,6 +790,10 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 				IP: svcLBIP,
 			}}
 			svc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.SessionAffinity = api.ServiceAffinityClientIP
+			svc.Spec.SessionAffinityConfig = &api.SessionAffinityConfig{
+				ClientIP: &api.ClientIPConfig{TimeoutSeconds: &svcSessionAffinityTimeout},
+			}
 		}),
 	)
 
@@ -833,6 +847,9 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	}
 	if !hasJump(lbRules, localEpChain, "", 0) {
 		errorf(fmt.Sprintf("Didn't find jump from lb chain %v to local ep %v", lbChain, epStrNonLocal), lbRules, t)
+	}
+	if !hasSessionAffinityRule(lbRules) {
+		errorf(fmt.Sprintf("Didn't find session affinity rule from lb chain %v", lbChain), lbRules, t)
 	}
 }
 
