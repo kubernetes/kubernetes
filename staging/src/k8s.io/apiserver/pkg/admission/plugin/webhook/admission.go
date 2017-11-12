@@ -400,6 +400,9 @@ func toStatusErr(name string, result *metav1.Status) *apierrors.StatusError {
 
 func (a *GenericAdmissionWebhook) hookClient(h *v1alpha1.Webhook) (*rest.RESTClient, error) {
 	cacheKey, err := json.Marshal(h.ClientConfig)
+	if err != nil {
+		return nil, err
+	}
 	if client, ok := a.cache.Get(string(cacheKey)); ok {
 		return client.(*rest.RESTClient), nil
 	}
@@ -464,7 +467,6 @@ func (a *GenericAdmissionWebhook) hookClient(h *v1alpha1.Webhook) (*rest.RESTCli
 	cfg := rest.CopyConfig(restConfig)
 	cfg.Host = u.Host
 	cfg.APIPath = u.Path
-	// TODO: test if this is needed: cfg.TLSClientConfig.ServerName = u.Host
 
 	return complete(cfg)
 }

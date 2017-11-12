@@ -538,7 +538,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 						},
 					},
 				}),
-			expectedError: `[0].clientConfig.url: Required value: host must be provided`,
+			expectedError: `[0].clientConfig.url: Invalid value: "": host must be provided`,
 		},
 		{
 			name: "wrong scheme",
@@ -565,6 +565,45 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 					},
 				}),
 			expectedError: `host must be provided`,
+		},
+		{
+			name: "fragment",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.WebhookClientConfig{
+							URL: strPtr("https://example.com/#bookmark"),
+						},
+					},
+				}),
+			expectedError: `"bookmark": fragments are not permitted`,
+		},
+		{
+			name: "query",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.WebhookClientConfig{
+							URL: strPtr("https://example.com?arg=value"),
+						},
+					},
+				}),
+			expectedError: `"arg=value": query parameters are not permitted`,
+		},
+		{
+			name: "user",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.WebhookClientConfig{
+							URL: strPtr("https://harry.potter@example.com/"),
+						},
+					},
+				}),
+			expectedError: `"harry.potter": user information is not permitted`,
 		},
 		{
 			name: "just totally wrong",
