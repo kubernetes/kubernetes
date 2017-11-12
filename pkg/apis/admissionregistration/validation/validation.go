@@ -213,11 +213,20 @@ func validateWebhookClientConfig(fldPath *field.Path, cc *admissionregistration.
 		if u, err := url.Parse(*cc.URL); err != nil {
 			allErrors = append(allErrors, field.Required(fldPath.Child("url"), "url must be a valid URL: "+err.Error()+form))
 		} else {
-			if u.Scheme != "" && u.Scheme != "https" {
-				allErrors = append(allErrors, field.Required(fldPath.Child("url"), "'https' is the only allowed URL scheme"+form))
+			if u.Scheme != "https" {
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("url"), u.Scheme, "'https' is the only allowed URL scheme"+form))
 			}
 			if len(u.Host) == 0 {
-				allErrors = append(allErrors, field.Required(fldPath.Child("url"), "host must be provided"+form))
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("url"), u.Host, "host must be provided"+form))
+			}
+			if u.User != nil {
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("url"), u.User.String(), "user information is not permitted in the URL"))
+			}
+			if len(u.Fragment) != 0 {
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("url"), u.Fragment, "fragments are not permitted in the URL"))
+			}
+			if len(u.RawQuery) != 0 {
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("url"), u.RawQuery, "query parameters are not permitted in the URL"))
 			}
 		}
 	}

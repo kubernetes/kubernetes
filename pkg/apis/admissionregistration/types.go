@@ -282,11 +282,15 @@ type WebhookClientConfig struct {
 	// webhook. Such installs are likely to be non-portable, i.e., not easy
 	// to turn up in a new cluster.
 	//
-	// If the scheme is present, it must be "https://".
+	// The scheme must be "https"; the URL must begin with "https://".
 	//
 	// A path is optional, and if present may be any string permissible in
 	// a URL. You may use the path to pass an arbitrary string to the
 	// webhook, for example, a cluster identifier.
+	//
+	// Attempting to use a user or basic auth e.g. "user:password@" is not
+	// allowed. Fragments ("#...") and query parameters ("?...") are not
+	// allowed, either.
 	//
 	// +optional
 	URL *string
