@@ -190,6 +190,13 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			if (strings.HasPrefix(containerPath, "/") || strings.HasPrefix(containerPath, "\\")) && !strings.Contains(containerPath, ":") {
 				containerPath = "c:" + containerPath
 			}
+		} else {
+			p := containerPath
+			if len(p) > 1 && ((p[0] >= 'A' && p[0] <= 'Z') || (p[0] >= 'a' && p[0] <= 'z')) && p[1] == ':' {
+				// mitigate a windows path when it's form of "D:", "e:\foobar" etc
+				p = strings.Replace(p, "\\", "/", -1)
+				containerPath = "/" + strings.Replace(p, ":", "", -1)
+			}
 		}
 
 		propagation, err := translateMountPropagation(mount.MountPropagation)

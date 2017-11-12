@@ -82,6 +82,11 @@ func TestMakeMounts(t *testing.T) {
 						ReadOnly:  true,
 					},
 					{
+						MountPath: "D:",
+						Name:      "disk",
+						ReadOnly:  false,
+					},
+					{
 						MountPath: "/mnt/path4",
 						Name:      "disk4",
 						ReadOnly:  false,
@@ -107,6 +112,14 @@ func TestMakeMounts(t *testing.T) {
 					ContainerPath:  "/mnt/path3",
 					HostPath:       "/mnt/disk",
 					ReadOnly:       true,
+					SELinuxRelabel: false,
+					Propagation:    runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
+				},
+				{
+					Name:           "disk",
+					ContainerPath:  "/D",
+					HostPath:       "/mnt/disk",
+					ReadOnly:       false,
 					SELinuxRelabel: false,
 					Propagation:    runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
 				},
@@ -151,6 +164,12 @@ func TestMakeMounts(t *testing.T) {
 						MountPropagation: &propagationHostToContainer,
 					},
 					{
+						MountPath:        "C:\\foobar",
+						Name:             "disk",
+						ReadOnly:         true,
+						MountPropagation: &propagationHostToContainer,
+					},
+					{
 						MountPath: "/mnt/path4",
 						Name:      "disk4",
 						ReadOnly:  false,
@@ -172,6 +191,14 @@ func TestMakeMounts(t *testing.T) {
 				{
 					Name:           "disk",
 					ContainerPath:  "/mnt/path3",
+					HostPath:       "/mnt/disk",
+					ReadOnly:       true,
+					SELinuxRelabel: false,
+					Propagation:    runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
+				},
+				{
+					Name:           "disk",
+					ContainerPath:  "/C/foobar",
 					HostPath:       "/mnt/disk",
 					ReadOnly:       true,
 					SELinuxRelabel: false,
