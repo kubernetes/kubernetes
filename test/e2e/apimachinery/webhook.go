@@ -17,6 +17,7 @@ limitations under the License.
 package apimachinery
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -30,9 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
+	clientset "k8s.io/client-go/kubernetes"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -52,6 +55,7 @@ const (
 	skippedNamespaceName    = "exempted-namesapce"
 	disallowedPodName       = "disallowed-pod"
 	disallowedConfigMapName = "disallowed-configmap"
+	allowedConfigMapName    = "allowed-configmap"
 	crdName                 = "e2e-test-webhook-crd"
 	crdKind                 = "E2e-test-webhook-crd"
 	crdWebhookConfigName    = "e2e-test-webhook-config-crd"
@@ -284,7 +288,7 @@ func registerWebhook(f *framework.Framework, context *certContext) {
 			{
 				Name: "deny-unwanted-configmap-data.k8s.io",
 				Rules: []v1alpha1.RuleWithOperations{{
-					Operations: []v1alpha1.OperationType{v1alpha1.Create},
+					Operations: []v1alpha1.OperationType{v1alpha1.Create, v1alpha1.Update},
 					Rule: v1alpha1.Rule{
 						APIGroups:   []string{""},
 						APIVersions: []string{"v1"},
@@ -344,6 +348,40 @@ func testWebhook(f *framework.Framework) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
 	}
 
+	By("create a configmap that should be admitted by the webhook")
+	// Creating the configmap, the request should be admitted
+	configmap = &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: allowedConfigMapName,
+		},
+		Data: map[string]string{
+			"admit": "this",
+		},
+	}
+	_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Create(configmap)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("update (PUT) the admitted configmap to a non-compliant one should be rejected by the webhook")
+	toNonCompliantFn := func(cm *v1.ConfigMap) {
+		if cm.Data == nil {
+			cm.Data = map[string]string{}
+		}
+		cm.Data["webhook-e2e-test"] = "webhook-disallow"
+	}
+	_, err = updateConfigMap(client, f.Namespace.Name, allowedConfigMapName, toNonCompliantFn)
+	Expect(err).NotTo(BeNil())
+	if !strings.Contains(err.Error(), expectedErrMsg) {
+		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
+	}
+
+	By("update (PATCH) the admitted configmap to a non-compliant one should be rejected by the webhook")
+	patch := nonCompliantConfigMapPatch()
+	_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Patch(allowedConfigMapName, types.StrategicMergePatchType, []byte(patch))
+	Expect(err).NotTo(BeNil())
+	if !strings.Contains(err.Error(), expectedErrMsg) {
+		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
+	}
+
 	By("create a namespace that bypass the webhook")
 	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
 		_, err2 := client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{
@@ -396,6 +434,32 @@ func nonCompliantConfigMap(f *framework.Framework) *v1.ConfigMap {
 			"webhook-e2e-test": "webhook-disallow",
 		},
 	}
+}
+
+func nonCompliantConfigMapPatch() string {
+	return fmt.Sprint(`{"data":{"webhook-e2e-test":"webhook-disallow"}}`)
+}
+
+type updateConfigMapFn func(cm *v1.ConfigMap)
+
+func updateConfigMap(c clientset.Interface, ns, name string, update updateConfigMapFn) (*v1.ConfigMap, error) {
+	var cm *v1.ConfigMap
+	pollErr := wait.PollImmediate(2*time.Second, 1*time.Minute, func() (bool, error) {
+		var err error
+		if cm, err = c.CoreV1().ConfigMaps(ns).Get(name, metav1.GetOptions{}); err != nil {
+			return false, err
+		}
+		update(cm)
+		if cm, err = c.CoreV1().ConfigMaps(ns).Update(cm); err == nil {
+			return true, nil
+		}
+		// Only retry update on conflict
+		if !errors.IsConflict(err) {
+			return false, err
+		}
+		return false, nil
+	})
+	return cm, pollErr
 }
 
 func cleanWebhookTest(f *framework.Framework) {
