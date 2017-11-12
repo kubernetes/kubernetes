@@ -20,6 +20,7 @@ package webhook
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -53,6 +54,10 @@ const (
 	// Name of admission plug-in
 	PluginName       = "GenericAdmissionWebhook"
 	defaultCacheSize = 200
+)
+
+var (
+	ErrNeedServiceOrURL = errors.New("webhook configuration must have either service or URL")
 )
 
 type ErrCallingWebhook struct {
@@ -395,47 +400,71 @@ func toStatusErr(name string, result *metav1.Status) *apierrors.StatusError {
 
 func (a *GenericAdmissionWebhook) hookClient(h *v1alpha1.Webhook) (*rest.RESTClient, error) {
 	cacheKey, err := json.Marshal(h.ClientConfig)
-	if err != nil {
-		return nil, err
-	}
 	if client, ok := a.cache.Get(string(cacheKey)); ok {
 		return client.(*rest.RESTClient), nil
 	}
 
-	serverName := h.ClientConfig.Service.Name + "." + h.ClientConfig.Service.Namespace + ".svc"
-	restConfig, err := a.authInfoResolver.ClientConfigFor(serverName)
+	complete := func(cfg *rest.Config) (*rest.RESTClient, error) {
+		cfg.TLSClientConfig.CAData = h.ClientConfig.CABundle
+		cfg.ContentConfig.NegotiatedSerializer = a.negotiatedSerializer
+		cfg.ContentConfig.ContentType = runtime.ContentTypeJSON
+		client, err := rest.UnversionedRESTClientFor(cfg)
+		if err == nil {
+			a.cache.Add(string(cacheKey), client)
+		}
+		return client, err
+	}
+
+	if svc := h.ClientConfig.Service; svc != nil {
+		serverName := svc.Name + "." + svc.Namespace + ".svc"
+		restConfig, err := a.authInfoResolver.ClientConfigFor(serverName)
+		if err != nil {
+			return nil, err
+		}
+		cfg := rest.CopyConfig(restConfig)
+		host := serverName + ":443"
+		cfg.Host = "https://" + host
+		if svc.Path != nil {
+			cfg.APIPath = *svc.Path
+		}
+		cfg.TLSClientConfig.ServerName = serverName
+
+		delegateDialer := cfg.Dial
+		if delegateDialer == nil {
+			delegateDialer = net.Dial
+		}
+		cfg.Dial = func(network, addr string) (net.Conn, error) {
+			if addr == host {
+				u, err := a.serviceResolver.ResolveEndpoint(svc.Namespace, svc.Name)
+				if err != nil {
+					return nil, err
+				}
+				addr = u.Host
+			}
+			return delegateDialer(network, addr)
+		}
+
+		return complete(cfg)
+	}
+
+	if h.ClientConfig.URL == nil {
+		return nil, &ErrCallingWebhook{WebhookName: h.Name, Reason: ErrNeedServiceOrURL}
+	}
+
+	u, err := url.Parse(*h.ClientConfig.URL)
+	if err != nil {
+		return nil, &ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Unparsable URL: %v", err)}
+	}
+
+	restConfig, err := a.authInfoResolver.ClientConfigFor(u.Host)
 	if err != nil {
 		return nil, err
 	}
 
 	cfg := rest.CopyConfig(restConfig)
-	host := serverName + ":443"
-	cfg.Host = "https://" + host
-	cfg.APIPath = h.ClientConfig.URLPath
-	cfg.TLSClientConfig.ServerName = serverName
-	cfg.TLSClientConfig.CAData = h.ClientConfig.CABundle
-	cfg.ContentConfig.NegotiatedSerializer = a.negotiatedSerializer
-	cfg.ContentConfig.ContentType = runtime.ContentTypeJSON
+	cfg.Host = u.Host
+	cfg.APIPath = u.Path
+	// TODO: test if this is needed: cfg.TLSClientConfig.ServerName = u.Host
 
-	delegateDialer := cfg.Dial
-	if delegateDialer == nil {
-		delegateDialer = net.Dial
-	}
-
-	cfg.Dial = func(network, addr string) (net.Conn, error) {
-		if addr == host {
-			u, err := a.serviceResolver.ResolveEndpoint(h.ClientConfig.Service.Namespace, h.ClientConfig.Service.Name)
-			if err != nil {
-				return nil, err
-			}
-			addr = u.Host
-		}
-		return delegateDialer(network, addr)
-	}
-
-	client, err := rest.UnversionedRESTClientFor(cfg)
-	if err == nil {
-		a.cache.Add(string(cacheKey), client)
-	}
-	return client, err
+	return complete(cfg)
 }

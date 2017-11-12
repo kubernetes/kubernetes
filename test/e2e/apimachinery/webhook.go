@@ -218,6 +218,8 @@ func deployWebhookAndService(f *framework.Framework, image string, context *cert
 	framework.ExpectNoError(err, "waiting for service %s/%s have %d endpoint", namespace, serviceName, 1)
 }
 
+func strPtr(s string) *string { return &s }
+
 func registerWebhook(f *framework.Framework, context *certContext) {
 	client := f.ClientSet
 	By("Registering the webhook via the AdmissionRegistration API")
@@ -239,11 +241,11 @@ func registerWebhook(f *framework.Framework, context *certContext) {
 					},
 				}},
 				ClientConfig: v1alpha1.WebhookClientConfig{
-					Service: v1alpha1.ServiceReference{
+					Service: &v1alpha1.ServiceReference{
 						Namespace: namespace,
 						Name:      serviceName,
+						Path:      strPtr("/pods"),
 					},
-					URLPath:  "/pods",
 					CABundle: context.signingCert,
 				},
 			},
@@ -268,11 +270,11 @@ func registerWebhook(f *framework.Framework, context *certContext) {
 					},
 				},
 				ClientConfig: v1alpha1.WebhookClientConfig{
-					Service: v1alpha1.ServiceReference{
+					Service: &v1alpha1.ServiceReference{
 						Namespace: namespace,
 						Name:      serviceName,
+						Path:      strPtr("/configmaps"),
 					},
-					URLPath:  "/configmaps",
 					CABundle: context.signingCert,
 				},
 			},

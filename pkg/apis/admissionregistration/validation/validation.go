@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -192,29 +193,69 @@ func validateWebhook(hook *admissionregistration.Webhook, fldPath *field.Path) f
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *hook.FailurePolicy, supportedFailurePolicies.List()))
 	}
 
-	if len(hook.ClientConfig.URLPath) != 0 {
-		allErrors = append(allErrors, validateURLPath(fldPath.Child("clientConfig", "urlPath"), hook.ClientConfig.URLPath)...)
-	}
-
 	if hook.NamespaceSelector != nil {
 		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.NamespaceSelector, fldPath.Child("namespaceSelector"))...)
 	}
 
+	allErrors = append(allErrors, validateWebhookClientConfig(fldPath.Child("clientConfig"), &hook.ClientConfig)...)
+
 	return allErrors
 }
 
-func validateURLPath(fldPath *field.Path, urlPath string) field.ErrorList {
+func validateWebhookClientConfig(fldPath *field.Path, cc *admissionregistration.WebhookClientConfig) field.ErrorList {
 	var allErrors field.ErrorList
+	if (cc.URL == nil) == (cc.Service == nil) {
+		allErrors = append(allErrors, field.Required(fldPath.Child("url"), "exactly one of url or service is required"))
+	}
+
+	if cc.URL != nil {
+		const form = "; desired format: https://host[/path]"
+		if u, err := url.Parse(*cc.URL); err != nil {
+			allErrors = append(allErrors, field.Required(fldPath.Child("url"), "url must be a valid URL: "+err.Error()+form))
+		} else {
+			if u.Scheme != "" && u.Scheme != "https" {
+				allErrors = append(allErrors, field.Required(fldPath.Child("url"), "'https' is the only allowed URL scheme"+form))
+			}
+			if len(u.Host) == 0 {
+				allErrors = append(allErrors, field.Required(fldPath.Child("url"), "host must be provided"+form))
+			}
+		}
+	}
+
+	if cc.Service != nil {
+		allErrors = append(allErrors, validateWebhookService(fldPath.Child("service"), cc.Service)...)
+	}
+	return allErrors
+}
+
+func validateWebhookService(fldPath *field.Path, svc *admissionregistration.ServiceReference) field.ErrorList {
+	var allErrors field.ErrorList
+
+	if len(svc.Name) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("name"), "service name is required"))
+	}
+
+	if len(svc.Namespace) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("namespace"), "service namespace is required"))
+	}
+
+	if svc.Path == nil {
+		return allErrors
+	}
+
+	// TODO: replace below with url.Parse + verifying that host is empty?
+
+	urlPath := *svc.Path
 	if urlPath == "/" || len(urlPath) == 0 {
 		return allErrors
 	}
 	if urlPath == "//" {
-		allErrors = append(allErrors, field.Invalid(fldPath, urlPath, "segment[0] may not be empty"))
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("path"), urlPath, "segment[0] may not be empty"))
 		return allErrors
 	}
 
 	if !strings.HasPrefix(urlPath, "/") {
-		allErrors = append(allErrors, field.Invalid(fldPath, urlPath, "must start with a '/'"))
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("path"), urlPath, "must start with a '/'"))
 	}
 
 	urlPathToCheck := urlPath[1:]
@@ -224,12 +265,12 @@ func validateURLPath(fldPath *field.Path, urlPath string) field.ErrorList {
 	steps := strings.Split(urlPathToCheck, "/")
 	for i, step := range steps {
 		if len(step) == 0 {
-			allErrors = append(allErrors, field.Invalid(fldPath, urlPath, fmt.Sprintf("segment[%d] may not be empty", i)))
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("path"), urlPath, fmt.Sprintf("segment[%d] may not be empty", i)))
 			continue
 		}
 		failures := validation.IsDNS1123Subdomain(step)
 		for _, failure := range failures {
-			allErrors = append(allErrors, field.Invalid(fldPath, urlPath, fmt.Sprintf("segment[%d]: %v", i, failure)))
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("path"), urlPath, fmt.Sprintf("segment[%d]: %v", i, failure)))
 		}
 	}
 
