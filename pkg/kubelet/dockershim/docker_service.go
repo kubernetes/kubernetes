@@ -210,6 +210,7 @@ func NewDockerService(client libdocker.Interface, seccompProfileRoot string, pod
 	// NOTE: cgroup driver is only detectable in docker 1.11+
 	cgroupDriver := defaultCgroupDriver
 	dockerInfo, err := ds.client.Info()
+	glog.Infof("Docker Info: %+v", dockerInfo)
 	if err != nil {
 		glog.Errorf("Failed to execute Info() call to the Docker client: %v", err)
 		glog.Warningf("Falling back to use the default driver: %q", cgroupDriver)
