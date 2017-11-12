@@ -31,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 type DeploymentV1Beta1 struct{}
@@ -606,31 +605,6 @@ func (BasicReplicationController) ParamNames() []GeneratorParam {
 	}
 }
 
-// populateResourceList takes strings of form <resourceName1>=<value1>,<resourceName1>=<value2>
-// and returns ResourceList.
-func populateResourceList(spec string) (api.ResourceList, error) {
-	// empty input gets a nil response to preserve generator test expected behaviors
-	if spec == "" {
-		return nil, nil
-	}
-
-	result := api.ResourceList{}
-	resourceStatements := strings.Split(spec, ",")
-	for _, resourceStatement := range resourceStatements {
-		parts := strings.Split(resourceStatement, "=")
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("Invalid argument syntax %v, expected <resource>=<value>", resourceStatement)
-		}
-		resourceName := api.ResourceName(parts[0])
-		resourceQuantity, err := resource.ParseQuantity(parts[1])
-		if err != nil {
-			return nil, err
-		}
-		result[resourceName] = resourceQuantity
-	}
-	return result, nil
-}
-
 // populateResourceListV1 takes strings of form <resourceName1>=<value1>,<resourceName1>=<value2>
 // and returns ResourceList.
 func populateResourceListV1(spec string) (v1.ResourceList, error) {
@@ -653,23 +627,6 @@ func populateResourceListV1(spec string) (v1.ResourceList, error) {
 		}
 		result[resourceName] = resourceQuantity
 	}
-	return result, nil
-}
-
-// HandleResourceRequirements parses the limits and requests parameters if specified
-// and returns ResourceRequirements.
-func HandleResourceRequirements(params map[string]string) (api.ResourceRequirements, error) {
-	result := api.ResourceRequirements{}
-	limits, err := populateResourceList(params["limits"])
-	if err != nil {
-		return result, err
-	}
-	result.Limits = limits
-	requests, err := populateResourceList(params["requests"])
-	if err != nil {
-		return result, err
-	}
-	result.Requests = requests
 	return result, nil
 }
 

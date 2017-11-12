@@ -852,6 +852,12 @@ function assemble-docker-flags {
     docker_opts+=" --live-restore=false"
   fi
 
+  # Override docker storage driver if the environment variable is set
+
+  if [[ -n "${DOCKER_STORAGE_DRIVER:-}" ]]; then
+    docker_opts+=" --storage-driver=${DOCKER_STORAGE_DRIVER}"
+  fi
+
   echo "DOCKER_OPTS=\"${docker_opts} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
 
   if [[ "${use_net_plugin}" == "true" ]]; then
@@ -2050,7 +2056,7 @@ fi
 
 override-kubectl
 # Run the containerized mounter once to pre-cache the container image.
-if [[ "${CONTAINER_RUNTIME:-}" == "docker" ]]; then
+if [[ "${CONTAINER_RUNTIME:-docker}" == "docker" ]]; then
   assemble-docker-flags
 fi
 start-kubelet

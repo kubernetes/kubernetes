@@ -7,9 +7,9 @@ http_archive(
 
 http_archive(
     name = "io_kubernetes_build",
-    sha256 = "8e49ac066fbaadd475bd63762caa90f81cd1880eba4cc25faa93355ef5fa2739",
-    strip_prefix = "repo-infra-e26fc85d14a1d3dc25569831acc06919673c545a",
-    urls = ["https://github.com/kubernetes/repo-infra/archive/e26fc85d14a1d3dc25569831acc06919673c545a.tar.gz"],
+    sha256 = "89788eb30f10258ae0c6ab8b8625a28cb4c101fba93a8a6725ba227bb778ff27",
+    strip_prefix = "repo-infra-653485c1a6d554513266d55683da451bd41f7d65",
+    urls = ["https://github.com/kubernetes/repo-infra/archive/653485c1a6d554513266d55683da451bd41f7d65.tar.gz"],
 )
 
 ETCD_VERSION = "3.1.10"
@@ -62,15 +62,15 @@ http_file(
 
 docker_pull(
     name = "debian-iptables-amd64",
-    digest = "sha256:2e747bc7455b46350d8e57f05c03e109fa306861e7b2a2e8e1cd563932170cf1",
+    digest = "sha256:efc1d8a37f141869b7e45fa4e153ebea11502ee3d0ac29b25cd94cb02a40a91c",
     registry = "gcr.io",
     repository = "google-containers/debian-iptables-amd64",
-    tag = "v8",  # ignored, but kept here for documentation
+    tag = "v9",  # ignored, but kept here for documentation
 )
 
 docker_pull(
     name = "debian-hyperkube-base-amd64",
-    digest = "sha256:10546d592e58d5fdb2e25d79f291b8ac62c8d3a3d83337ad7309cca766dbebce",
+    digest = "sha256:1a05a58432254268c31ef5c8d9c21f3d01a40611b14707de6ac2772c0793bd13",
     registry = "gcr.io",
     repository = "google-containers/debian-hyperkube-base-amd64",
     tag = "0.6",  # ignored, but kept here for documentation

@@ -44,7 +44,8 @@ func (c *Config) addFlags() {
 }
 
 // only allow pods to pull images from specific registry.
-func admit(data []byte) *v1alpha1.AdmissionReviewStatus {
+func admitPods(data []byte) *v1alpha1.AdmissionReviewStatus {
+	glog.V(2).Info("admitting pods")
 	ar := v1alpha1.AdmissionReview{}
 	if err := json.Unmarshal(data, &ar); err != nil {
 		glog.Error(err)
@@ -86,7 +87,42 @@ func admit(data []byte) *v1alpha1.AdmissionReviewStatus {
 	return &reviewStatus
 }
 
-func serve(w http.ResponseWriter, r *http.Request) {
+// deny configmaps with specific key-value pair.
+func admitConfigMaps(data []byte) *v1alpha1.AdmissionReviewStatus {
+	glog.V(2).Info("admitting configmaps")
+	ar := v1alpha1.AdmissionReview{}
+	if err := json.Unmarshal(data, &ar); err != nil {
+		glog.Error(err)
+		return nil
+	}
+	configMapResource := metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}
+	if ar.Spec.Resource != configMapResource {
+		glog.Errorf("expect resource to be %s", configMapResource)
+		return nil
+	}
+
+	raw := ar.Spec.Object.Raw
+	configmap := v1.ConfigMap{}
+	if err := json.Unmarshal(raw, &configmap); err != nil {
+		glog.Error(err)
+		return nil
+	}
+	reviewStatus := v1alpha1.AdmissionReviewStatus{}
+	reviewStatus.Allowed = true
+	for k, v := range configmap.Data {
+		if k == "webhook-e2e-test" && v == "webhook-disallow" {
+			reviewStatus.Allowed = false
+			reviewStatus.Result = &metav1.Status{
+				Reason: "the configmap contains unwanted key and value",
+			}
+		}
+	}
+	return &reviewStatus
+}
+
+type admitFunc func(data []byte) *v1alpha1.AdmissionReviewStatus
+
+func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	var body []byte
 	if r.Body != nil {
 		if data, err := ioutil.ReadAll(r.Body); err == nil {
@@ -102,8 +138,10 @@ func serve(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reviewStatus := admit(body)
-	ar := v1alpha1.AdmissionReview{
-		Status: *reviewStatus,
+
+	ar := v1alpha1.AdmissionReview{}
+	if reviewStatus != nil {
+		ar.Status = *reviewStatus
 	}
 
 	resp, err := json.Marshal(ar)
@@ -115,12 +153,20 @@ func serve(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func servePods(w http.ResponseWriter, r *http.Request) {
+	serve(w, r, admitPods)
+}
+func serveConfigmaps(w http.ResponseWriter, r *http.Request) {
+	serve(w, r, admitConfigMaps)
+}
+
 func main() {
 	var config Config
 	config.addFlags()
 	flag.Parse()
 
-	http.HandleFunc("/", serve)
+	http.HandleFunc("/pods", servePods)
+	http.HandleFunc("/configmaps", serveConfigmaps)
 	clientset := getClient()
 	server := &http.Server{
 		Addr:      ":443",

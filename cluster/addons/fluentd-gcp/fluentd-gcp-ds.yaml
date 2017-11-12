@@ -132,4 +132,4 @@ spec:
           path: /usr/lib64
       - name: config-volume
         configMap:
-          name: fluentd-gcp-config-v1.2.2
+          name: fluentd-gcp-config-v1.2.3

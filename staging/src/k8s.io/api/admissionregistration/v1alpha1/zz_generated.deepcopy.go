@@ -21,6 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -338,6 +339,15 @@ func (in *Webhook) DeepCopyInto(out *Webhook) {
 		} else {
 			*out = new(FailurePolicyType)
 			**out = **in
+		}
+	}
+	if in.NamespaceSelector != nil {
+		in, out := &in.NamespaceSelector, &out.NamespaceSelector
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.LabelSelector)
+			(*in).DeepCopyInto(*out)
 		}
 	}
 	return

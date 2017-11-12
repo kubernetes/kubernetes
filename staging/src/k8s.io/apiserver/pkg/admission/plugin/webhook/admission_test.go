@@ -24,16 +24,20 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
 
 	"k8s.io/api/admission/v1alpha1"
 	registrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
-	api "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/rest"
@@ -47,6 +51,11 @@ type fakeHookSource struct {
 func (f *fakeHookSource) Webhooks() (*registrationv1alpha1.ValidatingWebhookConfiguration, error) {
 	if f.err != nil {
 		return nil, f.err
+	}
+	for i, h := range f.hooks {
+		if h.NamespaceSelector == nil {
+			f.hooks[i].NamespaceSelector = &metav1.LabelSelector{}
+		}
 	}
 	return &registrationv1alpha1.ValidatingWebhookConfiguration{Webhooks: f.hooks}, nil
 }
@@ -65,11 +74,26 @@ func (f fakeServiceResolver) ResolveEndpoint(namespace, name string) (*url.URL, 
 	return &u, nil
 }
 
+type fakeNamespaceLister struct {
+	namespaces map[string]*corev1.Namespace
+}
+
+func (f fakeNamespaceLister) List(selector labels.Selector) (ret []*corev1.Namespace, err error) {
+	return nil, nil
+}
+func (f fakeNamespaceLister) Get(name string) (*corev1.Namespace, error) {
+	ns, ok := f.namespaces[name]
+	if ok {
+		return ns, nil
+	}
+	return nil, errors.NewNotFound(corev1.Resource("namespaces"), name)
+}
+
 // TestAdmit tests that GenericAdmissionWebhook#Admit works as expected
 func TestAdmit(t *testing.T) {
 	scheme := runtime.NewScheme()
 	v1alpha1.AddToScheme(scheme)
-	api.AddToScheme(scheme)
+	corev1.AddToScheme(scheme)
 
 	testServer := newTestServer(t)
 	testServer.StartTLS()
@@ -85,12 +109,22 @@ func TestAdmit(t *testing.T) {
 	wh.authInfoResolver = newFakeAuthenticationInfoResolver()
 	wh.serviceResolver = fakeServiceResolver{base: *serverURL}
 	wh.SetScheme(scheme)
+	namespace := "webhook-test"
+	wh.namespaceLister = fakeNamespaceLister{map[string]*corev1.Namespace{
+		namespace: {
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"runlevel": "0",
+				},
+			},
+		},
+	},
+	}
 
 	// Set up a test object for the call
-	kind := api.SchemeGroupVersion.WithKind("Pod")
+	kind := corev1.SchemeGroupVersion.WithKind("Pod")
 	name := "my-pod"
-	namespace := "webhook-test"
-	object := api.Pod{
+	object := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
 				"pod.name": name,
@@ -103,11 +137,11 @@ func TestAdmit(t *testing.T) {
 			Kind:       "Pod",
 		},
 	}
-	oldObject := api.Pod{
+	oldObject := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 	}
 	operation := admission.Update
-	resource := api.Resource("pods").WithVersion("v1")
+	resource := corev1.Resource("pods").WithVersion("v1")
 	subResource := ""
 	userInfo := user.DefaultInfo{
 		Name: "webhook-test",
@@ -166,6 +200,40 @@ func TestAdmit(t *testing.T) {
 				}},
 			},
 			errorContains: "you shall not pass",
+		},
+		"match & disallow & but allowed because namespaceSelector exempt the namespace": {
+			hookSource: fakeHookSource{
+				hooks: []registrationv1alpha1.Webhook{{
+					Name:         "disallow",
+					ClientConfig: newFakeHookClientConfig("disallow"),
+					Rules:        newMatchEverythingRules(),
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{{
+							Key:      "runlevel",
+							Values:   []string{"1"},
+							Operator: metav1.LabelSelectorOpIn,
+						}},
+					},
+				}},
+			},
+			expectAllow: true,
+		},
+		"match & disallow & but allowed because namespaceSelector exempt the namespace ii": {
+			hookSource: fakeHookSource{
+				hooks: []registrationv1alpha1.Webhook{{
+					Name:         "disallow",
+					ClientConfig: newFakeHookClientConfig("disallow"),
+					Rules:        newMatchEverythingRules(),
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{{
+							Key:      "runlevel",
+							Values:   []string{"0"},
+							Operator: metav1.LabelSelectorOpNotIn,
+						}},
+					},
+				}},
+			},
+			expectAllow: true,
 		},
 		"match & fail (but allow because fail open)": {
 			hookSource: fakeHookSource{
@@ -230,9 +298,11 @@ func TestAdmit(t *testing.T) {
 	}
 
 	for name, tt := range table {
+		if !strings.Contains(name, "no match") {
+			continue
+		}
 		t.Run(name, func(t *testing.T) {
 			wh.hookSource = &tt.hookSource
-
 			err = wh.Admit(admission.NewAttributesRecord(&object, &oldObject, kind, namespace, name, resource, subResource, operation, &userInfo))
 			if tt.expectAllow != (err == nil) {
 				t.Errorf("expected allowed=%v, but got err=%v", tt.expectAllow, err)
@@ -254,7 +324,7 @@ func TestAdmit(t *testing.T) {
 func TestAdmitCachedClient(t *testing.T) {
 	scheme := runtime.NewScheme()
 	v1alpha1.AddToScheme(scheme)
-	api.AddToScheme(scheme)
+	corev1.AddToScheme(scheme)
 
 	testServer := newTestServer(t)
 	testServer.StartTLS()
@@ -270,12 +340,22 @@ func TestAdmitCachedClient(t *testing.T) {
 	wh.authInfoResolver = newFakeAuthenticationInfoResolver()
 	wh.serviceResolver = fakeServiceResolver{base: *serverURL}
 	wh.SetScheme(scheme)
+	namespace := "webhook-test"
+	wh.namespaceLister = fakeNamespaceLister{map[string]*corev1.Namespace{
+		namespace: {
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"runlevel": "0",
+				},
+			},
+		},
+	},
+	}
 
 	// Set up a test object for the call
-	kind := api.SchemeGroupVersion.WithKind("Pod")
+	kind := corev1.SchemeGroupVersion.WithKind("Pod")
 	name := "my-pod"
-	namespace := "webhook-test"
-	object := api.Pod{
+	object := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
 				"pod.name": name,
@@ -288,11 +368,11 @@ func TestAdmitCachedClient(t *testing.T) {
 			Kind:       "Pod",
 		},
 	}
-	oldObject := api.Pod{
+	oldObject := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 	}
 	operation := admission.Update
-	resource := api.Resource("pods").WithVersion("v1")
+	resource := corev1.Resource("pods").WithVersion("v1")
 	subResource := ""
 	userInfo := user.DefaultInfo{
 		Name: "webhook-test",
@@ -521,4 +601,90 @@ func newMatchEverythingRules() []registrationv1alpha1.RuleWithOperations {
 			Resources:   []string{"*/*"},
 		},
 	}}
+}
+
+func TestGetNamespaceLabels(t *testing.T) {
+	namespace1Labels := map[string]string{
+		"runlevel": "1",
+	}
+	namespace1 := corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "1",
+			Labels: namespace1Labels,
+		},
+	}
+	namespace2Labels := map[string]string{
+		"runlevel": "2",
+	}
+	namespace2 := corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "2",
+			Labels: namespace2Labels,
+		},
+	}
+	namespaceLister := fakeNamespaceLister{map[string]*corev1.Namespace{
+		"1": &namespace1,
+	},
+	}
+
+	tests := []struct {
+		name           string
+		attr           admission.Attributes
+		expectedLabels map[string]string
+	}{
+		{
+			name:           "request is for creating namespace, the labels should be from the object itself",
+			attr:           admission.NewAttributesRecord(&namespace2, nil, schema.GroupVersionKind{}, "", namespace2.Name, schema.GroupVersionResource{Resource: "namespaces"}, "", admission.Create, nil),
+			expectedLabels: namespace2Labels,
+		},
+		{
+			name:           "request is for updating namespace, the labels should be from the new object",
+			attr:           admission.NewAttributesRecord(&namespace2, nil, schema.GroupVersionKind{}, namespace2.Name, namespace2.Name, schema.GroupVersionResource{Resource: "namespaces"}, "", admission.Update, nil),
+			expectedLabels: namespace2Labels,
+		},
+		{
+			name:           "request is for deleting namespace, the labels should be from the cache",
+			attr:           admission.NewAttributesRecord(&namespace2, nil, schema.GroupVersionKind{}, namespace1.Name, namespace1.Name, schema.GroupVersionResource{Resource: "namespaces"}, "", admission.Delete, nil),
+			expectedLabels: namespace1Labels,
+		},
+		{
+			name:           "request is for namespace/finalizer",
+			attr:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, namespace1.Name, "mock-name", schema.GroupVersionResource{Resource: "namespaces"}, "finalizers", admission.Create, nil),
+			expectedLabels: namespace1Labels,
+		},
+		{
+			name:           "request is for pod",
+			attr:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, namespace1.Name, "mock-name", schema.GroupVersionResource{Resource: "pods"}, "", admission.Create, nil),
+			expectedLabels: namespace1Labels,
+		},
+	}
+	wh, err := NewGenericAdmissionWebhook(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wh.namespaceLister = namespaceLister
+	for _, tt := range tests {
+		actualLabels, err := wh.getNamespaceLabels(tt.attr)
+		if err != nil {
+			t.Error(err)
+		}
+		if !reflect.DeepEqual(actualLabels, tt.expectedLabels) {
+			t.Errorf("expected labels to be %#v, got %#v", tt.expectedLabels, actualLabels)
+		}
+	}
+}
+
+func TestExemptClusterScopedResource(t *testing.T) {
+	hook := &registrationv1alpha1.Webhook{
+		NamespaceSelector: &metav1.LabelSelector{},
+	}
+	attr := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "mock-name", schema.GroupVersionResource{Version: "v1", Resource: "nodes"}, "", admission.Create, nil)
+	g := GenericAdmissionWebhook{}
+	exempted, err := g.exemptedByNamespaceSelector(hook, attr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !exempted {
+		t.Errorf("cluster scoped resources (but not a namespace) should be exempted from all webhooks")
+	}
 }

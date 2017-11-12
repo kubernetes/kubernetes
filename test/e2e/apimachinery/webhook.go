@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -36,11 +37,16 @@ import (
 )
 
 const (
-	secretName        = "sample-webhook-secret"
-	deploymentName    = "sample-webhook-deployment"
-	serviceName       = "e2e-test-webhook"
-	roleBindingName   = "webhook-auth-reader"
-	webhookConfigName = "e2e-test-webhook-config"
+	secretName              = "sample-webhook-secret"
+	deploymentName          = "sample-webhook-deployment"
+	serviceName             = "e2e-test-webhook"
+	roleBindingName         = "webhook-auth-reader"
+	webhookConfigName       = "e2e-test-webhook-config"
+	skipNamespaceLabelKey   = "skip-webhook-admission"
+	skipNamespaceLabelValue = "yes"
+	skippedNamespaceName    = "exempted-namesapce"
+	disallowedPodName       = "disallowed-pod"
+	disallowedConfigMapName = "disallowed-configmap"
 )
 
 var serverWebhookVersion = utilversion.MustParseSemantic("v1.8.0")
@@ -51,7 +57,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		cleanWebhookTest(f)
 	})
 
-	It("Should be able to deny pod creation", func() {
+	It("Should be able to deny pod and configmap creation", func() {
 		// Make sure the relevant provider supports admission webhook
 		framework.SkipUnlessServerVersionGTE(serverWebhookVersion, f.ClientSet.Discovery())
 		framework.SkipUnlessProviderIs("gce", "gke")
@@ -68,7 +74,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		// Note that in 1.9 we will have backwards incompatible change to
 		// admission webhooks, so the image will be updated to 1.9 sometime in
 		// the development 1.9 cycle.
-		deployWebhookAndService(f, "gcr.io/kubernetes-e2e-test-images/k8s-sample-admission-webhook-amd64:1.8v1", context)
+		deployWebhookAndService(f, "gcr.io/kubernetes-e2e-test-images/k8s-sample-admission-webhook-amd64:1.8v2", context)
 		registerWebhook(f, context)
 		testWebhook(f)
 	})
@@ -223,7 +229,7 @@ func registerWebhook(f *framework.Framework, context *certContext) {
 		},
 		Webhooks: []v1alpha1.Webhook{
 			{
-				Name: "e2e-test-webhook.k8s.io",
+				Name: "deny-unwanted-pod-container-name-and-label.k8s.io",
 				Rules: []v1alpha1.RuleWithOperations{{
 					Operations: []v1alpha1.OperationType{v1alpha1.Create},
 					Rule: v1alpha1.Rule{
@@ -237,6 +243,36 @@ func registerWebhook(f *framework.Framework, context *certContext) {
 						Namespace: namespace,
 						Name:      serviceName,
 					},
+					URLPath:  "/pods",
+					CABundle: context.signingCert,
+				},
+			},
+			{
+				Name: "deny-unwanted-configmap-data.k8s.io",
+				Rules: []v1alpha1.RuleWithOperations{{
+					Operations: []v1alpha1.OperationType{v1alpha1.Create},
+					Rule: v1alpha1.Rule{
+						APIGroups:   []string{""},
+						APIVersions: []string{"v1"},
+						Resources:   []string{"configmaps"},
+					},
+				}},
+				// The webhook skips the namespace that has label "skip-webhook-admission":"yes"
+				NamespaceSelector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      skipNamespaceLabelKey,
+							Operator: metav1.LabelSelectorOpNotIn,
+							Values:   []string{skipNamespaceLabelValue},
+						},
+					},
+				},
+				ClientConfig: v1alpha1.WebhookClientConfig{
+					Service: v1alpha1.ServiceReference{
+						Namespace: namespace,
+						Name:      serviceName,
+					},
+					URLPath:  "/configmaps",
 					CABundle: context.signingCert,
 				},
 			},
@@ -262,12 +298,45 @@ func testWebhook(f *framework.Framework) {
 	// TODO: Test if webhook can detect pod with non-compliant metadata.
 	// Currently metadata is lost because webhook uses the external version of
 	// the objects, and the apiserver sends the internal objects.
+
+	By("create a configmap that should be denied by the webhook")
+	// Creating the configmap, the request should be rejected
+	configmap := nonCompliantConfigMap(f)
+	_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Create(configmap)
+	Expect(err).NotTo(BeNil())
+	expectedErrMsg = "the configmap contains unwanted key and value"
+	if !strings.Contains(err.Error(), expectedErrMsg) {
+		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
+	}
+
+	By("create a namespace that bypass the webhook")
+	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		_, err2 := client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{
+			Name: skippedNamespaceName,
+			Labels: map[string]string{
+				skipNamespaceLabelKey: skipNamespaceLabelValue,
+			},
+		}})
+		if err2 != nil {
+			if strings.HasPrefix(err2.Error(), "object is being deleted:") {
+				return false, nil
+			}
+			return false, err2
+		}
+		return true, nil
+	})
+	framework.ExpectNoError(err, "creating namespace %q", skippedNamespaceName)
+
+	By("create a configmap that violates the webhook policy but is in a whitelisted namespace")
+	configmap = nonCompliantConfigMap(f)
+	_, err = client.CoreV1().ConfigMaps(skippedNamespaceName).Create(configmap)
+	Expect(err).To(BeNil())
 }
 
 func nonCompliantPod(f *framework.Framework) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "disallowed-pod",
+			Name: disallowedPodName,
 			Labels: map[string]string{
 				"webhook-e2e-test": "disallow",
 			},
@@ -283,6 +352,17 @@ func nonCompliantPod(f *framework.Framework) *v1.Pod {
 	}
 }
 
+func nonCompliantConfigMap(f *framework.Framework) *v1.ConfigMap {
+	return &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: disallowedConfigMapName,
+		},
+		Data: map[string]string{
+			"webhook-e2e-test": "webhook-disallow",
+		},
+	}
+}
+
 func cleanWebhookTest(f *framework.Framework) {
 	client := f.ClientSet
 	_ = client.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations().Delete(webhookConfigName, nil)
@@ -291,4 +371,6 @@ func cleanWebhookTest(f *framework.Framework) {
 	_ = client.ExtensionsV1beta1().Deployments(namespaceName).Delete(deploymentName, nil)
 	_ = client.CoreV1().Secrets(namespaceName).Delete(secretName, nil)
 	_ = client.RbacV1beta1().RoleBindings("kube-system").Delete(roleBindingName, nil)
+	_ = client.CoreV1().ConfigMaps(skippedNamespaceName).Delete(disallowedConfigMapName, nil)
+	_ = client.CoreV1().Namespaces().Delete(skippedNamespaceName, nil)
 }

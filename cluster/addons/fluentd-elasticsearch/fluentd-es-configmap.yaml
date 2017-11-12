@@ -114,7 +114,7 @@ data:
         time_format %Y-%m-%dT%H:%M:%S.%NZ
       </pattern>
       <pattern>
-        format /^(?<time>.+)\b(?<stream>stdout|stderr)\b(?<log>.*)$/
+        format /^(?<time>.+) (?<stream>stdout|stderr) (?<log>.*)$/
         time_format %Y-%m-%dT%H:%M:%S.%N%:z
       </pattern>
     </source>
@@ -367,7 +367,7 @@ data:
        num_threads 2
     </match>
 metadata:
-  name: fluentd-es-config-v0.1.0
+  name: fluentd-es-config-v0.1.1
   namespace: kube-system
   labels:
     addonmanager.kubernetes.io/mode: Reconcile

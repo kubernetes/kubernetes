@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -193,6 +194,10 @@ func validateWebhook(hook *admissionregistration.Webhook, fldPath *field.Path) f
 
 	if len(hook.ClientConfig.URLPath) != 0 {
 		allErrors = append(allErrors, validateURLPath(fldPath.Child("clientConfig", "urlPath"), hook.ClientConfig.URLPath)...)
+	}
+
+	if hook.NamespaceSelector != nil {
+		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.NamespaceSelector, fldPath.Child("namespaceSelector"))...)
 	}
 
 	return allErrors

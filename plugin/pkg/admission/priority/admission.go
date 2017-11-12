@@ -105,6 +105,7 @@ var (
 )
 
 // Admit checks Pods and admits or rejects them. It also resolves the priority of pods based on their PriorityClass.
+// Note that pod validation mechanism prevents update of a pod priority.
 func (p *PriorityPlugin) Admit(a admission.Attributes) error {
 	operation := a.GetOperation()
 	// Ignore all calls to subresources
@@ -114,7 +115,7 @@ func (p *PriorityPlugin) Admit(a admission.Attributes) error {
 
 	switch a.GetResource().GroupResource() {
 	case podResource:
-		if operation == admission.Create || operation == admission.Update {
+		if operation == admission.Create {
 			return p.admitPod(a)
 		}
 		return nil
@@ -149,7 +150,6 @@ func (p *PriorityPlugin) Validate(a admission.Attributes) error {
 }
 
 // admitPod makes sure a new pod does not set spec.Priority field. It also makes sure that the PriorityClassName exists if it is provided and resolves the pod priority from the PriorityClassName.
-// Note that pod validation mechanism prevents update of a pod priority.
 func (p *PriorityPlugin) admitPod(a admission.Attributes) error {
 	operation := a.GetOperation()
 	pod, ok := a.GetObject().(*api.Pod)

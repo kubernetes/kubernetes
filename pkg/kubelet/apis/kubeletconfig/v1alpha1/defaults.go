@@ -242,6 +242,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.FeatureGates == nil {
 		obj.FeatureGates = make(map[string]bool)
 	}
+	if obj.ManifestURLHeader == nil {
+		obj.ManifestURLHeader = make(map[string][]string)
+	}
 }
 
 func boolVar(b bool) *bool {
