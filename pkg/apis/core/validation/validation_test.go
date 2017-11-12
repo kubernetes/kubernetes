@@ -3775,6 +3775,9 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "abc-123", MountPath: "/baz"},
 		{Name: "abc-123", MountPath: "/baa", SubPath: ""},
 		{Name: "abc-123", MountPath: "/bab", SubPath: "baz"},
+		{Name: "abc-123", MountPath: "d:", SubPath: ""},
+		{Name: "abc-123", MountPath: "F:", SubPath: ""},
+		{Name: "abc-123", MountPath: "G:\\mount", SubPath: ""},
 		{Name: "abc-123", MountPath: "/bac", SubPath: ".baz"},
 		{Name: "abc-123", MountPath: "/bad", SubPath: "..baz"},
 	}
@@ -3789,6 +3792,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		"relative mountpath":                     {{Name: "abc", MountPath: "bar"}},
 		"mountpath collision":                    {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
 		"absolute subpath":                       {{Name: "abc", MountPath: "/bar", SubPath: "/baz"}},
+		"windows absolute subpath":               {{Name: "abc", MountPath: "D", SubPath: ""}},
 		"subpath in ..":                          {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},
 		"subpath contains ..":                    {{Name: "abc", MountPath: "/bar", SubPath: "baz/../bat"}},
 		"subpath ends in ..":                     {{Name: "abc", MountPath: "/bar", SubPath: "./.."}},
