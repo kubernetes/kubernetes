@@ -55,6 +55,7 @@ import (
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/chaosclient"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -709,6 +710,8 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		kubeFlags.CloudProvider,
 		kubeFlags.CertDirectory,
 		kubeFlags.RootDirectory,
+		kubeFlags.RegisterNode,
+		kubeFlags.RegisterWithTaints,
 		kubeFlags.AllowedUnsafeSysctls,
 		kubeFlags.Containerized,
 		kubeFlags.RemoteRuntimeEndpoint,
@@ -723,7 +726,8 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		kubeFlags.MasterServiceNamespace,
 		kubeFlags.RegisterSchedulable,
 		kubeFlags.NonMasqueradeCIDR,
-		kubeFlags.KeepTerminatedPodVolumes)
+		kubeFlags.KeepTerminatedPodVolumes,
+		kubeFlags.NodeLabels)
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %v", err)
 	}
@@ -778,6 +782,8 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	cloudProvider string,
 	certDirectory string,
 	rootDirectory string,
+	registerNode bool,
+	registerWithTaints []api.Taint,
 	allowedUnsafeSysctls []string,
 	containerized bool,
 	remoteRuntimeEndpoint string,
@@ -792,7 +798,8 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	masterServiceNamespace string,
 	registerSchedulable bool,
 	nonMasqueradeCIDR string,
-	keepTerminatedPodVolumes bool) (k kubelet.Bootstrap, err error) {
+	keepTerminatedPodVolumes bool,
+	nodeLabels map[string]string) (k kubelet.Bootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
@@ -807,6 +814,8 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		cloudProvider,
 		certDirectory,
 		rootDirectory,
+		registerNode,
+		registerWithTaints,
 		allowedUnsafeSysctls,
 		containerized,
 		remoteRuntimeEndpoint,
@@ -821,7 +830,8 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		masterServiceNamespace,
 		registerSchedulable,
 		nonMasqueradeCIDR,
-		keepTerminatedPodVolumes)
+		keepTerminatedPodVolumes,
+		nodeLabels)
 	if err != nil {
 		return nil, err
 	}

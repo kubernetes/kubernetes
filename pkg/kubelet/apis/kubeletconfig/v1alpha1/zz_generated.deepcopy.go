@@ -21,7 +21,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	core_v1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -213,15 +212,6 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			**out = **in
 		}
 	}
-	if in.RegisterNode != nil {
-		in, out := &in.RegisterNode, &out.RegisterNode
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
-	}
 	if in.ClusterDNS != nil {
 		in, out := &in.ClusterDNS, &out.ClusterDNS
 		*out = make([]string, len(*in))
@@ -260,15 +250,6 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	}
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
-	if in.LockFilePath != nil {
-		in, out := &in.LockFilePath, &out.LockFilePath
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(string)
-			**out = **in
-		}
-	}
 	if in.CPUCFSQuota != nil {
 		in, out := &in.CPUCFSQuota, &out.CPUCFSQuota
 		if *in == nil {
@@ -276,13 +257,6 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		} else {
 			*out = new(bool)
 			**out = **in
-		}
-	}
-	if in.RegisterWithTaints != nil {
-		in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
-		*out = make([]core_v1.Taint, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.KubeAPIQPS != nil {
@@ -301,13 +275,6 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		} else {
 			*out = new(bool)
 			**out = **in
-		}
-	}
-	if in.NodeLabels != nil {
-		in, out := &in.NodeLabels, &out.NodeLabels
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
 		}
 	}
 	if in.EvictionHard != nil {

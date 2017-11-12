@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // HairpinMode denotes how the kubelet should configure networking to handle
@@ -138,8 +137,6 @@ type KubeletConfiguration struct {
 	// oomScoreAdj is The oom-score-adj value for kubelet process. Values
 	// must be within the range [-1000, 1000].
 	OOMScoreAdj int32
-	// registerNode enables automatic registration with the apiserver.
-	RegisterNode bool
 	// clusterDomain is the DNS domain for this cluster. If set, kubelet will
 	// configure all containers to search this domain in addition to the
 	// host's search domains.
@@ -167,9 +164,6 @@ type KubeletConfiguration struct {
 	ImageGCLowThresholdPercent int32
 	// How frequently to calculate and cache volume disk usage for all pods
 	VolumeStatsAggPeriod metav1.Duration
-	// volumePluginDir is the full path of the directory in which to search
-	// for additional third party volume plugins
-	VolumePluginDir string
 	// KubeletCgroups is the absolute name of cgroups to isolate the kubelet in.
 	// +optional
 	KubeletCgroups string
@@ -198,15 +192,6 @@ type KubeletConfiguration struct {
 	// requests - pull, logs, exec and attach.
 	// +optional
 	RuntimeRequestTimeout metav1.Duration
-	// lockFilePath is the path that kubelet will use to as a lock file.
-	// It uses this file as a lock to synchronize with other kubelet processes
-	// that may be running.
-	LockFilePath string
-	// ExitOnLockContention is a flag that signifies to the kubelet that it is running
-	// in "bootstrap" mode. This requires that 'LockFilePath' has been set.
-	// This will cause the kubelet to listen to inotify events on the lock file,
-	// releasing it and exiting when another process tries to open that file.
-	ExitOnLockContention bool
 	// How should the kubelet configure the container bridge for hairpin packets.
 	// Setting this flag allows endpoints in a Service to loadbalance back to
 	// themselves if they should try to access their own Service. Values:
@@ -229,10 +214,6 @@ type KubeletConfiguration struct {
 	CPUCFSQuota bool
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64
-	// registerWithTaints are an array of taints to add to a node object when
-	// the kubelet registers itself. This only takes effect when registerNode
-	// is true and upon the initial registration of the node.
-	RegisterWithTaints []api.Taint
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string
 	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver
@@ -245,8 +226,6 @@ type KubeletConfiguration struct {
 	// run docker daemon with version  < 1.9 or an Aufs storage backend.
 	// Issue #10959 has more details.
 	SerializeImagePulls bool
-	// nodeLabels to add when registering the node in the cluster.
-	NodeLabels map[string]string
 	// Comma-delimited list of hard eviction expressions.  For example, 'memory.available<300Mi'.
 	// +optional
 	EvictionHard string
