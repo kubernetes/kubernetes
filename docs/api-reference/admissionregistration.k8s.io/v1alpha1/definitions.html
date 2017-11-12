@@ -634,9 +634,11 @@ The <code>host</code> should not refer to a service running in the cluster; use 
 <br>
 Please note that using <code>localhost</code> or <code>127.0.0.1</code> as a <code>host</code> is risky unless you take great care to run this webhook on all hosts which run an apiserver which might need to make calls to this webhook. Such installs are likely to be non-portable, i.e., not easy to turn up in a new cluster.<br>
 <br>
-If the scheme is present, it must be "https://".<br>
+The scheme must be "https"; the URL must begin with "https://".<br>
 <br>
-A path is optional, and if present may be any string permissible in a URL. You may use the path to pass an arbitrary string to the webhook, for example, a cluster identifier.</p></td>
+A path is optional, and if present may be any string permissible in a URL. You may use the path to pass an arbitrary string to the webhook, for example, a cluster identifier.<br>
+<br>
+Attempting to use a user or basic auth e.g. "user:password@" is not allowed. Fragments ("#&#8230;") and query parameters ("?&#8230;") are not allowed, either.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
