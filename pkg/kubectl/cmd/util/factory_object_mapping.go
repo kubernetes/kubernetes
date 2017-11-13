@@ -51,6 +51,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+
+	apiversion "k8s.io/apimachinery/pkg/version"
 )
 
 type ring1Factory struct {
@@ -403,6 +405,9 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout tim
 }
 
 func (f *ring1Factory) Validator(validate bool, cacheDir string) (validation.Schema, error) {
+
+	fmt.Println("Validator is called")
+
 	if validate {
 		discovery, err := f.clientAccessFactory.DiscoveryClient()
 		if err != nil {
@@ -410,7 +415,21 @@ func (f *ring1Factory) Validator(validate bool, cacheDir string) (validation.Sch
 		}
 		dir := cacheDir
 		if len(dir) > 0 {
-			version, err := discovery.ServerVersion()
+			//version, err := discovery.ServerVersion()
+			var version apiversion.Info
+
+			version.Major = "1"
+			version.Minor = "7"
+			version.GitVersion = "v1.7.1"
+			version.GitCommit = "1dc5c66f5dd61da08412a74221ecc79208c2165b"
+			version.GitTreeState = "clean"
+			version.BuildDate = "2017-07-14T01:48:01Z"
+			version.GoVersion = "go1.8.3"
+			version.Compiler = "gc"
+			version.Platform = "linux/amd64"
+
+			fmt.Printf("get service version: %#v",version)
+
 			if err == nil {
 				dir = path.Join(cacheDir, version.String())
 			} else {
