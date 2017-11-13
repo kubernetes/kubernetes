@@ -21,13 +21,12 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
-
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -119,6 +118,7 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	mapper, _ := f.Object()
 	o.mapper = mapper
 	o.encoder = f.JSONEncoder()
+
 	o.resources, o.selector, err = getResourcesAndSelector(args)
 	if err != nil {
 		return err
@@ -178,10 +178,15 @@ func (o *SelectorOptions) RunSelector() error {
 	return r.Visit(func(info *resource.Info, err error) error {
 		patch := &Patch{Info: info}
 		CalculatePatch(patch, o.encoder, func(info *resource.Info) ([]byte, error) {
-			selectErr := updateSelectorForObject(info.Object, *o.selector)
+			versioned, err := info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
+			if err != nil {
+				return nil, err
+			}
+			patch.Info.VersionedObject = versioned
+			selectErr := updateSelectorForObject(info.VersionedObject, *o.selector)
 
 			if selectErr == nil {
-				return runtime.Encode(o.encoder, info.Object)
+				return runtime.Encode(o.encoder, info.VersionedObject)
 			}
 			return nil, selectErr
 		})
@@ -190,8 +195,7 @@ func (o *SelectorOptions) RunSelector() error {
 			return patch.Err
 		}
 		if o.local || o.dryrun {
-			o.PrintObject(info.Object)
-			return nil
+			return o.PrintObject(info.VersionedObject)
 		}
 
 		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
@@ -211,7 +215,7 @@ func (o *SelectorOptions) RunSelector() error {
 
 		shortOutput := o.output == "name"
 		if len(o.output) > 0 && !shortOutput {
-			return o.PrintObject(info.Object)
+			return o.PrintObject(patched)
 		}
 		cmdutil.PrintSuccess(o.mapper, shortOutput, o.out, info.Mapping.Resource, info.Name, o.dryrun, "selector updated")
 		return nil
@@ -231,7 +235,7 @@ func updateSelectorForObject(obj runtime.Object, selector metav1.LabelSelector) 
 	}
 	var err error
 	switch t := obj.(type) {
-	case *api.Service:
+	case *v1.Service:
 		t.Spec.Selector, err = copyOldSelector()
 	default:
 		err = fmt.Errorf("setting a selector is only supported for Services")
