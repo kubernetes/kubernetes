@@ -42,6 +42,7 @@ import (
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
+	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
 	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -90,12 +91,16 @@ func TestQuota(t *testing.T) {
 	defer close(controllerCh)
 
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
-	rm := replicationcontroller.NewReplicationManager(
+	metrics.UnregisterMetricAndUntrackRateLimiterUsage("replication_controller")
+	rm, err := replicationcontroller.NewReplicationManager(
 		informers.Core().V1().Pods(),
 		informers.Core().V1().ReplicationControllers(),
 		clientset,
 		replicationcontroller.BurstReplicas,
 	)
+	if err != nil {
+		t.Fatalf("error creating replicationcontroller: %v", err)
+	}
 	rm.SetEventRecorder(&record.FakeRecorder{})
 	go rm.Run(3, controllerCh)
 
@@ -285,12 +290,16 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 	defer close(controllerCh)
 
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
-	rm := replicationcontroller.NewReplicationManager(
+	metrics.UnregisterMetricAndUntrackRateLimiterUsage("replication_controller")
+	rm, err := replicationcontroller.NewReplicationManager(
 		informers.Core().V1().Pods(),
 		informers.Core().V1().ReplicationControllers(),
 		clientset,
 		replicationcontroller.BurstReplicas,
 	)
+	if err != nil {
+		t.Fatalf("error creating replicationcontroller: %v", err)
+	}
 	rm.SetEventRecorder(&record.FakeRecorder{})
 	go rm.Run(3, controllerCh)
 

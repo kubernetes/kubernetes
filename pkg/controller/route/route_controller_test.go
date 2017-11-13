@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
 func alwaysReady() bool { return true }
@@ -64,7 +65,11 @@ func TestIsResponsibleForRoute(t *testing.T) {
 		}
 		client := fake.NewSimpleClientset()
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-		rc := New(nil, nil, informerFactory.Core().V1().Nodes(), myClusterName, cidr)
+		metrics.UnregisterMetricAndUntrackRateLimiterUsage("route_controller")
+		rc, err := New(nil, nil, informerFactory.Core().V1().Nodes(), myClusterName, cidr)
+		if err != nil {
+			t.Fatalf("error creating route controller: %v", err)
+		}
 		rc.nodeListerSynced = alwaysReady
 		route := &cloudprovider.Route{
 			Name:            testCase.routeName,
@@ -238,7 +243,12 @@ func TestReconcile(t *testing.T) {
 		}
 		_, cidr, _ := net.ParseCIDR("10.120.0.0/16")
 		informerFactory := informers.NewSharedInformerFactory(testCase.clientset, controller.NoResyncPeriodFunc())
-		rc := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidr)
+		metrics.UnregisterMetricAndUntrackRateLimiterUsage("route_controller")
+		rc, er := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidr)
+		if er != nil {
+			t.Fatalf("error creating route controller: %v", er)
+		}
+
 		rc.nodeListerSynced = alwaysReady
 		if err := rc.reconcile(testCase.nodes, testCase.initialRoutes); err != nil {
 			t.Errorf("%d. Error from rc.reconcile(): %v", i, err)

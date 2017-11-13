@@ -107,11 +107,11 @@ type ReplicaSetController struct {
 }
 
 // NewReplicaSetController configures a replica set controller with the specified event recorder
-func NewReplicaSetController(rsInformer extensionsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicaSetController {
+func NewReplicaSetController(rsInformer extensionsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int) (*ReplicaSetController, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
-	return NewBaseController(rsInformer, podInformer, kubeClient, burstReplicas,
+	baseController, err := NewBaseController(rsInformer, podInformer, kubeClient, burstReplicas,
 		v1beta1.SchemeGroupVersion.WithKind("ReplicaSet"),
 		"replicaset_controller",
 		"replicaset",
@@ -120,14 +120,21 @@ func NewReplicaSetController(rsInformer extensionsinformers.ReplicaSetInformer, 
 			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "replicaset-controller"}),
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
+	return baseController, nil
 }
 
 // NewBaseController is the implementation of NewReplicaSetController with additional injected
 // parameters so that it can also serve as the implementation of NewReplicationController.
 func NewBaseController(rsInformer extensionsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int,
-	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface) *ReplicaSetController {
+	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface) (*ReplicaSetController, error) {
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage(metricOwnerName, kubeClient.CoreV1().RESTClient().GetRateLimiter())
+		err := metrics.RegisterMetricAndTrackRateLimiterUsage(metricOwnerName, kubeClient.CoreV1().RESTClient().GetRateLimiter())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	rsc := &ReplicaSetController{
@@ -163,7 +170,7 @@ func NewBaseController(rsInformer extensionsinformers.ReplicaSetInformer, podInf
 
 	rsc.syncHandler = rsc.syncReplicaSet
 
-	return rsc
+	return rsc, nil
 }
 
 // SetEventRecorder replaces the event recorder used by the ReplicaSetController

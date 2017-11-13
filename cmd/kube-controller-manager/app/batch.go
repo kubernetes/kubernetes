@@ -32,11 +32,15 @@ func startJobController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}] {
 		return false, nil
 	}
-	go job.NewJobController(
+	jobController, err := job.NewJobController(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Batch().V1().Jobs(),
 		ctx.ClientBuilder.ClientOrDie("job-controller"),
-	).Run(int(ctx.Options.ConcurrentJobSyncs), ctx.Stop)
+	)
+	if err != nil {
+		return true, fmt.Errorf("error creating jobController: %v", err)
+	}
+	go jobController.Run(int(ctx.Options.ConcurrentJobSyncs), ctx.Stop)
 	return true, nil
 }
 

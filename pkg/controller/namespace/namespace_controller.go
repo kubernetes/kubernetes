@@ -67,7 +67,7 @@ func NewNamespaceController(
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
 	namespaceInformer coreinformers.NamespaceInformer,
 	resyncPeriod time.Duration,
-	finalizerToken v1.FinalizerName) *NamespaceController {
+	finalizerToken v1.FinalizerName) (*NamespaceController, error) {
 
 	// create the controller so we can inject the enqueue function
 	namespaceController := &NamespaceController{
@@ -76,7 +76,10 @@ func NewNamespaceController(
 	}
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("namespace_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
+		err := metrics.RegisterMetricAndTrackRateLimiterUsage("namespace_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// configure the namespace informer event handlers
@@ -96,7 +99,7 @@ func NewNamespaceController(
 	namespaceController.lister = namespaceInformer.Lister()
 	namespaceController.listerSynced = namespaceInformer.Informer().HasSynced
 
-	return namespaceController
+	return namespaceController, nil
 }
 
 // enqueueNamespace adds an object to the controller work queue

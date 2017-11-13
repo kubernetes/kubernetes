@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
+	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -148,7 +149,8 @@ func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.R
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "rs-informers")), resyncPeriod)
 
-	rm := replicaset.NewReplicaSetController(
+	metrics.UnregisterMetricAndUntrackRateLimiterUsage("replicaset_controller")
+	rm, err := replicaset.NewReplicaSetController(
 		informers.Extensions().V1beta1().ReplicaSets(),
 		informers.Core().V1().Pods(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "replicaset-controller")),
@@ -156,7 +158,7 @@ func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.R
 	)
 
 	if err != nil {
-		t.Fatalf("Failed to create replicaset controller")
+		t.Fatalf("Failed to create replicaset controller: %v", err)
 	}
 	return s, closeFn, rm, informers, clientSet
 }

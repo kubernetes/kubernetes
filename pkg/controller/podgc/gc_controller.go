@@ -51,9 +51,12 @@ type PodGCController struct {
 	terminatedPodThreshold int
 }
 
-func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInformer, terminatedPodThreshold int) *PodGCController {
+func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInformer, terminatedPodThreshold int) (*PodGCController, error) {
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("gc_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
+		err := metrics.RegisterMetricAndTrackRateLimiterUsage("gc_controller", kubeClient.Core().RESTClient().GetRateLimiter())
+		if err != nil {
+			return nil, err
+		}
 	}
 	gcc := &PodGCController{
 		kubeClient:             kubeClient,
@@ -67,7 +70,7 @@ func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInfor
 	gcc.podLister = podInformer.Lister()
 	gcc.podListerSynced = podInformer.Informer().HasSynced
 
-	return gcc
+	return gcc, nil
 }
 
 func (gcc *PodGCController) Run(stop <-chan struct{}) {

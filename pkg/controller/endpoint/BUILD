@@ -48,6 +48,7 @@ go_test(
         "//pkg/api/v1/endpoints:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/controller:go_default_library",
+        "//pkg/util/metrics:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
