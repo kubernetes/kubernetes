@@ -61,12 +61,14 @@ type Handler interface {
 type HandlerImpl struct {
 	// TODO: consider to change this to RWMutex.
 	sync.Mutex
+	// devicePluginManager is an implementation of deviceplugin.Manager interface.
 	devicePluginManager Manager
 	// activePods is a method for listing active pods on the node
 	// so the amount of pluginResources requested by existing pods
 	// could be counted when updating allocated devices
 	activePods ActivePodsFunc
-	// devicePluginManagerMonitorCallback is used for testing only.
+	// devicePluginManagerMonitorCallback is used for updating devices' states in one time call.
+	// e.g. a new device is advertised, two old devices are deleted and a running device fails.
 	devicePluginManagerMonitorCallback MonitorCallback
 	// allDevices contains all of registered resourceNames and their exported device IDs.
 	allDevices map[string]sets.String
