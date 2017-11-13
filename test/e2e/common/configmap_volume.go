@@ -32,10 +32,20 @@ import (
 var _ = Describe("[sig-storage] ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
 
+	/*
+		    Testname: configmap-nomap-simple
+		    Description: Make sure config map without mappings works by mounting it
+			to a volume with a custom path (mapping) on the pod with no other settings.
+	*/
 	framework.ConformanceIt("should be consumable from pods in volume ", func() {
 		doConfigMapE2EWithoutMappings(f, 0, 0, nil)
 	})
 
+	/*
+		    Testname: configmap-nomap-default-mode
+		    Description: Make sure config map without mappings works by mounting it
+			to a volume with a custom path (mapping) on the pod with defaultMode set
+	*/
 	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set ", func() {
 		defaultMode := int32(0400)
 		doConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode)
@@ -46,6 +56,11 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		doConfigMapE2EWithoutMappings(f, 1000, 1001, &defaultMode)
 	})
 
+	/*
+		    Testname: configmap-nomap-user
+		    Description: Make sure config map without mappings works by mounting it
+			to a volume with a custom path (mapping) on the pod as non-root.
+	*/
 	framework.ConformanceIt("should be consumable from pods in volume as non-root ", func() {
 		doConfigMapE2EWithoutMappings(f, 1000, 0, nil)
 	})
@@ -54,15 +69,30 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		doConfigMapE2EWithoutMappings(f, 1000, 1001, nil)
 	})
 
+	/*
+		    Testname: configmap-simple-mapped
+		    Description: Make sure config map works by mounting it to a volume with
+			a custom path (mapping) on the pod with no other settings and make sure
+			the pod actually consumes it.
+	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings ", func() {
 		doConfigMapE2EWithMappings(f, 0, 0, nil)
 	})
 
+	/*
+		    Testname: configmap-with-item-mode-mapped
+		    Description: Make sure config map works with an item mode (e.g. 0400)
+			for the config map item.
+	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set", func() {
 		mode := int32(0400)
 		doConfigMapE2EWithMappings(f, 0, 0, &mode)
 	})
 
+	/*
+	   Testname: configmap-simple-user-mapped
+	   Description: Make sure config map works when it is mounted as non-root.
+	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root ", func() {
 		doConfigMapE2EWithMappings(f, 1000, 0, nil)
 	})
@@ -71,6 +101,11 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		doConfigMapE2EWithMappings(f, 1000, 1001, nil)
 	})
 
+	/*
+		    Testname: configmap-update-test
+		    Description: Make sure update operation is working on config map and
+			the result is observed on volumes mounted in containers.
+	*/
 	framework.ConformanceIt("updates should be reflected in volume ", func() {
 		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
@@ -149,6 +184,11 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		Eventually(pollLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-2"))
 	})
 
+	/*
+		    Testname: configmap-CUD-test
+		    Description: Make sure Create, Update, Delete operations are all working
+			on config map and the result is observed on volumes mounted in containers.
+	*/
 	framework.ConformanceIt("optional updates should be reflected in volume ", func() {
 		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
@@ -327,6 +367,11 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/configmap-volumes/delete/data-1"))
 	})
 
+	/*
+		    Testname: configmap-multiple-volumes
+		    Description: Make sure config map works when it mounted as two different
+			volumes on the same node.
+	*/
 	framework.ConformanceIt("should be consumable in multiple volumes in the same pod ", func() {
 		var (
 			name             = "configmap-test-volume-" + string(uuid.NewUUID())
