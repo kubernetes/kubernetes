@@ -233,7 +233,7 @@ func createClients(s *options.CMServer) (*clientset.Clientset, *clientset.Client
 		return nil, nil, nil, err
 	}
 
-	kubeconfig.ContentConfig.ContentType = s.ContentType
+	kubeconfig.ContentType = s.ContentType
 	// Override kubeconfig qps/burst settings from flags
 	kubeconfig.QPS = s.KubeAPIQPS
 	kubeconfig.Burst = int(s.KubeAPIBurst)
