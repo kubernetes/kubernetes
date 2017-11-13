@@ -10,5 +10,8 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: system:node
+  name: system:node-bootstrapper
 subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: kubelet
