@@ -17,17 +17,22 @@ limitations under the License.
 package certificate
 
 import (
+	"bytes"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
 	"net"
+	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	certificates "k8s.io/api/certificates/v1beta1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	clientcertificates "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
+	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -147,4 +152,119 @@ func NewKubeletClientCertificateManager(certDirectory string, nodeName types.Nod
 		return nil, fmt.Errorf("failed to initialize client certificate manager: %v", err)
 	}
 	return m, nil
+}
+
+// Updater updates kubelet certifcate information if and dns/ip information changes
+type Updater interface {
+	UpdateCertInfo(nodeAddrs []v1.NodeAddress) error
+	Current() *tls.Certificate
+}
+
+type updater struct {
+	ipList         []net.IP
+	dnsList        []string
+	host           string
+	needsCertRegen bool
+
+	certMutex sync.RWMutex
+	cert      *tls.Certificate
+}
+
+// NewUpdater sets up a certificate updater that can regenerate certficates if any dns/ip information changes
+func NewUpdater(hostName string, certFile, keyFile string, iplist []net.IP, dnslist []string) (Updater, error) {
+	c, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return nil, err
+	}
+	return &updater{
+		ipList:         iplist,
+		dnsList:        dnslist,
+		host:           hostName,
+		cert:           &c,
+		needsCertRegen: false,
+	}, nil
+}
+
+func (u *updater) UpdateCertInfo(nodeAddrs []v1.NodeAddress) error {
+	ips := []net.IP{}
+	dnsNames := []string{}
+	for _, addr := range nodeAddrs {
+		switch addr.Type {
+		case v1.NodeHostName:
+			if u.host != addr.Address {
+				u.needsCertRegen = true
+			}
+			u.host = addr.Address
+		case v1.NodeExternalIP, v1.NodeInternalIP:
+			ips = append(ips, net.ParseIP(addr.Address))
+		case v1.NodeExternalDNS, v1.NodeInternalDNS:
+			dnsNames = append(dnsNames, addr.Address)
+		}
+	}
+
+	u.updateIPList(ips)
+	u.updateDNSList(dnsNames)
+	if u.needsCertRegen {
+		cert, key, err := certutil.GenerateSelfSignedCertKey(u.host, u.ipList, u.dnsList)
+		if err != nil {
+			return err
+		}
+		newCert, err := tls.X509KeyPair(cert, key)
+		if err != nil {
+			return err
+		}
+		u.cert = &newCert
+		u.needsCertRegen = false
+	}
+	return nil
+}
+
+func (u *updater) Current() *tls.Certificate {
+	return u.cert
+}
+
+func (u *updater) updateIPList(ips []net.IP) {
+	if len(u.ipList) != len(ips) {
+		// Length is different so we need to regen cert
+		u.needsCertRegen = true
+	} else {
+		// Lengths are the same, so verify all entries are the same
+		for _, ip := range ips {
+			var existing net.IP
+			for _, existing = range u.ipList {
+				if bytes.Equal(ip, existing) {
+					break
+				}
+			}
+			if !bytes.Equal(existing, ip) {
+				// We found a difference, so no need to continue evaluating
+				u.needsCertRegen = true
+				break
+			}
+		}
+	}
+	u.ipList = ips
+}
+
+func (u *updater) updateDNSList(dnsNames []string) {
+	if len(u.dnsList) != len(dnsNames) {
+		// Length is different so we need to regen cert
+		u.needsCertRegen = true
+	} else {
+		// Lengths are the same, so verify all entries are the same
+		for _, dnsName := range dnsNames {
+			var existing string
+			for _, existing = range u.dnsList {
+				if dnsName == existing {
+					break
+				}
+			}
+			if existing != dnsName {
+				// We found a difference, so no need to continue evaluating
+				u.needsCertRegen = true
+				break
+			}
+		}
+	}
+	u.dnsList = dnsNames
 }

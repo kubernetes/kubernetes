@@ -765,6 +765,17 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
 
+	klet.certUpdater, err = kubeletcertificate.NewUpdater(klet.hostname, kubeDeps.TLSOptions.CertFile, kubeDeps.TLSOptions.KeyFile, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	kubeDeps.TLSOptions.Config.GetCertificate = func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+		cert := klet.certUpdater.Current()
+		if cert == nil {
+			return nil, fmt.Errorf("no certificate available")
+		}
+		return cert, nil
+	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) && kubeDeps.TLSOptions != nil {
 		var ips []net.IP
 		cfgAddress := net.ParseIP(kubeCfg.Address)
@@ -1009,6 +1020,9 @@ type Kubelet struct {
 
 	//Cached RootFsInfo returned by cadvisor
 	rootfsInfo *cadvisorapiv2.FsInfo
+
+	// Handles cert updates from external cloud provider name/ip changes
+	certUpdater kubeletcertificate.Updater
 
 	// Handles certificate rotations.
 	serverCertificateManager certificate.Manager

@@ -411,6 +411,10 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 		return fmt.Errorf("nil %q node object", kl.nodeName)
 	}
 
+	if kl.externalCloudProvider {
+		// Update the hostnames and ips used by the kublet's cert with information from the cloud provider
+		kl.certUpdater.UpdateCertInfo(node.Status.Addresses)
+	}
 	kl.updatePodCIDR(node.Spec.PodCIDR)
 
 	kl.setNodeStatus(node)
