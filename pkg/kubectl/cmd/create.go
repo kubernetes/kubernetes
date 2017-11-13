@@ -30,6 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+
+	"github.com/golang/glog"
 )
 
 type CreateOptions struct {
@@ -117,23 +119,34 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 	}
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 	if err != nil {
+		glog.Warningf("Validator is failed, err:%s.",err.Error())
 		return err
 	}
+
+	glog.Warningf("Validator is succeed.")
+
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
+	glog.Warningf("Validator 11 is succeed.")
+
 	mapper, _, err := f.UnstructuredObject()
 	if err != nil {
+		glog.Warningf("UnstructuredObject is failed, err:%s.",err.Error())
 		return err
 	}
+
+	glog.Warningf("Validator 2 is succeed.")
 
 	builder, err := f.NewUnstructuredBuilder(true)
 	if err != nil {
 		return err
 	}
+
+	glog.Warningf("Validator 3 is succeed.")
 
 	r := builder.
 		Schema(schema).
@@ -147,6 +160,8 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 	if err != nil {
 		return err
 	}
+
+	glog.Warningf("Validator 4 is succeed.")
 
 	dryRun := cmdutil.GetFlagBool(cmd, "dry-run")
 	output := cmdutil.GetFlagString(cmd, "output")
@@ -188,9 +203,15 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 	if err != nil {
 		return err
 	}
+
+	glog.Warningf("Validator 5 is succeed.")
+
 	if count == 0 {
 		return fmt.Errorf("no objects passed to create")
 	}
+
+	glog.Warningf("Validator 6 is succeed.")
+
 	return nil
 }
 
