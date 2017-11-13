@@ -23,8 +23,6 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
-// NewAlwaysAllowAuthorizer must return a struct which implements authorizer.Authorizer
-// and always return nil.
 func TestNewAlwaysAllowAuthorizer(t *testing.T) {
 	aaa := NewAlwaysAllowAuthorizer()
 	if decision, _, _ := aaa.Authorize(nil); decision != authorizer.DecisionAllow {
@@ -32,8 +30,6 @@ func TestNewAlwaysAllowAuthorizer(t *testing.T) {
 	}
 }
 
-// NewAlwaysDenyAuthorizer must return a struct which implements authorizer.Authorizer
-// and always return an error as everything is forbidden.
 func TestNewAlwaysDenyAuthorizer(t *testing.T) {
 	ada := NewAlwaysDenyAuthorizer()
 	if decision, _, _ := ada.Authorize(nil); decision == authorizer.DecisionAllow {

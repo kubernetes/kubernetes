@@ -68,19 +68,6 @@ func NewAlwaysDenyAuthorizer() *alwaysDenyAuthorizer {
 	return new(alwaysDenyAuthorizer)
 }
 
-// alwaysFailAuthorizer is an implementation of authorizer.Attributes
-// which always says no to an authorization request.
-// It is useful in unit tests to force an operation to fail with error.
-type alwaysFailAuthorizer struct{}
-
-func (alwaysFailAuthorizer) Authorize(a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
-	return authorizer.DecisionNoOpinion, "", errors.New("Authorization failure.")
-}
-
-func NewAlwaysFailAuthorizer() authorizer.Authorizer {
-	return new(alwaysFailAuthorizer)
-}
-
 type privilegedGroupAuthorizer struct {
 	groups []string
 }
