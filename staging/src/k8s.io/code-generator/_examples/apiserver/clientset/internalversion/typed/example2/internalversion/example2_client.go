@@ -14,31 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package internalversion
 
 import (
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
-	v1 "k8s.io/code-generator/_examples/crd/apis/example2/v1"
-	"k8s.io/code-generator/_examples/crd/clientset/versioned/scheme"
+	"k8s.io/code-generator/_examples/apiserver/clientset/internalversion/scheme"
 )
 
-type SecondExampleV1Interface interface {
+type SecondExampleInterface interface {
 	RESTClient() rest.Interface
 	TestTypesGetter
 }
 
-// SecondExampleV1Client is used to interact with features provided by the example.test.crd.code-generator.k8s.io group.
-type SecondExampleV1Client struct {
+// SecondExampleClient is used to interact with features provided by the example.test.apiserver.code-generator.k8s.io group.
+type SecondExampleClient struct {
 	restClient rest.Interface
 }
 
-func (c *SecondExampleV1Client) TestTypes(namespace string) TestTypeInterface {
+func (c *SecondExampleClient) TestTypes(namespace string) TestTypeInterface {
 	return newTestTypes(c, namespace)
 }
 
-// NewForConfig creates a new SecondExampleV1Client for the given config.
-func NewForConfig(c *rest.Config) (*SecondExampleV1Client, error) {
+// NewForConfig creates a new SecondExampleClient for the given config.
+func NewForConfig(c *rest.Config) (*SecondExampleClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -47,12 +45,12 @@ func NewForConfig(c *rest.Config) (*SecondExampleV1Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &SecondExampleV1Client{client}, nil
+	return &SecondExampleClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new SecondExampleV1Client for the given config and
+// NewForConfigOrDie creates a new SecondExampleClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *rest.Config) *SecondExampleV1Client {
+func NewForConfigOrDie(c *rest.Config) *SecondExampleClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -60,19 +58,32 @@ func NewForConfigOrDie(c *rest.Config) *SecondExampleV1Client {
 	return client
 }
 
-// New creates a new SecondExampleV1Client for the given RESTClient.
-func New(c rest.Interface) *SecondExampleV1Client {
-	return &SecondExampleV1Client{c}
+// New creates a new SecondExampleClient for the given RESTClient.
+func New(c rest.Interface) *SecondExampleClient {
+	return &SecondExampleClient{c}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv := v1.SchemeGroupVersion
-	config.GroupVersion = &gv
-	config.APIPath = "/apis"
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+	g, err := scheme.Registry.Group("example.test.apiserver.code-generator.k8s.io")
+	if err != nil {
+		return err
+	}
 
+	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
+	}
+	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
+		gv := g.GroupVersion
+		config.GroupVersion = &gv
+	}
+	config.NegotiatedSerializer = scheme.Codecs
+
+	if config.QPS == 0 {
+		config.QPS = 5
+	}
+	if config.Burst == 0 {
+		config.Burst = 10
 	}
 
 	return nil
@@ -80,7 +91,7 @@ func setConfigDefaults(config *rest.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *SecondExampleV1Client) RESTClient() rest.Interface {
+func (c *SecondExampleClient) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}

@@ -19,8 +19,8 @@ package v1
 import (
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
-	v1 "k8s.io/code-generator/_examples/crd/apis/example2/v1"
-	"k8s.io/code-generator/_examples/crd/clientset/versioned/scheme"
+	v1 "k8s.io/code-generator/_examples/apiserver/apis/example2/v1"
+	"k8s.io/code-generator/_examples/apiserver/clientset/versioned/scheme"
 )
 
 type SecondExampleV1Interface interface {
@@ -28,7 +28,7 @@ type SecondExampleV1Interface interface {
 	TestTypesGetter
 }
 
-// SecondExampleV1Client is used to interact with features provided by the example.test.crd.code-generator.k8s.io group.
+// SecondExampleV1Client is used to interact with features provided by the example.test.apiserver.code-generator.k8s.io group.
 type SecondExampleV1Client struct {
 	restClient rest.Interface
 }

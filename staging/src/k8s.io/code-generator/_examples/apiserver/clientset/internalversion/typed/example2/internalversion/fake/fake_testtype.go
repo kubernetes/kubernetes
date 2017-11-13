@@ -23,34 +23,34 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
-	example2_v1 "k8s.io/code-generator/_examples/crd/apis/example2/v1"
+	example2 "k8s.io/code-generator/_examples/apiserver/apis/example2"
 )
 
 // FakeTestTypes implements TestTypeInterface
 type FakeTestTypes struct {
-	Fake *FakeSecondExampleV1
+	Fake *FakeSecondExample
 	ns   string
 }
 
-var testtypesResource = schema.GroupVersionResource{Group: "example.test.crd.code-generator.k8s.io", Version: "v1", Resource: "testtypes"}
+var testtypesResource = schema.GroupVersionResource{Group: "example.test.apiserver.code-generator.k8s.io", Version: "", Resource: "testtypes"}
 
-var testtypesKind = schema.GroupVersionKind{Group: "example.test.crd.code-generator.k8s.io", Version: "v1", Kind: "TestType"}
+var testtypesKind = schema.GroupVersionKind{Group: "example.test.apiserver.code-generator.k8s.io", Version: "", Kind: "TestType"}
 
 // Get takes name of the testType, and returns the corresponding testType object, and an error if there is any.
-func (c *FakeTestTypes) Get(name string, options v1.GetOptions) (result *example2_v1.TestType, err error) {
+func (c *FakeTestTypes) Get(name string, options v1.GetOptions) (result *example2.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(testtypesResource, c.ns, name), &example2_v1.TestType{})
+		Invokes(testing.NewGetAction(testtypesResource, c.ns, name), &example2.TestType{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*example2_v1.TestType), err
+	return obj.(*example2.TestType), err
 }
 
 // List takes label and field selectors, and returns the list of TestTypes that match those selectors.
-func (c *FakeTestTypes) List(opts v1.ListOptions) (result *example2_v1.TestTypeList, err error) {
+func (c *FakeTestTypes) List(opts v1.ListOptions) (result *example2.TestTypeList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(testtypesResource, testtypesKind, c.ns, opts), &example2_v1.TestTypeList{})
+		Invokes(testing.NewListAction(testtypesResource, testtypesKind, c.ns, opts), &example2.TestTypeList{})
 
 	if obj == nil {
 		return nil, err
@@ -60,8 +60,8 @@ func (c *FakeTestTypes) List(opts v1.ListOptions) (result *example2_v1.TestTypeL
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &example2_v1.TestTypeList{}
-	for _, item := range obj.(*example2_v1.TestTypeList).Items {
+	list := &example2.TestTypeList{}
+	for _, item := range obj.(*example2.TestTypeList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -77,43 +77,43 @@ func (c *FakeTestTypes) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a testType and creates it.  Returns the server's representation of the testType, and an error, if there is any.
-func (c *FakeTestTypes) Create(testType *example2_v1.TestType) (result *example2_v1.TestType, err error) {
+func (c *FakeTestTypes) Create(testType *example2.TestType) (result *example2.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(testtypesResource, c.ns, testType), &example2_v1.TestType{})
+		Invokes(testing.NewCreateAction(testtypesResource, c.ns, testType), &example2.TestType{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*example2_v1.TestType), err
+	return obj.(*example2.TestType), err
 }
 
 // Update takes the representation of a testType and updates it. Returns the server's representation of the testType, and an error, if there is any.
-func (c *FakeTestTypes) Update(testType *example2_v1.TestType) (result *example2_v1.TestType, err error) {
+func (c *FakeTestTypes) Update(testType *example2.TestType) (result *example2.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(testtypesResource, c.ns, testType), &example2_v1.TestType{})
+		Invokes(testing.NewUpdateAction(testtypesResource, c.ns, testType), &example2.TestType{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*example2_v1.TestType), err
+	return obj.(*example2.TestType), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeTestTypes) UpdateStatus(testType *example2_v1.TestType) (*example2_v1.TestType, error) {
+func (c *FakeTestTypes) UpdateStatus(testType *example2.TestType) (*example2.TestType, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(testtypesResource, "status", c.ns, testType), &example2_v1.TestType{})
+		Invokes(testing.NewUpdateSubresourceAction(testtypesResource, "status", c.ns, testType), &example2.TestType{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*example2_v1.TestType), err
+	return obj.(*example2.TestType), err
 }
 
 // Delete takes name of the testType and deletes it. Returns an error if one occurs.
 func (c *FakeTestTypes) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(testtypesResource, c.ns, name), &example2_v1.TestType{})
+		Invokes(testing.NewDeleteAction(testtypesResource, c.ns, name), &example2.TestType{})
 
 	return err
 }
@@ -122,17 +122,17 @@ func (c *FakeTestTypes) Delete(name string, options *v1.DeleteOptions) error {
 func (c *FakeTestTypes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(testtypesResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &example2_v1.TestTypeList{})
+	_, err := c.Fake.Invokes(action, &example2.TestTypeList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched testType.
-func (c *FakeTestTypes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *example2_v1.TestType, err error) {
+func (c *FakeTestTypes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *example2.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(testtypesResource, c.ns, name, data, subresources...), &example2_v1.TestType{})
+		Invokes(testing.NewPatchSubresourceAction(testtypesResource, c.ns, name, data, subresources...), &example2.TestType{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*example2_v1.TestType), err
+	return obj.(*example2.TestType), err
 }
