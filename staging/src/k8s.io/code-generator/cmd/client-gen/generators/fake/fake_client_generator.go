@@ -119,6 +119,7 @@ func PackageForClientset(customArgs *clientgenargs.CustomArgs, fakeClientsetPack
 					InputPackages: customArgs.GroupVersionToInputPath,
 					OutputPackage: fakeClientsetPackage,
 					Groups:        customArgs.Groups,
+					GroupGoNames:  groupGoNames,
 					ImportTracker: generator.NewImportTracker(),
 					PrivateScheme: true,
 				},

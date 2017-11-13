@@ -199,7 +199,7 @@ func packageForClientset(customArgs *clientgenargs.CustomArgs, clientsetPackage 
 	}
 }
 
-func packageForScheme(customArgs *clientgenargs.CustomArgs, clientsetPackage string, srcTreePath string, boilerplate []byte) generator.Package {
+func packageForScheme(customArgs *clientgenargs.CustomArgs, clientsetPackage string, srcTreePath string, groupGoNames map[clientgentypes.GroupVersion]string, boilerplate []byte) generator.Package {
 	schemePackage := filepath.Join(clientsetPackage, "scheme")
 
 	// create runtime.Registry for internal client because it has to know about group versions
@@ -236,6 +236,7 @@ NextGroup:
 					OutputPackage:  schemePackage,
 					OutputPath:     filepath.Join(srcTreePath, schemePackage),
 					Groups:         customArgs.Groups,
+					GroupGoNames:   groupGoNames,
 					ImportTracker:  generator.NewImportTracker(),
 					CreateRegistry: internalClient,
 				},
@@ -274,7 +275,7 @@ func applyGroupOverrides(universe types.Universe, customArgs *clientgenargs.Cust
 		if newGV, ok := changes[gv]; ok {
 			// There's an override, so use it.
 			newGVS := clientgentypes.GroupVersions{
-				PackageName: gv.Group.NonEmpty(),
+				PackageName: gvs.PackageName,
 				Group:       newGV.Group,
 				Versions:    gvs.Versions,
 			}
@@ -360,7 +361,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	clientsetPackage := filepath.Join(customArgs.ClientsetOutputPath, customArgs.ClientsetName)
 
 	packageList = append(packageList, packageForClientset(customArgs, clientsetPackage, groupGoNames, boilerplate))
-	packageList = append(packageList, packageForScheme(customArgs, clientsetPackage, arguments.OutputBase, boilerplate))
+	packageList = append(packageList, packageForScheme(customArgs, clientsetPackage, arguments.OutputBase, groupGoNames, boilerplate))
 	if customArgs.FakeClient {
 		packageList = append(packageList, fake.PackageForClientset(customArgs, clientsetPackage, groupGoNames, boilerplate))
 	}
