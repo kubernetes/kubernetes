@@ -184,9 +184,8 @@ func testUnjoinFederationFactory(name, server, secret string) cmdutil.Factory {
 	tf.ClientConfig = kubefedtesting.DefaultClientConfig()
 	ns := serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: runtime.NewCodec(f.JSONEncoder(), api.Codecs.UniversalDecoder(fedv1beta1.SchemeGroupVersion))})
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         api.Registry.GroupOrDie("federation").GroupVersion,
 		NegotiatedSerializer: ns,
-		GroupName:            "federation",
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case strings.HasPrefix(p, urlPrefix):
@@ -241,7 +240,7 @@ func fakeUnjoinHostFactory(clusterName string) cmdutil.Factory {
 	ns := dynamic.ContentConfig().NegotiatedSerializer
 	tf.ClientConfig = kubefedtesting.DefaultClientConfig()
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {

@@ -153,7 +153,7 @@ func TestCordon(t *testing.T) {
 		new_node := &v1.Node{}
 		updated := false
 		tf.Client = &fake.RESTClient{
-			APIRegistry:          api.Registry,
+			GroupVersion:         api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				m := &MyReq{req}
@@ -596,7 +596,7 @@ func TestDrain(t *testing.T) {
 			evicted := false
 			f, tf, codec, ns := cmdtesting.NewAPIFactory()
 			tf.Client = &fake.RESTClient{
-				APIRegistry:          api.Registry,
+				GroupVersion:         api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					m := &MyReq{req}
