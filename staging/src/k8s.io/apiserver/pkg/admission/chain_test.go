@@ -17,7 +17,6 @@ limitations under the License.
 package admission
 
 import (
-	"strconv"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -109,8 +108,7 @@ func TestAdmitAndValidate(t *testing.T) {
 		}
 
 		labelFilter := map[string]string{
-			"is_system_ns": strconv.FormatBool(test.ns == sysns),
-			"type":         "mutating",
+			"type": "mutating",
 		}
 
 		checkAdmitAndValidateMetrics(t, labelFilter, test.accept, test.calls)
@@ -136,8 +134,7 @@ func TestAdmitAndValidate(t *testing.T) {
 		}
 
 		labelFilter = map[string]string{
-			"is_system_ns": strconv.FormatBool(test.ns == sysns),
-			"type":         "validating",
+			"type": "validating",
 		}
 
 		checkAdmitAndValidateMetrics(t, labelFilter, test.accept, test.calls)

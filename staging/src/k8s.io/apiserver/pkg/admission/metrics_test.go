@@ -41,7 +41,6 @@ func TestObserveAdmissionStep(t *testing.T) {
 		"resource":    resource.Resource,
 		"subresource": "subresource",
 		"type":        "mutating",
-		"isSystemNs":  "false",
 		"rejected":    "false",
 	}
 	expectHistogramCountTotal(t, "apiserver_admission_step_latencies", wantLabels, 1)
@@ -60,7 +59,6 @@ func TestObserveAdmissionController(t *testing.T) {
 		"resource":    resource.Resource,
 		"subresource": "subresource",
 		"type":        "validating",
-		"isSystemNs":  "false",
 		"rejected":    "false",
 	}
 	expectHistogramCountTotal(t, "apiserver_admission_controller_latencies", wantLabels, 1)
@@ -69,7 +67,7 @@ func TestObserveAdmissionController(t *testing.T) {
 
 func TestObserveExternalWebhook(t *testing.T) {
 	Metrics.reset()
-	hook := &v1alpha1.ExternalAdmissionHook{Name: "x"}
+	hook := &v1alpha1.Webhook{Name: "x"}
 	Metrics.ObserveExternalWebhook(2*time.Second, false, hook, attr)
 	wantLabels := map[string]string{
 		"name":        "x",
@@ -79,7 +77,6 @@ func TestObserveExternalWebhook(t *testing.T) {
 		"resource":    resource.Resource,
 		"subresource": "subresource",
 		"type":        "validating",
-		"isSystemNs":  "false",
 		"rejected":    "false",
 	}
 	expectHistogramCountTotal(t, "apiserver_admission_external_webhook_latencies", wantLabels, 1)
