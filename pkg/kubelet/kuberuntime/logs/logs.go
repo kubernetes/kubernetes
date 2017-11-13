@@ -289,6 +289,27 @@ func ReadLogs(path, containerID string, opts *LogOptions, runtimeService interna
 				// Return directly when reading to the end if not follow.
 				if len(l) > 0 {
 					glog.Warningf("Incomplete line in log file %q: %q", path, l)
+					if parse == nil {
+						// Intialize the log parsing function.
+						parse, err = getParseFunc(l)
+						if err != nil {
+							return fmt.Errorf("failed to get parse function: %v", err)
+						}
+					}
+					// Log a warning and exit if we can't parse the partial line.
+					if err := parse(l, msg); err != nil {
+						glog.Warningf("Failed with err %v when parsing partial line for log file %q: %q", err, path, l)
+						return nil
+					}
+					// Write the log line into the stream.
+					if err := writer.write(msg); err != nil {
+						if err == errMaximumWrite {
+							glog.V(2).Infof("Finish parsing log file %q, hit bytes limit %d(bytes)", path, opts.bytes)
+							return nil
+						}
+						glog.Errorf("Failed with err %v when writing partial log for log file %q: %+v", err, path, msg)
+						return err
+					}
 				}
 				glog.V(2).Infof("Finish parsing log file %q", path)
 				return nil
