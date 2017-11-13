@@ -30,7 +30,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim/errors"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -193,20 +192,10 @@ func (ds *dockerService) StopPodSandbox(podSandboxID string) error {
 		// actions will only have sandbox ID and not have pod namespace and name information.
 		// Return error if encounter any unexpected error.
 		if checkpointErr != nil {
-			if libdocker.IsContainerNotFoundError(statusErr) && checkpointErr == errors.CheckpointNotFoundError {
+			if libdocker.IsContainerNotFoundError(statusErr) {
 				glog.Warningf("Both sandbox container and checkpoint for id %q could not be found. "+
 					"Proceed without further sandbox information.", podSandboxID)
 			} else {
-				if checkpointErr == errors.CorruptCheckpointError {
-					// Remove the corrupted checkpoint so that the next
-					// StopPodSandbox call can proceed. This may indicate that
-					// some resources won't be reclaimed.
-					// TODO (#43021): Fix this properly.
-					glog.Warningf("Removing corrupted checkpoint %q: %+v", podSandboxID, *checkpoint)
-					if err := ds.checkpointHandler.RemoveCheckpoint(podSandboxID); err != nil {
-						glog.Warningf("Unable to remove corrupted checkpoint %q: %v", podSandboxID, err)
-					}
-				}
 				return utilerrors.NewAggregate([]error{
 					fmt.Errorf("failed to get checkpoint for sandbox %q: %v", podSandboxID, checkpointErr),
 					fmt.Errorf("failed to get sandbox status: %v", statusErr)})
@@ -488,13 +477,6 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]
 		checkpoint, err := ds.checkpointHandler.GetCheckpoint(id)
 		if err != nil {
 			glog.Errorf("Failed to retrieve checkpoint for sandbox %q: %v", id, err)
-
-			if err == errors.CorruptCheckpointError {
-				glog.Warningf("Removing corrupted checkpoint %q: %+v", id, *checkpoint)
-				if err := ds.checkpointHandler.RemoveCheckpoint(id); err != nil {
-					glog.Warningf("Unable to remove corrupted checkpoint %q: %v", id, err)
-				}
-			}
 			continue
 		}
 		result = append(result, checkpointToRuntimeAPISandbox(id, checkpoint))

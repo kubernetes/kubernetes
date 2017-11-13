@@ -174,7 +174,6 @@ pkg/kubelet/container/testing
 pkg/kubelet/custommetrics
 pkg/kubelet/dockershim
 pkg/kubelet/dockershim/cm
-pkg/kubelet/dockershim/errors
 pkg/kubelet/dockershim/libdocker
 pkg/kubelet/dockershim/remote
 pkg/kubelet/dockershim/testing
