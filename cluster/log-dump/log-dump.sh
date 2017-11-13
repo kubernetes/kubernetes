@@ -50,7 +50,7 @@ readonly gce_logfiles="startupscript"
 readonly kern_logfile="kern"
 readonly initd_logfiles="docker"
 readonly supervisord_logfiles="kubelet supervisor/supervisord supervisor/kubelet-stdout supervisor/kubelet-stderr supervisor/docker-stdout supervisor/docker-stderr"
-readonly systemd_services="kubelet docker"
+readonly systemd_services="kubelet ${SYSTEMD_SERVICES:-docker}"
 
 # Limit the number of concurrent node connections so that we don't run out of
 # file descriptors for large clusters.

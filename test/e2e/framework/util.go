@@ -4560,11 +4560,17 @@ func CoreDump(dir string) {
 		Logf("Dumping logs locally to: %s", dir)
 		cmd = exec.Command(path.Join(TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir)
 	}
+	cmd.Env = append(os.Environ(), fmt.Sprintf("SYSTEMD_SERVICES=%s", parseSystemdServices(TestContext.SystemdServices)))
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		Logf("Error running cluster/log-dump/log-dump.sh: %v", err)
 	}
+}
+
+// parseSystemdServices converts services separator from comma to space.
+func parseSystemdServices(services string) string {
+	return strings.TrimSpace(strings.Replace(services, ",", " ", -1))
 }
 
 func UpdatePodWithRetries(client clientset.Interface, ns, name string, update func(*v1.Pod)) (*v1.Pod, error) {
