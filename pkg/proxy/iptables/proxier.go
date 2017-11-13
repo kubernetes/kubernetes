@@ -798,7 +798,7 @@ func getLocalIPs(endpointsMap proxyEndpointsMap) map[types.NamespacedName]sets.S
 	for svcPortName := range endpointsMap {
 		for _, ep := range endpointsMap[svcPortName] {
 			if ep.isLocal {
-				// If the endpoint has a bad format, ipPart() will log an
+				// If the endpoint has a bad format, utilproxy.IPPart() will log an
 				// error and ep.IPPart() will return a null string.
 				if ip := ep.IPPart(); ip != "" {
 					nsn := svcPortName.NamespacedName

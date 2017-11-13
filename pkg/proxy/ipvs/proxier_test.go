@@ -2017,6 +2017,14 @@ func Test_getLocalIPs(t *testing.T) {
 			{Namespace: "ns2", Name: "ep2"}: sets.NewString("2.2.2.2", "2.2.2.22", "2.2.2.3"),
 			{Namespace: "ns4", Name: "ep4"}: sets.NewString("4.4.4.4", "4.4.4.6"),
 		},
+	}, {
+		// Case[5]: named port local and bad endpoints IP
+		endpointsMap: map[proxy.ServicePortName][]*endpointsInfo{
+			makeServicePortName("ns1", "ep1", "p11"): {
+				{endpoint: "bad ip:11", isLocal: true},
+			},
+		},
+		expected: map[types.NamespacedName]sets.String{},
 	}}
 
 	for tci, tc := range testCases {

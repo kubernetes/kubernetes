@@ -32,12 +32,17 @@ func IPPart(s string) string {
 		return s
 	}
 	// Must be IP:port
-	ip, _, err := net.SplitHostPort(s)
+	host, _, err := net.SplitHostPort(s)
 	if err != nil {
 		glog.Errorf("Error parsing '%s': %v", s, err)
 		return ""
 	}
-	return ip
+	// Check if host string is a valid IP address
+	if ip := net.ParseIP(host); ip != nil {
+		glog.Errorf("invalid IP part '%s'", host)
+		return host
+	}
+	return ""
 }
 
 // ToCIDR returns a host address of the form <ip-address>/32 for
