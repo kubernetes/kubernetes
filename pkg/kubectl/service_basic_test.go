@@ -116,6 +116,20 @@ func TestServiceBasicGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name:        "invalid-port",
+			tcp:         []string{"65536"},
+			clusterip:   "None",
+			serviceType: v1.ServiceTypeClusterIP,
+			expectErr:   true,
+		},
+		{
+			name:        "invalid-port-mapping",
+			tcp:         []string{"8080:-abc"},
+			clusterip:   "None",
+			serviceType: v1.ServiceTypeClusterIP,
+			expectErr:   true,
+		},
+		{
 			expectErr: true,
 		},
 	}
