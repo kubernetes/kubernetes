@@ -59,6 +59,7 @@ func TestIsStandardResource(t *testing.T) {
 		{"blah", false},
 		{"x.y.z", false},
 		{"hugepages-2Mi", true},
+		{"requests.hugepages-2Mi", true},
 	}
 	for i, tc := range testCases {
 		if IsStandardResourceName(tc.input) != tc.output {
