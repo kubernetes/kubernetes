@@ -262,9 +262,10 @@ func TestGetAltNames(t *testing.T) {
 	hostname := "valid-hostname"
 	advertiseIP := "1.2.3.4"
 	cfg := &kubeadmapi.MasterConfiguration{
-		API:        kubeadmapi.API{AdvertiseAddress: advertiseIP},
-		Networking: kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-		NodeName:   hostname,
+		API:               kubeadmapi.API{AdvertiseAddress: advertiseIP},
+		Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+		NodeName:          hostname,
+		APIServerCertSANs: []string{"10.1.245.94", "10.1.245.95"},
 	}
 
 	altNames, err := getAltNames(cfg)
@@ -287,7 +288,7 @@ func TestGetAltNames(t *testing.T) {
 		}
 	}
 
-	expectedIPAddresses := []string{"10.96.0.1", advertiseIP}
+	expectedIPAddresses := []string{"10.96.0.1", advertiseIP, "10.1.245.94", "10.1.245.95"}
 	for _, IPAddress := range expectedIPAddresses {
 		found := false
 		for _, val := range altNames.IPs {
