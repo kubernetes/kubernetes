@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -59,7 +60,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	event := validNewEvent(test.TestNamespace())
 	event.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -74,7 +75,7 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme).AllowCreateOnUpdate()
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme).AllowCreateOnUpdate()
 	test.TestUpdate(
 		// valid
 		validNewEvent(test.TestNamespace()),
@@ -97,7 +98,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestDelete(validNewEvent(test.TestNamespace()))
 }
 

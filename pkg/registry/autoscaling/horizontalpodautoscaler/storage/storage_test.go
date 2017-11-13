@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
@@ -75,7 +76,7 @@ func TestCreate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	autoscaler := validNewHorizontalPodAutoscaler("foo")
 	autoscaler.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -90,7 +91,7 @@ func TestUpdate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestUpdate(
 		// valid
 		validNewHorizontalPodAutoscaler("foo"),
@@ -107,7 +108,7 @@ func TestDelete(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestDelete(validNewHorizontalPodAutoscaler("foo"))
 }
 
@@ -115,7 +116,7 @@ func TestGet(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestGet(validNewHorizontalPodAutoscaler("foo"))
 }
 
@@ -123,7 +124,7 @@ func TestList(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestList(validNewHorizontalPodAutoscaler("foo"))
 }
 
@@ -131,7 +132,7 @@ func TestWatch(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestWatch(
 		validNewHorizontalPodAutoscaler("foo"),
 		// matching labels

@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -55,7 +56,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	serviceAccount := validNewServiceAccount("foo")
 	serviceAccount.ObjectMeta = metav1.ObjectMeta{GenerateName: "foo-"}
 	test.TestCreate(
@@ -73,7 +74,7 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestUpdate(
 		// valid
 		validNewServiceAccount("foo"),
@@ -90,7 +91,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme).ReturnDeletedObject()
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme).ReturnDeletedObject()
 	test.TestDelete(validNewServiceAccount("foo"))
 }
 
@@ -98,7 +99,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestGet(validNewServiceAccount("foo"))
 }
 
@@ -106,7 +107,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestList(validNewServiceAccount("foo"))
 }
 
@@ -114,7 +115,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestWatch(
 		validNewServiceAccount("foo"),
 		// matching labels

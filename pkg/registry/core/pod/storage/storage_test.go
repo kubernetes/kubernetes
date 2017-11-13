@@ -34,6 +34,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
@@ -99,7 +100,7 @@ func TestCreate(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	pod := validNewPod()
 	pod.ObjectMeta = metav1.ObjectMeta{}
 	// Make an invalid pod with an an incorrect label.
@@ -126,7 +127,7 @@ func TestUpdate(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestUpdate(
 		// valid
 		validNewPod(),
@@ -143,7 +144,7 @@ func TestDelete(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme).ReturnDeletedObject()
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme).ReturnDeletedObject()
 	test.TestDelete(validNewPod())
 
 	scheduledPod := validNewPod()
@@ -367,7 +368,7 @@ func TestGet(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestGet(validNewPod())
 }
 
@@ -375,7 +376,7 @@ func TestList(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestList(validNewPod())
 }
 
@@ -383,7 +384,7 @@ func TestWatch(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestWatch(
 		validNewPod(),
 		// matching labels

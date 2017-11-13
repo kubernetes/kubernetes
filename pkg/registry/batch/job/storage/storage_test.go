@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -83,7 +84,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Job.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Job.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Job.Store, legacyscheme.Scheme)
 	validJob := validNewJob()
 	validJob.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -104,7 +105,7 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Job.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Job.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Job.Store, legacyscheme.Scheme)
 	two := int32(2)
 	test.TestUpdate(
 		// valid
@@ -133,7 +134,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Job.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Job.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Job.Store, legacyscheme.Scheme)
 	test.TestDelete(validNewJob())
 }
 
@@ -141,7 +142,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Job.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Job.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Job.Store, legacyscheme.Scheme)
 	test.TestGet(validNewJob())
 }
 
@@ -149,7 +150,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Job.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Job.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Job.Store, legacyscheme.Scheme)
 	test.TestList(validNewJob())
 }
 
@@ -157,7 +158,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Job.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Job.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Job.Store, legacyscheme.Scheme)
 	test.TestWatch(
 		validNewJob(),
 		// matching labels

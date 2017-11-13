@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -94,7 +95,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.StatefulSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.StatefulSet.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.StatefulSet.Store, legacyscheme.Scheme)
 	ps := validNewStatefulSet()
 	ps.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -147,7 +148,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.StatefulSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.StatefulSet.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.StatefulSet.Store, legacyscheme.Scheme)
 	test.TestGet(validNewStatefulSet())
 }
 
@@ -155,7 +156,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.StatefulSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.StatefulSet.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.StatefulSet.Store, legacyscheme.Scheme)
 	test.TestList(validNewStatefulSet())
 }
 
@@ -163,7 +164,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.StatefulSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.StatefulSet.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.StatefulSet.Store, legacyscheme.Scheme)
 	test.TestDelete(validNewStatefulSet())
 }
 
@@ -171,7 +172,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.StatefulSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.StatefulSet.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.StatefulSet.Store, legacyscheme.Scheme)
 	test.TestWatch(
 		validNewStatefulSet(),
 		// matching labels

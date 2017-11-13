@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
@@ -69,7 +70,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme).ClusterScope()
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme).ClusterScope()
 	psp := validNewPodSecurityPolicy()
 	psp.ObjectMeta = metav1.ObjectMeta{GenerateName: "foo-"}
 	test.TestCreate(
@@ -86,7 +87,7 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme).ClusterScope()
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme).ClusterScope()
 	test.TestUpdate(
 		// valid
 		validNewPodSecurityPolicy(),
@@ -103,7 +104,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme).ClusterScope().ReturnDeletedObject()
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme).ClusterScope().ReturnDeletedObject()
 	test.TestDelete(validNewPodSecurityPolicy())
 }
 
@@ -111,7 +112,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme).ClusterScope()
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme).ClusterScope()
 	test.TestGet(validNewPodSecurityPolicy())
 }
 
@@ -119,7 +120,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme).ClusterScope()
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme).ClusterScope()
 	test.TestList(validNewPodSecurityPolicy())
 }
 
@@ -127,7 +128,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme).ClusterScope()
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme).ClusterScope()
 	test.TestWatch(
 		validNewPodSecurityPolicy(),
 		// matching labels

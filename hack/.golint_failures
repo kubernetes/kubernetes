@@ -1,4 +1,3 @@
-
 cluster/images/etcd-version-monitor
 cmd/gke-certificates-controller/app
 cmd/hyperkube
@@ -579,6 +578,7 @@ staging/src/k8s.io/apiserver/pkg/features
 staging/src/k8s.io/apiserver/pkg/registry/generic
 staging/src/k8s.io/apiserver/pkg/registry/generic/registry
 staging/src/k8s.io/apiserver/pkg/registry/generic/rest
+staging/src/k8s.io/apiserver/pkg/registry/generic/testing
 staging/src/k8s.io/apiserver/pkg/registry/rest
 staging/src/k8s.io/apiserver/pkg/registry/rest/resttest
 staging/src/k8s.io/apiserver/pkg/server

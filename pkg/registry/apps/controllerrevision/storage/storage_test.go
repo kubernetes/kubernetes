@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -35,7 +36,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	var (
 		valid       = stripObjectMeta(newControllerRevision("validname", metav1.NamespaceDefault, newObject(), 0))
 		badRevision = stripObjectMeta(newControllerRevision("validname", "validns", newObject(), -1))
@@ -59,7 +60,7 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 
 	addLabel := func(obj runtime.Object) runtime.Object {
 		rev := obj.(*apps.ControllerRevision)
@@ -94,7 +95,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestGet(newControllerRevision("valid", metav1.NamespaceDefault, newObject(), 0))
 }
 
@@ -102,7 +103,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestList(newControllerRevision("valid", metav1.NamespaceDefault, newObject(), 0))
 }
 
@@ -110,7 +111,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestDelete(newControllerRevision("valid", metav1.NamespaceDefault, newObject(), 0))
 }
 
@@ -118,7 +119,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestWatch(
 		newControllerRevision("valid", metav1.NamespaceDefault, newObject(), 0),
 		[]labels.Set{
