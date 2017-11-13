@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,6 +15,6 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package
-// +groupName=example.test.crd.code-generator.k8s.io
+// +groupName=example.test.apiserver.code-generator.k8s.io
 // +groupGoName=SecondExample
-package v1
+package example2 // import "k8s.io/code-generator/_examples/apiserver/apis/example2"
