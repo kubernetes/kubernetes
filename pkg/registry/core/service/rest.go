@@ -61,6 +61,16 @@ type REST struct {
 	proxyTransport   http.RoundTripper
 }
 
+// ServiceNodePort includes protocol and port number of a service NodePort.
+type ServiceNodePort struct {
+	// The IP protocol for this port. Supports "TCP" and "UDP".
+	Protocol api.Protocol
+
+	// The port on each node on which this service is exposed.
+	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
+	NodePort int32
+}
+
 // NewStorage returns a new REST.
 func NewStorage(registry Registry, endpoints endpoint.Registry, serviceIPs ipallocator.Interface,
 	serviceNodePorts portallocator.Interface, proxyTransport http.RoundTripper) *ServiceRest {
@@ -437,9 +447,20 @@ func (rs *REST) ResourceLocation(ctx genericapirequest.Context, id string) (*url
 
 // This is O(N), but we expect haystack to be small;
 // so small that we expect a linear search to be faster
-func contains(haystack []int, needle int) bool {
+func containsNumber(haystack []int, needle int) bool {
 	for _, v := range haystack {
 		if v == needle {
+			return true
+		}
+	}
+	return false
+}
+
+// This is O(N), but we expect serviceNodePorts to be small;
+// so small that we expect a linear search to be faster
+func containsNodePort(serviceNodePorts []ServiceNodePort, serviceNodePort ServiceNodePort) bool {
+	for _, snp := range serviceNodePorts {
+		if snp == serviceNodePort {
 			return true
 		}
 	}
@@ -569,44 +590,48 @@ func (rs *REST) initNodePorts(service *api.Service, nodePortOp *portallocator.Po
 }
 
 func (rs *REST) updateNodePorts(oldService, newService *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
-	oldNodePorts := CollectServiceNodePorts(oldService)
+	oldNodePortsNumbers := CollectServiceNodePorts(oldService)
+	newNodePorts := []ServiceNodePort{}
+	portAllocated := map[int]bool{}
 
-	newNodePorts := []int{}
 	for i := range newService.Spec.Ports {
 		servicePort := &newService.Spec.Ports[i]
-		nodePort := int(servicePort.NodePort)
-		if nodePort != 0 {
-			if !contains(oldNodePorts, nodePort) {
-				err := nodePortOp.Allocate(nodePort)
+		nodePort := ServiceNodePort{Protocol: servicePort.Protocol, NodePort: servicePort.NodePort}
+		if nodePort.NodePort != 0 {
+			if !containsNumber(oldNodePortsNumbers, int(nodePort.NodePort)) && !portAllocated[int(nodePort.NodePort)] {
+				err := nodePortOp.Allocate(int(nodePort.NodePort))
 				if err != nil {
-					el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), nodePort, err.Error())}
+					el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), nodePort.NodePort, err.Error())}
 					return errors.NewInvalid(api.Kind("Service"), newService.Name, el)
 				}
+				portAllocated[int(nodePort.NodePort)] = true
 			}
 		} else {
-			nodePort, err := nodePortOp.AllocateNext()
+			nodePortNumber, err := nodePortOp.AllocateNext()
 			if err != nil {
 				// TODO: what error should be returned here?  It's not a
 				// field-level validation failure (the field is valid), and it's
 				// not really an internal error.
 				return errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
 			}
-			servicePort.NodePort = int32(nodePort)
+			servicePort.NodePort = int32(nodePortNumber)
+			nodePort.NodePort = servicePort.NodePort
 		}
-		// Detect duplicate node ports; this should have been caught by validation, so we panic
-		if contains(newNodePorts, nodePort) {
-			panic("duplicate node port")
+		if containsNodePort(newNodePorts, nodePort) {
+			return fmt.Errorf("duplicate nodePort: %v", nodePort)
 		}
 		newNodePorts = append(newNodePorts, nodePort)
 	}
 
+	newNodePortsNumbers := CollectServiceNodePorts(newService)
+
 	// The comparison loops are O(N^2), but we don't expect N to be huge
 	// (there's a hard-limit at 2^16, because they're ports; and even 4 ports would be a lot)
-	for _, oldNodePort := range oldNodePorts {
-		if contains(newNodePorts, oldNodePort) {
+	for _, oldNodePortNumber := range oldNodePortsNumbers {
+		if containsNumber(newNodePortsNumbers, oldNodePortNumber) {
 			continue
 		}
-		nodePortOp.ReleaseDeferred(oldNodePort)
+		nodePortOp.ReleaseDeferred(int(oldNodePortNumber))
 	}
 
 	return nil

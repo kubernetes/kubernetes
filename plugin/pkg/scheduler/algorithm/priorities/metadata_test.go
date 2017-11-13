@@ -94,6 +94,24 @@ func TestPriorityMetadata(t *testing.T) {
 			Tolerations: tolerations,
 		},
 	}
+	podWithAffinityAndRequests := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "container",
+					Image:           "image",
+					ImagePullPolicy: "Always",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("200m"),
+							v1.ResourceMemory: resource.MustParse("2000"),
+						},
+					},
+				},
+			},
+			Affinity: podAffinity,
+		},
+	}
 	tests := []struct {
 		pod      *v1.Pod
 		test     string
@@ -119,6 +137,15 @@ func TestPriorityMetadata(t *testing.T) {
 				nonZeroRequest: specifiedReqs,
 				podTolerations: tolerations,
 				affinity:       nil,
+			},
+			test: "Produce a priorityMetadata with specified requests",
+		},
+		{
+			pod: podWithAffinityAndRequests,
+			expected: &priorityMetadata{
+				nonZeroRequest: specifiedReqs,
+				podTolerations: nil,
+				affinity:       podAffinity,
 			},
 			test: "Produce a priorityMetadata with specified requests",
 		},

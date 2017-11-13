@@ -1130,7 +1130,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Finish housekeeping.
 	// TODO: these could be made more consistent.
-	for _, svcIP := range staleServices.List() {
+	for _, svcIP := range staleServices.UnsortedList() {
 		// TODO : Check if this is required to cleanup stale services here
 		glog.V(5).Infof("Pending delete stale service IP %s connections", svcIP)
 	}

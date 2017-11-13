@@ -62,6 +62,7 @@ const isNegativeErrorMsg string = apimachineryvalidation.IsNegativeErrorMsg
 const isInvalidQuotaResource string = `must be a standard resource for quota`
 const fieldImmutableErrorMsg string = genericvalidation.FieldImmutableErrorMsg
 const isNotIntegerErrorMsg string = `must be an integer`
+const isZeroErrorMsg string = `must be greater than zero`
 
 var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
 var volumeModeErrorMsg string = "must be a number between 0 and 0777 (octal), both inclusive"
@@ -1601,6 +1602,9 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 		allErrs = append(allErrs, field.Required(fldPath.Child("resources").Key(string(core.ResourceStorage)), ""))
 	} else {
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(core.ResourceStorage), storageValue, fldPath.Child("resources").Key(string(core.ResourceStorage)))...)
+		if storageValue.Value() == int64(0) {
+			allErrs = append(allErrs, field.Invalid(fldPath, storageValue, isZeroErrorMsg))
+		}
 	}
 
 	if spec.StorageClassName != nil && len(*spec.StorageClassName) > 0 {

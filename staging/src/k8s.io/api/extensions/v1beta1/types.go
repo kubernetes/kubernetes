@@ -882,8 +882,9 @@ type PodSecurityPolicySpec struct {
 	// +optional
 	Privileged bool `json:"privileged,omitempty" protobuf:"varint,1,opt,name=privileged"`
 	// DefaultAddCapabilities is the default set of capabilities that will be added to the container
-	// unless the pod spec specifically drops the capability.  You may not list a capabiility in both
-	// DefaultAddCapabilities and RequiredDropCapabilities.
+	// unless the pod spec specifically drops the capability.  You may not list a capability in both
+	// DefaultAddCapabilities and RequiredDropCapabilities. Capabilities added here are implicitly
+	// allowed, and need not be included in the AllowedCapabilities list.
 	// +optional
 	DefaultAddCapabilities []v1.Capability `json:"defaultAddCapabilities,omitempty" protobuf:"bytes,2,rep,name=defaultAddCapabilities,casttype=k8s.io/api/core/v1.Capability"`
 	// RequiredDropCapabilities are the capabilities that will be dropped from the container.  These

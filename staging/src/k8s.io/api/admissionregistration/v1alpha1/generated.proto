@@ -22,6 +22,7 @@ syntax = 'proto2';
 package k8s.io.api.admissionregistration.v1alpha1;
 
 import "k8s.io/api/core/v1/generated.proto";
+import "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
@@ -147,13 +148,18 @@ message RuleWithOperations {
 
 // ServiceReference holds a reference to Service.legacy.k8s.io
 message ServiceReference {
-  // Namespace is the namespace of the service
+  // `namespace` is the namespace of the service.
   // Required
   optional string namespace = 1;
 
-  // Name is the name of the service
+  // `name` is the name of the service.
   // Required
   optional string name = 2;
+
+  // `path` is an optional URL path which will be sent in any request to
+  // this service.
+  // +optional
+  optional string path = 3;
 }
 
 // ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.
@@ -252,17 +258,50 @@ message Webhook {
 // WebhookClientConfig contains the information to make a TLS
 // connection with the webhook
 message WebhookClientConfig {
-  // Service is a reference to the service for this webhook. If there is only
-  // one port open for the service, that port will be used. If there are multiple
-  // ports open, port 443 will be used if it is open, otherwise it is an error.
-  // Required
+  // `url` gives the location of the webhook, in standard URL form
+  // (`[scheme://]host:port/path`). Exactly one of `url` or `service`
+  // must be specified.
+  // 
+  // The `host` should not refer to a service running in the cluster; use
+  // the `service` field instead. The host might be resolved via external
+  // DNS in some apiservers (e.g., `kube-apiserver` cannot resolve
+  // in-cluster DNS as that would be a layering violation). `host` may
+  // also be an IP address.
+  // 
+  // Please note that using `localhost` or `127.0.0.1` as a `host` is
+  // risky unless you take great care to run this webhook on all hosts
+  // which run an apiserver which might need to make calls to this
+  // webhook. Such installs are likely to be non-portable, i.e., not easy
+  // to turn up in a new cluster.
+  // 
+  // The scheme must be "https"; the URL must begin with "https://".
+  // 
+  // A path is optional, and if present may be any string permissible in
+  // a URL. You may use the path to pass an arbitrary string to the
+  // webhook, for example, a cluster identifier.
+  // 
+  // Attempting to use a user or basic auth e.g. "user:password@" is not
+  // allowed. Fragments ("#...") and query parameters ("?...") are not
+  // allowed, either.
+  // 
+  // +optional
+  optional string url = 3;
+
+  // `service` is a reference to the service for this webhook. Either
+  // `service` or `url` must be specified.
+  // 
+  // If the webhook is running within the cluster, then you should use `service`.
+  // 
+  // If there is only one port open for the service, that port will be
+  // used. If there are multiple ports open, port 443 will be used if it
+  // is open, otherwise it is an error.
+  // 
+  // +optional
   optional ServiceReference service = 1;
 
-  // URLPath is an optional field that specifies the URL path to use when posting the AdmissionReview object.
-  optional string urlPath = 3;
-
-  // CABundle is a PEM encoded CA bundle which will be used to validate webhook's server certificate.
-  // Required
+  // `caBundle` is a PEM encoded CA bundle which will be used to validate
+  // the webhook's server certificate.
+  // Required.
   optional bytes caBundle = 2;
 }
 

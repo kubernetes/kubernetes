@@ -231,6 +231,8 @@ func TestValidateInitializerConfiguration(t *testing.T) {
 	}
 }
 
+func strPtr(s string) *string { return &s }
+
 func newValidatingWebhookConfiguration(hooks []admissionregistration.Webhook) *admissionregistration.ValidatingWebhookConfiguration {
 	return &admissionregistration.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
@@ -243,6 +245,9 @@ func newValidatingWebhookConfiguration(hooks []admissionregistration.Webhook) *a
 // TODO: Add TestValidateMutatingWebhookConfiguration to test validation for mutating webhooks.
 
 func TestValidateValidatingWebhookConfiguration(t *testing.T) {
+	validClientConfig := admissionregistration.WebhookClientConfig{
+		URL: strPtr("https://example.com"),
+	}
 	tests := []struct {
 		name          string
 		config        *admissionregistration.ValidatingWebhookConfiguration
@@ -253,13 +258,16 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
-						Name: "webhook.k8s.io",
+						Name:         "webhook.k8s.io",
+						ClientConfig: validClientConfig,
 					},
 					{
-						Name: "k8s.io",
+						Name:         "k8s.io",
+						ClientConfig: validClientConfig,
 					},
 					{
-						Name: "",
+						Name:         "",
+						ClientConfig: validClientConfig,
 					},
 				}),
 			expectedError: `webhooks[1].name: Invalid value: "k8s.io": should be a domain with at least three segments separated by dots, webhooks[2].name: Required value`,
@@ -357,7 +365,8 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
-						Name: "webhook.k8s.io",
+						Name:         "webhook.k8s.io",
+						ClientConfig: validClientConfig,
 						Rules: []admissionregistration.RuleWithOperations{
 							{
 								Operations: []admissionregistration.OperationType{"CREATE"},
@@ -376,7 +385,8 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
-						Name: "webhook.k8s.io",
+						Name:         "webhook.k8s.io",
+						ClientConfig: validClientConfig,
 						Rules: []admissionregistration.RuleWithOperations{
 							{
 								Operations: []admissionregistration.OperationType{"CREATE"},
@@ -396,7 +406,8 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
-						Name: "webhook.k8s.io",
+						Name:         "webhook.k8s.io",
+						ClientConfig: validClientConfig,
 						Rules: []admissionregistration.RuleWithOperations{
 							{
 								Operations: []admissionregistration.OperationType{"CREATE"},
@@ -416,7 +427,8 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
-						Name: "webhook.k8s.io",
+						Name:         "webhook.k8s.io",
+						ClientConfig: validClientConfig,
 						Rules: []admissionregistration.RuleWithOperations{
 							{
 								Operations: []admissionregistration.OperationType{"CREATE"},
@@ -435,7 +447,8 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
-						Name: "webhook.k8s.io",
+						Name:         "webhook.k8s.io",
+						ClientConfig: validClientConfig,
 						Rules: []admissionregistration.RuleWithOperations{
 							{
 								Operations: []admissionregistration.OperationType{"CREATE"},
@@ -455,7 +468,8 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
-						Name: "webhook.k8s.io",
+						Name:         "webhook.k8s.io",
+						ClientConfig: validClientConfig,
 						Rules: []admissionregistration.RuleWithOperations{
 							{
 								Operations: []admissionregistration.OperationType{"CREATE"},
@@ -475,7 +489,8 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
-						Name: "webhook.k8s.io",
+						Name:         "webhook.k8s.io",
+						ClientConfig: validClientConfig,
 						FailurePolicy: func() *admissionregistration.FailurePolicyType {
 							r := admissionregistration.FailurePolicyType("other")
 							return &r
@@ -485,94 +500,241 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			expectedError: `webhooks[0].failurePolicy: Unsupported value: "other": supported values: "Fail", "Ignore"`,
 		},
 		{
-			name: "URLPath must start with slash",
+			name: "both service and URL missing",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name:         "webhook.k8s.io",
+						ClientConfig: admissionregistration.WebhookClientConfig{},
+					},
+				}),
+			expectedError: `exactly one of`,
+		},
+		{
+			name: "both service and URL provided",
 			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
 						ClientConfig: admissionregistration.WebhookClientConfig{
-							URLPath: "foo/",
+							Service: &admissionregistration.ServiceReference{
+								Namespace: "ns",
+								Name:      "n",
+							},
+							URL: strPtr("example.com/k8s/webhook"),
 						},
 					},
 				}),
-			expectedError: `clientConfig.urlPath: Invalid value: "foo/": must start with a '/'`,
+			expectedError: `[0].clientConfig.url: Required value: exactly one of url or service is required`,
 		},
 		{
-			name: "URLPath accepts slash",
+			name: "blank URL",
 			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
 						ClientConfig: admissionregistration.WebhookClientConfig{
-							URLPath: "/",
+							URL: strPtr(""),
+						},
+					},
+				}),
+			expectedError: `[0].clientConfig.url: Invalid value: "": host must be provided`,
+		},
+		{
+			name: "wrong scheme",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.WebhookClientConfig{
+							URL: strPtr("http://example.com"),
+						},
+					},
+				}),
+			expectedError: `https`,
+		},
+		{
+			name: "missing host",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.WebhookClientConfig{
+							URL: strPtr("https:///fancy/webhook"),
+						},
+					},
+				}),
+			expectedError: `host must be provided`,
+		},
+		{
+			name: "fragment",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.WebhookClientConfig{
+							URL: strPtr("https://example.com/#bookmark"),
+						},
+					},
+				}),
+			expectedError: `"bookmark": fragments are not permitted`,
+		},
+		{
+			name: "query",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.WebhookClientConfig{
+							URL: strPtr("https://example.com?arg=value"),
+						},
+					},
+				}),
+			expectedError: `"arg=value": query parameters are not permitted`,
+		},
+		{
+			name: "user",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.WebhookClientConfig{
+							URL: strPtr("https://harry.potter@example.com/"),
+						},
+					},
+				}),
+			expectedError: `"harry.potter": user information is not permitted`,
+		},
+		{
+			name: "just totally wrong",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.WebhookClientConfig{
+							URL: strPtr("arg#backwards=thisis?html.index/port:host//:https"),
+						},
+					},
+				}),
+			expectedError: `host must be provided`,
+		},
+		{
+			name: "path must start with slash",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.WebhookClientConfig{
+							Service: &admissionregistration.ServiceReference{
+								Namespace: "ns",
+								Name:      "n",
+								Path:      strPtr("foo/"),
+							},
+						},
+					},
+				}),
+			expectedError: `clientConfig.service.path: Invalid value: "foo/": must start with a '/'`,
+		},
+		{
+			name: "path accepts slash",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.WebhookClientConfig{
+							Service: &admissionregistration.ServiceReference{
+								Namespace: "ns",
+								Name:      "n",
+								Path:      strPtr("/"),
+							},
 						},
 					},
 				}),
 			expectedError: ``,
 		},
 		{
-			name: "URLPath accepts no trailing slash",
+			name: "path accepts no trailing slash",
 			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
 						ClientConfig: admissionregistration.WebhookClientConfig{
-							URLPath: "/foo",
+							Service: &admissionregistration.ServiceReference{
+								Namespace: "ns",
+								Name:      "n",
+								Path:      strPtr("/foo"),
+							},
 						},
 					},
 				}),
 			expectedError: ``,
 		},
 		{
-			name: "URLPath fails //",
+			name: "path fails //",
 			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
 						ClientConfig: admissionregistration.WebhookClientConfig{
-							URLPath: "//",
+							Service: &admissionregistration.ServiceReference{
+								Namespace: "ns",
+								Name:      "n",
+								Path:      strPtr("//"),
+							},
 						},
 					},
 				}),
-			expectedError: `clientConfig.urlPath: Invalid value: "//": segment[0] may not be empty`,
+			expectedError: `clientConfig.service.path: Invalid value: "//": segment[0] may not be empty`,
 		},
 		{
-			name: "URLPath no empty step",
+			name: "path no empty step",
 			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
 						ClientConfig: admissionregistration.WebhookClientConfig{
-							URLPath: "/foo//bar/",
+							Service: &admissionregistration.ServiceReference{
+								Namespace: "ns",
+								Name:      "n",
+								Path:      strPtr("/foo//bar/"),
+							},
 						},
 					},
 				}),
-			expectedError: `clientConfig.urlPath: Invalid value: "/foo//bar/": segment[1] may not be empty`,
+			expectedError: `clientConfig.service.path: Invalid value: "/foo//bar/": segment[1] may not be empty`,
 		}, {
-			name: "URLPath no empty step 2",
+			name: "path no empty step 2",
 			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
 						ClientConfig: admissionregistration.WebhookClientConfig{
-							URLPath: "/foo/bar//",
+							Service: &admissionregistration.ServiceReference{
+								Namespace: "ns",
+								Name:      "n",
+								Path:      strPtr("/foo/bar//"),
+							},
 						},
 					},
 				}),
-			expectedError: `clientConfig.urlPath: Invalid value: "/foo/bar//": segment[2] may not be empty`,
+			expectedError: `clientConfig.service.path: Invalid value: "/foo/bar//": segment[2] may not be empty`,
 		},
 		{
-			name: "URLPath no non-subdomain",
+			name: "path no non-subdomain",
 			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
 						ClientConfig: admissionregistration.WebhookClientConfig{
-							URLPath: "/apis/foo.bar/v1alpha1/--bad",
+							Service: &admissionregistration.ServiceReference{
+								Namespace: "ns",
+								Name:      "n",
+								Path:      strPtr("/apis/foo.bar/v1alpha1/--bad"),
+							},
 						},
 					},
 				}),
-			expectedError: `clientConfig.urlPath: Invalid value: "/apis/foo.bar/v1alpha1/--bad": segment[3]: a DNS-1123 subdomain`,
+			expectedError: `clientConfig.service.path: Invalid value: "/apis/foo.bar/v1alpha1/--bad": segment[3]: a DNS-1123 subdomain`,
 		},
 	}
 	for _, test := range tests {
