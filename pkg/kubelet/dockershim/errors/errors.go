@@ -18,5 +18,4 @@ package errors
 
 import "fmt"
 
-var CorruptCheckpointError = fmt.Errorf("checkpoint is corrupted.")
 var CheckpointNotFoundError = fmt.Errorf("checkpoint is not found.")
