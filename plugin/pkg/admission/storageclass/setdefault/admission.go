@@ -54,6 +54,7 @@ type claimDefaulterPlugin struct {
 }
 
 var _ admission.Interface = &claimDefaulterPlugin{}
+var _ admission.MutationInterface = &claimDefaulterPlugin{}
 var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&claimDefaulterPlugin{})
 
 // newPlugin creates a new admission plugin.

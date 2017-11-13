@@ -52,6 +52,7 @@ type persistentVolumeLabel struct {
 	gceCloudProvider *gce.GCECloud
 }
 
+var _ admission.MutationInterface = &persistentVolumeLabel{}
 var _ kubeapiserveradmission.WantsCloudConfig = &persistentVolumeLabel{}
 
 // NewPersistentVolumeLabel returns an admission.Interface implementation which adds labels to PersistentVolume CREATE requests,

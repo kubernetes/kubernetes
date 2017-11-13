@@ -46,6 +46,7 @@ type Provision struct {
 	namespaceLister corelisters.NamespaceLister
 }
 
+var _ admission.MutationInterface = &Provision{}
 var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&Provision{})
 var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&Provision{})
 
