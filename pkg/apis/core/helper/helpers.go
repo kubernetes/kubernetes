@@ -37,6 +37,12 @@ func IsHugePageResourceName(name core.ResourceName) bool {
 	return strings.HasPrefix(string(name), core.ResourceHugePagesPrefix)
 }
 
+// IsQuotaHugePageResourceName returns true if the resource name has the quota
+// related huge page resource prefix.
+func IsQuotaHugePageResourceName(name core.ResourceName) bool {
+	return strings.HasPrefix(string(name), core.ResourceHugePagesPrefix) || strings.HasPrefix(string(name), core.ResourceRequestsHugePagesPrefix)
+}
+
 // HugePageResourceName returns a ResourceName with the canonical hugepage
 // prefix prepended for the specified page size.  The page size is converted
 // to its canonical representation.
@@ -217,7 +223,7 @@ var standardQuotaResources = sets.NewString(
 // IsStandardQuotaResourceName returns true if the resource is known to
 // the quota tracking system
 func IsStandardQuotaResourceName(str string) bool {
-	return standardQuotaResources.Has(str)
+	return standardQuotaResources.Has(str) || IsQuotaHugePageResourceName(core.ResourceName(str))
 }
 
 var standardResources = sets.NewString(
@@ -245,7 +251,7 @@ var standardResources = sets.NewString(
 
 // IsStandardResourceName returns true if the resource is known to the system
 func IsStandardResourceName(str string) bool {
-	return standardResources.Has(str) || IsHugePageResourceName(core.ResourceName(str))
+	return standardResources.Has(str) || IsQuotaHugePageResourceName(core.ResourceName(str))
 }
 
 var integerResources = sets.NewString(

@@ -17,6 +17,8 @@ limitations under the License.
 package quota
 
 import (
+	"strings"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -194,6 +196,16 @@ func ResourceNames(resources api.ResourceList) []api.ResourceName {
 // Contains returns true if the specified item is in the list of items
 func Contains(items []api.ResourceName, item api.ResourceName) bool {
 	return ToSet(items).Has(string(item))
+}
+
+// ContainsPrefix returns true if the specified item has a prefix that contained in given prefix Set
+func ContainsPrefix(prefixSet []string, item api.ResourceName) bool {
+	for _, prefix := range prefixSet {
+		if strings.HasPrefix(string(item), prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // Intersection returns the intersection of both list of resources

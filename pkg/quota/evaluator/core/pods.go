@@ -58,6 +58,30 @@ var podResources = []api.ResourceName{
 	api.ResourcePods,
 }
 
+// podResourcePrefixes are the set of prefixes for resources (Hugepages, and other
+// potential extended reources with specific prefix) managed by quota associated with pods.
+var podResourcePrefixes = []string{
+	api.ResourceHugePagesPrefix,
+	api.ResourceRequestsHugePagesPrefix,
+}
+
+// requestedResourcePrefixes are the set of prefixes for resources
+// that might be declared in pod's Resources.Requests/Limits
+var requestedResourcePrefixes = []string{
+	api.ResourceHugePagesPrefix,
+}
+
+const (
+	requestsPrefix = "requests."
+	limitsPrefix   = "limits."
+)
+
+// maskResourceWithPrefix mask resource with certain prefix
+// e.g. hugepages-XXX -> requests.hugepages-XXX
+func maskResourceWithPrefix(resource api.ResourceName, prefix string) api.ResourceName {
+	return api.ResourceName(fmt.Sprintf("%s%s", prefix, string(resource)))
+}
+
 // NOTE: it was a mistake, but if a quota tracks cpu or memory related resources,
 // the incoming pod is required to have those values set.  we should not repeat
 // this mistake for other future resources (gpus, ephemeral-storage,etc).
@@ -157,7 +181,14 @@ func (p *podEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Ob
 
 // MatchingResources takes the input specified list of resources and returns the set of resources it matches.
 func (p *podEvaluator) MatchingResources(input []api.ResourceName) []api.ResourceName {
-	return quota.Intersection(input, podResources)
+	result := quota.Intersection(input, podResources)
+	for _, resource := range input {
+		if quota.ContainsPrefix(podResourcePrefixes, resource) {
+			result = append(result, resource)
+		}
+	}
+
+	return result
 }
 
 // Usage knows how to measure usage associated with pods
@@ -212,6 +243,18 @@ func podComputeUsageHelper(requests api.ResourceList, limits api.ResourceList) a
 	if limit, found := limits[api.ResourceEphemeralStorage]; found {
 		result[api.ResourceLimitsEphemeralStorage] = limit
 	}
+	for resource, request := range requests {
+		if quota.ContainsPrefix(requestedResourcePrefixes, resource) {
+			result[resource] = request
+			result[maskResourceWithPrefix(resource, requestsPrefix)] = request
+		}
+	}
+	for resource, limit := range limits {
+		if quota.ContainsPrefix(requestedResourcePrefixes, resource) {
+			result[maskResourceWithPrefix(resource, limitsPrefix)] = limit
+		}
+	}
+
 	return result
 }
 
