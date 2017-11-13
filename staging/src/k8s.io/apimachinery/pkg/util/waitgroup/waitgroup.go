@@ -35,10 +35,10 @@ type SafeWaitGroup struct {
 // which prevent unsafe Add.
 func (wg *SafeWaitGroup) Add(delta int) error {
 	wg.mu.RLock()
+	defer wg.mu.RUnlock()
 	if wg.wait && delta > 0 {
-		return fmt.Errorf("Add with postive delta after Wait is forbidden")
+		return fmt.Errorf("add with postive delta after Wait is forbidden")
 	}
-	wg.mu.RUnlock()
 	wg.wg.Add(delta)
 	return nil
 }
