@@ -879,6 +879,11 @@ EOF
 CLUSTER_SIGNING_DURATION: $(yaml-quote ${CLUSTER_SIGNING_DURATION})
 EOF
     fi
+    if [[ "${NODE_ACCELERATORS:-}" == *"type=nvidia"* ]]; then
+      cat >>$file <<EOF
+ENABLE_NVIDIA_GPU_DEVICE_PLUGIN: $(yaml-quote "true")
+EOF
+    fi
 
   else
     # Node-only env vars.

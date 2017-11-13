@@ -26,9 +26,6 @@
 # 3. Kubectl prints the output to stderr (the output should be captured and then
 #    logged)
 
-# The business logic for whether a given object should be created
-# was already enforced by salt, and /etc/kubernetes/addons is the
-# managed result is of that. Start everything below that directory.
 KUBECTL=${KUBECTL_BIN:-/usr/local/bin/kubectl}
 KUBECTL_OPTS=${KUBECTL_OPTS:-}
 
