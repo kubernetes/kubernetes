@@ -76,16 +76,18 @@ func (vm *VirtualMachine) AttachDisk(ctx context.Context, vmDiskPath string, vol
 		return diskUUID, nil
 	}
 
-	pbmClient, err := NewPbmClient(ctx, vm.Client())
-	if err != nil {
-		glog.Errorf("Error occurred while creating new pbmClient. err: %+v", err)
-		return "", err
-	}
+	if volumeOptions.StoragePolicyName != "" {
+		pbmClient, err := NewPbmClient(ctx, vm.Client())
+		if err != nil {
+			glog.Errorf("Error occurred while creating new pbmClient. err: %+v", err)
+			return "", err
+		}
 
-	volumeOptions.StoragePolicyID, err = pbmClient.ProfileIDByName(ctx, volumeOptions.StoragePolicyName)
-	if err != nil {
-		glog.Errorf("Failed to get Profile ID by name: %s. err: %+v", volumeOptions.StoragePolicyName, err)
-		return "", err
+		volumeOptions.StoragePolicyID, err = pbmClient.ProfileIDByName(ctx, volumeOptions.StoragePolicyName)
+		if err != nil {
+			glog.Errorf("Failed to get Profile ID by name: %s. err: %+v", volumeOptions.StoragePolicyName, err)
+			return "", err
+		}
 	}
 
 	dsObj, err := vm.Datacenter.GetDatastoreByPath(ctx, vmDiskPathCopy)
