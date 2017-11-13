@@ -34,12 +34,11 @@ type Selector struct {
 	FieldSelector        string
 	Export               bool
 	IncludeUninitialized bool
-	RequestTable         bool
 	LimitChunks          int64
 }
 
 // NewSelector creates a resource selector which hides details of getting items by their label selector.
-func NewSelector(client RESTClient, mapping *meta.RESTMapping, namespace, labelSelector, fieldSelector string, export, includeUninitialized, requestTable bool, limitChunks int64) *Selector {
+func NewSelector(client RESTClient, mapping *meta.RESTMapping, namespace, labelSelector, fieldSelector string, export, includeUninitialized bool, limitChunks int64) *Selector {
 	return &Selector{
 		Client:               client,
 		Mapping:              mapping,
@@ -49,7 +48,6 @@ func NewSelector(client RESTClient, mapping *meta.RESTMapping, namespace, labelS
 		Export:               export,
 		IncludeUninitialized: includeUninitialized,
 		LimitChunks:          limitChunks,
-		RequestTable:         requestTable,
 	}
 }
 
@@ -61,7 +59,6 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 			r.Namespace,
 			r.ResourceMapping().GroupVersionKind.GroupVersion().String(),
 			r.Export,
-			r.RequestTable,
 			&metav1.ListOptions{
 				LabelSelector:        r.LabelSelector,
 				FieldSelector:        r.FieldSelector,

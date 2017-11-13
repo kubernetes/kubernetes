@@ -473,7 +473,6 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, shortOutput,
 		namespace,
 		mapping.GroupVersionKind.Version,
 		false,
-		false,
 		&metav1.ListOptions{
 			LabelSelector:        p.labelSelector,
 			FieldSelector:        p.fieldSelector,

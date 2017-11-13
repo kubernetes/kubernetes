@@ -16,9 +16,7 @@ limitations under the License.
 
 package serializer
 
-import (
-	"k8s.io/apimachinery/pkg/runtime"
-)
+import "k8s.io/apimachinery/pkg/runtime"
 
 // TODO: We should split negotiated serializers that we can change versions on from those we can change
 // serialization formats on

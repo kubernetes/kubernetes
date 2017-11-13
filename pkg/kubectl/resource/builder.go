@@ -79,8 +79,7 @@ type Builder struct {
 
 	singleItemImplied bool
 
-	tabularResponse bool
-	export          bool
+	export bool
 
 	schema validation.Schema
 }
@@ -167,13 +166,6 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 // Local wraps the builder's clientMapper in a DisabledClientMapperForMapping
 func (b *Builder) Local(mapperFunc ClientMapperFunc) *Builder {
 	b.mapper.ClientMapper = DisabledClientForMapping{ClientMapper: ClientMapperFunc(mapperFunc)}
-	return b
-}
-
-// TabularResponse sets the header "Accept: application/json;as=Table;v=v1alpha1;g=meta.k8s.io"
-// as part of a request to a resource endpoint
-func (b *Builder) TabularResponse(tabular bool) *Builder {
-	b.tabularResponse = tabular
 	return b
 }
 
@@ -667,7 +659,7 @@ func (b *Builder) visitBySelector() *Result {
 		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 			selectorNamespace = ""
 		}
-		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, labelSelector, fieldSelector, b.export, b.includeUninitialized, b.tabularResponse, b.limitChunks))
+		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, labelSelector, fieldSelector, b.export, b.includeUninitialized, b.limitChunks))
 	}
 	if b.continueOnError {
 		result.visitor = EagerVisitorList(visitors)
