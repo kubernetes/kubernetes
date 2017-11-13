@@ -3188,22 +3188,6 @@ func ValidateService(service *core.Service) field.ErrorList {
 		ports[key] = true
 	}
 
-	// Check for duplicate TargetPort
-	portsPath = specPath.Child("ports")
-	targetPorts := make(map[core.ServicePort]bool)
-	for i, port := range service.Spec.Ports {
-		if (port.TargetPort.Type == intstr.Int && port.TargetPort.IntVal == 0) || (port.TargetPort.Type == intstr.String && port.TargetPort.StrVal == "") {
-			continue
-		}
-		portPath := portsPath.Index(i)
-		key := core.ServicePort{Protocol: port.Protocol, TargetPort: port.TargetPort}
-		_, found := targetPorts[key]
-		if found {
-			allErrs = append(allErrs, field.Duplicate(portPath.Child("targetPort"), port.TargetPort))
-		}
-		targetPorts[key] = true
-	}
-
 	// Validate SourceRange field and annotation
 	_, ok := service.Annotations[core.AnnotationLoadBalancerSourceRangesKey]
 	if len(service.Spec.LoadBalancerSourceRanges) > 0 || ok {
