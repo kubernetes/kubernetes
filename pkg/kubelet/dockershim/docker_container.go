@@ -197,7 +197,7 @@ func (ds *dockerService) createContainerLogSymlink(containerID string) error {
 				path, realPath, containerID, err)
 		}
 	} else {
-		supported, err := IsCRISupportedLogDriver(ds.client)
+		supported, err := ds.IsCRISupportedLogDriver()
 		if err != nil {
 			glog.Warningf("Failed to check supported logging driver by CRI: %v", err)
 			return nil
