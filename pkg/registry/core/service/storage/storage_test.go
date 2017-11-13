@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apiserver/pkg/registry/generic"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
@@ -66,7 +67,7 @@ func TestCreate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
 	validService := validService()
 	validService.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -97,7 +98,7 @@ func TestUpdate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).AllowCreateOnUpdate()
+	test := registrytest.New(t, storage.Store, legacyscheme.Scheme).AllowCreateOnUpdate()
 	test.TestUpdate(
 		// valid
 		validService(),
@@ -124,7 +125,7 @@ func TestDelete(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).AllowCreateOnUpdate()
+	test := registrytest.New(t, storage.Store, legacyscheme.Scheme).AllowCreateOnUpdate()
 	test.TestDelete(validService())
 }
 
@@ -132,7 +133,7 @@ func TestGet(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).AllowCreateOnUpdate()
+	test := registrytest.New(t, storage.Store, legacyscheme.Scheme).AllowCreateOnUpdate()
 	test.TestGet(validService())
 }
 
@@ -140,7 +141,7 @@ func TestList(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).AllowCreateOnUpdate()
+	test := registrytest.New(t, storage.Store, legacyscheme.Scheme).AllowCreateOnUpdate()
 	test.TestList(validService())
 }
 
@@ -148,7 +149,7 @@ func TestWatch(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestWatch(
 		validService(),
 		// matching labels

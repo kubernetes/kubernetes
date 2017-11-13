@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
@@ -60,7 +61,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
 
 	validConfigMap := validNewConfigMap()
 	validConfigMap.ObjectMeta = metav1.ObjectMeta{
@@ -88,7 +89,7 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestUpdate(
 		// valid
 		validNewConfigMap(),
@@ -111,7 +112,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestDelete(validNewConfigMap())
 }
 
@@ -119,7 +120,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestGet(validNewConfigMap())
 }
 
@@ -127,7 +128,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestList(validNewConfigMap())
 }
 
@@ -135,7 +136,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestWatch(
 		validNewConfigMap(),
 		// matching labels

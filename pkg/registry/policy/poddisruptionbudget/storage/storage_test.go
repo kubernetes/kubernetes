@@ -27,6 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
@@ -69,7 +70,7 @@ func TestCreate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
 	pdb := validNewPodDisruptionBudget()
 	pdb.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -130,7 +131,7 @@ func TestGet(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestGet(validNewPodDisruptionBudget())
 }
 
@@ -138,7 +139,7 @@ func TestList(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestList(validNewPodDisruptionBudget())
 }
 
@@ -146,7 +147,7 @@ func TestDelete(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestDelete(validNewPodDisruptionBudget())
 }
 
@@ -154,7 +155,7 @@ func TestWatch(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := registrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestWatch(
 		validNewPodDisruptionBudget(),
 		// matching labels

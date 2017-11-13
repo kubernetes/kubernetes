@@ -33,9 +33,7 @@ import (
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func NewEtcdStorage(t *testing.T, group string) (*storagebackend.Config, *etcdtesting.EtcdTestServer) {
@@ -50,9 +48,9 @@ type Tester struct {
 }
 type UpdateFunc func(runtime.Object) runtime.Object
 
-func New(t *testing.T, storage *genericregistry.Store) *Tester {
+func New(t *testing.T, storage *genericregistry.Store, scheme *runtime.Scheme) *Tester {
 	return &Tester{
-		tester:  resttest.New(t, storage, legacyscheme.Scheme),
+		tester:  resttest.New(t, storage, scheme),
 		storage: storage,
 	}
 }
@@ -149,29 +147,6 @@ func (t *Tester) TestWatch(valid runtime.Object, labelsPass, labelsFail []labels
 		// TODO: This should be filtered, the registry should not be aware of this level of detail
 		[]string{etcdstorage.EtcdCreate, etcdstorage.EtcdDelete},
 	)
-}
-
-// =============================================================================
-// get codec based on runtime.Object
-func getCodec(obj runtime.Object) (runtime.Codec, error) {
-	fqKinds, _, err := legacyscheme.Scheme.ObjectKinds(obj)
-	if err != nil {
-		return nil, fmt.Errorf("unexpected encoding error: %v", err)
-	}
-	fqKind := fqKinds[0]
-	// TODO: caesarxuchao: we should detect which group an object belongs to
-	// by using the version returned by Schem.ObjectVersionAndKind() once we
-	// split the schemes for internal objects.
-	// TODO: caesarxuchao: we should add a map from kind to group in Scheme.
-	var codec runtime.Codec
-	if legacyscheme.Scheme.Recognizes(legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.WithKind(fqKind.Kind)) {
-		codec = testapi.Default.Codec()
-	} else if legacyscheme.Scheme.Recognizes(testapi.Extensions.GroupVersion().WithKind(fqKind.Kind)) {
-		codec = testapi.Extensions.Codec()
-	} else {
-		return nil, fmt.Errorf("unexpected kind: %v", fqKind)
-	}
-	return codec, nil
 }
 
 // Helper functions
