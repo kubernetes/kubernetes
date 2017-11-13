@@ -175,7 +175,7 @@ func GetStdFile(nFile int) (*os.File, uintptr) {
 
 	fd, err := syscall.GetStdHandle(nFile)
 	if err != nil {
-		panic(fmt.Errorf("Invalid standard handle indentifier: %v -- %v", nFile, err))
+		panic(fmt.Errorf("Invalid standard handle identifier: %v -- %v", nFile, err))
 	}
 
 	return file, uintptr(fd)

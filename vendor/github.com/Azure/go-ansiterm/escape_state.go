@@ -5,7 +5,7 @@ type escapeState struct {
 }
 
 func (escState escapeState) Handle(b byte) (s state, e error) {
-	logger.Infof("escapeState::Handle %#x", b)
+	escState.parser.logf("escapeState::Handle %#x", b)
 	nextState, err := escState.baseState.Handle(b)
 	if nextState != nil || err != nil {
 		return nextState, err
@@ -28,7 +28,7 @@ func (escState escapeState) Handle(b byte) (s state, e error) {
 }
 
 func (escState escapeState) Transition(s state) error {
-	logger.Infof("Escape::Transition %s --> %s", escState.Name(), s.Name())
+	escState.parser.logf("Escape::Transition %s --> %s", escState.Name(), s.Name())
 	escState.baseState.Transition(s)
 
 	switch s {
