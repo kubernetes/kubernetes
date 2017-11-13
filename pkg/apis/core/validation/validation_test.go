@@ -833,6 +833,28 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 				},
 			}),
 		},
+		"zero-storage-request": {
+			isExpectedFailure: true,
+			claim: testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
+				Selector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "key2",
+							Operator: "Exists",
+						},
+					},
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{
+					core.ReadWriteOnce,
+					core.ReadOnlyMany,
+				},
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceName(api.ResourceStorage): resource.MustParse("0G"),
+					},
+				},
+			}),
+		},
 		"invalid-storage-class-name": {
 			isExpectedFailure: true,
 			claim: testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
