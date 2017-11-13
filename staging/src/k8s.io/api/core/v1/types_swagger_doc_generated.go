@@ -1275,10 +1275,11 @@ func (PodAffinity) SwaggerDoc() map[string]string {
 }
 
 var map_PodAffinityTerm = map[string]string{
-	"":              "Defines a set of pods (namely those matching the labelSelector relative to the given namespace(s)) that this pod should be co-located (affinity) or not co-located (anti-affinity) with, where co-located is defined as running on a node whose value of the label with key <topologyKey> matches that of any node on which a pod of the set of pods is running",
-	"labelSelector": "A label query over a set of resources, in this case pods.",
-	"namespaces":    "namespaces specifies which namespaces the labelSelector applies to (matches against); null or empty list means \"this pod's namespace\"",
-	"topologyKey":   "This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching the labelSelector in the specified namespaces, where co-located is defined as running on a node whose value of the label with key topologyKey matches that of any node on which any of the selected pods is running. Empty topologyKey is not allowed.",
+	"":                  "Defines a set of pods (namely those matching the labelSelector relative to the given namespace(s)) that this pod should be co-located (affinity) or not co-located (anti-affinity) with, where co-located is defined as running on a node whose value of the label with key <topologyKey> matches that of any node on which a pod of the set of pods is running",
+	"labelSelector":     "A label query over a set of resources, in this case pods.",
+	"namespaces":        "namespaces specifies which namespaces the labelSelector applies to (matches against); null or empty list means \"this pod's namespace\"",
+	"topologyKey":       "This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching the labelSelector in the specified namespaces, where co-located is defined as running on a node whose value of the label with key topologyKey matches that of any node on which any of the selected pods is running. Empty topologyKey is not allowed.",
+	"numOfMatchingPods": "NumOfMatchingPods specifies the minimal number of pod that matching the selector; the term is considered to be matched if and only if the matching number is larger than NumOfMatchingPods. Only support anti-affinity: a node N is eligible only if the number of pods matching the LabelSelector that are running on nodes with the same value for key TopologyKey as N has is less than NumOfMatchingPods. For example, if NumOfMatchingPods is 1 (the default), then after this pod is scheduled to node M, there will not be more than one pod from the set selected by the LabelSelector running on nodes with M's value for key TopologyKey. The default value is 1.",
 }
 
 func (PodAffinityTerm) SwaggerDoc() map[string]string {

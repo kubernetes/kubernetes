@@ -1777,6 +1777,13 @@ When an object is created, the system will populate this list with the current s
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">numOfMatchingPods</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">NumOfMatchingPods specifies the minimal number of pod that matching the selector; the term is considered to be matched if and only if the matching number is larger than NumOfMatchingPods. Only support anti-affinity: a node N is eligible only if the number of pods matching the LabelSelector that are running on nodes with the same value for key TopologyKey as N has is less than NumOfMatchingPods. For example, if NumOfMatchingPods is 1 (the default), then after this pod is scheduled to node M, there will not be more than one pod from the set selected by the LabelSelector running on nodes with M&#8217;s value for key TopologyKey. The default value is 1.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
