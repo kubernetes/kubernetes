@@ -1050,7 +1050,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	// the not-deleted service, because one of it's ServicePorts was deleted.
 	expectedStaleUDPServices := []string{"172.16.55.10", "172.16.55.4", "172.16.55.11", "172.16.55.12"}
 	if len(result.staleServices) != len(expectedStaleUDPServices) {
-		t.Errorf("expected stale UDP services length %d, got %v", len(expectedStaleUDPServices), result.staleServices.List())
+		t.Errorf("expected stale UDP services length %d, got %v", len(expectedStaleUDPServices), result.staleServices.UnsortedList())
 	}
 	for _, ip := range expectedStaleUDPServices {
 		if !result.staleServices.Has(ip) {
@@ -1166,7 +1166,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 		t.Errorf("expected healthcheck ports length 1, got %v", result.hcServices)
 	}
 	if len(result.staleServices) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %v", result.staleServices.List())
+		t.Errorf("expected stale UDP services length 0, got %v", result.staleServices.UnsortedList())
 	}
 
 	// No change; make sure the service map stays the same and there are
@@ -1180,7 +1180,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 		t.Errorf("expected healthcheck ports length 1, got %v", result.hcServices)
 	}
 	if len(result.staleServices) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %v", result.staleServices.List())
+		t.Errorf("expected stale UDP services length 0, got %v", result.staleServices.UnsortedList())
 	}
 
 	// And back to ClusterIP
