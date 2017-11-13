@@ -20,10 +20,10 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
+	tst "k8s.io/apimachinery/pkg/util/openapi/testing"
 )
 
-var resources = tst.NewFakeResources("test-swagger.json")
+var resources = tst.FakeResources{Getter: &tst.Fake{Path: "test-swagger.json"}}
 
 func TestReferenceTypename(t *testing.T) {
 	schema := resources.LookupResource(schema.GroupVersionKind{

@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/openapi"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
@@ -43,8 +44,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	openapivalidation "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation"
+	kopenapi "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
@@ -60,7 +60,7 @@ type ring1Factory struct {
 
 type openAPIGetter struct {
 	once   sync.Once
-	getter openapi.Getter
+	getter kopenapi.Getter
 }
 
 func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) ObjectMappingFactory {
@@ -423,7 +423,7 @@ func (f *ring1Factory) Validator(validate bool) (validation.Schema, error) {
 	}
 
 	return validation.ConjunctiveSchema{
-		openapivalidation.NewSchemaValidation(resources),
+		openapi.NewSchemaValidation(resources),
 		validation.NoDoubleKeySchema{},
 	}, nil
 }
@@ -438,7 +438,7 @@ func (f *ring1Factory) OpenAPISchema() (openapi.Resources, error) {
 	// Lazily initialize the OpenAPIGetter once
 	f.openAPIGetter.once.Do(func() {
 		// Create the caching OpenAPIGetter
-		f.openAPIGetter.getter = openapi.NewOpenAPIGetter(discovery)
+		f.openAPIGetter.getter = kopenapi.NewOpenAPIGetter(discovery)
 	})
 
 	// Delegate to the OpenAPIGetter

@@ -19,9 +19,9 @@ package strategy_test
 import (
 	. "github.com/onsi/ginkgo"
 
+	"k8s.io/apimachinery/pkg/util/openapi"
+	tst "k8s.io/apimachinery/pkg/util/openapi/testing"
 	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 )
 
 var _ = Describe("Merging fields of type list-of-map with openapi", func() {
@@ -435,7 +435,7 @@ spec:
 var _ = Describe("Merging fields of type list-of-map with openapi containing a multi-field mergekey", func() {
 	var resources openapi.Resources
 	BeforeEach(func() {
-		resources = tst.NewFakeResources("test_swagger.json")
+		resources = &tst.FakeResources{Getter: &tst.Fake{Path: "test_swagger.json"}}
 	})
 
 	Context("where one of the items has been deleted", func() {

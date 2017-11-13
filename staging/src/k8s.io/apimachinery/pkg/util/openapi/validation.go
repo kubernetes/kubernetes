@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validation
+package openapi
 
 import (
 	"errors"
@@ -25,17 +25,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kube-openapi/pkg/util/proto/validation"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
 // SchemaValidation validates the object against an OpenAPI schema.
 type SchemaValidation struct {
-	resources openapi.Resources
+	resources Resources
 }
 
 // NewSchemaValidation creates a new SchemaValidation that can be used
 // to validate objects.
-func NewSchemaValidation(resources openapi.Resources) *SchemaValidation {
+func NewSchemaValidation(resources Resources) *SchemaValidation {
 	return &SchemaValidation{
 		resources: resources,
 	}
