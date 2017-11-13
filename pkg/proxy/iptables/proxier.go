@@ -1433,7 +1433,28 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Now write loadbalancing & DNAT rules.
+		numLocalEndpoints := 0
 		n := len(endpointChains)
+		// First rule in the chain redirects all pod -> external VIP traffic to the
+		// Service's ClusterIP instead. This happens whether or not we have local
+		// endpoints; only if clusterCIDR is specified
+		if svcInfo.onlyNodeLocalEndpoints {
+			for i := range endpointChains {
+				if endpoints[i].isLocal {
+					numLocalEndpoints++
+				}
+			}
+			if len(proxier.clusterCIDR) > 0 {
+				args = append(args[:0],
+					"-A", string(svcXlbChain),
+					"-m", "comment", "--comment",
+					`"Redirect pods trying to reach external loadbalancer VIP to clusterIP"`,
+					"-s", proxier.clusterCIDR,
+					"-j", string(svcChain),
+				)
+				writeLine(proxier.natRules, args...)
+			}
+		}
 		for i, endpointChain := range endpointChains {
 			epIP := endpoints[i].IPPart()
 			if epIP == "" {
@@ -1456,6 +1477,26 @@ func (proxier *Proxier) syncProxyRules() {
 			args = append(args, "-j", string(endpointChain))
 			writeLine(proxier.natRules, args...)
 
+			// Setup probability filter rules only over local endpoints
+			if svcInfo.onlyNodeLocalEndpoints && endpoints[i].isLocal {
+				// Balancing rules in the per-service chain.
+				args = append(args[:0],
+					"-A", string(svcXlbChain),
+					"-m", "comment", "--comment",
+					fmt.Sprintf(`"Balancing rule %d for %s"`, i, svcNameString),
+				)
+				if i < (numLocalEndpoints - 1) {
+					// Each rule is a probabilistic match.
+					args = append(args,
+						"-m", "statistic",
+						"--mode", "random",
+						"--probability", proxier.probability(numLocalEndpoints-i))
+				}
+				// The final (or only if n == 1) rule is a guaranteed match.
+				args = append(args, "-j", string(endpointChain))
+				writeLine(proxier.natRules, args...)
+			}
+
 			// Rules in the per-endpoint chain.
 			args = append(args[:0],
 				"-A", string(endpointChain),
@@ -1474,38 +1515,7 @@ func (proxier *Proxier) syncProxyRules() {
 			writeLine(proxier.natRules, args...)
 		}
 
-		// The logic below this applies only if this service is marked as OnlyLocal
-		if !svcInfo.onlyNodeLocalEndpoints {
-			continue
-		}
-
-		// Now write ingress loadbalancing & DNAT rules only for services that request OnlyLocal traffic.
-		// TODO - This logic may be combinable with the block above that creates the svc balancer chain
-		localEndpoints := make([]*endpointsInfo, 0)
-		localEndpointChains := make([]utiliptables.Chain, 0)
-		for i := range endpointChains {
-			if endpoints[i].isLocal {
-				// These slices parallel each other; must be kept in sync
-				localEndpoints = append(localEndpoints, endpoints[i])
-				localEndpointChains = append(localEndpointChains, endpointChains[i])
-			}
-		}
-		// First rule in the chain redirects all pod -> external VIP traffic to the
-		// Service's ClusterIP instead. This happens whether or not we have local
-		// endpoints; only if clusterCIDR is specified
-		if len(proxier.clusterCIDR) > 0 {
-			args = append(args[:0],
-				"-A", string(svcXlbChain),
-				"-m", "comment", "--comment",
-				`"Redirect pods trying to reach external loadbalancer VIP to clusterIP"`,
-				"-s", proxier.clusterCIDR,
-				"-j", string(svcChain),
-			)
-			writeLine(proxier.natRules, args...)
-		}
-
-		numLocalEndpoints := len(localEndpointChains)
-		if numLocalEndpoints == 0 {
+		if numLocalEndpoints == 0 && svcInfo.onlyNodeLocalEndpoints {
 			// Blackhole all traffic since there are no local endpoints
 			args = append(args[:0],
 				"-A", string(svcXlbChain),
@@ -1515,26 +1525,6 @@ func (proxier *Proxier) syncProxyRules() {
 				string(KubeMarkDropChain),
 			)
 			writeLine(proxier.natRules, args...)
-		} else {
-			// Setup probability filter rules only over local endpoints
-			for i, endpointChain := range localEndpointChains {
-				// Balancing rules in the per-service chain.
-				args = append(args[:0],
-					"-A", string(svcXlbChain),
-					"-m", "comment", "--comment",
-					fmt.Sprintf(`"Balancing rule %d for %s"`, i, svcNameString),
-				)
-				if i < (numLocalEndpoints - 1) {
-					// Each rule is a probabilistic match.
-					args = append(args,
-						"-m", "statistic",
-						"--mode", "random",
-						"--probability", proxier.probability(numLocalEndpoints-i))
-				}
-				// The final (or only if n == 1) rule is a guaranteed match.
-				args = append(args, "-j", string(endpointChain))
-				writeLine(proxier.natRules, args...)
-			}
 		}
 	}
 
