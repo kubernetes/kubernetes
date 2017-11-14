@@ -1355,11 +1355,6 @@ EOF
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"
   fi
-  if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]]; then
-    setup-addon-manifests "addons" "metadata-proxy/gce"
-    local -r metadata_proxy_yaml="${dst_dir}/metadata-proxy/gce/metadata-proxy.yaml"
-    update-prometheus-to-sd-parameters ${metadata_proxy_yaml}
-  fi
 
   # Place addon manager pod manifest.
   cp "${src_dir}/kube-addon-manager.yaml" /etc/kubernetes/manifests
