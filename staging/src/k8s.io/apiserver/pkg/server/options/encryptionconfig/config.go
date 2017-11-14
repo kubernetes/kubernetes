@@ -150,18 +150,37 @@ func GetPrefixTransformers(config *ResourceConfig) ([]value.PrefixTransformer, e
 			if found == true {
 				return nil, fmt.Errorf("more than one provider specified in a single element, should split into different list elements")
 			}
-			f, err := os.Open(provider.KMS.ConfigFile)
-			if err != nil {
-				return nil, fmt.Errorf("error opening KMS provider configuration file %q: %v", provider.KMS.ConfigFile, err)
+
+			var envelopeService envelope.Service
+			remoteConfig := provider.KMS.RemoteServer
+			if remoteConfig == nil {
+				// There should be no KMS provider plugins on API server side in future.
+				f, err := os.Open(provider.KMS.ConfigFile)
+				if err != nil {
+					return nil, fmt.Errorf("error opening KMS provider configuration file %q: %v", provider.KMS.ConfigFile, err)
+				}
+				defer f.Close()
+				pluginFound := false
+				envelopeService, pluginFound, err = KMSPluginRegistry.getPlugin(provider.KMS.Name, f)
+				if err != nil {
+					return nil, fmt.Errorf("could not configure KMS plugin %q, %v", provider.KMS.Name, err)
+				}
+				if pluginFound == false {
+					return nil, fmt.Errorf("KMS plugin %q not found", provider.KMS.Name)
+				}
+			} else {
+				// Get gRPC client service with remote config
+				envelopeService, err = envelope.NewEnvelopeService(
+					remoteConfig.Endpoint,
+					remoteConfig.ServerCACert,
+					remoteConfig.ClientCert,
+					remoteConfig.ClientKey,
+				)
+				if err != nil {
+					return nil, fmt.Errorf("could not configure KMS plugin %q, error: %v", provider.KMS.Name, err)
+				}
 			}
-			defer f.Close()
-			envelopeService, pluginFound, err := KMSPluginRegistry.getPlugin(provider.KMS.Name, f)
-			if err != nil {
-				return nil, fmt.Errorf("could not configure KMS plugin %q, %v", provider.KMS.Name, err)
-			}
-			if pluginFound == false {
-				return nil, fmt.Errorf("KMS plugin %q not found", provider.KMS.Name)
-			}
+
 			transformer, err = getEnvelopePrefixTransformer(provider.KMS, envelopeService, kmsTransformerPrefixV1)
 			found = true
 		}
