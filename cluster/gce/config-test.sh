@@ -310,11 +310,6 @@ if [[ -n "${DISABLE_DOCKER_LIVE_RESTORE:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} DISABLE_DOCKER_LIVE_RESTORE"
 fi
 
-# Override default docker storage driver.
-if [[ -n "${DOCKER_STORAGE_DRIVER:-}" ]]; then
-  PROVIDER_VARS="${PROVIDER_VARS:-} DOCKER_STORAGE_DRIVER"
-fi
-
 # Override default GLBC image
 if [[ -n "${GCE_GLBC_IMAGE:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} GCE_GLBC_IMAGE"
