@@ -24,10 +24,15 @@ import (
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apiextensions-apiserver/test/integration/testserver"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -47,6 +52,11 @@ const (
 	skippedNamespaceName    = "exempted-namesapce"
 	disallowedPodName       = "disallowed-pod"
 	disallowedConfigMapName = "disallowed-configmap"
+	crdName                 = "e2e-test-webhook-crd"
+	crdKind                 = "E2e-test-webhook-crd"
+	crdWebhookConfigName    = "e2e-test-webhook-config-crd"
+	crdAPIGroup             = "webhook-crd-test.k8s.io"
+	crdAPIVersion           = "v1"
 )
 
 var serverWebhookVersion = utilversion.MustParseSemantic("v1.8.0")
@@ -60,7 +70,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 	It("Should be able to deny pod and configmap creation", func() {
 		// Make sure the relevant provider supports admission webhook
 		framework.SkipUnlessServerVersionGTE(serverWebhookVersion, f.ClientSet.Discovery())
-		framework.SkipUnlessProviderIs("gce", "gke")
+		framework.SkipUnlessProviderIs("gce", "gke", "local")
 
 		_, err := f.ClientSet.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations().List(metav1.ListOptions{})
 		if errors.IsNotFound(err) {
@@ -74,9 +84,28 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		// Note that in 1.9 we will have backwards incompatible change to
 		// admission webhooks, so the image will be updated to 1.9 sometime in
 		// the development 1.9 cycle.
-		deployWebhookAndService(f, "gcr.io/kubernetes-e2e-test-images/k8s-sample-admission-webhook-amd64:1.8v2", context)
+		deployWebhookAndService(f, "gcr.io/kubernetes-e2e-test-images/k8s-sample-admission-webhook-amd64:1.8v3", context)
 		registerWebhook(f, context)
 		testWebhook(f)
+	})
+
+	It("Should be able to deny custom resource creation", func() {
+		// Make sure the relevant provider supports admission webhook
+		framework.SkipUnlessServerVersionGTE(serverWebhookVersion, f.ClientSet.Discovery())
+		framework.SkipUnlessProviderIs("gce", "gke", "local")
+		_, err := f.ClientSet.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations().List(metav1.ListOptions{})
+		if errors.IsNotFound(err) {
+			framework.Skipf("dynamic configuration of webhooks requires the alpha admissionregistration.k8s.io group to be enabled")
+		}
+		By("Setting up server cert")
+		namespaceName := f.Namespace.Name
+		context := setupServerCert(namespaceName, serviceName)
+		createAuthReaderRoleBinding(f, namespaceName)
+		deployWebhookAndService(f, "gcr.io/kubernetes-e2e-test-images/k8s-sample-admission-webhook-amd64:1.8v3", context)
+		crdCleanup, dynamicClient := createCRD(f)
+		defer crdCleanup()
+		registerWebhookForCRD(f, context)
+		testCRDWebhook(f, dynamicClient)
 	})
 })
 
@@ -105,12 +134,15 @@ func createAuthReaderRoleBinding(f *framework.Framework, namespace string) {
 			},
 		},
 	})
-	framework.ExpectNoError(err, "creating role binding %s:webhook to access configMap", namespace)
+	if err != nil && errors.IsAlreadyExists(err) {
+		framework.Logf("role binding %s already exists", roleBindingName)
+	} else {
+		framework.ExpectNoError(err, "creating role binding %s:webhook to access configMap", namespace)
+	}
 }
 
 func deployWebhookAndService(f *framework.Framework, image string, context *certContext) {
 	By("Deploying the webhook pod")
-
 	client := f.ClientSet
 
 	// Creating the secret that contains the webhook's cert.
@@ -283,7 +315,7 @@ func registerWebhook(f *framework.Framework, context *certContext) {
 	framework.ExpectNoError(err, "registering webhook config %s with namespace %s", webhookConfigName, namespace)
 
 	// The webhook configuration is honored in 1s.
-	time.Sleep(2 * time.Second)
+	time.Sleep(10 * time.Second)
 }
 
 func testWebhook(f *framework.Framework) {
@@ -293,20 +325,21 @@ func testWebhook(f *framework.Framework) {
 	pod := nonCompliantPod(f)
 	_, err := client.CoreV1().Pods(f.Namespace.Name).Create(pod)
 	Expect(err).NotTo(BeNil())
-	expectedErrMsg := "the pod contains unwanted container name"
-	if !strings.Contains(err.Error(), expectedErrMsg) {
-		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
+	expectedErrMsg1 := "the pod contains unwanted container name"
+	if !strings.Contains(err.Error(), expectedErrMsg1) {
+		framework.Failf("expect error contains %q, got %q", expectedErrMsg1, err.Error())
 	}
-	// TODO: Test if webhook can detect pod with non-compliant metadata.
-	// Currently metadata is lost because webhook uses the external version of
-	// the objects, and the apiserver sends the internal objects.
+	expectedErrMsg2 := "the pod contains unwanted label"
+	if !strings.Contains(err.Error(), expectedErrMsg2) {
+		framework.Failf("expect error contains %q, got %q", expectedErrMsg2, err.Error())
+	}
 
 	By("create a configmap that should be denied by the webhook")
 	// Creating the configmap, the request should be rejected
 	configmap := nonCompliantConfigMap(f)
 	_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Create(configmap)
 	Expect(err).NotTo(BeNil())
-	expectedErrMsg = "the configmap contains unwanted key and value"
+	expectedErrMsg := "the configmap contains unwanted key and value"
 	if !strings.Contains(err.Error(), expectedErrMsg) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
 	}
@@ -340,7 +373,7 @@ func nonCompliantPod(f *framework.Framework) *v1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: disallowedPodName,
 			Labels: map[string]string{
-				"webhook-e2e-test": "disallow",
+				"webhook-e2e-test": "webhook-disallow",
 			},
 		},
 		Spec: v1.PodSpec{
@@ -368,6 +401,7 @@ func nonCompliantConfigMap(f *framework.Framework) *v1.ConfigMap {
 func cleanWebhookTest(f *framework.Framework) {
 	client := f.ClientSet
 	_ = client.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations().Delete(webhookConfigName, nil)
+	_ = client.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations().Delete(crdWebhookConfigName, nil)
 	namespaceName := f.Namespace.Name
 	_ = client.CoreV1().Services(namespaceName).Delete(serviceName, nil)
 	_ = client.ExtensionsV1beta1().Deployments(namespaceName).Delete(deploymentName, nil)
@@ -375,4 +409,115 @@ func cleanWebhookTest(f *framework.Framework) {
 	_ = client.RbacV1beta1().RoleBindings("kube-system").Delete(roleBindingName, nil)
 	_ = client.CoreV1().ConfigMaps(skippedNamespaceName).Delete(disallowedConfigMapName, nil)
 	_ = client.CoreV1().Namespaces().Delete(skippedNamespaceName, nil)
+}
+
+// newCRDForAdmissionWebhookTest generates a CRD
+func newCRDForAdmissionWebhookTest() *apiextensionsv1beta1.CustomResourceDefinition {
+	return &apiextensionsv1beta1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: crdName + "s." + crdAPIGroup},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group:   crdAPIGroup,
+			Version: crdAPIVersion,
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural:   crdName + "s",
+				Singular: crdName,
+				Kind:     crdKind,
+				ListKind: crdName + "List",
+			},
+			Scope: apiextensionsv1beta1.NamespaceScoped,
+		},
+	}
+}
+
+func createCRD(f *framework.Framework) (func(), dynamic.ResourceInterface) {
+	config, err := framework.LoadConfig()
+	if err != nil {
+		framework.Failf("failed to load config: %v", err)
+	}
+
+	apiExtensionClient, err := crdclientset.NewForConfig(config)
+	if err != nil {
+		framework.Failf("failed to initialize apiExtensionClient: %v", err)
+	}
+
+	crd := newCRDForAdmissionWebhookTest()
+
+	//create CRD and waits for the resource to be recognized and available.
+	dynamicClient, err := testserver.CreateNewCustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient, f.ClientPool)
+	if err != nil {
+		framework.Failf("failed to create CustomResourceDefinition: %v", err)
+	}
+
+	resourceClient := dynamicClient.Resource(&metav1.APIResource{
+		Name:       crd.Spec.Names.Plural,
+		Namespaced: true,
+	}, f.Namespace.Name)
+
+	return func() {
+		err = testserver.DeleteCustomResourceDefinition(crd, apiExtensionClient)
+		if err != nil {
+			framework.Failf("failed to delete CustomResourceDefinition: %v", err)
+		}
+	}, resourceClient
+}
+
+func registerWebhookForCRD(f *framework.Framework, context *certContext) {
+	client := f.ClientSet
+	By("Registering the crd webhook via the AdmissionRegistration API")
+
+	namespace := f.Namespace.Name
+	_, err := client.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations().Create(&v1alpha1.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: crdWebhookConfigName,
+		},
+		Webhooks: []v1alpha1.Webhook{
+			{
+				Name: "deny-unwanted-crd-data.k8s.io",
+				Rules: []v1alpha1.RuleWithOperations{{
+					Operations: []v1alpha1.OperationType{v1alpha1.Create},
+					Rule: v1alpha1.Rule{
+						APIGroups:   []string{crdAPIGroup},
+						APIVersions: []string{crdAPIVersion},
+						Resources:   []string{crdName + "s"},
+					},
+				}},
+				ClientConfig: v1alpha1.WebhookClientConfig{
+					Service: &v1alpha1.ServiceReference{
+						Namespace: namespace,
+						Name:      serviceName,
+						Path:      strPtr("/crd"),
+					},
+					CABundle: context.signingCert,
+				},
+			},
+		},
+	})
+	framework.ExpectNoError(err, "registering crd webhook config %s with namespace %s", webhookConfigName, namespace)
+
+	// The webhook configuration is honored in 1s.
+	time.Sleep(10 * time.Second)
+}
+
+func testCRDWebhook(f *framework.Framework, crdClient dynamic.ResourceInterface) {
+	By("Creating a custom resource that should be denied by the webhook")
+	crd := newCRDForAdmissionWebhookTest()
+	crInstance := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       crd.Spec.Names.Kind,
+			"apiVersion": crd.Spec.Group + "/" + crd.Spec.Version,
+			"metadata": map[string]interface{}{
+				"name":      "cr-instance-1",
+				"namespace": f.Namespace.Name,
+			},
+			"data": map[string]interface{}{
+				"webhook-e2e-test": "webhook-disallow",
+			},
+		},
+	}
+	_, err := crdClient.Create(crInstance)
+	Expect(err).NotTo(BeNil())
+	expectedErrMsg := "the custom resource contains unwanted data"
+	if !strings.Contains(err.Error(), expectedErrMsg) {
+		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
+	}
 }

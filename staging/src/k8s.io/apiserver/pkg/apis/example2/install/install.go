@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package install installs the example API group, making it available as
+// Package install installs the example2 API group, making it available as
 // an option to all of the API encoding/decoding machinery.
 package install
 
@@ -23,19 +23,20 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/apis/example"
-	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/apis/example2"
+	example2v1 "k8s.io/apiserver/pkg/apis/example2/v1"
 )
 
 // Install registers the API group and adds types to a scheme
 func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
-			GroupName:                  example.GroupName,
-			VersionPreferenceOrder:     []string{examplev1.SchemeGroupVersion.Version},
+			GroupName:                  example2.GroupName,
+			VersionPreferenceOrder:     []string{example2v1.SchemeGroupVersion.Version},
 			AddInternalObjectsToScheme: example.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{
-			examplev1.SchemeGroupVersion.Version: examplev1.AddToScheme,
+			example2v1.SchemeGroupVersion.Version: example2v1.AddToScheme,
 		},
 	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
 		panic(err)
