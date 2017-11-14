@@ -1007,7 +1007,6 @@ function create-certs {
   PRIMARY_CN="${primary_cn}" SANS="${sans}" generate-certs
   AGGREGATOR_PRIMARY_CN="${primary_cn}" AGGREGATOR_SANS="${sans}" generate-aggregator-certs
 
-  CERT_DIR="${KUBE_TEMP}/easy-rsa-master/easyrsa3"
   # By default, linux wraps base64 output every 76 cols, so we use 'tr -d' to remove whitespaces.
   # Note 'base64 -w0' doesn't work on Mac OS X, which has different flags.
   CA_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/ca.key" | base64 | tr -d '\r\n')
@@ -1024,13 +1023,20 @@ function create-certs {
   # Setting up an addition directory (beyond pki) as it is the simplest way to
   # ensure we get a different CA pair to sign the proxy-client certs and which
   # we can send CA public key to the user-apiserver to validate communication.
-  AGGREGATOR_CERT_DIR="${KUBE_TEMP}/easy-rsa-master/aggregator"
   AGGREGATOR_CA_KEY_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/private/ca.key" | base64 | tr -d '\r\n')
   REQUESTHEADER_CA_CERT_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/ca.crt" | base64 | tr -d '\r\n')
   PROXY_CLIENT_CERT_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/issued/proxy-client.crt" | base64 | tr -d '\r\n')
   PROXY_CLIENT_KEY_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/private/proxy-client.key" | base64 | tr -d '\r\n')
 }
 
+# Set up easy-rsa directory structure.
+#
+# Assumed vars
+#   KUBE_TEMP
+#
+# Vars set:
+#   CERT_DIR
+#   AGGREGATOR_CERT_DIR
 function setup-easyrsa {
   local -r cert_create_debug_output=$(mktemp "${KUBE_TEMP}/cert_create_debug_output.XXX")
   # Note: This was heavily cribbed from make-ca-cert.sh
@@ -1041,21 +1047,25 @@ function setup-easyrsa {
     mkdir easy-rsa-master/kubelet
     cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/kubelet
     mkdir easy-rsa-master/aggregator
-    cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/aggregator) &>${cert_create_debug_output} || {
-    # If there was an error in the subshell, just die.
-    # TODO(roberthbailey): add better error handling here
+    cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/aggregator) &>${cert_create_debug_output} || true
+  CERT_DIR="${KUBE_TEMP}/easy-rsa-master/easyrsa3"
+  AGGREGATOR_CERT_DIR="${KUBE_TEMP}/easy-rsa-master/aggregator"
+  if [ ! -x "${CERT_DIR}/easyrsa" -o ! -x "${AGGREGATOR_CERT_DIR}/easyrsa" ]; then
+    # TODO(roberthbailey,porridge): add better error handling here,
+    # see https://github.com/kubernetes/kubernetes/issues/55229
     cat "${cert_create_debug_output}" >&2
     echo "=== Failed to setup easy-rsa: Aborting ===" >&2
     exit 2
-  }
+  fi
 }
 
 # Runs the easy RSA commands to generate certificate files.
-# The generated files are at ${KUBE_TEMP}/easy-rsa-master/easyrsa3
+# The generated files are IN ${CERT_DIR}
 #
 # Assumed vars
 #   KUBE_TEMP
 #   MASTER_NAME
+#   CERT_DIR
 #   PRIMARY_CN: Primary canonical name
 #   SANS: Subject alternate names
 #
@@ -1064,7 +1074,7 @@ function generate-certs {
   local -r cert_create_debug_output=$(mktemp "${KUBE_TEMP}/cert_create_debug_output.XXX")
   # Note: This was heavily cribbed from make-ca-cert.sh
   (set -x
-    cd "${KUBE_TEMP}/easy-rsa-master/easyrsa3"
+    cd "${CERT_DIR}"
     ./easyrsa init-pki
     # this puts the cert into pki/ca.crt and the key into pki/private/ca.key
     ./easyrsa --batch "--req-cn=${PRIMARY_CN}@$(date +%s)" build-ca nopass
@@ -1085,21 +1095,42 @@ function generate-certs {
     ./easyrsa --dn-mode=org \
       --req-cn=kubecfg --req-org=system:masters \
       --req-c= --req-st= --req-city= --req-email= --req-ou= \
-      build-client-full kubecfg nopass) &>${cert_create_debug_output} || {
-    # If there was an error in the subshell, just die.
-    # TODO(roberthbailey): add better error handling here
+      build-client-full kubecfg nopass) &>${cert_create_debug_output} || true
+  local output_file_missing=0
+  local output_file
+  for output_file in \
+    "${CERT_DIR}/pki/private/ca.key" \
+    "${CERT_DIR}/pki/ca.crt" \
+    "${CERT_DIR}/pki/issued/${MASTER_NAME}.crt" \
+    "${CERT_DIR}/pki/private/${MASTER_NAME}.key" \
+    "${CERT_DIR}/pki/issued/kubelet.crt" \
+    "${CERT_DIR}/pki/private/kubelet.key" \
+    "${CERT_DIR}/pki/issued/kubecfg.crt" \
+    "${CERT_DIR}/pki/private/kubecfg.key" \
+    "${CERT_DIR}/pki/issued/kube-apiserver.crt" \
+    "${CERT_DIR}/pki/private/kube-apiserver.key"
+  do
+    if [[ ! -s "${output_file}" ]]; then
+      echo "Expected file ${output_file} not created" >&2
+      output_file_missing=1
+    fi
+  done
+  if (( $output_file_missing )); then
+    # TODO(roberthbailey,porridge): add better error handling here,
+    # see https://github.com/kubernetes/kubernetes/issues/55229
     cat "${cert_create_debug_output}" >&2
     echo "=== Failed to generate master certificates: Aborting ===" >&2
     exit 2
-  }
+  fi
 }
 
 # Runs the easy RSA commands to generate aggregator certificate files.
-# The generated files are at ${KUBE_TEMP}/easy-rsa-master/aggregator
+# The generated files are in ${AGGREGATOR_CERT_DIR}
 #
 # Assumed vars
 #   KUBE_TEMP
 #   AGGREGATOR_MASTER_NAME
+#   AGGREGATOR_CERT_DIR
 #   AGGREGATOR_PRIMARY_CN: Primary canonical name
 #   AGGREGATOR_SANS: Subject alternate names
 #
@@ -1129,13 +1160,27 @@ function generate-aggregator-certs {
     ./easyrsa --dn-mode=org \
       --req-cn=proxy-clientcfg --req-org=system:aggregator \
       --req-c= --req-st= --req-city= --req-email= --req-ou= \
-      build-client-full proxy-clientcfg nopass) &>${cert_create_debug_output} || {
-    # If there was an error in the subshell, just die.
-    # TODO(roberthbailey): add better error handling here
+      build-client-full proxy-clientcfg nopass) &>${cert_create_debug_output} || true
+  local output_file_missing=0
+  local output_file
+  for output_file in \
+    "${AGGREGATOR_CERT_DIR}/pki/private/ca.key" \
+    "${AGGREGATOR_CERT_DIR}/pki/ca.crt" \
+    "${AGGREGATOR_CERT_DIR}/pki/issued/proxy-client.crt" \
+    "${AGGREGATOR_CERT_DIR}/pki/private/proxy-client.key"
+  do
+    if [[ ! -s "${output_file}" ]]; then
+      echo "Expected file ${output_file} not created" >&2
+      output_file_missing=1
+    fi
+  done
+  if (( $output_file_missing )); then
+    # TODO(roberthbailey,porridge): add better error handling here,
+    # see https://github.com/kubernetes/kubernetes/issues/55229
     cat "${cert_create_debug_output}" >&2
     echo "=== Failed to generate aggregator certificates: Aborting ===" >&2
     exit 2
-  }
+  fi
 }
 
 # Run the cfssl command to generates certificate files for etcd service, the
