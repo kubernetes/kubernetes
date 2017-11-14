@@ -26,6 +26,7 @@ import (
 	"net"
 	"net/url"
 	"sync"
+	"time"
 
 	"github.com/golang/glog"
 	lru "github.com/hashicorp/golang-lru"
@@ -306,7 +307,9 @@ func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
 		go func(hook *v1alpha1.Webhook) {
 			defer wg.Done()
 
+			t := time.Now()
 			err := a.callHook(ctx, hook, versionedAttr)
+			admission.Metrics.ObserveWebhook(time.Since(t), err != nil, hook, attr)
 			if err == nil {
 				return
 			}
