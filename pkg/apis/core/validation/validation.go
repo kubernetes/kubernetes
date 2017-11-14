@@ -901,24 +901,20 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 	for _, source := range projection.Sources {
 		numSources := 0
 		if source.Secret != nil {
-			if numSources > 0 {
-				allErrs = append(allErrs, field.Forbidden(fldPath.Child("secret"), "may not specify more than 1 volume type"))
-			} else {
-				numSources++
-				if len(source.Secret.Name) == 0 {
-					allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
-				}
-				itemsPath := fldPath.Child("items")
-				for i, kp := range source.Secret.Items {
-					itemPath := itemsPath.Index(i)
-					allErrs = append(allErrs, validateKeyToPath(&kp, itemPath)...)
-					if len(kp.Path) > 0 {
-						curPath := kp.Path
-						if !allPaths.Has(curPath) {
-							allPaths.Insert(curPath)
-						} else {
-							allErrs = append(allErrs, field.Invalid(fldPath, source.Secret.Name, "conflicting duplicate paths"))
-						}
+			numSources++
+			if len(source.Secret.Name) == 0 {
+				allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+			}
+			itemsPath := fldPath.Child("items")
+			for i, kp := range source.Secret.Items {
+				itemPath := itemsPath.Index(i)
+				allErrs = append(allErrs, validateKeyToPath(&kp, itemPath)...)
+				if len(kp.Path) > 0 {
+					curPath := kp.Path
+					if !allPaths.Has(curPath) {
+						allPaths.Insert(curPath)
+					} else {
+						allErrs = append(allErrs, field.Invalid(fldPath, source.Secret.Name, "conflicting duplicate paths"))
 					}
 				}
 			}
@@ -1354,12 +1350,8 @@ func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
 
 	numVolumes := 0
 	if pv.Spec.HostPath != nil {
-		if numVolumes > 0 {
-			allErrs = append(allErrs, field.Forbidden(specPath.Child("hostPath"), "may not specify more than 1 volume type"))
-		} else {
-			numVolumes++
-			allErrs = append(allErrs, validateHostPathVolumeSource(pv.Spec.HostPath, specPath.Child("hostPath"))...)
-		}
+		numVolumes++
+		allErrs = append(allErrs, validateHostPathVolumeSource(pv.Spec.HostPath, specPath.Child("hostPath"))...)
 	}
 	if pv.Spec.GCEPersistentDisk != nil {
 		if numVolumes > 0 {
@@ -1752,7 +1744,6 @@ func validateEnvVarValueFrom(ev core.EnvVar, fldPath *field.Path) field.ErrorLis
 	}
 
 	numSources := 0
-
 	if ev.ValueFrom.FieldRef != nil {
 		numSources++
 		allErrs = append(allErrs, validateObjectFieldSelector(ev.ValueFrom.FieldRef, &validFieldPathExpressionsEnv, fldPath.Child("fieldRef"))...)
@@ -2103,12 +2094,8 @@ func validateHandler(handler *core.Handler, fldPath *field.Path) field.ErrorList
 	numHandlers := 0
 	allErrors := field.ErrorList{}
 	if handler.Exec != nil {
-		if numHandlers > 0 {
-			allErrors = append(allErrors, field.Forbidden(fldPath.Child("exec"), "may not specify more than 1 handler type"))
-		} else {
-			numHandlers++
-			allErrors = append(allErrors, validateExecAction(handler.Exec, fldPath.Child("exec"))...)
-		}
+		numHandlers++
+		allErrors = append(allErrors, validateExecAction(handler.Exec, fldPath.Child("exec"))...)
 	}
 	if handler.HTTPGet != nil {
 		if numHandlers > 0 {
