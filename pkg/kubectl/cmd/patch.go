@@ -220,7 +220,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			}
 
 			if len(options.OutputFormat) > 0 && options.OutputFormat != "name" {
-				return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
+				return f.PrintResourceInfoForCommand(cmd, info, out)
 			}
 			mapper, _, err := f.UnstructuredObject()
 			if err != nil {
@@ -260,7 +260,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		if err := info.Refresh(targetObj, true); err != nil {
 			return err
 		}
-		return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
+		return f.PrintResourceInfoForCommand(cmd, info, out)
 	})
 	if err != nil {
 		return err

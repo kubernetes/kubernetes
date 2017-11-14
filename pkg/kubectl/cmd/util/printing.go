@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 
@@ -136,24 +135,6 @@ func PrinterForCommand(cmd *cobra.Command, outputOpts *printers.OutputOptions, m
 	}
 
 	return maybeWrapSortingPrinter(cmd, printer), nil
-}
-
-// PrintResourceInfoForCommand receives a *cobra.Command and a *resource.Info and
-// attempts to print an info object based on the specified output format. If the
-// object passed is non-generic, it attempts to print the object using a HumanReadablePrinter.
-// Requires that printer flags have been added to cmd (see AddPrinterFlags).
-func PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, f Factory, out io.Writer) error {
-	printer, err := f.PrinterForCommand(cmd, false, nil, printers.PrintOptions{})
-	if err != nil {
-		return err
-	}
-	if !printer.IsGeneric() {
-		printer, err = f.PrinterForMapping(cmd, false, nil, nil, false)
-		if err != nil {
-			return err
-		}
-	}
-	return printer.PrintObj(info.Object, out)
 }
 
 // extractOutputOptions parses printer specific commandline args and returns
