@@ -238,7 +238,8 @@ if [[ ${KUBE_ENABLE_INSECURE_REGISTRY:-false} == "true" ]]; then
 fi
 
 # Optional: Install cluster DNS.
-CLUSTER_DNS_CORE_DNS="${CLUSTER_DNS_CORE_DNS:-true}"
+# Set CLUSTER_DNS_CORE_DNS to 'true' to install CoreDNS instead of kube-dns.
+CLUSTER_DNS_CORE_DNS="${CLUSTER_DNS_CORE_DNS:-false}"
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
 DNS_SERVER_IP="10.0.0.10"
 DNS_DOMAIN="cluster.local"
