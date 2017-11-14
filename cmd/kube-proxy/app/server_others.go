@@ -282,8 +282,6 @@ func tryIPVSProxy(iptver iptables.IPTablesVersioner, kcompat iptables.KernelComp
 		return proxyModeIPVS
 	}
 
-	// TODO: Check ipvs version
-
 	// Try to fallback to iptables before falling back to userspace
 	glog.V(1).Infof("Can't use ipvs proxier, trying iptables proxier")
 	return tryIPTablesProxy(iptver, kcompat)
