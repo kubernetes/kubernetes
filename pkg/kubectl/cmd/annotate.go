@@ -189,28 +189,22 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 	changeCause := f.Command(cmd, false)
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
-	b := f.NewBuilder().
-		ContinueOnError().
+	b := f.NewBuilder()
+	if o.local {
+		b = b.Local()
+	} else {
+		b = b.Unstructured()
+	}
+	b = b.ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		IncludeUninitialized(includeUninitialized).
 		Flatten()
 
 	if !o.local {
-		// call this method here, as it requires an api call
-		// and will cause the command to fail when there is
-		// no connection to a server
-		mapper, typer, err := f.UnstructuredObject()
-		if err != nil {
-			return err
-		}
-
 		b = b.LabelSelectorParam(o.selector).
-			Unstructured(f.UnstructuredClientForMapping, mapper, typer).
 			ResourceTypeOrNameArgs(o.all, o.resources...).
 			Latest()
-	} else {
-		b = b.Local(f.ClientForMapping)
 	}
 
 	r := b.Do()
@@ -287,15 +281,7 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 			}
 		}
 
-		var mapper meta.RESTMapper
-		if o.local {
-			mapper, _ = f.Object()
-		} else {
-			mapper, _, err = f.UnstructuredObject()
-			if err != nil {
-				return err
-			}
-		}
+		mapper := r.Mapper().RESTMapper
 		if len(o.outputFormat) > 0 {
 			return f.PrintObject(cmd, o.local, mapper, outputObj, o.out)
 		}

@@ -280,7 +280,7 @@ func (obj InfoObject) toMap(data []byte) (map[string]interface{}, error) {
 }
 
 func (obj InfoObject) Local() (map[string]interface{}, error) {
-	data, err := runtime.Encode(obj.Encoder, obj.Info.VersionedObject)
+	data, err := runtime.Encode(obj.Encoder, obj.Info.Object)
 	if err != nil {
 		return nil, err
 	}
@@ -408,24 +408,18 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions, from, t
 
 	printer := Printer{}
 
-	mapper, typer, err := f.UnstructuredObject()
-	if err != nil {
-		return err
-	}
-
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
 	r := f.NewBuilder().
-		Unstructured(f.UnstructuredClientForMapping, mapper, typer).
+		Unstructured().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
 		Flatten().
 		Do()
-	err = r.Err()
-	if err != nil {
+	if err := r.Err(); err != nil {
 		return err
 	}
 

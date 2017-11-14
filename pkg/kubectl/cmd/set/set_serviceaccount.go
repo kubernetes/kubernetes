@@ -138,7 +138,7 @@ func (saConfig *serviceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 		builder.ResourceTypeOrNameArgs(saConfig.all, resources...).
 			Latest()
 	} else {
-		builder = builder.Local(f.ClientForMapping)
+		builder = builder.Local()
 	}
 	saConfig.infos, err = builder.Do().Infos()
 	if err != nil {
@@ -151,11 +151,12 @@ func (saConfig *serviceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 func (saConfig *serviceAccountConfig) Run() error {
 	patchErrs := []error{}
 	patchFn := func(info *resource.Info) ([]byte, error) {
-		saConfig.updatePodSpecForObject(info.VersionedObject, func(podSpec *v1.PodSpec) error {
+		info.Object = info.AsVersioned()
+		saConfig.updatePodSpecForObject(info.Object, func(podSpec *v1.PodSpec) error {
 			podSpec.ServiceAccountName = saConfig.serviceAccountName
 			return nil
 		})
-		return runtime.Encode(saConfig.encoder, info.VersionedObject)
+		return runtime.Encode(saConfig.encoder, info.Object)
 	}
 	patches := CalculatePatches(saConfig.infos, saConfig.encoder, patchFn)
 	for _, patch := range patches {
@@ -165,7 +166,7 @@ func (saConfig *serviceAccountConfig) Run() error {
 			continue
 		}
 		if saConfig.local || saConfig.dryRun {
-			if err := saConfig.PrintObject(saConfig.cmd, saConfig.local, saConfig.mapper, patch.Info.VersionedObject, saConfig.out); err != nil {
+			if err := saConfig.PrintObject(saConfig.cmd, saConfig.local, saConfig.mapper, patch.Info.AsVersioned(), saConfig.out); err != nil {
 				return err
 			}
 			continue
@@ -184,11 +185,7 @@ func (saConfig *serviceAccountConfig) Run() error {
 			}
 		}
 		if len(saConfig.output) > 0 {
-			versionedObject, err := patch.Info.Mapping.ConvertToVersion(patched, patch.Info.Mapping.GroupVersionKind.GroupVersion())
-			if err != nil {
-				return err
-			}
-			if err := saConfig.PrintObject(saConfig.cmd, saConfig.local, saConfig.mapper, versionedObject, saConfig.out); err != nil {
+			if err := saConfig.PrintObject(saConfig.cmd, saConfig.local, saConfig.mapper, info.AsVersioned(), saConfig.out); err != nil {
 				return err
 			}
 			continue

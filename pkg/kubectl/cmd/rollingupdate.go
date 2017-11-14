@@ -395,11 +395,11 @@ func findNewName(args []string, oldRc *api.ReplicationController) string {
 }
 
 func isReplicasDefaulted(info *resource.Info) bool {
-	if info == nil || info.VersionedObject == nil {
+	if info == nil {
 		// was unable to recover versioned info
 		return false
 	}
-	switch t := info.VersionedObject.(type) {
+	switch t := info.AsVersioned().(type) {
 	case *v1.ReplicationController:
 		return t.Spec.Replicas == nil
 	}

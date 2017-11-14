@@ -193,6 +193,7 @@ type ObjectMappingFactory interface {
 	// runtime.Unstructured. This performs API calls to discover types.
 	UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error)
 	// Returns interface for expanding categories like `all`.
+	// TODO: this should probably return an error if the full expander can't be loaded.
 	CategoryExpander() categories.CategoryExpander
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
 	// for working with arbitrary resources and is not guaranteed to point to a Kubernetes APIServer.

@@ -147,7 +147,7 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 			return resource.LocalResourceError
 		}
 
-		o.builder = o.builder.Local(f.ClientForMapping)
+		o.builder = o.builder.Local()
 	}
 
 	o.PrintObject = func(obj runtime.Object) error {
@@ -181,15 +181,12 @@ func (o *SelectorOptions) RunSelector() error {
 	return r.Visit(func(info *resource.Info, err error) error {
 		patch := &Patch{Info: info}
 		CalculatePatch(patch, o.encoder, func(info *resource.Info) ([]byte, error) {
-			versioned, err := info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
-			if err != nil {
-				return nil, err
-			}
-			patch.Info.VersionedObject = versioned
-			selectErr := updateSelectorForObject(info.VersionedObject, *o.selector)
+			versioned := info.AsVersioned()
+			patch.Info.Object = versioned
+			selectErr := updateSelectorForObject(info.Object, *o.selector)
 
 			if selectErr == nil {
-				return runtime.Encode(o.encoder, info.VersionedObject)
+				return runtime.Encode(o.encoder, info.Object)
 			}
 			return nil, selectErr
 		})
@@ -198,7 +195,7 @@ func (o *SelectorOptions) RunSelector() error {
 			return patch.Err
 		}
 		if o.local || o.dryrun {
-			return o.PrintObject(info.VersionedObject)
+			return o.PrintObject(info.Object)
 		}
 
 		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)

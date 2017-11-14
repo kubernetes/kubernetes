@@ -247,7 +247,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 				ResourceTypeOrNameArgs(o.All, o.From).
 				Latest()
 		} else {
-			b = b.Local(f.ClientForMapping)
+			b = b.Local()
 		}
 
 		infos, err := b.Do().Infos()
@@ -315,7 +315,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 			ResourceTypeOrNameArgs(o.All, o.Resources...).
 			Latest()
 	} else {
-		b = b.Local(f.ClientForMapping)
+		b = b.Local()
 	}
 
 	o.Infos, err = b.Do().Infos()
@@ -323,7 +323,8 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		return err
 	}
 	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
-		_, err := o.UpdatePodSpecForObject(info.VersionedObject, func(spec *v1.PodSpec) error {
+		info.Object = info.AsVersioned()
+		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
 			resolutionErrorsEncountered := false
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
 			if len(containers) == 0 {
@@ -389,7 +390,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		})
 
 		if err == nil {
-			return runtime.Encode(o.Encoder, info.VersionedObject)
+			return runtime.Encode(o.Encoder, info.Object)
 		}
 		return nil, err
 	})
@@ -413,7 +414,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		}
 
 		if o.PrintObject != nil && (o.Local || o.DryRun) {
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, patch.Info.VersionedObject, o.Out); err != nil {
+			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, patch.Info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue
@@ -433,11 +434,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		}
 
 		if len(o.Output) > 0 {
-			versionedObject, err := patch.Info.Mapping.ConvertToVersion(obj, patch.Info.Mapping.GroupVersionKind.GroupVersion())
-			if err != nil {
-				return err
-			}
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, versionedObject, o.Out); err != nil {
+			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue

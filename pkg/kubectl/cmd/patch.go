@@ -153,13 +153,8 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		return fmt.Errorf("unable to parse %q: %v", patch, err)
 	}
 
-	mapper, typer, err := f.UnstructuredObject()
-	if err != nil {
-		return err
-	}
-
 	r := f.NewBuilder().
-		Unstructured(f.UnstructuredClientForMapping, mapper, typer).
+		Unstructured().
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
@@ -196,7 +191,6 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 				// Copy the resource info and update with the result of applying the user's patch
 				infoCopy := *info
 				infoCopy.Object = patchedObj
-				infoCopy.VersionedObject = patchedObj
 				if patch, patchType, err := cmdutil.ChangeResourcePatch(&infoCopy, f.Command(cmd, true)); err == nil {
 					if recordedObj, err := helper.Patch(info.Namespace, info.Name, patchType, patch); err != nil {
 						glog.V(4).Infof("error recording reason: %v", err)
@@ -244,7 +238,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 
 		count++
 
-		originalObjJS, err := runtime.Encode(unstructured.UnstructuredJSONScheme, info.VersionedObject)
+		originalObjJS, err := runtime.Encode(unstructured.UnstructuredJSONScheme, info.Object)
 		if err != nil {
 			return err
 		}

@@ -136,7 +136,7 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.C
 		}
 		o.builder = o.builder.Schema(schema)
 	} else {
-		o.builder = o.builder.Local(f.ClientForMapping)
+		o.builder = o.builder.Local()
 	}
 
 	cmdNamespace, _, err := f.DefaultNamespace()

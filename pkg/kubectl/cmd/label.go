@@ -191,7 +191,13 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 	changeCause := f.Command(cmd, false)
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
-	b := f.NewBuilder().
+	b := f.NewBuilder()
+	if o.local {
+		b = b.Local()
+	} else {
+		b = b.Unstructured()
+	}
+	b = b.
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
@@ -199,20 +205,9 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 		Flatten()
 
 	if !o.local {
-		// call this method here, as it requires an api call
-		// and will cause the command to fail when there is
-		// no connection to a server
-		mapper, typer, err := f.UnstructuredObject()
-		if err != nil {
-			return err
-		}
-
 		b = b.LabelSelectorParam(o.selector).
-			Unstructured(f.UnstructuredClientForMapping, mapper, typer).
 			ResourceTypeOrNameArgs(o.all, o.resources...).
 			Latest()
-	} else {
-		b = b.Local(f.ClientForMapping)
 	}
 
 	one := false

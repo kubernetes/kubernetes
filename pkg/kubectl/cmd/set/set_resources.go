@@ -164,7 +164,7 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 			return resource.LocalResourceError
 		}
 
-		builder = builder.Local(f.ClientForMapping)
+		builder = builder.Local()
 	}
 
 	o.Infos, err = builder.Do().Infos()
@@ -192,7 +192,8 @@ func (o *ResourcesOptions) Run() error {
 	allErrs := []error{}
 	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
 		transformed := false
-		_, err := o.UpdatePodSpecForObject(info.VersionedObject, func(spec *v1.PodSpec) error {
+		info.Object = info.AsVersioned()
+		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
 			if len(containers) != 0 {
 				for i := range containers {
@@ -217,7 +218,7 @@ func (o *ResourcesOptions) Run() error {
 			return nil
 		})
 		if transformed && err == nil {
-			return runtime.Encode(o.Encoder, info.VersionedObject)
+			return runtime.Encode(o.Encoder, info.Object)
 		}
 		return nil, err
 	})
@@ -236,7 +237,7 @@ func (o *ResourcesOptions) Run() error {
 		}
 
 		if o.Local || cmdutil.GetDryRunFlag(o.Cmd) {
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, patch.Info.VersionedObject, o.Out); err != nil {
+			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, patch.Info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue
@@ -261,11 +262,7 @@ func (o *ResourcesOptions) Run() error {
 
 		shortOutput := o.Output == "name"
 		if len(o.Output) > 0 && !shortOutput {
-			versionedObject, err := patch.Info.Mapping.ConvertToVersion(obj, patch.Info.Mapping.GroupVersionKind.GroupVersion())
-			if err != nil {
-				return err
-			}
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, versionedObject, o.Out); err != nil {
+			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue
