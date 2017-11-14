@@ -22,7 +22,6 @@ var (
 // Depending on the pagination strategy of a particular resource, there may be an additional subinterface that the result type
 // will need to implement.
 type Page interface {
-
 	// NextPageURL generates the URL for the page of data that follows this collection.
 	// Return "" if no such page exists.
 	NextPageURL() (string, error)
