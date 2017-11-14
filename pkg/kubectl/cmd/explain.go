@@ -79,7 +79,6 @@ func RunExplain(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, ar
 
 	recursive := cmdutil.GetFlagBool(cmd, "recursive")
 	apiVersionString := cmdutil.GetFlagString(cmd, "api-version")
-	apiVersion := schema.GroupVersion{}
 
 	mapper, _ := f.Object()
 	// TODO: After we figured out the new syntax to separate group and resource, allow
@@ -103,15 +102,13 @@ func RunExplain(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, ar
 		}
 	}
 
-	if len(apiVersionString) == 0 {
-		apiVersion = gvk.GroupVersion()
-	} else {
-		apiVersion, err = schema.ParseGroupVersion(apiVersionString)
+	if len(apiVersionString) != 0 {
+		apiVersion, err := schema.ParseGroupVersion(apiVersionString)
 		if err != nil {
 			return err
 		}
+		gvk = apiVersion.WithKind(gvk.Kind)
 	}
-	gvk = apiVersion.WithKind(gvk.Kind)
 
 	resources, err := f.OpenAPISchema()
 	if err != nil {
