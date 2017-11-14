@@ -39,7 +39,7 @@ const (
 	// StoreCertsInSecrets is alpha in v1.8
 	StoreCertsInSecrets = "StoreCertsInSecrets"
 
-	// SupportIPVSProxyMode is alpha in v1.8
+	// SupportIPVSProxyMode is alpha in v1.9
 	SupportIPVSProxyMode = "SupportIPVSProxyMode"
 )
 
