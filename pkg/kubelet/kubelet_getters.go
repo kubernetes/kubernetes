@@ -46,7 +46,11 @@ func (kl *Kubelet) getRootDir() string {
 // getPodsDir returns the full path to the directory under which pod
 // directories are created.
 func (kl *Kubelet) getPodsDir() string {
-	return filepath.Join(kl.getRootDir(), config.DefaultKubeletPodsDirName)
+	path := filepath.Join(kl.getRootDir(), config.DefaultKubeletPodsDirName)
+	if kl.experimentalUserNSRootUID > 0 {
+		path = fmt.Sprintf("%s-%d.%d", path, kl.experimentalUserNSRootUID, kl.experimentalUserNSRootGID)
+	}
+	return path
 }
 
 // getPluginsDir returns the full path to the directory under which plugin

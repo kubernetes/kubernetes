@@ -233,6 +233,8 @@ LOG_DIR=${LOG_DIR:-"/tmp"}
 CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"docker"}
 CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-""}
 IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}
+USERNS_REMAP_ROOT_UID=${USERNS_REMAP_ROOT_UID:-""}
+USERNS_REMAP_ROOT_GID=${USERNS_REMAP_ROOT_GID:-""}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-true}
 ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
@@ -751,6 +753,14 @@ function start_kubelet {
       image_service_endpoint_args="--image-service-endpoint=${IMAGE_SERVICE_ENDPOINT}"
     fi
 
+    userns_remap_args=""
+    if [[ -n "${USERNS_REMAP_ROOT_UID}" ]]; then
+      userns_remap_args="--experimental-userns-remap-root-uid=${USERNS_REMAP_ROOT_UID}"
+      if [[ -n "${USERNS_REMAP_ROOT_GID}" ]]; then
+        userns_remap_args="$userns_remap_args --experimental-userns-remap-root-gid=${USERNS_REMAP_ROOT_GID}"
+      fi
+    fi
+
     all_kubelet_flags=(
       ${priv_arg}
       --v="${LOG_LEVEL}"
@@ -779,6 +789,7 @@ function start_kubelet {
       ${net_plugin_args}
       ${container_runtime_endpoint_args}
       ${image_service_endpoint_args}
+      ${userns_remap_args}
       --port="$KUBELET_PORT"
       ${KUBELET_FLAGS}
     )
