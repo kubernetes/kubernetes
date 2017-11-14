@@ -29,6 +29,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -286,7 +287,7 @@ func (f *FakeFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 
 func (f *FakeFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error) {
 	groupResources := testDynamicResources()
-	mapper := discovery.NewRESTMapper(groupResources, meta.InterfacesForUnstructured)
+	mapper := discovery.NewRESTMapper(groupResources, meta.InterfacesForUnstructuredConversion(legacyscheme.Registry.InterfacesFor))
 	typer := discovery.NewUnstructuredObjectTyper(groupResources)
 
 	fakeDs := &fakeCachedDiscoveryClient{}
@@ -518,7 +519,23 @@ func (f *FakeFactory) PrinterForMapping(cmd *cobra.Command, isLocal bool, output
 
 func (f *FakeFactory) NewBuilder() *resource.Builder {
 	mapper, typer := f.Object()
-	return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
+	unstructuredMapper, unstructuredTyper, _ := f.UnstructuredObject()
+
+	return resource.NewBuilder(
+		&resource.Mapper{
+			RESTMapper:   mapper,
+			ObjectTyper:  typer,
+			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
+			Decoder:      f.Decoder(true),
+		},
+		&resource.Mapper{
+			RESTMapper:   unstructuredMapper,
+			ObjectTyper:  unstructuredTyper,
+			ClientMapper: resource.ClientMapperFunc(f.UnstructuredClientForMapping),
+			Decoder:      unstructured.UnstructuredJSONScheme,
+		},
+		f.CategoryExpander(),
+	)
 }
 
 func (f *FakeFactory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions {
@@ -593,7 +610,23 @@ func (f *fakeAPIFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 
 func (f *fakeAPIFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error) {
 	groupResources := testDynamicResources()
-	mapper := discovery.NewRESTMapper(groupResources, meta.InterfacesForUnstructured)
+	mapper := discovery.NewRESTMapper(
+		groupResources,
+		meta.InterfacesForUnstructuredConversion(func(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
+			switch version {
+			// provide typed objects for these two versions
+			case ValidVersionGV, UnlikelyGV:
+				return &meta.VersionInterfaces{
+					ObjectConvertor:  f.tf.Typer.(*runtime.Scheme),
+					MetadataAccessor: meta.NewAccessor(),
+				}, nil
+			// otherwise fall back to the legacy scheme
+			default:
+				return legacyscheme.Registry.InterfacesFor(version)
+			}
+		}),
+	)
+
 	typer := discovery.NewUnstructuredObjectTyper(groupResources)
 	fakeDs := &fakeCachedDiscoveryClient{}
 	expander, err := cmdutil.NewShortcutExpander(mapper, fakeDs)
@@ -832,7 +865,23 @@ func (f *fakeAPIFactory) PrinterForMapping(cmd *cobra.Command, isLocal bool, out
 
 func (f *fakeAPIFactory) NewBuilder() *resource.Builder {
 	mapper, typer := f.Object()
-	return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
+	unstructuredMapper, unstructuredTyper, _ := f.UnstructuredObject()
+
+	return resource.NewBuilder(
+		&resource.Mapper{
+			RESTMapper:   mapper,
+			ObjectTyper:  typer,
+			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
+			Decoder:      f.Decoder(true),
+		},
+		&resource.Mapper{
+			RESTMapper:   unstructuredMapper,
+			ObjectTyper:  unstructuredTyper,
+			ClientMapper: resource.ClientMapperFunc(f.UnstructuredClientForMapping),
+			Decoder:      unstructured.UnstructuredJSONScheme,
+		},
+		f.CategoryExpander(),
+	)
 }
 
 func (f *fakeAPIFactory) SuggestedPodTemplateResources() []schema.GroupResource {
@@ -857,6 +906,17 @@ func NewAPIFactory() (cmdutil.Factory, *TestFactory, runtime.Codec, runtime.Nego
 	}, t, testapi.Default.Codec(), testapi.Default.NegotiatedSerializer()
 }
 
+func (f *TestFactory) WithCustomScheme() *TestFactory {
+	scheme, _, _ := newExternalScheme()
+	f.Typer = scheme
+	return f
+}
+
+func (f *TestFactory) WithLegacyScheme() *TestFactory {
+	f.Typer = legacyscheme.Scheme
+	return f
+}
+
 func testDynamicResources() []*discovery.APIGroupResources {
 	return []*discovery.APIGroupResources{
 		{
@@ -875,7 +935,6 @@ func testDynamicResources() []*discovery.APIGroupResources {
 					{Name: "nodes", Namespaced: false, Kind: "Node"},
 					{Name: "secrets", Namespaced: true, Kind: "Secret"},
 					{Name: "configmaps", Namespaced: true, Kind: "ConfigMap"},
-					{Name: "type", Namespaced: false, Kind: "Type"},
 					{Name: "namespacedtype", Namespaced: true, Kind: "NamespacedType"},
 				},
 			},
@@ -940,6 +999,22 @@ func testDynamicResources() []*discovery.APIGroupResources {
 			VersionedResources: map[string][]metav1.APIResource{
 				"v1": {
 					{Name: "widgets", Namespaced: true, Kind: "Widget"},
+				},
+			},
+		},
+		{
+			Group: metav1.APIGroup{
+				Name: "apitest",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{GroupVersion: "apitest/unlikelyversion", Version: "unlikelyversion"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{
+					GroupVersion: "apitest/unlikelyversion",
+					Version:      "unlikelyversion"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"unlikelyversion": {
+					{Name: "types", SingularName: "type", Namespaced: false, Kind: "Type"},
 				},
 			},
 		},
