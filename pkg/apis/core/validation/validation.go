@@ -33,7 +33,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
-	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
@@ -56,11 +55,11 @@ import (
 
 // TODO: delete this global variable when we enable the validation of common
 // fields by default.
-var RepairMalformedUpdates bool = genericvalidation.RepairMalformedUpdates
+var RepairMalformedUpdates bool = apimachineryvalidation.RepairMalformedUpdates
 
 const isNegativeErrorMsg string = apimachineryvalidation.IsNegativeErrorMsg
 const isInvalidQuotaResource string = `must be a standard resource for quota`
-const fieldImmutableErrorMsg string = genericvalidation.FieldImmutableErrorMsg
+const fieldImmutableErrorMsg string = apimachineryvalidation.FieldImmutableErrorMsg
 const isNotIntegerErrorMsg string = `must be an integer`
 const isZeroErrorMsg string = `must be greater than zero`
 
@@ -68,7 +67,7 @@ var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
 var volumeModeErrorMsg string = "must be a number between 0 and 0777 (octal), both inclusive"
 
 // BannedOwners is a black list of object that are not allowed to be owners.
-var BannedOwners = genericvalidation.BannedOwners
+var BannedOwners = apimachineryvalidation.BannedOwners
 
 var iscsiInitiatorIqnRegex = regexp.MustCompile(`iqn\.\d{4}-\d{2}\.([[:alnum:]-.]+)(:[^,;*&$|\s]+)$`)
 var iscsiInitiatorEuiRegex = regexp.MustCompile(`^eui.[[:alnum:]]{16}$`)
@@ -92,7 +91,7 @@ func ValidateHasLabel(meta metav1.ObjectMeta, fldPath *field.Path, key, expected
 
 // ValidateAnnotations validates that a set of annotations are correctly defined.
 func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
-	return genericvalidation.ValidateAnnotations(annotations, fldPath)
+	return apimachineryvalidation.ValidateAnnotations(annotations, fldPath)
 }
 
 func ValidateDNS1123Label(value string, fldPath *field.Path) field.ErrorList {
@@ -202,7 +201,7 @@ func ValidateEndpointsSpecificAnnotations(annotations map[string]string, fldPath
 }
 
 func ValidateOwnerReferences(ownerReferences []metav1.OwnerReference, fldPath *field.Path) field.ErrorList {
-	return genericvalidation.ValidateOwnerReferences(ownerReferences, fldPath)
+	return apimachineryvalidation.ValidateOwnerReferences(ownerReferences, fldPath)
 }
 
 // ValidateNameFunc validates that the provided name is valid for a given resource type.
@@ -274,7 +273,7 @@ var ValidateServiceAccountName = apimachineryvalidation.ValidateServiceAccountNa
 var ValidateEndpointsName = NameIsDNSSubdomain
 
 // ValidateClusterName can be used to check whether the given cluster name is valid.
-var ValidateClusterName = genericvalidation.ValidateClusterName
+var ValidateClusterName = apimachineryvalidation.ValidateClusterName
 
 // ValidateClassName can be used to check whether the given class name is valid.
 // It is defined here to avoid import cycle between pkg/apis/storage/validation
@@ -285,7 +284,7 @@ var ValidateClassName = NameIsDNSSubdomain
 // class name is valid.
 var ValidatePriorityClassName = NameIsDNSSubdomain
 
-// TODO update all references to these functions to point to the genericvalidation ones
+// TODO update all references to these functions to point to the apimachineryvalidation ones
 // NameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
 func NameIsDNSSubdomain(name string, prefix bool) []string {
 	return apimachineryvalidation.NameIsDNSSubdomain(name, prefix)
@@ -316,7 +315,7 @@ func ValidateNonnegativeQuantity(value resource.Quantity, fldPath *field.Path) f
 }
 
 func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) field.ErrorList {
-	return genericvalidation.ValidateImmutableField(newVal, oldVal, fldPath)
+	return apimachineryvalidation.ValidateImmutableField(newVal, oldVal, fldPath)
 }
 
 func ValidateImmutableAnnotation(newVal string, oldVal string, annotation string, fldPath *field.Path) field.ErrorList {
@@ -333,7 +332,7 @@ func ValidateImmutableAnnotation(newVal string, oldVal string, annotation string
 // It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
 // TODO: Remove calls to this method scattered in validations of specific resources, e.g., ValidatePodUpdate.
 func ValidateObjectMeta(meta *metav1.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
-	allErrs := genericvalidation.ValidateObjectMeta(meta, requiresNamespace, apimachineryvalidation.ValidateNameFunc(nameFn), fldPath)
+	allErrs := apimachineryvalidation.ValidateObjectMeta(meta, requiresNamespace, apimachineryvalidation.ValidateNameFunc(nameFn), fldPath)
 	// run additional checks for the finalizer name
 	for i := range meta.Finalizers {
 		allErrs = append(allErrs, validateKubeFinalizerName(string(meta.Finalizers[i]), fldPath.Child("finalizers").Index(i))...)
@@ -343,7 +342,7 @@ func ValidateObjectMeta(meta *metav1.ObjectMeta, requiresNamespace bool, nameFn 
 
 // ValidateObjectMetaUpdate validates an object's metadata when updated
 func ValidateObjectMetaUpdate(newMeta, oldMeta *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
-	allErrs := genericvalidation.ValidateObjectMetaUpdate(newMeta, oldMeta, fldPath)
+	allErrs := apimachineryvalidation.ValidateObjectMetaUpdate(newMeta, oldMeta, fldPath)
 	// run additional checks for the finalizer name
 	for i := range newMeta.Finalizers {
 		allErrs = append(allErrs, validateKubeFinalizerName(string(newMeta.Finalizers[i]), fldPath.Child("finalizers").Index(i))...)
@@ -353,7 +352,7 @@ func ValidateObjectMetaUpdate(newMeta, oldMeta *metav1.ObjectMeta, fldPath *fiel
 }
 
 func ValidateNoNewFinalizers(newFinalizers []string, oldFinalizers []string, fldPath *field.Path) field.ErrorList {
-	return genericvalidation.ValidateNoNewFinalizers(newFinalizers, oldFinalizers, fldPath)
+	return apimachineryvalidation.ValidateNoNewFinalizers(newFinalizers, oldFinalizers, fldPath)
 }
 
 func ValidateVolumes(volumes []core.Volume, fldPath *field.Path) (sets.String, field.ErrorList) {
@@ -4197,7 +4196,7 @@ func ValidateNamespace(namespace *core.Namespace) field.ErrorList {
 
 // Validate finalizer names
 func validateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorList {
-	allErrs := genericvalidation.ValidateFinalizerName(stringValue, fldPath)
+	allErrs := apimachineryvalidation.ValidateFinalizerName(stringValue, fldPath)
 	for _, err := range validateKubeFinalizerName(stringValue, fldPath) {
 		allErrs = append(allErrs, err)
 	}
