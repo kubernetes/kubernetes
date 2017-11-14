@@ -228,7 +228,7 @@ func parseThresholdStatement(statement string) (evictionapi.Threshold, error) {
 func getAllocatableThreshold(allocatableConfig []string) []evictionapi.Threshold {
 	for _, key := range allocatableConfig {
 		if key == cm.NodeAllocatableEnforcementKey {
-			return []evictionapi.Threshold{
+			thresholds := []evictionapi.Threshold{
 				{
 					Signal:   evictionapi.SignalAllocatableMemoryAvailable,
 					Operator: evictionapi.OpLessThan,
@@ -239,7 +239,9 @@ func getAllocatableThreshold(allocatableConfig []string) []evictionapi.Threshold
 						Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
 					},
 				},
-				{
+			}
+			if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+				thresholds = append(thresholds, evictionapi.Threshold{
 					Signal:   evictionapi.SignalAllocatableNodeFsAvailable,
 					Operator: evictionapi.OpLessThan,
 					Value: evictionapi.ThresholdValue{
@@ -248,8 +250,9 @@ func getAllocatableThreshold(allocatableConfig []string) []evictionapi.Threshold
 					MinReclaim: &evictionapi.ThresholdValue{
 						Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
 					},
-				},
+				})
 			}
+			return thresholds
 		}
 	}
 	return []evictionapi.Threshold{}
