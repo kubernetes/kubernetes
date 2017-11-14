@@ -56,6 +56,17 @@ spec:
           - --stackdriver-prefix={{ prometheus_to_sd_prefix }}/addons
           - --api-override={{ prometheus_to_sd_endpoint }}
           - --source=metadata_proxy:http://127.0.0.1:989?whitelisted=request_count
+          - --pod-id=$(POD_NAME)
+          - --namespace-id=$(POD_NAMESPACE)
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
       # END_PROMETHEUS_TO_SD
       nodeSelector:
         beta.kubernetes.io/metadata-proxy-ready: "true"
