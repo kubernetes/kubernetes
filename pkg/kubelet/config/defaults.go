@@ -17,9 +17,8 @@ limitations under the License.
 package config
 
 const (
-	DefaultKubeletPodsDirName             = "pods"
-	DefaultKubeletVolumesDirName          = "volumes"
-	DefaultKubeletPluginsDirName          = "plugins"
-	DefaultKubeletContainersDirName       = "containers"
-	DefaultKubeletPluginContainersDirName = "plugin-containers"
+	DefaultKubeletPodsDirName       = "pods"
+	DefaultKubeletVolumesDirName    = "volumes"
+	DefaultKubeletPluginsDirName    = "plugins"
+	DefaultKubeletContainersDirName = "containers"
 )

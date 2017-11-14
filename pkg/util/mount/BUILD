@@ -17,7 +17,6 @@ go_library(
         "nsenter_mount_unsupported.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "exec_mount.go",
             "mount_linux.go",
             "nsenter_mount.go",
         ],
@@ -47,7 +46,6 @@ go_test(
         "safe_format_and_mount_test.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "exec_mount_test.go",
             "mount_linux_test.go",
             "nsenter_mount_test.go",
         ],

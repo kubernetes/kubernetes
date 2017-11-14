@@ -169,12 +169,6 @@ const (
 	//
 	// Enable nodes to exclude themselves from service load balancers
 	ServiceNodeExclusion utilfeature.Feature = "ServiceNodeExclusion"
-
-	// owner: @jsafrane
-	// alpha: v1.9
-	//
-	// Enable running mount utilities in containers.
-	MountContainers utilfeature.Feature = "MountContainers"
 )
 
 func init() {
@@ -207,7 +201,6 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	ExpandPersistentVolumes:                     {Default: false, PreRelease: utilfeature.Alpha},
 	CPUManager:                                  {Default: false, PreRelease: utilfeature.Alpha},
 	ServiceNodeExclusion:                        {Default: false, PreRelease: utilfeature.Alpha},
-	MountContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
