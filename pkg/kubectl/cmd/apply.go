@@ -341,6 +341,12 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			} else {
 				visitedUids.Insert(string(uid))
 			}
+
+			if string(patchBytes) == "{}" {
+				count++
+				cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "unchanged")
+				return nil
+			}
 		}
 		count++
 		if len(output) > 0 && !shortOutput {
@@ -616,6 +622,10 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		if err != nil {
 			return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf(createPatchErrFormat, original, modified, current), source, err)
 		}
+	}
+
+	if string(patch) == "{}" {
+		return patch, obj, nil
 	}
 
 	patchedObj, err := p.helper.Patch(namespace, name, patchType, patch)
