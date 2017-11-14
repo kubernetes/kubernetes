@@ -166,6 +166,23 @@ func constructAllocResp(devices, mounts, envs map[string]string) *pluginapi.Allo
 	return resp
 }
 
+func makePod(limits v1.ResourceList) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: uuid.NewUUID(),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: limits,
+					},
+				},
+			},
+		},
+	}
+}
+
 func TestCheckpoint(t *testing.T) {
 	resourceName1 := "domain1.com/resource1"
 	resourceName2 := "domain2.com/resource2"
@@ -238,6 +255,27 @@ func (a *activePodsStub) updateActivePods(newPods []*v1.Pod) {
 	a.activePods = newPods
 }
 
+func TestHandlerStart(t *testing.T) {
+	podsStub := activePodsStub{
+		activePods: []*v1.Pod{},
+	}
+	m, err := NewDevicePluginManagerTestStub()
+	monitorCallback := func(resourceName string, added, updated, deleted []pluginapi.Device) {}
+	testHandler := &HandlerImpl{
+		devicePluginManager:                m,
+		devicePluginManagerMonitorCallback: monitorCallback,
+		allDevices:                         make(map[string]sets.String),
+		allocatedDevices:                   make(map[string]sets.String),
+		podDevices:                         make(podDevices),
+	}
+	as := assert.New(t)
+	as.Nil(err)
+	as.Nil(testHandler.activePods)
+	err = testHandler.Start(podsStub.getActivePods)
+	as.NotNil(testHandler.activePods)
+	as.Nil(err)
+}
+
 func TestPodContainerDeviceAllocation(t *testing.T) {
 	flag.Set("alsologtostderr", fmt.Sprintf("%t", true))
 	var logLevel string
@@ -292,80 +330,70 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 	m.devRuntimeEnvs[resourceName2+devID3] = append(m.devRuntimeEnvs[resourceName2+devID3], stringPairType{"key2", "val2"})
 	m.devRuntimeEnvs[resourceName2+devID4] = append(m.devRuntimeEnvs[resourceName2+devID4], stringPairType{"key2", "val3"})
 
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID: uuid.NewUUID(),
+	testPods := []*v1.Pod{
+		makePod(v1.ResourceList{
+			v1.ResourceName(resourceName1): resourceQuantity1,
+			v1.ResourceName("cpu"):         resourceQuantity1,
+			v1.ResourceName(resourceName2): resourceQuantity2}),
+		makePod(v1.ResourceList{
+			v1.ResourceName(resourceName1): resourceQuantity2}),
+		makePod(v1.ResourceList{
+			v1.ResourceName(resourceName2): resourceQuantity2}),
+	}
+	testCases := []struct {
+		description               string
+		testPod                   *v1.Pod
+		expectedContainerOptsLen  []int
+		expectedAllocatedResName1 int
+		expectedAllocatedResName2 int
+		expErr                    error
+	}{
+		{
+			description:               "Successfull allocation of two Res1 resources and one Res2 resource",
+			testPod:                   testPods[0],
+			expectedContainerOptsLen:  []int{3, 2, 2},
+			expectedAllocatedResName1: 2,
+			expectedAllocatedResName2: 1,
+			expErr: nil,
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name: string(uuid.NewUUID()),
-					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
-							v1.ResourceName(resourceName1): resourceQuantity1,
-							v1.ResourceName("cpu"):         resourceQuantity1,
-							v1.ResourceName(resourceName2): resourceQuantity2,
-						},
-					},
-				},
-			},
+		{
+			description:               "Requesting to create a pod without enough resources should fail",
+			testPod:                   testPods[1],
+			expectedContainerOptsLen:  nil,
+			expectedAllocatedResName1: 2,
+			expectedAllocatedResName2: 1,
+			expErr: fmt.Errorf("requested number of devices unavailable for domain1.com/resource1. Requested: 1, Available: 0"),
+		},
+		{
+			description:               "Successfull allocation of all available Res1 resources and Res2 resources",
+			testPod:                   testPods[2],
+			expectedContainerOptsLen:  []int{0, 0, 1},
+			expectedAllocatedResName1: 2,
+			expectedAllocatedResName2: 2,
+			expErr: nil,
 		},
 	}
-
-	podsStub.updateActivePods([]*v1.Pod{pod})
-	err = testHandler.Allocate(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: pod})
-	as.Nil(err)
-	runContainerOpts := testHandler.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
-	as.Equal(len(runContainerOpts.Devices), 3)
-	as.Equal(len(runContainerOpts.Mounts), 2)
-	as.Equal(len(runContainerOpts.Envs), 2)
-
-	// Requesting to create a pod without enough resources should fail.
-	as.Equal(2, testHandler.allocatedDevices[resourceName1].Len())
-	failPod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID: uuid.NewUUID(),
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name: string(uuid.NewUUID()),
-					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
-							v1.ResourceName(resourceName1): resourceQuantity2,
-						},
-					},
-				},
-			},
-		},
+	activePods := []*v1.Pod{}
+	for _, testCase := range testCases {
+		pod := testCase.testPod
+		activePods = append(activePods, pod)
+		podsStub.updateActivePods(activePods)
+		err = testHandler.Allocate(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: pod})
+		if !reflect.DeepEqual(err, testCase.expErr) {
+			t.Errorf("DevicePluginHandler error (%v). expected error: %v but got: %v",
+				testCase.description, testCase.expErr, err)
+		}
+		runContainerOpts := testHandler.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
+		if testCase.expectedContainerOptsLen == nil {
+			as.Nil(runContainerOpts)
+		} else {
+			as.Equal(len(runContainerOpts.Devices), testCase.expectedContainerOptsLen[0])
+			as.Equal(len(runContainerOpts.Mounts), testCase.expectedContainerOptsLen[1])
+			as.Equal(len(runContainerOpts.Envs), testCase.expectedContainerOptsLen[2])
+		}
+		as.Equal(testCase.expectedAllocatedResName1, testHandler.allocatedDevices[resourceName1].Len())
+		as.Equal(testCase.expectedAllocatedResName2, testHandler.allocatedDevices[resourceName2].Len())
 	}
-	err = testHandler.Allocate(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: failPod})
-	as.NotNil(err)
-	runContainerOpts2 := testHandler.GetDeviceRunContainerOptions(failPod, &failPod.Spec.Containers[0])
-	as.Nil(runContainerOpts2)
-
-	// Requesting to create a new pod with a single resourceName2 should succeed.
-	newPod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID: uuid.NewUUID(),
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name: string(uuid.NewUUID()),
-					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
-							v1.ResourceName(resourceName2): resourceQuantity2,
-						},
-					},
-				},
-			},
-		},
-	}
-	err = testHandler.Allocate(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: newPod})
-	as.Nil(err)
-	runContainerOpts3 := testHandler.GetDeviceRunContainerOptions(newPod, &newPod.Spec.Containers[0])
-	as.Equal(1, len(runContainerOpts3.Envs))
 }
 
 func TestSanitizeNodeAllocatable(t *testing.T) {
