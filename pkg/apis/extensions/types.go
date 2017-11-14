@@ -879,9 +879,9 @@ type AllowedHostPath struct {
 // for pods to use.  It requires both the start and end to be defined.
 type HostPortRange struct {
 	// Min is the start of the range, inclusive.
-	Min int
+	Min int32
 	// Max is the end of the range, inclusive.
-	Max int
+	Max int32
 }
 
 // AllowAllCapabilities can be used as a value for the PodSecurityPolicy.AllowAllCapabilities

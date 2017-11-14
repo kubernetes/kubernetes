@@ -761,8 +761,8 @@ func Convert_extensions_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in 
 }
 
 func autoConvert_v1beta1_HostPortRange_To_extensions_HostPortRange(in *v1beta1.HostPortRange, out *extensions.HostPortRange, s conversion.Scope) error {
-	out.Min = int(in.Min)
-	out.Max = int(in.Max)
+	out.Min = in.Min
+	out.Max = in.Max
 	return nil
 }
 
@@ -772,8 +772,8 @@ func Convert_v1beta1_HostPortRange_To_extensions_HostPortRange(in *v1beta1.HostP
 }
 
 func autoConvert_extensions_HostPortRange_To_v1beta1_HostPortRange(in *extensions.HostPortRange, out *v1beta1.HostPortRange, s conversion.Scope) error {
-	out.Min = int32(in.Min)
-	out.Max = int32(in.Max)
+	out.Min = in.Min
+	out.Max = in.Max
 	return nil
 }
 
@@ -1051,17 +1051,7 @@ func autoConvert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySp
 	out.AllowedCapabilities = *(*[]core.Capability)(unsafe.Pointer(&in.AllowedCapabilities))
 	out.Volumes = *(*[]extensions.FSType)(unsafe.Pointer(&in.Volumes))
 	out.HostNetwork = in.HostNetwork
-	if in.HostPorts != nil {
-		in, out := &in.HostPorts, &out.HostPorts
-		*out = make([]extensions.HostPortRange, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_HostPortRange_To_extensions_HostPortRange(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.HostPorts = nil
-	}
+	out.HostPorts = *(*[]extensions.HostPortRange)(unsafe.Pointer(&in.HostPorts))
 	out.HostPID = in.HostPID
 	out.HostIPC = in.HostIPC
 	if err := Convert_v1beta1_SELinuxStrategyOptions_To_extensions_SELinuxStrategyOptions(&in.SELinux, &out.SELinux, s); err != nil {
@@ -1097,17 +1087,7 @@ func autoConvert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySp
 	out.AllowedCapabilities = *(*[]v1.Capability)(unsafe.Pointer(&in.AllowedCapabilities))
 	out.Volumes = *(*[]v1beta1.FSType)(unsafe.Pointer(&in.Volumes))
 	out.HostNetwork = in.HostNetwork
-	if in.HostPorts != nil {
-		in, out := &in.HostPorts, &out.HostPorts
-		*out = make([]v1beta1.HostPortRange, len(*in))
-		for i := range *in {
-			if err := Convert_extensions_HostPortRange_To_v1beta1_HostPortRange(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.HostPorts = nil
-	}
+	out.HostPorts = *(*[]v1beta1.HostPortRange)(unsafe.Pointer(&in.HostPorts))
 	out.HostPID = in.HostPID
 	out.HostIPC = in.HostIPC
 	if err := Convert_extensions_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(&in.SELinux, &out.SELinux, s); err != nil {

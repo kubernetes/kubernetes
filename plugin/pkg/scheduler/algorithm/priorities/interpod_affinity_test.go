@@ -561,7 +561,7 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 		pod                   *v1.Pod
 		pods                  []*v1.Pod
 		nodes                 []*v1.Node
-		hardPodAffinityWeight int
+		hardPodAffinityWeight int32
 		expectedList          schedulerapi.HostPriorityList
 		test                  string
 	}{
