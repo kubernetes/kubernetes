@@ -41,8 +41,6 @@ type UnstructuredList struct {
 
 func (u *UnstructuredList) GetObjectKind() schema.ObjectKind { return u }
 
-func (u *UnstructuredList) IsUnstructuredObject() {}
-
 func (u *UnstructuredList) IsList() bool { return true }
 
 func (u *UnstructuredList) EachListItem(fn func(runtime.Object) error) error {
@@ -71,6 +69,33 @@ func (u *UnstructuredList) UnstructuredContent() map[string]interface{} {
 	}
 	out["items"] = items
 	return out
+}
+
+// SetUnstructuredContent obeys the conventions of List and keeps Items and the items
+// array in sync. If items is not an array of objects in the incoming map, then any
+// mismatched item will be removed.
+func (obj *UnstructuredList) SetUnstructuredContent(content map[string]interface{}) {
+	obj.Object = content
+	if content == nil {
+		obj.Items = nil
+		return
+	}
+	items, ok := obj.Object["items"].([]interface{})
+	if !ok || items == nil {
+		items = []interface{}{}
+	}
+	unstructuredItems := make([]Unstructured, 0, len(items))
+	newItems := make([]interface{}, 0, len(items))
+	for _, item := range items {
+		o, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		unstructuredItems = append(unstructuredItems, Unstructured{Object: o})
+		newItems = append(newItems, o)
+	}
+	obj.Items = unstructuredItems
+	obj.Object["items"] = newItems
 }
 
 func (u *UnstructuredList) DeepCopy() *UnstructuredList {

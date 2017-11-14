@@ -49,8 +49,6 @@ var _ runtime.Unstructured = &Unstructured{}
 
 func (obj *Unstructured) GetObjectKind() schema.ObjectKind { return obj }
 
-func (obj *Unstructured) IsUnstructuredObject() {}
-
 func (obj *Unstructured) IsList() bool {
 	if obj.Object != nil {
 		_, ok := obj.Object["items"]
@@ -88,6 +86,10 @@ func (obj *Unstructured) UnstructuredContent() map[string]interface{} {
 		obj.Object = make(map[string]interface{})
 	}
 	return obj.Object
+}
+
+func (obj *Unstructured) SetUnstructuredContent(content map[string]interface{}) {
+	obj.Object = content
 }
 
 // MarshalJSON ensures that the unstructured object produces proper
