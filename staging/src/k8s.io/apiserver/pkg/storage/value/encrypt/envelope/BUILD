@@ -8,22 +8,40 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["envelope.go"],
+    srcs = [
+        "envelope.go",
+        "grpc_service.go",
+        "service.pb.go",
+    ],
     importpath = "k8s.io/apiserver/pkg/storage/value/encrypt/envelope",
     deps = [
+        "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/hashicorp/golang-lru:go_default_library",
+        "//vendor/golang.org/x/net/context:go_default_library",
+        "//vendor/google.golang.org/grpc:go_default_library",
+        "//vendor/google.golang.org/grpc/credentials:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["envelope_test.go"],
+    srcs = [
+        "envelope_test.go",
+        "grpc_service_test.go",
+        "grpc_service_unix_test.go",
+    ],
+    data = glob(["testdata/**"]),
     embed = [":go_default_library"],
     importpath = "k8s.io/apiserver/pkg/storage/value/encrypt/envelope",
     deps = [
+        "//vendor/golang.org/x/net/context:go_default_library",
+        "//vendor/golang.org/x/sys/unix:go_default_library",
+        "//vendor/google.golang.org/grpc:go_default_library",
+        "//vendor/google.golang.org/grpc/credentials:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/value/encrypt/aes:go_default_library",
+        "//vendor/k8s.io/client-go/util/cert:go_default_library",
     ],
 )
 
@@ -38,4 +56,10 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+)
+
+filegroup(
+    name = "go_default_library_protos",
+    srcs = ["service.proto"],
+    visibility = ["//visibility:public"],
 )

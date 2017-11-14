@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package envelope;
+
+service KmsService {
+    rpc Decrypt(DecryptRequest) returns (DecryptResponse) {}
+    rpc Encrypt(EncryptRequest) returns (EncryptResponse) {}
+}
+
+message DecryptRequest {
+    bytes cipher = 1;
+    // Version of the KMS plugin API, now use “v1beta1”
+    string version = 2;
+}
+
+message DecryptResponse {
+    bytes plain = 1;
+}
+
+message EncryptRequest {
+    bytes plain = 1;
+    // Version of the KMS plugin API, now use “v1beta1”
+    string version = 2;
+}
+
+message EncryptResponse {
+    bytes cipher = 1;
+}
+
