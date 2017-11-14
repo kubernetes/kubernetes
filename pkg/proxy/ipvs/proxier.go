@@ -1466,14 +1466,18 @@ func writeLine(buf *bytes.Buffer, words ...string) {
 
 func getLocalIPs(endpointsMap proxyEndpointsMap) map[types.NamespacedName]sets.String {
 	localIPs := make(map[types.NamespacedName]sets.String)
-	for svcPort := range endpointsMap {
-		for _, ep := range endpointsMap[svcPort] {
+	for svcPortName := range endpointsMap {
+		for _, ep := range endpointsMap[svcPortName] {
 			if ep.isLocal {
-				nsn := svcPort.NamespacedName
-				if localIPs[nsn] == nil {
-					localIPs[nsn] = sets.NewString()
+				// If the endpoint has a bad format, utilproxy.IPPart() will log an
+				// error and ep.IPPart() will return a null string.
+				if ip := ep.IPPart(); ip != "" {
+					nsn := svcPortName.NamespacedName
+					if localIPs[nsn] == nil {
+						localIPs[nsn] = sets.NewString()
+					}
+					localIPs[nsn].Insert(ip)
 				}
-				localIPs[nsn].Insert(ep.IPPart()) // just the IP part
 			}
 		}
 	}
