@@ -18,7 +18,7 @@ package admission
 
 import "time"
 
-// chainAdmissionHandler is an instance of admission.Interface that performs admission control using
+// chainAdmissionHandler is an instance of admission.NamedHandler that performs admission control using
 // a chain of admission handlers
 type chainAdmissionHandler []NamedHandler
 
@@ -35,15 +35,15 @@ func NewNamedHandler(name string, i Interface) NamedHandler {
 }
 
 const (
-	stepValidating = "validating"
-	stepMutating   = "mutating"
+	stepValidate = "validate"
+	stepAdmit    = "admit"
 )
 
 // Admit performs an admission control check using a chain of handlers, and returns immediately on first error
 func (admissionHandler chainAdmissionHandler) Admit(a Attributes) error {
 	start := time.Now()
 	err := admissionHandler.admit(a)
-	Metrics.ObserveAdmissionStep(time.Since(start), err != nil, a, stepMutating)
+	Metrics.ObserveAdmissionStep(time.Since(start), err != nil, a, stepAdmit)
 	return err
 }
 
@@ -55,7 +55,7 @@ func (admissionHandler chainAdmissionHandler) admit(a Attributes) error {
 		if mutator, ok := handler.Interface().(MutationInterface); ok {
 			t := time.Now()
 			err := mutator.Admit(a)
-			Metrics.ObserveAdmissionController(time.Since(t), err != nil, handler, a, stepMutating)
+			Metrics.ObserveAdmissionController(time.Since(t), err != nil, handler, a, stepAdmit)
 			if err != nil {
 				return err
 			}
@@ -68,7 +68,7 @@ func (admissionHandler chainAdmissionHandler) admit(a Attributes) error {
 func (admissionHandler chainAdmissionHandler) Validate(a Attributes) error {
 	start := time.Now()
 	err := admissionHandler.validate(a)
-	Metrics.ObserveAdmissionStep(time.Since(start), err != nil, a, stepValidating)
+	Metrics.ObserveAdmissionStep(time.Since(start), err != nil, a, stepValidate)
 	return err
 }
 
@@ -80,7 +80,7 @@ func (admissionHandler chainAdmissionHandler) validate(a Attributes) (err error)
 		if validator, ok := handler.Interface().(ValidationInterface); ok {
 			t := time.Now()
 			err := validator.Validate(a)
-			Metrics.ObserveAdmissionController(time.Since(t), err != nil, handler, a, stepValidating)
+			Metrics.ObserveAdmissionController(time.Since(t), err != nil, handler, a, stepValidate)
 			if err != nil {
 				return err
 			}

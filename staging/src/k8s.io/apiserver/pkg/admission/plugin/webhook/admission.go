@@ -309,7 +309,7 @@ func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
 
 			t := time.Now()
 			err := a.callHook(ctx, hook, versionedAttr)
-			admission.Metrics.ObserveExternalWebhook(time.Since(t), err != nil, hook, attr)
+			admission.Metrics.ObserveWebhook(time.Since(t), err != nil, hook, attr)
 			if err == nil {
 				return
 			}

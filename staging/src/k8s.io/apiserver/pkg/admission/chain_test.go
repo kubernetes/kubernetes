@@ -103,12 +103,12 @@ func TestAdmitAndValidate(t *testing.T) {
 				t.Errorf("validate handler %s called during admit", h.Name())
 			}
 
-			//  reset value for validation test
+			// reset value for validation test
 			fake.admitCalled = false
 		}
 
 		labelFilter := map[string]string{
-			"type": "mutating",
+			"type": "admit",
 		}
 
 		checkAdmitAndValidateMetrics(t, labelFilter, test.accept, test.calls)
@@ -134,7 +134,7 @@ func TestAdmitAndValidate(t *testing.T) {
 		}
 
 		labelFilter = map[string]string{
-			"type": "validating",
+			"type": "validate",
 		}
 
 		checkAdmitAndValidateMetrics(t, labelFilter, test.accept, test.calls)
@@ -154,22 +154,22 @@ func checkAdmitAndValidateMetrics(t *testing.T, labelFilter map[string]string, a
 
 	if accept {
 		// Ensure exactly one admission end-to-end admission accept should have been recorded.
-		expectHistogramCountTotal(t, "apiserver_admission_step_latencies", acceptFilter, 1)
+		expectHistogramCountTotal(t, "apiserver_admission_step_admission_latencies_seconds", acceptFilter, 1)
 
 		// Ensure the expected count of admission controllers have been executed.
-		expectHistogramCountTotal(t, "apiserver_admission_controller_latencies", acceptFilter, len(calls))
+		expectHistogramCountTotal(t, "apiserver_admission_controller_admission_latencies_seconds", acceptFilter, len(calls))
 	} else {
 		// When not accepted, ensure exactly one end-to-end rejection has been recorded.
-		expectHistogramCountTotal(t, "apiserver_admission_step_latencies", rejectFilter, 1)
+		expectHistogramCountTotal(t, "apiserver_admission_step_admission_latencies_seconds", rejectFilter, 1)
 		if len(calls) > 0 {
 			if len(calls) > 1 {
 				// When not accepted, ensure that all but the last controller had been accepted, since
 				// the chain stops execution at the first rejection.
-				expectHistogramCountTotal(t, "apiserver_admission_controller_latencies", acceptFilter, len(calls)-1)
+				expectHistogramCountTotal(t, "apiserver_admission_controller_admission_latencies_seconds", acceptFilter, len(calls)-1)
 			}
 
 			// When not accepted, ensure exactly one controller has been rejected.
-			expectHistogramCountTotal(t, "apiserver_admission_controller_latencies", rejectFilter, 1)
+			expectHistogramCountTotal(t, "apiserver_admission_controller_admission_latencies_seconds", rejectFilter, 1)
 		}
 	}
 }

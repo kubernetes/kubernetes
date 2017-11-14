@@ -33,24 +33,24 @@ var (
 
 func TestObserveAdmissionStep(t *testing.T) {
 	Metrics.reset()
-	Metrics.ObserveAdmissionStep(2*time.Second, false, attr, "mutating")
+	Metrics.ObserveAdmissionStep(2*time.Second, false, attr, "admit")
 	wantLabels := map[string]string{
 		"operation":   string(Create),
 		"group":       resource.Group,
 		"version":     resource.Version,
 		"resource":    resource.Resource,
 		"subresource": "subresource",
-		"type":        "mutating",
+		"type":        "admit",
 		"rejected":    "false",
 	}
-	expectHistogramCountTotal(t, "apiserver_admission_step_latencies", wantLabels, 1)
-	expectFindMetric(t, "apiserver_admission_step_latencies_summary", wantLabels)
+	expectHistogramCountTotal(t, "apiserver_admission_step_admission_latencies_seconds", wantLabels, 1)
+	expectFindMetric(t, "apiserver_admission_step_admission_latencies_seconds_summary", wantLabels)
 }
 
 func TestObserveAdmissionController(t *testing.T) {
 	Metrics.reset()
 	handler := makeValidatingNamedHandler("a", true, Create)
-	Metrics.ObserveAdmissionController(2*time.Second, false, handler, attr, "validating")
+	Metrics.ObserveAdmissionController(2*time.Second, false, handler, attr, "validate")
 	wantLabels := map[string]string{
 		"name":        "a",
 		"operation":   string(Create),
@@ -58,17 +58,17 @@ func TestObserveAdmissionController(t *testing.T) {
 		"version":     resource.Version,
 		"resource":    resource.Resource,
 		"subresource": "subresource",
-		"type":        "validating",
+		"type":        "validate",
 		"rejected":    "false",
 	}
-	expectHistogramCountTotal(t, "apiserver_admission_controller_latencies", wantLabels, 1)
-	expectFindMetric(t, "apiserver_admission_controller_latencies_summary", wantLabels)
+	expectHistogramCountTotal(t, "apiserver_admission_controller_admission_latencies_seconds", wantLabels, 1)
+	expectFindMetric(t, "apiserver_admission_controller_admission_latencies_seconds_summary", wantLabels)
 }
 
-func TestObserveExternalWebhook(t *testing.T) {
+func TestObserveWebhook(t *testing.T) {
 	Metrics.reset()
 	hook := &v1alpha1.Webhook{Name: "x"}
-	Metrics.ObserveExternalWebhook(2*time.Second, false, hook, attr)
+	Metrics.ObserveWebhook(2*time.Second, false, hook, attr)
 	wantLabels := map[string]string{
 		"name":        "x",
 		"operation":   string(Create),
@@ -76,9 +76,9 @@ func TestObserveExternalWebhook(t *testing.T) {
 		"version":     resource.Version,
 		"resource":    resource.Resource,
 		"subresource": "subresource",
-		"type":        "validating",
+		"type":        "admit",
 		"rejected":    "false",
 	}
-	expectHistogramCountTotal(t, "apiserver_admission_external_webhook_latencies", wantLabels, 1)
-	expectFindMetric(t, "apiserver_admission_external_webhook_latencies_summary", wantLabels)
+	expectHistogramCountTotal(t, "apiserver_admission_webhook_admission_latencies_seconds", wantLabels, 1)
+	expectFindMetric(t, "apiserver_admission_webhook_admission_latencies_seconds_summary", wantLabels)
 }

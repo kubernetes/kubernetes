@@ -47,9 +47,9 @@ type NamedHandler interface {
 
 // AdmissionMetrics instruments admission with prometheus metrics.
 type AdmissionMetrics struct {
-	step            *metricSet
-	controller      *metricSet
-	externalWebhook *metricSet
+	step       *metricSet
+	controller *metricSet
+	webhook    *metricSet
 }
 
 // newAdmissionMetrics create a new AdmissionMetrics, configured with default metric names.
@@ -58,28 +58,28 @@ func newAdmissionMetrics() *AdmissionMetrics {
 	// Each step is identified by a distinct type label value.
 	step := newMetricSet("step",
 		[]string{"type", "operation", "group", "version", "resource", "subresource", "rejected"},
-		"Admission sub-step %s, broken out for each operation and API resource and step type (validating or mutating).")
+		"Admission sub-step %s, broken out for each operation and API resource and step type (validate or admit).")
 
 	// Built-in admission controller metrics. Each admission controller is identified by name.
 	controller := newMetricSet("controller",
 		[]string{"name", "type", "operation", "group", "version", "resource", "subresource", "rejected"},
-		"Admission controller %s, identified by name and broken out for each operation and API resource and type (validating or mutating).")
+		"Admission controller %s, identified by name and broken out for each operation and API resource and type (validate or admit).")
 
-	// External admission webhook metrics. Each webhook is identified by name.
-	externalWebhook := newMetricSet("external_webhook",
+	// Admission webhook metrics. Each webhook is identified by name.
+	webhook := newMetricSet("webhook",
 		[]string{"name", "type", "operation", "group", "version", "resource", "subresource", "rejected"},
-		"External admission webhook %s, identified by name and broken out for each operation and API resource and type (validating or mutating).")
+		"Admission webhook %s, identified by name and broken out for each operation and API resource and type (validate or admit).")
 
 	step.mustRegister()
 	controller.mustRegister()
-	externalWebhook.mustRegister()
-	return &AdmissionMetrics{step: step, controller: controller, externalWebhook: externalWebhook}
+	webhook.mustRegister()
+	return &AdmissionMetrics{step: step, controller: controller, webhook: webhook}
 }
 
 func (m *AdmissionMetrics) reset() {
 	m.step.reset()
 	m.controller.reset()
-	m.externalWebhook.reset()
+	m.webhook.reset()
 }
 
 // ObserveAdmissionStep records admission related metrics for a admission step, identified by step type.
@@ -94,11 +94,11 @@ func (m *AdmissionMetrics) ObserveAdmissionController(elapsed time.Duration, rej
 	m.controller.observe(elapsed, handler.Name(), stepType, string(attr.GetOperation()), gvr.Group, gvr.Version, gvr.Resource, attr.GetSubresource(), strconv.FormatBool(rejected))
 }
 
-// ObserveExternalWebhook records admission related metrics for a external admission webhook.
-func (m *AdmissionMetrics) ObserveExternalWebhook(elapsed time.Duration, rejected bool, hook *v1alpha1.Webhook, attr Attributes) {
-	t := "validating" // TODO: pass in type (validating|mutating) once mutating webhook functionality has been implemented
+// ObserveWebhook records admission related metrics for a admission webhook.
+func (m *AdmissionMetrics) ObserveWebhook(elapsed time.Duration, rejected bool, hook *v1alpha1.Webhook, attr Attributes) {
+	t := "admit" // TODO: pass in type (validate|admit) once mutating webhook functionality has been implemented
 	gvr := attr.GetResource()
-	m.externalWebhook.observe(elapsed, hook.Name, t, string(attr.GetOperation()), gvr.Group, gvr.Version, gvr.Resource, attr.GetSubresource(), strconv.FormatBool(rejected))
+	m.webhook.observe(elapsed, hook.Name, t, string(attr.GetOperation()), gvr.Group, gvr.Version, gvr.Resource, attr.GetSubresource(), strconv.FormatBool(rejected))
 }
 
 type metricSet struct {
@@ -112,7 +112,7 @@ func newMetricSet(name string, labels []string, helpTemplate string) *metricSet 
 			prometheus.HistogramOpts{
 				Namespace: namespace,
 				Subsystem: subsystem,
-				Name:      fmt.Sprintf("%s_latencies", name),
+				Name:      fmt.Sprintf("%s_admission_latencies_seconds", name),
 				Help:      fmt.Sprintf(helpTemplate, "latency histogram"),
 				Buckets:   latencyBuckets,
 			},
@@ -122,7 +122,7 @@ func newMetricSet(name string, labels []string, helpTemplate string) *metricSet 
 			prometheus.SummaryOpts{
 				Namespace: namespace,
 				Subsystem: subsystem,
-				Name:      fmt.Sprintf("%s_latencies_summary", name),
+				Name:      fmt.Sprintf("%s_admission_latencies_seconds_summary", name),
 				Help:      fmt.Sprintf(helpTemplate, "latency summary"),
 				MaxAge:    latencySummaryMaxAge,
 			},
