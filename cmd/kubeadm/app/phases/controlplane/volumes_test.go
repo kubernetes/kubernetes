@@ -306,15 +306,6 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 			},
 		},
 	}
-	volMap[kubeadmconstants.KubeControllerManager]["flexvolume-dir"] = v1.Volume{
-		Name: "flexvolume-dir",
-		VolumeSource: v1.VolumeSource{
-			HostPath: &v1.HostPathVolumeSource{
-				Path: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec",
-				Type: &hostPathDirectoryOrCreate,
-			},
-		},
-	}
 	volMap[kubeadmconstants.KubeScheduler] = map[string]v1.Volume{}
 	volMap[kubeadmconstants.KubeScheduler]["kubeconfig"] = v1.Volume{
 		Name: "kubeconfig",
@@ -352,11 +343,6 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		Name:      "kubeconfig",
 		MountPath: "/etc/kubernetes/controller-manager.conf",
 		ReadOnly:  true,
-	}
-	volMountMap[kubeadmconstants.KubeControllerManager]["flexvolume-dir"] = v1.VolumeMount{
-		Name:      "flexvolume-dir",
-		MountPath: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec",
-		ReadOnly:  false,
 	}
 	volMountMap[kubeadmconstants.KubeScheduler] = map[string]v1.VolumeMount{}
 	volMountMap[kubeadmconstants.KubeScheduler]["kubeconfig"] = v1.VolumeMount{
@@ -431,15 +417,6 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 			},
 		},
 	}
-	volMap2[kubeadmconstants.KubeControllerManager]["flexvolume-dir"] = v1.Volume{
-		Name: "flexvolume-dir",
-		VolumeSource: v1.VolumeSource{
-			HostPath: &v1.HostPathVolumeSource{
-				Path: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec",
-				Type: &hostPathDirectoryOrCreate,
-			},
-		},
-	}
 	volMap2[kubeadmconstants.KubeScheduler] = map[string]v1.Volume{}
 	volMap2[kubeadmconstants.KubeScheduler]["kubeconfig"] = v1.Volume{
 		Name: "kubeconfig",
@@ -487,11 +464,6 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		Name:      "kubeconfig",
 		MountPath: "/etc/kubernetes/controller-manager.conf",
 		ReadOnly:  true,
-	}
-	volMountMap2[kubeadmconstants.KubeControllerManager]["flexvolume-dir"] = v1.VolumeMount{
-		Name:      "flexvolume-dir",
-		MountPath: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec",
-		ReadOnly:  false,
 	}
 	volMountMap2[kubeadmconstants.KubeScheduler] = map[string]v1.VolumeMount{}
 	volMountMap2[kubeadmconstants.KubeScheduler]["kubeconfig"] = v1.VolumeMount{
