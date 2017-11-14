@@ -446,7 +446,7 @@ func getSchedulingLatency(c clientset.Interface) (*SchedulingLatency, error) {
 	var data string
 	var masterRegistered = false
 	for _, node := range nodes.Items {
-		if system.IsMasterNode(node.Name) {
+		if system.IsMasterNode(node) {
 			masterRegistered = true
 		}
 	}
