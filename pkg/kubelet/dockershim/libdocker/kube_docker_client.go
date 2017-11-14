@@ -408,14 +408,14 @@ func (d *kubeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemov
 func (d *kubeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions) error {
 	ctx, cancel := d.getCancelableContext()
 	defer cancel()
-	resp, err := d.client.ContainerLogs(ctx, id, opts)
 	if ctxErr := contextError(ctx); ctxErr != nil {
 		return ctxErr
 	}
+	resp, err := d.client.ContainerLogs(ctx, id, opts)
+	defer resp.Close()
 	if err != nil {
 		return err
 	}
-	defer resp.Close()
 	return d.redirectResponseToOutputStream(sopts.RawTerminal, sopts.OutputStream, sopts.ErrorStream, resp)
 }
 
