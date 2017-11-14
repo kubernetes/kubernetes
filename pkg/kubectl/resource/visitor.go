@@ -81,10 +81,6 @@ type Info struct {
 	// Optional, Source is the filename or URL to template file (.json or .yaml),
 	// or stdin to use to handle the resource
 	Source string
-	// Optional, this is the provided object in a versioned type before defaulting
-	// and conversions into its corresponding internal type. This is useful for
-	// reflecting on user intent which may be lost after defaulting and conversions.
-	VersionedObject runtime.Object
 	// Optional, this is the most recent value returned by the server if available
 	Object runtime.Object
 	// Optional, this is the most recent resource version the server knows about for
@@ -94,17 +90,6 @@ type Info struct {
 	ResourceVersion string
 	// Optional, should this resource be exported, stripped of cluster-specific and instance specific fields
 	Export bool
-}
-
-// NewInfo returns a new info object
-func NewInfo(client RESTClient, mapping *meta.RESTMapping, namespace, name string, export bool) *Info {
-	return &Info{
-		Client:    client,
-		Mapping:   mapping,
-		Namespace: namespace,
-		Name:      name,
-		Export:    export,
-	}
 }
 
 // Visit implements Visitor
@@ -388,10 +373,7 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 		if err != nil {
 			return fn(info, nil)
 		}
-		if errs := runtime.DecodeList(items, struct {
-			runtime.ObjectTyper
-			runtime.Decoder
-		}{v.Mapper, v.Mapper.Decoder}); len(errs) > 0 {
+		if errs := runtime.DecodeList(items, v.Mapper.Decoder); len(errs) > 0 {
 			return utilerrors.NewAggregate(errs)
 		}
 

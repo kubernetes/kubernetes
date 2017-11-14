@@ -183,11 +183,28 @@ func (f *ring2Factory) PrintResourceInfoForCommand(cmd *cobra.Command, info *res
 // NewBuilder returns a new resource builder for structured api objects.
 func (f *ring2Factory) NewBuilder() *resource.Builder {
 	clientMapperFunc := resource.ClientMapperFunc(f.objectMappingFactory.ClientForMapping)
-
 	mapper, typer := f.objectMappingFactory.Object()
+
+	unstructuredClientMapperFunc := resource.ClientMapperFunc(f.objectMappingFactory.UnstructuredClientForMapping)
+	unstructuredMapper, unstructuredTyper, _ := f.objectMappingFactory.UnstructuredObject()
+
 	categoryExpander := f.objectMappingFactory.CategoryExpander()
 
-	return resource.NewBuilder(mapper, categoryExpander, typer, clientMapperFunc, f.clientAccessFactory.Decoder(true))
+	return resource.NewBuilder(
+		&resource.Mapper{
+			RESTMapper:   mapper,
+			ObjectTyper:  typer,
+			ClientMapper: clientMapperFunc,
+			Decoder:      f.clientAccessFactory.Decoder(true),
+		},
+		&resource.Mapper{
+			RESTMapper:   unstructuredMapper,
+			ObjectTyper:  unstructuredTyper,
+			ClientMapper: unstructuredClientMapperFunc,
+			Decoder:      unstructured.UnstructuredJSONScheme,
+		},
+		categoryExpander,
+	)
 }
 
 // PluginLoader loads plugins from a path set by the KUBECTL_PLUGINS_PATH env var.

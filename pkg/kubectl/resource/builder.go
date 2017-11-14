@@ -26,9 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -46,6 +44,7 @@ const defaultHttpGetAttempts int = 3
 // over using the Visitor interface.
 type Builder struct {
 	mapper           *Mapper
+	unstructured     *Mapper
 	categoryExpander categories.CategoryExpander
 
 	errs []error
@@ -118,9 +117,10 @@ type resourceTuple struct {
 }
 
 // NewBuilder creates a builder that operates on generic objects.
-func NewBuilder(mapper meta.RESTMapper, categoryExpander categories.CategoryExpander, typer runtime.ObjectTyper, clientMapper ClientMapper, decoder runtime.Decoder) *Builder {
+func NewBuilder(mapper, unstructured *Mapper, categoryExpander categories.CategoryExpander) *Builder {
 	return &Builder{
-		mapper:           &Mapper{typer, mapper, clientMapper, decoder},
+		mapper:           mapper,
+		unstructured:     unstructured,
 		categoryExpander: categoryExpander,
 		requireObject:    true,
 	}
@@ -166,21 +166,29 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 	return b
 }
 
-// Local wraps the builder's clientMapper in a DisabledClientMapperForMapping
-func (b *Builder) Local(mapperFunc ClientMapperFunc) *Builder {
-	b.mapper.ClientMapper = DisabledClientForMapping{ClientMapper: ClientMapperFunc(mapperFunc)}
+// Unstructured updates the builder so that it will request and send unstructured
+// objects by default. Calling this method resets Local().
+func (b *Builder) Unstructured() *Builder {
+	if b.unstructured == nil {
+		b.errs = append(b.errs, fmt.Errorf("no unstructured builder provided"))
+		return b
+	}
+	b.mapper = b.unstructured
 	return b
 }
 
-// Unstructured updates the builder's ClientMapper, RESTMapper,
-// ObjectTyper, and codec for working with unstructured api objects
-func (b *Builder) Unstructured(mapperFunc ClientMapperFunc, mapper meta.RESTMapper, typer runtime.ObjectTyper) *Builder {
-	b.mapper.RESTMapper = mapper
-	b.mapper.ObjectTyper = typer
-	b.mapper.Decoder = unstructured.UnstructuredJSONScheme
-	b.mapper.ClientMapper = ClientMapperFunc(mapperFunc)
-
+// Local will avoid asking the server for results.
+func (b *Builder) Local() *Builder {
+	mapper := *b.mapper
+	mapper.ClientMapper = DisabledClientForMapping{ClientMapper: mapper.ClientMapper}
+	b.mapper = &mapper
 	return b
+}
+
+// Mapper returns a copy of the current mapper.
+func (b *Builder) Mapper() *Mapper {
+	mapper := *b.mapper
+	return &mapper
 }
 
 // URL accepts a number of URLs directly.
@@ -755,7 +763,13 @@ func (b *Builder) visitByResource() *Result {
 			}
 		}
 
-		info := NewInfo(client, mapping, selectorNamespace, tuple.Name, b.export)
+		info := &Info{
+			Client:    client,
+			Mapping:   mapping,
+			Namespace: selectorNamespace,
+			Name:      tuple.Name,
+			Export:    b.export,
+		}
 		items = append(items, info)
 	}
 
@@ -814,7 +828,13 @@ func (b *Builder) visitByName() *Result {
 
 	visitors := []Visitor{}
 	for _, name := range b.names {
-		info := NewInfo(client, mapping, selectorNamespace, name, b.export)
+		info := &Info{
+			Client:    client,
+			Mapping:   mapping,
+			Namespace: selectorNamespace,
+			Name:      name,
+			Export:    b.export,
+		}
 		visitors = append(visitors, info)
 	}
 	result.visitor = VisitorList(visitors)
@@ -875,6 +895,7 @@ func (b *Builder) visitByPaths() *Result {
 // for further iteration.
 func (b *Builder) Do() *Result {
 	r := b.visitorResult()
+	r.mapper = b.Mapper()
 	if r.err != nil {
 		return r
 	}

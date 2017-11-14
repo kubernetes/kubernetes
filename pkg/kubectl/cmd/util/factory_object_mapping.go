@@ -108,7 +108,9 @@ func (f *ring1Factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectType
 		return nil, nil, err
 	}
 
-	mapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.InterfacesForUnstructured)
+	// allow conversion between typed and unstructured objects
+	interfaces := meta.InterfacesForUnstructuredConversion(legacyscheme.Registry.InterfacesFor)
+	mapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.VersionInterfacesFunc(interfaces))
 	typer := discovery.NewUnstructuredObjectTyper(groupResources)
 	expander, err := NewShortcutExpander(mapper, discoveryClient)
 	return expander, typer, err
