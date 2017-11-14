@@ -4354,5 +4354,5 @@ const (
 	// corresponding to every RequiredDuringScheduling affinity rule.
 	// When the --hard-pod-affinity-weight scheduler flag is not specified,
 	// DefaultHardPodAffinityWeight defines the weight of the implicit PreferredDuringScheduling affinity rule.
-	DefaultHardPodAffinitySymmetricWeight int = 1
+	DefaultHardPodAffinitySymmetricWeight int32 = 1
 )

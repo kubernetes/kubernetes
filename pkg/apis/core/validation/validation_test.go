@@ -260,6 +260,21 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 			}),
 		},
+		"bad-volume-zero-capacity": {
+			isExpectedFailure: true,
+			volume: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("0"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+			}),
+		},
 		"missing-accessmodes": {
 			isExpectedFailure: true,
 			volume: testVolume("goodname", "missing-accessmodes", core.PersistentVolumeSpec{
@@ -727,6 +742,29 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 				Resources: core.ResourceRequirements{
 					Requests: core.ResourceList{
 						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+					},
+				},
+				StorageClassName: &validClassName,
+			}),
+		},
+		"invalid-claim-zero-capacity": {
+			isExpectedFailure: true,
+			claim: testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
+				Selector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "key2",
+							Operator: "Exists",
+						},
+					},
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{
+					core.ReadWriteOnce,
+					core.ReadOnlyMany,
+				},
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceName(core.ResourceStorage): resource.MustParse("0G"),
 					},
 				},
 				StorageClassName: &validClassName,
@@ -7204,42 +7242,6 @@ func TestValidateService(t *testing.T) {
 				s.Spec.Type = core.ServiceTypeClusterIP
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "r", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt(80)})
-			},
-			numErrs: 0,
-		},
-		{
-			name: "invalid duplicate targetports (number with same protocol)",
-			tweakSvc: func(s *core.Service) {
-				s.Spec.Type = core.ServiceTypeClusterIP
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "r", Port: 2, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
-			},
-			numErrs: 1,
-		},
-		{
-			name: "invalid duplicate targetports (name with same protocol)",
-			tweakSvc: func(s *core.Service) {
-				s.Spec.Type = core.ServiceTypeClusterIP
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", TargetPort: intstr.FromString("http")})
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "r", Port: 2, Protocol: "TCP", TargetPort: intstr.FromString("http")})
-			},
-			numErrs: 1,
-		},
-		{
-			name: "valid duplicate targetports (number with different protocols)",
-			tweakSvc: func(s *core.Service) {
-				s.Spec.Type = core.ServiceTypeClusterIP
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "r", Port: 2, Protocol: "UDP", TargetPort: intstr.FromInt(8080)})
-			},
-			numErrs: 0,
-		},
-		{
-			name: "valid duplicate targetports (name with different protocols)",
-			tweakSvc: func(s *core.Service) {
-				s.Spec.Type = core.ServiceTypeClusterIP
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", TargetPort: intstr.FromString("http")})
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "r", Port: 2, Protocol: "UDP", TargetPort: intstr.FromString("http")})
 			},
 			numErrs: 0,
 		},

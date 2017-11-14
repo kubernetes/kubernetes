@@ -69,6 +69,13 @@ func (o RoleRuleOwner) SetRules(in []rbac.PolicyRule) {
 	o.Role.Rules = in
 }
 
+func (o RoleRuleOwner) GetAggregationRule() *rbac.AggregationRule {
+	return nil
+}
+
+func (o RoleRuleOwner) SetAggregationRule(in *rbac.AggregationRule) {
+}
+
 type RoleModifier struct {
 	Client          internalversion.RolesGetter
 	NamespaceClient core.NamespaceInterface

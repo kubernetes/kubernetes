@@ -62,7 +62,7 @@ const isNegativeErrorMsg string = apimachineryvalidation.IsNegativeErrorMsg
 const isInvalidQuotaResource string = `must be a standard resource for quota`
 const fieldImmutableErrorMsg string = genericvalidation.FieldImmutableErrorMsg
 const isNotIntegerErrorMsg string = `must be an integer`
-const isZeroErrorMsg string = `must be greater than zero`
+const isNotPositiveErrorMsg string = `must be greater than zero`
 
 var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
 var volumeModeErrorMsg string = "must be a number between 0 and 0777 (octal), both inclusive"
@@ -311,6 +311,15 @@ func ValidateNonnegativeQuantity(value resource.Quantity, fldPath *field.Path) f
 	allErrs := field.ErrorList{}
 	if value.Cmp(resource.Quantity{}) < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, value.String(), isNegativeErrorMsg))
+	}
+	return allErrs
+}
+
+// Validates that a Quantity is positive
+func ValidatePositiveQuantityValue(value resource.Quantity, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if value.Cmp(resource.Quantity{}) <= 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, value.String(), isNotPositiveErrorMsg))
 	}
 	return allErrs
 }
@@ -1342,6 +1351,7 @@ func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
 	capPath := specPath.Child("capacity")
 	for r, qty := range pv.Spec.Capacity {
 		allErrs = append(allErrs, validateBasicResource(qty, capPath.Key(string(r)))...)
+		allErrs = append(allErrs, ValidatePositiveQuantityValue(qty, capPath.Key(string(r)))...)
 	}
 	if len(string(pv.Spec.PersistentVolumeReclaimPolicy)) > 0 {
 		if !supportedReclaimPolicy.Has(string(pv.Spec.PersistentVolumeReclaimPolicy)) {
@@ -1602,9 +1612,7 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 		allErrs = append(allErrs, field.Required(fldPath.Child("resources").Key(string(core.ResourceStorage)), ""))
 	} else {
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(core.ResourceStorage), storageValue, fldPath.Child("resources").Key(string(core.ResourceStorage)))...)
-		if storageValue.Value() == int64(0) {
-			allErrs = append(allErrs, field.Invalid(fldPath, storageValue, isZeroErrorMsg))
-		}
+		allErrs = append(allErrs, ValidatePositiveQuantityValue(storageValue, fldPath.Child("resources").Key(string(core.ResourceStorage)))...)
 	}
 
 	if spec.StorageClassName != nil && len(*spec.StorageClassName) > 0 {
@@ -3186,22 +3194,6 @@ func ValidateService(service *core.Service) field.ErrorList {
 			allErrs = append(allErrs, field.Duplicate(portPath, key))
 		}
 		ports[key] = true
-	}
-
-	// Check for duplicate TargetPort
-	portsPath = specPath.Child("ports")
-	targetPorts := make(map[core.ServicePort]bool)
-	for i, port := range service.Spec.Ports {
-		if (port.TargetPort.Type == intstr.Int && port.TargetPort.IntVal == 0) || (port.TargetPort.Type == intstr.String && port.TargetPort.StrVal == "") {
-			continue
-		}
-		portPath := portsPath.Index(i)
-		key := core.ServicePort{Protocol: port.Protocol, TargetPort: port.TargetPort}
-		_, found := targetPorts[key]
-		if found {
-			allErrs = append(allErrs, field.Duplicate(portPath.Child("targetPort"), port.TargetPort))
-		}
-		targetPorts[key] = true
 	}
 
 	// Validate SourceRange field and annotation

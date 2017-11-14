@@ -25,7 +25,7 @@ go_library(
         "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
-        "//pkg/kubelet/dockershim/libdocker:go_default_library",
+        "//pkg/kubelet/dockershim:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/proxy:go_default_library",
         "//pkg/proxy/config:go_default_library",

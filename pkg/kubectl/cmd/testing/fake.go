@@ -354,6 +354,20 @@ func (f *FakeFactory) PrinterForCommand(cmd *cobra.Command, isLocal bool, output
 	return f.tf.Printer, f.tf.Err
 }
 
+func (f *FakeFactory) PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, out io.Writer) error {
+	printer, err := f.PrinterForCommand(cmd, false, nil, printers.PrintOptions{})
+	if err != nil {
+		return err
+	}
+	if !printer.IsGeneric() {
+		printer, err = f.PrinterForMapping(cmd, false, nil, nil, false)
+		if err != nil {
+			return err
+		}
+	}
+	return printer.PrintObj(info.Object, out)
+}
+
 func (f *FakeFactory) Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
 }
@@ -681,6 +695,20 @@ func (f *fakeAPIFactory) UnstructuredClientForMapping(m *meta.RESTMapping) (reso
 
 func (f *fakeAPIFactory) PrinterForCommand(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, options printers.PrintOptions) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
+}
+
+func (f *fakeAPIFactory) PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, out io.Writer) error {
+	printer, err := f.PrinterForCommand(cmd, false, nil, printers.PrintOptions{})
+	if err != nil {
+		return err
+	}
+	if !printer.IsGeneric() {
+		printer, err = f.PrinterForMapping(cmd, false, nil, nil, false)
+		if err != nil {
+			return err
+		}
+	}
+	return printer.PrintObj(info.Object, out)
 }
 
 func (f *fakeAPIFactory) Describer(*meta.RESTMapping) (printers.Describer, error) {

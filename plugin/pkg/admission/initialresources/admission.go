@@ -64,6 +64,8 @@ type InitialResources struct {
 	nsOnly     bool
 }
 
+var _ admission.MutationInterface = &InitialResources{}
+
 func newInitialResources(source dataSource, percentile int64, nsOnly bool) *InitialResources {
 	return &InitialResources{
 		Handler:    admission.NewHandler(admission.Create),

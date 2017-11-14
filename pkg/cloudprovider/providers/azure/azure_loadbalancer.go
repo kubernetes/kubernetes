@@ -39,6 +39,9 @@ const ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/azure-
 // to specify what subnet it is exposed on
 const ServiceAnnotationLoadBalancerInternalSubnet = "service.beta.kubernetes.io/azure-load-balancer-internal-subnet"
 
+// ServiceAnnotationDNSLabelName annotation speficying the DNS label name for the service.
+const ServiceAnnotationDNSLabelName = "service.beta.kubernetes.io/azure-dns-label-name"
+
 // GetLoadBalancer returns whether the specified load balancer exists, and
 // if so, what its status is.
 func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
@@ -118,6 +121,13 @@ func (az *Cloud) determinePublicIPName(clusterName string, service *v1.Service) 
 	return "", fmt.Errorf("user supplied IP Address %s was not found", loadBalancerIP)
 }
 
+func getPublicIPLabel(service *v1.Service) string {
+	if labelName, found := service.Annotations[ServiceAnnotationDNSLabelName]; found {
+		return labelName
+	}
+	return ""
+}
+
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
 func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	isInternal := requiresInternalLoadBalancer(service)
@@ -185,7 +195,8 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 		if err != nil {
 			return nil, err
 		}
-		pip, err := az.ensurePublicIPExists(serviceName, pipName)
+		domainNameLabel := getPublicIPLabel(service)
+		pip, err := az.ensurePublicIPExists(serviceName, pipName, domainNameLabel)
 		if err != nil {
 			return nil, err
 		}
@@ -463,7 +474,7 @@ func (az *Cloud) cleanupLoadBalancer(clusterName string, service *v1.Service, is
 	return nil
 }
 
-func (az *Cloud) ensurePublicIPExists(serviceName, pipName string) (*network.PublicIPAddress, error) {
+func (az *Cloud) ensurePublicIPExists(serviceName, pipName, domainNameLabel string) (*network.PublicIPAddress, error) {
 	pip, existsPip, err := az.getPublicIPAddress(pipName)
 	if err != nil {
 		return nil, err
@@ -476,6 +487,11 @@ func (az *Cloud) ensurePublicIPExists(serviceName, pipName string) (*network.Pub
 	pip.Location = to.StringPtr(az.Location)
 	pip.PublicIPAddressPropertiesFormat = &network.PublicIPAddressPropertiesFormat{
 		PublicIPAllocationMethod: network.Static,
+	}
+	if len(domainNameLabel) > 0 {
+		pip.PublicIPAddressPropertiesFormat.DNSSettings = &network.PublicIPAddressDNSSettings{
+			DomainNameLabel: &domainNameLabel,
+		}
 	}
 	pip.Tags = &map[string]*string{"service": &serviceName}
 

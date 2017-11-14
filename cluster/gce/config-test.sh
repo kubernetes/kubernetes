@@ -114,10 +114,6 @@ RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 # Optional: set feature gates
 FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
 
-if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
-    FEATURE_GATES="${FEATURE_GATES},Accelerators=true"
-fi
-
 TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 
 # Extra docker options for nodes.
@@ -235,6 +231,13 @@ ELASTICSEARCH_LOGGING_REPLICAS=1
 # Optional: Don't require https for registries in our local RFC1918 network
 if [[ ${KUBE_ENABLE_INSECURE_REGISTRY:-false} == "true" ]]; then
   EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS} --insecure-registry 10.0.0.0/8"
+fi
+
+if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
+    FEATURE_GATES="${FEATURE_GATES},DevicePlugins=true"
+    if [[ "${NODE_ACCELERATORS}" =~ .*type=([a-zA-Z0-9-]+).* ]]; then
+        NODE_LABELS="${NODE_LABELS},cloud.google.com/gke-accelerator=${BASH_REMATCH[1]}"
+    fi
 fi
 
 # Optional: Install cluster DNS.

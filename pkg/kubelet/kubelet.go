@@ -68,7 +68,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	dockerremote "k8s.io/kubernetes/pkg/kubelet/dockershim/remote"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
@@ -250,7 +249,7 @@ type Dependencies struct {
 	CAdvisorInterface       cadvisor.Interface
 	Cloud                   cloudprovider.Interface
 	ContainerManager        cm.ContainerManager
-	DockerClient            libdocker.Interface
+	DockerClientConfig      *dockershim.ClientConfig
 	EventClient             v1core.EventsGetter
 	HeartbeatClient         v1core.CoreV1Interface
 	KubeClient              clientset.Interface
@@ -608,7 +607,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		case kubetypes.DockerContainerRuntime:
 			// Create and start the CRI shim running as a grpc server.
 			streamingConfig := getStreamingConfig(kubeCfg, kubeDeps)
-			ds, err := dockershim.NewDockerService(kubeDeps.DockerClient, crOptions.PodSandboxImage, streamingConfig,
+			ds, err := dockershim.NewDockerService(kubeDeps.DockerClientConfig, crOptions.PodSandboxImage, streamingConfig,
 				&pluginSettings, runtimeCgroups, kubeCfg.CgroupDriver, crOptions.DockershimRootDirectory,
 				crOptions.DockerDisableSharedPID)
 			if err != nil {
@@ -632,12 +631,12 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			}
 
 			// Create dockerLegacyService when the logging driver is not supported.
-			supported, err := dockershim.IsCRISupportedLogDriver(kubeDeps.DockerClient)
+			supported, err := ds.IsCRISupportedLogDriver()
 			if err != nil {
 				return nil, err
 			}
 			if !supported {
-				klet.dockerLegacyService = dockershim.NewDockerLegacyService(kubeDeps.DockerClient)
+				klet.dockerLegacyService = ds.NewDockerLegacyService()
 				legacyLogProvider = dockershim.NewLegacyLogProvider(klet.dockerLegacyService)
 			}
 		case kubetypes.RemoteContainerRuntime:
@@ -886,7 +885,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewNoNewPrivsAdmitHandler(klet.containerRuntime))
 	if utilfeature.DefaultFeatureGate.Enabled(features.Accelerators) {
 		if containerRuntime == kubetypes.DockerContainerRuntime {
-			if klet.gpuManager, err = nvidia.NewNvidiaGPUManager(klet, kubeDeps.DockerClient); err != nil {
+			if klet.gpuManager, err = nvidia.NewNvidiaGPUManager(klet, kubeDeps.DockerClientConfig); err != nil {
 				return nil, err
 			}
 		} else {

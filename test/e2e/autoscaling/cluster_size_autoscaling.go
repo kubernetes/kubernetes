@@ -910,7 +910,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			func(size int) bool { return size == nodeCount }, scaleDownTimeout))
 	})
 
-	It("shouldn't scale down when non expendable pod is running [Feature:ClusterSizeAutoscalingScalePriority]", func() {
+	It("shouldn't scale down when non expendable pod is running [Feature:ClusterSizeAutoscalingScaleDown]", func() {
 		defer createPriorityClasses(f)()
 		increasedSize := manuallyIncreaseClusterSize(f, originalSizes)
 		// Create increasedSize pods allocating 0.7 allocatable on present nodes - one pod per node.
@@ -977,10 +977,18 @@ func getGKEURL(apiVersion string, suffix string) string {
 }
 
 func getGKEClusterURL(apiVersion string) string {
-	return getGKEURL(apiVersion, fmt.Sprintf("projects/%s/zones/%s/clusters/%s",
-		framework.TestContext.CloudConfig.ProjectID,
-		framework.TestContext.CloudConfig.Zone,
-		framework.TestContext.CloudConfig.Cluster))
+	if isRegionalCluster() {
+		// TODO(bskiba): Use locations API for all clusters once it's graduated to v1.
+		return getGKEURL(apiVersion, fmt.Sprintf("projects/%s/locations/%s/clusters/%s",
+			framework.TestContext.CloudConfig.ProjectID,
+			framework.TestContext.CloudConfig.Region,
+			framework.TestContext.CloudConfig.Cluster))
+	} else {
+		return getGKEURL(apiVersion, fmt.Sprintf("projects/%s/zones/%s/clusters/%s",
+			framework.TestContext.CloudConfig.ProjectID,
+			framework.TestContext.CloudConfig.Zone,
+			framework.TestContext.CloudConfig.Cluster))
+	}
 }
 
 func getCluster(apiVersion string) (string, error) {
@@ -1001,7 +1009,11 @@ func getCluster(apiVersion string) (string, error) {
 }
 
 func isAutoscalerEnabled(expectedMaxNodeCountInTargetPool int) (bool, error) {
-	strBody, err := getCluster("v1")
+	apiVersion := "v1"
+	if isRegionalCluster() {
+		apiVersion = "v1beta1"
+	}
+	strBody, err := getCluster(apiVersion)
 	if err != nil {
 		return false, err
 	}
@@ -1011,16 +1023,43 @@ func isAutoscalerEnabled(expectedMaxNodeCountInTargetPool int) (bool, error) {
 	return false, nil
 }
 
+func getClusterLocation() string {
+	if isRegionalCluster() {
+		return "--region=" + framework.TestContext.CloudConfig.Region
+	} else {
+		return "--zone=" + framework.TestContext.CloudConfig.Zone
+	}
+}
+
+func getGcloudCommand(commandTrack string, args []string) []string {
+	command := []string{"gcloud"}
+	if commandTrack == "beta" || commandTrack == "alpha" {
+		command = append(command, commandTrack)
+	}
+	command = append(command, args...)
+	command = append(command, getClusterLocation())
+	command = append(command, "--project="+framework.TestContext.CloudConfig.ProjectID)
+	return command
+}
+
+func isRegionalCluster() bool {
+	// TODO(bskiba): Use an appropriate indicator that the cluster is regional.
+	return framework.TestContext.CloudConfig.MultiZone
+}
+
 func enableAutoscaler(nodePool string, minCount, maxCount int) error {
 	glog.Infof("Using gcloud to enable autoscaling for pool %s", nodePool)
 
-	output, err := execCmd("gcloud", "container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
+	args := []string{"container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
 		"--enable-autoscaling",
-		"--min-nodes="+strconv.Itoa(minCount),
-		"--max-nodes="+strconv.Itoa(maxCount),
-		"--node-pool="+nodePool,
-		"--project="+framework.TestContext.CloudConfig.ProjectID,
-		"--zone="+framework.TestContext.CloudConfig.Zone).CombinedOutput()
+		"--min-nodes=" + strconv.Itoa(minCount),
+		"--max-nodes=" + strconv.Itoa(maxCount),
+		"--node-pool=" + nodePool}
+	track := ""
+	if isRegionalCluster() {
+		track = "beta"
+	}
+	output, err := execCmd(getGcloudCommand(track, args)...).CombinedOutput()
 
 	if err != nil {
 		glog.Errorf("Failed config update result: %s", output)
@@ -1041,12 +1080,14 @@ func enableAutoscaler(nodePool string, minCount, maxCount int) error {
 
 func disableAutoscaler(nodePool string, minCount, maxCount int) error {
 	glog.Infof("Using gcloud to disable autoscaling for pool %s", nodePool)
-
-	output, err := execCmd("gcloud", "container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
+	args := []string{"container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
 		"--no-enable-autoscaling",
-		"--node-pool="+nodePool,
-		"--project="+framework.TestContext.CloudConfig.ProjectID,
-		"--zone="+framework.TestContext.CloudConfig.Zone).CombinedOutput()
+		"--node-pool=" + nodePool}
+	track := ""
+	if isRegionalCluster() {
+		track = "beta"
+	}
+	output, err := execCmd(getGcloudCommand(track, args)...).CombinedOutput()
 
 	if err != nil {
 		glog.Errorf("Failed config update result: %s", output)
@@ -1218,22 +1259,20 @@ func waitTillAllNAPNodePoolsAreRemoved() error {
 }
 
 func addNodePool(name string, machineType string, numNodes int) {
-	output, err := execCmd("gcloud", "alpha", "container", "node-pools", "create", name, "--quiet",
-		"--machine-type="+machineType,
-		"--num-nodes="+strconv.Itoa(numNodes),
-		"--project="+framework.TestContext.CloudConfig.ProjectID,
-		"--zone="+framework.TestContext.CloudConfig.Zone,
-		"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
+	args := []string{"container", "node-pools", "create", name, "--quiet",
+		"--machine-type=" + machineType,
+		"--num-nodes=" + strconv.Itoa(numNodes),
+		"--cluster=" + framework.TestContext.CloudConfig.Cluster}
+	output, err := execCmd(getGcloudCommand("alpha", args)...).CombinedOutput()
 	glog.Infof("Creating node-pool %s: %s", name, output)
 	framework.ExpectNoError(err)
 }
 
 func deleteNodePool(name string) {
 	glog.Infof("Deleting node pool %s", name)
-	output, err := execCmd("gcloud", "alpha", "container", "node-pools", "delete", name, "--quiet",
-		"--project="+framework.TestContext.CloudConfig.ProjectID,
-		"--zone="+framework.TestContext.CloudConfig.Zone,
-		"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
+	args := []string{"container", "node-pools", "delete", name, "--quiet",
+		"--cluster=" + framework.TestContext.CloudConfig.Cluster}
+	output, err := execCmd(getGcloudCommand("alpha", args)...).CombinedOutput()
 	if err != nil {
 		glog.Infof("Error: %v", err)
 	}

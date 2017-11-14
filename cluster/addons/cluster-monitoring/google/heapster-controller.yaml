@@ -58,26 +58,12 @@ spec:
             - /heapster
             - --source=kubernetes.summary_api:''
             - --sink=gcm
-          volumeMounts:
-            - name: ssl-certs
-              mountPath: /etc/ssl/certs
-              readOnly: true
-            - name: usr-ca-certs
-              mountPath: /usr/share/ca-certificates
-              readOnly: true
         - image: gcr.io/google_containers/heapster-amd64:v1.5.0-beta.0
           name: eventer
           command:
             - /eventer
             - --source=kubernetes:''
             - --sink=gcl
-          volumeMounts:
-            - name: ssl-certs
-              mountPath: /etc/ssl/certs
-              readOnly: true
-            - name: usr-ca-certs
-              mountPath: /usr/share/ca-certificates
-              readOnly: true
         - image: gcr.io/google_containers/addon-resizer:1.7
           name: heapster-nanny
           resources:
@@ -136,13 +122,6 @@ spec:
             - --container=eventer
             - --poll-period=300000
             - --estimator=exponential
-      volumes:
-        - name: ssl-certs
-          hostPath:
-            path: "/etc/ssl/certs"
-        - name: usr-ca-certs
-          hostPath:
-            path: "/usr/share/ca-certificates"
       serviceAccountName: heapster
       tolerations:
         - key: "CriticalAddonsOnly"

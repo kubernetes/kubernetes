@@ -1702,14 +1702,35 @@ function start-cluster-autoscaler {
   fi
 }
 
-# A helper function for copying addon manifests and set dir/files
-# permissions.
+# A helper function for setting up addon manifests.
 #
 # $1: addon category under /etc/kubernetes
 # $2: manifest source dir
+# $3: (optional) auxilary manifest source dir
 function setup-addon-manifests {
-  local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/$2"
+  local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   local -r dst_dir="/etc/kubernetes/$1/$2"
+
+  copy-manifests "${src_dir}/$2" "${dst_dir}"
+
+  # If the PodSecurityPolicy admission controller is enabled,
+  # set up the corresponding addon policies.
+  if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
+    local -r psp_dir="${src_dir}/${3:-$2}/podsecuritypolicies"
+    if [[ -d "${psp_dir}" ]]; then
+      copy-manifests "${psp_dir}" "${dst_dir}"
+    fi
+  fi
+}
+
+# A helper function for copying manifests and setting dir/files
+# permissions.
+#
+# $1: absolute source dir
+# $2: absolute destination dir
+function copy-manifests {
+  local -r src_dir="$1"
+  local -r dst_dir="$2"
   if [[ ! -d "${dst_dir}" ]]; then
     mkdir -p "${dst_dir}"
   fi
@@ -1780,7 +1801,7 @@ function start-kube-addons {
   fi
 
   if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
-      setup-addon-manifests "addons" "podsecuritypolicies"
+    setup-addon-manifests "addons" "podsecuritypolicies"
   fi
 
   # Set up manifests of other addons.
@@ -1836,6 +1857,9 @@ EOF
   if [[ "${ENABLE_METRICS_SERVER:-}" == "true" ]]; then
     setup-addon-manifests "addons" "metrics-server"
   fi
+  if [[ "${ENABLE_NVIDIA_GPU_DEVICE_PLUGIN:-}" == "true" ]]; then
+    setup-addon-manifests "addons" "device-plugins/nvidia-gpu"
+  fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns"
     local -r kubedns_file="${dst_dir}/dns/kube-dns.yaml"
@@ -1889,7 +1913,7 @@ EOF
   fi
   if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
     # Setup role binding for standalone node problem detector.
-    setup-addon-manifests "addons" "node-problem-detector/standalone"
+    setup-addon-manifests "addons" "node-problem-detector/standalone" "node-problem-detector"
   fi
   if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then
     setup-addon-manifests "admission-controls" "limit-range"

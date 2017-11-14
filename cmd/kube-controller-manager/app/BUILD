@@ -20,6 +20,7 @@ go_library(
         "import_known_versions.go",
         "plugins.go",
         "policy.go",
+        "rbac.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/kube-controller-manager/app",
     deps = [
@@ -52,6 +53,7 @@ go_library(
         "//pkg/controller/certificates/approver:go_default_library",
         "//pkg/controller/certificates/cleaner:go_default_library",
         "//pkg/controller/certificates/signer:go_default_library",
+        "//pkg/controller/clusterroleaggregation:go_default_library",
         "//pkg/controller/cronjob:go_default_library",
         "//pkg/controller/daemon:go_default_library",
         "//pkg/controller/deployment:go_default_library",

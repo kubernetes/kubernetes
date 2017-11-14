@@ -59,6 +59,7 @@ type podPresetPlugin struct {
 	lister settingslisters.PodPresetLister
 }
 
+var _ admission.MutationInterface = &podPresetPlugin{}
 var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&podPresetPlugin{})
 var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&podPresetPlugin{})
 

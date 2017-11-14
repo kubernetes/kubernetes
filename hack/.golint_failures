@@ -96,6 +96,7 @@ pkg/controller/certificates
 pkg/controller/certificates/approver
 pkg/controller/certificates/signer
 pkg/controller/cloud
+pkg/controller/clusterroleaggregation
 pkg/controller/cronjob
 pkg/controller/daemon
 pkg/controller/daemon/util
@@ -174,7 +175,6 @@ pkg/kubelet/container/testing
 pkg/kubelet/custommetrics
 pkg/kubelet/dockershim
 pkg/kubelet/dockershim/cm
-pkg/kubelet/dockershim/errors
 pkg/kubelet/dockershim/libdocker
 pkg/kubelet/dockershim/remote
 pkg/kubelet/dockershim/testing
@@ -551,6 +551,8 @@ staging/src/k8s.io/apiserver/pkg/apis/audit/v1beta1
 staging/src/k8s.io/apiserver/pkg/apis/audit/validation
 staging/src/k8s.io/apiserver/pkg/apis/example
 staging/src/k8s.io/apiserver/pkg/apis/example/v1
+staging/src/k8s.io/apiserver/pkg/apis/example2
+staging/src/k8s.io/apiserver/pkg/apis/example2/v1
 staging/src/k8s.io/apiserver/pkg/audit
 staging/src/k8s.io/apiserver/pkg/audit/policy
 staging/src/k8s.io/apiserver/pkg/authentication/authenticatorfactory

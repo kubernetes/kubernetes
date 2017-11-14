@@ -23,8 +23,10 @@ import (
 )
 
 type LimitRangerActions interface {
-	// Limit is a pluggable function to enforce limits on the object.
-	Limit(limitRange *api.LimitRange, kind string, obj runtime.Object) error
+	// MutateLimit is a pluggable function to set limits on the object.
+	MutateLimit(limitRange *api.LimitRange, kind string, obj runtime.Object) error
+	// ValidateLimits is a pluggable function to enforce limits on the object.
+	ValidateLimit(limitRange *api.LimitRange, kind string, obj runtime.Object) error
 	// SupportsAttributes is a pluggable function to allow overridding what resources the limitranger
 	// supports.
 	SupportsAttributes(attr admission.Attributes) bool

@@ -2729,6 +2729,19 @@ func WaitForControlledPodsRunning(c clientset.Interface, ns, name string, kind s
 	return nil
 }
 
+// Wait up to PodListTimeout for getting pods of the specified controller name and return them.
+func WaitForControlledPods(c clientset.Interface, ns, name string, kind schema.GroupKind) (pods *v1.PodList, err error) {
+	rtObject, err := getRuntimeObjectForKind(c, kind, ns, name)
+	if err != nil {
+		return nil, err
+	}
+	selector, err := getSelectorFromRuntimeObject(rtObject)
+	if err != nil {
+		return nil, err
+	}
+	return WaitForPodsWithLabel(c, ns, selector)
+}
+
 // Returns true if all the specified pods are scheduled, else returns false.
 func podsWithLabelScheduled(c clientset.Interface, ns string, label labels.Selector) (bool, error) {
 	PodStore := testutil.NewPodStore(c, ns, label, fields.Everything())
@@ -4560,11 +4573,17 @@ func CoreDump(dir string) {
 		Logf("Dumping logs locally to: %s", dir)
 		cmd = exec.Command(path.Join(TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir)
 	}
+	cmd.Env = append(os.Environ(), fmt.Sprintf("SYSTEMD_SERVICES=%s", parseSystemdServices(TestContext.SystemdServices)))
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		Logf("Error running cluster/log-dump/log-dump.sh: %v", err)
 	}
+}
+
+// parseSystemdServices converts services separator from comma to space.
+func parseSystemdServices(services string) string {
+	return strings.TrimSpace(strings.Replace(services, ",", " ", -1))
 }
 
 func UpdatePodWithRetries(client clientset.Interface, ns, name string, update func(*v1.Pod)) (*v1.Pod, error) {

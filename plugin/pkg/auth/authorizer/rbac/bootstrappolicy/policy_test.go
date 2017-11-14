@@ -53,11 +53,11 @@ func getSemanticRoles(roles []rbac.ClusterRole) semanticRoles {
 	for i := range roles {
 		role := roles[i]
 		switch role.Name {
-		case "admin":
+		case "system:aggregate-to-admin":
 			ret.admin = &role
-		case "edit":
+		case "system:aggregate-to-edit":
 			ret.edit = &role
-		case "view":
+		case "system:aggregate-to-view":
 			ret.view = &role
 		}
 	}
@@ -319,8 +319,9 @@ func TestClusterRoleLabel(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if got, want := accessor.GetLabels(), map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}; !reflect.DeepEqual(got, want) {
-			t.Errorf("ClusterRole: %s GetLabels() = %s, want %s", accessor.GetName(), got, want)
+
+		if accessor.GetLabels()["kubernetes.io/bootstrapping"] != "rbac-defaults" {
+			t.Errorf("ClusterRole: %s GetLabels() = %s, want %s", accessor.GetName(), accessor.GetLabels(), map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"})
 		}
 	}
 
