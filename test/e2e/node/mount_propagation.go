@@ -35,10 +35,6 @@ func preparePod(name string, node *v1.Node, propagation v1.MountPropagationMode,
 	// The pod prepares /mnt/test/<podname> and sleeps.
 	cmd := fmt.Sprintf("mkdir /mnt/test/%[1]s; sleep 3600", name)
 	pod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -92,6 +88,13 @@ var _ = SIGDescribe("Mount propagation [Feature:MountPropagation]", func() {
 		Expect(len(nodes.Items)).NotTo(BeZero(), "No available nodes for scheduling")
 		node := &nodes.Items[0]
 
+		// Fail the test if the namespace is not set. We expect that the
+		// namespace is unique and we might delete user data if it's not.
+		if len(f.Namespace.Name) == 0 {
+			Expect(f.Namespace.Name).ToNot(Equal(""))
+			return
+		}
+
 		// hostDir is the directory that's shared via HostPath among all pods.
 		// Make sure it's random enough so we don't clash with another test
 		// running in parallel.
@@ -103,10 +106,7 @@ var _ = SIGDescribe("Mount propagation [Feature:MountPropagation]", func() {
 
 		podClient := f.PodClient()
 		master := podClient.CreateSync(preparePod("master", node, v1.MountPropagationBidirectional, hostDir))
-		defer podClient.Delete(master.Name, nil)
-
 		slave := podClient.CreateSync(preparePod("slave", node, v1.MountPropagationHostToContainer, hostDir))
-		defer podClient.Delete(slave.Name, nil)
 
 		// Check that the pods sees directories of each other. This just checks
 		// that they have the same HostPath, not the mount propagation.
@@ -114,14 +114,14 @@ var _ = SIGDescribe("Mount propagation [Feature:MountPropagation]", func() {
 		for _, podName := range podNames {
 			for _, dirName := range podNames {
 				cmd := fmt.Sprintf("test -d /mnt/test/%s", dirName)
-				_ = f.ExecShellInPod(podName, cmd)
+				f.ExecShellInPod(podName, cmd)
 			}
 		}
 
 		// Each pod mounts one tmpfs to /mnt/test/<podname> and puts a file there.
 		for _, podName := range podNames {
 			cmd := fmt.Sprintf("mount -t tmpfs e2e-mount-propagation-%[1]s /mnt/test/%[1]s; echo %[1]s > /mnt/test/%[1]s/file", podName)
-			_ = f.ExecShellInPod(podName, cmd)
+			f.ExecShellInPod(podName, cmd)
 
 			// unmount tmpfs when the test finishes
 			cmd = fmt.Sprintf("umount /mnt/test/%s", podName)
@@ -132,7 +132,7 @@ var _ = SIGDescribe("Mount propagation [Feature:MountPropagation]", func() {
 		// can check mount propagation from the host to pods.
 		cmd := fmt.Sprintf("sudo mkdir %[1]q/host; sudo mount -t tmpfs e2e-mount-propagation-host %[1]q/host; echo host > %[1]q/host/file", hostDir)
 		err := framework.IssueSSHCommand(cmd, framework.TestContext.Provider, node)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		defer func() {
 			cmd := fmt.Sprintf("sudo umount %q/host", hostDir)
@@ -157,9 +157,10 @@ var _ = SIGDescribe("Mount propagation [Feature:MountPropagation]", func() {
 				msg := fmt.Sprintf("When checking pod %s and directory %s", podName, mountName)
 				shouldBeVisible := mounts.Has(mountName)
 				if shouldBeVisible {
-					Expect(err).NotTo(HaveOccurred(), "%s: failed to run %q", msg, cmd)
+					framework.ExpectNoError(err, "%s: failed to run %q", msg, cmd)
 					Expect(stdout).To(Equal(mountName), msg)
 				} else {
+					// We *expect* cat to return error here
 					Expect(err).To(HaveOccurred(), msg)
 				}
 			}
@@ -168,11 +169,11 @@ var _ = SIGDescribe("Mount propagation [Feature:MountPropagation]", func() {
 		// Host can see mount from master
 		cmd = fmt.Sprintf("test `cat %q/master/file` = master", hostDir)
 		err = framework.IssueSSHCommand(cmd, framework.TestContext.Provider, node)
-		Expect(err).NotTo(HaveOccurred(), "host should see mount from master")
+		framework.ExpectNoError(err, "host should see mount from master")
 
 		// Host can't see mount from slave
 		cmd = fmt.Sprintf("test ! -e %q/slave/file", hostDir)
 		err = framework.IssueSSHCommand(cmd, framework.TestContext.Provider, node)
-		Expect(err).NotTo(HaveOccurred(), "host shouldn't see mount from slave")
+		framework.ExpectNoError(err, "host shouldn't see mount from slave")
 	})
 })
