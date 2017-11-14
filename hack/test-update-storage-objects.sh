@@ -104,7 +104,7 @@ echo "${ETCD_VERSION}" > "${ETCD_DIR}/version.txt"
 
 # source_file,resource,namespace,name,old_version,new_version
 tests=(
-examples/persistent-volume-provisioning/rbd/rbd-storage-class.yaml,storageclasses,,slow,v1beta1,v1
+examples/persistent-volume-provisioning/rbd/rbd-storage-class.yaml,storageclasses,,slow,storage.k8s.io/v1beta1,storage.k8s.io/v1
 )
 
 KUBE_OLD_API_VERSION="networking.k8s.io/v1,storage.k8s.io/v1beta1,extensions/v1beta1"
@@ -142,7 +142,7 @@ for test in ${tests[@]}; do
     namespace="${namespace}/"
   fi
   kube::log::status "Verifying ${resource}/${namespace}${name} has storage version ${old_storage_version} in etcd"
-  ETCDCTL_API=3 ${ETCDCTL} --endpoints="http://${ETCD_HOST}:${ETCD_PORT}" get "/${ETCD_PREFIX}/${resource}/${namespace}${name}" | grep ${old_storage_version}
+  ETCDCTL_API=3 ${ETCDCTL} --endpoints="http://${ETCD_HOST}:${ETCD_PORT}" get "/${ETCD_PREFIX}/${resource}/${namespace}${name}" | grep '"'${old_storage_version}'"'
 done
 
 killApiServer
@@ -174,7 +174,7 @@ for test in ${tests[@]}; do
     namespace="${namespace}/"
   fi
   kube::log::status "Verifying ${resource}/${namespace}${name} has updated storage version ${new_storage_version} in etcd"
-  ETCDCTL_API=3 ${ETCDCTL} --endpoints="http://${ETCD_HOST}:${ETCD_PORT}" get "/${ETCD_PREFIX}/${resource}/${namespace}${name}" | grep ${new_storage_version}
+  ETCDCTL_API=3 ${ETCDCTL} --endpoints="http://${ETCD_HOST}:${ETCD_PORT}" get "/${ETCD_PREFIX}/${resource}/${namespace}${name}" | grep '"'${new_storage_version}'"'
 done
 
 killApiServer
