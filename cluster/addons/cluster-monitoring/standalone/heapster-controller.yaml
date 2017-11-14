@@ -1,7 +1,7 @@
-{% set base_metrics_memory = "140Mi" -%}
-{% set metrics_memory_per_node = 4 -%}
-{% set base_metrics_cpu = "80m" -%}
-{% set metrics_cpu_per_node = 0.5 -%}
+{% set base_metrics_memory = "175Mi" -%}
+{% set metrics_memory_per_node = 6 -%}
+{% set base_metrics_cpu = "100m" -%}
+{% set metrics_cpu_per_node = 0.7 -%}
 {% set num_nodes = pillar.get('num_nodes', -1) -%}
 {% set nanny_memory = "90Mi" -%}
 {% set nanny_memory_per_node = 200 -%}
@@ -55,7 +55,7 @@ spec:
           command:
             - /heapster
             - --source=kubernetes.summary_api:''
-        - image: gcr.io/google_containers/addon-resizer:1.7
+        - image: gcr.io/google_containers/addon-resizer:2.0
           name: heapster-nanny
           resources:
             limits:
@@ -79,11 +79,9 @@ spec:
             - --extra-cpu={{ metrics_cpu_per_node }}m
             - --memory={{ base_metrics_memory }}
             - --extra-memory={{ metrics_memory_per_node }}Mi
-            - --threshold=5
             - --deployment=heapster-v1.5.0-beta.0
             - --container=heapster
             - --poll-period=300000
-            - --estimator=exponential
       serviceAccountName: heapster
       tolerations:
         - key: "CriticalAddonsOnly"
