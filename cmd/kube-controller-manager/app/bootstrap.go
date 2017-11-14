@@ -25,6 +25,8 @@ import (
 func startBootstrapSignerController(ctx ControllerContext) (bool, error) {
 	bsc, err := bootstrap.NewBootstrapSigner(
 		ctx.ClientBuilder.ClientGoClientOrDie("bootstrap-signer"),
+		ctx.InformerFactory.Core().V1().Secrets(),
+		ctx.InformerFactory.Core().V1().ConfigMaps(),
 		bootstrap.DefaultBootstrapSignerOptions(),
 	)
 	if err != nil {
