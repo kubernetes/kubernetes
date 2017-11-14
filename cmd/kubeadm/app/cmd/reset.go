@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -34,7 +35,9 @@ import (
 )
 
 var (
-	crictlParamsFormat = "%s -r %s sandboxes --quiet | xargs -r %s -r %s rms"
+	crictlSandboxesParamsFormat = "%s -r %s sandboxes --quiet | xargs -r"
+	crictlStopParamsFormat      = "%s -r %s stops %s"
+	crictlRemoveParamsFormat    = "%s -r %s rms %s"
 )
 
 // NewCmdReset returns the "kubeadm reset" command
@@ -172,10 +175,27 @@ func resetWithDocker(execer utilsexec.Interface, dockerCheck preflight.Checker) 
 func resetWithCrictl(execer utilsexec.Interface, dockerCheck preflight.Checker, criSocketPath, crictlPath string) {
 	if criSocketPath != "" {
 		fmt.Printf("[reset] Cleaning up running containers using crictl with socket %s\n", criSocketPath)
-		cmd := fmt.Sprintf(crictlParamsFormat, crictlPath, criSocketPath, crictlPath, criSocketPath)
-		if err := execer.Command("sh", "-c", cmd).Run(); err != nil {
-			fmt.Println("[reset] Failed to stop the running containers using crictl. Trying using docker instead.")
+		listcmd := fmt.Sprintf(crictlSandboxesParamsFormat, crictlPath, criSocketPath)
+		output, err := execer.Command("sh", "-c", listcmd).CombinedOutput()
+		if err != nil {
+			fmt.Println("[reset] Failed to list running pods using crictl. Trying using docker instead.")
 			resetWithDocker(execer, dockerCheck)
+			return
+		}
+		sandboxes := strings.Split(string(output), " ")
+		for _, s := range sandboxes {
+			stopcmd := fmt.Sprintf(crictlStopParamsFormat, crictlPath, criSocketPath, s)
+			if err := execer.Command("sh", "-c", stopcmd).Run(); err != nil {
+				fmt.Println("[reset] Failed to stop the running containers using crictl. Trying using docker instead.")
+				resetWithDocker(execer, dockerCheck)
+				return
+			}
+			removecmd := fmt.Sprintf(crictlRemoveParamsFormat, crictlPath, criSocketPath, s)
+			if err := execer.Command("sh", "-c", removecmd).Run(); err != nil {
+				fmt.Println("[reset] Failed to remove the running containers using crictl. Trying using docker instead.")
+				resetWithDocker(execer, dockerCheck)
+				return
+			}
 		}
 	} else {
 		fmt.Println("[reset] CRI socket path not provided for crictl. Trying docker instead.")
