@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -29,6 +30,7 @@ import (
 	"os"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/utils/exec"
 )
 
 var (
@@ -216,7 +218,7 @@ func TestRunInitMasterChecks(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := RunInitMasterChecks(rt.cfg)
+		actual := RunInitMasterChecks(exec.New(), rt.cfg, "")
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed RunInitMasterChecks:\n\texpected: %t\n\t  actual: %t\n\t error: %v",
@@ -252,7 +254,7 @@ func TestRunJoinNodeChecks(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := RunJoinNodeChecks(rt.cfg)
+		actual := RunJoinNodeChecks(exec.New(), rt.cfg, "")
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed RunJoinNodeChecks:\n\texpected: %t\n\t  actual: %t",
@@ -279,8 +281,8 @@ func TestRunChecks(t *testing.T) {
 		{[]Checker{FileContentCheck{Path: "/does/not/exist"}}, false, ""},
 		{[]Checker{FileContentCheck{Path: "/"}}, true, ""},
 		{[]Checker{FileContentCheck{Path: "/", Content: []byte("does not exist")}}, false, ""},
-		{[]Checker{InPathCheck{executable: "foobarbaz"}}, true, "[preflight] WARNING: foobarbaz not found in system path\n"},
-		{[]Checker{InPathCheck{executable: "foobarbaz", mandatory: true}}, false, ""},
+		{[]Checker{InPathCheck{executable: "foobarbaz", exec: exec.New()}}, true, "[preflight] WARNING: foobarbaz not found in system path\n"},
+		{[]Checker{InPathCheck{executable: "foobarbaz", mandatory: true, exec: exec.New()}}, false, ""},
 		{[]Checker{ExtraArgsCheck{
 			APIServerExtraArgs:         map[string]string{"secure-port": "1234"},
 			ControllerManagerExtraArgs: map[string]string{"use-service-account-credentials": "true"},
@@ -555,4 +557,60 @@ func restoreEnv(e map[string]string) {
 	for k, v := range e {
 		os.Setenv(k, v)
 	}
+}
+
+func TestKubeletVersionCheck(t *testing.T) {
+	type T struct {
+		kubeletVersion string
+		k8sVersion     string
+		expectErrors   bool
+		expectWarnings bool
+	}
+
+	cases := []T{
+		{"v1.10.2", "", false, false},              // check minimally supported version when there is no information about control plane
+		{"v1.7.3", "v1.7.8", true, false},          // too old kubelet (older than kubeadmconstants.MinimumKubeletVersion), should fail.
+		{"v1.9.0", "v1.9.5", false, false},         // kubelet within same major.minor as control plane
+		{"v1.9.5", "v1.9.1", false, false},         // kubelet is newer, but still within same major.minor as control plane
+		{"v1.9.0", "v1.10.1", false, false},        // kubelet is lower than control plane, but newer than minimally supported
+		{"v1.10.0-alpha.1", "v1.9.1", true, false}, // kubelet is newer (development build) than control plane, should fail.
+		{"v1.10.0", "v1.9.5", true, false},         // kubelet is newer (release) than control plane, should fail.
+	}
+
+	dir, err := ioutil.TempDir("", "test-kubelet-version-check")
+	if err != nil {
+		t.Errorf("Failed to create directory for testing GetKubeletVersion: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	// We don't want to call real kubelet or something else in $PATH
+	oldPATH := os.Getenv("PATH")
+	defer os.Setenv("PATH", oldPATH)
+
+	os.Setenv("PATH", dir)
+
+	kubeletFn := filepath.Join(dir, "kubelet")
+	for _, tc := range cases {
+
+		content := []byte(fmt.Sprintf("#!/bin/sh\necho 'Kubernetes %s'", tc.kubeletVersion))
+		if err := ioutil.WriteFile(kubeletFn, content, 0755); err != nil {
+			t.Errorf("Error creating test stub file %s: %v", kubeletFn, err)
+		}
+
+		check := KubeletVersionCheck{KubernetesVersion: tc.k8sVersion}
+		warnings, errors := check.Check()
+
+		switch {
+		case warnings != nil && !tc.expectWarnings:
+			t.Errorf("KubeletVersionCheck: unexpected warnings for kubelet version %q and kubernetes version %q. Warnings: %v", tc.kubeletVersion, tc.k8sVersion, warnings)
+		case warnings == nil && tc.expectWarnings:
+			t.Errorf("KubeletVersionCheck: expected warnings for kubelet version %q and kubernetes version %q but got nothing", tc.kubeletVersion, tc.k8sVersion)
+		case errors != nil && !tc.expectErrors:
+			t.Errorf("KubeletVersionCheck: unexpected errors for kubelet version %q and kubernetes version %q. errors: %v", tc.kubeletVersion, tc.k8sVersion, errors)
+		case errors == nil && tc.expectErrors:
+			t.Errorf("KubeletVersionCheck: expected errors for kubelet version %q and kubernetes version %q but got nothing", tc.kubeletVersion, tc.k8sVersion)
+		}
+
+	}
+
 }

@@ -22,13 +22,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // EventLister helps list Events.
 type EventLister interface {
 	// List lists all Events in the indexer.
-	List(selector labels.Selector) (ret []*api.Event, err error)
+	List(selector labels.Selector) (ret []*core.Event, err error)
 	// Events returns an object that can list and get Events.
 	Events(namespace string) EventNamespaceLister
 	EventListerExpansion
@@ -45,9 +45,9 @@ func NewEventLister(indexer cache.Indexer) EventLister {
 }
 
 // List lists all Events in the indexer.
-func (s *eventLister) List(selector labels.Selector) (ret []*api.Event, err error) {
+func (s *eventLister) List(selector labels.Selector) (ret []*core.Event, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.Event))
+		ret = append(ret, m.(*core.Event))
 	})
 	return ret, err
 }
@@ -60,9 +60,9 @@ func (s *eventLister) Events(namespace string) EventNamespaceLister {
 // EventNamespaceLister helps list and get Events.
 type EventNamespaceLister interface {
 	// List lists all Events in the indexer for a given namespace.
-	List(selector labels.Selector) (ret []*api.Event, err error)
+	List(selector labels.Selector) (ret []*core.Event, err error)
 	// Get retrieves the Event from the indexer for a given namespace and name.
-	Get(name string) (*api.Event, error)
+	Get(name string) (*core.Event, error)
 	EventNamespaceListerExpansion
 }
 
@@ -74,21 +74,21 @@ type eventNamespaceLister struct {
 }
 
 // List lists all Events in the indexer for a given namespace.
-func (s eventNamespaceLister) List(selector labels.Selector) (ret []*api.Event, err error) {
+func (s eventNamespaceLister) List(selector labels.Selector) (ret []*core.Event, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.Event))
+		ret = append(ret, m.(*core.Event))
 	})
 	return ret, err
 }
 
 // Get retrieves the Event from the indexer for a given namespace and name.
-func (s eventNamespaceLister) Get(name string) (*api.Event, error) {
+func (s eventNamespaceLister) Get(name string) (*core.Event, error) {
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(api.Resource("event"), name)
+		return nil, errors.NewNotFound(core.Resource("event"), name)
 	}
-	return obj.(*api.Event), nil
+	return obj.(*core.Event), nil
 }

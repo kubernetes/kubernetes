@@ -32,9 +32,9 @@ import (
 	kadmission "k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	kapi "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	kapi "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion"
@@ -49,8 +49,8 @@ const defaultContainerName = "test-c"
 
 // NewTestAdmission provides an admission plugin with test implementations of internal structs.  It uses
 // an authorizer that always returns true.
-func NewTestAdmission(lister extensionslisters.PodSecurityPolicyLister) kadmission.MutationInterface {
-	return &podSecurityPolicyPlugin{
+func NewTestAdmission(lister extensionslisters.PodSecurityPolicyLister) *PodSecurityPolicyPlugin {
+	return &PodSecurityPolicyPlugin{
 		Handler:         kadmission.NewHandler(kadmission.Create, kadmission.Update),
 		strategyFactory: kpsp.NewSimpleStrategyFactory(),
 		pspMatcher:      getMatchingPolicies,
@@ -89,35 +89,40 @@ func useInitContainers(pod *kapi.Pod) *kapi.Pod {
 func TestAdmitSeccomp(t *testing.T) {
 	containerName := "container"
 	tests := map[string]struct {
-		pspAnnotations map[string]string
-		podAnnotations map[string]string
-		shouldAdmit    bool
+		pspAnnotations     map[string]string
+		podAnnotations     map[string]string
+		shouldPassAdmit    bool
+		shouldPassValidate bool
 	}{
 		"no seccomp, no pod annotations": {
-			pspAnnotations: nil,
-			podAnnotations: nil,
-			shouldAdmit:    true,
+			pspAnnotations:     nil,
+			podAnnotations:     nil,
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
 		},
 		"no seccomp, pod annotations": {
 			pspAnnotations: nil,
 			podAnnotations: map[string]string{
 				kapi.SeccompPodAnnotationKey: "foo",
 			},
-			shouldAdmit: false,
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"no seccomp, container annotations": {
 			pspAnnotations: nil,
 			podAnnotations: map[string]string{
 				kapi.SeccompContainerAnnotationKeyPrefix + containerName: "foo",
 			},
-			shouldAdmit: false,
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"seccomp, allow any no pod annotation": {
 			pspAnnotations: map[string]string{
 				seccomp.AllowedProfilesAnnotationKey: seccomp.AllowAny,
 			},
-			podAnnotations: nil,
-			shouldAdmit:    true,
+			podAnnotations:     nil,
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
 		},
 		"seccomp, allow any pod annotation": {
 			pspAnnotations: map[string]string{
@@ -126,7 +131,8 @@ func TestAdmitSeccomp(t *testing.T) {
 			podAnnotations: map[string]string{
 				kapi.SeccompPodAnnotationKey: "foo",
 			},
-			shouldAdmit: true,
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
 		},
 		"seccomp, allow any container annotation": {
 			pspAnnotations: map[string]string{
@@ -135,7 +141,8 @@ func TestAdmitSeccomp(t *testing.T) {
 			podAnnotations: map[string]string{
 				kapi.SeccompContainerAnnotationKeyPrefix + containerName: "foo",
 			},
-			shouldAdmit: true,
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
 		},
 		"seccomp, allow specific pod annotation failure": {
 			pspAnnotations: map[string]string{
@@ -144,7 +151,8 @@ func TestAdmitSeccomp(t *testing.T) {
 			podAnnotations: map[string]string{
 				kapi.SeccompPodAnnotationKey: "bar",
 			},
-			shouldAdmit: false,
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"seccomp, allow specific container annotation failure": {
 			pspAnnotations: map[string]string{
@@ -155,7 +163,8 @@ func TestAdmitSeccomp(t *testing.T) {
 			podAnnotations: map[string]string{
 				kapi.SeccompContainerAnnotationKeyPrefix + containerName: "bar",
 			},
-			shouldAdmit: false,
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"seccomp, allow specific pod annotation pass": {
 			pspAnnotations: map[string]string{
@@ -164,7 +173,8 @@ func TestAdmitSeccomp(t *testing.T) {
 			podAnnotations: map[string]string{
 				kapi.SeccompPodAnnotationKey: "foo",
 			},
-			shouldAdmit: true,
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
 		},
 		"seccomp, allow specific container annotation pass": {
 			pspAnnotations: map[string]string{
@@ -175,7 +185,8 @@ func TestAdmitSeccomp(t *testing.T) {
 			podAnnotations: map[string]string{
 				kapi.SeccompContainerAnnotationKeyPrefix + containerName: "bar",
 			},
-			shouldAdmit: true,
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
 		},
 	}
 	for k, v := range tests {
@@ -191,7 +202,7 @@ func TestAdmitSeccomp(t *testing.T) {
 				},
 			},
 		}
-		testPSPAdmit(k, []*extensions.PodSecurityPolicy{psp}, pod, v.shouldAdmit, psp.Name, t)
+		testPSPAdmit(k, []*extensions.PodSecurityPolicy{psp}, pod, v.shouldPassAdmit, v.shouldPassValidate, psp.Name, t)
 	}
 }
 
@@ -214,58 +225,65 @@ func TestAdmitPrivileged(t *testing.T) {
 	falseValue := false
 
 	tests := map[string]struct {
-		pod          *kapi.Pod
-		psps         []*extensions.PodSecurityPolicy
-		shouldPass   bool
-		expectedPriv *bool
-		expectedPSP  string
+		pod                *kapi.Pod
+		psps               []*extensions.PodSecurityPolicy
+		shouldPassAdmit    bool
+		shouldPassValidate bool
+		expectedPriv       *bool
+		expectedPSP        string
 	}{
 		"pod with priv=nil allowed under non priv PSP": {
-			pod:          goodPod(),
-			psps:         []*extensions.PodSecurityPolicy{nonPrivilegedPSP},
-			shouldPass:   true,
-			expectedPriv: nil,
-			expectedPSP:  nonPrivilegedPSP.Name,
+			pod:                goodPod(),
+			psps:               []*extensions.PodSecurityPolicy{nonPrivilegedPSP},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPriv:       nil,
+			expectedPSP:        nonPrivilegedPSP.Name,
 		},
 		"pod with priv=nil allowed under priv PSP": {
-			pod:          goodPod(),
-			psps:         []*extensions.PodSecurityPolicy{privilegedPSP},
-			shouldPass:   true,
-			expectedPriv: nil,
-			expectedPSP:  privilegedPSP.Name,
+			pod:                goodPod(),
+			psps:               []*extensions.PodSecurityPolicy{privilegedPSP},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPriv:       nil,
+			expectedPSP:        privilegedPSP.Name,
 		},
 		"pod with priv=false allowed under non priv PSP": {
-			pod:          createPodWithPriv(false),
-			psps:         []*extensions.PodSecurityPolicy{nonPrivilegedPSP},
-			shouldPass:   true,
-			expectedPriv: &falseValue,
-			expectedPSP:  nonPrivilegedPSP.Name,
+			pod:                createPodWithPriv(false),
+			psps:               []*extensions.PodSecurityPolicy{nonPrivilegedPSP},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPriv:       &falseValue,
+			expectedPSP:        nonPrivilegedPSP.Name,
 		},
 		"pod with priv=false allowed under priv PSP": {
-			pod:          createPodWithPriv(false),
-			psps:         []*extensions.PodSecurityPolicy{privilegedPSP},
-			shouldPass:   true,
-			expectedPriv: &falseValue,
-			expectedPSP:  privilegedPSP.Name,
+			pod:                createPodWithPriv(false),
+			psps:               []*extensions.PodSecurityPolicy{privilegedPSP},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPriv:       &falseValue,
+			expectedPSP:        privilegedPSP.Name,
 		},
 		"pod with priv=true denied by non priv PSP": {
-			pod:        createPodWithPriv(true),
-			psps:       []*extensions.PodSecurityPolicy{nonPrivilegedPSP},
-			shouldPass: false,
+			pod:                createPodWithPriv(true),
+			psps:               []*extensions.PodSecurityPolicy{nonPrivilegedPSP},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"pod with priv=true allowed by priv PSP": {
-			pod:          createPodWithPriv(true),
-			psps:         []*extensions.PodSecurityPolicy{nonPrivilegedPSP, privilegedPSP},
-			shouldPass:   true,
-			expectedPriv: &trueValue,
-			expectedPSP:  privilegedPSP.Name,
+			pod:                createPodWithPriv(true),
+			psps:               []*extensions.PodSecurityPolicy{nonPrivilegedPSP, privilegedPSP},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPriv:       &trueValue,
+			expectedPSP:        privilegedPSP.Name,
 		},
 	}
 
 	for k, v := range tests {
-		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+		testPSPAdmit(k, v.psps, v.pod, v.shouldPassAdmit, v.shouldPassValidate, v.expectedPSP, t)
 
-		if v.shouldPass {
+		if v.shouldPassAdmit {
 			priv := v.pod.Spec.Containers[0].SecurityContext.Privileged
 			if (priv == nil) != (v.expectedPriv == nil) {
 				t.Errorf("%s expected privileged to be %v, got %v", k, v.expectedPriv, priv)
@@ -311,6 +329,11 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 	changedPod := unprivilegedRunAsAnyPod.DeepCopy()
 	changedPod.Spec.Containers[0].Image = "myimage2"
 
+	podWithSC := unprivilegedRunAsAnyPod.DeepCopy()
+	podWithSC.Annotations = map[string]string{psputil.ValidatedPSPAnnotation: privilegedPSP.Name}
+	changedPodWithSC := changedPod.DeepCopy()
+	changedPodWithSC.Annotations = map[string]string{psputil.ValidatedPSPAnnotation: privilegedPSP.Name}
+
 	gcChangedPod := unprivilegedRunAsAnyPod.DeepCopy()
 	gcChangedPod.OwnerReferences = []metav1.OwnerReference{{Kind: "Foo", Name: "bar"}}
 	gcChangedPod.Finalizers = []string{"foo"}
@@ -318,9 +341,10 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 	tests := map[string]struct {
 		operation             kadmission.Operation
 		pod                   *kapi.Pod
-		oldPod                *kapi.Pod
+		podBeforeUpdate       *kapi.Pod
 		psps                  []*extensions.PodSecurityPolicy
-		shouldPass            bool
+		shouldPassAdmit       bool
+		shouldPassValidate    bool
 		expectMutation        bool
 		expectedPodUser       *int64
 		expectedContainerUser *int64
@@ -330,7 +354,8 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			operation:             kadmission.Create,
 			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{privilegedPSP},
-			shouldPass:            true,
+			shouldPassAdmit:       true,
+			shouldPassValidate:    true,
 			expectMutation:        false,
 			expectedPodUser:       nil,
 			expectedContainerUser: nil,
@@ -340,7 +365,8 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			operation:             kadmission.Create,
 			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1, privilegedPSP},
-			shouldPass:            true,
+			shouldPassAdmit:       true,
+			shouldPassValidate:    true,
 			expectMutation:        false,
 			expectedPodUser:       nil,
 			expectedContainerUser: nil,
@@ -350,7 +376,8 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			operation:             kadmission.Create,
 			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1},
-			shouldPass:            true,
+			shouldPassAdmit:       true,
+			shouldPassValidate:    true,
 			expectMutation:        true,
 			expectedPodUser:       nil,
 			expectedContainerUser: &mutating1.Spec.RunAsUser.Ranges[0].Min,
@@ -358,21 +385,23 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 		},
 		"pod should prefer non-mutating PSP on update": {
 			operation:             kadmission.Update,
-			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
-			oldPod:                changedPod.DeepCopy(),
+			pod:                   changedPodWithSC.DeepCopy(),
+			podBeforeUpdate:       podWithSC.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1, privilegedPSP},
-			shouldPass:            true,
+			shouldPassAdmit:       true,
+			shouldPassValidate:    true,
 			expectMutation:        false,
 			expectedPodUser:       nil,
 			expectedContainerUser: nil,
 			expectedPSP:           privilegedPSP.Name,
 		},
-		"pod should not allow mutation on update": {
+		"pod should not mutate on update, but fail validation": {
 			operation:             kadmission.Update,
-			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
-			oldPod:                changedPod.DeepCopy(),
+			pod:                   changedPod.DeepCopy(),
+			podBeforeUpdate:       unprivilegedRunAsAnyPod.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1},
-			shouldPass:            false,
+			shouldPassAdmit:       true,
+			shouldPassValidate:    false,
 			expectMutation:        false,
 			expectedPodUser:       nil,
 			expectedContainerUser: nil,
@@ -381,9 +410,10 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 		"pod should be allowed if completely unchanged on update": {
 			operation:             kadmission.Update,
 			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
-			oldPod:                unprivilegedRunAsAnyPod.DeepCopy(),
+			podBeforeUpdate:       unprivilegedRunAsAnyPod.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1},
-			shouldPass:            true,
+			shouldPassAdmit:       true,
+			shouldPassValidate:    true,
 			expectMutation:        false,
 			expectedPodUser:       nil,
 			expectedContainerUser: nil,
@@ -391,10 +421,11 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 		},
 		"pod should be allowed if unchanged on update except finalizers,ownerrefs": {
 			operation:             kadmission.Update,
-			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
-			oldPod:                gcChangedPod.DeepCopy(),
+			pod:                   gcChangedPod.DeepCopy(),
+			podBeforeUpdate:       unprivilegedRunAsAnyPod.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1},
-			shouldPass:            true,
+			shouldPassAdmit:       true,
+			shouldPassValidate:    true,
 			expectMutation:        false,
 			expectedPodUser:       nil,
 			expectedContainerUser: nil,
@@ -403,9 +434,9 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		testPSPAdmitAdvanced(k, v.operation, v.psps, v.pod, v.oldPod, v.shouldPass, v.expectMutation, v.expectedPSP, t)
+		testPSPAdmitAdvanced(k, v.operation, v.psps, v.pod, v.podBeforeUpdate, v.shouldPassAdmit, v.shouldPassValidate, v.expectMutation, v.expectedPSP, t)
 
-		if v.shouldPass {
+		if v.shouldPassAdmit {
 			actualPodUser := (*int64)(nil)
 			if v.pod.Spec.SecurityContext != nil {
 				actualPodUser = v.pod.Spec.SecurityContext.RunAsUser
@@ -433,13 +464,21 @@ func TestFailClosedOnInvalidPod(t *testing.T) {
 	plugin := NewTestAdmission(nil)
 	pod := &v1.Pod{}
 	attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &user.DefaultInfo{})
-	err := plugin.Admit(attrs)
 
+	err := plugin.Admit(attrs)
 	if err == nil {
-		t.Fatalf("expected versioned pod object to fail admission")
+		t.Fatalf("expected versioned pod object to fail mutating admission")
 	}
 	if !strings.Contains(err.Error(), "unexpected type") {
-		t.Errorf("expected type error but got: %v", err)
+		t.Errorf("expected type error on Admit but got: %v", err)
+	}
+
+	err = plugin.Validate(attrs)
+	if err == nil {
+		t.Fatalf("expected versioned pod object to fail validating admission")
+	}
+	if !strings.Contains(err.Error(), "unexpected type") {
+		t.Errorf("expected type error on Validate but got: %v", err)
 	}
 }
 
@@ -471,53 +510,60 @@ func TestAdmitCaps(t *testing.T) {
 	tc := map[string]struct {
 		pod                  *kapi.Pod
 		psps                 []*extensions.PodSecurityPolicy
-		shouldPass           bool
+		shouldPassAdmit      bool
+		shouldPassValidate   bool
 		expectedCapabilities *kapi.Capabilities
 		expectedPSP          string
 	}{
 		// UC 1: if a PSP does not define allowed or required caps then a pod requesting a cap
 		// should be rejected.
 		"should reject cap add when not allowed or required": {
-			pod:        createPodWithCaps(&kapi.Capabilities{Add: []kapi.Capability{"foo"}}),
-			psps:       []*extensions.PodSecurityPolicy{restricted},
-			shouldPass: false,
+			pod:                createPodWithCaps(&kapi.Capabilities{Add: []kapi.Capability{"foo"}}),
+			psps:               []*extensions.PodSecurityPolicy{restricted},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		// UC 2: if a PSP allows a cap in the allowed field it should accept the pod request
 		// to add the cap.
 		"should accept cap add when in allowed": {
-			pod:         createPodWithCaps(&kapi.Capabilities{Add: []kapi.Capability{"foo"}}),
-			psps:        []*extensions.PodSecurityPolicy{restricted, allowsFooInAllowed},
-			shouldPass:  true,
-			expectedPSP: allowsFooInAllowed.Name,
+			pod:                createPodWithCaps(&kapi.Capabilities{Add: []kapi.Capability{"foo"}}),
+			psps:               []*extensions.PodSecurityPolicy{restricted, allowsFooInAllowed},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPSP:        allowsFooInAllowed.Name,
 		},
 		// UC 3: if a PSP requires a cap then it should accept the pod request
 		// to add the cap.
 		"should accept cap add when in required": {
-			pod:         createPodWithCaps(&kapi.Capabilities{Add: []kapi.Capability{"foo"}}),
-			psps:        []*extensions.PodSecurityPolicy{restricted, allowsFooInRequired},
-			shouldPass:  true,
-			expectedPSP: allowsFooInRequired.Name,
+			pod:                createPodWithCaps(&kapi.Capabilities{Add: []kapi.Capability{"foo"}}),
+			psps:               []*extensions.PodSecurityPolicy{restricted, allowsFooInRequired},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPSP:        allowsFooInRequired.Name,
 		},
 		// UC 4: if a PSP requires a cap to be dropped then it should fail both
 		// in the verification of adds and verification of drops
 		"should reject cap add when requested cap is required to be dropped": {
-			pod:        createPodWithCaps(&kapi.Capabilities{Add: []kapi.Capability{"foo"}}),
-			psps:       []*extensions.PodSecurityPolicy{restricted, requiresFooToBeDropped},
-			shouldPass: false,
+			pod:                createPodWithCaps(&kapi.Capabilities{Add: []kapi.Capability{"foo"}}),
+			psps:               []*extensions.PodSecurityPolicy{restricted, requiresFooToBeDropped},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		// UC 5: if a PSP requires a cap to be dropped it should accept
 		// a manual request to drop the cap.
 		"should accept cap drop when cap is required to be dropped": {
-			pod:         createPodWithCaps(&kapi.Capabilities{Drop: []kapi.Capability{"foo"}}),
-			psps:        []*extensions.PodSecurityPolicy{requiresFooToBeDropped},
-			shouldPass:  true,
-			expectedPSP: requiresFooToBeDropped.Name,
+			pod:                createPodWithCaps(&kapi.Capabilities{Drop: []kapi.Capability{"foo"}}),
+			psps:               []*extensions.PodSecurityPolicy{requiresFooToBeDropped},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPSP:        requiresFooToBeDropped.Name,
 		},
 		// UC 6: required add is defaulted
 		"required add is defaulted": {
-			pod:        goodPod(),
-			psps:       []*extensions.PodSecurityPolicy{allowsFooInRequired},
-			shouldPass: true,
+			pod:                goodPod(),
+			psps:               []*extensions.PodSecurityPolicy{allowsFooInRequired},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
 			expectedCapabilities: &kapi.Capabilities{
 				Add: []kapi.Capability{"foo"},
 			},
@@ -525,9 +571,10 @@ func TestAdmitCaps(t *testing.T) {
 		},
 		// UC 7: required drop is defaulted
 		"required drop is defaulted": {
-			pod:        goodPod(),
-			psps:       []*extensions.PodSecurityPolicy{requiresFooToBeDropped},
-			shouldPass: true,
+			pod:                goodPod(),
+			psps:               []*extensions.PodSecurityPolicy{requiresFooToBeDropped},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
 			expectedCapabilities: &kapi.Capabilities{
 				Drop: []kapi.Capability{"foo"},
 			},
@@ -535,15 +582,16 @@ func TestAdmitCaps(t *testing.T) {
 		},
 		// UC 8: using '*' in allowed caps
 		"should accept cap add when all caps are allowed": {
-			pod:         createPodWithCaps(&kapi.Capabilities{Add: []kapi.Capability{"foo"}}),
-			psps:        []*extensions.PodSecurityPolicy{restricted, allowAllInAllowed},
-			shouldPass:  true,
-			expectedPSP: allowAllInAllowed.Name,
+			pod:                createPodWithCaps(&kapi.Capabilities{Add: []kapi.Capability{"foo"}}),
+			psps:               []*extensions.PodSecurityPolicy{restricted, allowAllInAllowed},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPSP:        allowAllInAllowed.Name,
 		},
 	}
 
 	for k, v := range tc {
-		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+		testPSPAdmit(k, v.psps, v.pod, v.shouldPassAdmit, v.shouldPassValidate, v.expectedPSP, t)
 
 		if v.expectedCapabilities != nil {
 			if !reflect.DeepEqual(v.expectedCapabilities, v.pod.Spec.Containers[0].SecurityContext.Capabilities) {
@@ -554,7 +602,7 @@ func TestAdmitCaps(t *testing.T) {
 
 	for k, v := range tc {
 		useInitContainers(v.pod)
-		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+		testPSPAdmit(k, v.psps, v.pod, v.shouldPassAdmit, v.shouldPassValidate, v.expectedPSP, t)
 
 		if v.expectedCapabilities != nil {
 			if !reflect.DeepEqual(v.expectedCapabilities, v.pod.Spec.InitContainers[0].SecurityContext.Capabilities) {
@@ -593,19 +641,19 @@ func TestAdmitVolumes(t *testing.T) {
 		psp := restrictivePSP()
 
 		// expect a denial for this PSP
-		testPSPAdmit(fmt.Sprintf("%s denial", string(fsType)), []*extensions.PodSecurityPolicy{psp}, pod, false, "", t)
+		testPSPAdmit(fmt.Sprintf("%s denial", string(fsType)), []*extensions.PodSecurityPolicy{psp}, pod, false, false, "", t)
 
 		// also expect a denial for this PSP if it's an init container
 		useInitContainers(pod)
-		testPSPAdmit(fmt.Sprintf("%s denial", string(fsType)), []*extensions.PodSecurityPolicy{psp}, pod, false, "", t)
+		testPSPAdmit(fmt.Sprintf("%s denial", string(fsType)), []*extensions.PodSecurityPolicy{psp}, pod, false, false, "", t)
 
 		// now add the fstype directly to the psp and it should validate
 		psp.Spec.Volumes = []extensions.FSType{fsType}
-		testPSPAdmit(fmt.Sprintf("%s direct accept", string(fsType)), []*extensions.PodSecurityPolicy{psp}, pod, true, psp.Name, t)
+		testPSPAdmit(fmt.Sprintf("%s direct accept", string(fsType)), []*extensions.PodSecurityPolicy{psp}, pod, true, true, psp.Name, t)
 
 		// now change the psp to allow any volumes and the pod should still validate
 		psp.Spec.Volumes = []extensions.FSType{extensions.All}
-		testPSPAdmit(fmt.Sprintf("%s wildcard accept", string(fsType)), []*extensions.PodSecurityPolicy{psp}, pod, true, psp.Name, t)
+		testPSPAdmit(fmt.Sprintf("%s wildcard accept", string(fsType)), []*extensions.PodSecurityPolicy{psp}, pod, true, true, psp.Name, t)
 	}
 }
 
@@ -627,42 +675,47 @@ func TestAdmitHostNetwork(t *testing.T) {
 	tests := map[string]struct {
 		pod                 *kapi.Pod
 		psps                []*extensions.PodSecurityPolicy
-		shouldPass          bool
+		shouldPassAdmit     bool
+		shouldPassValidate  bool
 		expectedHostNetwork bool
 		expectedPSP         string
 	}{
 		"pod without hostnetwork request allowed under noHostNetwork PSP": {
 			pod:                 goodPod(),
 			psps:                []*extensions.PodSecurityPolicy{noHostNetwork},
-			shouldPass:          true,
+			shouldPassAdmit:     true,
+			shouldPassValidate:  true,
 			expectedHostNetwork: false,
 			expectedPSP:         noHostNetwork.Name,
 		},
 		"pod without hostnetwork request allowed under hostNetwork PSP": {
 			pod:                 goodPod(),
 			psps:                []*extensions.PodSecurityPolicy{hostNetwork},
-			shouldPass:          true,
+			shouldPassAdmit:     true,
+			shouldPassValidate:  true,
 			expectedHostNetwork: false,
 			expectedPSP:         hostNetwork.Name,
 		},
 		"pod with hostnetwork request denied by noHostNetwork PSP": {
-			pod:        createPodWithHostNetwork(true),
-			psps:       []*extensions.PodSecurityPolicy{noHostNetwork},
-			shouldPass: false,
+			pod:                createPodWithHostNetwork(true),
+			psps:               []*extensions.PodSecurityPolicy{noHostNetwork},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"pod with hostnetwork request allowed by hostNetwork PSP": {
 			pod:                 createPodWithHostNetwork(true),
 			psps:                []*extensions.PodSecurityPolicy{noHostNetwork, hostNetwork},
-			shouldPass:          true,
+			shouldPassAdmit:     true,
+			shouldPassValidate:  true,
 			expectedHostNetwork: true,
 			expectedPSP:         hostNetwork.Name,
 		},
 	}
 
 	for k, v := range tests {
-		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+		testPSPAdmit(k, v.psps, v.pod, v.shouldPassAdmit, v.shouldPassValidate, v.expectedPSP, t)
 
-		if v.shouldPass {
+		if v.shouldPassAdmit {
 			if v.pod.Spec.SecurityContext.HostNetwork != v.expectedHostNetwork {
 				t.Errorf("%s expected hostNetwork to be %t", k, v.expectedHostNetwork)
 			}
@@ -672,9 +725,9 @@ func TestAdmitHostNetwork(t *testing.T) {
 	// test again with init containers
 	for k, v := range tests {
 		useInitContainers(v.pod)
-		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+		testPSPAdmit(k, v.psps, v.pod, v.shouldPassAdmit, v.shouldPassValidate, v.expectedPSP, t)
 
-		if v.shouldPass {
+		if v.shouldPassAdmit {
 			if v.pod.Spec.SecurityContext.HostNetwork != v.expectedHostNetwork {
 				t.Errorf("%s expected hostNetwork to be %t", k, v.expectedHostNetwork)
 			}
@@ -701,45 +754,51 @@ func TestAdmitHostPorts(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		pod         *kapi.Pod
-		psps        []*extensions.PodSecurityPolicy
-		shouldPass  bool
-		expectedPSP string
+		pod                *kapi.Pod
+		psps               []*extensions.PodSecurityPolicy
+		shouldPassAdmit    bool
+		shouldPassValidate bool
+		expectedPSP        string
 	}{
 		"host port out of range": {
-			pod:        createPodWithHostPorts(11),
-			psps:       []*extensions.PodSecurityPolicy{hostPorts},
-			shouldPass: false,
+			pod:                createPodWithHostPorts(11),
+			psps:               []*extensions.PodSecurityPolicy{hostPorts},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"host port in range": {
-			pod:         createPodWithHostPorts(5),
-			psps:        []*extensions.PodSecurityPolicy{hostPorts},
-			shouldPass:  true,
-			expectedPSP: hostPorts.Name,
+			pod:                createPodWithHostPorts(5),
+			psps:               []*extensions.PodSecurityPolicy{hostPorts},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPSP:        hostPorts.Name,
 		},
 		"no host ports with range": {
-			pod:         goodPod(),
-			psps:        []*extensions.PodSecurityPolicy{hostPorts},
-			shouldPass:  true,
-			expectedPSP: hostPorts.Name,
+			pod:                goodPod(),
+			psps:               []*extensions.PodSecurityPolicy{hostPorts},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPSP:        hostPorts.Name,
 		},
 		"no host ports without range": {
-			pod:         goodPod(),
-			psps:        []*extensions.PodSecurityPolicy{noHostPorts},
-			shouldPass:  true,
-			expectedPSP: noHostPorts.Name,
+			pod:                goodPod(),
+			psps:               []*extensions.PodSecurityPolicy{noHostPorts},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPSP:        noHostPorts.Name,
 		},
 		"host ports without range": {
-			pod:        createPodWithHostPorts(5),
-			psps:       []*extensions.PodSecurityPolicy{noHostPorts},
-			shouldPass: false,
+			pod:                createPodWithHostPorts(5),
+			psps:               []*extensions.PodSecurityPolicy{noHostPorts},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 	}
 
 	for i := 0; i < 2; i++ {
 		for k, v := range tests {
 			v.pod.Spec.Containers, v.pod.Spec.InitContainers = v.pod.Spec.InitContainers, v.pod.Spec.Containers
-			testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+			testPSPAdmit(k, v.psps, v.pod, v.shouldPassAdmit, v.shouldPassValidate, v.expectedPSP, t)
 		}
 	}
 }
@@ -760,44 +819,48 @@ func TestAdmitHostPID(t *testing.T) {
 	hostPID.Spec.HostPID = true
 
 	tests := map[string]struct {
-		pod             *kapi.Pod
-		psps            []*extensions.PodSecurityPolicy
-		shouldPass      bool
-		expectedHostPID bool
-		expectedPSP     string
+		pod                *kapi.Pod
+		psps               []*extensions.PodSecurityPolicy
+		shouldPassAdmit    bool
+		shouldPassValidate bool
+		expectedHostPID    bool
+		expectedPSP        string
 	}{
 		"pod without hostpid request allowed under noHostPID PSP": {
-			pod:             goodPod(),
-			psps:            []*extensions.PodSecurityPolicy{noHostPID},
-			shouldPass:      true,
-			expectedHostPID: false,
-			expectedPSP:     noHostPID.Name,
+			pod:                goodPod(),
+			psps:               []*extensions.PodSecurityPolicy{noHostPID},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedHostPID:    false,
+			expectedPSP:        noHostPID.Name,
 		},
 		"pod without hostpid request allowed under hostPID PSP": {
-			pod:             goodPod(),
-			psps:            []*extensions.PodSecurityPolicy{hostPID},
-			shouldPass:      true,
-			expectedHostPID: false,
-			expectedPSP:     hostPID.Name,
+			pod:                goodPod(),
+			psps:               []*extensions.PodSecurityPolicy{hostPID},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedHostPID:    false,
+			expectedPSP:        hostPID.Name,
 		},
 		"pod with hostpid request denied by noHostPID PSP": {
-			pod:        createPodWithHostPID(true),
-			psps:       []*extensions.PodSecurityPolicy{noHostPID},
-			shouldPass: false,
+			pod:             createPodWithHostPID(true),
+			psps:            []*extensions.PodSecurityPolicy{noHostPID},
+			shouldPassAdmit: false,
 		},
 		"pod with hostpid request allowed by hostPID PSP": {
-			pod:             createPodWithHostPID(true),
-			psps:            []*extensions.PodSecurityPolicy{noHostPID, hostPID},
-			shouldPass:      true,
-			expectedHostPID: true,
-			expectedPSP:     hostPID.Name,
+			pod:                createPodWithHostPID(true),
+			psps:               []*extensions.PodSecurityPolicy{noHostPID, hostPID},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedHostPID:    true,
+			expectedPSP:        hostPID.Name,
 		},
 	}
 
 	for k, v := range tests {
-		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+		testPSPAdmit(k, v.psps, v.pod, v.shouldPassAdmit, v.shouldPassValidate, v.expectedPSP, t)
 
-		if v.shouldPass {
+		if v.shouldPassAdmit {
 			if v.pod.Spec.SecurityContext.HostPID != v.expectedHostPID {
 				t.Errorf("%s expected hostPID to be %t", k, v.expectedHostPID)
 			}
@@ -821,44 +884,49 @@ func TestAdmitHostIPC(t *testing.T) {
 	hostIPC.Spec.HostIPC = true
 
 	tests := map[string]struct {
-		pod             *kapi.Pod
-		psps            []*extensions.PodSecurityPolicy
-		shouldPass      bool
-		expectedHostIPC bool
-		expectedPSP     string
+		pod                *kapi.Pod
+		psps               []*extensions.PodSecurityPolicy
+		shouldPassAdmit    bool
+		shouldPassValidate bool
+		expectedHostIPC    bool
+		expectedPSP        string
 	}{
 		"pod without hostIPC request allowed under noHostIPC PSP": {
-			pod:             goodPod(),
-			psps:            []*extensions.PodSecurityPolicy{noHostIPC},
-			shouldPass:      true,
-			expectedHostIPC: false,
-			expectedPSP:     noHostIPC.Name,
+			pod:                goodPod(),
+			psps:               []*extensions.PodSecurityPolicy{noHostIPC},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedHostIPC:    false,
+			expectedPSP:        noHostIPC.Name,
 		},
 		"pod without hostIPC request allowed under hostIPC PSP": {
-			pod:             goodPod(),
-			psps:            []*extensions.PodSecurityPolicy{hostIPC},
-			shouldPass:      true,
-			expectedHostIPC: false,
-			expectedPSP:     hostIPC.Name,
+			pod:                goodPod(),
+			psps:               []*extensions.PodSecurityPolicy{hostIPC},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedHostIPC:    false,
+			expectedPSP:        hostIPC.Name,
 		},
 		"pod with hostIPC request denied by noHostIPC PSP": {
-			pod:        createPodWithHostIPC(true),
-			psps:       []*extensions.PodSecurityPolicy{noHostIPC},
-			shouldPass: false,
+			pod:                createPodWithHostIPC(true),
+			psps:               []*extensions.PodSecurityPolicy{noHostIPC},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"pod with hostIPC request allowed by hostIPC PSP": {
-			pod:             createPodWithHostIPC(true),
-			psps:            []*extensions.PodSecurityPolicy{noHostIPC, hostIPC},
-			shouldPass:      true,
-			expectedHostIPC: true,
-			expectedPSP:     hostIPC.Name,
+			pod:                createPodWithHostIPC(true),
+			psps:               []*extensions.PodSecurityPolicy{noHostIPC, hostIPC},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedHostIPC:    true,
+			expectedPSP:        hostIPC.Name,
 		},
 	}
 
 	for k, v := range tests {
-		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+		testPSPAdmit(k, v.psps, v.pod, v.shouldPassAdmit, v.shouldPassValidate, v.expectedPSP, t)
 
-		if v.shouldPass {
+		if v.shouldPassAdmit {
 			if v.pod.Spec.SecurityContext.HostIPC != v.expectedHostIPC {
 				t.Errorf("%s expected hostIPC to be %t", k, v.expectedHostIPC)
 			}
@@ -891,7 +959,8 @@ func TestAdmitSELinux(t *testing.T) {
 	tests := map[string]struct {
 		pod                 *kapi.Pod
 		psps                []*extensions.PodSecurityPolicy
-		shouldPass          bool
+		shouldPassAdmit     bool
+		shouldPassValidate  bool
 		expectedPodSC       *kapi.PodSecurityContext
 		expectedContainerSC *kapi.SecurityContext
 		expectedPSP         string
@@ -899,7 +968,8 @@ func TestAdmitSELinux(t *testing.T) {
 		"runAsAny with no request": {
 			pod:                 createPodWithSecurityContexts(nil, nil),
 			psps:                []*extensions.PodSecurityPolicy{runAsAny},
-			shouldPass:          true,
+			shouldPassAdmit:     true,
+			shouldPassValidate:  true,
 			expectedPodSC:       nil,
 			expectedContainerSC: nil,
 			expectedPSP:         runAsAny.Name,
@@ -907,7 +977,8 @@ func TestAdmitSELinux(t *testing.T) {
 		"runAsAny with empty pod request": {
 			pod:                 createPodWithSecurityContexts(&kapi.PodSecurityContext{}, nil),
 			psps:                []*extensions.PodSecurityPolicy{runAsAny},
-			shouldPass:          true,
+			shouldPassAdmit:     true,
+			shouldPassValidate:  true,
 			expectedPodSC:       &kapi.PodSecurityContext{},
 			expectedContainerSC: nil,
 			expectedPSP:         runAsAny.Name,
@@ -915,7 +986,8 @@ func TestAdmitSELinux(t *testing.T) {
 		"runAsAny with empty container request": {
 			pod:                 createPodWithSecurityContexts(nil, &kapi.SecurityContext{}),
 			psps:                []*extensions.PodSecurityPolicy{runAsAny},
-			shouldPass:          true,
+			shouldPassAdmit:     true,
+			shouldPassValidate:  true,
 			expectedPodSC:       nil,
 			expectedContainerSC: &kapi.SecurityContext{},
 			expectedPSP:         runAsAny.Name,
@@ -924,7 +996,8 @@ func TestAdmitSELinux(t *testing.T) {
 		"runAsAny with pod request": {
 			pod:                 createPodWithSecurityContexts(&kapi.PodSecurityContext{SELinuxOptions: &kapi.SELinuxOptions{User: "foo"}}, nil),
 			psps:                []*extensions.PodSecurityPolicy{runAsAny},
-			shouldPass:          true,
+			shouldPassAdmit:     true,
+			shouldPassValidate:  true,
 			expectedPodSC:       &kapi.PodSecurityContext{SELinuxOptions: &kapi.SELinuxOptions{User: "foo"}},
 			expectedContainerSC: nil,
 			expectedPSP:         runAsAny.Name,
@@ -932,7 +1005,8 @@ func TestAdmitSELinux(t *testing.T) {
 		"runAsAny with container request": {
 			pod:                 createPodWithSecurityContexts(nil, &kapi.SecurityContext{SELinuxOptions: &kapi.SELinuxOptions{User: "foo"}}),
 			psps:                []*extensions.PodSecurityPolicy{runAsAny},
-			shouldPass:          true,
+			shouldPassAdmit:     true,
+			shouldPassValidate:  true,
 			expectedPodSC:       nil,
 			expectedContainerSC: &kapi.SecurityContext{SELinuxOptions: &kapi.SELinuxOptions{User: "foo"}},
 			expectedPSP:         runAsAny.Name,
@@ -940,26 +1014,30 @@ func TestAdmitSELinux(t *testing.T) {
 		"runAsAny with pod and container request": {
 			pod:                 createPodWithSecurityContexts(&kapi.PodSecurityContext{SELinuxOptions: &kapi.SELinuxOptions{User: "bar"}}, &kapi.SecurityContext{SELinuxOptions: &kapi.SELinuxOptions{User: "foo"}}),
 			psps:                []*extensions.PodSecurityPolicy{runAsAny},
-			shouldPass:          true,
+			shouldPassAdmit:     true,
+			shouldPassValidate:  true,
 			expectedPodSC:       &kapi.PodSecurityContext{SELinuxOptions: &kapi.SELinuxOptions{User: "bar"}},
 			expectedContainerSC: &kapi.SecurityContext{SELinuxOptions: &kapi.SELinuxOptions{User: "foo"}},
 			expectedPSP:         runAsAny.Name,
 		},
 
 		"mustRunAs with bad pod request": {
-			pod:        createPodWithSecurityContexts(&kapi.PodSecurityContext{SELinuxOptions: &kapi.SELinuxOptions{User: "foo"}}, nil),
-			psps:       []*extensions.PodSecurityPolicy{mustRunAs},
-			shouldPass: false,
+			pod:                createPodWithSecurityContexts(&kapi.PodSecurityContext{SELinuxOptions: &kapi.SELinuxOptions{User: "foo"}}, nil),
+			psps:               []*extensions.PodSecurityPolicy{mustRunAs},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"mustRunAs with bad container request": {
-			pod:        createPodWithSecurityContexts(nil, &kapi.SecurityContext{SELinuxOptions: &kapi.SELinuxOptions{User: "foo"}}),
-			psps:       []*extensions.PodSecurityPolicy{mustRunAs},
-			shouldPass: false,
+			pod:                createPodWithSecurityContexts(nil, &kapi.SecurityContext{SELinuxOptions: &kapi.SELinuxOptions{User: "foo"}}),
+			psps:               []*extensions.PodSecurityPolicy{mustRunAs},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"mustRunAs with no request": {
 			pod:                 createPodWithSecurityContexts(nil, nil),
 			psps:                []*extensions.PodSecurityPolicy{mustRunAs},
-			shouldPass:          true,
+			shouldPassAdmit:     true,
+			shouldPassValidate:  true,
 			expectedPodSC:       &kapi.PodSecurityContext{SELinuxOptions: mustRunAs.Spec.SELinux.SELinuxOptions},
 			expectedContainerSC: nil,
 			expectedPSP:         mustRunAs.Name,
@@ -970,7 +1048,8 @@ func TestAdmitSELinux(t *testing.T) {
 				nil,
 			),
 			psps:                []*extensions.PodSecurityPolicy{mustRunAs},
-			shouldPass:          true,
+			shouldPassAdmit:     true,
+			shouldPassValidate:  true,
 			expectedPodSC:       &kapi.PodSecurityContext{SELinuxOptions: mustRunAs.Spec.SELinux.SELinuxOptions},
 			expectedContainerSC: nil,
 			expectedPSP:         mustRunAs.Name,
@@ -981,7 +1060,8 @@ func TestAdmitSELinux(t *testing.T) {
 				nil,
 			),
 			psps:                []*extensions.PodSecurityPolicy{mustRunAs},
-			shouldPass:          true,
+			shouldPassAdmit:     true,
+			shouldPassValidate:  true,
 			expectedPodSC:       &kapi.PodSecurityContext{SELinuxOptions: mustRunAs.Spec.SELinux.SELinuxOptions},
 			expectedContainerSC: nil,
 			expectedPSP:         mustRunAs.Name,
@@ -989,9 +1069,9 @@ func TestAdmitSELinux(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+		testPSPAdmit(k, v.psps, v.pod, v.shouldPassAdmit, v.shouldPassValidate, v.expectedPSP, t)
 
-		if v.shouldPass {
+		if v.shouldPassAdmit {
 			if !reflect.DeepEqual(v.expectedPodSC, v.pod.Spec.SecurityContext) {
 				t.Errorf("%s unexpected diff:\n%s", k, diff.ObjectGoPrintSideBySide(v.expectedPodSC, v.pod.Spec.SecurityContext))
 			}
@@ -1025,57 +1105,65 @@ func TestAdmitAppArmor(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		pod             *kapi.Pod
-		psp             *extensions.PodSecurityPolicy
-		shouldPass      bool
-		expectedProfile string
+		pod                *kapi.Pod
+		psp                *extensions.PodSecurityPolicy
+		shouldPassAdmit    bool
+		shouldPassValidate bool
+		expectedProfile    string
 	}{
 		"unconstrained with no profile": {
-			pod:             goodPod(),
-			psp:             unconstrainedPSP,
-			shouldPass:      true,
-			expectedProfile: "",
+			pod:                goodPod(),
+			psp:                unconstrainedPSP,
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedProfile:    "",
 		},
 		"unconstrained with profile": {
-			pod:             createPodWithAppArmor(apparmor.ProfileRuntimeDefault),
-			psp:             unconstrainedPSP,
-			shouldPass:      true,
-			expectedProfile: apparmor.ProfileRuntimeDefault,
+			pod:                createPodWithAppArmor(apparmor.ProfileRuntimeDefault),
+			psp:                unconstrainedPSP,
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedProfile:    apparmor.ProfileRuntimeDefault,
 		},
 		"unconstrained with default profile": {
-			pod:             goodPod(),
-			psp:             defaultedPSP,
-			shouldPass:      true,
-			expectedProfile: apparmor.ProfileRuntimeDefault,
+			pod:                goodPod(),
+			psp:                defaultedPSP,
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedProfile:    apparmor.ProfileRuntimeDefault,
 		},
 		"AppArmor enforced with no profile": {
-			pod:        goodPod(),
-			psp:        appArmorPSP,
-			shouldPass: false,
+			pod:                goodPod(),
+			psp:                appArmorPSP,
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"AppArmor enforced with default profile": {
-			pod:             goodPod(),
-			psp:             appArmorDefaultPSP,
-			shouldPass:      true,
-			expectedProfile: apparmor.ProfileRuntimeDefault,
+			pod:                goodPod(),
+			psp:                appArmorDefaultPSP,
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedProfile:    apparmor.ProfileRuntimeDefault,
 		},
 		"AppArmor enforced with good profile": {
-			pod:             createPodWithAppArmor(apparmor.ProfileNamePrefix + "foo"),
-			psp:             appArmorDefaultPSP,
-			shouldPass:      true,
-			expectedProfile: apparmor.ProfileNamePrefix + "foo",
+			pod:                createPodWithAppArmor(apparmor.ProfileNamePrefix + "foo"),
+			psp:                appArmorDefaultPSP,
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedProfile:    apparmor.ProfileNamePrefix + "foo",
 		},
 		"AppArmor enforced with local profile": {
-			pod:        createPodWithAppArmor(apparmor.ProfileNamePrefix + "bar"),
-			psp:        appArmorPSP,
-			shouldPass: false,
+			pod:                createPodWithAppArmor(apparmor.ProfileNamePrefix + "bar"),
+			psp:                appArmorPSP,
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 	}
 
 	for k, v := range tests {
-		testPSPAdmit(k, []*extensions.PodSecurityPolicy{v.psp}, v.pod, v.shouldPass, v.psp.Name, t)
+		testPSPAdmit(k, []*extensions.PodSecurityPolicy{v.psp}, v.pod, v.shouldPassAdmit, v.shouldPassValidate, v.psp.Name, t)
 
-		if v.shouldPass {
+		if v.shouldPassAdmit {
 			assert.Equal(t, v.expectedProfile, apparmor.GetProfileNameFromPodAnnotations(v.pod.Annotations, defaultContainerName), k)
 		}
 	}
@@ -1109,7 +1197,8 @@ func TestAdmitRunAsUser(t *testing.T) {
 	tests := map[string]struct {
 		pod                 *kapi.Pod
 		psps                []*extensions.PodSecurityPolicy
-		shouldPass          bool
+		shouldPassAdmit     bool
+		shouldPassValidate  bool
 		expectedPodSC       *kapi.PodSecurityContext
 		expectedContainerSC *kapi.SecurityContext
 		expectedPSP         string
@@ -1117,7 +1206,8 @@ func TestAdmitRunAsUser(t *testing.T) {
 		"runAsAny no pod request": {
 			pod:                 createPodWithSecurityContexts(nil, nil),
 			psps:                []*extensions.PodSecurityPolicy{runAsAny},
-			shouldPass:          true,
+			shouldPassAdmit:     true,
+			shouldPassValidate:  true,
 			expectedPodSC:       nil,
 			expectedContainerSC: nil,
 			expectedPSP:         runAsAny.Name,
@@ -1125,7 +1215,8 @@ func TestAdmitRunAsUser(t *testing.T) {
 		"runAsAny pod request": {
 			pod:                 createPodWithSecurityContexts(podSC(userIDPtr(1)), nil),
 			psps:                []*extensions.PodSecurityPolicy{runAsAny},
-			shouldPass:          true,
+			shouldPassAdmit:     true,
+			shouldPassValidate:  true,
 			expectedPodSC:       podSC(userIDPtr(1)),
 			expectedContainerSC: nil,
 			expectedPSP:         runAsAny.Name,
@@ -1133,27 +1224,31 @@ func TestAdmitRunAsUser(t *testing.T) {
 		"runAsAny container request": {
 			pod:                 createPodWithSecurityContexts(nil, containerSC(userIDPtr(1))),
 			psps:                []*extensions.PodSecurityPolicy{runAsAny},
-			shouldPass:          true,
+			shouldPassAdmit:     true,
+			shouldPassValidate:  true,
 			expectedPodSC:       nil,
 			expectedContainerSC: containerSC(userIDPtr(1)),
 			expectedPSP:         runAsAny.Name,
 		},
 
 		"mustRunAs pod request out of range": {
-			pod:        createPodWithSecurityContexts(podSC(userIDPtr(1)), nil),
-			psps:       []*extensions.PodSecurityPolicy{mustRunAs},
-			shouldPass: false,
+			pod:                createPodWithSecurityContexts(podSC(userIDPtr(1)), nil),
+			psps:               []*extensions.PodSecurityPolicy{mustRunAs},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"mustRunAs container request out of range": {
-			pod:        createPodWithSecurityContexts(podSC(userIDPtr(999)), containerSC(userIDPtr(1))),
-			psps:       []*extensions.PodSecurityPolicy{mustRunAs},
-			shouldPass: false,
+			pod:                createPodWithSecurityContexts(podSC(userIDPtr(999)), containerSC(userIDPtr(1))),
+			psps:               []*extensions.PodSecurityPolicy{mustRunAs},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 
 		"mustRunAs pod request in range": {
 			pod:                 createPodWithSecurityContexts(podSC(userIDPtr(999)), nil),
 			psps:                []*extensions.PodSecurityPolicy{mustRunAs},
-			shouldPass:          true,
+			shouldPassAdmit:     true,
+			shouldPassValidate:  true,
 			expectedPodSC:       podSC(&mustRunAs.Spec.RunAsUser.Ranges[0].Min),
 			expectedContainerSC: nil,
 			expectedPSP:         mustRunAs.Name,
@@ -1161,7 +1256,8 @@ func TestAdmitRunAsUser(t *testing.T) {
 		"mustRunAs container request in range": {
 			pod:                 createPodWithSecurityContexts(nil, containerSC(userIDPtr(999))),
 			psps:                []*extensions.PodSecurityPolicy{mustRunAs},
-			shouldPass:          true,
+			shouldPassAdmit:     true,
+			shouldPassValidate:  true,
 			expectedPodSC:       nil,
 			expectedContainerSC: containerSC(&mustRunAs.Spec.RunAsUser.Ranges[0].Min),
 			expectedPSP:         mustRunAs.Name,
@@ -1169,7 +1265,8 @@ func TestAdmitRunAsUser(t *testing.T) {
 		"mustRunAs pod and container request in range": {
 			pod:                 createPodWithSecurityContexts(podSC(userIDPtr(999)), containerSC(userIDPtr(1000))),
 			psps:                []*extensions.PodSecurityPolicy{mustRunAs},
-			shouldPass:          true,
+			shouldPassAdmit:     true,
+			shouldPassValidate:  true,
 			expectedPodSC:       podSC(userIDPtr(999)),
 			expectedContainerSC: containerSC(userIDPtr(1000)),
 			expectedPSP:         mustRunAs.Name,
@@ -1177,7 +1274,8 @@ func TestAdmitRunAsUser(t *testing.T) {
 		"mustRunAs no request": {
 			pod:                 createPodWithSecurityContexts(nil, nil),
 			psps:                []*extensions.PodSecurityPolicy{mustRunAs},
-			shouldPass:          true,
+			shouldPassAdmit:     true,
+			shouldPassValidate:  true,
 			expectedPodSC:       nil,
 			expectedContainerSC: containerSC(&mustRunAs.Spec.RunAsUser.Ranges[0].Min),
 			expectedPSP:         mustRunAs.Name,
@@ -1186,32 +1284,37 @@ func TestAdmitRunAsUser(t *testing.T) {
 		"runAsNonRoot no request": {
 			pod:                 createPodWithSecurityContexts(nil, nil),
 			psps:                []*extensions.PodSecurityPolicy{runAsNonRoot},
-			shouldPass:          true,
+			shouldPassAdmit:     true,
+			shouldPassValidate:  true,
 			expectedPodSC:       nil,
 			expectedContainerSC: &kapi.SecurityContext{RunAsNonRoot: &trueValue},
 			expectedPSP:         runAsNonRoot.Name,
 		},
 		"runAsNonRoot pod request root": {
-			pod:        createPodWithSecurityContexts(podSC(userIDPtr(0)), nil),
-			psps:       []*extensions.PodSecurityPolicy{runAsNonRoot},
-			shouldPass: false,
+			pod:                createPodWithSecurityContexts(podSC(userIDPtr(0)), nil),
+			psps:               []*extensions.PodSecurityPolicy{runAsNonRoot},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"runAsNonRoot pod request non-root": {
-			pod:           createPodWithSecurityContexts(podSC(userIDPtr(1)), nil),
-			psps:          []*extensions.PodSecurityPolicy{runAsNonRoot},
-			shouldPass:    true,
-			expectedPodSC: podSC(userIDPtr(1)),
-			expectedPSP:   runAsNonRoot.Name,
+			pod:                createPodWithSecurityContexts(podSC(userIDPtr(1)), nil),
+			psps:               []*extensions.PodSecurityPolicy{runAsNonRoot},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPodSC:      podSC(userIDPtr(1)),
+			expectedPSP:        runAsNonRoot.Name,
 		},
 		"runAsNonRoot container request root": {
-			pod:        createPodWithSecurityContexts(podSC(userIDPtr(1)), containerSC(userIDPtr(0))),
-			psps:       []*extensions.PodSecurityPolicy{runAsNonRoot},
-			shouldPass: false,
+			pod:                createPodWithSecurityContexts(podSC(userIDPtr(1)), containerSC(userIDPtr(0))),
+			psps:               []*extensions.PodSecurityPolicy{runAsNonRoot},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"runAsNonRoot container request non-root": {
 			pod:                 createPodWithSecurityContexts(podSC(userIDPtr(1)), containerSC(userIDPtr(2))),
 			psps:                []*extensions.PodSecurityPolicy{runAsNonRoot},
-			shouldPass:          true,
+			shouldPassAdmit:     true,
+			shouldPassValidate:  true,
 			expectedPodSC:       podSC(userIDPtr(1)),
 			expectedContainerSC: containerSC(userIDPtr(2)),
 			expectedPSP:         runAsNonRoot.Name,
@@ -1219,9 +1322,9 @@ func TestAdmitRunAsUser(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+		testPSPAdmit(k, v.psps, v.pod, v.shouldPassAdmit, v.shouldPassValidate, v.expectedPSP, t)
 
-		if v.shouldPass {
+		if v.shouldPassAdmit {
 			if !reflect.DeepEqual(v.expectedPodSC, v.pod.Spec.SecurityContext) {
 				t.Errorf("%s unexpected pod sc diff:\n%s", k, diff.ObjectGoPrintSideBySide(v.expectedPodSC, v.pod.Spec.SecurityContext))
 			}
@@ -1247,65 +1350,73 @@ func TestAdmitSupplementalGroups(t *testing.T) {
 	mustRunAs.Spec.SupplementalGroups.Ranges = []extensions.GroupIDRange{{Min: int64(999), Max: int64(1000)}}
 
 	tests := map[string]struct {
-		pod           *kapi.Pod
-		psps          []*extensions.PodSecurityPolicy
-		shouldPass    bool
-		expectedPodSC *kapi.PodSecurityContext
-		expectedPSP   string
+		pod                *kapi.Pod
+		psps               []*extensions.PodSecurityPolicy
+		shouldPassAdmit    bool
+		shouldPassValidate bool
+		expectedPodSC      *kapi.PodSecurityContext
+		expectedPSP        string
 	}{
 		"runAsAny no pod request": {
-			pod:           createPodWithSecurityContexts(nil, nil),
-			psps:          []*extensions.PodSecurityPolicy{runAsAny},
-			shouldPass:    true,
-			expectedPodSC: nil,
-			expectedPSP:   runAsAny.Name,
+			pod:                createPodWithSecurityContexts(nil, nil),
+			psps:               []*extensions.PodSecurityPolicy{runAsAny},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPodSC:      nil,
+			expectedPSP:        runAsAny.Name,
 		},
 		"runAsAny empty pod request": {
-			pod:           createPodWithSecurityContexts(&kapi.PodSecurityContext{}, nil),
-			psps:          []*extensions.PodSecurityPolicy{runAsAny},
-			shouldPass:    true,
-			expectedPodSC: &kapi.PodSecurityContext{},
-			expectedPSP:   runAsAny.Name,
+			pod:                createPodWithSecurityContexts(&kapi.PodSecurityContext{}, nil),
+			psps:               []*extensions.PodSecurityPolicy{runAsAny},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPodSC:      &kapi.PodSecurityContext{},
+			expectedPSP:        runAsAny.Name,
 		},
 		"runAsAny empty pod request empty supplemental groups": {
-			pod:           createPodWithSecurityContexts(&kapi.PodSecurityContext{SupplementalGroups: []int64{}}, nil),
-			psps:          []*extensions.PodSecurityPolicy{runAsAny},
-			shouldPass:    true,
-			expectedPodSC: &kapi.PodSecurityContext{SupplementalGroups: []int64{}},
-			expectedPSP:   runAsAny.Name,
+			pod:                createPodWithSecurityContexts(&kapi.PodSecurityContext{SupplementalGroups: []int64{}}, nil),
+			psps:               []*extensions.PodSecurityPolicy{runAsAny},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPodSC:      &kapi.PodSecurityContext{SupplementalGroups: []int64{}},
+			expectedPSP:        runAsAny.Name,
 		},
 		"runAsAny pod request": {
-			pod:           createPodWithSecurityContexts(podSC(1), nil),
-			psps:          []*extensions.PodSecurityPolicy{runAsAny},
-			shouldPass:    true,
-			expectedPodSC: &kapi.PodSecurityContext{SupplementalGroups: []int64{1}},
-			expectedPSP:   runAsAny.Name,
+			pod:                createPodWithSecurityContexts(podSC(1), nil),
+			psps:               []*extensions.PodSecurityPolicy{runAsAny},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPodSC:      &kapi.PodSecurityContext{SupplementalGroups: []int64{1}},
+			expectedPSP:        runAsAny.Name,
 		},
 		"mustRunAs no pod request": {
-			pod:           createPodWithSecurityContexts(nil, nil),
-			psps:          []*extensions.PodSecurityPolicy{mustRunAs},
-			shouldPass:    true,
-			expectedPodSC: podSC(mustRunAs.Spec.SupplementalGroups.Ranges[0].Min),
-			expectedPSP:   mustRunAs.Name,
+			pod:                createPodWithSecurityContexts(nil, nil),
+			psps:               []*extensions.PodSecurityPolicy{mustRunAs},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPodSC:      podSC(mustRunAs.Spec.SupplementalGroups.Ranges[0].Min),
+			expectedPSP:        mustRunAs.Name,
 		},
 		"mustRunAs bad pod request": {
-			pod:        createPodWithSecurityContexts(podSC(1), nil),
-			psps:       []*extensions.PodSecurityPolicy{mustRunAs},
-			shouldPass: false,
+			pod:                createPodWithSecurityContexts(podSC(1), nil),
+			psps:               []*extensions.PodSecurityPolicy{mustRunAs},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"mustRunAs good pod request": {
-			pod:           createPodWithSecurityContexts(podSC(999), nil),
-			psps:          []*extensions.PodSecurityPolicy{mustRunAs},
-			shouldPass:    true,
-			expectedPodSC: podSC(999),
-			expectedPSP:   mustRunAs.Name,
+			pod:                createPodWithSecurityContexts(podSC(999), nil),
+			psps:               []*extensions.PodSecurityPolicy{mustRunAs},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPodSC:      podSC(999),
+			expectedPSP:        mustRunAs.Name,
 		},
 	}
 
 	for k, v := range tests {
-		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+		testPSPAdmit(k, v.psps, v.pod, v.shouldPassAdmit, v.shouldPassValidate, v.expectedPSP, t)
 
-		if v.shouldPass {
+		if v.shouldPassAdmit {
 			if !reflect.DeepEqual(v.expectedPodSC, v.pod.Spec.SecurityContext) {
 				t.Errorf("%s unexpected pod sc diff:\n%s", k, diff.ObjectGoPrintSideBySide(v.expectedPodSC, v.pod.Spec.SecurityContext))
 			}
@@ -1331,51 +1442,57 @@ func TestAdmitFSGroup(t *testing.T) {
 	mustRunAs.Name = "mustRunAs"
 
 	tests := map[string]struct {
-		pod             *kapi.Pod
-		psps            []*extensions.PodSecurityPolicy
-		shouldPass      bool
-		expectedFSGroup *int64
-		expectedPSP     string
+		pod                *kapi.Pod
+		psps               []*extensions.PodSecurityPolicy
+		shouldPassAdmit    bool
+		shouldPassValidate bool
+		expectedFSGroup    *int64
+		expectedPSP        string
 	}{
 		"runAsAny no pod request": {
-			pod:             goodPod(),
-			psps:            []*extensions.PodSecurityPolicy{runAsAny},
-			shouldPass:      true,
-			expectedFSGroup: nil,
-			expectedPSP:     runAsAny.Name,
+			pod:                goodPod(),
+			psps:               []*extensions.PodSecurityPolicy{runAsAny},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedFSGroup:    nil,
+			expectedPSP:        runAsAny.Name,
 		},
 		"runAsAny pod request": {
-			pod:             createPodWithFSGroup(1),
-			psps:            []*extensions.PodSecurityPolicy{runAsAny},
-			shouldPass:      true,
-			expectedFSGroup: groupIDPtr(1),
-			expectedPSP:     runAsAny.Name,
+			pod:                createPodWithFSGroup(1),
+			psps:               []*extensions.PodSecurityPolicy{runAsAny},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedFSGroup:    groupIDPtr(1),
+			expectedPSP:        runAsAny.Name,
 		},
 		"mustRunAs no pod request": {
-			pod:             goodPod(),
-			psps:            []*extensions.PodSecurityPolicy{mustRunAs},
-			shouldPass:      true,
-			expectedFSGroup: &mustRunAs.Spec.SupplementalGroups.Ranges[0].Min,
-			expectedPSP:     mustRunAs.Name,
+			pod:                goodPod(),
+			psps:               []*extensions.PodSecurityPolicy{mustRunAs},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedFSGroup:    &mustRunAs.Spec.SupplementalGroups.Ranges[0].Min,
+			expectedPSP:        mustRunAs.Name,
 		},
 		"mustRunAs bad pod request": {
-			pod:        createPodWithFSGroup(1),
-			psps:       []*extensions.PodSecurityPolicy{mustRunAs},
-			shouldPass: false,
+			pod:                createPodWithFSGroup(1),
+			psps:               []*extensions.PodSecurityPolicy{mustRunAs},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"mustRunAs good pod request": {
-			pod:             createPodWithFSGroup(999),
-			psps:            []*extensions.PodSecurityPolicy{mustRunAs},
-			shouldPass:      true,
-			expectedFSGroup: groupIDPtr(999),
-			expectedPSP:     mustRunAs.Name,
+			pod:                createPodWithFSGroup(999),
+			psps:               []*extensions.PodSecurityPolicy{mustRunAs},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedFSGroup:    groupIDPtr(999),
+			expectedPSP:        mustRunAs.Name,
 		},
 	}
 
 	for k, v := range tests {
-		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+		testPSPAdmit(k, v.psps, v.pod, v.shouldPassAdmit, v.shouldPassValidate, v.expectedPSP, t)
 
-		if v.shouldPass {
+		if v.shouldPassAdmit {
 			if v.pod.Spec.SecurityContext.FSGroup == nil && v.expectedFSGroup == nil {
 				// ok, don't need to worry about identifying specific diffs
 				continue
@@ -1411,51 +1528,57 @@ func TestAdmitReadOnlyRootFilesystem(t *testing.T) {
 	rorfs.Spec.ReadOnlyRootFilesystem = true
 
 	tests := map[string]struct {
-		pod           *kapi.Pod
-		psps          []*extensions.PodSecurityPolicy
-		shouldPass    bool
-		expectedRORFS bool
-		expectedPSP   string
+		pod                *kapi.Pod
+		psps               []*extensions.PodSecurityPolicy
+		shouldPassAdmit    bool
+		shouldPassValidate bool
+		expectedRORFS      bool
+		expectedPSP        string
 	}{
 		"no-rorfs allows pod request with rorfs": {
-			pod:           createPodWithRORFS(true),
-			psps:          []*extensions.PodSecurityPolicy{noRORFS},
-			shouldPass:    true,
-			expectedRORFS: true,
-			expectedPSP:   noRORFS.Name,
+			pod:                createPodWithRORFS(true),
+			psps:               []*extensions.PodSecurityPolicy{noRORFS},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedRORFS:      true,
+			expectedPSP:        noRORFS.Name,
 		},
 		"no-rorfs allows pod request without rorfs": {
-			pod:           createPodWithRORFS(false),
-			psps:          []*extensions.PodSecurityPolicy{noRORFS},
-			shouldPass:    true,
-			expectedRORFS: false,
-			expectedPSP:   noRORFS.Name,
+			pod:                createPodWithRORFS(false),
+			psps:               []*extensions.PodSecurityPolicy{noRORFS},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedRORFS:      false,
+			expectedPSP:        noRORFS.Name,
 		},
 		"rorfs rejects pod request without rorfs": {
-			pod:        createPodWithRORFS(false),
-			psps:       []*extensions.PodSecurityPolicy{rorfs},
-			shouldPass: false,
+			pod:                createPodWithRORFS(false),
+			psps:               []*extensions.PodSecurityPolicy{rorfs},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"rorfs defaults nil pod request": {
-			pod:           goodPod(),
-			psps:          []*extensions.PodSecurityPolicy{rorfs},
-			shouldPass:    true,
-			expectedRORFS: true,
-			expectedPSP:   rorfs.Name,
+			pod:                goodPod(),
+			psps:               []*extensions.PodSecurityPolicy{rorfs},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedRORFS:      true,
+			expectedPSP:        rorfs.Name,
 		},
 		"rorfs accepts pod request with rorfs": {
-			pod:           createPodWithRORFS(true),
-			psps:          []*extensions.PodSecurityPolicy{rorfs},
-			shouldPass:    true,
-			expectedRORFS: true,
-			expectedPSP:   rorfs.Name,
+			pod:                createPodWithRORFS(true),
+			psps:               []*extensions.PodSecurityPolicy{rorfs},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedRORFS:      true,
+			expectedPSP:        rorfs.Name,
 		},
 	}
 
 	for k, v := range tests {
-		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+		testPSPAdmit(k, v.psps, v.pod, v.shouldPassAdmit, v.shouldPassValidate, v.expectedPSP, t)
 
-		if v.shouldPass {
+		if v.shouldPassAdmit {
 			if v.pod.Spec.Containers[0].SecurityContext.ReadOnlyRootFilesystem == nil ||
 				*v.pod.Spec.Containers[0].SecurityContext.ReadOnlyRootFilesystem != v.expectedRORFS {
 				t.Errorf("%s expected ReadOnlyRootFilesystem to be %t but found %#v", k, v.expectedRORFS, v.pod.Spec.Containers[0].SecurityContext.ReadOnlyRootFilesystem)
@@ -1508,116 +1631,136 @@ func TestAdmitSysctls(t *testing.T) {
 	catchallSysctls.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "*"
 
 	tests := map[string]struct {
-		pod         *kapi.Pod
-		psps        []*extensions.PodSecurityPolicy
-		shouldPass  bool
-		expectedPSP string
+		pod                *kapi.Pod
+		psps               []*extensions.PodSecurityPolicy
+		shouldPassAdmit    bool
+		shouldPassValidate bool
+		expectedPSP        string
 	}{
 		"pod without unsafe sysctls request allowed under noSysctls PSP": {
-			pod:         goodPod(),
-			psps:        []*extensions.PodSecurityPolicy{noSysctls},
-			shouldPass:  true,
-			expectedPSP: noSysctls.Name,
+			pod:                goodPod(),
+			psps:               []*extensions.PodSecurityPolicy{noSysctls},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPSP:        noSysctls.Name,
 		},
 		"pod without any sysctls request allowed under emptySysctls PSP": {
-			pod:         goodPod(),
-			psps:        []*extensions.PodSecurityPolicy{emptySysctls},
-			shouldPass:  true,
-			expectedPSP: emptySysctls.Name,
+			pod:                goodPod(),
+			psps:               []*extensions.PodSecurityPolicy{emptySysctls},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPSP:        emptySysctls.Name,
 		},
 		"pod with safe sysctls request allowed under noSysctls PSP": {
-			pod:         podWithSysctls([]string{"a", "b"}, []string{}),
-			psps:        []*extensions.PodSecurityPolicy{noSysctls},
-			shouldPass:  true,
-			expectedPSP: noSysctls.Name,
+			pod:                podWithSysctls([]string{"a", "b"}, []string{}),
+			psps:               []*extensions.PodSecurityPolicy{noSysctls},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPSP:        noSysctls.Name,
 		},
 		"pod with unsafe sysctls request allowed under noSysctls PSP": {
-			pod:         podWithSysctls([]string{}, []string{"a", "b"}),
-			psps:        []*extensions.PodSecurityPolicy{noSysctls},
-			shouldPass:  true,
-			expectedPSP: noSysctls.Name,
+			pod:                podWithSysctls([]string{}, []string{"a", "b"}),
+			psps:               []*extensions.PodSecurityPolicy{noSysctls},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPSP:        noSysctls.Name,
 		},
 		"pod with safe sysctls request disallowed under emptySysctls PSP": {
-			pod:        podWithSysctls([]string{"a", "b"}, []string{}),
-			psps:       []*extensions.PodSecurityPolicy{emptySysctls},
-			shouldPass: false,
+			pod:                podWithSysctls([]string{"a", "b"}, []string{}),
+			psps:               []*extensions.PodSecurityPolicy{emptySysctls},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"pod with unsafe sysctls a, b request disallowed under aSysctls SCC": {
-			pod:        podWithSysctls([]string{}, []string{"a", "b"}),
-			psps:       []*extensions.PodSecurityPolicy{aSysctl},
-			shouldPass: false,
+			pod:                podWithSysctls([]string{}, []string{"a", "b"}),
+			psps:               []*extensions.PodSecurityPolicy{aSysctl},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"pod with unsafe sysctls b request disallowed under aSysctls SCC": {
-			pod:        podWithSysctls([]string{}, []string{"b"}),
-			psps:       []*extensions.PodSecurityPolicy{aSysctl},
-			shouldPass: false,
+			pod:                podWithSysctls([]string{}, []string{"b"}),
+			psps:               []*extensions.PodSecurityPolicy{aSysctl},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"pod with unsafe sysctls a request allowed under aSysctls SCC": {
-			pod:         podWithSysctls([]string{}, []string{"a"}),
-			psps:        []*extensions.PodSecurityPolicy{aSysctl},
-			shouldPass:  true,
-			expectedPSP: aSysctl.Name,
+			pod:                podWithSysctls([]string{}, []string{"a"}),
+			psps:               []*extensions.PodSecurityPolicy{aSysctl},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPSP:        aSysctl.Name,
 		},
 		"pod with safe sysctls a, b request disallowed under aSysctls SCC": {
-			pod:        podWithSysctls([]string{"a", "b"}, []string{}),
-			psps:       []*extensions.PodSecurityPolicy{aSysctl},
-			shouldPass: false,
+			pod:                podWithSysctls([]string{"a", "b"}, []string{}),
+			psps:               []*extensions.PodSecurityPolicy{aSysctl},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"pod with safe sysctls b request disallowed under aSysctls SCC": {
-			pod:        podWithSysctls([]string{"b"}, []string{}),
-			psps:       []*extensions.PodSecurityPolicy{aSysctl},
-			shouldPass: false,
+			pod:                podWithSysctls([]string{"b"}, []string{}),
+			psps:               []*extensions.PodSecurityPolicy{aSysctl},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"pod with safe sysctls a request allowed under aSysctls SCC": {
-			pod:         podWithSysctls([]string{"a"}, []string{}),
-			psps:        []*extensions.PodSecurityPolicy{aSysctl},
-			shouldPass:  true,
-			expectedPSP: aSysctl.Name,
+			pod:                podWithSysctls([]string{"a"}, []string{}),
+			psps:               []*extensions.PodSecurityPolicy{aSysctl},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPSP:        aSysctl.Name,
 		},
 		"pod with unsafe sysctls request disallowed under emptySysctls PSP": {
-			pod:        podWithSysctls([]string{}, []string{"a", "b"}),
-			psps:       []*extensions.PodSecurityPolicy{emptySysctls},
-			shouldPass: false,
+			pod:                podWithSysctls([]string{}, []string{"a", "b"}),
+			psps:               []*extensions.PodSecurityPolicy{emptySysctls},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"pod with matching sysctls request allowed under mixedSysctls PSP": {
-			pod:         podWithSysctls([]string{"a.b", "b.c"}, []string{"c", "d.e.f"}),
-			psps:        []*extensions.PodSecurityPolicy{mixedSysctls},
-			shouldPass:  true,
-			expectedPSP: mixedSysctls.Name,
+			pod:                podWithSysctls([]string{"a.b", "b.c"}, []string{"c", "d.e.f"}),
+			psps:               []*extensions.PodSecurityPolicy{mixedSysctls},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPSP:        mixedSysctls.Name,
 		},
 		"pod with not-matching unsafe sysctls request disallowed under mixedSysctls PSP": {
-			pod:        podWithSysctls([]string{"a.b", "b.c", "c", "d.e.f"}, []string{"e"}),
-			psps:       []*extensions.PodSecurityPolicy{mixedSysctls},
-			shouldPass: false,
+			pod:                podWithSysctls([]string{"a.b", "b.c", "c", "d.e.f"}, []string{"e"}),
+			psps:               []*extensions.PodSecurityPolicy{mixedSysctls},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"pod with not-matching safe sysctls request disallowed under mixedSysctls PSP": {
-			pod:        podWithSysctls([]string{"a.b", "b.c", "c", "d.e.f", "e"}, []string{}),
-			psps:       []*extensions.PodSecurityPolicy{mixedSysctls},
-			shouldPass: false,
+			pod:                podWithSysctls([]string{"a.b", "b.c", "c", "d.e.f", "e"}, []string{}),
+			psps:               []*extensions.PodSecurityPolicy{mixedSysctls},
+			shouldPassAdmit:    false,
+			shouldPassValidate: false,
 		},
 		"pod with sysctls request allowed under catchallSysctls PSP": {
-			pod:         podWithSysctls([]string{"e"}, []string{"f"}),
-			psps:        []*extensions.PodSecurityPolicy{catchallSysctls},
-			shouldPass:  true,
-			expectedPSP: catchallSysctls.Name,
+			pod:                podWithSysctls([]string{"e"}, []string{"f"}),
+			psps:               []*extensions.PodSecurityPolicy{catchallSysctls},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPSP:        catchallSysctls.Name,
 		},
 		"pod with sysctls request allowed under catchallSysctls PSP, not under mixedSysctls or emptySysctls PSP": {
-			pod:         podWithSysctls([]string{"e"}, []string{"f"}),
-			psps:        []*extensions.PodSecurityPolicy{mixedSysctls, catchallSysctls, emptySysctls},
-			shouldPass:  true,
-			expectedPSP: catchallSysctls.Name,
+			pod:                podWithSysctls([]string{"e"}, []string{"f"}),
+			psps:               []*extensions.PodSecurityPolicy{mixedSysctls, catchallSysctls, emptySysctls},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPSP:        catchallSysctls.Name,
 		},
 		"pod with safe c sysctl request allowed under cSysctl PSP, not under aSysctl or bSysctl PSP": {
-			pod:         podWithSysctls([]string{}, []string{"c"}),
-			psps:        []*extensions.PodSecurityPolicy{aSysctl, bSysctl, cSysctl},
-			shouldPass:  true,
-			expectedPSP: cSysctl.Name,
+			pod:                podWithSysctls([]string{}, []string{"c"}),
+			psps:               []*extensions.PodSecurityPolicy{aSysctl, bSysctl, cSysctl},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPSP:        cSysctl.Name,
 		},
 		"pod with unsafe c sysctl request allowed under cSysctl PSP, not under aSysctl or bSysctl PSP": {
-			pod:         podWithSysctls([]string{"c"}, []string{}),
-			psps:        []*extensions.PodSecurityPolicy{aSysctl, bSysctl, cSysctl},
-			shouldPass:  true,
-			expectedPSP: cSysctl.Name,
+			pod:                podWithSysctls([]string{"c"}, []string{}),
+			psps:               []*extensions.PodSecurityPolicy{aSysctl, bSysctl, cSysctl},
+			shouldPassAdmit:    true,
+			shouldPassValidate: true,
+			expectedPSP:        cSysctl.Name,
 		},
 	}
 
@@ -1627,9 +1770,9 @@ func TestAdmitSysctls(t *testing.T) {
 			t.Fatalf("invalid sysctl annotation: %v", err)
 		}
 
-		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+		testPSPAdmit(k, v.psps, v.pod, v.shouldPassAdmit, v.shouldPassValidate, v.expectedPSP, t)
 
-		if v.shouldPass {
+		if v.shouldPassAdmit {
 			safeSysctls, unsafeSysctls, _ := helper.SysctlsFromPodAnnotations(v.pod.Annotations)
 			if !reflect.DeepEqual(safeSysctls, origSafeSysctls) {
 				t.Errorf("%s: wrong safe sysctls: expected=%v, got=%v", k, origSafeSysctls, safeSysctls)
@@ -1641,11 +1784,11 @@ func TestAdmitSysctls(t *testing.T) {
 	}
 }
 
-func testPSPAdmit(testCaseName string, psps []*extensions.PodSecurityPolicy, pod *kapi.Pod, shouldPass bool, expectedPSP string, t *testing.T) {
-	testPSPAdmitAdvanced(testCaseName, kadmission.Create, psps, pod, nil, shouldPass, true, expectedPSP, t)
+func testPSPAdmit(testCaseName string, psps []*extensions.PodSecurityPolicy, pod *kapi.Pod, shouldPassAdmit, shouldPassValidate bool, expectedPSP string, t *testing.T) {
+	testPSPAdmitAdvanced(testCaseName, kadmission.Create, psps, pod, nil, shouldPassAdmit, shouldPassValidate, true, expectedPSP, t)
 }
 
-func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*extensions.PodSecurityPolicy, pod, oldPod *kapi.Pod, shouldPass bool, canMutate bool, expectedPSP string, t *testing.T) {
+func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*extensions.PodSecurityPolicy, pod, oldPod *kapi.Pod, shouldPassAdmit, shouldPassValidate bool, canMutate bool, expectedPSP string, t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 	store := informerFactory.Extensions().InternalVersion().PodSecurityPolicies().Informer().GetStore()
 
@@ -1660,13 +1803,13 @@ func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*
 	attrs := kadmission.NewAttributesRecord(pod, oldPod, kapi.Kind("Pod").WithVersion("version"), "namespace", "", kapi.Resource("pods").WithVersion("version"), "", op, &user.DefaultInfo{})
 	err := plugin.Admit(attrs)
 
-	if shouldPass && err != nil {
-		t.Errorf("%s: expected no errors but received %v", testCaseName, err)
+	if shouldPassAdmit && err != nil {
+		t.Errorf("%s: expected no errors on Admit but received %v", testCaseName, err)
 	}
 
-	if shouldPass && err == nil {
+	if shouldPassAdmit && err == nil {
 		if pod.Annotations[psputil.ValidatedPSPAnnotation] != expectedPSP {
-			t.Errorf("%s: expected to validate under %q PSP but found %q", testCaseName, expectedPSP, pod.Annotations[psputil.ValidatedPSPAnnotation])
+			t.Errorf("%s: expected to be admitted under %q PSP but found %q", testCaseName, expectedPSP, pod.Annotations[psputil.ValidatedPSPAnnotation])
 		}
 
 		if !canMutate {
@@ -1677,13 +1820,20 @@ func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*
 			delete(originalPodWithoutPSPAnnotation.Annotations, psputil.ValidatedPSPAnnotation)
 
 			if !apiequality.Semantic.DeepEqual(originalPodWithoutPSPAnnotation.Spec, podWithoutPSPAnnotation.Spec) {
-				t.Errorf("%s: expected no mutation, got %s", testCaseName, diff.ObjectGoPrintSideBySide(originalPodWithoutPSPAnnotation.Spec, podWithoutPSPAnnotation.Spec))
+				t.Errorf("%s: expected no mutation on Admit, got %s", testCaseName, diff.ObjectGoPrintSideBySide(originalPodWithoutPSPAnnotation.Spec, podWithoutPSPAnnotation.Spec))
 			}
 		}
 	}
 
-	if !shouldPass && err == nil {
-		t.Errorf("%s: expected errors but received none", testCaseName)
+	if !shouldPassAdmit && err == nil {
+		t.Errorf("%s: expected errors on Admit but received none", testCaseName)
+	}
+
+	err = plugin.Validate(attrs)
+	if shouldPassValidate && err != nil {
+		t.Errorf("%s: expected no errors on Validate but received %v", testCaseName, err)
+	} else if !shouldPassValidate && err == nil {
+		t.Errorf("%s: expected errors on Validate but received none", testCaseName)
 	}
 }
 
@@ -1807,7 +1957,7 @@ func TestCreateProvidersFromConstraints(t *testing.T) {
 	}
 
 	for k, v := range testCases {
-		admit := &podSecurityPolicyPlugin{
+		admit := &PodSecurityPolicyPlugin{
 			Handler:         kadmission.NewHandler(kadmission.Create, kadmission.Update),
 			strategyFactory: kpsp.NewSimpleStrategyFactory(),
 		}

@@ -37,7 +37,7 @@ type ClientConnectionConfiguration struct {
 	// qps controls the number of queries per second allowed for this connection.
 	QPS float32
 	// burst allows extra queries to accumulate when a client is exceeding its rate.
-	Burst int
+	Burst int32
 }
 
 // KubeProxyIPTablesConfiguration contains iptables-related configuration
@@ -73,21 +73,21 @@ type KubeProxyIPVSConfiguration struct {
 // the Kubernetes proxy server.
 type KubeProxyConntrackConfiguration struct {
 	// max is the maximum number of NAT connections to track (0 to
-	// leave as-is).  This takes precedence over conntrackMaxPerCore and conntrackMin.
-	Max int32
+	// leave as-is).  This takes precedence over maxPerCore and min.
+	Max *int32
 	// maxPerCore is the maximum number of NAT connections to track
-	// per CPU core (0 to leave the limit as-is and ignore conntrackMin).
-	MaxPerCore int32
+	// per CPU core (0 to leave the limit as-is and ignore min).
+	MaxPerCore *int32
 	// min is the minimum value of connect-tracking records to allocate,
-	// regardless of conntrackMaxPerCore (set conntrackMaxPerCore=0 to leave the limit as-is).
-	Min int32
+	// regardless of maxPerCore (set maxPerCore=0 to leave the limit as-is).
+	Min *int32
 	// tcpEstablishedTimeout is how long an idle TCP connection will be kept open
-	// (e.g. '2s').  Must be greater than 0.
-	TCPEstablishedTimeout metav1.Duration
+	// (e.g. '2s').  Must be greater than 0 to set.
+	TCPEstablishedTimeout *metav1.Duration
 	// tcpCloseWaitTimeout is how long an idle conntrack entry
 	// in CLOSE_WAIT state will remain in the conntrack
 	// table. (e.g. '60s'). Must be greater than 0 to set.
-	TCPCloseWaitTimeout metav1.Duration
+	TCPCloseWaitTimeout *metav1.Duration
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

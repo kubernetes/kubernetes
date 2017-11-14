@@ -408,7 +408,7 @@ func TestInvalidFactoryArgs(t *testing.T) {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
 	testCases := []struct {
-		hardPodAffinitySymmetricWeight int
+		hardPodAffinitySymmetricWeight int32
 		expectErr                      string
 	}{
 		{

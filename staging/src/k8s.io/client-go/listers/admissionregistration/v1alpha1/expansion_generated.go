@@ -18,10 +18,14 @@ limitations under the License.
 
 package v1alpha1
 
-// ExternalAdmissionHookConfigurationListerExpansion allows custom methods to be added to
-// ExternalAdmissionHookConfigurationLister.
-type ExternalAdmissionHookConfigurationListerExpansion interface{}
-
 // InitializerConfigurationListerExpansion allows custom methods to be added to
 // InitializerConfigurationLister.
 type InitializerConfigurationListerExpansion interface{}
+
+// MutatingWebhookConfigurationListerExpansion allows custom methods to be added to
+// MutatingWebhookConfigurationLister.
+type MutatingWebhookConfigurationListerExpansion interface{}
+
+// ValidatingWebhookConfigurationListerExpansion allows custom methods to be added to
+// ValidatingWebhookConfigurationLister.
+type ValidatingWebhookConfigurationListerExpansion interface{}

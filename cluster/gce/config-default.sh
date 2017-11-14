@@ -43,7 +43,7 @@ REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-true}
 PREEMPTIBLE_NODE=${PREEMPTIBLE_NODE:-false}
 PREEMPTIBLE_MASTER=${PREEMPTIBLE_MASTER:-false}
 KUBE_DELETE_NODES=${KUBE_DELETE_NODES:-true}
-KUBE_DELETE_NETWORK=${KUBE_DELETE_NETWORK:-false}
+KUBE_DELETE_NETWORK=${KUBE_DELETE_NETWORK:-} # default value calculated below
 CREATE_CUSTOM_NETWORK=${CREATE_CUSTOM_NETWORK:-false}
 
 MASTER_OS_DISTRIBUTION=${KUBE_MASTER_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
@@ -91,6 +91,12 @@ MASTER_EXTRA_METADATA=${KUBE_MASTER_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
 NODE_EXTRA_METADATA=${KUBE_NODE_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
 
 NETWORK=${KUBE_GCE_NETWORK:-default}
+# Enable network deletion by default (for kube-down), unless we're using 'default' network.
+if [[ "${NETWORK}" == "default" ]]; then
+  KUBE_DELETE_NETWORK=${KUBE_DELETE_NETWORK:-false}
+else
+  KUBE_DELETE_NETWORK=${KUBE_DELETE_NETWORK:-true}
+fi
 if [[ "${CREATE_CUSTOM_NETWORK}" == true ]]; then
   SUBNETWORK="${SUBNETWORK:-${NETWORK}-custom-subnet}"
 fi
@@ -191,7 +197,10 @@ RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
 
 if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
-    FEATURE_GATES="${FEATURE_GATES},Accelerators=true"
+    FEATURE_GATES="${FEATURE_GATES},DevicePlugins=true"
+    if [[ "${NODE_ACCELERATORS}" =~ .*type=([a-zA-Z0-9-]+).* ]]; then
+        NODE_LABELS="${NODE_LABELS},cloud.google.com/gke-accelerator=${BASH_REMATCH[1]}"
+    fi
 fi
 
 # Optional: Install cluster DNS.
@@ -262,6 +271,11 @@ fi
 # Disable Docker live-restore.
 if [[ -n "${DISABLE_DOCKER_LIVE_RESTORE:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} DISABLE_DOCKER_LIVE_RESTORE"
+fi
+
+# Override default docker storage driver.
+if [[ -n "${DOCKER_STORAGE_DRIVER:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} DOCKER_STORAGE_DRIVER"
 fi
 
 # Override default GLBC image

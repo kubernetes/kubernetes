@@ -70,9 +70,13 @@ func NewCIDRRangeAllocator(client clientset.Interface, clusterCIDR *net.IPNet, s
 	glog.V(0).Infof("Sending events to api server.")
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(client.CoreV1().RESTClient()).Events("")})
 
+	set, err := cidrset.NewCIDRSet(clusterCIDR, subNetMaskSize)
+	if err != nil {
+		return nil, err
+	}
 	ra := &rangeAllocator{
 		client:                client,
-		cidrs:                 cidrset.NewCIDRSet(clusterCIDR, subNetMaskSize),
+		cidrs:                 set,
 		clusterCIDR:           clusterCIDR,
 		nodeCIDRUpdateChannel: make(chan nodeAndCIDR, cidrUpdateQueueSize),
 		recorder:              recorder,

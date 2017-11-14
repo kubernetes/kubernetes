@@ -70,8 +70,8 @@ func TestGVPackageFlag(t *testing.T) {
 		{
 			args: []string{"api/v1", "api"},
 			expected: map[types.GroupVersion]string{
-				{Group: "api", Version: "v1"}: "../api/v1",
-				{Group: "api", Version: ""}:   "../api",
+				{Group: "api", Version: "v1"}: "core/v1",
+				{Group: "api", Version: ""}:   "core",
 			},
 			expectedGroups: []types.GroupVersions{
 				{PackageName: "core", Group: types.Group("api"), Versions: []types.Version{types.Version("v1"), types.Version("")}},

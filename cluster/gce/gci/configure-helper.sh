@@ -244,10 +244,6 @@ function create-node-pki {
     KUBELET_KEY_PATH="${pki_dir}/kubelet.key"
     write-pki-data "${KUBELET_KEY}" "${KUBELET_KEY_PATH}"
   fi
-
-  # TODO(mikedanese): remove this when we don't support downgrading to versions
-  # < 1.6.
-  ln -sf "${CA_CERT_BUNDLE_PATH}" /etc/srv/kubernetes/ca.crt
 }
 
 function create-master-pki {
@@ -297,11 +293,6 @@ function create-master-pki {
 
   SERVICEACCOUNT_KEY_PATH="${pki_dir}/serviceaccount.key"
   write-pki-data "${SERVICEACCOUNT_KEY}" "${SERVICEACCOUNT_KEY_PATH}"
-
-  # TODO(mikedanese): remove this when we don't support downgrading to versions
-  # < 1.6.
-  ln -sf "${APISERVER_SERVER_KEY_PATH}" /etc/srv/kubernetes/server.key
-  ln -sf "${APISERVER_SERVER_CERT_PATH}" /etc/srv/kubernetes/server.cert
 
   if [[ ! -z "${REQUESTHEADER_CA_CERT:-}" ]]; then
     AGGREGATOR_CA_KEY_PATH="${pki_dir}/aggr_ca.key"
@@ -859,6 +850,12 @@ function assemble-docker-flags {
 
   if [[ "${DISABLE_DOCKER_LIVE_RESTORE:-false}" == "true" ]]; then
     docker_opts+=" --live-restore=false"
+  fi
+
+  # Override docker storage driver if the environment variable is set
+
+  if [[ -n "${DOCKER_STORAGE_DRIVER:-}" ]]; then
+    docker_opts+=" --storage-driver=${DOCKER_STORAGE_DRIVER}"
   fi
 
   echo "DOCKER_OPTS=\"${docker_opts} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
@@ -1779,7 +1776,7 @@ function start-kube-addons {
   if [[ "${REGISTER_MASTER_KUBELET:-false}" == "true" ]]; then
     setup-addon-manifests "addons" "rbac/legacy-kubelet-user"
   else
-    setup-addon-manifests "addons" "rbac/legacy-kubelet-user-disabled"
+    setup-addon-manifests "addons" "rbac/legacy-kubelet-user-disable"
   fi
 
   if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
@@ -1838,6 +1835,9 @@ EOF
   fi
   if [[ "${ENABLE_METRICS_SERVER:-}" == "true" ]]; then
     setup-addon-manifests "addons" "metrics-server"
+  fi
+  if [[ "${ENABLE_NVIDIA_GPU_DEVICE_PLUGIN:-}" == "true" ]]; then
+    setup-addon-manifests "addons" "device-plugins/nvidia-gpu"
   fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns"
@@ -2059,7 +2059,7 @@ fi
 
 override-kubectl
 # Run the containerized mounter once to pre-cache the container image.
-if [[ "${CONTAINER_RUNTIME:-}" == "docker" ]]; then
+if [[ "${CONTAINER_RUNTIME:-docker}" == "docker" ]]; then
   assemble-docker-flags
 fi
 start-kubelet

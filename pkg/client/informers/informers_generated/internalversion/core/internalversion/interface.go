@@ -59,90 +59,92 @@ type Interface interface {
 }
 
 type version struct {
-	internalinterfaces.SharedInformerFactory
+	factory          internalinterfaces.SharedInformerFactory
+	namespace        string
+	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
 // New returns a new Interface.
-func New(f internalinterfaces.SharedInformerFactory) Interface {
-	return &version{f}
+func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
+	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
 // ComponentStatuses returns a ComponentStatusInformer.
 func (v *version) ComponentStatuses() ComponentStatusInformer {
-	return &componentStatusInformer{factory: v.SharedInformerFactory}
+	return &componentStatusInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // ConfigMaps returns a ConfigMapInformer.
 func (v *version) ConfigMaps() ConfigMapInformer {
-	return &configMapInformer{factory: v.SharedInformerFactory}
+	return &configMapInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Endpoints returns a EndpointsInformer.
 func (v *version) Endpoints() EndpointsInformer {
-	return &endpointsInformer{factory: v.SharedInformerFactory}
+	return &endpointsInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Events returns a EventInformer.
 func (v *version) Events() EventInformer {
-	return &eventInformer{factory: v.SharedInformerFactory}
+	return &eventInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // LimitRanges returns a LimitRangeInformer.
 func (v *version) LimitRanges() LimitRangeInformer {
-	return &limitRangeInformer{factory: v.SharedInformerFactory}
+	return &limitRangeInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Namespaces returns a NamespaceInformer.
 func (v *version) Namespaces() NamespaceInformer {
-	return &namespaceInformer{factory: v.SharedInformerFactory}
+	return &namespaceInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // Nodes returns a NodeInformer.
 func (v *version) Nodes() NodeInformer {
-	return &nodeInformer{factory: v.SharedInformerFactory}
+	return &nodeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // PersistentVolumes returns a PersistentVolumeInformer.
 func (v *version) PersistentVolumes() PersistentVolumeInformer {
-	return &persistentVolumeInformer{factory: v.SharedInformerFactory}
+	return &persistentVolumeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // PersistentVolumeClaims returns a PersistentVolumeClaimInformer.
 func (v *version) PersistentVolumeClaims() PersistentVolumeClaimInformer {
-	return &persistentVolumeClaimInformer{factory: v.SharedInformerFactory}
+	return &persistentVolumeClaimInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Pods returns a PodInformer.
 func (v *version) Pods() PodInformer {
-	return &podInformer{factory: v.SharedInformerFactory}
+	return &podInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // PodTemplates returns a PodTemplateInformer.
 func (v *version) PodTemplates() PodTemplateInformer {
-	return &podTemplateInformer{factory: v.SharedInformerFactory}
+	return &podTemplateInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // ReplicationControllers returns a ReplicationControllerInformer.
 func (v *version) ReplicationControllers() ReplicationControllerInformer {
-	return &replicationControllerInformer{factory: v.SharedInformerFactory}
+	return &replicationControllerInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // ResourceQuotas returns a ResourceQuotaInformer.
 func (v *version) ResourceQuotas() ResourceQuotaInformer {
-	return &resourceQuotaInformer{factory: v.SharedInformerFactory}
+	return &resourceQuotaInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Secrets returns a SecretInformer.
 func (v *version) Secrets() SecretInformer {
-	return &secretInformer{factory: v.SharedInformerFactory}
+	return &secretInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Services returns a ServiceInformer.
 func (v *version) Services() ServiceInformer {
-	return &serviceInformer{factory: v.SharedInformerFactory}
+	return &serviceInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // ServiceAccounts returns a ServiceAccountInformer.
 func (v *version) ServiceAccounts() ServiceAccountInformer {
-	return &serviceAccountInformer{factory: v.SharedInformerFactory}
+	return &serviceAccountInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

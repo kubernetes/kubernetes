@@ -449,7 +449,7 @@ func (PodSecurityPolicyList) SwaggerDoc() map[string]string {
 var map_PodSecurityPolicySpec = map[string]string{
 	"":                                "Pod Security Policy Spec defines the policy enforced.",
 	"privileged":                      "privileged determines if a pod can request to be run as privileged.",
-	"defaultAddCapabilities":          "DefaultAddCapabilities is the default set of capabilities that will be added to the container unless the pod spec specifically drops the capability.  You may not list a capabiility in both DefaultAddCapabilities and RequiredDropCapabilities.",
+	"defaultAddCapabilities":          "DefaultAddCapabilities is the default set of capabilities that will be added to the container unless the pod spec specifically drops the capability.  You may not list a capability in both DefaultAddCapabilities and RequiredDropCapabilities. Capabilities added here are implicitly allowed, and need not be included in the AllowedCapabilities list.",
 	"requiredDropCapabilities":        "RequiredDropCapabilities are the capabilities that will be dropped from the container.  These are required to be dropped and cannot be added.",
 	"allowedCapabilities":             "AllowedCapabilities is a list of capabilities that can be requested to add to the container. Capabilities in this field may be added at the pod author's discretion. You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.",
 	"volumes":                         "volumes is a white list of allowed volume plugins.  Empty indicates that all plugins may be used.",

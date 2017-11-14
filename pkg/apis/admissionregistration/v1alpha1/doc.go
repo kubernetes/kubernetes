@@ -21,7 +21,7 @@ limitations under the License.
 
 // Package v1alpha1 is the v1alpha1 version of the API.
 // AdmissionConfiguration and AdmissionPluginConfiguration are legacy static admission plugin configuration
-// admissionregistrationv1alpha1.InitializerConfiguration and admissionregistrationv1alpha1.ExternalAdmissionHookConfiguration is for the
+// InitializerConfiguration, ValidatingWebhookConfiguration, and MutatingWebhookConfiguration are for the
 // new dynamic admission controller configuration.
 // +groupName=admissionregistration.k8s.io
 package v1alpha1 // import "k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"

@@ -49,6 +49,7 @@ func TestControlPlaneSubCommandsHasFlags(t *testing.T) {
 				"apiserver-bind-port",
 				"service-cidr",
 				"pod-network-cidr",
+				"feature-gates",
 			},
 		},
 		{
@@ -58,6 +59,7 @@ func TestControlPlaneSubCommandsHasFlags(t *testing.T) {
 				"apiserver-advertise-address",
 				"apiserver-bind-port",
 				"service-cidr",
+				"feature-gates",
 			},
 		},
 		{

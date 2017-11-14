@@ -68,9 +68,9 @@ func TestScaleSubresources(t *testing.T) {
 		makeGVR("apps", "v1beta2", "replicasets/scale"):  makeGVK("apps", "v1beta2", "Scale"),
 		makeGVR("apps", "v1beta2", "statefulsets/scale"): makeGVK("apps", "v1beta2", "Scale"),
 
-		// makeGVR("apps", "v1", "deployments/scale"):  makeGVK("autoscaling", "v1", "Scale"),
-		// makeGVR("apps", "v1", "replicasets/scale"):  makeGVK("autoscaling", "v1", "Scale"),
-		// makeGVR("apps", "v1", "statefulsets/scale"): makeGVK("autoscaling", "v1", "Scale"),
+		makeGVR("apps", "v1", "deployments/scale"):  makeGVK("autoscaling", "v1", "Scale"),
+		makeGVR("apps", "v1", "replicasets/scale"):  makeGVK("autoscaling", "v1", "Scale"),
+		makeGVR("apps", "v1", "statefulsets/scale"): makeGVK("autoscaling", "v1", "Scale"),
 	}
 
 	autoscalingGVK := schema.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"}

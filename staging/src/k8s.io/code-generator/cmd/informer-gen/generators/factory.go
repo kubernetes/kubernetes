@@ -74,19 +74,21 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 		gvNewFuncs[groupPkgName] = c.Universe.Function(types.Name{Package: path.Join(g.outputPackage, groupPkgName), Name: "New"})
 	}
 	m := map[string]interface{}{
-		"cacheSharedIndexInformer":   c.Universe.Type(cacheSharedIndexInformer),
-		"groupVersions":              g.groupVersions,
-		"gvInterfaces":               gvInterfaces,
-		"gvNewFuncs":                 gvNewFuncs,
-		"gvGoNames":                  g.gvGoNames,
-		"interfacesNewInformerFunc":  c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "NewInformerFunc"}),
-		"informerFactoryInterface":   c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
-		"clientSetInterface":         c.Universe.Type(types.Name{Package: g.clientSetPackage, Name: "Interface"}),
-		"reflectType":                c.Universe.Type(reflectType),
-		"runtimeObject":              c.Universe.Type(runtimeObject),
-		"schemaGroupVersionResource": c.Universe.Type(schemaGroupVersionResource),
-		"syncMutex":                  c.Universe.Type(syncMutex),
-		"timeDuration":               c.Universe.Type(timeDuration),
+		"cacheSharedIndexInformer":       c.Universe.Type(cacheSharedIndexInformer),
+		"groupVersions":                  g.groupVersions,
+		"gvInterfaces":                   gvInterfaces,
+		"gvNewFuncs":                     gvNewFuncs,
+		"gvGoNames":                      g.gvGoNames,
+		"interfacesNewInformerFunc":      c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "NewInformerFunc"}),
+		"interfacesTweakListOptionsFunc": c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "TweakListOptionsFunc"}),
+		"informerFactoryInterface":       c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
+		"clientSetInterface":             c.Universe.Type(types.Name{Package: g.clientSetPackage, Name: "Interface"}),
+		"reflectType":                    c.Universe.Type(reflectType),
+		"runtimeObject":                  c.Universe.Type(runtimeObject),
+		"schemaGroupVersionResource":     c.Universe.Type(schemaGroupVersionResource),
+		"syncMutex":                      c.Universe.Type(syncMutex),
+		"timeDuration":                   c.Universe.Type(timeDuration),
+		"namespaceAll":                   c.Universe.Type(metav1NamespaceAll),
 	}
 
 	sw.Do(sharedInformerFactoryStruct, m)
@@ -98,6 +100,8 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 var sharedInformerFactoryStruct = `
 type sharedInformerFactory struct {
 	client {{.clientSetInterface|raw}}
+	namespace string
+	tweakListOptions {{.interfacesTweakListOptionsFunc|raw}}
 	lock {{.syncMutex|raw}}
 	defaultResync {{.timeDuration|raw}}
 
@@ -109,8 +113,17 @@ type sharedInformerFactory struct {
 
 // NewSharedInformerFactory constructs a new instance of sharedInformerFactory
 func NewSharedInformerFactory(client {{.clientSetInterface|raw}}, defaultResync {{.timeDuration|raw}}) SharedInformerFactory {
+  return NewFilteredSharedInformerFactory(client, defaultResync, {{.namespaceAll|raw}}, nil)
+}
+
+// NewFilteredSharedInformerFactory constructs a new instance of sharedInformerFactory.
+// Listers obtained via this SharedInformerFactory will be subject to the same filters
+// as specified here.
+func NewFilteredSharedInformerFactory(client {{.clientSetInterface|raw}}, defaultResync {{.timeDuration|raw}}, namespace string, tweakListOptions {{.interfacesTweakListOptionsFunc|raw}}) SharedInformerFactory {
   return &sharedInformerFactory{
-		client: client,
+    client:           client,
+    namespace:        namespace,
+	tweakListOptions: tweakListOptions,
     defaultResync:    defaultResync,
     informers:        make(map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}}),
     startedInformers: make(map[{{.reflectType|raw}}]bool),
@@ -189,7 +202,7 @@ type SharedInformerFactory interface {
 {{$gvGoNames := .gvGoNames}}
 {{range $groupPkgName, $group := .groupVersions}}
 func (f *sharedInformerFactory) {{index $gvGoNames $groupPkgName}}() {{index $gvInterfaces $groupPkgName|raw}} {
-  return {{index $gvNewFuncs $groupPkgName|raw}}(f)
+  return {{index $gvNewFuncs $groupPkgName|raw}}(f, f.namespace, f.tweakListOptions)
 }
 {{end}}
 `

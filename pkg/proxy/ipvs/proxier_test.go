@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
@@ -2017,6 +2017,14 @@ func Test_getLocalIPs(t *testing.T) {
 			{Namespace: "ns2", Name: "ep2"}: sets.NewString("2.2.2.2", "2.2.2.22", "2.2.2.3"),
 			{Namespace: "ns4", Name: "ep4"}: sets.NewString("4.4.4.4", "4.4.4.6"),
 		},
+	}, {
+		// Case[5]: named port local and bad endpoints IP
+		endpointsMap: map[proxy.ServicePortName][]*endpointsInfo{
+			makeServicePortName("ns1", "ep1", "p11"): {
+				{endpoint: "bad ip:11", isLocal: true},
+			},
+		},
+		expected: map[types.NamespacedName]sets.String{},
 	}}
 
 	for tci, tc := range testCases {
@@ -2211,77 +2219,5 @@ func Test_endpointsToEndpointsMap(t *testing.T) {
 				}
 			}
 		}
-	}
-}
-
-func Test_ensureDummyDevice(t *testing.T) {
-	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			// Success.
-			func() ([]byte, error) { return []byte{}, nil },
-			// Exists.
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 2} },
-		},
-	}
-	fexec := fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-	}
-	// Success.
-	exists, err := ensureDummyDevice(&fexec, DefaultDummyDevice)
-	if err != nil {
-		t.Errorf("expected success, got %v", err)
-	}
-	if exists {
-		t.Errorf("expected exists = false")
-	}
-	if fcmd.CombinedOutputCalls != 1 {
-		t.Errorf("expected 1 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
-	}
-	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("ip", "link", "add", "kube-ipvs0", "type", "dummy") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
-	}
-	// Exists.
-	exists, err = ensureDummyDevice(&fexec, DefaultDummyDevice)
-	if err != nil {
-		t.Errorf("expected success, got %v", err)
-	}
-	if !exists {
-		t.Errorf("expected exists = true")
-	}
-}
-
-func Test_deleteDummyDevice(t *testing.T) {
-	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			// Success.
-			func() ([]byte, error) { return []byte{}, nil },
-			// Failure.
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
-		},
-	}
-	fexec := fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-	}
-	// Success.
-	err := deleteDummyDevice(&fexec, DefaultDummyDevice)
-	if err != nil {
-		t.Errorf("expected success, got %v", err)
-	}
-	if fcmd.CombinedOutputCalls != 1 {
-		t.Errorf("expected 1 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
-	}
-	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("ip", "link", "del", "kube-ipvs0") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
-	}
-	// Failure.
-	err = deleteDummyDevice(&fexec, DefaultDummyDevice)
-	if err == nil {
-		t.Errorf("expected failure")
 	}
 }

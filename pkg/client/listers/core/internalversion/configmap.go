@@ -22,13 +22,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // ConfigMapLister helps list ConfigMaps.
 type ConfigMapLister interface {
 	// List lists all ConfigMaps in the indexer.
-	List(selector labels.Selector) (ret []*api.ConfigMap, err error)
+	List(selector labels.Selector) (ret []*core.ConfigMap, err error)
 	// ConfigMaps returns an object that can list and get ConfigMaps.
 	ConfigMaps(namespace string) ConfigMapNamespaceLister
 	ConfigMapListerExpansion
@@ -45,9 +45,9 @@ func NewConfigMapLister(indexer cache.Indexer) ConfigMapLister {
 }
 
 // List lists all ConfigMaps in the indexer.
-func (s *configMapLister) List(selector labels.Selector) (ret []*api.ConfigMap, err error) {
+func (s *configMapLister) List(selector labels.Selector) (ret []*core.ConfigMap, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.ConfigMap))
+		ret = append(ret, m.(*core.ConfigMap))
 	})
 	return ret, err
 }
@@ -60,9 +60,9 @@ func (s *configMapLister) ConfigMaps(namespace string) ConfigMapNamespaceLister 
 // ConfigMapNamespaceLister helps list and get ConfigMaps.
 type ConfigMapNamespaceLister interface {
 	// List lists all ConfigMaps in the indexer for a given namespace.
-	List(selector labels.Selector) (ret []*api.ConfigMap, err error)
+	List(selector labels.Selector) (ret []*core.ConfigMap, err error)
 	// Get retrieves the ConfigMap from the indexer for a given namespace and name.
-	Get(name string) (*api.ConfigMap, error)
+	Get(name string) (*core.ConfigMap, error)
 	ConfigMapNamespaceListerExpansion
 }
 
@@ -74,21 +74,21 @@ type configMapNamespaceLister struct {
 }
 
 // List lists all ConfigMaps in the indexer for a given namespace.
-func (s configMapNamespaceLister) List(selector labels.Selector) (ret []*api.ConfigMap, err error) {
+func (s configMapNamespaceLister) List(selector labels.Selector) (ret []*core.ConfigMap, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.ConfigMap))
+		ret = append(ret, m.(*core.ConfigMap))
 	})
 	return ret, err
 }
 
 // Get retrieves the ConfigMap from the indexer for a given namespace and name.
-func (s configMapNamespaceLister) Get(name string) (*api.ConfigMap, error) {
+func (s configMapNamespaceLister) Get(name string) (*core.ConfigMap, error) {
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(api.Resource("configmap"), name)
+		return nil, errors.NewNotFound(core.Resource("configmap"), name)
 	}
-	return obj.(*api.ConfigMap), nil
+	return obj.(*core.ConfigMap), nil
 }

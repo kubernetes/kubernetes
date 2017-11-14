@@ -22,13 +22,12 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -64,7 +63,6 @@ type ResourcesOptions struct {
 	resource.FilenameOptions
 
 	Mapper            meta.RESTMapper
-	Typer             runtime.ObjectTyper
 	Infos             []*resource.Info
 	Encoder           runtime.Encoder
 	Out               io.Writer
@@ -80,10 +78,10 @@ type ResourcesOptions struct {
 
 	Limits               string
 	Requests             string
-	ResourceRequirements api.ResourceRequirements
+	ResourceRequirements v1.ResourceRequirements
 
 	PrintObject            func(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
-	UpdatePodSpecForObject func(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error)
+	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
 	Resources              []string
 }
 
@@ -128,7 +126,7 @@ func NewCmdResources(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.
 }
 
 func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	o.Mapper, o.Typer = f.Object()
+	o.Mapper, _ = f.Object()
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
 	o.Encoder = f.JSONEncoder()
 	o.Output = cmdutil.GetFlagString(cmd, "output")
@@ -180,7 +178,7 @@ func (o *ResourcesOptions) Validate() error {
 		return fmt.Errorf("you must specify an update to requests or limits (in the form of --requests/--limits)")
 	}
 
-	o.ResourceRequirements, err = kubectl.HandleResourceRequirements(map[string]string{"limits": o.Limits, "requests": o.Requests})
+	o.ResourceRequirements, err = kubectl.HandleResourceRequirementsV1(map[string]string{"limits": o.Limits, "requests": o.Requests})
 	if err != nil {
 		return err
 	}
@@ -192,19 +190,19 @@ func (o *ResourcesOptions) Run() error {
 	allErrs := []error{}
 	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
 		transformed := false
-		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *api.PodSpec) error {
+		_, err := o.UpdatePodSpecForObject(info.VersionedObject, func(spec *v1.PodSpec) error {
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
 			if len(containers) != 0 {
 				for i := range containers {
 					if len(o.Limits) != 0 && len(containers[i].Resources.Limits) == 0 {
-						containers[i].Resources.Limits = make(api.ResourceList)
+						containers[i].Resources.Limits = make(v1.ResourceList)
 					}
 					for key, value := range o.ResourceRequirements.Limits {
 						containers[i].Resources.Limits[key] = value
 					}
 
 					if len(o.Requests) != 0 && len(containers[i].Resources.Requests) == 0 {
-						containers[i].Resources.Requests = make(api.ResourceList)
+						containers[i].Resources.Requests = make(v1.ResourceList)
 					}
 					for key, value := range o.ResourceRequirements.Requests {
 						containers[i].Resources.Requests[key] = value
@@ -217,9 +215,7 @@ func (o *ResourcesOptions) Run() error {
 			return nil
 		})
 		if transformed && err == nil {
-			// TODO: switch UpdatePodSpecForObject to work on v1.PodSpec, use info.VersionedObject, and avoid conversion completely
-			versionedEncoder := legacyscheme.Codecs.EncoderForVersion(o.Encoder, info.Mapping.GroupVersionKind.GroupVersion())
-			return runtime.Encode(versionedEncoder, info.Object)
+			return runtime.Encode(o.Encoder, info.VersionedObject)
 		}
 		return nil, err
 	})
@@ -238,7 +234,7 @@ func (o *ResourcesOptions) Run() error {
 		}
 
 		if o.Local || cmdutil.GetDryRunFlag(o.Cmd) {
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, info.Object, o.Out); err != nil {
+			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, patch.Info.VersionedObject, o.Out); err != nil {
 				return err
 			}
 			continue
@@ -263,7 +259,14 @@ func (o *ResourcesOptions) Run() error {
 
 		shortOutput := o.Output == "name"
 		if len(o.Output) > 0 && !shortOutput {
-			return o.PrintObject(o.Cmd, o.Local, o.Mapper, info.Object, o.Out)
+			versionedObject, err := patch.Info.Mapping.ConvertToVersion(obj, patch.Info.Mapping.GroupVersionKind.GroupVersion())
+			if err != nil {
+				return err
+			}
+			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, versionedObject, o.Out); err != nil {
+				return err
+			}
+			continue
 		}
 		cmdutil.PrintSuccess(o.Mapper, shortOutput, o.Out, info.Mapping.Resource, info.Name, false, "resource requirements updated")
 	}

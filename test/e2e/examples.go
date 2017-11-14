@@ -194,7 +194,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				forEachPod(selectorKey, selectorValue, func(pod v1.Pod) {
 					_, maErr := framework.LookForStringInLog(f.Namespace.Name, pod.Name, "spark-master", "Starting Spark master at", serverStartTimeout)
 					if maErr != nil {
-						framework.Failf("Didn't find target string. error:", maErr)
+						framework.Failf("Didn't find target string. error: %v", maErr)
 					}
 				})
 			}

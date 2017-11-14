@@ -32,6 +32,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubemark"
 	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
@@ -116,14 +117,18 @@ func main() {
 			NodeName: config.NodeName,
 		}
 		containerManager := cm.NewStubContainerManager()
-		fakeDockerClient := libdocker.NewFakeDockerClient().WithTraceDisabled()
-		fakeDockerClient.EnableSleep = true
+
+		fakeDockerClientConfig := &dockershim.ClientConfig{
+			DockerEndpoint:    libdocker.FakeDockerEndpoint,
+			EnableSleep:       true,
+			WithTraceDisabled: true,
+		}
 
 		hollowKubelet := kubemark.NewHollowKubelet(
 			config.NodeName,
 			clientset,
 			cadvisorInterface,
-			fakeDockerClient,
+			fakeDockerClientConfig,
 			config.KubeletPort,
 			config.KubeletReadOnlyPort,
 			containerManager,

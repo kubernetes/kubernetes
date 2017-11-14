@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package,register
+// +k8s:deepcopy-gen=package
 
 // Package api contains scheduler plugin API objects.
 package api // import "k8s.io/kubernetes/plugin/pkg/scheduler/api"

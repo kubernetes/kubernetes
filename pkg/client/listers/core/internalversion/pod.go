@@ -22,13 +22,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // PodLister helps list Pods.
 type PodLister interface {
 	// List lists all Pods in the indexer.
-	List(selector labels.Selector) (ret []*api.Pod, err error)
+	List(selector labels.Selector) (ret []*core.Pod, err error)
 	// Pods returns an object that can list and get Pods.
 	Pods(namespace string) PodNamespaceLister
 	PodListerExpansion
@@ -45,9 +45,9 @@ func NewPodLister(indexer cache.Indexer) PodLister {
 }
 
 // List lists all Pods in the indexer.
-func (s *podLister) List(selector labels.Selector) (ret []*api.Pod, err error) {
+func (s *podLister) List(selector labels.Selector) (ret []*core.Pod, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.Pod))
+		ret = append(ret, m.(*core.Pod))
 	})
 	return ret, err
 }
@@ -60,9 +60,9 @@ func (s *podLister) Pods(namespace string) PodNamespaceLister {
 // PodNamespaceLister helps list and get Pods.
 type PodNamespaceLister interface {
 	// List lists all Pods in the indexer for a given namespace.
-	List(selector labels.Selector) (ret []*api.Pod, err error)
+	List(selector labels.Selector) (ret []*core.Pod, err error)
 	// Get retrieves the Pod from the indexer for a given namespace and name.
-	Get(name string) (*api.Pod, error)
+	Get(name string) (*core.Pod, error)
 	PodNamespaceListerExpansion
 }
 
@@ -74,21 +74,21 @@ type podNamespaceLister struct {
 }
 
 // List lists all Pods in the indexer for a given namespace.
-func (s podNamespaceLister) List(selector labels.Selector) (ret []*api.Pod, err error) {
+func (s podNamespaceLister) List(selector labels.Selector) (ret []*core.Pod, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.Pod))
+		ret = append(ret, m.(*core.Pod))
 	})
 	return ret, err
 }
 
 // Get retrieves the Pod from the indexer for a given namespace and name.
-func (s podNamespaceLister) Get(name string) (*api.Pod, error) {
+func (s podNamespaceLister) Get(name string) (*core.Pod, error) {
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(api.Resource("pod"), name)
+		return nil, errors.NewNotFound(core.Resource("pod"), name)
 	}
-	return obj.(*api.Pod), nil
+	return obj.(*core.Pod), nil
 }

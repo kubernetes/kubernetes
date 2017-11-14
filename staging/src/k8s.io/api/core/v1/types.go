@@ -2486,11 +2486,8 @@ type PodAffinityTerm struct {
 	// the labelSelector in the specified namespaces, where co-located is defined as running on a node
 	// whose value of the label with key topologyKey matches that of any node on which any of the
 	// selected pods is running.
-	// For PreferredDuringScheduling pod anti-affinity, empty topologyKey is interpreted as "all topologies"
-	// ("all topologies" here means all the topologyKeys indicated by scheduler command-line argument --failure-domains);
-	// for affinity and for RequiredDuringScheduling pod anti-affinity, empty topologyKey is not allowed.
-	// +optional
-	TopologyKey string `json:"topologyKey,omitempty" protobuf:"bytes,3,opt,name=topologyKey"`
+	// Empty topologyKey is not allowed.
+	TopologyKey string `json:"topologyKey" protobuf:"bytes,3,opt,name=topologyKey"`
 }
 
 // Node affinity is a group of node affinity scheduling rules.
@@ -4927,7 +4924,7 @@ const (
 	// corresponding to every RequiredDuringScheduling affinity rule.
 	// When the --hard-pod-affinity-weight scheduler flag is not specified,
 	// DefaultHardPodAffinityWeight defines the weight of the implicit PreferredDuringScheduling affinity rule.
-	DefaultHardPodAffinitySymmetricWeight int = 1
+	DefaultHardPodAffinitySymmetricWeight int32 = 1
 )
 
 // Sysctl defines a kernel parameter to be set

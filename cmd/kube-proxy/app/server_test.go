@@ -28,7 +28,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/iptables"
@@ -203,9 +203,9 @@ func TestGetConntrackMax(t *testing.T) {
 
 	for i, tc := range testCases {
 		cfg := kubeproxyconfig.KubeProxyConntrackConfiguration{
-			Min:        tc.min,
-			Max:        tc.max,
-			MaxPerCore: tc.maxPerCore,
+			Min:        utilpointer.Int32Ptr(tc.min),
+			Max:        utilpointer.Int32Ptr(tc.max),
+			MaxPerCore: utilpointer.Int32Ptr(tc.maxPerCore),
 		}
 		x, e := getConntrackMax(cfg)
 		if e != nil {
@@ -344,11 +344,11 @@ udpTimeoutMilliseconds: 123ms
 			ClusterCIDR:      tc.clusterCIDR,
 			ConfigSyncPeriod: metav1.Duration{Duration: 15 * time.Second},
 			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				Max:                   4,
-				MaxPerCore:            2,
-				Min:                   1,
-				TCPCloseWaitTimeout:   metav1.Duration{Duration: 10 * time.Second},
-				TCPEstablishedTimeout: metav1.Duration{Duration: 20 * time.Second},
+				Max:                   utilpointer.Int32Ptr(4),
+				MaxPerCore:            utilpointer.Int32Ptr(2),
+				Min:                   utilpointer.Int32Ptr(1),
+				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 10 * time.Second},
+				TCPEstablishedTimeout: &metav1.Duration{Duration: 20 * time.Second},
 			},
 			FeatureGates:       "all",
 			HealthzBindAddress: tc.healthzBindAddress,

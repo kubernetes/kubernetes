@@ -30,6 +30,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
+	"k8s.io/api/scheduling/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -40,7 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -76,6 +77,9 @@ const (
 	caNoScaleUpStatus      = "NoActivity"
 	caOngoingScaleUpStatus = "InProgress"
 	timestampFormat        = "2006-01-02 15:04:05 -0700 MST"
+
+	expendablePriorityClassName = "expendable-priority"
+	highPriorityClassName       = "high-priority"
 )
 
 var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
@@ -860,6 +864,63 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		By("Check if NAP group was created")
 		Expect(getNAPNodePoolsNumber()).Should(Equal(1))
 	})
+
+	It("shouldn't scale up when expendable pod is created [Feature:ClusterSizeAutoscalingScaleUp]", func() {
+		defer createPriorityClasses(f)()
+		// Create nodesCountAfterResize+1 pods allocating 0.7 allocatable on present nodes. One more node will have to be created.
+		cleanupFunc := ReserveMemoryWithPriority(f, "memory-reservation", nodeCount+1, int(float64(nodeCount+1)*float64(0.7)*float64(memAllocatableMb)), false, time.Second, expendablePriorityClassName)
+		defer cleanupFunc()
+		By(fmt.Sprintf("Waiting for scale up hoping it won't happen, sleep for %s", scaleUpTimeout.String()))
+		time.Sleep(scaleUpTimeout)
+		// Verify that cluster size is not changed
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+			func(size int) bool { return size == nodeCount }, time.Second))
+	})
+
+	It("should scale up when non expendable pod is created [Feature:ClusterSizeAutoscalingScaleUp]", func() {
+		defer createPriorityClasses(f)()
+		// Create nodesCountAfterResize+1 pods allocating 0.7 allocatable on present nodes. One more node will have to be created.
+		cleanupFunc := ReserveMemoryWithPriority(f, "memory-reservation", nodeCount+1, int(float64(nodeCount+1)*float64(0.7)*float64(memAllocatableMb)), true, scaleUpTimeout, highPriorityClassName)
+		defer cleanupFunc()
+		// Verify that cluster size is not changed
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+			func(size int) bool { return size > nodeCount }, time.Second))
+	})
+
+	It("shouldn't scale up when expendable pod is preempted [Feature:ClusterSizeAutoscalingScaleUp]", func() {
+		defer createPriorityClasses(f)()
+		// Create nodesCountAfterResize pods allocating 0.7 allocatable on present nodes - one pod per node.
+		cleanupFunc1 := ReserveMemoryWithPriority(f, "memory-reservation1", nodeCount, int(float64(nodeCount)*float64(0.7)*float64(memAllocatableMb)), true, defaultTimeout, expendablePriorityClassName)
+		defer cleanupFunc1()
+		// Create nodesCountAfterResize pods allocating 0.7 allocatable on present nodes - one pod per node. Pods created here should preempt pods created above.
+		cleanupFunc2 := ReserveMemoryWithPriority(f, "memory-reservation2", nodeCount, int(float64(nodeCount)*float64(0.7)*float64(memAllocatableMb)), true, defaultTimeout, highPriorityClassName)
+		defer cleanupFunc2()
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+			func(size int) bool { return size == nodeCount }, time.Second))
+	})
+
+	It("should scale down when expendable pod is running [Feature:ClusterSizeAutoscalingScaleDown]", func() {
+		defer createPriorityClasses(f)()
+		increasedSize := manuallyIncreaseClusterSize(f, originalSizes)
+		// Create increasedSize pods allocating 0.7 allocatable on present nodes - one pod per node.
+		cleanupFunc := ReserveMemoryWithPriority(f, "memory-reservation", increasedSize, int(float64(increasedSize)*float64(0.7)*float64(memAllocatableMb)), true, scaleUpTimeout, expendablePriorityClassName)
+		defer cleanupFunc()
+		By("Waiting for scale down")
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+			func(size int) bool { return size == nodeCount }, scaleDownTimeout))
+	})
+
+	It("shouldn't scale down when non expendable pod is running [Feature:ClusterSizeAutoscalingScaleDown]", func() {
+		defer createPriorityClasses(f)()
+		increasedSize := manuallyIncreaseClusterSize(f, originalSizes)
+		// Create increasedSize pods allocating 0.7 allocatable on present nodes - one pod per node.
+		cleanupFunc := ReserveMemoryWithPriority(f, "memory-reservation", increasedSize, int(float64(increasedSize)*float64(0.7)*float64(memAllocatableMb)), true, scaleUpTimeout, highPriorityClassName)
+		defer cleanupFunc()
+		By(fmt.Sprintf("Waiting for scale down hoping it won't happen, sleep for %s", scaleDownTimeout.String()))
+		time.Sleep(scaleDownTimeout)
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+			func(size int) bool { return size == increasedSize }, time.Second))
+	})
 })
 
 func execCmd(args ...string) *exec.Cmd {
@@ -1221,21 +1282,20 @@ func doPut(url, content string) (string, error) {
 	return strBody, nil
 }
 
-// ReserveMemoryWithSelector creates a replication controller with pods with node selector that, in summation,
-// request the specified amount of memory.
-func ReserveMemoryWithSelector(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration, selector map[string]string) func() error {
+func reserveMemory(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration, selector map[string]string, priorityClassName string) func() error {
 	By(fmt.Sprintf("Running RC which reserves %v MB of memory", megabytes))
 	request := int64(1024 * 1024 * megabytes / replicas)
 	config := &testutils.RCConfig{
-		Client:         f.ClientSet,
-		InternalClient: f.InternalClientset,
-		Name:           id,
-		Namespace:      f.Namespace.Name,
-		Timeout:        timeout,
-		Image:          framework.GetPauseImageName(f.ClientSet),
-		Replicas:       replicas,
-		MemRequest:     request,
-		NodeSelector:   selector,
+		Client:            f.ClientSet,
+		InternalClient:    f.InternalClientset,
+		Name:              id,
+		Namespace:         f.Namespace.Name,
+		Timeout:           timeout,
+		Image:             framework.GetPauseImageName(f.ClientSet),
+		Replicas:          replicas,
+		MemRequest:        request,
+		NodeSelector:      selector,
+		PriorityClassName: priorityClassName,
 	}
 	for start := time.Now(); time.Since(start) < rcCreationRetryTimeout; time.Sleep(rcCreationRetryDelay) {
 		err := framework.RunRC(*config)
@@ -1254,10 +1314,22 @@ func ReserveMemoryWithSelector(f *framework.Framework, id string, replicas, mega
 	return nil
 }
 
+// ReserveMemoryWithPriority creates a replication controller with pods with priority that, in summation,
+// request the specified amount of memory.
+func ReserveMemoryWithPriority(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration, priorityClassName string) func() error {
+	return reserveMemory(f, id, replicas, megabytes, expectRunning, timeout, nil, priorityClassName)
+}
+
+// ReserveMemoryWithSelector creates a replication controller with pods with node selector that, in summation,
+// request the specified amount of memory.
+func ReserveMemoryWithSelector(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration, selector map[string]string) func() error {
+	return reserveMemory(f, id, replicas, megabytes, expectRunning, timeout, selector, "")
+}
+
 // ReserveMemory creates a replication controller with pods that, in summation,
 // request the specified amount of memory.
 func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration) func() error {
-	return ReserveMemoryWithSelector(f, id, replicas, megabytes, expectRunning, timeout, nil)
+	return reserveMemory(f, id, replicas, megabytes, expectRunning, timeout, nil, "")
 }
 
 // WaitForClusterSizeFunc waits until the cluster size matches the given function.
@@ -1829,4 +1901,21 @@ func addKubeSystemPdbs(f *framework.Framework) (func(), error) {
 		}
 	}
 	return cleanup, nil
+}
+
+func createPriorityClasses(f *framework.Framework) func() {
+	priorityClasses := map[string]int32{
+		expendablePriorityClassName: -15,
+		highPriorityClassName:       1000,
+	}
+	for className, priority := range priorityClasses {
+		_, err := f.ClientSet.SchedulingV1alpha1().PriorityClasses().Create(&v1alpha1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: className}, Value: priority})
+		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
+	}
+
+	return func() {
+		for className := range priorityClasses {
+			f.ClientSet.SchedulingV1alpha1().PriorityClasses().Delete(className, nil)
+		}
+	}
 }

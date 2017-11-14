@@ -15,11 +15,12 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e/scalability",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/batch:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/timer:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",

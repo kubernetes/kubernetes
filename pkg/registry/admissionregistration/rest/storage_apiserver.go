@@ -24,8 +24,9 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
-	externaladmissionhookconfigurationstorage "k8s.io/kubernetes/pkg/registry/admissionregistration/externaladmissionhookconfiguration/storage"
 	initializerconfigurationstorage "k8s.io/kubernetes/pkg/registry/admissionregistration/initializerconfiguration/storage"
+	mutatingwebhookconfigurationstorage "k8s.io/kubernetes/pkg/registry/admissionregistration/mutatingwebhookconfiguration/storage"
+	validatingwebhookconfigurationstorage "k8s.io/kubernetes/pkg/registry/admissionregistration/validatingwebhookconfiguration/storage"
 )
 
 type RESTStorageProvider struct{}
@@ -49,9 +50,13 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 		s := initializerconfigurationstorage.NewREST(restOptionsGetter)
 		storage["initializerconfigurations"] = s
 	}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("externaladmissionhookconfigurations")) {
-		s := externaladmissionhookconfigurationstorage.NewREST(restOptionsGetter)
-		storage["externaladmissionhookconfigurations"] = s
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("validatingwebhookconfigurations")) {
+		s := validatingwebhookconfigurationstorage.NewREST(restOptionsGetter)
+		storage["validatingwebhookconfigurations"] = s
+	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("mutatingwebhookconfigurations")) {
+		s := mutatingwebhookconfigurationstorage.NewREST(restOptionsGetter)
+		storage["mutatingwebhookconfigurations"] = s
 	}
 	return storage
 }

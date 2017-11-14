@@ -30,7 +30,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/hawkular/hawkular-client-go/metrics"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"

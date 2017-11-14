@@ -85,7 +85,7 @@ readonly KUBE_CONTAINER_RSYNC_PORT=8730
 #
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
-  debian_iptables_version=v8
+  debian_iptables_version=v9
   ### If you change any of these lists, please also update DOCKERIZED_BINARIES
   ### in build/BUILD.
   case $1 in
@@ -720,7 +720,7 @@ function kube::build::sync_to_container() {
   # necessary.
   kube::build::rsync \
     --delete \
-    --filter='H /.git/' \
+    --filter='H /.git' \
     --filter='- /.make/' \
     --filter='- /_tmp/' \
     --filter='- /_output/' \

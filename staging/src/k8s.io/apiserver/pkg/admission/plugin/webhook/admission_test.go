@@ -24,30 +24,40 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"k8s.io/api/admission/v1alpha1"
 	registrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
-	api "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/rest"
 )
 
 type fakeHookSource struct {
-	hooks []registrationv1alpha1.ExternalAdmissionHook
+	hooks []registrationv1alpha1.Webhook
 	err   error
 }
 
-func (f *fakeHookSource) ExternalAdmissionHooks() (*registrationv1alpha1.ExternalAdmissionHookConfiguration, error) {
+func (f *fakeHookSource) Webhooks() (*registrationv1alpha1.ValidatingWebhookConfiguration, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
-	return &registrationv1alpha1.ExternalAdmissionHookConfiguration{ExternalAdmissionHooks: f.hooks}, nil
+	for i, h := range f.hooks {
+		if h.NamespaceSelector == nil {
+			f.hooks[i].NamespaceSelector = &metav1.LabelSelector{}
+		}
+	}
+	return &registrationv1alpha1.ValidatingWebhookConfiguration{Webhooks: f.hooks}, nil
 }
 
 func (f *fakeHookSource) Run(stopCh <-chan struct{}) {}
@@ -64,25 +74,55 @@ func (f fakeServiceResolver) ResolveEndpoint(namespace, name string) (*url.URL, 
 	return &u, nil
 }
 
+type fakeNamespaceLister struct {
+	namespaces map[string]*corev1.Namespace
+}
+
+func (f fakeNamespaceLister) List(selector labels.Selector) (ret []*corev1.Namespace, err error) {
+	return nil, nil
+}
+func (f fakeNamespaceLister) Get(name string) (*corev1.Namespace, error) {
+	ns, ok := f.namespaces[name]
+	if ok {
+		return ns, nil
+	}
+	return nil, errors.NewNotFound(corev1.Resource("namespaces"), name)
+}
+
+// ccfgSVC returns a client config using the service reference mechanism.
+func ccfgSVC(urlPath string) registrationv1alpha1.WebhookClientConfig {
+	return registrationv1alpha1.WebhookClientConfig{
+		Service: &registrationv1alpha1.ServiceReference{
+			Name:      "webhook-test",
+			Namespace: "default",
+			Path:      &urlPath,
+		},
+		CABundle: caCert,
+	}
+}
+
+type urlConfigGenerator struct {
+	baseURL *url.URL
+}
+
+// ccfgURL returns a client config using the URL mechanism.
+func (c urlConfigGenerator) ccfgURL(urlPath string) registrationv1alpha1.WebhookClientConfig {
+	u2 := *c.baseURL
+	u2.Path = urlPath
+	urlString := u2.String()
+	return registrationv1alpha1.WebhookClientConfig{
+		URL:      &urlString,
+		CABundle: caCert,
+	}
+}
+
 // TestAdmit tests that GenericAdmissionWebhook#Admit works as expected
 func TestAdmit(t *testing.T) {
 	scheme := runtime.NewScheme()
 	v1alpha1.AddToScheme(scheme)
-	api.AddToScheme(scheme)
+	corev1.AddToScheme(scheme)
 
-	// Create the test webhook server
-	sCert, err := tls.X509KeyPair(serverCert, serverKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	rootCAs := x509.NewCertPool()
-	rootCAs.AppendCertsFromPEM(caCert)
-	testServer := httptest.NewUnstartedServer(http.HandlerFunc(webhookHandler))
-	testServer.TLS = &tls.Config{
-		Certificates: []tls.Certificate{sCert},
-		ClientCAs:    rootCAs,
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-	}
+	testServer := newTestServer(t)
 	testServer.StartTLS()
 	defer testServer.Close()
 	serverURL, err := url.ParseRequestURI(testServer.URL)
@@ -93,21 +133,25 @@ func TestAdmit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wh.authInfoResolver = &fakeAuthenticationInfoResolver{
-		restConfig: &rest.Config{
-			TLSClientConfig: rest.TLSClientConfig{
-				CAData:   caCert,
-				CertData: clientCert,
-				KeyData:  clientKey,
+	wh.authInfoResolver = newFakeAuthenticationInfoResolver()
+	wh.serviceResolver = fakeServiceResolver{base: *serverURL}
+	wh.SetScheme(scheme)
+	namespace := "webhook-test"
+	wh.namespaceLister = fakeNamespaceLister{map[string]*corev1.Namespace{
+		namespace: {
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"runlevel": "0",
+				},
 			},
 		},
+	},
 	}
 
 	// Set up a test object for the call
-	kind := api.SchemeGroupVersion.WithKind("Pod")
+	kind := corev1.SchemeGroupVersion.WithKind("Pod")
 	name := "my-pod"
-	namespace := "webhook-test"
-	object := api.Pod{
+	object := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
 				"pod.name": name,
@@ -120,32 +164,24 @@ func TestAdmit(t *testing.T) {
 			Kind:       "Pod",
 		},
 	}
-	oldObject := api.Pod{
+	oldObject := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 	}
 	operation := admission.Update
-	resource := api.Resource("pods").WithVersion("v1")
+	resource := corev1.Resource("pods").WithVersion("v1")
 	subResource := ""
 	userInfo := user.DefaultInfo{
 		Name: "webhook-test",
 		UID:  "webhook-test",
 	}
 
+	ccfgURL := urlConfigGenerator{serverURL}.ccfgURL
+
 	type test struct {
 		hookSource    fakeHookSource
 		path          string
 		expectAllow   bool
 		errorContains string
-	}
-	ccfg := func(urlPath string) registrationv1alpha1.AdmissionHookClientConfig {
-		return registrationv1alpha1.AdmissionHookClientConfig{
-			Service: registrationv1alpha1.ServiceReference{
-				Name:      "webhook-test",
-				Namespace: "default",
-			},
-			URLPath:  urlPath,
-			CABundle: caCert,
-		}
 	}
 
 	matchEverythingRules := []registrationv1alpha1.RuleWithOperations{{
@@ -163,9 +199,9 @@ func TestAdmit(t *testing.T) {
 	table := map[string]test{
 		"no match": {
 			hookSource: fakeHookSource{
-				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
+				hooks: []registrationv1alpha1.Webhook{{
 					Name:         "nomatch",
-					ClientConfig: ccfg("disallow"),
+					ClientConfig: ccfgSVC("disallow"),
 					Rules: []registrationv1alpha1.RuleWithOperations{{
 						Operations: []registrationv1alpha1.OperationType{registrationv1alpha1.Create},
 					}},
@@ -175,9 +211,9 @@ func TestAdmit(t *testing.T) {
 		},
 		"match & allow": {
 			hookSource: fakeHookSource{
-				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
+				hooks: []registrationv1alpha1.Webhook{{
 					Name:         "allow",
-					ClientConfig: ccfg("allow"),
+					ClientConfig: ccfgSVC("allow"),
 					Rules:        matchEverythingRules,
 				}},
 			},
@@ -185,9 +221,9 @@ func TestAdmit(t *testing.T) {
 		},
 		"match & disallow": {
 			hookSource: fakeHookSource{
-				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
+				hooks: []registrationv1alpha1.Webhook{{
 					Name:         "disallow",
-					ClientConfig: ccfg("disallow"),
+					ClientConfig: ccfgSVC("disallow"),
 					Rules:        matchEverythingRules,
 				}},
 			},
@@ -195,29 +231,63 @@ func TestAdmit(t *testing.T) {
 		},
 		"match & disallow ii": {
 			hookSource: fakeHookSource{
-				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
+				hooks: []registrationv1alpha1.Webhook{{
 					Name:         "disallowReason",
-					ClientConfig: ccfg("disallowReason"),
+					ClientConfig: ccfgSVC("disallowReason"),
 					Rules:        matchEverythingRules,
 				}},
 			},
 			errorContains: "you shall not pass",
 		},
+		"match & disallow & but allowed because namespaceSelector exempt the namespace": {
+			hookSource: fakeHookSource{
+				hooks: []registrationv1alpha1.Webhook{{
+					Name:         "disallow",
+					ClientConfig: ccfgSVC("disallow"),
+					Rules:        newMatchEverythingRules(),
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{{
+							Key:      "runlevel",
+							Values:   []string{"1"},
+							Operator: metav1.LabelSelectorOpIn,
+						}},
+					},
+				}},
+			},
+			expectAllow: true,
+		},
+		"match & disallow & but allowed because namespaceSelector exempt the namespace ii": {
+			hookSource: fakeHookSource{
+				hooks: []registrationv1alpha1.Webhook{{
+					Name:         "disallow",
+					ClientConfig: ccfgSVC("disallow"),
+					Rules:        newMatchEverythingRules(),
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{{
+							Key:      "runlevel",
+							Values:   []string{"0"},
+							Operator: metav1.LabelSelectorOpNotIn,
+						}},
+					},
+				}},
+			},
+			expectAllow: true,
+		},
 		"match & fail (but allow because fail open)": {
 			hookSource: fakeHookSource{
-				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
+				hooks: []registrationv1alpha1.Webhook{{
 					Name:          "internalErr A",
-					ClientConfig:  ccfg("internalErr"),
+					ClientConfig:  ccfgSVC("internalErr"),
 					Rules:         matchEverythingRules,
 					FailurePolicy: &policyIgnore,
 				}, {
 					Name:          "internalErr B",
-					ClientConfig:  ccfg("internalErr"),
+					ClientConfig:  ccfgSVC("internalErr"),
 					Rules:         matchEverythingRules,
 					FailurePolicy: &policyIgnore,
 				}, {
 					Name:          "internalErr C",
-					ClientConfig:  ccfg("internalErr"),
+					ClientConfig:  ccfgSVC("internalErr"),
 					Rules:         matchEverythingRules,
 					FailurePolicy: &policyIgnore,
 				}},
@@ -226,17 +296,17 @@ func TestAdmit(t *testing.T) {
 		},
 		"match & fail (but disallow because fail closed on nil)": {
 			hookSource: fakeHookSource{
-				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
+				hooks: []registrationv1alpha1.Webhook{{
 					Name:         "internalErr A",
-					ClientConfig: ccfg("internalErr"),
+					ClientConfig: ccfgSVC("internalErr"),
 					Rules:        matchEverythingRules,
 				}, {
 					Name:         "internalErr B",
-					ClientConfig: ccfg("internalErr"),
+					ClientConfig: ccfgSVC("internalErr"),
 					Rules:        matchEverythingRules,
 				}, {
 					Name:         "internalErr C",
-					ClientConfig: ccfg("internalErr"),
+					ClientConfig: ccfgSVC("internalErr"),
 					Rules:        matchEverythingRules,
 				}},
 			},
@@ -244,33 +314,55 @@ func TestAdmit(t *testing.T) {
 		},
 		"match & fail (but fail because fail closed)": {
 			hookSource: fakeHookSource{
-				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
+				hooks: []registrationv1alpha1.Webhook{{
 					Name:          "internalErr A",
-					ClientConfig:  ccfg("internalErr"),
+					ClientConfig:  ccfgSVC("internalErr"),
 					Rules:         matchEverythingRules,
 					FailurePolicy: &policyFail,
 				}, {
 					Name:          "internalErr B",
-					ClientConfig:  ccfg("internalErr"),
+					ClientConfig:  ccfgSVC("internalErr"),
 					Rules:         matchEverythingRules,
 					FailurePolicy: &policyFail,
 				}, {
 					Name:          "internalErr C",
-					ClientConfig:  ccfg("internalErr"),
+					ClientConfig:  ccfgSVC("internalErr"),
 					Rules:         matchEverythingRules,
 					FailurePolicy: &policyFail,
 				}},
 			},
 			expectAllow: false,
 		},
+		"match & allow (url)": {
+			hookSource: fakeHookSource{
+				hooks: []registrationv1alpha1.Webhook{{
+					Name:         "allow",
+					ClientConfig: ccfgURL("allow"),
+					Rules:        matchEverythingRules,
+				}},
+			},
+			expectAllow: true,
+		},
+		"match & disallow (url)": {
+			hookSource: fakeHookSource{
+				hooks: []registrationv1alpha1.Webhook{{
+					Name:         "disallow",
+					ClientConfig: ccfgURL("disallow"),
+					Rules:        matchEverythingRules,
+				}},
+			},
+			errorContains: "without explanation",
+		},
+		// No need to test everything with the url case, since only the
+		// connection is different.
 	}
 
 	for name, tt := range table {
+		if !strings.Contains(name, "no match") {
+			continue
+		}
 		t.Run(name, func(t *testing.T) {
 			wh.hookSource = &tt.hookSource
-			wh.serviceResolver = fakeServiceResolver{base: *serverURL}
-			wh.SetScheme(scheme)
-
 			err = wh.Admit(admission.NewAttributesRecord(&object, &oldObject, kind, namespace, name, resource, subResource, operation, &userInfo))
 			if tt.expectAllow != (err == nil) {
 				t.Errorf("expected allowed=%v, but got err=%v", tt.expectAllow, err)
@@ -286,6 +378,181 @@ func TestAdmit(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestAdmitCachedClient tests that GenericAdmissionWebhook#Admit should cache restClient
+func TestAdmitCachedClient(t *testing.T) {
+	scheme := runtime.NewScheme()
+	v1alpha1.AddToScheme(scheme)
+	corev1.AddToScheme(scheme)
+
+	testServer := newTestServer(t)
+	testServer.StartTLS()
+	defer testServer.Close()
+	serverURL, err := url.ParseRequestURI(testServer.URL)
+	if err != nil {
+		t.Fatalf("this should never happen? %v", err)
+	}
+	wh, err := NewGenericAdmissionWebhook(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wh.authInfoResolver = newFakeAuthenticationInfoResolver()
+	wh.serviceResolver = fakeServiceResolver{base: *serverURL}
+	wh.SetScheme(scheme)
+	namespace := "webhook-test"
+	wh.namespaceLister = fakeNamespaceLister{map[string]*corev1.Namespace{
+		namespace: {
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"runlevel": "0",
+				},
+			},
+		},
+	},
+	}
+
+	// Set up a test object for the call
+	kind := corev1.SchemeGroupVersion.WithKind("Pod")
+	name := "my-pod"
+	object := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				"pod.name": name,
+			},
+			Name:      name,
+			Namespace: namespace,
+		},
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Pod",
+		},
+	}
+	oldObject := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+	}
+	operation := admission.Update
+	resource := corev1.Resource("pods").WithVersion("v1")
+	subResource := ""
+	userInfo := user.DefaultInfo{
+		Name: "webhook-test",
+		UID:  "webhook-test",
+	}
+	ccfgURL := urlConfigGenerator{serverURL}.ccfgURL
+
+	type test struct {
+		name        string
+		hookSource  fakeHookSource
+		expectAllow bool
+		expectCache bool
+	}
+
+	policyIgnore := registrationv1alpha1.Ignore
+	cases := []test{
+		{
+			name: "cache 1",
+			hookSource: fakeHookSource{
+				hooks: []registrationv1alpha1.Webhook{{
+					Name:          "cache1",
+					ClientConfig:  ccfgSVC("allow"),
+					Rules:         newMatchEverythingRules(),
+					FailurePolicy: &policyIgnore,
+				}},
+			},
+			expectAllow: true,
+			expectCache: true,
+		},
+		{
+			name: "cache 2",
+			hookSource: fakeHookSource{
+				hooks: []registrationv1alpha1.Webhook{{
+					Name:          "cache2",
+					ClientConfig:  ccfgSVC("internalErr"),
+					Rules:         newMatchEverythingRules(),
+					FailurePolicy: &policyIgnore,
+				}},
+			},
+			expectAllow: true,
+			expectCache: true,
+		},
+		{
+			name: "cache 3",
+			hookSource: fakeHookSource{
+				hooks: []registrationv1alpha1.Webhook{{
+					Name:          "cache3",
+					ClientConfig:  ccfgSVC("allow"),
+					Rules:         newMatchEverythingRules(),
+					FailurePolicy: &policyIgnore,
+				}},
+			},
+			expectAllow: true,
+			expectCache: false,
+		},
+		{
+			name: "cache 4",
+			hookSource: fakeHookSource{
+				hooks: []registrationv1alpha1.Webhook{{
+					Name:          "cache4",
+					ClientConfig:  ccfgURL("allow"),
+					Rules:         newMatchEverythingRules(),
+					FailurePolicy: &policyIgnore,
+				}},
+			},
+			expectAllow: true,
+			expectCache: true,
+		},
+		{
+			name: "cache 5",
+			hookSource: fakeHookSource{
+				hooks: []registrationv1alpha1.Webhook{{
+					Name:          "cache5",
+					ClientConfig:  ccfgURL("allow"),
+					Rules:         newMatchEverythingRules(),
+					FailurePolicy: &policyIgnore,
+				}},
+			},
+			expectAllow: true,
+			expectCache: false,
+		},
+	}
+
+	for _, testcase := range cases {
+		t.Run(testcase.name, func(t *testing.T) {
+			wh.hookSource = &testcase.hookSource
+			wh.authInfoResolver.(*fakeAuthenticationInfoResolver).cachedCount = 0
+
+			err = wh.Admit(admission.NewAttributesRecord(&object, &oldObject, kind, namespace, testcase.name, resource, subResource, operation, &userInfo))
+			if testcase.expectAllow != (err == nil) {
+				t.Errorf("expected allowed=%v, but got err=%v", testcase.expectAllow, err)
+			}
+
+			if testcase.expectCache && wh.authInfoResolver.(*fakeAuthenticationInfoResolver).cachedCount != 1 {
+				t.Errorf("expected cacheclient, but got none")
+			}
+
+			if !testcase.expectCache && wh.authInfoResolver.(*fakeAuthenticationInfoResolver).cachedCount != 0 {
+				t.Errorf("expected not cacheclient, but got cache")
+			}
+		})
+	}
+
+}
+
+func newTestServer(t *testing.T) *httptest.Server {
+	// Create the test webhook server
+	sCert, err := tls.X509KeyPair(serverCert, serverKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootCAs := x509.NewCertPool()
+	rootCAs.AppendCertsFromPEM(caCert)
+	testServer := httptest.NewUnstartedServer(http.HandlerFunc(webhookHandler))
+	testServer.TLS = &tls.Config{
+		Certificates: []tls.Certificate{sCert},
+		ClientCAs:    rootCAs,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+	}
+	return testServer
 }
 
 func webhookHandler(w http.ResponseWriter, r *http.Request) {
@@ -330,11 +597,25 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func newFakeAuthenticationInfoResolver() *fakeAuthenticationInfoResolver {
+	return &fakeAuthenticationInfoResolver{
+		restConfig: &rest.Config{
+			TLSClientConfig: rest.TLSClientConfig{
+				CAData:   caCert,
+				CertData: clientCert,
+				KeyData:  clientKey,
+			},
+		},
+	}
+}
+
 type fakeAuthenticationInfoResolver struct {
-	restConfig *rest.Config
+	restConfig  *rest.Config
+	cachedCount int32
 }
 
 func (c *fakeAuthenticationInfoResolver) ClientConfigFor(server string) (*rest.Config, error) {
+	atomic.AddInt32(&c.cachedCount, 1)
 	return c.restConfig, nil
 }
 
@@ -384,5 +665,102 @@ func TestToStatusErr(t *testing.T) {
 		if err == nil || err.Error() != test.expectedError {
 			t.Errorf("%s: expected an error saying %q, but got %v", test.name, test.expectedError, err)
 		}
+	}
+}
+
+func newMatchEverythingRules() []registrationv1alpha1.RuleWithOperations {
+	return []registrationv1alpha1.RuleWithOperations{{
+		Operations: []registrationv1alpha1.OperationType{registrationv1alpha1.OperationAll},
+		Rule: registrationv1alpha1.Rule{
+			APIGroups:   []string{"*"},
+			APIVersions: []string{"*"},
+			Resources:   []string{"*/*"},
+		},
+	}}
+}
+
+func TestGetNamespaceLabels(t *testing.T) {
+	namespace1Labels := map[string]string{
+		"runlevel": "1",
+	}
+	namespace1 := corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "1",
+			Labels: namespace1Labels,
+		},
+	}
+	namespace2Labels := map[string]string{
+		"runlevel": "2",
+	}
+	namespace2 := corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "2",
+			Labels: namespace2Labels,
+		},
+	}
+	namespaceLister := fakeNamespaceLister{map[string]*corev1.Namespace{
+		"1": &namespace1,
+	},
+	}
+
+	tests := []struct {
+		name           string
+		attr           admission.Attributes
+		expectedLabels map[string]string
+	}{
+		{
+			name:           "request is for creating namespace, the labels should be from the object itself",
+			attr:           admission.NewAttributesRecord(&namespace2, nil, schema.GroupVersionKind{}, "", namespace2.Name, schema.GroupVersionResource{Resource: "namespaces"}, "", admission.Create, nil),
+			expectedLabels: namespace2Labels,
+		},
+		{
+			name:           "request is for updating namespace, the labels should be from the new object",
+			attr:           admission.NewAttributesRecord(&namespace2, nil, schema.GroupVersionKind{}, namespace2.Name, namespace2.Name, schema.GroupVersionResource{Resource: "namespaces"}, "", admission.Update, nil),
+			expectedLabels: namespace2Labels,
+		},
+		{
+			name:           "request is for deleting namespace, the labels should be from the cache",
+			attr:           admission.NewAttributesRecord(&namespace2, nil, schema.GroupVersionKind{}, namespace1.Name, namespace1.Name, schema.GroupVersionResource{Resource: "namespaces"}, "", admission.Delete, nil),
+			expectedLabels: namespace1Labels,
+		},
+		{
+			name:           "request is for namespace/finalizer",
+			attr:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, namespace1.Name, "mock-name", schema.GroupVersionResource{Resource: "namespaces"}, "finalizers", admission.Create, nil),
+			expectedLabels: namespace1Labels,
+		},
+		{
+			name:           "request is for pod",
+			attr:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, namespace1.Name, "mock-name", schema.GroupVersionResource{Resource: "pods"}, "", admission.Create, nil),
+			expectedLabels: namespace1Labels,
+		},
+	}
+	wh, err := NewGenericAdmissionWebhook(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wh.namespaceLister = namespaceLister
+	for _, tt := range tests {
+		actualLabels, err := wh.getNamespaceLabels(tt.attr)
+		if err != nil {
+			t.Error(err)
+		}
+		if !reflect.DeepEqual(actualLabels, tt.expectedLabels) {
+			t.Errorf("expected labels to be %#v, got %#v", tt.expectedLabels, actualLabels)
+		}
+	}
+}
+
+func TestExemptClusterScopedResource(t *testing.T) {
+	hook := &registrationv1alpha1.Webhook{
+		NamespaceSelector: &metav1.LabelSelector{},
+	}
+	attr := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "mock-name", schema.GroupVersionResource{Version: "v1", Resource: "nodes"}, "", admission.Create, nil)
+	g := GenericAdmissionWebhook{}
+	exempted, err := g.exemptedByNamespaceSelector(hook, attr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !exempted {
+		t.Errorf("cluster scoped resources (but not a namespace) should be exempted from all webhooks")
 	}
 }

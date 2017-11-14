@@ -59,13 +59,14 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/version"
+	utilsexec "k8s.io/utils/exec"
 )
 
 var (
 	initDoneTempl = template.Must(template.New("init").Parse(dedent.Dedent(`
 		Your Kubernetes master has initialized successfully!
 
-		To start using your cluster, you need to run (as a regular user):
+		To start using your cluster, you need to run the following as a regular user:
 
 		  mkdir -p $HOME/.kube
 		  sudo cp -i {{.KubeConfigPath}} $HOME/.kube/config
@@ -86,15 +87,15 @@ var (
 		Unfortunately, an error has occurred:
 			{{ .Error }}
 
-		This error is likely caused by that:
+		This error is likely caused by:
 			- The kubelet is not running
 			- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
-			- There is no internet connection; so the kubelet can't pull the following control plane images:
+			- There is no internet connection, so the kubelet cannot pull the following control plane images:
 				- {{ .APIServerImage }}
 				- {{ .ControllerManagerImage }}
 				- {{ .SchedulerImage }}
 
-		You can troubleshoot this for example with the following commands if you're on a systemd-powered system:
+		If you are on a systemd-powered system, you can try to troubleshoot the error with the following commands:
 			- 'systemctl status kubelet'
 			- 'journalctl -xeu kubelet'
 		`)))
@@ -110,10 +111,11 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	var skipTokenPrint bool
 	var dryRun bool
 	var featureGatesString string
+	var criSocket string
 
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Run this in order to set up the Kubernetes master",
+		Short: "Run this command in order to set up the Kubernetes master.",
 		Run: func(cmd *cobra.Command, args []string) {
 			var err error
 			if cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
@@ -124,7 +126,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 			internalcfg := &kubeadmapi.MasterConfiguration{}
 			legacyscheme.Scheme.Convert(cfg, internalcfg, nil)
 
-			i, err := NewInit(cfgPath, internalcfg, skipPreFlight, skipTokenPrint, dryRun)
+			i, err := NewInit(cfgPath, internalcfg, skipPreFlight, skipTokenPrint, dryRun, criSocket)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(i.Validate(cmd))
 			kubeadmutil.CheckErr(i.Run(out))
@@ -132,7 +134,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	}
 
 	AddInitConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
-	AddInitOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &skipTokenPrint, &dryRun)
+	AddInitOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &skipTokenPrint, &dryRun, &criSocket)
 
 	return cmd
 }
@@ -141,7 +143,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress,
-		"The IP address the API Server will advertise it's listening on. 0.0.0.0 means the default network interface's address.",
+		"The IP address the API Server will advertise it's listening on. Specify '0.0.0.0' to use the address of the default network interface.",
 	)
 	flagSet.Int32Var(
 		&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort,
@@ -153,7 +155,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfigur
 	)
 	flagSet.StringVar(
 		&cfg.Networking.PodSubnet, "pod-network-cidr", cfg.Networking.PodSubnet,
-		"Specify range of IP addresses for the pod network; if set, the control plane will automatically allocate CIDRs for every node.",
+		"Specify range of IP addresses for the pod network. If set, the control plane will automatically allocate CIDRs for every node.",
 	)
 	flagSet.StringVar(
 		&cfg.Networking.DNSDomain, "service-dns-domain", cfg.Networking.DNSDomain,
@@ -169,7 +171,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfigur
 	)
 	flagSet.StringSliceVar(
 		&cfg.APIServerCertSANs, "apiserver-cert-extra-sans", cfg.APIServerCertSANs,
-		`Optional extra altnames to use for the API Server serving cert. Can be both IP addresses and dns names.`,
+		`Optional extra Subject Alternative Names (SANs) to use for the API Server serving certificate. Can be both IP addresses and DNS names.`,
 	)
 	flagSet.StringVar(
 		&cfg.NodeName, "node-name", cfg.NodeName,
@@ -181,14 +183,14 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfigur
 	)
 	flagSet.DurationVar(
 		&cfg.TokenTTL.Duration, "token-ttl", cfg.TokenTTL.Duration,
-		"The duration before the bootstrap token is automatically deleted. 0 means 'never expires'.",
+		"The duration before the bootstrap token is automatically deleted. If set to '0', the token will never expire.",
 	)
 	flagSet.StringVar(featureGatesString, "feature-gates", *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
 		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
 }
 
 // AddInitOtherFlags adds init flags that are not bound to a configuration file to the given flagset
-func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, skipTokenPrint, dryRun *bool) {
+func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, skipTokenPrint, dryRun *bool, criSocket *string) {
 	flagSet.StringVar(
 		cfgPath, "config", *cfgPath,
 		"Path to kubeadm config file. WARNING: Usage of a configuration file is experimental.",
@@ -196,7 +198,7 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, sk
 	// Note: All flags that are not bound to the cfg object should be whitelisted in cmd/kubeadm/app/apis/kubeadm/validation/validation.go
 	flagSet.BoolVar(
 		skipPreFlight, "skip-preflight-checks", *skipPreFlight,
-		"Skip preflight checks normally run before modifying the system.",
+		"Skip preflight checks which normally run before modifying the system.",
 	)
 	// Note: All flags that are not bound to the cfg object should be whitelisted in cmd/kubeadm/app/apis/kubeadm/validation/validation.go
 	flagSet.BoolVar(
@@ -208,12 +210,16 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, sk
 		dryRun, "dry-run", *dryRun,
 		"Don't apply any changes; just output what would be done.",
 	)
+	flagSet.StringVar(
+		criSocket, "cri-socket", "/var/run/dockershim.sock",
+		`Specify the CRI socket to connect to.`,
+	)
 }
 
 // NewInit validates given arguments and instantiates Init struct with provided information.
-func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight, skipTokenPrint, dryRun bool) (*Init, error) {
+func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight, skipTokenPrint, dryRun bool, criSocket string) (*Init, error) {
 
-	fmt.Println("[kubeadm] WARNING: kubeadm is in beta, please do not use it for production clusters.")
+	fmt.Println("[kubeadm] WARNING: kubeadm is in beta. Please do not use it for production clusters!")
 
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
@@ -247,7 +253,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight,
 	if !skipPreFlight {
 		fmt.Println("[preflight] Running pre-flight checks.")
 
-		if err := preflight.RunInitMasterChecks(cfg); err != nil {
+		if err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, criSocket); err != nil {
 			return nil, err
 		}
 
@@ -411,7 +417,7 @@ func (i *Init) Run(out io.Writer) error {
 	if features.Enabled(i.cfg.FeatureGates, features.SelfHosting) {
 		// Temporary control plane is up, now we create our self hosted control
 		// plane components and remove the static manifests:
-		fmt.Println("[self-hosted] Creating self-hosted control plane...")
+		fmt.Println("[self-hosted] Creating self-hosted control plane.")
 		if err := selfhostingphase.CreateSelfHostedControlPlane(manifestDir, kubeConfigDir, i.cfg, client, waiter); err != nil {
 			return fmt.Errorf("error creating self hosted control plane: %v", err)
 		}
@@ -419,7 +425,7 @@ func (i *Init) Run(out io.Writer) error {
 
 	// Exit earlier if we're dryrunning
 	if i.dryRun {
-		fmt.Println("[dryrun] Finished dry-running successfully; above are the resources that would be created.")
+		fmt.Println("[dryrun] Finished dry-running successfully. Above are the resources that would be created.")
 		return nil
 	}
 
@@ -481,9 +487,9 @@ func printFilesIfDryRunning(dryRun bool, manifestDir string) error {
 		return nil
 	}
 
-	fmt.Printf("[dryrun] Wrote certificates, kubeconfig files and control plane manifests to %q\n", manifestDir)
-	fmt.Println("[dryrun] Won't print certificates or kubeconfig files due to the sensitive nature of them")
-	fmt.Printf("[dryrun] Please go and examine the %q directory for details about what would be written\n", manifestDir)
+	fmt.Printf("[dryrun] Wrote certificates, kubeconfig files and control plane manifests to the %q directory.\n", manifestDir)
+	fmt.Println("[dryrun] The certificates or kubeconfig files would not be printed due to their sensitive nature.")
+	fmt.Printf("[dryrun] Please examine the %q directory for details about what would be written.\n", manifestDir)
 
 	// Print the contents of the upgraded manifests and pretend like they were in /etc/kubernetes/manifests
 	files := []dryrunutil.FileToPrint{}
@@ -511,7 +517,7 @@ func waitForAPIAndKubelet(waiter apiclient.Waiter) error {
 	errorChan := make(chan error)
 
 	fmt.Printf("[init] Waiting for the kubelet to boot up the control plane as Static Pods from directory %q.\n", kubeadmconstants.GetStaticPodDirectory())
-	fmt.Println("[init] This often takes around a minute; or longer if the control plane images have to be pulled.")
+	fmt.Println("[init] This might take a minute or longer if the control plane images have to be pulled.")
 
 	go func(errC chan error, waiter apiclient.Waiter) {
 		// This goroutine can only make kubeadm init fail. If this check succeeds, it won't do anything special

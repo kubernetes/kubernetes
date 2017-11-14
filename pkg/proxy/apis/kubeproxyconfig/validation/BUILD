@@ -11,7 +11,7 @@ go_library(
     srcs = ["validation.go"],
     importpath = "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/validation",
     deps = [
-        "//pkg/api/validation:go_default_library",
+        "//pkg/apis/core/validation:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
@@ -38,6 +38,7 @@ go_test(
     library = ":go_default_library",
     deps = [
         "//pkg/proxy/apis/kubeproxyconfig:go_default_library",
+        "//pkg/util/pointer:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],

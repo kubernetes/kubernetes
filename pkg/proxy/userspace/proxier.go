@@ -28,8 +28,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/proxy"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -503,7 +503,7 @@ func (proxier *Proxier) unmergeService(service *api.Service, existingPorts sets.
 		}
 		proxier.loadBalancer.DeleteService(serviceName)
 	}
-	for _, svcIP := range staleUDPServices.List() {
+	for _, svcIP := range staleUDPServices.UnsortedList() {
 		if err := utilproxy.ClearUDPConntrackForIP(proxier.exec, svcIP); err != nil {
 			glog.Errorf("Failed to delete stale service IP %s connections, error: %v", svcIP, err)
 		}

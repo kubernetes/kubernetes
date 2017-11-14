@@ -21,6 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
@@ -53,7 +54,7 @@ func autoConvert_v1alpha1_ClientConnectionConfiguration_To_kubeproxyconfig_Clien
 	out.AcceptContentTypes = in.AcceptContentTypes
 	out.ContentType = in.ContentType
 	out.QPS = in.QPS
-	out.Burst = in.Burst
+	out.Burst = int32(in.Burst)
 	return nil
 }
 
@@ -67,7 +68,7 @@ func autoConvert_kubeproxyconfig_ClientConnectionConfiguration_To_v1alpha1_Clien
 	out.AcceptContentTypes = in.AcceptContentTypes
 	out.ContentType = in.ContentType
 	out.QPS = in.QPS
-	out.Burst = in.Burst
+	out.Burst = int(in.Burst)
 	return nil
 }
 
@@ -145,11 +146,11 @@ func Convert_kubeproxyconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfigu
 }
 
 func autoConvert_v1alpha1_KubeProxyConntrackConfiguration_To_kubeproxyconfig_KubeProxyConntrackConfiguration(in *KubeProxyConntrackConfiguration, out *kubeproxyconfig.KubeProxyConntrackConfiguration, s conversion.Scope) error {
-	out.Max = in.Max
-	out.MaxPerCore = in.MaxPerCore
-	out.Min = in.Min
-	out.TCPEstablishedTimeout = in.TCPEstablishedTimeout
-	out.TCPCloseWaitTimeout = in.TCPCloseWaitTimeout
+	out.Max = (*int32)(unsafe.Pointer(in.Max))
+	out.MaxPerCore = (*int32)(unsafe.Pointer(in.MaxPerCore))
+	out.Min = (*int32)(unsafe.Pointer(in.Min))
+	out.TCPEstablishedTimeout = (*v1.Duration)(unsafe.Pointer(in.TCPEstablishedTimeout))
+	out.TCPCloseWaitTimeout = (*v1.Duration)(unsafe.Pointer(in.TCPCloseWaitTimeout))
 	return nil
 }
 
@@ -159,11 +160,11 @@ func Convert_v1alpha1_KubeProxyConntrackConfiguration_To_kubeproxyconfig_KubePro
 }
 
 func autoConvert_kubeproxyconfig_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration(in *kubeproxyconfig.KubeProxyConntrackConfiguration, out *KubeProxyConntrackConfiguration, s conversion.Scope) error {
-	out.Max = in.Max
-	out.MaxPerCore = in.MaxPerCore
-	out.Min = in.Min
-	out.TCPEstablishedTimeout = in.TCPEstablishedTimeout
-	out.TCPCloseWaitTimeout = in.TCPCloseWaitTimeout
+	out.Max = (*int32)(unsafe.Pointer(in.Max))
+	out.MaxPerCore = (*int32)(unsafe.Pointer(in.MaxPerCore))
+	out.Min = (*int32)(unsafe.Pointer(in.Min))
+	out.TCPEstablishedTimeout = (*v1.Duration)(unsafe.Pointer(in.TCPEstablishedTimeout))
+	out.TCPCloseWaitTimeout = (*v1.Duration)(unsafe.Pointer(in.TCPCloseWaitTimeout))
 	return nil
 }
 

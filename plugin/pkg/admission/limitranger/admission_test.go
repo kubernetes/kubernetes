@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -430,7 +430,11 @@ func TestPodLimitFunc(t *testing.T) {
 	}
 	for i := range successCases {
 		test := successCases[i]
-		err := PodLimitFunc(&test.limitRange, &test.pod)
+		err := PodMutateLimitFunc(&test.limitRange, &test.pod)
+		if err != nil {
+			t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
+		}
+		err = PodValidateLimitFunc(&test.limitRange, &test.pod)
 		if err != nil {
 			t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
 		}
@@ -610,7 +614,11 @@ func TestPodLimitFunc(t *testing.T) {
 	}
 	for i := range errorCases {
 		test := errorCases[i]
-		err := PodLimitFunc(&test.limitRange, &test.pod)
+		err := PodMutateLimitFunc(&test.limitRange, &test.pod)
+		if err != nil {
+			t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
+		}
+		err = PodValidateLimitFunc(&test.limitRange, &test.pod)
 		if err == nil {
 			t.Errorf("Expected error for pod: %s", test.pod.Name)
 		}
@@ -628,7 +636,7 @@ func getLocalStorageResourceList(ephemeralStorage string) api.ResourceList {
 func TestPodLimitFuncApplyDefault(t *testing.T) {
 	limitRange := validLimitRange()
 	testPod := validPodInit(validPod("foo", 1, getResourceRequirements(api.ResourceList{}, api.ResourceList{})), getResourceRequirements(api.ResourceList{}, api.ResourceList{}))
-	err := PodLimitFunc(&limitRange, &testPod)
+	err := PodMutateLimitFunc(&limitRange, &testPod)
 	if err != nil {
 		t.Errorf("Unexpected error for valid pod: %s, %v", testPod.Name, err)
 	}
@@ -687,11 +695,15 @@ func TestLimitRangerIgnoresSubresource(t *testing.T) {
 
 	testPod := validPod("testPod", 1, api.ResourceRequirements{})
 	err = handler.Admit(admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = handler.Validate(admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
 	if err == nil {
 		t.Errorf("Expected an error since the pod did not specify resource limits in its update call")
 	}
 
-	err = handler.Admit(admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "status", admission.Update, nil))
+	err = handler.Validate(admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "status", admission.Update, nil))
 	if err != nil {
 		t.Errorf("Should have ignored calls to any subresource of pod %v", err)
 	}
@@ -709,11 +721,15 @@ func TestLimitRangerAdmitPod(t *testing.T) {
 
 	testPod := validPod("testPod", 1, api.ResourceRequirements{})
 	err = handler.Admit(admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = handler.Validate(admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
 	if err == nil {
 		t.Errorf("Expected an error since the pod did not specify resource limits in its update call")
 	}
 
-	err = handler.Admit(admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "status", admission.Update, nil))
+	err = handler.Validate(admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "status", admission.Update, nil))
 	if err != nil {
 		t.Errorf("Should have ignored calls to any subresource of pod %v", err)
 	}
@@ -786,7 +802,7 @@ func TestPersistentVolumeClaimLimitFunc(t *testing.T) {
 	}
 	for i := range successCases {
 		test := successCases[i]
-		err := PersistentVolumeClaimLimitFunc(&test.limitRange, &test.pvc)
+		err := PersistentVolumeClaimValidateLimitFunc(&test.limitRange, &test.pvc)
 		if err != nil {
 			t.Errorf("Unexpected error for pvc: %s, %v", test.pvc.Name, err)
 		}
@@ -804,7 +820,7 @@ func TestPersistentVolumeClaimLimitFunc(t *testing.T) {
 	}
 	for i := range errorCases {
 		test := errorCases[i]
-		err := PersistentVolumeClaimLimitFunc(&test.limitRange, &test.pvc)
+		err := PersistentVolumeClaimValidateLimitFunc(&test.limitRange, &test.pvc)
 		if err == nil {
 			t.Errorf("Expected error for pvc: %s", test.pvc.Name)
 		}

@@ -23,7 +23,7 @@ package v1beta2
 import (
 	v1beta2 "k8s.io/api/apps/v1beta2"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
+	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.

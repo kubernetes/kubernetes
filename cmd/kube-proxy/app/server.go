@@ -45,8 +45,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -144,14 +144,17 @@ func AddFlags(options *Options, fs *pflag.FlagSet) {
 	fs.StringVar(&options.config.ClusterCIDR, "cluster-cidr", options.config.ClusterCIDR, "The CIDR range of pods in the cluster. When configured, traffic sent to a Service cluster IP from outside this range will be masqueraded and traffic sent from pods to an external LoadBalancer IP will be directed to the respective cluster IP instead")
 	fs.StringVar(&options.config.ClientConnection.ContentType, "kube-api-content-type", options.config.ClientConnection.ContentType, "Content type of requests sent to apiserver.")
 	fs.Float32Var(&options.config.ClientConnection.QPS, "kube-api-qps", options.config.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver")
-	fs.IntVar(&options.config.ClientConnection.Burst, "kube-api-burst", options.config.ClientConnection.Burst, "Burst to use while talking with kubernetes apiserver")
+	fs.Int32Var(&options.config.ClientConnection.Burst, "kube-api-burst", options.config.ClientConnection.Burst, "Burst to use while talking with kubernetes apiserver")
 	fs.DurationVar(&options.config.UDPIdleTimeout.Duration, "udp-timeout", options.config.UDPIdleTimeout.Duration, "How long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxy-mode=userspace")
-	fs.Int32Var(&options.config.Conntrack.Max, "conntrack-max", options.config.Conntrack.Max,
+	if options.config.Conntrack.Max == nil {
+		options.config.Conntrack.Max = utilpointer.Int32Ptr(0)
+	}
+	fs.Int32Var(options.config.Conntrack.Max, "conntrack-max", *options.config.Conntrack.Max,
 		"Maximum number of NAT connections to track (0 to leave as-is). This overrides conntrack-max-per-core and conntrack-min.")
 	fs.MarkDeprecated("conntrack-max", "This feature will be removed in a later release.")
-	fs.Int32Var(&options.config.Conntrack.MaxPerCore, "conntrack-max-per-core", options.config.Conntrack.MaxPerCore,
+	fs.Int32Var(options.config.Conntrack.MaxPerCore, "conntrack-max-per-core", *options.config.Conntrack.MaxPerCore,
 		"Maximum number of NAT connections to track per CPU core (0 to leave the limit as-is and ignore conntrack-min).")
-	fs.Int32Var(&options.config.Conntrack.Min, "conntrack-min", options.config.Conntrack.Min,
+	fs.Int32Var(options.config.Conntrack.Min, "conntrack-min", *options.config.Conntrack.Min,
 		"Minimum number of conntrack entries to allocate, regardless of conntrack-max-per-core (set conntrack-max-per-core=0 to leave the limit as-is).")
 	fs.DurationVar(&options.config.Conntrack.TCPEstablishedTimeout.Duration, "conntrack-tcp-timeout-established", options.config.Conntrack.TCPEstablishedTimeout.Duration, "Idle timeout for established TCP connections (0 to leave as-is)")
 	fs.DurationVar(
@@ -179,6 +182,17 @@ func (o *Options) Complete() error {
 		o.applyDeprecatedHealthzPortToConfig()
 	}
 
+	// Load the config file here in Complete, so that Validate validates the fully-resolved config.
+	if len(o.ConfigFile) > 0 {
+		if c, err := o.loadConfigFromFile(o.ConfigFile); err != nil {
+			return err
+		} else {
+			o.config = c
+			// Make sure we apply the feature gate settings in the config file.
+			utilfeature.DefaultFeatureGate.Set(o.config.FeatureGates)
+		}
+	}
+
 	return nil
 }
 
@@ -196,23 +210,11 @@ func (o *Options) Validate(args []string) error {
 }
 
 func (o *Options) Run() error {
-	config := o.config
-
 	if len(o.WriteConfigTo) > 0 {
 		return o.writeConfigFile()
 	}
 
-	if len(o.ConfigFile) > 0 {
-		if c, err := o.loadConfigFromFile(o.ConfigFile); err != nil {
-			return err
-		} else {
-			config = c
-			// Make sure we apply the feature gate settings in the config file.
-			utilfeature.DefaultFeatureGate.Set(config.FeatureGates)
-		}
-	}
-
-	proxyServer, err := NewProxyServer(config, o.CleanupAndExit, o.scheme, o.master)
+	proxyServer, err := NewProxyServer(o.config, o.CleanupAndExit, o.scheme, o.master)
 	if err != nil {
 		return err
 	}
@@ -420,7 +422,7 @@ func (s *ProxyServer) Run() error {
 	if s.CleanupAndExit {
 		encounteredError := userspace.CleanupLeftovers(s.IptInterface)
 		encounteredError = iptables.CleanupLeftovers(s.IptInterface) || encounteredError
-		encounteredError = ipvs.CleanupLeftovers(s.execer, s.IpvsInterface, s.IptInterface) || encounteredError
+		encounteredError = ipvs.CleanupLeftovers(s.IpvsInterface, s.IptInterface) || encounteredError
 		if encounteredError {
 			return errors.New("encountered an error while tearing down rules.")
 		}
@@ -502,14 +504,14 @@ func (s *ProxyServer) Run() error {
 			}
 		}
 
-		if s.ConntrackConfiguration.TCPEstablishedTimeout.Duration > 0 {
+		if s.ConntrackConfiguration.TCPEstablishedTimeout != nil && s.ConntrackConfiguration.TCPEstablishedTimeout.Duration > 0 {
 			timeout := int(s.ConntrackConfiguration.TCPEstablishedTimeout.Duration / time.Second)
 			if err := s.Conntracker.SetTCPEstablishedTimeout(timeout); err != nil {
 				return err
 			}
 		}
 
-		if s.ConntrackConfiguration.TCPCloseWaitTimeout.Duration > 0 {
+		if s.ConntrackConfiguration.TCPCloseWaitTimeout != nil && s.ConntrackConfiguration.TCPCloseWaitTimeout.Duration > 0 {
 			timeout := int(s.ConntrackConfiguration.TCPCloseWaitTimeout.Duration / time.Second)
 			if err := s.Conntracker.SetTCPCloseWaitTimeout(timeout); err != nil {
 				return err
@@ -548,16 +550,19 @@ func (s *ProxyServer) birthCry() {
 }
 
 func getConntrackMax(config kubeproxyconfig.KubeProxyConntrackConfiguration) (int, error) {
-	if config.Max > 0 {
-		if config.MaxPerCore > 0 {
+	if config.Max != nil && *config.Max > 0 {
+		if config.MaxPerCore != nil && *config.MaxPerCore > 0 {
 			return -1, fmt.Errorf("invalid config: Conntrack Max and Conntrack MaxPerCore are mutually exclusive")
 		}
 		glog.V(3).Infof("getConntrackMax: using absolute conntrack-max (deprecated)")
-		return int(config.Max), nil
+		return int(*config.Max), nil
 	}
-	if config.MaxPerCore > 0 {
-		floor := int(config.Min)
-		scaled := int(config.MaxPerCore) * goruntime.NumCPU()
+	if config.MaxPerCore != nil && *config.MaxPerCore > 0 {
+		floor := 0
+		if config.Min != nil {
+			floor = int(*config.Min)
+		}
+		scaled := int(*config.MaxPerCore) * goruntime.NumCPU()
 		if scaled > floor {
 			glog.V(3).Infof("getConntrackMax: using scaled conntrack-max-per-core")
 			return scaled, nil

@@ -37,7 +37,10 @@ TestCase:
 		{"10.2.0.0/24"},
 	} {
 		serviceCIDR := test.MustParseCIDR(tc.serviceCIDR)
-		set := cidrset.NewCIDRSet(test.MustParseCIDR(clusterCIDR), 24)
+		set, err := cidrset.NewCIDRSet(test.MustParseCIDR(clusterCIDR), 24)
+		if err != nil {
+			t.Errorf("test case %+v: NewCIDRSet() = %v, want nil", tc, err)
+		}
 		if err := occupyServiceCIDR(set, test.MustParseCIDR(clusterCIDR), serviceCIDR); err != nil {
 			t.Errorf("test case %+v: occupyServiceCIDR() = %v, want nil", tc, err)
 		}

@@ -16,7 +16,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/replication",
     deps = [
-        "//pkg/api/v1:go_default_library",
+        "//pkg/apis/core/v1:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/controller:go_default_library",

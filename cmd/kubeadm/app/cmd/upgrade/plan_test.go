@@ -89,7 +89,7 @@ func TestPrintAvailableUpgrades(t *testing.T) {
 					},
 				},
 			},
-			expectedBytes: []byte(`Components that must be upgraded manually after you've upgraded the control plane with 'kubeadm upgrade apply':
+			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
 COMPONENT   CURRENT      AVAILABLE
 Kubelet     1 x v1.7.1   v1.7.3
 
@@ -106,7 +106,7 @@ You can now apply the upgrade by executing the following command:
 
 	kubeadm upgrade apply v1.7.3
 
-Note: Before you can perform this upgrade, you have to update kubeadm to v1.7.3
+Note: Before you can perform this upgrade, you have to update kubeadm to v1.7.3.
 
 _____________________________________________________________________
 
@@ -131,7 +131,7 @@ _____________________________________________________________________
 					},
 				},
 			},
-			expectedBytes: []byte(`Components that must be upgraded manually after you've upgraded the control plane with 'kubeadm upgrade apply':
+			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
 COMPONENT   CURRENT      AVAILABLE
 Kubelet     1 x v1.7.3   v1.8.0
 
@@ -187,7 +187,7 @@ _____________________________________________________________________
 					},
 				},
 			},
-			expectedBytes: []byte(`Components that must be upgraded manually after you've upgraded the control plane with 'kubeadm upgrade apply':
+			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
 COMPONENT   CURRENT      AVAILABLE
 Kubelet     1 x v1.7.3   v1.7.5
 
@@ -206,7 +206,7 @@ You can now apply the upgrade by executing the following command:
 
 _____________________________________________________________________
 
-Components that must be upgraded manually after you've upgraded the control plane with 'kubeadm upgrade apply':
+Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
 COMPONENT   CURRENT      AVAILABLE
 Kubelet     1 x v1.7.3   v1.8.2
 
@@ -223,7 +223,7 @@ You can now apply the upgrade by executing the following command:
 
 	kubeadm upgrade apply v1.8.2
 
-Note: Before you can perform this upgrade, you have to update kubeadm to v1.8.2
+Note: Before you can perform this upgrade, you have to update kubeadm to v1.8.2.
 
 _____________________________________________________________________
 
@@ -248,7 +248,7 @@ _____________________________________________________________________
 					},
 				},
 			},
-			expectedBytes: []byte(`Components that must be upgraded manually after you've upgraded the control plane with 'kubeadm upgrade apply':
+			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
 COMPONENT   CURRENT      AVAILABLE
 Kubelet     1 x v1.7.5   v1.8.0-beta.1
 
@@ -265,7 +265,7 @@ You can now apply the upgrade by executing the following command:
 
 	kubeadm upgrade apply v1.8.0-beta.1
 
-Note: Before you can perform this upgrade, you have to update kubeadm to v1.8.0-beta.1
+Note: Before you can perform this upgrade, you have to update kubeadm to v1.8.0-beta.1.
 
 _____________________________________________________________________
 
@@ -290,7 +290,7 @@ _____________________________________________________________________
 					},
 				},
 			},
-			expectedBytes: []byte(`Components that must be upgraded manually after you've upgraded the control plane with 'kubeadm upgrade apply':
+			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
 COMPONENT   CURRENT      AVAILABLE
 Kubelet     1 x v1.7.5   v1.8.0-rc.1
 
@@ -307,7 +307,7 @@ You can now apply the upgrade by executing the following command:
 
 	kubeadm upgrade apply v1.8.0-rc.1
 
-Note: Before you can perform this upgrade, you have to update kubeadm to v1.8.0-rc.1
+Note: Before you can perform this upgrade, you have to update kubeadm to v1.8.0-rc.1.
 
 _____________________________________________________________________
 

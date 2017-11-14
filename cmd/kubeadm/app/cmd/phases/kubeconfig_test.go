@@ -44,6 +44,7 @@ func TestKubeConfigCSubCommandsHasFlags(t *testing.T) {
 		"cert-dir",
 		"apiserver-advertise-address",
 		"apiserver-bind-port",
+		"kubeconfig-dir",
 	}
 
 	var tests = []struct {
@@ -167,6 +168,8 @@ func TestKubeConfigSubCommandsThatCreateFilesWithFlags(t *testing.T) {
 		// Adds a pki folder with a ca certs to the temp folder
 		pkidir := testutil.SetupPkiDirWithCertificateAuthorithy(t, tmpdir)
 
+		outputdir := tmpdir
+
 		// Retrives ca cert for assertions
 		caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(pkidir, kubeadmconstants.CACertAndKeyBaseName)
 		if err != nil {
@@ -178,7 +181,9 @@ func TestKubeConfigSubCommandsThatCreateFilesWithFlags(t *testing.T) {
 
 		// Execute the subcommand
 		certDirFlag := fmt.Sprintf("--cert-dir=%s", pkidir)
+		outputDirFlag := fmt.Sprintf("--kubeconfig-dir=%s", outputdir)
 		allFlags := append(commonFlags, certDirFlag)
+		allFlags = append(allFlags, outputDirFlag)
 		allFlags = append(allFlags, test.additionalFlags...)
 		cmdtestutil.RunSubCommand(t, subCmds, test.command, allFlags...)
 
@@ -320,6 +325,8 @@ func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 	// Adds a pki folder with a ca cert to the temp folder
 	pkidir := testutil.SetupPkiDirWithCertificateAuthorithy(t, tmpdir)
 
+	outputdir := tmpdir
+
 	// Retrives ca cert for assertions
 	caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(pkidir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
@@ -331,6 +338,7 @@ func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 		"--apiserver-bind-port=1234",
 		"--client-name=myUser",
 		fmt.Sprintf("--cert-dir=%s", pkidir),
+		fmt.Sprintf("--kubeconfig-dir=%s", outputdir),
 	}
 
 	var tests = []struct {

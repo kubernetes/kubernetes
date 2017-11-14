@@ -19,13 +19,14 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/api/admission/v1alpha1"
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -43,50 +44,112 @@ func (c *Config) addFlags() {
 		"File containing the default x509 private key matching --tls-cert-file.")
 }
 
-// only allow pods to pull images from specific registry.
-func admit(data []byte) *v1alpha1.AdmissionReviewStatus {
-	ar := v1alpha1.AdmissionReview{}
-	if err := json.Unmarshal(data, &ar); err != nil {
-		glog.Error(err)
-		return nil
+func toAdmissionReviewStatus(err error) *v1alpha1.AdmissionReviewStatus {
+	return &v1alpha1.AdmissionReviewStatus{
+		Result: &metav1.Status{
+			Message: err.Error(),
+		},
 	}
+}
+
+// only allow pods to pull images from specific registry.
+func admitPods(ar v1alpha1.AdmissionReview) *v1alpha1.AdmissionReviewStatus {
+	glog.V(2).Info("admitting pods")
 	podResource := metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 	if ar.Spec.Resource != podResource {
-		glog.Errorf("expect resource to be %s", podResource)
-		return nil
+		err := fmt.Errorf("expect resource to be %s", podResource)
+		glog.Error(err)
+		return toAdmissionReviewStatus(err)
 	}
 
 	raw := ar.Spec.Object.Raw
-	pod := v1.Pod{}
-	if err := json.Unmarshal(raw, &pod); err != nil {
+	pod := corev1.Pod{}
+	deserializer := codecs.UniversalDeserializer()
+	if _, _, err := deserializer.Decode(raw, nil, &pod); err != nil {
 		glog.Error(err)
-		return nil
+		return toAdmissionReviewStatus(err)
 	}
 	reviewStatus := v1alpha1.AdmissionReviewStatus{}
 	reviewStatus.Allowed = true
-	// Note: the apiserver encodes the api.Pod. Decoding it as a v1.Pod will
-	// lose the metadata. So the following check on labels will not work
-	// until we let the apiserver encodes the versioned object.
+
+	var msg string
 	for k, v := range pod.Labels {
 		if k == "webhook-e2e-test" && v == "webhook-disallow" {
 			reviewStatus.Allowed = false
-			reviewStatus.Result = &metav1.Status{
-				Reason: "the pod contains unwanted label",
-			}
+			msg = msg + "the pod contains unwanted label; "
 		}
 	}
 	for _, container := range pod.Spec.Containers {
 		if strings.Contains(container.Name, "webhook-disallow") {
 			reviewStatus.Allowed = false
+			msg = msg + "the pod contains unwanted container name; "
+		}
+	}
+	if !reviewStatus.Allowed {
+		reviewStatus.Result = &metav1.Status{Message: strings.TrimSpace(msg)}
+	}
+	return &reviewStatus
+}
+
+// deny configmaps with specific key-value pair.
+func admitConfigMaps(ar v1alpha1.AdmissionReview) *v1alpha1.AdmissionReviewStatus {
+	glog.V(2).Info("admitting configmaps")
+	configMapResource := metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}
+	if ar.Spec.Resource != configMapResource {
+		glog.Errorf("expect resource to be %s", configMapResource)
+		return nil
+	}
+
+	raw := ar.Spec.Object.Raw
+	configmap := corev1.ConfigMap{}
+	deserializer := codecs.UniversalDeserializer()
+	if _, _, err := deserializer.Decode(raw, nil, &configmap); err != nil {
+		glog.Error(err)
+		return toAdmissionReviewStatus(err)
+	}
+	reviewStatus := v1alpha1.AdmissionReviewStatus{}
+	reviewStatus.Allowed = true
+	for k, v := range configmap.Data {
+		if k == "webhook-e2e-test" && v == "webhook-disallow" {
+			reviewStatus.Allowed = false
 			reviewStatus.Result = &metav1.Status{
-				Message: "the pod contains unwanted container name",
+				Reason: "the configmap contains unwanted key and value",
 			}
 		}
 	}
 	return &reviewStatus
 }
 
-func serve(w http.ResponseWriter, r *http.Request) {
+func admitCRD(ar v1alpha1.AdmissionReview) *v1alpha1.AdmissionReviewStatus {
+	glog.V(2).Info("admitting crd")
+	cr := struct {
+		metav1.ObjectMeta
+		Data map[string]string
+	}{}
+
+	raw := ar.Spec.Object.Raw
+	err := json.Unmarshal(raw, &cr)
+	if err != nil {
+		glog.Error(err)
+		return toAdmissionReviewStatus(err)
+	}
+
+	reviewStatus := v1alpha1.AdmissionReviewStatus{}
+	reviewStatus.Allowed = true
+	for k, v := range cr.Data {
+		if k == "webhook-e2e-test" && v == "webhook-disallow" {
+			reviewStatus.Allowed = false
+			reviewStatus.Result = &metav1.Status{
+				Reason: "the custom resource contains unwanted data",
+			}
+		}
+	}
+	return &reviewStatus
+}
+
+type admitFunc func(v1alpha1.AdmissionReview) *v1alpha1.AdmissionReviewStatus
+
+func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	var body []byte
 	if r.Body != nil {
 		if data, err := ioutil.ReadAll(r.Body); err == nil {
@@ -101,9 +164,18 @@ func serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reviewStatus := admit(body)
-	ar := v1alpha1.AdmissionReview{
-		Status: *reviewStatus,
+	var reviewStatus *v1alpha1.AdmissionReviewStatus
+	ar := v1alpha1.AdmissionReview{}
+	deserializer := codecs.UniversalDeserializer()
+	if _, _, err := deserializer.Decode(body, nil, &ar); err != nil {
+		glog.Error(err)
+		reviewStatus = toAdmissionReviewStatus(err)
+	} else {
+		reviewStatus = admit(ar)
+	}
+
+	if reviewStatus != nil {
+		ar.Status = *reviewStatus
 	}
 
 	resp, err := json.Marshal(ar)
@@ -115,12 +187,26 @@ func serve(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func servePods(w http.ResponseWriter, r *http.Request) {
+	serve(w, r, admitPods)
+}
+
+func serveConfigmaps(w http.ResponseWriter, r *http.Request) {
+	serve(w, r, admitConfigMaps)
+}
+
+func serveCRD(w http.ResponseWriter, r *http.Request) {
+	serve(w, r, admitCRD)
+}
+
 func main() {
 	var config Config
 	config.addFlags()
 	flag.Parse()
 
-	http.HandleFunc("/", serve)
+	http.HandleFunc("/pods", servePods)
+	http.HandleFunc("/configmaps", serveConfigmaps)
+	http.HandleFunc("/crd", serveCRD)
 	clientset := getClient()
 	server := &http.Server{
 		Addr:      ":443",

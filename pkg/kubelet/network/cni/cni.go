@@ -282,7 +282,7 @@ func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName s
 
 func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string, podSandboxID kubecontainer.ContainerID, podNetnsPath string) (*libcni.RuntimeConf, error) {
 	glog.V(4).Infof("Got netns path %v", podNetnsPath)
-	glog.V(4).Infof("Using netns path %v", podNs)
+	glog.V(4).Infof("Using podns path %v", podNs)
 
 	rt := &libcni.RuntimeConf{
 		ContainerID: podSandboxID.ID,

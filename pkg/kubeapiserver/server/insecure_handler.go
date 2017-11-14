@@ -19,6 +19,7 @@ package server
 import (
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -45,11 +46,12 @@ func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config) http.H
 	}
 	handler = genericapifilters.WithAuthentication(handler, c.RequestContextMapper, insecureSuperuser{}, nil)
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
-	handler = genericfilters.WithPanicRecovery(handler)
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.RequestContextMapper, c.LongRunningFunc, c.RequestTimeout)
 	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.RequestContextMapper, c.LongRunningFunc)
+	handler = genericfilters.WithWaitGroup(handler, c.RequestContextMapper, c.LongRunningFunc, c.HandlerChainWaitGroup)
 	handler = genericapifilters.WithRequestInfo(handler, server.NewRequestInfoResolver(c), c.RequestContextMapper)
 	handler = apirequest.WithRequestContext(handler, c.RequestContextMapper)
+	handler = genericfilters.WithPanicRecovery(handler)
 
 	return handler
 }
@@ -84,12 +86,12 @@ func (s *InsecureServingInfo) NewLoopbackClientConfig(token string) (*rest.Confi
 
 // NonBlockingRun spawns the insecure http server. An error is
 // returned if the ports cannot be listened on.
-func NonBlockingRun(insecureServingInfo *InsecureServingInfo, insecureHandler http.Handler, stopCh <-chan struct{}) error {
+func NonBlockingRun(insecureServingInfo *InsecureServingInfo, insecureHandler http.Handler, shutDownTimeout time.Duration, stopCh <-chan struct{}) error {
 	// Use an internal stop channel to allow cleanup of the listeners on error.
 	internalStopCh := make(chan struct{})
 
 	if insecureServingInfo != nil && insecureHandler != nil {
-		if err := serveInsecurely(insecureServingInfo, insecureHandler, internalStopCh); err != nil {
+		if err := serveInsecurely(insecureServingInfo, insecureHandler, shutDownTimeout, internalStopCh); err != nil {
 			close(internalStopCh)
 			return err
 		}
@@ -109,7 +111,7 @@ func NonBlockingRun(insecureServingInfo *InsecureServingInfo, insecureHandler ht
 // serveInsecurely run the insecure http server. It fails only if the initial listen
 // call fails. The actual server loop (stoppable by closing stopCh) runs in a go
 // routine, i.e. serveInsecurely does not block.
-func serveInsecurely(insecureServingInfo *InsecureServingInfo, insecureHandler http.Handler, stopCh <-chan struct{}) error {
+func serveInsecurely(insecureServingInfo *InsecureServingInfo, insecureHandler http.Handler, shutDownTimeout time.Duration, stopCh <-chan struct{}) error {
 	insecureServer := &http.Server{
 		Addr:           insecureServingInfo.BindAddress,
 		Handler:        insecureHandler,
@@ -117,7 +119,7 @@ func serveInsecurely(insecureServingInfo *InsecureServingInfo, insecureHandler h
 	}
 	glog.Infof("Serving insecurely on %s", insecureServingInfo.BindAddress)
 	var err error
-	_, err = server.RunServer(insecureServer, insecureServingInfo.BindNetwork, stopCh)
+	_, err = server.RunServer(insecureServer, insecureServingInfo.BindNetwork, shutDownTimeout, stopCh)
 	return err
 }
 

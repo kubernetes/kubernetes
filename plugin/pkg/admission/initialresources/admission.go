@@ -28,7 +28,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 var (
@@ -63,6 +63,8 @@ type InitialResources struct {
 	percentile int64
 	nsOnly     bool
 }
+
+var _ admission.MutationInterface = &InitialResources{}
 
 func newInitialResources(source dataSource, percentile int64, nsOnly bool) *InitialResources {
 	return &InitialResources{

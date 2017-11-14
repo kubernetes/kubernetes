@@ -26,8 +26,9 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/api"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
+	core "k8s.io/kubernetes/pkg/apis/core"
+	core_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	unsafe "unsafe"
 )
@@ -128,12 +129,12 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_extensions_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions,
 		Convert_v1beta1_SELinuxStrategyOptions_To_extensions_SELinuxStrategyOptions,
 		Convert_extensions_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions,
-		Convert_v1beta1_Scale_To_extensions_Scale,
-		Convert_extensions_Scale_To_v1beta1_Scale,
-		Convert_v1beta1_ScaleSpec_To_extensions_ScaleSpec,
-		Convert_extensions_ScaleSpec_To_v1beta1_ScaleSpec,
-		Convert_v1beta1_ScaleStatus_To_extensions_ScaleStatus,
-		Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus,
+		Convert_v1beta1_Scale_To_autoscaling_Scale,
+		Convert_autoscaling_Scale_To_v1beta1_Scale,
+		Convert_v1beta1_ScaleSpec_To_autoscaling_ScaleSpec,
+		Convert_autoscaling_ScaleSpec_To_v1beta1_ScaleSpec,
+		Convert_v1beta1_ScaleStatus_To_autoscaling_ScaleStatus,
+		Convert_autoscaling_ScaleStatus_To_v1beta1_ScaleStatus,
 		Convert_v1beta1_SupplementalGroupsStrategyOptions_To_extensions_SupplementalGroupsStrategyOptions,
 		Convert_extensions_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions,
 	)
@@ -277,7 +278,7 @@ func Convert_extensions_DaemonSet_To_v1beta1_DaemonSet(in *extensions.DaemonSet,
 
 func autoConvert_v1beta1_DaemonSetCondition_To_extensions_DaemonSetCondition(in *v1beta1.DaemonSetCondition, out *extensions.DaemonSetCondition, s conversion.Scope) error {
 	out.Type = extensions.DaemonSetConditionType(in.Type)
-	out.Status = api.ConditionStatus(in.Status)
+	out.Status = core.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
@@ -347,7 +348,7 @@ func Convert_extensions_DaemonSetList_To_v1beta1_DaemonSetList(in *extensions.Da
 
 func autoConvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *v1beta1.DaemonSetSpec, out *extensions.DaemonSetSpec, s conversion.Scope) error {
 	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := core_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_v1beta1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
@@ -366,7 +367,7 @@ func Convert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *v1beta1.Daemo
 
 func autoConvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extensions.DaemonSetSpec, out *v1beta1.DaemonSetSpec, s conversion.Scope) error {
 	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := core_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_extensions_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
@@ -493,7 +494,7 @@ func Convert_extensions_Deployment_To_v1beta1_Deployment(in *extensions.Deployme
 
 func autoConvert_v1beta1_DeploymentCondition_To_extensions_DeploymentCondition(in *v1beta1.DeploymentCondition, out *extensions.DeploymentCondition, s conversion.Scope) error {
 	out.Type = extensions.DeploymentConditionType(in.Type)
-	out.Status = api.ConditionStatus(in.Status)
+	out.Status = core.ConditionStatus(in.Status)
 	out.LastUpdateTime = in.LastUpdateTime
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
@@ -596,7 +597,7 @@ func autoConvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *v1beta1
 		return err
 	}
 	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := core_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
@@ -615,7 +616,7 @@ func autoConvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensi
 		return err
 	}
 	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := core_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
@@ -760,8 +761,8 @@ func Convert_extensions_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in 
 }
 
 func autoConvert_v1beta1_HostPortRange_To_extensions_HostPortRange(in *v1beta1.HostPortRange, out *extensions.HostPortRange, s conversion.Scope) error {
-	out.Min = int(in.Min)
-	out.Max = int(in.Max)
+	out.Min = in.Min
+	out.Max = in.Max
 	return nil
 }
 
@@ -771,8 +772,8 @@ func Convert_v1beta1_HostPortRange_To_extensions_HostPortRange(in *v1beta1.HostP
 }
 
 func autoConvert_extensions_HostPortRange_To_v1beta1_HostPortRange(in *extensions.HostPortRange, out *v1beta1.HostPortRange, s conversion.Scope) error {
-	out.Min = int32(in.Min)
-	out.Max = int32(in.Max)
+	out.Min = in.Min
+	out.Max = in.Max
 	return nil
 }
 
@@ -1045,22 +1046,12 @@ func Convert_extensions_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList(i
 
 func autoConvert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySpec(in *v1beta1.PodSecurityPolicySpec, out *extensions.PodSecurityPolicySpec, s conversion.Scope) error {
 	out.Privileged = in.Privileged
-	out.DefaultAddCapabilities = *(*[]api.Capability)(unsafe.Pointer(&in.DefaultAddCapabilities))
-	out.RequiredDropCapabilities = *(*[]api.Capability)(unsafe.Pointer(&in.RequiredDropCapabilities))
-	out.AllowedCapabilities = *(*[]api.Capability)(unsafe.Pointer(&in.AllowedCapabilities))
+	out.DefaultAddCapabilities = *(*[]core.Capability)(unsafe.Pointer(&in.DefaultAddCapabilities))
+	out.RequiredDropCapabilities = *(*[]core.Capability)(unsafe.Pointer(&in.RequiredDropCapabilities))
+	out.AllowedCapabilities = *(*[]core.Capability)(unsafe.Pointer(&in.AllowedCapabilities))
 	out.Volumes = *(*[]extensions.FSType)(unsafe.Pointer(&in.Volumes))
 	out.HostNetwork = in.HostNetwork
-	if in.HostPorts != nil {
-		in, out := &in.HostPorts, &out.HostPorts
-		*out = make([]extensions.HostPortRange, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_HostPortRange_To_extensions_HostPortRange(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.HostPorts = nil
-	}
+	out.HostPorts = *(*[]extensions.HostPortRange)(unsafe.Pointer(&in.HostPorts))
 	out.HostPID = in.HostPID
 	out.HostIPC = in.HostIPC
 	if err := Convert_v1beta1_SELinuxStrategyOptions_To_extensions_SELinuxStrategyOptions(&in.SELinux, &out.SELinux, s); err != nil {
@@ -1096,17 +1087,7 @@ func autoConvert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySp
 	out.AllowedCapabilities = *(*[]v1.Capability)(unsafe.Pointer(&in.AllowedCapabilities))
 	out.Volumes = *(*[]v1beta1.FSType)(unsafe.Pointer(&in.Volumes))
 	out.HostNetwork = in.HostNetwork
-	if in.HostPorts != nil {
-		in, out := &in.HostPorts, &out.HostPorts
-		*out = make([]v1beta1.HostPortRange, len(*in))
-		for i := range *in {
-			if err := Convert_extensions_HostPortRange_To_v1beta1_HostPortRange(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.HostPorts = nil
-	}
+	out.HostPorts = *(*[]v1beta1.HostPortRange)(unsafe.Pointer(&in.HostPorts))
 	out.HostPID = in.HostPID
 	out.HostIPC = in.HostIPC
 	if err := Convert_extensions_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(&in.SELinux, &out.SELinux, s); err != nil {
@@ -1164,7 +1145,7 @@ func Convert_extensions_ReplicaSet_To_v1beta1_ReplicaSet(in *extensions.ReplicaS
 
 func autoConvert_v1beta1_ReplicaSetCondition_To_extensions_ReplicaSetCondition(in *v1beta1.ReplicaSetCondition, out *extensions.ReplicaSetCondition, s conversion.Scope) error {
 	out.Type = extensions.ReplicaSetConditionType(in.Type)
-	out.Status = api.ConditionStatus(in.Status)
+	out.Status = core.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
@@ -1238,7 +1219,7 @@ func autoConvert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *v1beta1
 	}
 	out.MinReadySeconds = in.MinReadySeconds
 	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := core_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
@@ -1250,7 +1231,7 @@ func autoConvert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(in *extensi
 	}
 	out.MinReadySeconds = in.MinReadySeconds
 	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := core_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
@@ -1370,7 +1351,7 @@ func Convert_extensions_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOpt
 
 func autoConvert_v1beta1_SELinuxStrategyOptions_To_extensions_SELinuxStrategyOptions(in *v1beta1.SELinuxStrategyOptions, out *extensions.SELinuxStrategyOptions, s conversion.Scope) error {
 	out.Rule = extensions.SELinuxStrategy(in.Rule)
-	out.SELinuxOptions = (*api.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
+	out.SELinuxOptions = (*core.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
 	return nil
 }
 
@@ -1390,68 +1371,68 @@ func Convert_extensions_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions
 	return autoConvert_extensions_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(in, out, s)
 }
 
-func autoConvert_v1beta1_Scale_To_extensions_Scale(in *v1beta1.Scale, out *extensions.Scale, s conversion.Scope) error {
+func autoConvert_v1beta1_Scale_To_autoscaling_Scale(in *v1beta1.Scale, out *autoscaling.Scale, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_v1beta1_ScaleSpec_To_extensions_ScaleSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_v1beta1_ScaleSpec_To_autoscaling_ScaleSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := Convert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(&in.Status, &out.Status, s); err != nil {
+	if err := Convert_v1beta1_ScaleStatus_To_autoscaling_ScaleStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-// Convert_v1beta1_Scale_To_extensions_Scale is an autogenerated conversion function.
-func Convert_v1beta1_Scale_To_extensions_Scale(in *v1beta1.Scale, out *extensions.Scale, s conversion.Scope) error {
-	return autoConvert_v1beta1_Scale_To_extensions_Scale(in, out, s)
+// Convert_v1beta1_Scale_To_autoscaling_Scale is an autogenerated conversion function.
+func Convert_v1beta1_Scale_To_autoscaling_Scale(in *v1beta1.Scale, out *autoscaling.Scale, s conversion.Scope) error {
+	return autoConvert_v1beta1_Scale_To_autoscaling_Scale(in, out, s)
 }
 
-func autoConvert_extensions_Scale_To_v1beta1_Scale(in *extensions.Scale, out *v1beta1.Scale, s conversion.Scope) error {
+func autoConvert_autoscaling_Scale_To_v1beta1_Scale(in *autoscaling.Scale, out *v1beta1.Scale, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_extensions_ScaleSpec_To_v1beta1_ScaleSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_autoscaling_ScaleSpec_To_v1beta1_ScaleSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(&in.Status, &out.Status, s); err != nil {
+	if err := Convert_autoscaling_ScaleStatus_To_v1beta1_ScaleStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-// Convert_extensions_Scale_To_v1beta1_Scale is an autogenerated conversion function.
-func Convert_extensions_Scale_To_v1beta1_Scale(in *extensions.Scale, out *v1beta1.Scale, s conversion.Scope) error {
-	return autoConvert_extensions_Scale_To_v1beta1_Scale(in, out, s)
+// Convert_autoscaling_Scale_To_v1beta1_Scale is an autogenerated conversion function.
+func Convert_autoscaling_Scale_To_v1beta1_Scale(in *autoscaling.Scale, out *v1beta1.Scale, s conversion.Scope) error {
+	return autoConvert_autoscaling_Scale_To_v1beta1_Scale(in, out, s)
 }
 
-func autoConvert_v1beta1_ScaleSpec_To_extensions_ScaleSpec(in *v1beta1.ScaleSpec, out *extensions.ScaleSpec, s conversion.Scope) error {
+func autoConvert_v1beta1_ScaleSpec_To_autoscaling_ScaleSpec(in *v1beta1.ScaleSpec, out *autoscaling.ScaleSpec, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 	return nil
 }
 
-// Convert_v1beta1_ScaleSpec_To_extensions_ScaleSpec is an autogenerated conversion function.
-func Convert_v1beta1_ScaleSpec_To_extensions_ScaleSpec(in *v1beta1.ScaleSpec, out *extensions.ScaleSpec, s conversion.Scope) error {
-	return autoConvert_v1beta1_ScaleSpec_To_extensions_ScaleSpec(in, out, s)
+// Convert_v1beta1_ScaleSpec_To_autoscaling_ScaleSpec is an autogenerated conversion function.
+func Convert_v1beta1_ScaleSpec_To_autoscaling_ScaleSpec(in *v1beta1.ScaleSpec, out *autoscaling.ScaleSpec, s conversion.Scope) error {
+	return autoConvert_v1beta1_ScaleSpec_To_autoscaling_ScaleSpec(in, out, s)
 }
 
-func autoConvert_extensions_ScaleSpec_To_v1beta1_ScaleSpec(in *extensions.ScaleSpec, out *v1beta1.ScaleSpec, s conversion.Scope) error {
+func autoConvert_autoscaling_ScaleSpec_To_v1beta1_ScaleSpec(in *autoscaling.ScaleSpec, out *v1beta1.ScaleSpec, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 	return nil
 }
 
-// Convert_extensions_ScaleSpec_To_v1beta1_ScaleSpec is an autogenerated conversion function.
-func Convert_extensions_ScaleSpec_To_v1beta1_ScaleSpec(in *extensions.ScaleSpec, out *v1beta1.ScaleSpec, s conversion.Scope) error {
-	return autoConvert_extensions_ScaleSpec_To_v1beta1_ScaleSpec(in, out, s)
+// Convert_autoscaling_ScaleSpec_To_v1beta1_ScaleSpec is an autogenerated conversion function.
+func Convert_autoscaling_ScaleSpec_To_v1beta1_ScaleSpec(in *autoscaling.ScaleSpec, out *v1beta1.ScaleSpec, s conversion.Scope) error {
+	return autoConvert_autoscaling_ScaleSpec_To_v1beta1_ScaleSpec(in, out, s)
 }
 
-func autoConvert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *v1beta1.ScaleStatus, out *extensions.ScaleStatus, s conversion.Scope) error {
+func autoConvert_v1beta1_ScaleStatus_To_autoscaling_ScaleStatus(in *v1beta1.ScaleStatus, out *autoscaling.ScaleStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
-	// WARNING: in.Selector requires manual conversion: inconvertible types (map[string]string vs *k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector)
+	// WARNING: in.Selector requires manual conversion: inconvertible types (map[string]string vs string)
 	// WARNING: in.TargetSelector requires manual conversion: does not exist in peer-type
 	return nil
 }
 
-func autoConvert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.ScaleStatus, out *v1beta1.ScaleStatus, s conversion.Scope) error {
+func autoConvert_autoscaling_ScaleStatus_To_v1beta1_ScaleStatus(in *autoscaling.ScaleStatus, out *v1beta1.ScaleStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
-	// WARNING: in.Selector requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector vs map[string]string)
+	// WARNING: in.Selector requires manual conversion: inconvertible types (string vs map[string]string)
 	return nil
 }
 

@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
@@ -73,8 +74,9 @@ func TestNewNvidiaGPUManager(t *testing.T) {
 	as.NotNil(err)
 
 	// Expects a GPUManager to be created with non-nil dockerClient.
-	fakeDocker := libdocker.NewFakeDockerClient()
-	testGpuManager2, err := NewNvidiaGPUManager(podLister, fakeDocker)
+	testGpuManager2, err := NewNvidiaGPUManager(podLister, &dockershim.ClientConfig{
+		DockerEndpoint: libdocker.FakeDockerEndpoint,
+	})
 	as.NotNil(testGpuManager2)
 	as.Nil(err)
 

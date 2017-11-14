@@ -23,9 +23,10 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e/scheduling",
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1/helper:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
+        "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/v1/helper:go_default_library",
+        "//pkg/apis/extensions:go_default_library",
         "//pkg/quota/evaluator/core:go_default_library",
         "//pkg/util/system:go_default_library",
         "//pkg/util/version:go_default_library",
