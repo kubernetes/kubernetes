@@ -493,26 +493,9 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 		go controller.Run(stopCh)
 		controller.NodeUpdated(item.oldNode, item.newNode)
 
-		startedAt := time.Now()
+		time.Sleep(2 * time.Second)
+
 		for i := range item.expectedDeleteTimes {
-			if i == 0 || item.expectedDeleteTimes[i-1].timestamp != item.expectedDeleteTimes[i].timestamp {
-				// compute a grace duration to give controller time to process updates. Choose big
-				// enough intervals in the test cases above to avoid flakes.
-				var increment time.Duration
-				if i == len(item.expectedDeleteTimes)-1 || item.expectedDeleteTimes[i+1].timestamp == item.expectedDeleteTimes[i].timestamp {
-					increment = 500 * time.Millisecond
-				} else {
-					increment = ((item.expectedDeleteTimes[i+1].timestamp - item.expectedDeleteTimes[i].timestamp) / time.Duration(2))
-				}
-
-				sleepTime := item.expectedDeleteTimes[i].timestamp - time.Since(startedAt) + increment
-				if sleepTime < 0 {
-					sleepTime = 0
-				}
-				t.Logf("Sleeping for %v", sleepTime)
-				time.Sleep(sleepTime)
-			}
-
 			for delay, podName := range item.expectedDeleteTimes[i].names {
 				deleted := false
 				for _, action := range fakeClientset.Actions() {
@@ -532,31 +515,34 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 					t.Errorf("Failed to deleted pod %v after %v", podName, delay)
 				}
 			}
-			for _, action := range fakeClientset.Actions() {
-				deleteAction, ok := action.(clienttesting.DeleteActionImpl)
-				if !ok {
-					t.Logf("Found not-delete action with verb %v. Ignoring.", action.GetVerb())
-					continue
-				}
-				if deleteAction.GetResource().Resource != "pods" {
-					continue
-				}
-				deletedPodName := deleteAction.GetName()
-				expected := false
+		}
+		for _, action := range fakeClientset.Actions() {
+			deleteAction, ok := action.(clienttesting.DeleteActionImpl)
+			if !ok {
+				t.Logf("Found not-delete action with verb %v. Ignoring.", action.GetVerb())
+				continue
+			}
+			if deleteAction.GetResource().Resource != "pods" {
+				continue
+			}
+			deletedPodName := deleteAction.GetName()
+			expected := false
+			for i := range item.expectedDeleteTimes {
 				for _, podName := range item.expectedDeleteTimes[i].names {
 					if podName == deletedPodName {
 						expected = true
 					}
 				}
-				if !expected {
-					t.Errorf("Pod %v was deleted even though it shouldn't have", deletedPodName)
-				}
 			}
-			fakeClientset.ClearActions()
+			if !expected {
+				t.Errorf("Pod %v was deleted even though it shouldn't have", deletedPodName)
+			}
 		}
+		fakeClientset.ClearActions()
 
 		close(stopCh)
 	}
+
 }
 
 func TestGetMinTolerationTime(t *testing.T) {
