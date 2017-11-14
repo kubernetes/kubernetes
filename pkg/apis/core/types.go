@@ -2183,6 +2183,11 @@ const (
 	// DNSDefault indicates that the pod should use the default (as
 	// determined by kubelet) DNS settings.
 	DNSDefault DNSPolicy = "Default"
+
+	// DNSNone indicates that the pod should use empty DNS settings. DNS
+	// parameters such as nameservers and search paths should be defined via
+	// DNSConfig.
+	DNSNone DNSPolicy = "None"
 )
 
 // A node selector represents the union of the results of one or more label queries
@@ -2482,7 +2487,12 @@ type PodSpec struct {
 	// before the system actively tries to terminate the pod; value must be positive integer
 	// +optional
 	ActiveDeadlineSeconds *int64
-	// Required: Set DNS policy.
+	// Set DNS policy for the pod.
+	// Defaults to "ClusterFirst".
+	// Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'.
+	// DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.
+	// To have DNS options set along with hostNetwork, you have to specify DNS policy
+	// explicitly to 'ClusterFirstWithHostNet'.
 	// +optional
 	DNSPolicy DNSPolicy
 	// NodeSelector is a selector which must be true for the pod to fit on a node
@@ -2546,6 +2556,11 @@ type PodSpec struct {
 	// The higher the value, the higher the priority.
 	// +optional
 	Priority *int32
+	// Specifies the DNS parameters of a pod.
+	// Parameters specified here will be merged to the generated DNS
+	// configuration based on DNSPolicy.
+	// +optional
+	DNSConfig *PodDNSConfig
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
@@ -2634,6 +2649,35 @@ const (
 	// PodQOSBestEffort is the BestEffort qos class.
 	PodQOSBestEffort PodQOSClass = "BestEffort"
 )
+
+// PodDNSConfig defines the DNS parameters of a pod in addition to
+// those generated from DNSPolicy.
+type PodDNSConfig struct {
+	// A list of DNS name server IP addresses.
+	// This will be appended to the base nameservers generated from DNSPolicy.
+	// Duplicated nameservers will be removed.
+	// +optional
+	Nameservers []string
+	// A list of DNS search domains for host-name lookup.
+	// This will be appended to the base search paths generated from DNSPolicy.
+	// Duplicated search paths will be removed.
+	// +optional
+	Searches []string
+	// A list of DNS resolver options.
+	// This will be merged with the base options generated from DNSPolicy.
+	// Duplicated entries will be removed. Resolution options given in Options
+	// will override those that appear in the base DNSPolicy.
+	// +optional
+	Options []PodDNSConfigOption
+}
+
+// PodDNSConfigOption defines DNS resolver options of a pod.
+type PodDNSConfigOption struct {
+	// Required.
+	Name string
+	// +optional
+	Value *string
+}
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
 // state of a system.
