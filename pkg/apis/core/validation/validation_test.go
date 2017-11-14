@@ -3341,7 +3341,7 @@ func TestValidateVolumes(t *testing.T) {
 
 }
 
-func TestAlphaHugePagesIsolation(t *testing.T) {
+func TestAlphaHugePages(t *testing.T) {
 	successCases := []core.Pod{
 		{ // Basic fields.
 			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
@@ -3673,6 +3673,43 @@ func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
 		t.Errorf("expected failure: %v", errs)
 	}
 
+}
+
+func TestAlphaAccelerators(t *testing.T) {
+
+	testCases := []core.ResourceRequirements{
+		{
+			Requests: core.ResourceList{core.ResourceNvidiaGPU: resource.MustParse("2")},
+			Limits:   core.ResourceList{core.ResourceNvidiaGPU: resource.MustParse("2")},
+		},
+		{
+			Limits: core.ResourceList{core.ResourceNvidiaGPU: resource.MustParse("4")},
+		},
+	}
+
+	// Enable alpha feature Accelerators
+	err := utilfeature.DefaultFeatureGate.Set("Accelerators=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for Accelerators: %v", err)
+		return
+	}
+	for _, tc := range testCases {
+		if errs := ValidateResourceRequirements(&tc, field.NewPath("resources")); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	// Disable alpha feature Accelerators
+	err = utilfeature.DefaultFeatureGate.Set("Accelerators=false")
+	if err != nil {
+		t.Errorf("Failed to disable feature gate for Accelerators: %v", err)
+		return
+	}
+	for _, tc := range testCases {
+		if errs := ValidateResourceRequirements(&tc, field.NewPath("resources")); len(errs) == 0 {
+			t.Errorf("expected failure: %v", errs)
+		}
+	}
 }
 
 func TestValidateResourceQuotaWithAlphaLocalStorageCapacityIsolation(t *testing.T) {
@@ -4974,6 +5011,11 @@ func TestValidateContainers(t *testing.T) {
 			},
 		},
 		{Name: "abc-1234", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", SecurityContext: fakeValidSecurityContext(true)},
+	}
+	err := utilfeature.DefaultFeatureGate.Set("Accelerators=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for Accelerators: %v", err)
+		return
 	}
 	if errs := validateContainers(successCase, volumeDevices, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)

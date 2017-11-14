@@ -4391,19 +4391,13 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 		fldPath := limPath.Key(string(resourceName))
 		// Validate resource name.
 		allErrs = append(allErrs, validateContainerResourceName(string(resourceName), fldPath)...)
-
+		// Validate resource name against feature-gate.
+		allErrs = append(allErrs, validateResourceNameGated(resourceName, fldPath)...)
 		// Validate resource quantity.
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(resourceName), quantity, fldPath)...)
 
-		if resourceName == core.ResourceEphemeralStorage && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-			allErrs = append(allErrs, field.Forbidden(limPath, "ResourceEphemeralStorage field disabled by feature-gate for ResourceRequirements"))
-		}
 		if helper.IsHugePageResourceName(resourceName) {
-			if !utilfeature.DefaultFeatureGate.Enabled(features.HugePages) {
-				allErrs = append(allErrs, field.Forbidden(limPath, fmt.Sprintf("%s field disabled by feature-gate for ResourceRequirements", resourceName)))
-			} else {
-				limContainsHugePages = true
-			}
+			limContainsHugePages = true
 		}
 
 		if supportedQoSComputeResources.Has(string(resourceName)) {
@@ -4414,6 +4408,8 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 		fldPath := reqPath.Key(string(resourceName))
 		// Validate resource name.
 		allErrs = append(allErrs, validateContainerResourceName(string(resourceName), fldPath)...)
+		// Validate resource name against feature-gate.
+		allErrs = append(allErrs, validateResourceNameGated(resourceName, fldPath)...)
 		// Validate resource quantity.
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(resourceName), quantity, fldPath)...)
 
@@ -4442,6 +4438,24 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 	}
 
 	return allErrs
+}
+
+// validateResourceNameGated checks if a resource name is gated by a feature gate.
+func validateResourceNameGated(name core.ResourceName, fldPath *field.Path) field.ErrorList {
+	errFmt := "%s field disabled by feature-gate '%s'"
+	if helper.IsHugePageResourceName(name) && !utilfeature.DefaultFeatureGate.Enabled(features.HugePages) {
+		return field.ErrorList{field.Forbidden(fldPath, fmt.Sprintf(errFmt, string(name), features.HugePages))}
+	}
+
+	if name == core.ResourceEphemeralStorage && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+		return field.ErrorList{field.Forbidden(fldPath, fmt.Sprintf(errFmt, string(name), features.LocalStorageCapacityIsolation))}
+	}
+
+	// TODO: remove this checking when the Accelerators feature gate is finally removed
+	if name == core.ResourceNvidiaGPU && !utilfeature.DefaultFeatureGate.Enabled(features.Accelerators) {
+		return field.ErrorList{field.Forbidden(fldPath, fmt.Sprintf(errFmt, string(name), features.Accelerators))}
+	}
+	return nil
 }
 
 // validateResourceQuotaScopes ensures that each enumerated hard resource constraint is valid for set of scopes
