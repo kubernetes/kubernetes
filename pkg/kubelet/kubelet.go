@@ -77,6 +77,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/network/dns"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/preemption"
@@ -477,6 +478,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 	}
 	httpClient := &http.Client{}
+	parsedNodeIP := net.ParseIP(nodeIP)
 
 	klet := &Kubelet{
 		hostname:                       hostname,
@@ -488,8 +490,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		sourcesReady:                   config.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
 		registerNode:                   kubeCfg.RegisterNode,
 		registerSchedulable:            registerSchedulable,
-		clusterDomain:                  kubeCfg.ClusterDomain,
-		clusterDNS:                     clusterDNS,
+		dnsConfigurer:                  dns.NewConfigurer(kubeDeps.Recorder, nodeRef, parsedNodeIP, clusterDNS, kubeCfg.ClusterDomain, kubeCfg.ResolverConfig),
 		serviceLister:                  serviceLister,
 		nodeInfo:                       nodeInfo,
 		masterServiceNamespace:         masterServiceNamespace,
@@ -512,11 +513,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		maxPods:              int(kubeCfg.MaxPods),
 		podsPerCore:          int(kubeCfg.PodsPerCore),
 		syncLoopMonitor:      atomic.Value{},
-		resolverConfig:       kubeCfg.ResolverConfig,
 		daemonEndpoints:      daemonEndpoints,
 		containerManager:     kubeDeps.ContainerManager,
 		containerRuntimeName: containerRuntime,
-		nodeIP:               net.ParseIP(nodeIP),
+		nodeIP:               parsedNodeIP,
 		clock:                clock.RealClock{},
 		enableControllerAttachDetach:            kubeCfg.EnableControllerAttachDetach,
 		iptClient:                               utilipt.New(utilexec.New(), utildbus.New(), utilipt.ProtocolIpv4),
@@ -806,7 +806,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		experimentalCheckNodeCapabilitiesBeforeMount = false
 		// Replace the nameserver in containerized-mounter's rootfs/etc/resolve.conf with kubelet.ClusterDNS
 		// so that service name could be resolved
-		klet.setupDNSinContainerizedMounter(experimentalMounterPath)
+		klet.dnsConfigurer.SetupDNSinContainerizedMounter(experimentalMounterPath)
 	}
 
 	// setup volumeManager
@@ -948,11 +948,8 @@ type Kubelet struct {
 	// for internal book keeping; access only from within registerWithApiserver
 	registrationCompleted bool
 
-	// If non-empty, use this for container DNS search.
-	clusterDomain string
-
-	// If non-nil, use this for container DNS server.
-	clusterDNS []net.IP
+	// dnsConfigurer is used for setting up DNS resolver configuration when launching pods.
+	dnsConfigurer *dns.Configurer
 
 	// masterServiceNamespace is the namespace that the master service is exposed in.
 	masterServiceNamespace string
@@ -1096,11 +1093,6 @@ type Kubelet struct {
 
 	// Channel for sending pods to kill.
 	podKillingCh chan *kubecontainer.PodPair
-
-	// The configuration file used as the base to generate the container's
-	// DNS resolver configuration file. This can be used in conjunction with
-	// clusterDomain and clusterDNS.
-	resolverConfig string
 
 	// Information about the ports which are opened by daemons on Node running this Kubelet server.
 	daemonEndpoints *v1.NodeDaemonEndpoints
@@ -1375,8 +1367,8 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	go wait.Until(kl.podKiller, 1*time.Second, wait.NeverStop)
 
 	// Start gorouting responsible for checking limits in resolv.conf
-	if kl.resolverConfig != "" {
-		go wait.Until(func() { kl.checkLimitsForResolvConf() }, 30*time.Second, wait.NeverStop)
+	if kl.dnsConfigurer.ResolverConfig != "" {
+		go wait.Until(func() { kl.dnsConfigurer.CheckLimitsForResolvConf() }, 30*time.Second, wait.NeverStop)
 	}
 
 	// Start component sync loops.
