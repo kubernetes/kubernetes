@@ -20,7 +20,6 @@ import (
 	"bytes"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -80,7 +79,7 @@ func (u *UnstructuredList) DeepCopy() *UnstructuredList {
 	}
 	out := new(UnstructuredList)
 	*out = *u
-	out.Object = unstructured.DeepCopyJSON(u.Object)
+	out.Object = runtime.DeepCopyJSON(u.Object)
 	out.Items = make([]Unstructured, len(u.Items))
 	for i := range u.Items {
 		u.Items[i].DeepCopyInto(&out.Items[i])
