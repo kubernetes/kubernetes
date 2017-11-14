@@ -31,7 +31,7 @@ func GetCoreImage(image, repoPrefix, k8sVersion, overrideImage string) string {
 	}
 	kubernetesImageTag := kubeadmutil.KubernetesVersionToImageTag(k8sVersion)
 	return map[string]string{
-		constants.Etcd:                  fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "etcd", runtime.GOARCH, constants.DefaultEtcdVersion),
+		constants.Etcd:                  fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "etcd", runtime.GOARCH, constants.GetDefaultEtcdVersion(k8sVersion)),
 		constants.KubeAPIServer:         fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-apiserver", runtime.GOARCH, kubernetesImageTag),
 		constants.KubeControllerManager: fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-controller-manager", runtime.GOARCH, kubernetesImageTag),
 		constants.KubeScheduler:         fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-scheduler", runtime.GOARCH, kubernetesImageTag),

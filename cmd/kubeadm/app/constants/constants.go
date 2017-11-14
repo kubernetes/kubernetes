@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/util/version"
+	pkgver "k8s.io/kubernetes/pkg/version"
 )
 
 // KubernetesDir is the directory kubernetes owns for storing various configuration files
@@ -146,6 +147,9 @@ const (
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
 	DefaultEtcdVersion = "3.1.10"
 
+	// DefaultEtcdVersionForPreviousKubernetesRelease is the default etcd version that kubeadm uses if deploying Kubernetes version lower than kubeadm's version
+	DefaultEtcdVersionForPreviousKubernetesRelease = "3.0.17"
+
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
 	// KubeAPIServer defines variable used internally when referring to kube-apiserver component
@@ -242,4 +246,26 @@ func CreateTempDirForKubeadm(dirName string) (string, error) {
 		return "", fmt.Errorf("couldn't create a temporary directory: %v", err)
 	}
 	return tempDir, nil
+}
+
+// GetDefaultEtcdVersion returns default version for etcd based on Kubernetes version
+func GetDefaultEtcdVersion(forVersion string) string {
+	// defaults in case detection fails
+	etcdVersion := DefaultEtcdVersion
+	kubeadmMajor := uint(1)
+	kubeadmMinor := uint(9)
+	if forVersion != "" {
+		k8sVersion, err := version.ParseSemantic(forVersion)
+		if err == nil {
+			kubeadmVersion, err := version.ParseSemantic(pkgver.Get().String())
+			if err == nil {
+				kubeadmMajor = kubeadmVersion.Major()
+				kubeadmMinor = kubeadmVersion.Minor()
+			}
+			if k8sVersion.Minor() < kubeadmMinor && k8sVersion.Major() <= kubeadmMajor {
+				etcdVersion = DefaultEtcdVersionForPreviousKubernetesRelease
+			}
+		}
+	}
+	return etcdVersion
 }

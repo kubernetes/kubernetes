@@ -110,3 +110,46 @@ func TestAddSelfHostedPrefix(t *testing.T) {
 		}
 	}
 }
+
+func TestGetDefaultEtcdVersion(t *testing.T) {
+	var tests = []struct {
+		k8sversion, expected string
+	}{
+		{
+			// unknown version. Should return current default
+			k8sversion: "",
+			expected:   DefaultEtcdVersion,
+		},
+		{
+			// non-semantic version. Should return current default
+			k8sversion: "foo",
+			expected:   DefaultEtcdVersion,
+		},
+		{
+			// same major version, but way higher minor version. Should return current default
+			k8sversion: "v1.99999.0",
+			expected:   DefaultEtcdVersion,
+		},
+		{
+			// version way higher than current. Should return current default
+			k8sversion: "v10.2.3",
+			expected:   DefaultEtcdVersion,
+		},
+		{
+			// version lower than current. Should return etcd version for previous releases
+			k8sversion: "v1.0.0",
+			expected:   DefaultEtcdVersionForPreviousKubernetesRelease,
+		},
+	}
+	for _, rt := range tests {
+		actual := GetDefaultEtcdVersion(rt.k8sversion)
+		if actual != rt.expected {
+			t.Errorf(
+				"failed GetDefaultEtcdVersion:\n\tk8sversion: %s\n\texpected: %s\n\t  actual: %s",
+				rt.k8sversion,
+				rt.expected,
+				actual,
+			)
+		}
+	}
+}
