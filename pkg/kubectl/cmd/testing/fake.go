@@ -29,7 +29,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -522,19 +521,6 @@ func (f *FakeFactory) NewBuilder() *resource.Builder {
 	return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
 }
 
-func (f *FakeFactory) NewUnstructuredBuilder() *resource.Builder {
-	mapper, typer, err := f.UnstructuredObject()
-	if err != nil {
-		cmdutil.CheckErr(err)
-	}
-	return resource.NewBuilder(
-		mapper,
-		f.CategoryExpander(),
-		typer,
-		resource.ClientMapperFunc(f.UnstructuredClientForMapping),
-		unstructured.UnstructuredJSONScheme)
-}
-
 func (f *FakeFactory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions {
 	return &printers.PrintOptions{}
 }
@@ -847,19 +833,6 @@ func (f *fakeAPIFactory) PrinterForMapping(cmd *cobra.Command, isLocal bool, out
 func (f *fakeAPIFactory) NewBuilder() *resource.Builder {
 	mapper, typer := f.Object()
 	return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
-}
-
-func (f *fakeAPIFactory) NewUnstructuredBuilder() *resource.Builder {
-	mapper, typer, err := f.UnstructuredObject()
-	if err != nil {
-		cmdutil.CheckErr(err)
-	}
-	return resource.NewBuilder(
-		mapper,
-		f.CategoryExpander(),
-		typer,
-		resource.ClientMapperFunc(f.UnstructuredClientForMapping),
-		unstructured.UnstructuredJSONScheme)
 }
 
 func (f *fakeAPIFactory) SuggestedPodTemplateResources() []schema.GroupResource {

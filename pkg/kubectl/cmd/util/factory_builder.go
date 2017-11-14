@@ -190,18 +190,6 @@ func (f *ring2Factory) NewBuilder() *resource.Builder {
 	return resource.NewBuilder(mapper, categoryExpander, typer, clientMapperFunc, f.clientAccessFactory.Decoder(true))
 }
 
-// NewUnstructuredBuilder returns a new resource builder for unstructured api objects.
-func (f *ring2Factory) NewUnstructuredBuilder() *resource.Builder {
-	clientMapperFunc := resource.ClientMapperFunc(f.objectMappingFactory.UnstructuredClientForMapping)
-	mapper, typer, err := f.objectMappingFactory.UnstructuredObject()
-	if err != nil {
-		CheckErr(err)
-	}
-	categoryExpander := f.objectMappingFactory.CategoryExpander()
-
-	return resource.NewBuilder(mapper, categoryExpander, typer, clientMapperFunc, unstructured.UnstructuredJSONScheme)
-}
-
 // PluginLoader loads plugins from a path set by the KUBECTL_PLUGINS_PATH env var.
 // If this env var is not set, it defaults to
 //   "~/.kube/plugins", plus

@@ -116,10 +116,16 @@ func RunDescribe(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, a
 		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
 	}
 
+	mapper, typer, err := f.UnstructuredObject()
+	if err != nil {
+		return err
+	}
+
 	// include the uninitialized objects by default
 	// unless user explicitly set --include-uninitialized=false
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, true)
-	r := f.NewUnstructuredBuilder().
+	r := f.NewBuilder().
+		Unstructured(f.UnstructuredClientForMapping, mapper, typer).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
 		FilenameParam(enforceNamespace, options).

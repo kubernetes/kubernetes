@@ -87,7 +87,13 @@ func (o *ViewLastAppliedOptions) Complete(f cmdutil.Factory, args []string) erro
 		return err
 	}
 
-	r := f.NewUnstructuredBuilder().
+	mapper, typer, err := f.UnstructuredObject()
+	if err != nil {
+		return err
+	}
+
+	r := f.NewBuilder().
+		Unstructured(f.UnstructuredClientForMapping, mapper, typer).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(enforceNamespace, args...).

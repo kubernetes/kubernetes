@@ -251,10 +251,9 @@ type BuilderFactory interface {
 	PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, out io.Writer) error
 	// PrintSuccess prints message after finishing mutating operations
 	PrintSuccess(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
-	// One stop shopping for a structured Builder
+	// NewBuilder returns an object that assists in loading objects from both disk and the server
+	// and which implements the common patterns for CLI interactions with generic resources.
 	NewBuilder() *resource.Builder
-	// One stop shopping for a unstructured Builder
-	NewUnstructuredBuilder() *resource.Builder
 	// PluginLoader provides the implementation to be used to load cli plugins.
 	PluginLoader() plugins.PluginLoader
 	// PluginRunner provides the implementation to be used to run cli plugins.

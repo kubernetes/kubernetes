@@ -170,14 +170,15 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args 
 	}
 
 	// Set up client based support.
-	mapper, _, err := f.UnstructuredObject()
+	mapper, typer, err := f.UnstructuredObject()
 	if err != nil {
 		return err
 	}
 
 	o.Mapper = mapper
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
-	r := f.NewUnstructuredBuilder().
+	r := f.NewBuilder().
+		Unstructured(f.UnstructuredClientForMapping, mapper, typer).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).

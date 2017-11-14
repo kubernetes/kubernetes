@@ -241,13 +241,13 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 			FilenameParam(enforceNamespace, &o.FilenameOptions).
 			Flatten()
 
-		if o.Local {
-			b = b.Local(f.ClientForMapping)
-		} else {
+		if !o.Local {
 			b = b.
 				LabelSelectorParam(o.Selector).
 				ResourceTypeOrNameArgs(o.All, o.From).
 				Latest()
+		} else {
+			b = b.Local(f.ClientForMapping)
 		}
 
 		infos, err := b.Do().Infos()
@@ -309,13 +309,13 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		Flatten()
 
-	if o.Local {
-		b = b.Local(f.ClientForMapping)
-	} else {
+	if !o.Local {
 		b = b.
 			LabelSelectorParam(o.Selector).
 			ResourceTypeOrNameArgs(o.All, o.Resources...).
 			Latest()
+	} else {
+		b = b.Local(f.ClientForMapping)
 	}
 
 	o.Infos, err = b.Do().Infos()
