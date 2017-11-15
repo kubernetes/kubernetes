@@ -106,6 +106,9 @@ func (handler *PersistentCheckpointHandler) CreateCheckpoint(podSandboxID string
 func (handler *PersistentCheckpointHandler) GetCheckpoint(podSandboxID string) (*PodSandboxCheckpoint, error) {
 	blob, err := handler.store.Read(podSandboxID)
 	if err != nil {
+		if err == utilstore.ErrKeyNotFound {
+			return nil, errors.CheckpointNotFoundError
+		}
 		return nil, err
 	}
 	var checkpoint PodSandboxCheckpoint

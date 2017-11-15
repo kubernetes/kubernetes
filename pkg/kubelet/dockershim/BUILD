@@ -110,6 +110,7 @@ go_test(
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
+        "//pkg/kubelet/dockershim/errors:go_default_library",
         "//pkg/kubelet/dockershim/libdocker:go_default_library",
         "//pkg/kubelet/dockershim/testing:go_default_library",
         "//pkg/kubelet/network:go_default_library",
