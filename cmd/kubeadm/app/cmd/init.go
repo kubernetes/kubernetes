@@ -26,15 +26,20 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/ghodss/yaml"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
+	"k8s.io/api/core/v1"
+	rbac "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -58,7 +63,15 @@ import (
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
+	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 	utilsexec "k8s.io/utils/exec"
+)
+
+const (
+	// KubeletBaseConfigMapRoleName sets the name for the ClusterRole that allows access to ConfigMaps in the kube-system ns
+	KubeletBaseConfigMapRoleName = "kubeadm:kubelet-base-configmap"
 )
 
 var (
@@ -217,7 +230,6 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, sk
 
 // NewInit validates given arguments and instantiates Init struct with provided information.
 func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight, skipTokenPrint, dryRun bool, criSocket string) (*Init, error) {
-
 	fmt.Println("[kubeadm] WARNING: kubeadm is currently in beta")
 
 	if cfgPath != "" {
@@ -255,9 +267,6 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight,
 		if err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, criSocket); err != nil {
 			return nil, err
 		}
-
-		// Try to start the kubelet service in case it's inactive
-		preflight.TryStartKubelet()
 	} else {
 		fmt.Println("[preflight] Skipping pre-flight checks.")
 	}
@@ -338,6 +347,57 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
+	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
+		// TODO: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+		kubeletCfg := &kubeadmapi.KubeletConfiguration{
+			BaseConfig: &kubeletconfigv1alpha1.KubeletConfiguration{
+				PodManifestPath: "/etc/kubernetes/manifests",
+				AllowPrivileged: utilpointer.BoolPtr(true),
+				ClusterDNS:      []string{"10.96.0.10"},
+				ClusterDomain:   "cluster.local",
+				Authorization: kubeletconfigv1alpha1.KubeletAuthorization{
+					Mode: "Webhook",
+				},
+				Authentication: kubeletconfigv1alpha1.KubeletAuthentication{
+					X509: kubeletconfigv1alpha1.KubeletX509Authentication{
+						ClientCAFile: "/etc/kubernetes/pki/ca.crt",
+					},
+				},
+				CAdvisorPort: utilpointer.Int32Ptr(0),
+			},
+		}
+
+		// Convert cfg to the external version as that's the only version of the API that can be deserialized later
+		externalKubeletCfg := &kubeadmapiext.KubeletConfiguration{}
+		legacyscheme.Scheme.Convert(kubeletCfg, externalKubeletCfg, nil)
+
+		kubeletCfgYaml, err := yaml.Marshal(*externalKubeletCfg)
+		if err != nil {
+			return err
+		}
+
+		err = apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      kubeadmconstants.KubeletBaseConfigurationConfigMap,
+				Namespace: metav1.NamespaceSystem,
+			},
+			Data: map[string]string{
+				kubeadmconstants.KubeletBaseConfigurationConfigMapKey: string(kubeletCfgYaml),
+			},
+		})
+		if err != nil {
+			return err
+		}
+
+		if err := CreateKubeletBaseConfigMapRBACRules(client, i.cfg.NodeName); err != nil {
+			return fmt.Errorf("error creating kubelet base configmap RBAC rules: %v", err)
+		}
+
+	}
+
+	// Try to start the kubelet service in case it's inactive
+	preflight.TryStartKubelet()
+
 	// waiter holds the apiclient.Waiter implementation of choice, responsible for querying the API server in various ways and waiting for conditions to be fulfilled
 	waiter := getWaiter(i.dryRun, client)
 
@@ -352,6 +412,13 @@ func (i *Init) Run(out io.Writer) error {
 		kubeletFailTempl.Execute(out, ctx)
 
 		return fmt.Errorf("couldn't initialize a Kubernetes cluster")
+	}
+
+	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
+		err = cmdutil.UpdateNodeWithConfigMap(client, i.cfg.NodeName)
+		if err != nil {
+			return nil
+		}
 	}
 
 	// Upload currently used configuration to the cluster
@@ -534,4 +601,38 @@ func waitForAPIAndKubelet(waiter apiclient.Waiter) error {
 
 	// This call is blocking until one of the goroutines sends to errorChan
 	return <-errorChan
+}
+
+// CreateKubeletBaseConfigMapRBACRules creates the RBAC rules for exposing the kubelet base ConfigMap in the kube-system namespace to unauthenticated users
+func CreateKubeletBaseConfigMapRBACRules(client clientset.Interface, nodeName string) error {
+	err := apiclient.CreateOrUpdateRole(client, &rbac.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      KubeletBaseConfigMapRoleName,
+			Namespace: metav1.NamespaceSystem,
+		},
+		Rules: []rbac.PolicyRule{
+			rbachelper.NewRule("get").Groups("").Resources("configmaps").Names(kubeadmconstants.KubeletBaseConfigurationConfigMap).RuleOrDie(),
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	return apiclient.CreateOrUpdateRoleBinding(client, &rbac.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      KubeletBaseConfigMapRoleName,
+			Namespace: metav1.NamespaceSystem,
+		},
+		RoleRef: rbac.RoleRef{
+			APIGroup: rbac.GroupName,
+			Kind:     "Role",
+			Name:     KubeletBaseConfigMapRoleName,
+		},
+		Subjects: []rbac.Subject{
+			{
+				Kind: "Group",
+				Name: kubeadmconstants.NodesGroup,
+			},
+		},
+	})
 }

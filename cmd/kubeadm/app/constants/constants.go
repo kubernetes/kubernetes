@@ -140,6 +140,12 @@ const (
 	// MasterConfigurationConfigMapKey specifies in what ConfigMap key the master configuration should be stored
 	MasterConfigurationConfigMapKey = "MasterConfiguration"
 
+	// KubeletBaseConfigurationConfigMap specifies in what ConfigMap in the kube-system namespace the init kubelet configuration should be stored
+	KubeletBaseConfigurationConfigMap = "kubelet-base-config-1.9"
+
+	// KubeletBaseConfigurationConfigMapKey specifies in what ConfigMap key the init kubelet configuration should be stored
+	KubeletBaseConfigurationConfigMapKey = "kubelet"
+
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
 	MinExternalEtcdVersion = "3.0.14"
 

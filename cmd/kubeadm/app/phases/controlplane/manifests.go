@@ -70,7 +70,6 @@ func CreateSchedulerStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.Ma
 // GetStaticPodSpecs returns all staticPodSpecs actualized to the context of the current MasterConfiguration
 // NB. this methods holds the information about how kubeadm creates static pod mainfests.
 func GetStaticPodSpecs(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.Version) map[string]v1.Pod {
-
 	// Get the required hostpath mounts
 	mounts := getHostPathVolumesForTheControlPlane(cfg)
 
@@ -110,7 +109,6 @@ func GetStaticPodSpecs(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.
 
 // createStaticPodFiles creates all the requested static pod files.
 func createStaticPodFiles(manifestDir string, cfg *kubeadmapi.MasterConfiguration, componentNames ...string) error {
-
 	// TODO: Move the "pkg/util/version".Version object into the internal API instead of always parsing the string
 	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
 	if err != nil {
@@ -210,12 +208,15 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *versio
 		command = append(command, "--endpoint-reconciler-type="+reconcilers.LeaseEndpointReconcilerType)
 	}
 
+	if features.Enabled(cfg.FeatureGates, features.DynamicKubeletConfig) {
+		command = append(command, "--feature-gates=DynamicKubeletConfig=true")
+	}
+
 	return command
 }
 
 // getControllerManagerCommand builds the right controller manager command from the given config object and version
 func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.Version) []string {
-
 	defaultArguments := map[string]string{
 		"address":                          "127.0.0.1",
 		"leader-elect":                     "true",

@@ -17,9 +17,18 @@ limitations under the License.
 package util
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	clientset "k8s.io/client-go/kubernetes"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // SubCmdRunE returns a function that handles a case where a subcommand must be specified
@@ -55,5 +64,44 @@ func ValidateExactArgNumber(args []string, supportedArgs []string) error {
 	if validArgs < lenSupported {
 		return fmt.Errorf("missing one or more required arguments. Required arguments: %v", supportedArgs)
 	}
+	return nil
+}
+
+// UpdateNodeWithConfigMap updates node ConfigSource with KubeletBaseConfigurationConfigMap
+func UpdateNodeWithConfigMap(client clientset.Interface, nodeName string) error {
+	node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	oldData, err := json.Marshal(node)
+	if err != nil {
+		return err
+	}
+
+	kubeletCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeletBaseConfigurationConfigMap, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	node.Spec.ConfigSource.ConfigMapRef.UID = kubeletCfg.UID
+
+	newData, err := json.Marshal(node)
+	if err != nil {
+		return err
+	}
+
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
+	if err != nil {
+		return err
+	}
+
+	if _, err := client.CoreV1().Nodes().Patch(node.Name, types.StrategicMergePatchType, patchBytes); err != nil {
+		if apierrs.IsConflict(err) {
+			fmt.Println("Temporarily unable to update node metadata due to conflict (will retry)")
+		}
+		return err
+	}
+
 	return nil
 }

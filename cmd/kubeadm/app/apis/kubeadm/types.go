@@ -18,6 +18,7 @@ package kubeadm
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -142,6 +143,13 @@ type NodeConfiguration struct {
 	// without CA verification via DiscoveryTokenCACertHashes. This can weaken
 	// the security of kubeadm since other nodes can impersonate the master.
 	DiscoveryTokenUnsafeSkipCAVerification bool
+
+	// FeatureGates enabled by the user
+	FeatureGates map[string]bool
+}
+
+type KubeletConfiguration struct {
+	BaseConfig *kubeletconfigv1alpha1.KubeletConfiguration
 }
 
 // GetControlPlaneImageRepository returns name of image repository

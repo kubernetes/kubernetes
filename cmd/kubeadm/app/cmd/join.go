@@ -21,6 +21,7 @@ import (
 	"io"
 	"io/ioutil"
 	"path/filepath"
+	"strings"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -31,8 +32,10 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -103,6 +106,7 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 	var skipPreFlight bool
 	var cfgPath string
 	var criSocket string
+	var featureGatesString string
 
 	cmd := &cobra.Command{
 		Use:   "join [flags]",
@@ -110,6 +114,11 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		Long:  joinLongDescription,
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg.DiscoveryTokenAPIServers = args
+
+			var err error
+			if cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
+				kubeadmutil.CheckErr(err)
+			}
 
 			legacyscheme.Scheme.Default(cfg)
 			internalcfg := &kubeadmapi.NodeConfiguration{}
@@ -122,14 +131,14 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		},
 	}
 
-	AddJoinConfigFlags(cmd.PersistentFlags(), cfg)
+	AddJoinConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
 	AddJoinOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &criSocket)
 
 	return cmd
 }
 
 // AddJoinConfigFlags adds join flags bound to the config to the specified flagset
-func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.NodeConfiguration) {
+func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.NodeConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.DiscoveryFile, "discovery-file", "",
 		"A file or url from which to load cluster information.")
@@ -151,6 +160,10 @@ func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.NodeConfigurat
 	flagSet.StringVar(
 		&cfg.Token, "token", "",
 		"Use this token for both discovery-token and tls-bootstrap-token.")
+	flagSet.StringVar(
+		featureGatesString, "feature-gates", *featureGatesString,
+		"A set of key=value pairs that describe feature gates for various features. "+
+			"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
 }
 
 // AddJoinOtherFlags adds join flags that are not bound to a configuration file to the given flagset
@@ -199,9 +212,6 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 		if err := preflight.RunJoinNodeChecks(utilsexec.New(), cfg, criSocket); err != nil {
 			return nil, err
 		}
-
-		// Try to start the kubelet service in case it's inactive
-		preflight.TryStartKubelet()
 	} else {
 		fmt.Println("[preflight] Skipping pre-flight checks.")
 	}
@@ -222,6 +232,22 @@ func (j *Join) Run(out io.Writer) error {
 	cfg, err := discovery.For(j.cfg)
 	if err != nil {
 		return err
+	}
+
+	// Try to start the kubelet service in case it's inactive
+	preflight.TryStartKubelet()
+
+	if features.Enabled(j.cfg.FeatureGates, features.DynamicKubeletConfig) {
+		// TODO: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+		client, err := kubeconfigutil.ClientSetFromFile(kubeadmconstants.GetAdminKubeConfigPath())
+		if err != nil {
+			return err
+		}
+
+		err = cmdutil.UpdateNodeWithConfigMap(client, j.cfg.NodeName)
+		if err != nil {
+			return nil
+		}
 	}
 
 	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)
