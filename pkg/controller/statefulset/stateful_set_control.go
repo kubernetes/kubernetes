@@ -22,7 +22,7 @@ import (
 
 	"github.com/golang/glog"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
@@ -269,8 +269,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 	// set the generation, and revisions in the returned status
 	status := apps.StatefulSetStatus{}
-	status.ObservedGeneration = new(int64)
-	*status.ObservedGeneration = set.Generation
+	status.ObservedGeneration = set.Generation
 	status.CurrentRevision = currentRevision.Name
 	status.UpdateRevision = updateRevision.Name
 	status.CollisionCount = new(int32)

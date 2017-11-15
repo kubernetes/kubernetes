@@ -20,7 +20,7 @@ import (
 	"sort"
 	"testing"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -574,16 +574,16 @@ func TestGetPodsForStatefulSetRelease(t *testing.T) {
 func newFakeStatefulSetController(initialObjects ...runtime.Object) (*StatefulSetController, *fakeStatefulPodControl) {
 	client := fake.NewSimpleClientset(initialObjects...)
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-	fpc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
-	ssu := newFakeStatefulSetStatusUpdater(informerFactory.Apps().V1beta1().StatefulSets())
+	fpc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1().StatefulSets())
+	ssu := newFakeStatefulSetStatusUpdater(informerFactory.Apps().V1().StatefulSets())
 	ssc := NewStatefulSetController(
 		informerFactory.Core().V1().Pods(),
-		informerFactory.Apps().V1beta1().StatefulSets(),
+		informerFactory.Apps().V1().StatefulSets(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Apps().V1beta1().ControllerRevisions(),
+		informerFactory.Apps().V1().ControllerRevisions(),
 		client,
 	)
-	ssh := history.NewFakeHistory(informerFactory.Apps().V1beta1().ControllerRevisions())
+	ssh := history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions())
 	ssc.podListerSynced = alwaysReady
 	ssc.setListerSynced = alwaysReady
 	recorder := record.NewFakeRecorder(10)

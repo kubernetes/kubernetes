@@ -101,7 +101,7 @@ go_library(
         "//vendor/golang.org/x/net/websocket:go_default_library",
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
         "//vendor/google.golang.org/api/googleapi:go_default_library",
-        "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
+        "//vendor/k8s.io/api/apps/v1:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta2:go_default_library",
         "//vendor/k8s.io/api/authorization/v1beta1:go_default_library",
         "//vendor/k8s.io/api/batch/v1:go_default_library",

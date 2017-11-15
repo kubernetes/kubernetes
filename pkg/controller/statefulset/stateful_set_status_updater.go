@@ -19,10 +19,10 @@ package statefulset
 import (
 	"fmt"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
-	appslisters "k8s.io/client-go/listers/apps/v1beta1"
+	appslisters "k8s.io/client-go/listers/apps/v1"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -53,7 +53,7 @@ func (ssu *realStatefulSetStatusUpdater) UpdateStatefulSetStatus(
 	// don't wait due to limited number of clients, but backoff after the default number of steps
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		set.Status = *status
-		_, updateErr := ssu.client.AppsV1beta1().StatefulSets(set.Namespace).UpdateStatus(set)
+		_, updateErr := ssu.client.AppsV1().StatefulSets(set.Namespace).UpdateStatus(set)
 		if updateErr == nil {
 			return nil
 		}

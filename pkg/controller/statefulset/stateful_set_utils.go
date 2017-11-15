@@ -23,7 +23,7 @@ import (
 	"regexp"
 	"strconv"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -363,8 +363,7 @@ func nextRevision(revisions []*apps.ControllerRevision) int64 {
 // inconsistentStatus returns true if the ObservedGeneration of status is greater than set's
 // Generation or if any of the status's fields do not match those of set's status.
 func inconsistentStatus(set *apps.StatefulSet, status *apps.StatefulSetStatus) bool {
-	return set.Status.ObservedGeneration == nil ||
-		*status.ObservedGeneration > *set.Status.ObservedGeneration ||
+	return status.ObservedGeneration > set.Status.ObservedGeneration ||
 		status.Replicas != set.Status.Replicas ||
 		status.CurrentReplicas != set.Status.CurrentReplicas ||
 		status.ReadyReplicas != set.Status.ReadyReplicas ||
