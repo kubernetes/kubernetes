@@ -66,7 +66,8 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 		})
 	})
 
-	SIGDescribe("ReplicationController light", func() {
+	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #54637 is fixed.
+	SIGDescribe("[DisabledForLargeClusters] ReplicationController light", func() {
 		It("Should scale from 1 pod to 2 pods", func() {
 			scaleTest := &HPAScaleTest{
 				initPods:                    1,
