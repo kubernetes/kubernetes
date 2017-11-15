@@ -20,12 +20,14 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -185,9 +187,10 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 	})
 
 	/*
-		    Testname: configmap-CUD-test
-		    Description: Make sure Create, Update, Delete operations are all working
-			on config map and the result is observed on volumes mounted in containers.
+	   Testname: configmap-CUD-test
+	   Description: Make sure Create, Get, Watch, Update, Delete
+	   operations are all working on config map and the result
+	   is observed on volumes mounted in containers.
 	*/
 	framework.ConformanceIt("optional updates should be reflected in volume ", func() {
 		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
@@ -355,13 +358,31 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(updateConfigMap)
 		Expect(err).NotTo(HaveOccurred(), "Failed to update configmap %q in namespace %q", updateConfigMap.Name, f.Namespace.Name)
 
+		By("Setting up configMap watch")
+		w, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Watch(metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred(), "failed to set up watch")
+
 		By(fmt.Sprintf("Creating configMap with name %s", createConfigMap.Name))
 		if createConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(createConfigMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", createConfigMap.Name, err)
 		}
 
-		By("waiting to observe update in volume")
+		By("Verifying configMap creation was observed")
+		select {
+		case event, _ := <-w.ResultChan():
+			if event.Type != watch.Added {
+				framework.Failf("Failed to observe configMap creation: %v", event)
+			}
+		case <-time.After(framework.ServiceRespondingTimeout):
+			framework.Failf("Timeout while waiting for configMap creation")
+		}
 
+		By("Trying to get the newly created configMap")
+		fetchedConfigMap, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(createConfigMap.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred(), "failed to query for configMap")
+		Expect(fetchedConfigMap.Data["data-1"]).To(Equal(createConfigMap.Data["data-1"]))
+
+		By("waiting to observe update in volume")
 		Eventually(pollCreateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-1"))
 		Eventually(pollUpdateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-3"))
 		Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/configmap-volumes/delete/data-1"))
