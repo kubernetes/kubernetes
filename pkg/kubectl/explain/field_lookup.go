@@ -78,10 +78,14 @@ func (f *fieldLookup) VisitKind(k *proto.Kind) {
 	if f.SaveLeafSchema(k) {
 		return
 	}
-
-	subSchema, ok := k.Fields[f.Path[0]]
+	var field string = f.Path[0]
+	if len(f.Path) > 1 && f.Path[1] == "" {
+		// validate the last field which can be accidently ended with period
+		field = field + "." + f.Path[1]
+	}
+	subSchema, ok := k.Fields[field]
 	if !ok {
-		f.Error = fmt.Errorf("field %q does not exist", f.Path[0])
+		f.Error = fmt.Errorf("field %q does not exist", field)
 		return
 	}
 
