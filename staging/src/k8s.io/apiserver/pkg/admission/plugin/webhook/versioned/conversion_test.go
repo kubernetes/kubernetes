@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validating
+package versioned
 
 import (
 	"reflect"
@@ -39,10 +39,7 @@ func initiateScheme() *runtime.Scheme {
 
 func TestConvertToGVK(t *testing.T) {
 	scheme := initiateScheme()
-	w := GenericAdmissionWebhook{
-		convertor: scheme,
-		creator:   scheme,
-	}
+	c := Convertor{Scheme: scheme}
 	table := map[string]struct {
 		obj         runtime.Object
 		gvk         schema.GroupVersionKind
@@ -123,7 +120,7 @@ func TestConvertToGVK(t *testing.T) {
 
 	for name, test := range table {
 		t.Run(name, func(t *testing.T) {
-			actual, err := w.convertToGVK(test.obj, test.gvk)
+			actual, err := c.ConvertToGVK(test.obj, test.gvk)
 			if err != nil {
 				t.Error(err)
 			}

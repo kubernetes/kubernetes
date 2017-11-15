@@ -24,7 +24,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -37,7 +36,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -146,7 +144,7 @@ func TestAdmit(t *testing.T) {
 		t.Fatal(err)
 	}
 	namespace := "webhook-test"
-	wh.namespaceLister = fakeNamespaceLister{map[string]*corev1.Namespace{
+	wh.namespaceMatcher.NamespaceLister = fakeNamespaceLister{map[string]*corev1.Namespace{
 		namespace: {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
@@ -414,7 +412,7 @@ func TestAdmitCachedClient(t *testing.T) {
 	wh.clientManager = cm
 	wh.SetScheme(scheme)
 	namespace := "webhook-test"
-	wh.namespaceLister = fakeNamespaceLister{map[string]*corev1.Namespace{
+	wh.namespaceMatcher.NamespaceLister = fakeNamespaceLister{map[string]*corev1.Namespace{
 		namespace: {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
@@ -638,55 +636,6 @@ func (c *fakeAuthenticationInfoResolver) ClientConfigFor(server string) (*rest.C
 	return c.restConfig, nil
 }
 
-func TestToStatusErr(t *testing.T) {
-	hookName := "foo"
-	deniedBy := fmt.Sprintf("admission webhook %q denied the request", hookName)
-	tests := []struct {
-		name          string
-		result        *metav1.Status
-		expectedError string
-	}{
-		{
-			"nil result",
-			nil,
-			deniedBy + " without explanation",
-		},
-		{
-			"only message",
-			&metav1.Status{
-				Message: "you shall not pass",
-			},
-			deniedBy + ": you shall not pass",
-		},
-		{
-			"only reason",
-			&metav1.Status{
-				Reason: metav1.StatusReasonForbidden,
-			},
-			deniedBy + ": Forbidden",
-		},
-		{
-			"message and reason",
-			&metav1.Status{
-				Message: "you shall not pass",
-				Reason:  metav1.StatusReasonForbidden,
-			},
-			deniedBy + ": you shall not pass",
-		},
-		{
-			"no message, no reason",
-			&metav1.Status{},
-			deniedBy + " without explanation",
-		},
-	}
-	for _, test := range tests {
-		err := toStatusErr(hookName, test.result)
-		if err == nil || err.Error() != test.expectedError {
-			t.Errorf("%s: expected an error saying %q, but got %v", test.name, test.expectedError, err)
-		}
-	}
-}
-
 func newMatchEverythingRules() []registrationv1alpha1.RuleWithOperations {
 	return []registrationv1alpha1.RuleWithOperations{{
 		Operations: []registrationv1alpha1.OperationType{registrationv1alpha1.OperationAll},
@@ -696,90 +645,4 @@ func newMatchEverythingRules() []registrationv1alpha1.RuleWithOperations {
 			Resources:   []string{"*/*"},
 		},
 	}}
-}
-
-func TestGetNamespaceLabels(t *testing.T) {
-	namespace1Labels := map[string]string{
-		"runlevel": "1",
-	}
-	namespace1 := corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "1",
-			Labels: namespace1Labels,
-		},
-	}
-	namespace2Labels := map[string]string{
-		"runlevel": "2",
-	}
-	namespace2 := corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "2",
-			Labels: namespace2Labels,
-		},
-	}
-	namespaceLister := fakeNamespaceLister{map[string]*corev1.Namespace{
-		"1": &namespace1,
-	},
-	}
-
-	tests := []struct {
-		name           string
-		attr           admission.Attributes
-		expectedLabels map[string]string
-	}{
-		{
-			name:           "request is for creating namespace, the labels should be from the object itself",
-			attr:           admission.NewAttributesRecord(&namespace2, nil, schema.GroupVersionKind{}, "", namespace2.Name, schema.GroupVersionResource{Resource: "namespaces"}, "", admission.Create, nil),
-			expectedLabels: namespace2Labels,
-		},
-		{
-			name:           "request is for updating namespace, the labels should be from the new object",
-			attr:           admission.NewAttributesRecord(&namespace2, nil, schema.GroupVersionKind{}, namespace2.Name, namespace2.Name, schema.GroupVersionResource{Resource: "namespaces"}, "", admission.Update, nil),
-			expectedLabels: namespace2Labels,
-		},
-		{
-			name:           "request is for deleting namespace, the labels should be from the cache",
-			attr:           admission.NewAttributesRecord(&namespace2, nil, schema.GroupVersionKind{}, namespace1.Name, namespace1.Name, schema.GroupVersionResource{Resource: "namespaces"}, "", admission.Delete, nil),
-			expectedLabels: namespace1Labels,
-		},
-		{
-			name:           "request is for namespace/finalizer",
-			attr:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, namespace1.Name, "mock-name", schema.GroupVersionResource{Resource: "namespaces"}, "finalizers", admission.Create, nil),
-			expectedLabels: namespace1Labels,
-		},
-		{
-			name:           "request is for pod",
-			attr:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, namespace1.Name, "mock-name", schema.GroupVersionResource{Resource: "pods"}, "", admission.Create, nil),
-			expectedLabels: namespace1Labels,
-		},
-	}
-	wh, err := NewGenericAdmissionWebhook(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	wh.namespaceLister = namespaceLister
-	for _, tt := range tests {
-		actualLabels, err := wh.getNamespaceLabels(tt.attr)
-		if err != nil {
-			t.Error(err)
-		}
-		if !reflect.DeepEqual(actualLabels, tt.expectedLabels) {
-			t.Errorf("expected labels to be %#v, got %#v", tt.expectedLabels, actualLabels)
-		}
-	}
-}
-
-func TestExemptClusterScopedResource(t *testing.T) {
-	hook := &registrationv1alpha1.Webhook{
-		NamespaceSelector: &metav1.LabelSelector{},
-	}
-	attr := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "mock-name", schema.GroupVersionResource{Version: "v1", Resource: "nodes"}, "", admission.Create, nil)
-	g := GenericAdmissionWebhook{}
-	exempted, err := g.exemptedByNamespaceSelector(hook, attr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !exempted {
-		t.Errorf("cluster scoped resources (but not a namespace) should be exempted from all webhooks")
-	}
 }

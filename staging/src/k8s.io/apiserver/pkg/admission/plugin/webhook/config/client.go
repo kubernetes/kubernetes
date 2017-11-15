@@ -27,6 +27,7 @@ import (
 	"k8s.io/api/admissionregistration/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/client-go/rest"
 )
 
@@ -153,12 +154,12 @@ func (cm *ClientManager) HookClient(h *v1alpha1.Webhook) (*rest.RESTClient, erro
 	}
 
 	if h.ClientConfig.URL == nil {
-		return nil, &ErrCallingWebhook{WebhookName: h.Name, Reason: ErrNeedServiceOrURL}
+		return nil, &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: ErrNeedServiceOrURL}
 	}
 
 	u, err := url.Parse(*h.ClientConfig.URL)
 	if err != nil {
-		return nil, &ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Unparsable URL: %v", err)}
+		return nil, &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Unparsable URL: %v", err)}
 	}
 
 	restConfig, err := cm.authInfoResolver.ClientConfigFor(u.Host)

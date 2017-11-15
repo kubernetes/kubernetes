@@ -5,7 +5,6 @@ go_library(
     srcs = [
         "authentication.go",
         "client.go",
-        "errors.go",
         "kubeconfig.go",
         "serviceresolver.go",
     ],
@@ -17,6 +16,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/errors:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",

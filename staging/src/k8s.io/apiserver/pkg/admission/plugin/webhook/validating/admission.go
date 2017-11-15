@@ -30,11 +30,8 @@ import (
 	admissionv1alpha1 "k8s.io/api/admission/v1alpha1"
 	"k8s.io/api/admissionregistration/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -42,10 +39,13 @@ import (
 	"k8s.io/apiserver/pkg/admission/configuration"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
+	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/namespace"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/request"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/rules"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/versioned"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	corelisters "k8s.io/client-go/listers/core/v1"
 )
 
 const (
@@ -104,12 +104,10 @@ func NewGenericAdmissionWebhook(configFile io.Reader) (*GenericAdmissionWebhook,
 // GenericAdmissionWebhook is an implementation of admission.Interface.
 type GenericAdmissionWebhook struct {
 	*admission.Handler
-	hookSource      WebhookSource
-	namespaceLister corelisters.NamespaceLister
-	client          clientset.Interface
-	convertor       runtime.ObjectConvertor
-	creator         runtime.ObjectCreater
-	clientManager   config.ClientManager
+	hookSource       WebhookSource
+	namespaceMatcher namespace.Matcher
+	clientManager    config.ClientManager
+	convertor        versioned.Convertor
 }
 
 var (
@@ -133,21 +131,20 @@ func (a *GenericAdmissionWebhook) SetScheme(scheme *runtime.Scheme) {
 		a.clientManager.SetNegotiatedSerializer(serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{
 			Serializer: serializer.NewCodecFactory(scheme).LegacyCodec(admissionv1alpha1.SchemeGroupVersion),
 		}))
-		a.convertor = scheme
-		a.creator = scheme
+		a.convertor.Scheme = scheme
 	}
 }
 
 // WantsExternalKubeClientSet defines a function which sets external ClientSet for admission plugins that need it
 func (a *GenericAdmissionWebhook) SetExternalKubeClientSet(client clientset.Interface) {
-	a.client = client
+	a.namespaceMatcher.Client = client
 	a.hookSource = configuration.NewValidatingWebhookConfigurationManager(client.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations())
 }
 
 // SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
 func (a *GenericAdmissionWebhook) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().V1().Namespaces()
-	a.namespaceLister = namespaceInformer.Lister()
+	a.namespaceMatcher.NamespaceLister = namespaceInformer.Lister()
 	a.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 }
 
@@ -156,11 +153,14 @@ func (a *GenericAdmissionWebhook) ValidateInitialization() error {
 	if a.hookSource == nil {
 		return fmt.Errorf("the GenericAdmissionWebhook admission plugin requires a Kubernetes client to be provided")
 	}
-	if a.namespaceLister == nil {
-		return fmt.Errorf("the GenericAdmissionWebhook admission plugin requires a namespaceLister")
+	if err := a.namespaceMatcher.Validate(); err != nil {
+		return fmt.Errorf("the GenericAdmissionWebhook.namespaceMatcher is not properly setup: %v", err)
 	}
 	if err := a.clientManager.Validate(); err != nil {
 		return fmt.Errorf("the GenericAdmissionWebhook.clientManager is not properly setup: %v", err)
+	}
+	if err := a.convertor.Validate(); err != nil {
+		return fmt.Errorf("the GenericAdmissionWebhook.convertor is not properly setup: %v", err)
 	}
 	go a.hookSource.Run(wait.NeverStop)
 	return nil
@@ -183,39 +183,6 @@ func (a *GenericAdmissionWebhook) loadConfiguration(attr admission.Attributes) (
 		return nil, e
 	}
 	return hookConfig, nil
-}
-
-// TODO: move this object to a common package
-type versionedAttributes struct {
-	admission.Attributes
-	oldObject runtime.Object
-	object    runtime.Object
-}
-
-func (v versionedAttributes) GetObject() runtime.Object {
-	return v.object
-}
-
-func (v versionedAttributes) GetOldObject() runtime.Object {
-	return v.oldObject
-}
-
-// TODO: move this method to a common package
-func (a *GenericAdmissionWebhook) convertToGVK(obj runtime.Object, gvk schema.GroupVersionKind) (runtime.Object, error) {
-	// Unlike other resources, custom resources do not have internal version, so
-	// if obj is a custom resource, it should not need conversion.
-	if obj.GetObjectKind().GroupVersionKind() == gvk {
-		return obj, nil
-	}
-	out, err := a.creator.New(gvk)
-	if err != nil {
-		return nil, err
-	}
-	err = a.convertor.Convert(obj, out, nil)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 // Admit makes an admission decision based on the request attributes.
@@ -244,22 +211,22 @@ func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
 	}
 
 	// convert the object to the external version before sending it to the webhook
-	versionedAttr := versionedAttributes{
+	versionedAttr := versioned.Attributes{
 		Attributes: attr,
 	}
 	if oldObj := attr.GetOldObject(); oldObj != nil {
-		out, err := a.convertToGVK(oldObj, attr.GetKind())
+		out, err := a.convertor.ConvertToGVK(oldObj, attr.GetKind())
 		if err != nil {
 			return apierrors.NewInternalError(err)
 		}
-		versionedAttr.oldObject = out
+		versionedAttr.OldObject = out
 	}
 	if obj := attr.GetObject(); obj != nil {
-		out, err := a.convertToGVK(obj, attr.GetKind())
+		out, err := a.convertor.ConvertToGVK(obj, attr.GetKind())
 		if err != nil {
 			return apierrors.NewInternalError(err)
 		}
-		versionedAttr.object = out
+		versionedAttr.Object = out
 	}
 
 	wg := sync.WaitGroup{}
@@ -277,7 +244,7 @@ func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
 			}
 
 			ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1alpha1.Ignore
-			if callErr, ok := err.(*config.ErrCallingWebhook); ok {
+			if callErr, ok := err.(*webhookerrors.ErrCallingWebhook); ok {
 				if ignoreClientCallFailures {
 					glog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
 					utilruntime.HandleError(callErr)
@@ -313,75 +280,6 @@ func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
 	return errs[0]
 }
 
-// TODO: move this method to a common package
-func (a *GenericAdmissionWebhook) getNamespaceLabels(attr admission.Attributes) (map[string]string, error) {
-	// If the request itself is creating or updating a namespace, then get the
-	// labels from attr.Object, because namespaceLister doesn't have the latest
-	// namespace yet.
-	//
-	// However, if the request is deleting a namespace, then get the label from
-	// the namespace in the namespaceLister, because a delete request is not
-	// going to change the object, and attr.Object will be a DeleteOptions
-	// rather than a namespace object.
-	if attr.GetResource().Resource == "namespaces" &&
-		len(attr.GetSubresource()) == 0 &&
-		(attr.GetOperation() == admission.Create || attr.GetOperation() == admission.Update) {
-		accessor, err := meta.Accessor(attr.GetObject())
-		if err != nil {
-			return nil, err
-		}
-		return accessor.GetLabels(), nil
-	}
-
-	namespaceName := attr.GetNamespace()
-	namespace, err := a.namespaceLister.Get(namespaceName)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, err
-	}
-	if apierrors.IsNotFound(err) {
-		// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
-		namespace, err = a.client.Core().Namespaces().Get(namespaceName, metav1.GetOptions{})
-		if err != nil {
-			return nil, err
-		}
-	}
-	return namespace.Labels, nil
-}
-
-// TODO: move this method to a common package
-// whether the request is exempted by the webhook because of the
-// namespaceSelector of the webhook.
-func (a *GenericAdmissionWebhook) exemptedByNamespaceSelector(h *v1alpha1.Webhook, attr admission.Attributes) (bool, *apierrors.StatusError) {
-	namespaceName := attr.GetNamespace()
-	if len(namespaceName) == 0 && attr.GetResource().Resource != "namespaces" {
-		// If the request is about a cluster scoped resource, and it is not a
-		// namespace, it is exempted from all webhooks for now.
-		// TODO: figure out a way selective exempt cluster scoped resources.
-		// Also update the comment in types.go
-		return true, nil
-	}
-	namespaceLabels, err := a.getNamespaceLabels(attr)
-	// this means the namespace is not found, for backwards compatibility,
-	// return a 404
-	if apierrors.IsNotFound(err) {
-		status, ok := err.(apierrors.APIStatus)
-		if !ok {
-			return false, apierrors.NewInternalError(err)
-		}
-		return false, &apierrors.StatusError{status.Status()}
-	}
-	if err != nil {
-		return false, apierrors.NewInternalError(err)
-	}
-	// TODO: adding an LRU cache to cache the translation
-	selector, err := metav1.LabelSelectorAsSelector(h.NamespaceSelector)
-	if err != nil {
-		return false, apierrors.NewInternalError(err)
-	}
-	return !selector.Matches(labels.Set(namespaceLabels)), nil
-}
-
-// TODO: move this method to a common package
 func (a *GenericAdmissionWebhook) shouldCallHook(h *v1alpha1.Webhook, attr admission.Attributes) (bool, *apierrors.StatusError) {
 	var matches bool
 	for _, r := range h.Rules {
@@ -395,52 +293,24 @@ func (a *GenericAdmissionWebhook) shouldCallHook(h *v1alpha1.Webhook, attr admis
 		return false, nil
 	}
 
-	excluded, err := a.exemptedByNamespaceSelector(h, attr)
-	if err != nil {
-		return false, err
-	}
-	return !excluded, nil
+	return a.namespaceMatcher.MatchNamespaceSelector(h, attr)
 }
 
 func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.Webhook, attr admission.Attributes) error {
 	// Make the webhook request
-	request := createAdmissionReview(attr)
+	request := request.CreateAdmissionReview(attr)
 	client, err := a.clientManager.HookClient(h)
 	if err != nil {
-		return &config.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
+		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 	response := &admissionv1alpha1.AdmissionReview{}
 	if err := client.Post().Context(ctx).Body(&request).Do().Into(response); err != nil {
-		return &config.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
+		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 
 	if response.Status.Allowed {
 		return nil
 	}
 
-	return toStatusErr(h.Name, response.Status.Result)
-}
-
-// TODO: move this function to a common package
-// toStatusErr returns a StatusError with information about the webhook controller
-func toStatusErr(name string, result *metav1.Status) *apierrors.StatusError {
-	deniedBy := fmt.Sprintf("admission webhook %q denied the request", name)
-	const noExp = "without explanation"
-
-	if result == nil {
-		result = &metav1.Status{Status: metav1.StatusFailure}
-	}
-
-	switch {
-	case len(result.Message) > 0:
-		result.Message = fmt.Sprintf("%s: %s", deniedBy, result.Message)
-	case len(result.Reason) > 0:
-		result.Message = fmt.Sprintf("%s: %s", deniedBy, result.Reason)
-	default:
-		result.Message = fmt.Sprintf("%s %s", deniedBy, noExp)
-	}
-
-	return &apierrors.StatusError{
-		ErrStatus: *result,
-	}
+	return webhookerrors.ToStatusErr(h.Name, response.Status.Result)
 }
