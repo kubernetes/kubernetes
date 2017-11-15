@@ -39,7 +39,7 @@ func TestUnixSockEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	server := startTestKmsProvider(listener)
+	server := startTestKMSProvider(listener)
 	defer func() {
 		server.Stop()
 		if err := cleanSockFile(); err != nil {

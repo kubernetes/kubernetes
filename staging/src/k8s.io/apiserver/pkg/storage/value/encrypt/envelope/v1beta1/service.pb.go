@@ -19,7 +19,7 @@ limitations under the License.
 // DO NOT EDIT!
 
 /*
-Package envelope is a generated protocol buffer package.
+Package v1beta1 is a generated protocol buffer package.
 
 It is generated from these files:
 	service.proto
@@ -30,7 +30,7 @@ It has these top-level messages:
 	EncryptRequest
 	EncryptResponse
 */
-package envelope
+package v1beta1
 
 import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
@@ -93,10 +93,10 @@ func (*EncryptResponse) ProtoMessage()               {}
 func (*EncryptResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{3} }
 
 func init() {
-	proto.RegisterType((*DecryptRequest)(nil), "envelope.DecryptRequest")
-	proto.RegisterType((*DecryptResponse)(nil), "envelope.DecryptResponse")
-	proto.RegisterType((*EncryptRequest)(nil), "envelope.EncryptRequest")
-	proto.RegisterType((*EncryptResponse)(nil), "envelope.EncryptResponse")
+	proto.RegisterType((*DecryptRequest)(nil), "v1beta1.DecryptRequest")
+	proto.RegisterType((*DecryptResponse)(nil), "v1beta1.DecryptResponse")
+	proto.RegisterType((*EncryptRequest)(nil), "v1beta1.EncryptRequest")
+	proto.RegisterType((*EncryptResponse)(nil), "v1beta1.EncryptResponse")
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -107,97 +107,97 @@ var _ grpc.ClientConn
 // is compatible with the grpc package it is being compiled against.
 const _ = grpc.SupportPackageIsVersion4
 
-// Client API for KmsService service
+// Client API for KMSService service
 
-type KmsServiceClient interface {
+type KMSServiceClient interface {
 	Decrypt(ctx context.Context, in *DecryptRequest, opts ...grpc.CallOption) (*DecryptResponse, error)
 	Encrypt(ctx context.Context, in *EncryptRequest, opts ...grpc.CallOption) (*EncryptResponse, error)
 }
 
-type kmsServiceClient struct {
+type kMSServiceClient struct {
 	cc *grpc.ClientConn
 }
 
-func NewKmsServiceClient(cc *grpc.ClientConn) KmsServiceClient {
-	return &kmsServiceClient{cc}
+func NewKMSServiceClient(cc *grpc.ClientConn) KMSServiceClient {
+	return &kMSServiceClient{cc}
 }
 
-func (c *kmsServiceClient) Decrypt(ctx context.Context, in *DecryptRequest, opts ...grpc.CallOption) (*DecryptResponse, error) {
+func (c *kMSServiceClient) Decrypt(ctx context.Context, in *DecryptRequest, opts ...grpc.CallOption) (*DecryptResponse, error) {
 	out := new(DecryptResponse)
-	err := grpc.Invoke(ctx, "/envelope.KmsService/Decrypt", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/v1beta1.KMSService/Decrypt", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *kmsServiceClient) Encrypt(ctx context.Context, in *EncryptRequest, opts ...grpc.CallOption) (*EncryptResponse, error) {
+func (c *kMSServiceClient) Encrypt(ctx context.Context, in *EncryptRequest, opts ...grpc.CallOption) (*EncryptResponse, error) {
 	out := new(EncryptResponse)
-	err := grpc.Invoke(ctx, "/envelope.KmsService/Encrypt", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/v1beta1.KMSService/Encrypt", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// Server API for KmsService service
+// Server API for KMSService service
 
-type KmsServiceServer interface {
+type KMSServiceServer interface {
 	Decrypt(context.Context, *DecryptRequest) (*DecryptResponse, error)
 	Encrypt(context.Context, *EncryptRequest) (*EncryptResponse, error)
 }
 
-func RegisterKmsServiceServer(s *grpc.Server, srv KmsServiceServer) {
-	s.RegisterService(&_KmsService_serviceDesc, srv)
+func RegisterKMSServiceServer(s *grpc.Server, srv KMSServiceServer) {
+	s.RegisterService(&_KMSService_serviceDesc, srv)
 }
 
-func _KmsService_Decrypt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _KMSService_Decrypt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DecryptRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(KmsServiceServer).Decrypt(ctx, in)
+		return srv.(KMSServiceServer).Decrypt(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/envelope.KmsService/Decrypt",
+		FullMethod: "/v1beta1.KMSService/Decrypt",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(KmsServiceServer).Decrypt(ctx, req.(*DecryptRequest))
+		return srv.(KMSServiceServer).Decrypt(ctx, req.(*DecryptRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _KmsService_Encrypt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _KMSService_Encrypt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(EncryptRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(KmsServiceServer).Encrypt(ctx, in)
+		return srv.(KMSServiceServer).Encrypt(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/envelope.KmsService/Encrypt",
+		FullMethod: "/v1beta1.KMSService/Encrypt",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(KmsServiceServer).Encrypt(ctx, req.(*EncryptRequest))
+		return srv.(KMSServiceServer).Encrypt(ctx, req.(*EncryptRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-var _KmsService_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "envelope.KmsService",
-	HandlerType: (*KmsServiceServer)(nil),
+var _KMSService_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "v1beta1.KMSService",
+	HandlerType: (*KMSServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "Decrypt",
-			Handler:    _KmsService_Decrypt_Handler,
+			Handler:    _KMSService_Decrypt_Handler,
 		},
 		{
 			MethodName: "Encrypt",
-			Handler:    _KmsService_Encrypt_Handler,
+			Handler:    _KMSService_Encrypt_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -207,19 +207,18 @@ var _KmsService_serviceDesc = grpc.ServiceDesc{
 func init() { proto.RegisterFile("service.proto", fileDescriptor0) }
 
 var fileDescriptor0 = []byte{
-	// 209 bytes of a gzipped FileDescriptorProto
+	// 207 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x2d, 0x4e, 0x2d, 0x2a,
-	0xcb, 0x4c, 0x4e, 0xd5, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0xe2, 0x48, 0xcd, 0x2b, 0x4b, 0xcd,
-	0xc9, 0x2f, 0x48, 0x55, 0x72, 0xe2, 0xe2, 0x73, 0x49, 0x4d, 0x2e, 0xaa, 0x2c, 0x28, 0x09, 0x4a,
-	0x2d, 0x2c, 0x4d, 0x2d, 0x2e, 0x11, 0x12, 0xe3, 0x62, 0x4b, 0xce, 0x2c, 0xc8, 0x48, 0x2d, 0x92,
-	0x60, 0x54, 0x60, 0xd4, 0xe0, 0x09, 0x82, 0xf2, 0x84, 0x24, 0xb8, 0xd8, 0xcb, 0x52, 0x8b, 0x8a,
-	0x33, 0xf3, 0xf3, 0x24, 0x98, 0x14, 0x18, 0x35, 0x38, 0x83, 0x60, 0x5c, 0x25, 0x75, 0x2e, 0x7e,
-	0xb8, 0x19, 0xc5, 0x05, 0xf9, 0x79, 0xc5, 0xa9, 0x42, 0x22, 0x5c, 0xac, 0x05, 0x39, 0x89, 0x99,
-	0x79, 0x50, 0x33, 0x20, 0x1c, 0x25, 0x07, 0x2e, 0x3e, 0xd7, 0x3c, 0x14, 0xcb, 0xb0, 0xaa, 0xc3,
-	0x63, 0x95, 0x26, 0x17, 0x3f, 0xdc, 0x04, 0xa8, 0x55, 0x38, 0xdc, 0x6b, 0x34, 0x81, 0x91, 0x8b,
-	0xcb, 0x3b, 0xb7, 0x38, 0x18, 0xe2, 0x71, 0x21, 0x07, 0x2e, 0x76, 0xa8, 0x23, 0x85, 0x24, 0xf4,
-	0x60, 0xde, 0xd7, 0x43, 0xf5, 0xbb, 0x94, 0x24, 0x16, 0x19, 0x88, 0x35, 0x4a, 0x0c, 0x20, 0x13,
-	0xa0, 0x76, 0x23, 0x9b, 0x80, 0xea, 0x21, 0x64, 0x13, 0xd0, 0x1c, 0xaa, 0xc4, 0x90, 0xc4, 0x06,
-	0x0e, 0x7d, 0x63, 0x40, 0x00, 0x00, 0x00, 0xff, 0xff, 0xb0, 0xc2, 0xcf, 0x84, 0x8e, 0x01, 0x00,
-	0x00,
+	0xcb, 0x4c, 0x4e, 0xd5, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x2f, 0x33, 0x4c, 0x4a, 0x2d,
+	0x49, 0x34, 0x54, 0x72, 0xe2, 0xe2, 0x73, 0x49, 0x4d, 0x2e, 0xaa, 0x2c, 0x28, 0x09, 0x4a, 0x2d,
+	0x2c, 0x4d, 0x2d, 0x2e, 0x11, 0x12, 0xe3, 0x62, 0x4b, 0xce, 0x2c, 0xc8, 0x48, 0x2d, 0x92, 0x60,
+	0x54, 0x60, 0xd4, 0xe0, 0x09, 0x82, 0xf2, 0x84, 0x24, 0xb8, 0xd8, 0xcb, 0x52, 0x8b, 0x8a, 0x33,
+	0xf3, 0xf3, 0x24, 0x98, 0x14, 0x18, 0x35, 0x38, 0x83, 0x60, 0x5c, 0x25, 0x75, 0x2e, 0x7e, 0xb8,
+	0x19, 0xc5, 0x05, 0xf9, 0x79, 0xc5, 0xa9, 0x42, 0x22, 0x5c, 0xac, 0x05, 0x39, 0x89, 0x99, 0x79,
+	0x50, 0x33, 0x20, 0x1c, 0x25, 0x07, 0x2e, 0x3e, 0xd7, 0x3c, 0x14, 0xcb, 0xb0, 0xaa, 0xc3, 0x63,
+	0x95, 0x26, 0x17, 0x3f, 0xdc, 0x04, 0xa8, 0x55, 0x38, 0xdc, 0x6b, 0xd4, 0xc3, 0xc8, 0xc5, 0xe5,
+	0xed, 0x1b, 0x1c, 0x0c, 0xf1, 0xb7, 0x90, 0x1d, 0x17, 0x3b, 0xd4, 0x91, 0x42, 0xe2, 0x7a, 0x50,
+	0xdf, 0xeb, 0xa1, 0x7a, 0x5d, 0x4a, 0x02, 0x53, 0x02, 0x62, 0x89, 0x12, 0x03, 0x48, 0x3f, 0xd4,
+	0x66, 0x24, 0xfd, 0xa8, 0xbe, 0x41, 0xd2, 0x8f, 0xe6, 0x48, 0x25, 0x86, 0x24, 0x36, 0x70, 0xc0,
+	0x1b, 0x03, 0x02, 0x00, 0x00, 0xff, 0xff, 0xd2, 0x95, 0x8d, 0x5c, 0x89, 0x01, 0x00, 0x00,
 }

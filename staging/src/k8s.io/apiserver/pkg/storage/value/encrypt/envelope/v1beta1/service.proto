@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package envelope;
+package v1beta1;
 
-service KmsService {
+service KMSService {
     rpc Decrypt(DecryptRequest) returns (DecryptResponse) {}
     rpc Encrypt(EncryptRequest) returns (EncryptResponse) {}
 }

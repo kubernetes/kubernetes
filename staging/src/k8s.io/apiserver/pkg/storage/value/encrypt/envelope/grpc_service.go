@@ -30,6 +30,8 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"golang.org/x/net/context"
+
+	kmsapi "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
 )
 
 const (
@@ -43,12 +45,12 @@ const (
 
 type gRPCService struct {
 	// gRPC client instance
-	kmsClient  KmsServiceClient
+	kmsClient  kmsapi.KMSServiceClient
 	connection *grpc.ClientConn
 }
 
-// NewEnvelopeService returns an envelope.Service which use gRPC to communicate the remote KMS provider.
-func NewEnvelopeService(endpoint, serverCert, clientCert, clientKey string) (Service, error) {
+// NewGRPCService returns an envelope.Service which use gRPC to communicate the remote KMS provider.
+func NewGRPCService(endpoint, serverCert, clientCert, clientKey string) (Service, error) {
 	protocol, addr, err := parseEndpoint(endpoint)
 	if err != nil {
 		return nil, err
@@ -59,7 +61,7 @@ func NewEnvelopeService(endpoint, serverCert, clientCert, clientKey string) (Ser
 	}
 
 	// With or without TLS/SSL support
-	tlsOption, err := getTlsDialOption(serverCert, clientCert, clientKey)
+	tlsOption, err := getTLSDialOption(serverCert, clientCert, clientKey)
 	if err != nil {
 		return nil, err
 	}
@@ -69,11 +71,15 @@ func NewEnvelopeService(endpoint, serverCert, clientCert, clientKey string) (Ser
 		return nil, fmt.Errorf("connect remote image service %s failed, error: %v", addr, err)
 	}
 
-	return &gRPCService{kmsClient: NewKmsServiceClient(conn), connection: conn}, nil
+	return &gRPCService{kmsClient: kmsapi.NewKMSServiceClient(conn), connection: conn}, nil
 }
 
 // Parse the endpoint to extract schema, host or path.
 func parseEndpoint(endpoint string) (string, string, error) {
+	if len(endpoint) == 0 {
+		return "", "", fmt.Errorf("remote KMS provider can't use empty string as endpoint")
+	}
+
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		return "", "", fmt.Errorf("invalid kms provider endpoint %q, error: %v", endpoint, err)
@@ -90,7 +96,7 @@ func parseEndpoint(endpoint string) (string, string, error) {
 }
 
 // Build the TLS/SSL options for gRPC client.
-func getTlsDialOption(serverCert, clientCert, clientKey string) (grpc.DialOption, error) {
+func getTLSDialOption(serverCert, clientCert, clientKey string) (grpc.DialOption, error) {
 	// No TLS/SSL support.
 	if len(serverCert) == 0 && len(clientCert) == 0 && len(clientKey) == 0 {
 		return grpc.WithInsecure(), nil
@@ -132,7 +138,7 @@ func getTlsDialOption(serverCert, clientCert, clientKey string) (grpc.DialOption
 
 // Decrypt a given data string to obtain the original byte data.
 func (g *gRPCService) Decrypt(cipher string) ([]byte, error) {
-	request := &DecryptRequest{Cipher: []byte(cipher), Version: version}
+	request := &kmsapi.DecryptRequest{Cipher: []byte(cipher), Version: version}
 	response, err := g.kmsClient.Decrypt(context.Background(), request)
 	if err != nil {
 		return nil, err
@@ -142,7 +148,7 @@ func (g *gRPCService) Decrypt(cipher string) ([]byte, error) {
 
 // Encrypt bytes to a string ciphertext.
 func (g *gRPCService) Encrypt(plain []byte) (string, error) {
-	request := &EncryptRequest{Plain: plain, Version: version}
+	request := &kmsapi.EncryptRequest{Plain: plain, Version: version}
 	response, err := g.kmsClient.Encrypt(context.Background(), request)
 	if err != nil {
 		return "", err

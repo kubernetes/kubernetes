@@ -29,6 +29,7 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"golang.org/x/net/context"
+	kmsapi "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
 	"k8s.io/client-go/util/cert"
 )
 
@@ -43,21 +44,21 @@ const (
 	clientKey  = "testdata/client.key"
 )
 
-func TestTcpEndpoint(t *testing.T) {
+func TestTCPEndpoint(t *testing.T) {
 	// Start the gRPC server that listens on tcp socket.
 	listener, err := tcpListner()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	server := startTestKmsProvider(listener)
+	server := startTestKMSProvider(listener)
 	defer server.Stop()
 
 	endpoint := tcpProtocol + "://" + listener.Addr().String()
 	verifyService(t, endpoint, "", "", "")
 }
 
-func TestTlsEndpoint(t *testing.T) {
+func TestTLSEndpoint(t *testing.T) {
 	// Start the gRPC server that listens on tcp socket.
 	listener, err := tcpListner()
 	if err != nil {
@@ -69,7 +70,7 @@ func TestTlsEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	server := startTestKmsProvider(listener, tlsOption)
+	server := startTestKMSProvider(listener, tlsOption)
 	defer server.Stop()
 
 	// There are 2 TLS case: no auth and client auth.
@@ -102,7 +103,7 @@ func TestInvalidConfiguration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	server := startTestKmsProvider(listener, tlsOption)
+	server := startTestKMSProvider(listener, tlsOption)
 	defer server.Stop()
 	endpoint := tcpProtocol + "://" + listener.Addr().String()
 
@@ -122,7 +123,7 @@ func TestInvalidConfiguration(t *testing.T) {
 
 	for _, testCase := range invalidConfigs {
 		t.Run(testCase.name, func(t *testing.T) {
-			_, err := NewEnvelopeService(
+			_, err := NewGRPCService(
 				testCase.endpoint,
 				testCase.serverCACert,
 				testCase.clientCert,
@@ -136,7 +137,7 @@ func TestInvalidConfiguration(t *testing.T) {
 }
 
 func verifyService(t *testing.T, endpoint, serverCACert, clientCert, clientKey string) {
-	service, err := NewEnvelopeService(endpoint, serverCACert, clientCert, clientKey)
+	service, err := NewGRPCService(endpoint, serverCACert, clientCert, clientKey)
 	if err != nil {
 		t.Fatalf("failed to create envelope service, error: %v", err)
 	}
@@ -172,9 +173,9 @@ func tcpListner() (net.Listener, error) {
 	return listener, nil
 }
 
-func startTestKmsProvider(listener net.Listener, options ...grpc.ServerOption) *grpc.Server {
+func startTestKMSProvider(listener net.Listener, options ...grpc.ServerOption) *grpc.Server {
 	server := grpc.NewServer(options...)
-	RegisterKmsServiceServer(server, &base64Server{})
+	kmsapi.RegisterKMSServiceServer(server, &base64Server{})
 	go server.Serve(listener)
 	return server
 }
@@ -201,18 +202,18 @@ func tlsServerOption() (grpc.ServerOption, error) {
 // Fake gRPC sever for remote KMS provider.
 type base64Server struct{}
 
-func (b *base64Server) Decrypt(ctx context.Context, request *DecryptRequest) (*DecryptResponse, error) {
+func (b *base64Server) Decrypt(ctx context.Context, request *kmsapi.DecryptRequest) (*kmsapi.DecryptResponse, error) {
 	buf := make([]byte, base64.StdEncoding.DecodedLen(len(request.Cipher)))
 	n, err := base64.StdEncoding.Decode(buf, request.Cipher)
 	if err != nil {
 		return nil, err
 	}
 
-	return &DecryptResponse{Plain: buf[:n]}, nil
+	return &kmsapi.DecryptResponse{Plain: buf[:n]}, nil
 }
 
-func (b *base64Server) Encrypt(ctx context.Context, request *EncryptRequest) (*EncryptResponse, error) {
+func (b *base64Server) Encrypt(ctx context.Context, request *kmsapi.EncryptRequest) (*kmsapi.EncryptResponse, error) {
 	buf := make([]byte, base64.StdEncoding.EncodedLen(len(request.Plain)))
 	base64.StdEncoding.Encode(buf, request.Plain)
-	return &EncryptResponse{Cipher: buf}, nil
+	return &kmsapi.EncryptResponse{Cipher: buf}, nil
 }

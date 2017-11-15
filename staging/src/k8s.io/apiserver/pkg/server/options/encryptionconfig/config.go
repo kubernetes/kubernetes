@@ -170,7 +170,7 @@ func GetPrefixTransformers(config *ResourceConfig) ([]value.PrefixTransformer, e
 				}
 			} else {
 				// Get gRPC client service with remote config
-				envelopeService, err = envelope.NewEnvelopeService(
+				envelopeService, err = envelope.NewGRPCService(
 					remoteConfig.Endpoint,
 					remoteConfig.ServerCACert,
 					remoteConfig.ClientCert,
