@@ -33,10 +33,24 @@ REGENERATE_DOCS=${REGENERATE_DOCS:-""}
 UPSTREAM_REMOTE=${UPSTREAM_REMOTE:-upstream}
 FORK_REMOTE=${FORK_REMOTE:-origin}
 
+
+set +o errexit
+GIT_LOCAL_USER=$(git config --local --get user.name)
+GIT_GLOBAL_USER=$(git config --global --get user.name)
+set -o errexit
+
 if [[ -z ${GITHUB_USER:-} ]]; then
-  echo "Please export GITHUB_USER=<your-user> (or GH organization, if that's where your fork lives)"
-  exit 1
+  if [[ -n ${GIT_LOCAL_USER} ]]; then
+    GITHUB_USER=${GIT_LOCAL_USER}
+  elif [[ -n ${GIT_GLOBAL_USER} ]]; then
+   GITHUB_USER=${GIT_GLOBAL_USER}
+  else
+    echo "Please export GITHUB_USER=<your-user> (or GH organization, if that's where your fork lives)"
+    exit 1
+  fi
 fi
+
+
 
 if ! which hub > /dev/null; then
   echo "Can't find 'hub' tool in PATH, please install from https://github.com/github/hub"
