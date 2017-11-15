@@ -22,11 +22,12 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/admission"
 )
 
-// createAdmissionReview creates an AdmissionReview for the provided admission.Attributes
-func createAdmissionReview(attr admission.Attributes) admissionv1alpha1.AdmissionReview {
+// createAdmissionReviewRequest creates an AdmissionReviewRequest for the provided admission.Attributes
+func createAdmissionReviewRequest(attr admission.Attributes) admissionv1alpha1.AdmissionReviewRequest {
 	gvk := attr.GetKind()
 	gvr := attr.GetResource()
 	aUserInfo := attr.GetUserInfo()
@@ -42,8 +43,9 @@ func createAdmissionReview(attr admission.Attributes) admissionv1alpha1.Admissio
 		userInfo.Extra[key] = authenticationv1.ExtraValue(val)
 	}
 
-	return admissionv1alpha1.AdmissionReview{
-		Spec: admissionv1alpha1.AdmissionReviewSpec{
+	return admissionv1alpha1.AdmissionReviewRequest{
+		Metadata: admissionv1alpha1.AdmissionReviewMetadata{
+			UID:       uuid.NewUUID(),
 			Name:      attr.GetName(),
 			Namespace: attr.GetNamespace(),
 			Resource: metav1.GroupVersionResource{
@@ -53,18 +55,18 @@ func createAdmissionReview(attr admission.Attributes) admissionv1alpha1.Admissio
 			},
 			SubResource: attr.GetSubresource(),
 			Operation:   admissionv1alpha1.Operation(attr.GetOperation()),
-			Object: runtime.RawExtension{
-				Object: attr.GetObject(),
-			},
-			OldObject: runtime.RawExtension{
-				Object: attr.GetOldObject(),
-			},
 			Kind: metav1.GroupVersionKind{
 				Group:   gvk.Group,
 				Kind:    gvk.Kind,
 				Version: gvk.Version,
 			},
 			UserInfo: userInfo,
+		},
+		Object: runtime.RawExtension{
+			Object: attr.GetObject(),
+		},
+		OldObject: runtime.RawExtension{
+			Object: attr.GetOldObject(),
 		},
 	}
 }

@@ -19,36 +19,41 @@ package admission
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/apis/authentication"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// AdmissionReview describes an admission request.
-type AdmissionReview struct {
+// AdmissionReviewRequest describes an admission request.
+type AdmissionReviewRequest struct {
 	metav1.TypeMeta
 
-	// Spec describes the attributes for the admission request.
-	// Since this admission controller is non-mutating the webhook should avoid setting this in its response to avoid the
-	// cost of deserializing it.
-	Spec AdmissionReviewSpec
-	// Status is filled in by the webhook and indicates whether the admission request should be permitted.
-	Status AdmissionReviewStatus
+	// Metadata contains metadata about the request including the UID for the Request.
+	Metadata AdmissionReviewMetadata
+
+	// Object is the object from the incoming request prior to default values being applied
+	Object runtime.Object
+
+	// OldObject is the existing object. Only populated for UPDATE requests.
+	// +optional
+	OldObject runtime.Object
 }
 
-// AdmissionReviewSpec describes the admission.Attributes for the admission request.
-type AdmissionReviewSpec struct {
+// AdmissionReviewMetadata contains information about the request, including a UID to identify the request instance.
+type AdmissionReviewMetadata struct {
+	// UID is an identifier for the individual request. It allows us to distinguish instances of requests which are
+	// otherwise identical (parallel requests, requests when earlier requests did not modify etc)
+	UID types.UID
 	// Kind is the type of object being manipulated.  For example: Pod
 	Kind metav1.GroupVersionKind
 	// Name is the name of the object as presented in the request.  On a CREATE operation, the client may omit name and
 	// rely on the server to generate the name.  If that is the case, this method will return the empty string.
+	// +optional
 	Name string
 	// Namespace is the namespace associated with the request (if any).
+	// +optional
 	Namespace string
-	// Object is the object from the incoming request prior to default values being applied
-	Object runtime.Object
-	// OldObject is the existing object. Only populated for UPDATE requests.
-	OldObject runtime.Object
 	// Operation is the operation being performed
 	Operation Operation
 	// Resource is the name of the resource being requested.  This is not the kind.  For example: pods
@@ -58,9 +63,32 @@ type AdmissionReviewSpec struct {
 	// /pods/foo/status has the resource "pods", the sub resource "status", and the kind "Pod" (because status operates on
 	// pods). The binding resource for a pod though may be /pods/foo/binding, which has resource "pods", subresource
 	// "binding", and kind "Binding".
+	// +optional
 	SubResource string
 	// UserInfo is information about the requesting user
 	UserInfo authentication.UserInfo
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// AdmissionReviewResponse describes an admission response.
+type AdmissionReviewResponse struct {
+	metav1.TypeMeta
+
+	// Metadata contains metadata about the request including the UID from the Request.
+	Metadata AdmissionReviewMetadata
+
+	// Status is filled in by the webhook and indicates whether the admission
+	// request should be permitted.
+	// +optional
+	Status AdmissionReviewStatus
+
+	// The patch body. Currently we only support "JSONPatch" in compliance with RFC 6902.
+	// +optional
+	Patch []byte
+
+	// The type of Patch. Currently we only allow "JSONPatch".
+	PatchType string
 }
 
 // AdmissionReviewStatus describes the status of the admission request.

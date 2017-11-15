@@ -94,7 +94,10 @@ func init() {
 		&announced.GroupMetaFactoryArgs{
 			GroupName:              admissionv1alpha1.GroupName,
 			VersionPreferenceOrder: []string{admissionv1alpha1.SchemeGroupVersion.Version},
-			RootScopedKinds:        sets.NewString("AdmissionReview"),
+			RootScopedKinds: sets.NewString(
+				"AdmissionReviewRequest",
+				"AdmissionReviewResponse",
+			),
 		},
 		announced.VersionToSchemeFunc{
 			admissionv1alpha1.SchemeGroupVersion.Version: admissionv1alpha1.AddToScheme,

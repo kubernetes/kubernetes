@@ -36,9 +36,12 @@ func init() {
 func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
-			GroupName:                  admission.GroupName,
-			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
-			RootScopedKinds:            sets.NewString("AdmissionReview"),
+			GroupName:              admission.GroupName,
+			VersionPreferenceOrder: []string{v1alpha1.SchemeGroupVersion.Version},
+			RootScopedKinds: sets.NewString(
+				"AdmissionReviewRequest",
+				"AdmissionReviewResponse",
+			),
 			AddInternalObjectsToScheme: admission.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{

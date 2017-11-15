@@ -570,14 +570,14 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("webhook invalid response"))
 	case "/disallow":
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(&v1alpha1.AdmissionReview{
+		json.NewEncoder(w).Encode(&v1alpha1.AdmissionReviewResponse{
 			Status: v1alpha1.AdmissionReviewStatus{
 				Allowed: false,
 			},
 		})
 	case "/disallowReason":
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(&v1alpha1.AdmissionReview{
+		json.NewEncoder(w).Encode(&v1alpha1.AdmissionReviewResponse{
 			Status: v1alpha1.AdmissionReviewStatus{
 				Allowed: false,
 				Result: &metav1.Status{
@@ -587,7 +587,7 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 		})
 	case "/allow":
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(&v1alpha1.AdmissionReview{
+		json.NewEncoder(w).Encode(&v1alpha1.AdmissionReviewResponse{
 			Status: v1alpha1.AdmissionReviewStatus{
 				Allowed: true,
 			},
