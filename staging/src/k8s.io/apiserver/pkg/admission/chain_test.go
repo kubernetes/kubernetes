@@ -17,47 +17,18 @@ limitations under the License.
 package admission
 
 import (
-	"fmt"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-type FakeHandler struct {
-	*Handler
-	name                     string
-	admit, admitCalled       bool
-	validate, validateCalled bool
-}
-
-func (h *FakeHandler) Admit(a Attributes) (err error) {
-	h.admitCalled = true
-	if h.admit {
-		return nil
-	}
-	return fmt.Errorf("Don't admit")
-}
-
-func (h *FakeHandler) Validate(a Attributes) (err error) {
-	h.validateCalled = true
-	if h.validate {
-		return nil
-	}
-	return fmt.Errorf("Don't validate")
-}
-
-func makeHandler(name string, accept bool, ops ...Operation) Interface {
-	return &FakeHandler{
-		name:     name,
-		admit:    accept,
-		validate: accept,
-		Handler:  NewHandler(ops...),
-	}
-}
-
 func TestAdmitAndValidate(t *testing.T) {
+	sysns := metav1.NamespaceSystem
+	otherns := "default"
 	tests := []struct {
 		name      string
+		ns        string
 		operation Operation
 		chain     chainAdmissionHandler
 		accept    bool
@@ -65,97 +36,149 @@ func TestAdmitAndValidate(t *testing.T) {
 	}{
 		{
 			name:      "all accept",
+			ns:        sysns,
 			operation: Create,
-			chain: []Interface{
-				makeHandler("a", true, Update, Delete, Create),
-				makeHandler("b", true, Delete, Create),
-				makeHandler("c", true, Create),
+			chain: []NamedHandler{
+				makeNamedHandler("a", true, Update, Delete, Create),
+				makeNamedHandler("b", true, Delete, Create),
+				makeNamedHandler("c", true, Create),
 			},
 			calls:  map[string]bool{"a": true, "b": true, "c": true},
 			accept: true,
 		},
 		{
 			name:      "ignore handler",
+			ns:        otherns,
 			operation: Create,
-			chain: []Interface{
-				makeHandler("a", true, Update, Delete, Create),
-				makeHandler("b", false, Delete),
-				makeHandler("c", true, Create),
+			chain: []NamedHandler{
+				makeNamedHandler("a", true, Update, Delete, Create),
+				makeNamedHandler("b", false, Delete),
+				makeNamedHandler("c", true, Create),
 			},
 			calls:  map[string]bool{"a": true, "c": true},
 			accept: true,
 		},
 		{
 			name:      "ignore all",
+			ns:        sysns,
 			operation: Connect,
-			chain: []Interface{
-				makeHandler("a", true, Update, Delete, Create),
-				makeHandler("b", false, Delete),
-				makeHandler("c", true, Create),
+			chain: []NamedHandler{
+				makeNamedHandler("a", true, Update, Delete, Create),
+				makeNamedHandler("b", false, Delete),
+				makeNamedHandler("c", true, Create),
 			},
 			calls:  map[string]bool{},
 			accept: true,
 		},
 		{
 			name:      "reject one",
+			ns:        otherns,
 			operation: Delete,
-			chain: []Interface{
-				makeHandler("a", true, Update, Delete, Create),
-				makeHandler("b", false, Delete),
-				makeHandler("c", true, Create),
+			chain: []NamedHandler{
+				makeNamedHandler("a", true, Update, Delete, Create),
+				makeNamedHandler("b", false, Delete),
+				makeNamedHandler("c", true, Create),
 			},
 			calls:  map[string]bool{"a": true, "b": true},
 			accept: false,
 		},
 	}
 	for _, test := range tests {
+		Metrics.reset()
+		t.Logf("testcase = %s", test.name)
 		// call admit and check that validate was not called at all
-		err := test.chain.Admit(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", test.operation, nil))
+		err := test.chain.Admit(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, nil))
 		accepted := (err == nil)
 		if accepted != test.accept {
-			t.Errorf("%s: unexpected result of admit call: %v\n", test.name, accepted)
+			t.Errorf("unexpected result of admit call: %v", accepted)
 		}
 		for _, h := range test.chain {
-			fake := h.(*FakeHandler)
-			_, shouldBeCalled := test.calls[fake.name]
+			fake := h.Interface().(*FakeHandler)
+			_, shouldBeCalled := test.calls[h.Name()]
 			if shouldBeCalled != fake.admitCalled {
-				t.Errorf("%s: admit handler %s not called as expected: %v", test.name, fake.name, fake.admitCalled)
+				t.Errorf("admit handler %s not called as expected: %v", h.Name(), fake.admitCalled)
 				continue
 			}
 			if fake.validateCalled {
-				t.Errorf("%s: validate handler %s called during admit", test.name, fake.name)
+				t.Errorf("validate handler %s called during admit", h.Name())
 			}
 
 			// reset value for validation test
 			fake.admitCalled = false
 		}
 
+		labelFilter := map[string]string{
+			"type": "admit",
+		}
+
+		checkAdmitAndValidateMetrics(t, labelFilter, test.accept, test.calls)
+		Metrics.reset()
 		// call validate and check that admit was not called at all
-		err = test.chain.Validate(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", test.operation, nil))
+		err = test.chain.Validate(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, nil))
 		accepted = (err == nil)
 		if accepted != test.accept {
-			t.Errorf("%s: unexpected result of validate call: %v\n", test.name, accepted)
+			t.Errorf("unexpected result of validate call: %v\n", accepted)
 		}
 		for _, h := range test.chain {
-			fake := h.(*FakeHandler)
-			_, shouldBeCalled := test.calls[fake.name]
+			fake := h.Interface().(*FakeHandler)
+
+			_, shouldBeCalled := test.calls[h.Name()]
 			if shouldBeCalled != fake.validateCalled {
-				t.Errorf("%s: validate handler %s not called as expected: %v", test.name, fake.name, fake.validateCalled)
+				t.Errorf("validate handler %s not called as expected: %v", h.Name(), fake.validateCalled)
 				continue
 			}
 
 			if fake.admitCalled {
-				t.Errorf("%s: admit handler %s called during admit", test.name, fake.name)
+				t.Errorf("mutating handler unexpectedly called: %s", h.Name())
 			}
+		}
+
+		labelFilter = map[string]string{
+			"type": "validate",
+		}
+
+		checkAdmitAndValidateMetrics(t, labelFilter, test.accept, test.calls)
+	}
+}
+
+func checkAdmitAndValidateMetrics(t *testing.T, labelFilter map[string]string, accept bool, calls map[string]bool) {
+	acceptFilter := map[string]string{"rejected": "false"}
+	for k, v := range labelFilter {
+		acceptFilter[k] = v
+	}
+
+	rejectFilter := map[string]string{"rejected": "true"}
+	for k, v := range labelFilter {
+		rejectFilter[k] = v
+	}
+
+	if accept {
+		// Ensure exactly one admission end-to-end admission accept should have been recorded.
+		expectHistogramCountTotal(t, "apiserver_admission_step_admission_latencies_seconds", acceptFilter, 1)
+
+		// Ensure the expected count of admission controllers have been executed.
+		expectHistogramCountTotal(t, "apiserver_admission_controller_admission_latencies_seconds", acceptFilter, len(calls))
+	} else {
+		// When not accepted, ensure exactly one end-to-end rejection has been recorded.
+		expectHistogramCountTotal(t, "apiserver_admission_step_admission_latencies_seconds", rejectFilter, 1)
+		if len(calls) > 0 {
+			if len(calls) > 1 {
+				// When not accepted, ensure that all but the last controller had been accepted, since
+				// the chain stops execution at the first rejection.
+				expectHistogramCountTotal(t, "apiserver_admission_controller_admission_latencies_seconds", acceptFilter, len(calls)-1)
+			}
+
+			// When not accepted, ensure exactly one controller has been rejected.
+			expectHistogramCountTotal(t, "apiserver_admission_controller_admission_latencies_seconds", rejectFilter, 1)
 		}
 	}
 }
 
 func TestHandles(t *testing.T) {
 	chain := chainAdmissionHandler{
-		makeHandler("a", true, Update, Delete, Create),
-		makeHandler("b", true, Delete, Create),
-		makeHandler("c", true, Create),
+		makeNamedHandler("a", true, Update, Delete, Create),
+		makeNamedHandler("b", true, Delete, Create),
+		makeNamedHandler("c", true, Create),
 	}
 
 	tests := []struct {

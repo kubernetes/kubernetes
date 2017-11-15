@@ -39,6 +39,20 @@ type Plugins struct {
 	registry map[string]Factory
 }
 
+// pluginHandler associates name with a admission.Interface handler.
+type pluginHandler struct {
+	i    Interface
+	name string
+}
+
+func (h *pluginHandler) Interface() Interface {
+	return h.i
+}
+
+func (h *pluginHandler) Name() string {
+	return h.name
+}
+
 // All registered admission options.
 var (
 	// PluginEnabledFn checks whether a plugin is enabled.  By default, if you ask about it, it's enabled.
@@ -121,7 +135,7 @@ func splitStream(config io.Reader) (io.Reader, io.Reader, error) {
 // NewFromPlugins returns an admission.Interface that will enforce admission control decisions of all
 // the given plugins.
 func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigProvider, pluginInitializer PluginInitializer) (Interface, error) {
-	plugins := []Interface{}
+	handlers := []NamedHandler{}
 	for _, pluginName := range pluginNames {
 		pluginConfig, err := configProvider.ConfigFor(pluginName)
 		if err != nil {
@@ -133,10 +147,11 @@ func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigPro
 			return nil, err
 		}
 		if plugin != nil {
-			plugins = append(plugins, plugin)
+			handler := &pluginHandler{i: plugin, name: pluginName}
+			handlers = append(handlers, handler)
 		}
 	}
-	return chainAdmissionHandler(plugins), nil
+	return chainAdmissionHandler(handlers), nil
 }
 
 // InitPlugin creates an instance of the named interface.

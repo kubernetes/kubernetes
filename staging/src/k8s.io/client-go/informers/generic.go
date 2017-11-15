@@ -40,6 +40,7 @@ import (
 	scheduling_v1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	settings_v1alpha1 "k8s.io/api/settings/v1alpha1"
 	storage_v1 "k8s.io/api/storage/v1"
+	storage_v1alpha1 "k8s.io/api/storage/v1alpha1"
 	storage_v1beta1 "k8s.io/api/storage/v1beta1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
@@ -230,6 +231,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=storage.k8s.io, Version=v1
 	case storage_v1.SchemeGroupVersion.WithResource("storageclasses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Storage().V1().StorageClasses().Informer()}, nil
+
+		// Group=storage.k8s.io, Version=v1alpha1
+	case storage_v1alpha1.SchemeGroupVersion.WithResource("volumeattachments"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Storage().V1alpha1().VolumeAttachments().Informer()}, nil
 
 		// Group=storage.k8s.io, Version=v1beta1
 	case storage_v1beta1.SchemeGroupVersion.WithResource("storageclasses"):

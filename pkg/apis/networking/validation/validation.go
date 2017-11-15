@@ -17,8 +17,6 @@ limitations under the License.
 package validation
 
 import (
-	"net"
-
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -163,7 +161,7 @@ func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path) field.ErrorLi
 		allErrs = append(allErrs, field.Required(fldPath.Child("cidr"), ""))
 		return allErrs
 	}
-	cidrIPNet, err := validateCIDR(ipb.CIDR)
+	cidrIPNet, err := apivalidation.ValidateCIDR(ipb.CIDR)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("cidr"), ipb.CIDR, "not a valid CIDR"))
 		return allErrs
@@ -171,7 +169,7 @@ func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path) field.ErrorLi
 	exceptCIDR := ipb.Except
 	for i, exceptIP := range exceptCIDR {
 		exceptPath := fldPath.Child("except").Index(i)
-		exceptCIDR, err := validateCIDR(exceptIP)
+		exceptCIDR, err := apivalidation.ValidateCIDR(exceptIP)
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(exceptPath, exceptIP, "not a valid CIDR"))
 			return allErrs
@@ -181,13 +179,4 @@ func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path) field.ErrorLi
 		}
 	}
 	return allErrs
-}
-
-// validateCIDR validates whether a CIDR matches the conventions expected by net.ParseCIDR
-func validateCIDR(cidr string) (*net.IPNet, error) {
-	_, net, err := net.ParseCIDR(cidr)
-	if err != nil {
-		return nil, err
-	}
-	return net, nil
 }

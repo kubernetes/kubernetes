@@ -46,5 +46,8 @@ func main() {
 	hk.AddServer(NewKubeProxy())
 	hk.AddServer(NewKubeAggregator())
 
+	// Alpha servers
+	hk.AddAlphaServer(NewCloudControllerManager())
+
 	hk.RunToExit(os.Args)
 }

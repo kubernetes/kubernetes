@@ -21,3 +21,7 @@ package internalversion
 // StorageClassListerExpansion allows custom methods to be added to
 // StorageClassLister.
 type StorageClassListerExpansion interface{}
+
+// VolumeAttachmentListerExpansion allows custom methods to be added to
+// VolumeAttachmentLister.
+type VolumeAttachmentListerExpansion interface{}

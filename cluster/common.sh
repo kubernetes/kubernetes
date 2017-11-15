@@ -884,6 +884,11 @@ EOF
 ENABLE_NVIDIA_GPU_DEVICE_PLUGIN: $(yaml-quote "true")
 EOF
     fi
+    if [ -n "${ADDON_MANAGER_LEADER_ELECTION:-}" ]; then
+      cat >>$file <<EOF
+ADDON_MANAGER_LEADER_ELECTION: $(yaml-quote ${ADDON_MANAGER_LEADER_ELECTION})
+EOF
+    fi
 
   else
     # Node-only env vars.

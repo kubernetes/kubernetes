@@ -73,6 +73,7 @@ pkg/apis/storage
 pkg/apis/storage/util
 pkg/apis/storage/v1
 pkg/apis/storage/v1/util
+pkg/apis/storage/v1alpha1
 pkg/apis/storage/v1beta1
 pkg/apis/storage/v1beta1/util
 pkg/auth/authorizer/abac
@@ -458,6 +459,7 @@ staging/src/k8s.io/api/rbac/v1beta1
 staging/src/k8s.io/api/scheduling/v1alpha1
 staging/src/k8s.io/api/settings/v1alpha1
 staging/src/k8s.io/api/storage/v1
+staging/src/k8s.io/api/storage/v1alpha1
 staging/src/k8s.io/api/storage/v1beta1
 staging/src/k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr
 staging/src/k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1
@@ -542,7 +544,8 @@ staging/src/k8s.io/apiserver/pkg/admission
 staging/src/k8s.io/apiserver/pkg/admission/configuration
 staging/src/k8s.io/apiserver/pkg/admission/plugin/initialization
 staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle
-staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook
+staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config
+staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/validating
 staging/src/k8s.io/apiserver/pkg/apis/apiserver
 staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1
 staging/src/k8s.io/apiserver/pkg/apis/audit
@@ -668,6 +671,8 @@ staging/src/k8s.io/client-go/kubernetes/typed/settings/v1alpha1
 staging/src/k8s.io/client-go/kubernetes/typed/settings/v1alpha1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/storage/v1
 staging/src/k8s.io/client-go/kubernetes/typed/storage/v1/fake
+staging/src/k8s.io/client-go/kubernetes/typed/storage/v1alpha1
+staging/src/k8s.io/client-go/kubernetes/typed/storage/v1alpha1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/storage/v1beta1
 staging/src/k8s.io/client-go/kubernetes/typed/storage/v1beta1/fake
 staging/src/k8s.io/client-go/plugin/pkg/auth/authenticator/token/oidc/testing
