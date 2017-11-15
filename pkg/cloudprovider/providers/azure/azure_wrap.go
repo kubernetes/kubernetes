@@ -40,6 +40,19 @@ func checkResourceExistsFromError(err error) (bool, error) {
 	return false, v
 }
 
+// If it is StatusNotFound return nil,
+// Otherwise, return what it is
+func ignoreStatusNotFoundFromError(err error) error {
+	if err == nil {
+		return nil
+	}
+	v, ok := err.(autorest.DetailedError)
+	if ok && v.StatusCode == http.StatusNotFound {
+		return nil
+	}
+	return err
+}
+
 func (az *Cloud) getVirtualMachine(nodeName types.NodeName) (vm compute.VirtualMachine, exists bool, err error) {
 	var realErr error
 
@@ -103,7 +116,6 @@ func (az *Cloud) getSecurityGroup() (sg network.SecurityGroup, exists bool, err 
 
 func (az *Cloud) getAzureLoadBalancer(name string) (lb network.LoadBalancer, exists bool, err error) {
 	var realErr error
-
 	az.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("LoadBalancerClient.Get(%s): start", name)
 	lb, err = az.LoadBalancerClient.Get(az.ResourceGroup, name, "")
@@ -119,6 +131,25 @@ func (az *Cloud) getAzureLoadBalancer(name string) (lb network.LoadBalancer, exi
 	}
 
 	return lb, exists, err
+}
+
+func (az *Cloud) listLoadBalancers() (lbListResult network.LoadBalancerListResult, exists bool, err error) {
+	var realErr error
+
+	az.operationPollRateLimiter.Accept()
+	glog.V(10).Infof("LoadBalancerClient.List(%s): start", az.ResourceGroup)
+	lbListResult, err = az.LoadBalancerClient.List(az.ResourceGroup)
+	glog.V(10).Infof("LoadBalancerClient.List(%s): end", az.ResourceGroup)
+	exists, realErr = checkResourceExistsFromError(err)
+	if realErr != nil {
+		return lbListResult, false, realErr
+	}
+
+	if !exists {
+		return lbListResult, false, nil
+	}
+
+	return lbListResult, exists, err
 }
 
 func (az *Cloud) getPublicIPAddress(name string) (pip network.PublicIPAddress, exists bool, err error) {

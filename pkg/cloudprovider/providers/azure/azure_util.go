@@ -20,7 +20,9 @@ import (
 	"errors"
 	"fmt"
 	"hash/crc32"
+	"math"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -31,6 +33,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (
@@ -44,6 +47,12 @@ const (
 	loadBalancerRuleIDTemplate  = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/loadBalancers/%s/loadBalancingRules/%s"
 	loadBalancerProbeIDTemplate = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/loadBalancers/%s/probes/%s"
 	securityRuleIDTemplate      = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/networkSecurityGroups/%s/securityRules/%s"
+
+	// InternalLoadBalancerNameSuffix is load balancer posfix
+	InternalLoadBalancerNameSuffix = "-internal"
+
+	// nodeLabelRole specifies the role of a node
+	nodeLabelRole = "kubernetes.io/role"
 )
 
 var providerIDRE = regexp.MustCompile(`^` + CloudProviderName + `://(?:.*)/Microsoft.Compute/virtualMachines/(.+)$`)
@@ -116,6 +125,197 @@ func (az *Cloud) getSecurityRuleID(securityRuleName string) string {
 		securityRuleName)
 }
 
+// returns the full identifier of a publicIPAddress.
+func (az *Cloud) getpublicIPAddressID(pipName string) string {
+	return fmt.Sprintf(
+		publicIPAddressIDTemplate,
+		az.SubscriptionID,
+		az.ResourceGroup,
+		pipName)
+}
+
+// select load balancer for the service in the cluster
+func (az *Cloud) selectLoadBalancer(clusterName string, service *v1.Service, existingLBs *[]network.LoadBalancer, nodes []*v1.Node) (selectedLB *network.LoadBalancer, existsLb bool, err error) {
+	isInternal := requiresInternalLoadBalancer(service)
+	serviceName := getServiceName(service)
+	glog.V(3).Infof("selectLoadBalancer(%s): isInternal(%s) - start", serviceName, isInternal)
+	availabilitySetNames, err := az.getLoadBalancerAvailabilitySetNames(service, nodes)
+	if err != nil {
+		return nil, false, err
+	}
+	glog.Infof("selectLoadBalancer(%s): isInternal(%s) - availabilitysetsname %v", serviceName, isInternal, *availabilitySetNames)
+	mapExistingLBs := map[string]*network.LoadBalancer{}
+	for lbx := range *existingLBs {
+		lb := (*existingLBs)[lbx]
+		mapExistingLBs[*lb.Name] = &lb
+	}
+	selectedLBRuleCount := math.MaxInt32
+	for asx := range *availabilitySetNames {
+		currASName := (*availabilitySetNames)[asx]
+		currLBName := az.getLoadBalancerName(clusterName, currASName, isInternal)
+		lb, ok := mapExistingLBs[currLBName]
+		if !ok {
+			// select this LB as this is a new LB and will have minimum rules
+			// create tmp lb struct to hold metadata for the new load-balancer
+			selectedLB = &network.LoadBalancer{
+				Name:                         &currLBName,
+				Location:                     &az.Location,
+				LoadBalancerPropertiesFormat: &network.LoadBalancerPropertiesFormat{},
+			}
+
+			return selectedLB, false, nil
+		}
+
+		lbRules := *lb.LoadBalancingRules
+		currLBRuleCount := 0
+		if lbRules != nil {
+			currLBRuleCount = len(lbRules)
+		}
+		if currLBRuleCount < selectedLBRuleCount {
+			selectedLBRuleCount = currLBRuleCount
+			selectedLB = lb
+		}
+	}
+
+	if selectedLB == nil {
+		glog.Errorf("selectLoadBalancer service (%s) - unable to find load balancer for selected availability sets %v", serviceName, *availabilitySetNames)
+		return nil, false, fmt.Errorf("selectLoadBalancer (%s)- unable to find load balancer for selected availability sets %v", serviceName, *availabilitySetNames)
+	}
+	// validate if the selected LB has not exceeded the MaximumLoadBalancerRuleCount
+	if az.Config.MaximumLoadBalancerRuleCount != 0 && selectedLBRuleCount >= az.Config.MaximumLoadBalancerRuleCount {
+		err = fmt.Errorf("selectLoadBalancer service (%s) -  all available load balancers have exceeded maximum rule limit %d", serviceName, selectedLBRuleCount)
+		glog.Error(err)
+		return selectedLB, existsLb, err
+	}
+
+	return selectedLB, existsLb, nil
+}
+
+// getLoadBalancerAvailabilitySetNames selects all possible availability sets for
+// service load balancer, if the service has no loadbalancer mode annotaion returns the
+// primary availability set if service annotation for loadbalancer availability set
+// exists then return the eligible a availability set
+func (az *Cloud) getLoadBalancerAvailabilitySetNames(service *v1.Service, nodes []*v1.Node) (availabilitySetNames *[]string, err error) {
+	hasMode, isAuto, serviceASL := getServiceLoadBalancerMode(service)
+	if !hasMode {
+		// legacy load balancer auto mode load balancer.
+		availabilitySetNames = &[]string{az.Config.PrimaryAvailabilitySetName}
+		return availabilitySetNames, nil
+	}
+	availabilitySetNames, err = az.getAgentPoolAvailabiliySets(nodes)
+	if err != nil {
+		return nil, err
+	}
+	if len(*availabilitySetNames) == 0 {
+		return nil, fmt.Errorf("No availability sets found for nodes, node count(%d)", len(nodes))
+	}
+	// sort the list to have deterministic selection
+	sort.Strings(*availabilitySetNames)
+	if !isAuto {
+		if serviceASL == nil || len(serviceASL) == 0 {
+			return nil, fmt.Errorf("service annotation for LoadBalancerMode is empty, it should have __auto__ or availability sets value")
+		}
+		// validate availability set exists
+		var found bool
+		for sasx := range serviceASL {
+			for asx := range *availabilitySetNames {
+				if strings.EqualFold((*availabilitySetNames)[asx], serviceASL[sasx]) {
+					found = true
+					serviceASL[sasx] = (*availabilitySetNames)[asx]
+					break
+				}
+			}
+			if !found {
+				return nil, fmt.Errorf("availability set (%s) - not found", serviceASL[sasx])
+			}
+		}
+		availabilitySetNames = &serviceASL
+	}
+
+	return availabilitySetNames, nil
+}
+
+// lists the virtual machines for for the resource group and then builds
+// a list of availability sets that match the nodes available to k8s
+func (az *Cloud) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentPoolAs *[]string, err error) {
+	vms, err := az.VirtualMachineClientListWithRetry()
+	if err != nil {
+		return nil, err
+	}
+	vmNameToAvailabilitySetID := make(map[string]string, len(vms))
+	for vmx := range vms {
+		vm := vms[vmx]
+		if vm.AvailabilitySet != nil {
+			vmNameToAvailabilitySetID[*vm.Name] = *vm.AvailabilitySet.ID
+		}
+	}
+	availabilitySetIDs := sets.NewString()
+	agentPoolAs = &[]string{}
+	for nx := range nodes {
+		nodeName := (*nodes[nx]).Name
+		if isMasterNode(nodes[nx]) {
+			continue
+		}
+		asID, ok := vmNameToAvailabilitySetID[nodeName]
+		if !ok {
+			return nil, fmt.Errorf("Node (%s) - has no availability sets", nodeName)
+		}
+		if availabilitySetIDs.Has(asID) {
+			// already added in the list
+			continue
+		}
+		asName, err := getLastSegment(asID)
+		if err != nil {
+			glog.Errorf("az.getNodeAvailabilitySet(%s), getLastSegment(%s), err=%v", nodeName, asID, err)
+			return nil, err
+		}
+		// AvailabilitySet ID is currently upper cased in a indeterministic way
+		// We want to keep it lower case, before the ID get fixed
+		asName = strings.ToLower(asName)
+
+		*agentPoolAs = append(*agentPoolAs, asName)
+	}
+
+	return agentPoolAs, nil
+}
+
+func (az *Cloud) mapLoadBalancerNameToAvailabilitySet(lbName string, clusterName string) (availabilitySetName string) {
+	availabilitySetName = strings.TrimSuffix(lbName, InternalLoadBalancerNameSuffix)
+	if strings.EqualFold(clusterName, lbName) {
+		availabilitySetName = az.Config.PrimaryAvailabilitySetName
+	}
+
+	return availabilitySetName
+}
+
+// For a load balancer, all frontend ip should reference either a subnet or publicIpAddress.
+// Thus Azure do not allow mixed type (public and internal) load balancer.
+// So we'd have a separate name for internal load balancer.
+// This would be the name for Azure LoadBalancer resource.
+func (az *Cloud) getLoadBalancerName(clusterName string, availabilitySetName string, isInternal bool) string {
+	lbNamePrefix := availabilitySetName
+	if strings.EqualFold(availabilitySetName, az.Config.PrimaryAvailabilitySetName) {
+		lbNamePrefix = clusterName
+	}
+	if isInternal {
+		return fmt.Sprintf("%s%s", lbNamePrefix, InternalLoadBalancerNameSuffix)
+	}
+	return lbNamePrefix
+}
+
+// isMasterNode returns returns true is the node has a master role label.
+// The master role is determined by looking for:
+// * a kubernetes.io/role="master" label
+func isMasterNode(node *v1.Node) bool {
+	for k, v := range node.Labels {
+		if k == nodeLabelRole && v == "master" {
+			return true
+		}
+	}
+
+	return false
+}
+
 // returns the deepest child's identifier from a full identifier string.
 func getLastSegment(ID string) (string, error) {
 	parts := strings.Split(ID, "/")
@@ -179,16 +379,8 @@ func getPrimaryIPConfig(nic network.Interface) (*network.InterfaceIPConfiguratio
 	return nil, fmt.Errorf("failed to determine the determine primary ipconfig. nicname=%q", *nic.Name)
 }
 
-// For a load balancer, all frontend ip should reference either a subnet or publicIpAddress.
-// Thus Azure do not allow mixed type (public and internal) load balancer.
-// So we'd have a separate name for internal load balancer.
-// This would be the name for Azure LoadBalancer resource.
-func getLoadBalancerName(clusterName string, isInternal bool) string {
-	if isInternal {
-		return fmt.Sprintf("%s-internal", clusterName)
-	}
-
-	return clusterName
+func isInternalLoadBalancer(lb *network.LoadBalancer) bool {
+	return strings.HasSuffix(*lb.Name, InternalLoadBalancerNameSuffix)
 }
 
 func getBackendPoolName(clusterName string) string {
