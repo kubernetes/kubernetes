@@ -17,7 +17,7 @@ limitations under the License.
 // This file was generated using openssl by the gencerts.sh script
 // and holds raw certificates for the webhook tests.
 
-package webhook
+package validating
 
 var caKey = []byte(`-----BEGIN RSA PRIVATE KEY-----
 MIIEpAIBAAKCAQEAt8E1XykA4860Tj7mypnsSU+hW0taUEvz26a5rgFSrwgKe1g+

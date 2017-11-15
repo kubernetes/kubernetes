@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package webhook
+package rules
 
 import (
 	"testing"
@@ -77,13 +77,13 @@ func TestGroup(t *testing.T) {
 
 	for name, tt := range table {
 		for _, m := range tt.match {
-			r := RuleMatcher{tt.rule, m}
+			r := Matcher{tt.rule, m}
 			if !r.group() {
 				t.Errorf("%v: expected match %#v", name, m)
 			}
 		}
 		for _, m := range tt.noMatch {
-			r := RuleMatcher{tt.rule, m}
+			r := Matcher{tt.rule, m}
 			if r.group() {
 				t.Errorf("%v: expected no match %#v", name, m)
 			}
@@ -121,13 +121,13 @@ func TestVersion(t *testing.T) {
 	}
 	for name, tt := range table {
 		for _, m := range tt.match {
-			r := RuleMatcher{tt.rule, m}
+			r := Matcher{tt.rule, m}
 			if !r.version() {
 				t.Errorf("%v: expected match %#v", name, m)
 			}
 		}
 		for _, m := range tt.noMatch {
-			r := RuleMatcher{tt.rule, m}
+			r := Matcher{tt.rule, m}
 			if r.version() {
 				t.Errorf("%v: expected no match %#v", name, m)
 			}
@@ -204,13 +204,13 @@ func TestOperation(t *testing.T) {
 	}
 	for name, tt := range table {
 		for _, m := range tt.match {
-			r := RuleMatcher{tt.rule, m}
+			r := Matcher{tt.rule, m}
 			if !r.operation() {
 				t.Errorf("%v: expected match %#v", name, m)
 			}
 		}
 		for _, m := range tt.noMatch {
-			r := RuleMatcher{tt.rule, m}
+			r := Matcher{tt.rule, m}
 			if r.operation() {
 				t.Errorf("%v: expected no match %#v", name, m)
 			}
@@ -285,13 +285,13 @@ func TestResource(t *testing.T) {
 	}
 	for name, tt := range table {
 		for _, m := range tt.match {
-			r := RuleMatcher{tt.rule, m}
+			r := Matcher{tt.rule, m}
 			if !r.resource() {
 				t.Errorf("%v: expected match %#v", name, m)
 			}
 		}
 		for _, m := range tt.noMatch {
-			r := RuleMatcher{tt.rule, m}
+			r := Matcher{tt.rule, m}
 			if r.resource() {
 				t.Errorf("%v: expected no match %#v", name, m)
 			}

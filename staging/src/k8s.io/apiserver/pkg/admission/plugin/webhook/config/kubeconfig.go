@@ -14,9 +14,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package webhook
+package config
+
+import (
+	"io"
+
+	"k8s.io/apimachinery/pkg/util/yaml"
+)
 
 // AdmissionConfig holds config data that is unique to each API server.
 type AdmissionConfig struct {
+	// KubeConfigFile is the path to the kubeconfig file.
 	KubeConfigFile string `json:"kubeConfigFile"`
+}
+
+// LoadConfig extract the KubeConfigFile from configFile
+func LoadConfig(configFile io.Reader) (string, error) {
+	var kubeconfigFile string
+	if configFile != nil {
+		// TODO: move this to a versioned configuration file format
+		var config AdmissionConfig
+		d := yaml.NewYAMLOrJSONDecoder(configFile, 4096)
+		err := d.Decode(&config)
+		if err != nil {
+			return "", err
+		}
+		kubeconfigFile = config.KubeConfigFile
+	}
+	return kubeconfigFile, nil
 }

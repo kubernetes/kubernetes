@@ -14,8 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package webhook checks a webhook for configured operation admission
-package webhook
+package rules
 
 import (
 	"strings"
@@ -24,12 +23,14 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 )
 
-type RuleMatcher struct {
+// Matcher determines if the Attr matches the Rule.
+type Matcher struct {
 	Rule v1alpha1.RuleWithOperations
 	Attr admission.Attributes
 }
 
-func (r *RuleMatcher) Matches() bool {
+// Matches returns if the Attr matches the Rule.
+func (r *Matcher) Matches() bool {
 	return r.operation() &&
 		r.group() &&
 		r.version() &&
@@ -49,15 +50,15 @@ func exactOrWildcard(items []string, requested string) bool {
 	return false
 }
 
-func (r *RuleMatcher) group() bool {
+func (r *Matcher) group() bool {
 	return exactOrWildcard(r.Rule.APIGroups, r.Attr.GetResource().Group)
 }
 
-func (r *RuleMatcher) version() bool {
+func (r *Matcher) version() bool {
 	return exactOrWildcard(r.Rule.APIVersions, r.Attr.GetResource().Version)
 }
 
-func (r *RuleMatcher) operation() bool {
+func (r *Matcher) operation() bool {
 	attrOp := r.Attr.GetOperation()
 	for _, op := range r.Rule.Operations {
 		if op == v1alpha1.OperationAll {
@@ -80,7 +81,7 @@ func splitResource(resSub string) (res, sub string) {
 	return parts[0], ""
 }
 
-func (r *RuleMatcher) resource() bool {
+func (r *Matcher) resource() bool {
 	opRes, opSub := r.Attr.GetResource().Resource, r.Attr.GetSubresource()
 	for _, res := range r.Rule.Resources {
 		res, sub := splitResource(res)

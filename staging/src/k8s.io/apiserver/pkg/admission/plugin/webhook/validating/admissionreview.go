@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package webhook delegates admission checks to dynamically configured webhooks.
-package webhook
+package validating
 
 import (
 	admissionv1alpha1 "k8s.io/api/admission/v1alpha1"
@@ -25,6 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 )
 
+// TODO: move this function to a common package
 // createAdmissionReview creates an AdmissionReview for the provided admission.Attributes
 func createAdmissionReview(attr admission.Attributes) admissionv1alpha1.AdmissionReview {
 	gvk := attr.GetKind()

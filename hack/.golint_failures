@@ -542,7 +542,8 @@ staging/src/k8s.io/apiserver/pkg/admission
 staging/src/k8s.io/apiserver/pkg/admission/configuration
 staging/src/k8s.io/apiserver/pkg/admission/plugin/initialization
 staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle
-staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook
+staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config
+staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/validating
 staging/src/k8s.io/apiserver/pkg/apis/apiserver
 staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1
 staging/src/k8s.io/apiserver/pkg/apis/audit

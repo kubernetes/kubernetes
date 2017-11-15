@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package webhook
+package validating
 
 import (
 	"crypto/tls"
@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/rest"
 )
@@ -133,9 +134,17 @@ func TestAdmit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wh.authInfoResolver = newFakeAuthenticationInfoResolver()
-	wh.serviceResolver = fakeServiceResolver{base: *serverURL}
+	cm, err := config.NewClientManager()
+	if err != nil {
+		t.Fatalf("cannot create client manager: %v", err)
+	}
+	cm.SetAuthenticationInfoResolver(newFakeAuthenticationInfoResolver(new(int32)))
+	cm.SetServiceResolver(fakeServiceResolver{base: *serverURL})
+	wh.clientManager = cm
 	wh.SetScheme(scheme)
+	if err = wh.clientManager.Validate(); err != nil {
+		t.Fatal(err)
+	}
 	namespace := "webhook-test"
 	wh.namespaceLister = fakeNamespaceLister{map[string]*corev1.Namespace{
 		namespace: {
@@ -397,8 +406,12 @@ func TestAdmitCachedClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wh.authInfoResolver = newFakeAuthenticationInfoResolver()
-	wh.serviceResolver = fakeServiceResolver{base: *serverURL}
+	cm, err := config.NewClientManager()
+	if err != nil {
+		t.Fatalf("cannot create client manager: %v", err)
+	}
+	cm.SetServiceResolver(fakeServiceResolver{base: *serverURL})
+	wh.clientManager = cm
 	wh.SetScheme(scheme)
 	namespace := "webhook-test"
 	wh.namespaceLister = fakeNamespaceLister{map[string]*corev1.Namespace{
@@ -519,18 +532,23 @@ func TestAdmitCachedClient(t *testing.T) {
 	for _, testcase := range cases {
 		t.Run(testcase.name, func(t *testing.T) {
 			wh.hookSource = &testcase.hookSource
-			wh.authInfoResolver.(*fakeAuthenticationInfoResolver).cachedCount = 0
+			authInfoResolverCount := new(int32)
+			r := newFakeAuthenticationInfoResolver(authInfoResolverCount)
+			wh.clientManager.SetAuthenticationInfoResolver(r)
+			if err = wh.clientManager.Validate(); err != nil {
+				t.Fatal(err)
+			}
 
 			err = wh.Admit(admission.NewAttributesRecord(&object, &oldObject, kind, namespace, testcase.name, resource, subResource, operation, &userInfo))
 			if testcase.expectAllow != (err == nil) {
 				t.Errorf("expected allowed=%v, but got err=%v", testcase.expectAllow, err)
 			}
 
-			if testcase.expectCache && wh.authInfoResolver.(*fakeAuthenticationInfoResolver).cachedCount != 1 {
+			if testcase.expectCache && *authInfoResolverCount != 1 {
 				t.Errorf("expected cacheclient, but got none")
 			}
 
-			if !testcase.expectCache && wh.authInfoResolver.(*fakeAuthenticationInfoResolver).cachedCount != 0 {
+			if !testcase.expectCache && *authInfoResolverCount != 0 {
 				t.Errorf("expected not cacheclient, but got cache")
 			}
 		})
@@ -597,7 +615,7 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func newFakeAuthenticationInfoResolver() *fakeAuthenticationInfoResolver {
+func newFakeAuthenticationInfoResolver(count *int32) *fakeAuthenticationInfoResolver {
 	return &fakeAuthenticationInfoResolver{
 		restConfig: &rest.Config{
 			TLSClientConfig: rest.TLSClientConfig{
@@ -606,16 +624,17 @@ func newFakeAuthenticationInfoResolver() *fakeAuthenticationInfoResolver {
 				KeyData:  clientKey,
 			},
 		},
+		cachedCount: count,
 	}
 }
 
 type fakeAuthenticationInfoResolver struct {
 	restConfig  *rest.Config
-	cachedCount int32
+	cachedCount *int32
 }
 
 func (c *fakeAuthenticationInfoResolver) ClientConfigFor(server string) (*rest.Config, error) {
-	atomic.AddInt32(&c.cachedCount, 1)
+	atomic.AddInt32(c.cachedCount, 1)
 	return c.restConfig, nil
 }
 

@@ -95,7 +95,7 @@ EOF
 echo "// This file was generated using openssl by the gencerts.sh script" >> $outfile
 echo "// and holds raw certificates for the webhook tests." >> $outfile
 echo "" >> $outfile
-echo "package webhook" >> $outfile
+echo "package validating" >> $outfile
 for file in caKey caCert badCAKey badCACert serverKey serverCert clientKey clientCert; do
 	data=$(cat ${file}.pem)
 	echo "" >> $outfile

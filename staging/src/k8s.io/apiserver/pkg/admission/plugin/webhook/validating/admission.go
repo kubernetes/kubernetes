@@ -14,22 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package webhook delegates admission checks to dynamically configured webhooks.
-package webhook
+// Package validating delegates admission checks to dynamically configured
+// validating webhooks.
+package validating
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"net"
-	"net/url"
 	"sync"
 	"time"
 
 	"github.com/golang/glog"
-	lru "github.com/hashicorp/golang-lru"
 
 	admissionv1alpha1 "k8s.io/api/admission/v1alpha1"
 	"k8s.io/api/admissionregistration/v1alpha1"
@@ -42,37 +38,20 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/configuration"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/rules"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/rest"
 )
 
 const (
 	// Name of admission plug-in
-	PluginName       = "GenericAdmissionWebhook"
-	defaultCacheSize = 200
+	PluginName = "GenericAdmissionWebhook"
 )
-
-var (
-	ErrNeedServiceOrURL = errors.New("webhook configuration must have either service or URL")
-)
-
-type ErrCallingWebhook struct {
-	WebhookName string
-	Reason      error
-}
-
-func (e *ErrCallingWebhook) Error() string {
-	if e.Reason != nil {
-		return fmt.Sprintf("failed calling admission webhook %q: %v", e.WebhookName, e.Reason)
-	}
-	return fmt.Sprintf("failed calling admission webhook %q; no further details available", e.WebhookName)
-}
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
@@ -94,26 +73,22 @@ type WebhookSource interface {
 
 // NewGenericAdmissionWebhook returns a generic admission webhook plugin.
 func NewGenericAdmissionWebhook(configFile io.Reader) (*GenericAdmissionWebhook, error) {
-	kubeconfigFile := ""
-	if configFile != nil {
-		// TODO: move this to a versioned configuration file format
-		var config AdmissionConfig
-		d := yaml.NewYAMLOrJSONDecoder(configFile, 4096)
-		err := d.Decode(&config)
-		if err != nil {
-			return nil, err
-		}
-		kubeconfigFile = config.KubeConfigFile
-	}
-	authInfoResolver, err := newDefaultAuthenticationInfoResolver(kubeconfigFile)
+	kubeconfigFile, err := config.LoadConfig(configFile)
 	if err != nil {
 		return nil, err
 	}
 
-	cache, err := lru.New(defaultCacheSize)
+	cm, err := config.NewClientManager()
 	if err != nil {
 		return nil, err
 	}
+	authInfoResolver, err := config.NewDefaultAuthenticationInfoResolver(kubeconfigFile)
+	if err != nil {
+		return nil, err
+	}
+	// Set defaults which may be overridden later.
+	cm.SetAuthenticationInfoResolver(authInfoResolver)
+	cm.SetServiceResolver(config.NewDefaultServiceResolver())
 
 	return &GenericAdmissionWebhook{
 		Handler: admission.NewHandler(
@@ -122,30 +97,19 @@ func NewGenericAdmissionWebhook(configFile io.Reader) (*GenericAdmissionWebhook,
 			admission.Delete,
 			admission.Update,
 		),
-		authInfoResolver: authInfoResolver,
-		serviceResolver:  defaultServiceResolver{},
-		cache:            cache,
+		clientManager: cm,
 	}, nil
 }
 
 // GenericAdmissionWebhook is an implementation of admission.Interface.
 type GenericAdmissionWebhook struct {
 	*admission.Handler
-	hookSource           WebhookSource
-	serviceResolver      ServiceResolver
-	negotiatedSerializer runtime.NegotiatedSerializer
-	namespaceLister      corelisters.NamespaceLister
-	client               clientset.Interface
-	convertor            runtime.ObjectConvertor
-	creator              runtime.ObjectCreater
-
-	authInfoResolver AuthenticationInfoResolver
-	cache            *lru.Cache
-}
-
-// serviceResolver knows how to convert a service reference into an actual location.
-type ServiceResolver interface {
-	ResolveEndpoint(namespace, name string) (*url.URL, error)
+	hookSource      WebhookSource
+	namespaceLister corelisters.NamespaceLister
+	client          clientset.Interface
+	convertor       runtime.ObjectConvertor
+	creator         runtime.ObjectCreater
+	clientManager   config.ClientManager
 }
 
 var (
@@ -153,26 +117,22 @@ var (
 )
 
 // TODO find a better way wire this, but keep this pull small for now.
-func (a *GenericAdmissionWebhook) SetAuthenticationInfoResolverWrapper(wrapper AuthenticationInfoResolverWrapper) {
-	if wrapper != nil {
-		a.authInfoResolver = wrapper(a.authInfoResolver)
-	}
+func (a *GenericAdmissionWebhook) SetAuthenticationInfoResolverWrapper(wrapper config.AuthenticationInfoResolverWrapper) {
+	a.clientManager.SetAuthenticationInfoResolverWrapper(wrapper)
 }
 
 // SetServiceResolver sets a service resolver for the webhook admission plugin.
 // Passing a nil resolver does not have an effect, instead a default one will be used.
-func (a *GenericAdmissionWebhook) SetServiceResolver(sr ServiceResolver) {
-	if sr != nil {
-		a.serviceResolver = sr
-	}
+func (a *GenericAdmissionWebhook) SetServiceResolver(sr config.ServiceResolver) {
+	a.clientManager.SetServiceResolver(sr)
 }
 
 // SetScheme sets a serializer(NegotiatedSerializer) which is derived from the scheme
 func (a *GenericAdmissionWebhook) SetScheme(scheme *runtime.Scheme) {
 	if scheme != nil {
-		a.negotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{
+		a.clientManager.SetNegotiatedSerializer(serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{
 			Serializer: serializer.NewCodecFactory(scheme).LegacyCodec(admissionv1alpha1.SchemeGroupVersion),
-		})
+		}))
 		a.convertor = scheme
 		a.creator = scheme
 	}
@@ -196,11 +156,11 @@ func (a *GenericAdmissionWebhook) ValidateInitialization() error {
 	if a.hookSource == nil {
 		return fmt.Errorf("the GenericAdmissionWebhook admission plugin requires a Kubernetes client to be provided")
 	}
-	if a.negotiatedSerializer == nil {
-		return fmt.Errorf("the GenericAdmissionWebhook admission plugin requires a runtime.Scheme to be provided to derive a serializer")
-	}
 	if a.namespaceLister == nil {
 		return fmt.Errorf("the GenericAdmissionWebhook admission plugin requires a namespaceLister")
+	}
+	if err := a.clientManager.Validate(); err != nil {
+		return fmt.Errorf("the GenericAdmissionWebhook.clientManager is not properly setup: %v", err)
 	}
 	go a.hookSource.Run(wait.NeverStop)
 	return nil
@@ -225,6 +185,7 @@ func (a *GenericAdmissionWebhook) loadConfiguration(attr admission.Attributes) (
 	return hookConfig, nil
 }
 
+// TODO: move this object to a common package
 type versionedAttributes struct {
 	admission.Attributes
 	oldObject runtime.Object
@@ -239,6 +200,7 @@ func (v versionedAttributes) GetOldObject() runtime.Object {
 	return v.oldObject
 }
 
+// TODO: move this method to a common package
 func (a *GenericAdmissionWebhook) convertToGVK(obj runtime.Object, gvk schema.GroupVersionKind) (runtime.Object, error) {
 	// Unlike other resources, custom resources do not have internal version, so
 	// if obj is a custom resource, it should not need conversion.
@@ -315,7 +277,7 @@ func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
 			}
 
 			ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1alpha1.Ignore
-			if callErr, ok := err.(*ErrCallingWebhook); ok {
+			if callErr, ok := err.(*config.ErrCallingWebhook); ok {
 				if ignoreClientCallFailures {
 					glog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
 					utilruntime.HandleError(callErr)
@@ -351,6 +313,7 @@ func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
 	return errs[0]
 }
 
+// TODO: move this method to a common package
 func (a *GenericAdmissionWebhook) getNamespaceLabels(attr admission.Attributes) (map[string]string, error) {
 	// If the request itself is creating or updating a namespace, then get the
 	// labels from attr.Object, because namespaceLister doesn't have the latest
@@ -385,6 +348,7 @@ func (a *GenericAdmissionWebhook) getNamespaceLabels(attr admission.Attributes) 
 	return namespace.Labels, nil
 }
 
+// TODO: move this method to a common package
 // whether the request is exempted by the webhook because of the
 // namespaceSelector of the webhook.
 func (a *GenericAdmissionWebhook) exemptedByNamespaceSelector(h *v1alpha1.Webhook, attr admission.Attributes) (bool, *apierrors.StatusError) {
@@ -417,10 +381,11 @@ func (a *GenericAdmissionWebhook) exemptedByNamespaceSelector(h *v1alpha1.Webhoo
 	return !selector.Matches(labels.Set(namespaceLabels)), nil
 }
 
+// TODO: move this method to a common package
 func (a *GenericAdmissionWebhook) shouldCallHook(h *v1alpha1.Webhook, attr admission.Attributes) (bool, *apierrors.StatusError) {
 	var matches bool
 	for _, r := range h.Rules {
-		m := RuleMatcher{Rule: r, Attr: attr}
+		m := rules.Matcher{Rule: r, Attr: attr}
 		if m.Matches() {
 			matches = true
 			break
@@ -440,13 +405,13 @@ func (a *GenericAdmissionWebhook) shouldCallHook(h *v1alpha1.Webhook, attr admis
 func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.Webhook, attr admission.Attributes) error {
 	// Make the webhook request
 	request := createAdmissionReview(attr)
-	client, err := a.hookClient(h)
+	client, err := a.clientManager.HookClient(h)
 	if err != nil {
-		return &ErrCallingWebhook{WebhookName: h.Name, Reason: err}
+		return &config.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 	response := &admissionv1alpha1.AdmissionReview{}
 	if err := client.Post().Context(ctx).Body(&request).Do().Into(response); err != nil {
-		return &ErrCallingWebhook{WebhookName: h.Name, Reason: err}
+		return &config.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 
 	if response.Status.Allowed {
@@ -456,6 +421,7 @@ func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.Webh
 	return toStatusErr(h.Name, response.Status.Result)
 }
 
+// TODO: move this function to a common package
 // toStatusErr returns a StatusError with information about the webhook controller
 func toStatusErr(name string, result *metav1.Status) *apierrors.StatusError {
 	deniedBy := fmt.Sprintf("admission webhook %q denied the request", name)
@@ -477,77 +443,4 @@ func toStatusErr(name string, result *metav1.Status) *apierrors.StatusError {
 	return &apierrors.StatusError{
 		ErrStatus: *result,
 	}
-}
-
-func (a *GenericAdmissionWebhook) hookClient(h *v1alpha1.Webhook) (*rest.RESTClient, error) {
-	cacheKey, err := json.Marshal(h.ClientConfig)
-	if err != nil {
-		return nil, err
-	}
-	if client, ok := a.cache.Get(string(cacheKey)); ok {
-		return client.(*rest.RESTClient), nil
-	}
-
-	complete := func(cfg *rest.Config) (*rest.RESTClient, error) {
-		cfg.TLSClientConfig.CAData = h.ClientConfig.CABundle
-		cfg.ContentConfig.NegotiatedSerializer = a.negotiatedSerializer
-		cfg.ContentConfig.ContentType = runtime.ContentTypeJSON
-		client, err := rest.UnversionedRESTClientFor(cfg)
-		if err == nil {
-			a.cache.Add(string(cacheKey), client)
-		}
-		return client, err
-	}
-
-	if svc := h.ClientConfig.Service; svc != nil {
-		serverName := svc.Name + "." + svc.Namespace + ".svc"
-		restConfig, err := a.authInfoResolver.ClientConfigFor(serverName)
-		if err != nil {
-			return nil, err
-		}
-		cfg := rest.CopyConfig(restConfig)
-		host := serverName + ":443"
-		cfg.Host = "https://" + host
-		if svc.Path != nil {
-			cfg.APIPath = *svc.Path
-		}
-		cfg.TLSClientConfig.ServerName = serverName
-
-		delegateDialer := cfg.Dial
-		if delegateDialer == nil {
-			delegateDialer = net.Dial
-		}
-		cfg.Dial = func(network, addr string) (net.Conn, error) {
-			if addr == host {
-				u, err := a.serviceResolver.ResolveEndpoint(svc.Namespace, svc.Name)
-				if err != nil {
-					return nil, err
-				}
-				addr = u.Host
-			}
-			return delegateDialer(network, addr)
-		}
-
-		return complete(cfg)
-	}
-
-	if h.ClientConfig.URL == nil {
-		return nil, &ErrCallingWebhook{WebhookName: h.Name, Reason: ErrNeedServiceOrURL}
-	}
-
-	u, err := url.Parse(*h.ClientConfig.URL)
-	if err != nil {
-		return nil, &ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Unparsable URL: %v", err)}
-	}
-
-	restConfig, err := a.authInfoResolver.ClientConfigFor(u.Host)
-	if err != nil {
-		return nil, err
-	}
-
-	cfg := rest.CopyConfig(restConfig)
-	cfg.Host = u.Host
-	cfg.APIPath = u.Path
-
-	return complete(cfg)
 }

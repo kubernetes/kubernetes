@@ -13,7 +13,7 @@ go_test(
     library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/config:go_default_library",
     ],
 )
 
@@ -27,7 +27,7 @@ go_library(
         "//pkg/quota:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/config:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
     ],
