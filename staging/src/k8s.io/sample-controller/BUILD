@@ -9,6 +9,12 @@ go_library(
     importpath = "k8s.io/sample-controller",
     visibility = ["//visibility:private"],
     deps = [
+        "//pkg/apis/samplecontroller/v1alpha1:go_default_library",
+        "//pkg/client/clientset/versioned:go_default_library",
+        "//pkg/client/clientset/versioned/scheme:go_default_library",
+        "//pkg/client/informers/externalversions:go_default_library",
+        "//pkg/client/listers/samplecontroller/v1alpha1:go_default_library",
+        "//pkg/signals:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta2:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -26,12 +32,6 @@ go_library(
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
         "//vendor/k8s.io/client-go/util/workqueue:go_default_library",
-        "//vendor/k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1:go_default_library",
-        "//vendor/k8s.io/sample-controller/pkg/client/clientset/versioned:go_default_library",
-        "//vendor/k8s.io/sample-controller/pkg/client/clientset/versioned/scheme:go_default_library",
-        "//vendor/k8s.io/sample-controller/pkg/client/informers/externalversions:go_default_library",
-        "//vendor/k8s.io/sample-controller/pkg/client/listers/samplecontroller/v1alpha1:go_default_library",
-        "//vendor/k8s.io/sample-controller/pkg/signals:go_default_library",
     ],
 )
 

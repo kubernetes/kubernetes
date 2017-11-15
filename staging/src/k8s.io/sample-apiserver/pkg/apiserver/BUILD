@@ -1,24 +1,17 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["scheme_test.go"],
-    importpath = "k8s.io/sample-apiserver/pkg/apiserver",
-    library = ":go_default_library",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/api/testing/roundtrip:go_default_library"],
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
     srcs = ["apiserver.go"],
     importpath = "k8s.io/sample-apiserver/pkg/apiserver",
+    visibility = ["//visibility:public"],
     deps = [
+        "//pkg/apis/wardle:go_default_library",
+        "//pkg/apis/wardle/install:go_default_library",
+        "//pkg/apis/wardle/v1alpha1:go_default_library",
+        "//pkg/registry:go_default_library",
+        "//pkg/registry/wardle/fischer:go_default_library",
+        "//pkg/registry/wardle/flunder:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -28,13 +21,15 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/version:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle/install:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/registry:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/registry/wardle/fischer:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/registry/wardle/flunder:go_default_library",
     ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["scheme_test.go"],
+    importpath = "k8s.io/sample-apiserver/pkg/apiserver",
+    library = ":go_default_library",
+    deps = ["//vendor/k8s.io/apimachinery/pkg/api/testing/roundtrip:go_default_library"],
 )
 
 filegroup(
@@ -48,4 +43,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

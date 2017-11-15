@@ -1,9 +1,14 @@
-package(default_visibility = ["//visibility:public"])
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
+go_library(
+    name = "go_default_library",
+    srcs = ["allow.go"],
+    importpath = "k8s.io/apiserver/plugin/pkg/authenticator/password/allow",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/authentication/authenticator:go_default_library",
+        "//pkg/authentication/user:go_default_library",
+    ],
 )
 
 go_test(
@@ -11,16 +16,6 @@ go_test(
     srcs = ["allow_test.go"],
     importpath = "k8s.io/apiserver/plugin/pkg/authenticator/password/allow",
     library = ":go_default_library",
-)
-
-go_library(
-    name = "go_default_library",
-    srcs = ["allow.go"],
-    importpath = "k8s.io/apiserver/plugin/pkg/authenticator/password/allow",
-    deps = [
-        "//vendor/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
-    ],
 )
 
 filegroup(
@@ -34,4 +29,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

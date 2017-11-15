@@ -19,13 +19,13 @@ go_test(
     importpath = "k8s.io/apiserver/pkg/admission",
     library = ":go_default_library",
     deps = [
+        "//pkg/apis/apiserver:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/prometheus/client_model/go:go_default_library",
         "//vendor/k8s.io/api/admissionregistration/v1alpha1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/apis/apiserver:go_default_library",
     ],
 )
 
@@ -43,6 +43,10 @@ go_library(
     ],
     importpath = "k8s.io/apiserver/pkg/admission",
     deps = [
+        "//pkg/apis/apiserver:go_default_library",
+        "//pkg/apis/apiserver/install:go_default_library",
+        "//pkg/apis/apiserver/v1alpha1:go_default_library",
+        "//pkg/authentication/user:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
@@ -56,10 +60,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/apis/apiserver:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/apis/apiserver/install:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
     ],
 )
 

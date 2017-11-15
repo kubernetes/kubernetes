@@ -6,8 +6,8 @@ go_library(
     importpath = "k8s.io/sample-controller/pkg/client/informers/externalversions/samplecontroller",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/k8s.io/sample-controller/pkg/client/informers/externalversions/internalinterfaces:go_default_library",
-        "//vendor/k8s.io/sample-controller/pkg/client/informers/externalversions/samplecontroller/v1alpha1:go_default_library",
+        "//pkg/client/informers/externalversions/internalinterfaces:go_default_library",
+        "//pkg/client/informers/externalversions/samplecontroller/v1alpha1:go_default_library",
     ],
 )
 

@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_test")
 
 go_test(
     name = "go_default_test",
@@ -14,13 +9,12 @@ go_test(
         "validation_test.go",
     ],
     importpath = "k8s.io/apiextensions-apiserver/test/integration",
-    tags = ["integration"],
     deps = [
+        "//pkg/apis/apiextensions/v1beta1:go_default_library",
+        "//pkg/apiserver:go_default_library",
+        "//test/integration/testserver:go_default_library",
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
-        "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
-        "//vendor/k8s.io/apiextensions-apiserver/pkg/apiserver:go_default_library",
-        "//vendor/k8s.io/apiextensions-apiserver/test/integration/testserver:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -48,4 +42,5 @@ filegroup(
         "//staging/src/k8s.io/apiextensions-apiserver/test/integration/testserver:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

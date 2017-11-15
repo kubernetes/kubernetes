@@ -1,0 +1,19 @@
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics:all-srcs",
+        "//staging/src/k8s.io/metrics/pkg/apis/metrics:all-srcs",
+        "//staging/src/k8s.io/metrics/pkg/client/clientset_generated/clientset:all-srcs",
+        "//staging/src/k8s.io/metrics/pkg/client/custom_metrics:all-srcs",
+    ],
+    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
+)

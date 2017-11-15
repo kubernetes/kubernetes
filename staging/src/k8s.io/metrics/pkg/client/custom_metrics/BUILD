@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -12,7 +7,9 @@ go_library(
         "interfaces.go",
     ],
     importpath = "k8s.io/metrics/pkg/client/custom_metrics",
+    visibility = ["//visibility:public"],
     deps = [
+        "//pkg/apis/custom_metrics/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
@@ -21,7 +18,6 @@ go_library(
         "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
-        "//vendor/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1:go_default_library",
     ],
 )
 
@@ -39,4 +35,5 @@ filegroup(
         "//staging/src/k8s.io/metrics/pkg/client/custom_metrics/fake:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

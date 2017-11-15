@@ -11,6 +11,8 @@ go_library(
     importpath = "k8s.io/sample-apiserver/pkg/client/clientset/internalversion/typed/wardle/internalversion/fake",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/apis/wardle:go_default_library",
+        "//pkg/client/clientset/internalversion/typed/wardle/internalversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
@@ -18,8 +20,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/testing:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/client/clientset/internalversion/typed/wardle/internalversion:go_default_library",
     ],
 )
 

@@ -1,14 +1,10 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = ["doc.go"],
     importpath = "k8s.io/apiserver/plugin/pkg/authenticator/password",
+    visibility = ["//visibility:public"],
 )
 
 filegroup(
@@ -27,4 +23,5 @@ filegroup(
         "//staging/src/k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
