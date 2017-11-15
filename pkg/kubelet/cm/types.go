@@ -19,6 +19,8 @@ package cm
 import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // ResourceConfig holds information about all the supported cgroup resource parameters.
@@ -120,4 +122,8 @@ type PodContainerManager interface {
 
 	// GetAllPodsFromCgroups enumerates the set of pod uids to their associated cgroup based on state of cgroupfs system.
 	GetAllPodsFromCgroups() (map[types.UID]CgroupName, error)
+
+	// GetResources returns RunContainerOptions with devices, mounts, and env fields populated for
+	// extended resources required by container.
+	GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error)
 }

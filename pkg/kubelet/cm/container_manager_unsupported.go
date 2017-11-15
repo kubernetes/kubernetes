@@ -78,10 +78,6 @@ func (cm *unsupportedContainerManager) NewPodContainerManager() PodContainerMana
 	return &unsupportedPodContainerManager{}
 }
 
-func (cm *unsupportedContainerManager) GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
-	return &kubecontainer.RunContainerOptions{}, nil
-}
-
 func (cm *unsupportedContainerManager) UpdatePluginResources(*schedulercache.NodeInfo, *lifecycle.PodAdmitAttributes) error {
 	return nil
 }

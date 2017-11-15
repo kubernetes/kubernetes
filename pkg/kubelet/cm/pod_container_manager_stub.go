@@ -19,6 +19,8 @@ package cm
 import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 type podContainerManagerStub struct {
@@ -48,4 +50,8 @@ func (m *podContainerManagerStub) ReduceCPULimits(_ CgroupName) error {
 
 func (m *podContainerManagerStub) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
 	return nil, nil
+}
+
+func (cm *podContainerManagerStub) GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
+	return &kubecontainer.RunContainerOptions{}, nil
 }

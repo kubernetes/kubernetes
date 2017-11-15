@@ -382,7 +382,8 @@ func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) string {
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
 // the container runtime to set parameters for launching a container.
 func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
-	opts, err := kl.containerManager.GetResources(pod, container)
+	pcm := kl.containerManager.NewPodContainerManager()
+	opts, err := pcm.GetResources(pod, container)
 	if err != nil {
 		return nil, err
 	}

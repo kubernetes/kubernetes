@@ -28,6 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	"k8s.io/kubernetes/pkg/kubelet/cm/deviceplugin"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 const (
@@ -45,6 +47,8 @@ type podContainerManagerImpl struct {
 	// cgroupManager is the cgroup Manager Object responsible for managing all
 	// pod cgroups.
 	cgroupManager CgroupManager
+	// devicePluginHandler exports and allocates devices reported by device plugins.
+	devicePluginHandler deviceplugin.Handler
 }
 
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
@@ -112,6 +116,22 @@ func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (CgroupName, 
 	cgroupfsName := m.cgroupManager.Name(cgroupName)
 
 	return cgroupName, cgroupfsName
+}
+
+// GetResources returns RunContainerOptions with devices, mounts, and env fields populated for
+// extended resources required by container.
+func (cm *podContainerManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
+	opts := &kubecontainer.RunContainerOptions{}
+	// Allocate should already be called during predicateAdmitHandler.Admit(),
+	// just try to fetch device runtime information from cached state here
+	devOpts := cm.devicePluginHandler.GetDeviceRunContainerOptions(pod, container)
+	if devOpts == nil {
+		return opts, nil
+	}
+	opts.Devices = append(opts.Devices, devOpts.Devices...)
+	opts.Mounts = append(opts.Mounts, devOpts.Mounts...)
+	opts.Envs = append(opts.Envs, devOpts.Envs...)
+	return opts, nil
 }
 
 // Scan through the whole cgroup directory and kill all processes either
@@ -267,5 +287,9 @@ func (m *podContainerManagerNoop) ReduceCPULimits(_ CgroupName) error {
 }
 
 func (m *podContainerManagerNoop) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
+	return nil, nil
+}
+
+func (cm *podContainerManagerNoop) GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
 	return nil, nil
 }
