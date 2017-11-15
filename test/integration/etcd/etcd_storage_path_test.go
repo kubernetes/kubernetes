@@ -289,6 +289,13 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	},
 	// --
 
+	// k8s.io/kubernetes/pkg/apis/storage/v1alpha1
+	gvr("storage.k8s.io", "v1alpha1", "volumeattachments"): {
+		stub:             `{"metadata": {"name": "va1"}, "spec": {"attacher": "gce", "nodeName": "localhost", "source": {"persistentVolumeName": "pv1"}}}`,
+		expectedEtcdPath: "/registry/volumeattachments/va1",
+	},
+	// --
+
 	// k8s.io/kubernetes/pkg/apis/storage/v1beta1
 	gvr("storage.k8s.io", "v1beta1", "storageclasses"): {
 		stub:             `{"metadata": {"name": "sc1"}, "provisioner": "aws"}`,

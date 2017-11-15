@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -156,4 +157,282 @@ func TestAlphaExpandPersistentVolumesFeatureValidation(t *testing.T) {
 		t.Errorf("expected failure, but got no error")
 	}
 
+}
+
+func TestVolumeAttachmentValidation(t *testing.T) {
+	volumeName := "pv-name"
+	empty := ""
+	successCases := []storage.VolumeAttachment{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+				NodeName: "mynode",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo-with-status"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+				NodeName: "mynode",
+			},
+			Status: storage.VolumeAttachmentStatus{
+				Attached: true,
+				AttachmentMetadata: map[string]string{
+					"foo": "bar",
+				},
+				AttachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+				DetachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+			},
+		},
+	}
+
+	for _, volumeAttachment := range successCases {
+		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+	errorCases := []storage.VolumeAttachment{
+		{
+			// Empty attacher name
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "",
+				NodeName: "mynode",
+			},
+		},
+		{
+			// Invalid attacher name
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "invalid!@#$%^&*()",
+				NodeName: "mynode",
+			},
+		},
+		{
+			// Empty node name
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "",
+			},
+		},
+		{
+			// No volume name
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: nil,
+				},
+			},
+		},
+		{
+			// Empty volume name
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &empty,
+				},
+			},
+		},
+		{
+			// Too long error message
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+			},
+			Status: storage.VolumeAttachmentStatus{
+				Attached: true,
+				AttachmentMetadata: map[string]string{
+					"foo": "bar",
+				},
+				AttachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+				DetachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: strings.Repeat("a", maxVolumeErrorMessageSize+1),
+				},
+			},
+		},
+		{
+			// Too long metadata
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+			},
+			Status: storage.VolumeAttachmentStatus{
+				Attached: true,
+				AttachmentMetadata: map[string]string{
+					"foo": strings.Repeat("a", maxAttachedVolumeMetadataSize),
+				},
+				AttachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+				DetachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+			},
+		},
+	}
+
+	for _, volumeAttachment := range errorCases {
+		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) == 0 {
+			t.Errorf("Expected failure for test: %v", volumeAttachment)
+		}
+	}
+}
+
+func TestVolumeAttachmentUpdateValidation(t *testing.T) {
+	volumeName := "foo"
+	newVolumeName := "bar"
+
+	old := storage.VolumeAttachment{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+		Spec: storage.VolumeAttachmentSpec{
+			Attacher: "myattacher",
+			Source: storage.VolumeAttachmentSource{
+				PersistentVolumeName: &volumeName,
+			},
+			NodeName: "mynode",
+		},
+	}
+	successCases := []storage.VolumeAttachment{
+		{
+			// no change
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+				NodeName: "mynode",
+			},
+		},
+		{
+			// modify status
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+				NodeName: "mynode",
+			},
+			Status: storage.VolumeAttachmentStatus{
+				Attached: true,
+				AttachmentMetadata: map[string]string{
+					"foo": "bar",
+				},
+				AttachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+				DetachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+			},
+		},
+	}
+
+	for _, volumeAttachment := range successCases {
+		if errs := ValidateVolumeAttachmentUpdate(&volumeAttachment, &old); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := []storage.VolumeAttachment{
+		{
+			// change attacher
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "another-attacher",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+				NodeName: "mynode",
+			},
+		},
+		{
+			// change volume
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &newVolumeName,
+				},
+				NodeName: "mynode",
+			},
+		},
+		{
+			// change node
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+				NodeName: "anothernode",
+			},
+		},
+		{
+			// add invalid status
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+				NodeName: "mynode",
+			},
+			Status: storage.VolumeAttachmentStatus{
+				Attached: true,
+				AttachmentMetadata: map[string]string{
+					"foo": "bar",
+				},
+				AttachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: strings.Repeat("a", maxAttachedVolumeMetadataSize),
+				},
+				DetachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+			},
+		},
+	}
+
+	for _, volumeAttachment := range errorCases {
+		if errs := ValidateVolumeAttachmentUpdate(&volumeAttachment, &old); len(errs) == 0 {
+			t.Errorf("Expected failure for test: %v", volumeAttachment)
+		}
+	}
 }

@@ -67,6 +67,7 @@ PACKAGES=(
   k8s.io/api/imagepolicy/v1alpha1
   k8s.io/api/scheduling/v1alpha1
   k8s.io/api/settings/v1alpha1
+  k8s.io/api/storage/v1alpha1
   k8s.io/api/storage/v1beta1
   k8s.io/api/storage/v1
   k8s.io/api/admissionregistration/v1alpha1
