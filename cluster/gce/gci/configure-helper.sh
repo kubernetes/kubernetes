@@ -745,12 +745,6 @@ function assemble-docker-flags {
     docker_opts+=" --live-restore=false"
   fi
 
-  # Override docker storage driver if the environment variable is set
-
-  if [[ -n "${DOCKER_STORAGE_DRIVER:-}" ]]; then
-    docker_opts+=" --storage-driver=${DOCKER_STORAGE_DRIVER}"
-  fi
-
   echo "DOCKER_OPTS=\"${docker_opts} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
 
   if [[ "${use_net_plugin}" == "true" ]]; then

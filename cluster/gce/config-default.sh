@@ -228,11 +228,6 @@ if [[ -n "${DISABLE_DOCKER_LIVE_RESTORE:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} DISABLE_DOCKER_LIVE_RESTORE"
 fi
 
-# Override default docker storage driver.
-if [[ -n "${DOCKER_STORAGE_DRIVER:-}" ]]; then
-  PROVIDER_VARS="${PROVIDER_VARS:-} DOCKER_STORAGE_DRIVER"
-fi
-
 # Admission Controllers to invoke prior to persisting objects in cluster
 # If we included ResourceQuota, we should keep it at the end of the list to prevent incrementing quota usage prematurely.
 ADMISSION_CONTROL=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
