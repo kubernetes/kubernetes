@@ -506,7 +506,7 @@ func TestProcessServiceDeletion(t *testing.T) {
 			},
 			expectedFn: func(svcErr error, retryDuration time.Duration) error {
 
-				expectedError := "Service external-balancer not in cache even though the watcher thought it was. Ignoring the deletion."
+				expectedError := "service external-balancer not in cache even though the watcher thought it was. Ignoring the deletion"
 				if svcErr == nil || svcErr.Error() != expectedError {
 					//cannot be nil or Wrong error message
 					return fmt.Errorf("Expected=%v Obtained=%v", expectedError, svcErr)
