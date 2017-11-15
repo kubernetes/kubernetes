@@ -198,18 +198,6 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		return err
 	}
 
-	if options.Prune {
-		mapper, _, err := f.UnstructuredObject()
-		if err != nil {
-			return err
-		}
-
-		options.PruneResources, err = parsePruneResources(mapper, cmdutil.GetFlagStringArray(cmd, "prune-whitelist"))
-		if err != nil {
-			return err
-		}
-	}
-
 	// include the uninitialized objects by default if --prune is true
 	// unless explicitly set --include-uninitialized=false
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, options.Prune)
@@ -225,6 +213,13 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		Do()
 	if err := r.Err(); err != nil {
 		return err
+	}
+
+	if options.Prune {
+		options.PruneResources, err = parsePruneResources(r.Mapper().RESTMapper, cmdutil.GetFlagStringArray(cmd, "prune-whitelist"))
+		if err != nil {
+			return err
+		}
 	}
 
 	dryRun := cmdutil.GetFlagBool(cmd, "dry-run")

@@ -286,11 +286,7 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout tim
 		}
 
 	default:
-		gvks, _, err := legacyscheme.Scheme.ObjectKinds(object)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("cannot get the logs from %v", gvks[0])
+		return nil, fmt.Errorf("cannot get the logs from %T", object)
 	}
 
 	sortBy := func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) }
@@ -414,11 +410,7 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout tim
 		return t, nil
 
 	default:
-		gvks, _, err := legacyscheme.Scheme.ObjectKinds(object)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("cannot attach to %v: not implemented", gvks[0])
+		return nil, fmt.Errorf("cannot attach to %T: not implemented", object)
 	}
 
 	sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }

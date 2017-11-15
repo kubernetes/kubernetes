@@ -308,10 +308,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 		if o.local {
 			mapper, _ = f.Object()
 		} else {
-			mapper, _, err = f.UnstructuredObject()
-			if err != nil {
-				return err
-			}
+			mapper, _ = f.UnstructuredObject()
 		}
 		if o.outputFormat != "" {
 			return f.PrintObject(cmd, o.local, mapper, outputObj, o.out)

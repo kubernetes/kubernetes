@@ -310,11 +310,7 @@ func (f *ring0Factory) MapBasedSelectorForObject(object runtime.Object) (string,
 		}
 		return kubectl.MakeLabels(t.Spec.Selector.MatchLabels), nil
 	default:
-		gvks, _, err := legacyscheme.Scheme.ObjectKinds(object)
-		if err != nil {
-			return "", err
-		}
-		return "", fmt.Errorf("cannot extract pod selector from %v", gvks[0])
+		return "", fmt.Errorf("cannot extract pod selector from %T", object)
 	}
 }
 
@@ -332,11 +328,7 @@ func (f *ring0Factory) PortsForObject(object runtime.Object) ([]string, error) {
 	case *extensions.ReplicaSet:
 		return getPorts(t.Spec.Template.Spec), nil
 	default:
-		gvks, _, err := legacyscheme.Scheme.ObjectKinds(object)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("cannot extract ports from %v", gvks[0])
+		return nil, fmt.Errorf("cannot extract ports from %T", object)
 	}
 }
 
@@ -354,11 +346,7 @@ func (f *ring0Factory) ProtocolsForObject(object runtime.Object) (map[string]str
 	case *extensions.ReplicaSet:
 		return getProtocols(t.Spec.Template.Spec), nil
 	default:
-		gvks, _, err := legacyscheme.Scheme.ObjectKinds(object)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("cannot extract protocols from %v", gvks[0])
+		return nil, fmt.Errorf("cannot extract protocols from %T", object)
 	}
 }
 

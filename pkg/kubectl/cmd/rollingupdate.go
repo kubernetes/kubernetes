@@ -192,7 +192,7 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 	var keepOldName bool
 	var replicasDefaulted bool
 
-	mapper, typer := f.Object()
+	mapper, _ := f.Object()
 
 	if len(filename) != 0 {
 		schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
@@ -223,11 +223,8 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 		}
 		newRc, ok = obj.(*api.ReplicationController)
 		if !ok {
-			if gvks, _, err := typer.ObjectKinds(obj); err == nil {
-				return cmdutil.UsageErrorf(cmd, "%s contains a %v not a ReplicationController", filename, gvks[0])
-			}
-			glog.V(4).Infof("Object %#v is not a ReplicationController", obj)
-			return cmdutil.UsageErrorf(cmd, "%s does not specify a valid ReplicationController", filename)
+			glog.V(4).Infof("Object %T is not a ReplicationController", obj)
+			return cmdutil.UsageErrorf(cmd, "%s contains a %v not a ReplicationController", filename, obj.GetObjectKind().GroupVersionKind())
 		}
 		infos, err := request.Infos()
 		if err != nil || len(infos) != 1 {

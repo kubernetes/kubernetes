@@ -222,11 +222,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			if len(options.OutputFormat) > 0 && options.OutputFormat != "name" {
 				return f.PrintResourceInfoForCommand(cmd, info, out)
 			}
-			mapper, _, err := f.UnstructuredObject()
-			if err != nil {
-				return err
-			}
-			f.PrintSuccess(mapper, options.OutputFormat == "name", out, info.Mapping.Resource, info.Name, false, dataChangedMsg)
+			f.PrintSuccess(r.Mapper().RESTMapper, options.OutputFormat == "name", out, info.Mapping.Resource, info.Name, false, dataChangedMsg)
 
 			// if object was not successfully patched, exit with error code 1
 			if !didPatch {

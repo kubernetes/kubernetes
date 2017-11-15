@@ -112,7 +112,7 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 	o.Codec = f.JSONEncoder()
 
 	var err error
-	o.Mapper, o.Typer, err = f.UnstructuredObject()
+	o.Mapper, o.Typer = f.UnstructuredObject()
 	if err != nil {
 		return err
 	}
