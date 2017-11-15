@@ -17,9 +17,12 @@ limitations under the License.
 package predicates
 
 import (
+	"strings"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	schedutil "k8s.io/kubernetes/plugin/pkg/scheduler/util"
 )
 
 // FindLabelsInSet gets as many key/value pairs as possible out of a label set.
@@ -88,4 +91,70 @@ func GetEquivalencePod(pod *v1.Pod) interface{} {
 // EquivalencePod is a group of pod attributes which can be reused as equivalence to schedule other pods.
 type EquivalencePod struct {
 	ControllerRef metav1.OwnerReference
+}
+
+type hostPortInfo struct {
+	protocol string
+	hostIP   string
+	hostPort string
+}
+
+// decode decodes string ("protocol/hostIP/hostPort") to *hostPortInfo object.
+func decode(info string) *hostPortInfo {
+	hostPortInfoSlice := strings.Split(info, "/")
+
+	protocol := hostPortInfoSlice[0]
+	hostIP := hostPortInfoSlice[1]
+	hostPort := hostPortInfoSlice[2]
+
+	return &hostPortInfo{
+		protocol: protocol,
+		hostIP:   hostIP,
+		hostPort: hostPort,
+	}
+}
+
+// specialPortConflictCheck detects whether specailHostPort(whose hostIP is 0.0.0.0) is conflict with otherHostPorts.
+// return true if we have a conflict.
+func specialPortConflictCheck(specialHostPort string, otherHostPorts map[string]bool) bool {
+	specialHostPortInfo := decode(specialHostPort)
+
+	if specialHostPortInfo.hostIP == schedutil.DefaultBindAllHostIP {
+		// loop through all the otherHostPorts to see if there exists a conflict
+		for hostPortItem := range otherHostPorts {
+			hostPortInfo := decode(hostPortItem)
+
+			// if there exists one hostPortItem which has the same hostPort and protocol with the specialHostPort, that will cause a conflict
+			if specialHostPortInfo.hostPort == hostPortInfo.hostPort && specialHostPortInfo.protocol == hostPortInfo.protocol {
+				return true
+			}
+		}
+
+	}
+
+	return false
+}
+
+// portsConflict check whether existingPorts and wantPorts conflict with each other
+// return true if we have a conflict
+func portsConflict(existingPorts, wantPorts map[string]bool) bool {
+
+	for existingPort := range existingPorts {
+		if specialPortConflictCheck(existingPort, wantPorts) {
+			return true
+		}
+	}
+
+	for wantPort := range wantPorts {
+		if specialPortConflictCheck(wantPort, existingPorts) {
+			return true
+		}
+
+		// general check hostPort conflict procedure for hostIP is not 0.0.0.0
+		if existingPorts[wantPort] {
+			return true
+		}
+	}
+
+	return false
 }
