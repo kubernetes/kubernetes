@@ -119,19 +119,22 @@ type Config struct {
 	MaximumLoadBalancerRuleCount int `json:"maximumLoadBalancerRuleCount"`
 }
 
-type iVirtualMachinesClient interface {
+// VirtualMachinesClient defines needed functions for azure network.VirtualMachinesClient
+type VirtualMachinesClient interface {
 	CreateOrUpdate(resourceGroupName string, VMName string, parameters compute.VirtualMachine, cancel <-chan struct{}) (<-chan compute.VirtualMachine, <-chan error)
 	Get(resourceGroupName string, VMName string, expand compute.InstanceViewTypes) (result compute.VirtualMachine, err error)
 	List(resourceGroupName string) (result compute.VirtualMachineListResult, err error)
 	ListNextResults(lastResults compute.VirtualMachineListResult) (result compute.VirtualMachineListResult, err error)
 }
 
-type iInterfacesClient interface {
+// InterfacesClient defines needed functions for azure network.InterfacesClient
+type InterfacesClient interface {
 	CreateOrUpdate(resourceGroupName string, networkInterfaceName string, parameters network.Interface, cancel <-chan struct{}) (<-chan network.Interface, <-chan error)
 	Get(resourceGroupName string, networkInterfaceName string, expand string) (result network.Interface, err error)
 }
 
-type iLoadBalancersClient interface {
+// LoadBalancersClient defines needed functions for azure network.LoadBalancersClient
+type LoadBalancersClient interface {
 	CreateOrUpdate(resourceGroupName string, loadBalancerName string, parameters network.LoadBalancer, cancel <-chan struct{}) (<-chan network.LoadBalancer, <-chan error)
 	Delete(resourceGroupName string, loadBalancerName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
 	Get(resourceGroupName string, loadBalancerName string, expand string) (result network.LoadBalancer, err error)
@@ -139,7 +142,8 @@ type iLoadBalancersClient interface {
 	ListNextResults(lastResult network.LoadBalancerListResult) (result network.LoadBalancerListResult, err error)
 }
 
-type iPublicIPAddressesClient interface {
+// PublicIPAddressesClient defines needed functions for azure network.PublicIPAddressesClient
+type PublicIPAddressesClient interface {
 	CreateOrUpdate(resourceGroupName string, publicIPAddressName string, parameters network.PublicIPAddress, cancel <-chan struct{}) (<-chan network.PublicIPAddress, <-chan error)
 	Delete(resourceGroupName string, publicIPAddressName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
 	Get(resourceGroupName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error)
@@ -147,14 +151,16 @@ type iPublicIPAddressesClient interface {
 	ListNextResults(lastResults network.PublicIPAddressListResult) (result network.PublicIPAddressListResult, err error)
 }
 
-type iSubnetsClient interface {
+// SubnetsClient defines needed functions for azure network.SubnetsClient
+type SubnetsClient interface {
 	CreateOrUpdate(resourceGroupName string, virtualNetworkName string, subnetName string, subnetParameters network.Subnet, cancel <-chan struct{}) (<-chan network.Subnet, <-chan error)
 	Delete(resourceGroupName string, virtualNetworkName string, subnetName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
 	Get(resourceGroupName string, virtualNetworkName string, subnetName string, expand string) (result network.Subnet, err error)
 	List(resourceGroupName string, virtualNetworkName string) (result network.SubnetListResult, err error)
 }
 
-type iSecurityGroupsClient interface {
+// SecurityGroupsClient defines needed functions for azure network.SecurityGroupsClient
+type SecurityGroupsClient interface {
 	CreateOrUpdate(resourceGroupName string, networkSecurityGroupName string, parameters network.SecurityGroup, cancel <-chan struct{}) (<-chan network.SecurityGroup, <-chan error)
 	Delete(resourceGroupName string, networkSecurityGroupName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
 	Get(resourceGroupName string, networkSecurityGroupName string, expand string) (result network.SecurityGroup, err error)
@@ -166,13 +172,13 @@ type Cloud struct {
 	Config
 	Environment              azure.Environment
 	RoutesClient             network.RoutesClient
-	SubnetsClient            iSubnetsClient
-	InterfacesClient         iInterfacesClient
+	SubnetsClient            SubnetsClient
+	InterfacesClient         InterfacesClient
 	RouteTablesClient        network.RouteTablesClient
-	LoadBalancerClient       iLoadBalancersClient
-	PublicIPAddressesClient  iPublicIPAddressesClient
-	SecurityGroupsClient     iSecurityGroupsClient
-	VirtualMachinesClient    iVirtualMachinesClient
+	LoadBalancerClient       LoadBalancersClient
+	PublicIPAddressesClient  PublicIPAddressesClient
+	SecurityGroupsClient     SecurityGroupsClient
+	VirtualMachinesClient    VirtualMachinesClient
 	StorageAccountClient     storage.AccountsClient
 	DisksClient              disk.DisksClient
 	operationPollRateLimiter flowcontrol.RateLimiter
