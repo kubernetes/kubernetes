@@ -727,13 +727,13 @@ func TestReconcilePublicIPWithNewService(t *testing.T) {
 	az := getTestCloud()
 	svc := getTestService("servicea", v1.ProtocolTCP, 80, 443)
 
-	pip, err := az.reconcilePublicIP(testClusterName, &svc, true /* wantLB*/)
+	pip, err := az.reconcilePublicIP(testClusterName, &svc, true /* wantLb*/)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
 	validatePublicIP(t, pip, &svc, true)
 
-	pip2, err := az.reconcilePublicIP(testClusterName, &svc, true /* wantLB */)
+	pip2, err := az.reconcilePublicIP(testClusterName, &svc, true /* wantLb */)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -748,7 +748,7 @@ func TestReconcilePublicIPRemoveService(t *testing.T) {
 	az := getTestCloud()
 	svc := getTestService("servicea", v1.ProtocolTCP, 80, 443)
 
-	pip, err := az.reconcilePublicIP(testClusterName, &svc, true /* wantLB*/)
+	pip, err := az.reconcilePublicIP(testClusterName, &svc, true /* wantLb*/)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -756,7 +756,7 @@ func TestReconcilePublicIPRemoveService(t *testing.T) {
 	validatePublicIP(t, pip, &svc, true)
 
 	// Remove the service
-	pip, err = az.reconcilePublicIP(testClusterName, &svc, false /* wantLB */)
+	pip, err = az.reconcilePublicIP(testClusterName, &svc, false /* wantLb */)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -768,7 +768,7 @@ func TestReconcilePublicIPWithInternalService(t *testing.T) {
 	az := getTestCloud()
 	svc := getInternalTestService("servicea", 80, 443)
 
-	pip, err := az.reconcilePublicIP(testClusterName, &svc, true /* wantLB*/)
+	pip, err := az.reconcilePublicIP(testClusterName, &svc, true /* wantLb*/)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -780,7 +780,7 @@ func TestReconcilePublicIPWithExternalAndInternalSwitch(t *testing.T) {
 	az := getTestCloud()
 	svc := getInternalTestService("servicea", 80, 443)
 
-	pip, err := az.reconcilePublicIP(testClusterName, &svc, true /* wantLB*/)
+	pip, err := az.reconcilePublicIP(testClusterName, &svc, true /* wantLb*/)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -788,14 +788,14 @@ func TestReconcilePublicIPWithExternalAndInternalSwitch(t *testing.T) {
 
 	// Update to external service
 	svcUpdated := getTestService("servicea", v1.ProtocolTCP, 80)
-	pip, err = az.reconcilePublicIP(testClusterName, &svcUpdated, true /* wantLB*/)
+	pip, err = az.reconcilePublicIP(testClusterName, &svcUpdated, true /* wantLb*/)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
 	validatePublicIP(t, pip, &svcUpdated, true)
 
 	// Update to internal service again
-	pip, err = az.reconcilePublicIP(testClusterName, &svc, true /* wantLB*/)
+	pip, err = az.reconcilePublicIP(testClusterName, &svc, true /* wantLb*/)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -1214,9 +1214,9 @@ func describeFIPs(frontendIPs []network.FrontendIPConfiguration) string {
 	return description
 }
 
-func validatePublicIP(t *testing.T, publicIP *network.PublicIPAddress, service *v1.Service, wantLB bool) {
+func validatePublicIP(t *testing.T, publicIP *network.PublicIPAddress, service *v1.Service, wantLb bool) {
 	isInternal := requiresInternalLoadBalancer(service)
-	if isInternal || !wantLB {
+	if isInternal || !wantLb {
 		if publicIP != nil {
 			t.Errorf("Expected publicIP resource to be nil, when it is an internal service or doesn't want LB")
 		}

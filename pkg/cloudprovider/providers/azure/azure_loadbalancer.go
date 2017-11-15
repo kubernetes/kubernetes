@@ -62,7 +62,6 @@ func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (statu
 		glog.V(5).Infof("getloadbalancer (cluster:%s) (service:%s)- IP doesn't exist in any of the lbs", clusterName, serviceName)
 		return nil, false, fmt.Errorf("Service(%s) - Loadbalancer not found", serviceName)
 	}
-
 	return status, true, nil
 }
 
@@ -320,17 +319,17 @@ func (az *Cloud) ensurePublicIPExists(serviceName, pipName, domainNameLabel stri
 // This ensures load balancer exists and the frontend ip config is setup.
 // This also reconciles the Service's Ports  with the LoadBalancer config.
 // This entails adding rules/probes for expected Ports and removing stale rules/ports.
-// nodes only used if wantLB is true
+// nodes only used if wantLb is true
 func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node, wantLb bool) (*network.LoadBalancer, error) {
 	isInternal := requiresInternalLoadBalancer(service)
 	serviceName := getServiceName(service)
-	glog.V(2).Infof("reconcileLoadBalancer(%s) - wantLB(%t): started", serviceName, wantLb)
+	glog.V(2).Infof("reconcileLoadBalancer(%s) - wantLb(%t): started", serviceName, wantLb)
 	lb, _, _, err := az.getServiceLoadBalancer(service, clusterName, nodes, wantLb)
 	if err != nil {
 		return nil, err
 	}
 	lbName := *lb.Name
-	glog.V(2).Infof("reconcileLoadBalancer(%s): lb(%s) wantLB(%t) resolved load balancer name", serviceName, lbName, wantLb)
+	glog.V(2).Infof("reconcileLoadBalancer(%s): lb(%s) wantLb(%t) resolved load balancer name", serviceName, lbName, wantLb)
 	lbFrontendIPConfigName := getFrontendIPConfigName(service, subnet(service))
 	lbFrontendIPConfigID := az.getFrontendIPConfigID(lbName, lbFrontendIPConfigName)
 	lbBackendPoolName := getBackendPoolName(clusterName)
