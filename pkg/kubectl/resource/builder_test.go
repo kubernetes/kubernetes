@@ -277,7 +277,7 @@ func newDefaultBuilderWith(client ClientMapper) *Builder {
 		},
 		nil,
 		categories.LegacyCategoryExpander,
-	)
+	).Internal()
 }
 
 func TestPathBuilderAndVersionedObjectNotDefaulted(t *testing.T) {
@@ -628,7 +628,7 @@ func TestMultipleResourceByTheSameName(t *testing.T) {
 
 func TestRequestModifier(t *testing.T) {
 	var got *rest.Request
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClientWith("test", t, nil), corev1Codec).
+	b := newDefaultBuilderWith(fakeClientWith("test", t, nil)).
 		NamespaceParam("foo").
 		TransformRequests(func(req *rest.Request) {
 			got = req

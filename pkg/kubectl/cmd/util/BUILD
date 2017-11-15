@@ -9,7 +9,6 @@ go_library(
     srcs = [
         "cached_discovery.go",
         "clientcache.go",
-        "discovery.go",
         "factory.go",
         "factory_builder.go",
         "factory_client_access.go",

@@ -188,7 +188,8 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		}
 	}
 
-	r := f.NewBuilder().Unstructured().
+	r := f.NewBuilder().
+		Unstructured().
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).

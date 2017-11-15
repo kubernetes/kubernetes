@@ -98,13 +98,13 @@ func (f *ring1Factory) objectLoader() (meta.RESTMapper, runtime.ObjectTyper, err
 	interfaces := meta.InterfacesForUnstructuredConversion(legacyscheme.Registry.InterfacesFor)
 	mapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.VersionInterfacesFunc(interfaces))
 	// TODO: should this also indicate it recognizes typed objects?
-	typer := discovery.NewUnstructuredObjectTyper(groupResources)
+	typer := discovery.NewUnstructuredObjectTyper(groupResources, legacyscheme.Scheme)
 	expander := NewShortcutExpander(mapper, discoveryClient)
 	return expander, typer, err
 }
 
 func (f *ring1Factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
-	return NewLazyObjectLoader(f.objectLoader)
+	return meta.NewLazyObjectLoader(f.objectLoader)
 }
 
 func (f *ring1Factory) CategoryExpander() categories.CategoryExpander {

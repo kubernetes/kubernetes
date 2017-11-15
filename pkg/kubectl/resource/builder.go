@@ -43,9 +43,12 @@ const defaultHttpGetAttempts int = 3
 // from the command line and converting them to a list of resources to iterate
 // over using the Visitor interface.
 type Builder struct {
-	mapper           *Mapper
-	unstructured     *Mapper
 	categoryExpander categories.CategoryExpander
+
+	// mapper is set explicitly by resource builders
+	mapper       *Mapper
+	internal     *Mapper
+	unstructured *Mapper
 
 	errs []error
 
@@ -116,10 +119,12 @@ type resourceTuple struct {
 	Name     string
 }
 
-// NewBuilder creates a builder that operates on generic objects.
-func NewBuilder(mapper, unstructured *Mapper, categoryExpander categories.CategoryExpander) *Builder {
+// NewBuilder creates a builder that operates on generic objects. At least one of
+// internal or unstructured must be specified.
+// TODO: Add versioned client (although versioned is still lossy)
+func NewBuilder(internal, unstructured *Mapper, categoryExpander categories.CategoryExpander) *Builder {
 	return &Builder{
-		mapper:           mapper,
+		internal:         internal,
 		unstructured:     unstructured,
 		categoryExpander: categoryExpander,
 		requireObject:    true,
@@ -167,13 +172,38 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 }
 
 // Unstructured updates the builder so that it will request and send unstructured
-// objects by default. Calling this method resets Local().
+// objects. Unstructured objects preserve all fields sent by the server in a map format
+// based on the object's JSON structure which means no data is lost when the client
+// reads and then writes an object. Use this mode in preference to Internal unless you
+// are working with Go types directly.
 func (b *Builder) Unstructured() *Builder {
 	if b.unstructured == nil {
-		b.errs = append(b.errs, fmt.Errorf("no unstructured builder provided"))
+		b.errs = append(b.errs, fmt.Errorf("no unstructured mapper provided"))
+		return b
+	}
+	if b.mapper != nil {
+		b.errs = append(b.errs, fmt.Errorf("another mapper was already selected, cannot use unstructured types"))
 		return b
 	}
 	b.mapper = b.unstructured
+	return b
+}
+
+// Internal updates the builder so that it will convert objects off the wire
+// into the internal form if necessary. Using internal types is lossy - fields added
+// to the server will not be seen by the client code and may result in failure. Only
+// use this mode when working offline, or when generating patches to send to the server.
+// Use Unstructured if you are reading an object and performing a POST or PUT.
+func (b *Builder) Internal() *Builder {
+	if b.internal == nil {
+		b.errs = append(b.errs, fmt.Errorf("no internal mapper provided"))
+		return b
+	}
+	if b.mapper != nil {
+		b.errs = append(b.errs, fmt.Errorf("another mapper was already selected, cannot use internal types"))
+		return b
+	}
+	b.mapper = b.internal
 	return b
 }
 

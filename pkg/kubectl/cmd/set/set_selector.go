@@ -129,6 +129,7 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	o.builder = f.NewBuilder().
+		Internal().
 		LocalParam(o.local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().

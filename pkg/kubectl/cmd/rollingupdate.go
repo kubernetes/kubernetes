@@ -201,6 +201,7 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 		}
 
 		request := f.NewBuilder().
+			Internal().
 			Schema(schema).
 			NamespaceParam(cmdNamespace).DefaultNamespace().
 			FilenameParam(enforceNamespace, &resource.FilenameOptions{Recursive: false, Filenames: []string{filename}}).

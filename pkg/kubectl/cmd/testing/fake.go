@@ -288,7 +288,7 @@ func (f *FakeFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 	}
 	groupResources := testDynamicResources()
 	mapper := discovery.NewRESTMapper(groupResources, meta.InterfacesForUnstructuredConversion(legacyscheme.Registry.InterfacesFor))
-	typer := discovery.NewUnstructuredObjectTyper(groupResources)
+	typer := discovery.NewUnstructuredObjectTyper(groupResources, legacyscheme.Scheme)
 
 	fakeDs := &fakeCachedDiscoveryClient{}
 	expander := cmdutil.NewShortcutExpander(mapper, fakeDs)
@@ -624,8 +624,17 @@ func (f *fakeAPIFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 			}
 		}),
 	)
+	// for backwards compatibility with existing tests, allow rest mappings from the scheme to show up
+	// TODO: make this opt-in?
+	mapper = meta.FirstHitRESTMapper{
+		MultiRESTMapper: meta.MultiRESTMapper{
+			mapper,
+			legacyscheme.Registry.RESTMapper(),
+		},
+	}
 
-	typer := discovery.NewUnstructuredObjectTyper(groupResources)
+	// TODO: should probably be the external scheme
+	typer := discovery.NewUnstructuredObjectTyper(groupResources, legacyscheme.Scheme)
 	fakeDs := &fakeCachedDiscoveryClient{}
 	expander := cmdutil.NewShortcutExpander(mapper, fakeDs)
 	return expander, typer
@@ -925,6 +934,8 @@ func testDynamicResources() []*discovery.APIGroupResources {
 					{Name: "secrets", Namespaced: true, Kind: "Secret"},
 					{Name: "configmaps", Namespaced: true, Kind: "ConfigMap"},
 					{Name: "namespacedtype", Namespaced: true, Kind: "NamespacedType"},
+					{Name: "namespaces", Namespaced: false, Kind: "Namespace"},
+					{Name: "resourcequotas", Namespaced: true, Kind: "ResourceQuota"},
 				},
 			},
 		},
@@ -939,6 +950,7 @@ func testDynamicResources() []*discovery.APIGroupResources {
 			VersionedResources: map[string][]metav1.APIResource{
 				"v1beta1": {
 					{Name: "deployments", Namespaced: true, Kind: "Deployment"},
+					{Name: "replicasets", Namespaced: true, Kind: "ReplicaSet"},
 				},
 			},
 		},
@@ -955,12 +967,14 @@ func testDynamicResources() []*discovery.APIGroupResources {
 			VersionedResources: map[string][]metav1.APIResource{
 				"v1beta1": {
 					{Name: "deployments", Namespaced: true, Kind: "Deployment"},
+					{Name: "replicasets", Namespaced: true, Kind: "ReplicaSet"},
 				},
 				"v1beta2": {
 					{Name: "deployments", Namespaced: true, Kind: "Deployment"},
 				},
 				"v1": {
 					{Name: "deployments", Namespaced: true, Kind: "Deployment"},
+					{Name: "replicasets", Namespaced: true, Kind: "ReplicaSet"},
 				},
 			},
 		},
@@ -998,6 +1012,24 @@ func testDynamicResources() []*discovery.APIGroupResources {
 				// bogus version of a known group/version/resource to make sure kubectl falls back to generic object mode
 				"v0": {
 					{Name: "storageclasses", Namespaced: false, Kind: "StorageClass"},
+				},
+			},
+		},
+		{
+			Group: metav1.APIGroup{
+				Name: "rbac.authorization.k8s.io",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v1beta1"},
+					{Version: "v1"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1": {
+					{Name: "clusterroles", Namespaced: false, Kind: "ClusterRole"},
+				},
+				"v1beta1": {
+					{Name: "clusterrolebindings", Namespaced: false, Kind: "ClusterRoleBinding"},
 				},
 			},
 		},

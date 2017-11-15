@@ -128,7 +128,9 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.C
 	}
 
 	// build the builder
-	o.builder = f.NewBuilder().LocalParam(o.local)
+	o.builder = f.NewBuilder().
+		Internal().
+		LocalParam(o.local)
 	if !o.local {
 		schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
 		if err != nil {
