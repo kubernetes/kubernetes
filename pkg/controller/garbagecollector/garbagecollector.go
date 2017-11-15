@@ -587,7 +587,7 @@ func (gc *GarbageCollector) GraphHasUID(UIDs []types.UID) bool {
 
 // GetDeletableResources returns all resources from discoveryClient that the
 // garbage collector should recognize and work with. More specifically, all
-// preferred resources which support the 'delete' verb.
+// preferred resources which support the 'delete', 'list', and 'watch' verbs.
 //
 // All discovery errors are considered temporary. Upon encountering any error,
 // GetDeletableResources will log and return any discovered resources it was
@@ -607,7 +607,7 @@ func GetDeletableResources(discoveryClient discovery.ServerResourcesInterface) m
 
 	// This is extracted from discovery.GroupVersionResources to allow tolerating
 	// failures on a per-resource basis.
-	deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"delete"}}, preferredResources)
+	deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"delete", "list", "watch"}}, preferredResources)
 	deletableGroupVersionResources := map[schema.GroupVersionResource]struct{}{}
 	for _, rl := range deletableResources {
 		gv, err := schema.ParseGroupVersion(rl.GroupVersion)
