@@ -3532,7 +3532,12 @@ func ValidateNode(node *core.Node) field.ErrorList {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "configSource"), "configSource may only be set if the DynamicKubeletConfig feature gate is enabled)"))
 	}
 
-	// TODO(rjnagal): Ignore PodCIDR till its completely implemented.
+	if len(node.Spec.PodCIDR) != 0 {
+		_, err := ValidateCIDR(node.Spec.PodCIDR)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "podCIDR"), node.Spec.PodCIDR, "not a valid CIDR"))
+		}
+	}
 	return allErrs
 }
 
@@ -4525,4 +4530,13 @@ func validateStorageNodeAffinityAnnotation(annotations map[string]string, fldPat
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("preferredDuringSchedulingIgnoredDuringExection"), "Storage node affinity does not support preferredDuringSchedulingIgnoredDuringExecution"))
 	}
 	return policySpecified, allErrs
+}
+
+// ValidateCIDR validates whether a CIDR matches the conventions expected by net.ParseCIDR
+func ValidateCIDR(cidr string) (*net.IPNet, error) {
+	_, net, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return nil, err
+	}
+	return net, nil
 }
