@@ -33,8 +33,6 @@ import (
 
 	"github.com/golang/glog"
 
-	clientgoclientset "k8s.io/client-go/kubernetes"
-
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/api/core/v1"
@@ -253,7 +251,7 @@ type Dependencies struct {
 	EventClient             v1core.EventsGetter
 	HeartbeatClient         v1core.CoreV1Interface
 	KubeClient              clientset.Interface
-	ExternalKubeClient      clientgoclientset.Interface
+	ExternalKubeClient      clientset.Interface
 	Mounter                 mount.Interface
 	NetworkPlugins          []network.NetworkPlugin
 	OOMAdjuster             *oom.OOMAdjuster

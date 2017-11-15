@@ -40,7 +40,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	clientgoclientset "k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
@@ -537,7 +536,7 @@ func createClients(config componentconfig.ClientConnectionConfiguration, masterO
 		return nil, nil, nil, err
 	}
 
-	eventClient, err := clientgoclientset.NewForConfig(kubeConfig)
+	eventClient, err := clientset.NewForConfig(kubeConfig)
 	if err != nil {
 		return nil, nil, nil, err
 	}
