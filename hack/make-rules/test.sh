@@ -69,6 +69,7 @@ kube::test::find_dirs() {
         -o -path './vendor/k8s.io/client-go/*' \
         -o -path './vendor/k8s.io/apiserver/*' \
         -o -path './test/e2e_node/system/*' \
+        -o -path './test/e2e_node/services/*' \
       -name '*_test.go' -print0 | xargs -0n1 dirname | sed "s|^\./|${KUBE_GO_PACKAGE}/|" | LC_ALL=C sort -u
 
     # run tests for client-go
