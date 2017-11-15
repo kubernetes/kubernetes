@@ -51,16 +51,12 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, options printers.PrintOptions) (printers.ResourcePrinter, error) {
 	var mapper meta.RESTMapper
 	var typer runtime.ObjectTyper
-	var err error
 
 	if isLocal {
 		mapper = legacyscheme.Registry.RESTMapper()
 		typer = legacyscheme.Scheme
 	} else {
-		mapper, typer, err = f.objectMappingFactory.UnstructuredObject()
-		if err != nil {
-			return nil, err
-		}
+		mapper, typer = f.objectMappingFactory.UnstructuredObject()
 	}
 	// TODO: used by the custom column implementation and the name implementation, break this dependency
 	decoders := []runtime.Decoder{f.clientAccessFactory.Decoder(true), unstructured.UnstructuredJSONScheme}
@@ -137,11 +133,7 @@ func (f *ring2Factory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta
 
 	// fall back to an unstructured object if we get something unregistered
 	if runtime.IsNotRegisteredError(err) {
-		_, typer, unstructuredErr := f.objectMappingFactory.UnstructuredObject()
-		if unstructuredErr != nil {
-			// if we can't get an unstructured typer, return the original error
-			return err
-		}
+		_, typer := f.objectMappingFactory.UnstructuredObject()
 		gvks, _, err = typer.ObjectKinds(obj)
 	}
 
@@ -186,7 +178,7 @@ func (f *ring2Factory) NewBuilder() *resource.Builder {
 	mapper, typer := f.objectMappingFactory.Object()
 
 	unstructuredClientMapperFunc := resource.ClientMapperFunc(f.objectMappingFactory.UnstructuredClientForMapping)
-	unstructuredMapper, unstructuredTyper, _ := f.objectMappingFactory.UnstructuredObject()
+	unstructuredMapper, unstructuredTyper := f.objectMappingFactory.Object()
 
 	categoryExpander := f.objectMappingFactory.CategoryExpander()
 

@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,34 +73,35 @@ func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) ObjectMapp
 	return f
 }
 
-// TODO: This method should return an error now that it can fail.  Alternatively, it needs to
-//   return lazy implementations of mapper and typer that don't hit the wire until they are
-//   invoked.
-func (f *ring1Factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
+func (f *ring1Factory) objectLoader() (meta.RESTMapper, runtime.ObjectTyper, error) {
 	mapper := legacyscheme.Registry.RESTMapper()
 	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
-	if err == nil {
-		mapper = meta.FirstHitRESTMapper{
-			MultiRESTMapper: meta.MultiRESTMapper{
-				discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, legacyscheme.Registry.InterfacesFor),
-				legacyscheme.Registry.RESTMapper(), // hardcoded fall back
-			},
-		}
-
-		// wrap with shortcuts, they require a discoveryClient
-		mapper, err = NewShortcutExpander(mapper, discoveryClient)
-		// you only have an error on missing discoveryClient, so this shouldn't fail.  Check anyway.
-		CheckErr(err)
+	if err != nil {
+		glog.V(5).Infof("Object loader was unable to retrieve a discovery client: %v", err)
+		return mapper, legacyscheme.Scheme, nil
+	}
+	mapper = meta.FirstHitRESTMapper{
+		MultiRESTMapper: meta.MultiRESTMapper{
+			discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, legacyscheme.Registry.InterfacesFor),
+			legacyscheme.Registry.RESTMapper(), // hardcoded fall back
+		},
 	}
 
-	return mapper, legacyscheme.Scheme
+	// wrap with shortcuts, they require a discoveryClient
+	mapper = NewShortcutExpander(mapper, discoveryClient)
+	return mapper, legacyscheme.Scheme, nil
 }
 
-func (f *ring1Factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error) {
+// TODO: unstructured and structured discovery should both gracefully degrade in the presence
+// of errors, and it should be possible to get access to the unstructured object typers no matter
+// whether the server responds or not. Make the legacy scheme recognize object typer, then we can
+// safely fall back to the built in restmapper as a last resort.
+func (f *ring1Factory) unstructuredObjectLoader() (meta.RESTMapper, runtime.ObjectTyper, error) {
 	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
 	if err != nil {
 		return nil, nil, err
 	}
+
 	groupResources, err := discovery.GetAPIGroupResources(discoveryClient)
 	if err != nil && !discoveryClient.Fresh() {
 		discoveryClient.Invalidate()
@@ -112,8 +115,16 @@ func (f *ring1Factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectType
 	interfaces := meta.InterfacesForUnstructuredConversion(legacyscheme.Registry.InterfacesFor)
 	mapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.VersionInterfacesFunc(interfaces))
 	typer := discovery.NewUnstructuredObjectTyper(groupResources)
-	expander, err := NewShortcutExpander(mapper, discoveryClient)
+	expander := NewShortcutExpander(mapper, discoveryClient)
 	return expander, typer, err
+}
+
+func (f *ring1Factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
+	return NewLazyObjectLoader(f.objectLoader)
+}
+
+func (f *ring1Factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper) {
+	return NewLazyObjectLoader(f.unstructuredObjectLoader)
 }
 
 func (f *ring1Factory) CategoryExpander() categories.CategoryExpander {

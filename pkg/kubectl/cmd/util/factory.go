@@ -191,7 +191,7 @@ type ObjectMappingFactory interface {
 	Object() (meta.RESTMapper, runtime.ObjectTyper)
 	// Returns interfaces for dealing with arbitrary
 	// runtime.Unstructured. This performs API calls to discover types.
-	UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error)
+	UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper)
 	// Returns interface for expanding categories like `all`.
 	// TODO: this should probably return an error if the full expander can't be loaded.
 	CategoryExpander() categories.CategoryExpander

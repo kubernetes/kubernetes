@@ -285,14 +285,14 @@ func (f *FakeFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 	return legacyscheme.Registry.RESTMapper(), f.tf.Typer
 }
 
-func (f *FakeFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error) {
+func (f *FakeFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper) {
 	groupResources := testDynamicResources()
 	mapper := discovery.NewRESTMapper(groupResources, meta.InterfacesForUnstructuredConversion(legacyscheme.Registry.InterfacesFor))
 	typer := discovery.NewUnstructuredObjectTyper(groupResources)
 
 	fakeDs := &fakeCachedDiscoveryClient{}
-	expander, err := cmdutil.NewShortcutExpander(mapper, fakeDs)
-	return expander, typer, err
+	expander := cmdutil.NewShortcutExpander(mapper, fakeDs)
+	return expander, typer
 }
 
 func (f *FakeFactory) CategoryExpander() categories.CategoryExpander {
@@ -519,7 +519,7 @@ func (f *FakeFactory) PrinterForMapping(cmd *cobra.Command, isLocal bool, output
 
 func (f *FakeFactory) NewBuilder() *resource.Builder {
 	mapper, typer := f.Object()
-	unstructuredMapper, unstructuredTyper, _ := f.UnstructuredObject()
+	unstructuredMapper, unstructuredTyper := f.UnstructuredObject()
 
 	return resource.NewBuilder(
 		&resource.Mapper{
@@ -608,7 +608,7 @@ func (f *fakeAPIFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 	return testapi.Default.RESTMapper(), legacyscheme.Scheme
 }
 
-func (f *fakeAPIFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error) {
+func (f *fakeAPIFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper) {
 	groupResources := testDynamicResources()
 	mapper := discovery.NewRESTMapper(
 		groupResources,
@@ -629,8 +629,8 @@ func (f *fakeAPIFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTy
 
 	typer := discovery.NewUnstructuredObjectTyper(groupResources)
 	fakeDs := &fakeCachedDiscoveryClient{}
-	expander, err := cmdutil.NewShortcutExpander(mapper, fakeDs)
-	return expander, typer, err
+	expander := cmdutil.NewShortcutExpander(mapper, fakeDs)
+	return expander, typer
 }
 
 func (f *fakeAPIFactory) Decoder(bool) runtime.Decoder {
@@ -865,7 +865,7 @@ func (f *fakeAPIFactory) PrinterForMapping(cmd *cobra.Command, isLocal bool, out
 
 func (f *fakeAPIFactory) NewBuilder() *resource.Builder {
 	mapper, typer := f.Object()
-	unstructuredMapper, unstructuredTyper, _ := f.UnstructuredObject()
+	unstructuredMapper, unstructuredTyper := f.UnstructuredObject()
 
 	return resource.NewBuilder(
 		&resource.Mapper{

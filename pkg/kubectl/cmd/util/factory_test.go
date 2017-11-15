@@ -539,10 +539,7 @@ func TestDiscoveryReplaceAliases(t *testing.T) {
 	}
 
 	ds := &fakeDiscoveryClient{}
-	mapper, err := NewShortcutExpander(testapi.Default.RESTMapper(), ds)
-	if err != nil {
-		t.Fatalf("Unable to create shortcut expander, err = %s", err.Error())
-	}
+	mapper := NewShortcutExpander(testapi.Default.RESTMapper(), ds)
 	b := resource.NewBuilder(
 		&resource.Mapper{
 			RESTMapper:   mapper,
