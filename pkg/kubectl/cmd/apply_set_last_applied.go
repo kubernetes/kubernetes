@@ -126,7 +126,6 @@ func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) 
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
-		Latest().
 		Flatten().
 		Do()
 
