@@ -135,12 +135,16 @@ func (az *Cloud) getpublicIPAddressID(pipName string) string {
 }
 
 // select load balancer for the service in the cluster
+// the selection algorithm selectes the the load balancer with currently has
+// the minimum lb rules, there there are multiple LB's with same number of rules
+// it selects the first one (sorted based on name)
 func (az *Cloud) selectLoadBalancer(clusterName string, service *v1.Service, existingLBs *[]network.LoadBalancer, nodes []*v1.Node) (selectedLB *network.LoadBalancer, existsLb bool, err error) {
 	isInternal := requiresInternalLoadBalancer(service)
 	serviceName := getServiceName(service)
 	glog.V(3).Infof("selectLoadBalancer(%s): isInternal(%s) - start", serviceName, isInternal)
 	availabilitySetNames, err := az.getLoadBalancerAvailabilitySetNames(service, nodes)
 	if err != nil {
+		glog.Errorf("az.selectLoadBalancer: cluster (%s) service(%s) - az.getLoadBalancerAvailabilitySetNames failed, err=(%v)", clusterName, serviceName, err)
 		return nil, false, err
 	}
 	glog.Infof("selectLoadBalancer(%s): isInternal(%s) - availabilitysetsname %v", serviceName, isInternal, *availabilitySetNames)
@@ -198,15 +202,17 @@ func (az *Cloud) selectLoadBalancer(clusterName string, service *v1.Service, exi
 func (az *Cloud) getLoadBalancerAvailabilitySetNames(service *v1.Service, nodes []*v1.Node) (availabilitySetNames *[]string, err error) {
 	hasMode, isAuto, serviceASL := getServiceLoadBalancerMode(service)
 	if !hasMode {
-		// legacy load balancer auto mode load balancer.
+		// no mode specified in service annotation default to PrimaryAvailabilitySetName
 		availabilitySetNames = &[]string{az.Config.PrimaryAvailabilitySetName}
 		return availabilitySetNames, nil
 	}
 	availabilitySetNames, err = az.getAgentPoolAvailabiliySets(nodes)
 	if err != nil {
+		glog.Errorf("az.getLoadBalancerAvailabilitySetNames - getAgentPoolAvailabiliySets failed err=(%v)", err)
 		return nil, err
 	}
 	if len(*availabilitySetNames) == 0 {
+		glog.Errorf("az.getLoadBalancerAvailabilitySetNames - No availability sets found for nodes in the cluster, node count(%d)", len(nodes))
 		return nil, fmt.Errorf("No availability sets found for nodes, node count(%d)", len(nodes))
 	}
 	// sort the list to have deterministic selection
@@ -226,6 +232,7 @@ func (az *Cloud) getLoadBalancerAvailabilitySetNames(service *v1.Service, nodes 
 				}
 			}
 			if !found {
+				glog.Errorf("az.getLoadBalancerAvailabilitySetNames - Availability set (%s) in service annotation not found", serviceASL[sasx])
 				return nil, fmt.Errorf("availability set (%s) - not found", serviceASL[sasx])
 			}
 		}
@@ -240,6 +247,7 @@ func (az *Cloud) getLoadBalancerAvailabilitySetNames(service *v1.Service, nodes 
 func (az *Cloud) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentPoolAs *[]string, err error) {
 	vms, err := az.VirtualMachineClientListWithRetry()
 	if err != nil {
+		glog.Errorf("az.getNodeAvailabilitySet - VirtualMachineClientListWithRetry failed, err=%v", err)
 		return nil, err
 	}
 	vmNameToAvailabilitySetID := make(map[string]string, len(vms))
@@ -258,6 +266,7 @@ func (az *Cloud) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentPoolAs *[]s
 		}
 		asID, ok := vmNameToAvailabilitySetID[nodeName]
 		if !ok {
+			glog.Errorf("az.getNodeAvailabilitySet - Node(%s) has no availability sets", nodeName)
 			return nil, fmt.Errorf("Node (%s) - has no availability sets", nodeName)
 		}
 		if availabilitySetIDs.Has(asID) {
@@ -266,7 +275,7 @@ func (az *Cloud) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentPoolAs *[]s
 		}
 		asName, err := getLastSegment(asID)
 		if err != nil {
-			glog.Errorf("az.getNodeAvailabilitySet(%s), getLastSegment(%s), err=%v", nodeName, asID, err)
+			glog.Errorf("az.getNodeAvailabilitySet - Node (%s)- getLastSegment(%s), err=%v", nodeName, asID, err)
 			return nil, err
 		}
 		// AvailabilitySet ID is currently upper cased in a indeterministic way
@@ -307,10 +316,8 @@ func (az *Cloud) getLoadBalancerName(clusterName string, availabilitySetName str
 // The master role is determined by looking for:
 // * a kubernetes.io/role="master" label
 func isMasterNode(node *v1.Node) bool {
-	for k, v := range node.Labels {
-		if k == nodeLabelRole && v == "master" {
-			return true
-		}
+	if val, ok := node.Labels[nodeLabelRole]; ok && val == "master" {
+		return true
 	}
 
 	return false
