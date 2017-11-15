@@ -210,7 +210,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: utilfeature.Beta},
 	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha},
 	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha},
-	DevicePlugins:                               {Default: false, PreRelease: utilfeature.Alpha},
+	DevicePlugins:                               {Default: true, PreRelease: utilfeature.Alpha},
 	TaintBasedEvictions:                         {Default: false, PreRelease: utilfeature.Alpha},
 	RotateKubeletServerCertificate:              {Default: false, PreRelease: utilfeature.Alpha},
 	RotateKubeletClientCertificate:              {Default: true, PreRelease: utilfeature.Beta},
