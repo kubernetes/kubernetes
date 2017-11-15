@@ -25,8 +25,8 @@ import (
 	clientset "k8s.io/code-generator/_examples/crd/clientset/versioned"
 	examplev1 "k8s.io/code-generator/_examples/crd/clientset/versioned/typed/example/v1"
 	fakeexamplev1 "k8s.io/code-generator/_examples/crd/clientset/versioned/typed/example/v1/fake"
-	example2v1 "k8s.io/code-generator/_examples/crd/clientset/versioned/typed/example2/v1"
-	fakeexample2v1 "k8s.io/code-generator/_examples/crd/clientset/versioned/typed/example2/v1/fake"
+	secondexamplev1 "k8s.io/code-generator/_examples/crd/clientset/versioned/typed/example2/v1"
+	fakesecondexamplev1 "k8s.io/code-generator/_examples/crd/clientset/versioned/typed/example2/v1/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -73,11 +73,11 @@ func (c *Clientset) Example() examplev1.ExampleV1Interface {
 }
 
 // SecondExampleV1 retrieves the SecondExampleV1Client
-func (c *Clientset) SecondExampleV1() example2v1.SecondExampleV1Interface {
-	return &fakeexample2v1.FakeSecondExampleV1{Fake: &c.Fake}
+func (c *Clientset) SecondExampleV1() secondexamplev1.SecondExampleV1Interface {
+	return &fakesecondexamplev1.FakeSecondExampleV1{Fake: &c.Fake}
 }
 
 // SecondExample retrieves the SecondExampleV1Client
-func (c *Clientset) SecondExample() example2v1.SecondExampleV1Interface {
-	return &fakeexample2v1.FakeSecondExampleV1{Fake: &c.Fake}
+func (c *Clientset) SecondExample() secondexamplev1.SecondExampleV1Interface {
+	return &fakesecondexamplev1.FakeSecondExampleV1{Fake: &c.Fake}
 }

@@ -15,6 +15,6 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package
-// +groupName=example.test2.crd.code-generator.k8s.io
+// +groupName=example.test.crd.code-generator.k8s.io
 // +groupGoName=SecondExample
 package v1

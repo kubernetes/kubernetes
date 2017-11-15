@@ -94,7 +94,7 @@ func ToGroupVersionPackages(groups []GroupVersions, groupGoNames map[GroupVersio
 			groupVersionPackages = append(groupVersionPackages, GroupVersionPackage{
 				Group:                Group(namer.IC(group.Group.NonEmpty())),
 				Version:              Version(namer.IC(version.String())),
-				PackageName:          strings.ToLower(group.PackageName + version.NonEmpty()),
+				PackageAlias:         strings.ToLower(groupGoName + version.NonEmpty()),
 				IsDefaultVersion:     version == defaultVersion && version != "",
 				GroupGoName:          groupGoName,
 				LowerCaseGroupGoName: namer.IL(groupGoName),
@@ -104,12 +104,14 @@ func ToGroupVersionPackages(groups []GroupVersions, groupGoNames map[GroupVersio
 	return groupVersionPackages
 }
 
-func ToGroupInstallPackages(groups []GroupVersions) []GroupInstallPackage {
+func ToGroupInstallPackages(groups []GroupVersions, groupGoNames map[GroupVersion]string) []GroupInstallPackage {
 	var groupInstallPackages []GroupInstallPackage
 	for _, group := range groups {
+		defaultVersion := defaultVersion(group.Versions)
+		groupGoName := groupGoNames[GroupVersion{Group: group.Group, Version: defaultVersion}]
 		groupInstallPackages = append(groupInstallPackages, GroupInstallPackage{
-			Group:              Group(namer.IC(group.Group.NonEmpty())),
-			InstallPackageName: group.PackageName,
+			Group:               Group(namer.IC(group.Group.NonEmpty())),
+			InstallPackageAlias: strings.ToLower(groupGoName),
 		})
 	}
 	return groupInstallPackages

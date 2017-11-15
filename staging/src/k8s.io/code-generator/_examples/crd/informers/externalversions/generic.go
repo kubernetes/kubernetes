@@ -56,7 +56,7 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case v1.SchemeGroupVersion.WithResource("testtypes"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Example().V1().TestTypes().Informer()}, nil
 
-		// Group=example.test2.crd.code-generator.k8s.io, Version=v1
+		// Group=example.test.crd.code-generator.k8s.io, Version=v1
 	case example2_v1.SchemeGroupVersion.WithResource("testtypes"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.SecondExample().V1().TestTypes().Informer()}, nil
 

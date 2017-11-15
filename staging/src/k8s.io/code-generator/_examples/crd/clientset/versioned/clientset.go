@@ -22,7 +22,7 @@ import (
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
 	examplev1 "k8s.io/code-generator/_examples/crd/clientset/versioned/typed/example/v1"
-	example2v1 "k8s.io/code-generator/_examples/crd/clientset/versioned/typed/example2/v1"
+	secondexamplev1 "k8s.io/code-generator/_examples/crd/clientset/versioned/typed/example2/v1"
 )
 
 type Interface interface {
@@ -30,9 +30,9 @@ type Interface interface {
 	ExampleV1() examplev1.ExampleV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Example() examplev1.ExampleV1Interface
-	SecondExampleV1() example2v1.SecondExampleV1Interface
+	SecondExampleV1() secondexamplev1.SecondExampleV1Interface
 	// Deprecated: please explicitly pick a version if possible.
-	SecondExample() example2v1.SecondExampleV1Interface
+	SecondExample() secondexamplev1.SecondExampleV1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -40,7 +40,7 @@ type Interface interface {
 type Clientset struct {
 	*discovery.DiscoveryClient
 	exampleV1       *examplev1.ExampleV1Client
-	secondExampleV1 *example2v1.SecondExampleV1Client
+	secondExampleV1 *secondexamplev1.SecondExampleV1Client
 }
 
 // ExampleV1 retrieves the ExampleV1Client
@@ -55,13 +55,13 @@ func (c *Clientset) Example() examplev1.ExampleV1Interface {
 }
 
 // SecondExampleV1 retrieves the SecondExampleV1Client
-func (c *Clientset) SecondExampleV1() example2v1.SecondExampleV1Interface {
+func (c *Clientset) SecondExampleV1() secondexamplev1.SecondExampleV1Interface {
 	return c.secondExampleV1
 }
 
 // Deprecated: SecondExample retrieves the default version of SecondExampleClient.
 // Please explicitly pick a version.
-func (c *Clientset) SecondExample() example2v1.SecondExampleV1Interface {
+func (c *Clientset) SecondExample() secondexamplev1.SecondExampleV1Interface {
 	return c.secondExampleV1
 }
 
@@ -85,7 +85,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	cs.secondExampleV1, err = example2v1.NewForConfig(&configShallowCopy)
+	cs.secondExampleV1, err = secondexamplev1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.exampleV1 = examplev1.NewForConfigOrDie(c)
-	cs.secondExampleV1 = example2v1.NewForConfigOrDie(c)
+	cs.secondExampleV1 = secondexamplev1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -113,7 +113,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.exampleV1 = examplev1.New(c)
-	cs.secondExampleV1 = example2v1.New(c)
+	cs.secondExampleV1 = secondexamplev1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs
