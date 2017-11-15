@@ -225,30 +225,6 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 			NotTo(HaveOccurred(), "error waiting for daemon pod to not be running on nodes")
 	})
 
-	It("should retry creating failed daemon pods", func() {
-		label := map[string]string{daemonsetNameLabel: dsName}
-
-		By(fmt.Sprintf("Creating a simple DaemonSet %q", dsName))
-		ds, err := c.ExtensionsV1beta1().DaemonSets(ns).Create(newDaemonSet(dsName, image, label))
-		Expect(err).NotTo(HaveOccurred())
-
-		By("Check that daemon pods launch on every node of the cluster.")
-		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
-		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
-		err = checkDaemonStatus(f, dsName)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("Set a daemon pod's phase to 'Failed', check that the daemon pod is revived.")
-		podList := listDaemonPods(c, ns, label)
-		pod := podList.Items[0]
-		pod.ResourceVersion = ""
-		pod.Status.Phase = v1.PodFailed
-		_, err = c.CoreV1().Pods(ns).UpdateStatus(&pod)
-		Expect(err).NotTo(HaveOccurred(), "error failing a daemon pod")
-		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
-		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to revive")
-	})
-
 	It("Should not update pod when spec was updated and update strategy is OnDelete", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
@@ -436,71 +412,6 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 
 		framework.Logf("Wait for pods and history to be adopted by DaemonSet %s", newAdoptDS.Name)
 		waitDaemonSetAdoption(c, newAdoptDS, ds.Name, templateGeneration)
-	})
-
-	It("Should rollback without unnecessary restarts", func() {
-		// Skip clusters with only one node, where we cannot have half-done DaemonSet rollout for this test
-		framework.SkipUnlessNodeCountIsAtLeast(2)
-
-		framework.Logf("Create a RollingUpdate DaemonSet")
-		label := map[string]string{daemonsetNameLabel: dsName}
-		ds := newDaemonSet(dsName, image, label)
-		ds.Spec.UpdateStrategy = extensions.DaemonSetUpdateStrategy{Type: extensions.RollingUpdateDaemonSetStrategyType}
-		ds, err := c.ExtensionsV1beta1().DaemonSets(ns).Create(ds)
-		Expect(err).NotTo(HaveOccurred())
-
-		framework.Logf("Check that daemon pods launch on every node of the cluster")
-		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
-		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
-
-		framework.Logf("Update the DaemonSet to trigger a rollout")
-		// We use a nonexistent image here, so that we make sure it won't finish
-		newImage := "foo:non-existent"
-		newDS, err := framework.UpdateDaemonSetWithRetries(c, ns, ds.Name, func(update *extensions.DaemonSet) {
-			update.Spec.Template.Spec.Containers[0].Image = newImage
-		})
-		Expect(err).NotTo(HaveOccurred())
-
-		// Make sure we're in the middle of a rollout
-		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkAtLeastOneNewPod(c, ns, label, newImage))
-		Expect(err).NotTo(HaveOccurred())
-
-		pods := listDaemonPods(c, ns, label)
-		var existingPods, newPods []*v1.Pod
-		for i := range pods.Items {
-			pod := pods.Items[i]
-			image := pod.Spec.Containers[0].Image
-			switch image {
-			case ds.Spec.Template.Spec.Containers[0].Image:
-				existingPods = append(existingPods, &pod)
-			case newDS.Spec.Template.Spec.Containers[0].Image:
-				newPods = append(newPods, &pod)
-			default:
-				framework.Failf("unexpected pod found, image = %s", image)
-			}
-		}
-		Expect(len(existingPods)).NotTo(Equal(0))
-		Expect(len(newPods)).NotTo(Equal(0))
-
-		framework.Logf("Roll back the DaemonSet before rollout is complete")
-		rollbackDS, err := framework.UpdateDaemonSetWithRetries(c, ns, ds.Name, func(update *extensions.DaemonSet) {
-			update.Spec.Template.Spec.Containers[0].Image = image
-		})
-		Expect(err).NotTo(HaveOccurred())
-
-		framework.Logf("Make sure DaemonSet rollback is complete")
-		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonPodsImageAndAvailability(c, rollbackDS, image, 1))
-		Expect(err).NotTo(HaveOccurred())
-
-		// After rollback is done, compare current pods with previous old pods during rollout, to make sure they're not restarted
-		pods = listDaemonPods(c, ns, label)
-		rollbackPods := map[string]bool{}
-		for _, pod := range pods.Items {
-			rollbackPods[pod.Name] = true
-		}
-		for _, pod := range existingPods {
-			Expect(rollbackPods[pod.Name]).To(BeTrue(), fmt.Sprintf("unexpected pod %s be restarted", pod.Name))
-		}
 	})
 })
 
