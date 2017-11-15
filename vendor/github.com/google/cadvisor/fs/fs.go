@@ -241,7 +241,7 @@ func getDockerImagePaths(context Context) map[string]struct{} {
 
 	// TODO(rjnagal): Detect docker root and graphdriver directories from docker info.
 	dockerRoot := context.Docker.Root
-	for _, dir := range []string{"devicemapper", "btrfs", "aufs", "overlay", "zfs"} {
+	for _, dir := range []string{"devicemapper", "btrfs", "aufs", "overlay", "overlay2", "zfs"} {
 		dockerImagePaths[path.Join(dockerRoot, dir)] = struct{}{}
 	}
 	for dockerRoot != "/" && dockerRoot != "." {

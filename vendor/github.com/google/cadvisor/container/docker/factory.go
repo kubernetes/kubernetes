@@ -83,6 +83,7 @@ const (
 	devicemapperStorageDriver storageDriver = "devicemapper"
 	aufsStorageDriver         storageDriver = "aufs"
 	overlayStorageDriver      storageDriver = "overlay"
+	overlay2StorageDriver     storageDriver = "overlay2"
 	zfsStorageDriver          storageDriver = "zfs"
 )
 
