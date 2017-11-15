@@ -150,9 +150,10 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 	}
 
 	if into != nil {
+		_, isUnstructured := into.(runtime.Unstructured)
 		types, _, err := s.typer.ObjectKinds(into)
 		switch {
-		case runtime.IsNotRegisteredError(err):
+		case runtime.IsNotRegisteredError(err), isUnstructured:
 			if err := jsoniter.ConfigFastest.Unmarshal(data, into); err != nil {
 				return nil, actual, err
 			}

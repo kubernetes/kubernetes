@@ -49,28 +49,22 @@ func NewUnstructuredObjectTyper(groupResources []*APIGroupResources) *Unstructur
 	return dot
 }
 
-// ObjectKind returns the group,version,kind of the provided object, or an error
-// if the object in not runtime.Unstructured or has no group,version,kind
-// information.
-func (d *UnstructuredObjectTyper) ObjectKind(obj runtime.Object) (schema.GroupVersionKind, error) {
-	if _, ok := obj.(runtime.Unstructured); !ok {
-		return schema.GroupVersionKind{}, fmt.Errorf("type %T is invalid for dynamic object typer", obj)
-	}
-
-	return obj.GetObjectKind().GroupVersionKind(), nil
-}
-
 // ObjectKinds returns a slice of one element with the group,version,kind of the
 // provided object, or an error if the object is not runtime.Unstructured or
 // has no group,version,kind information. unversionedType will always be false
 // because runtime.Unstructured object should always have group,version,kind
 // information set.
 func (d *UnstructuredObjectTyper) ObjectKinds(obj runtime.Object) (gvks []schema.GroupVersionKind, unversionedType bool, err error) {
-	gvk, err := d.ObjectKind(obj)
-	if err != nil {
-		return nil, false, err
+	if _, ok := obj.(runtime.Unstructured); !ok {
+		return nil, false, fmt.Errorf("type %T is invalid for dynamic object typer", obj)
 	}
-
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	if len(gvk.Kind) == 0 {
+		return nil, false, runtime.NewMissingKindErr("unstructured object has no kind")
+	}
+	if len(gvk.Version) == 0 {
+		return nil, false, runtime.NewMissingVersionErr("unstructured object has no version")
+	}
 	return []schema.GroupVersionKind{gvk}, false, nil
 }
 
@@ -78,18 +72,6 @@ func (d *UnstructuredObjectTyper) ObjectKinds(obj runtime.Object) (gvks []schema
 // discovery information.
 func (d *UnstructuredObjectTyper) Recognizes(gvk schema.GroupVersionKind) bool {
 	return d.registered[gvk]
-}
-
-// IsUnversioned returns false always because runtime.Unstructured objects
-// should always have group,version,kind information set. ok will be true if the
-// object's group,version,kind is api.Registry.
-func (d *UnstructuredObjectTyper) IsUnversioned(obj runtime.Object) (unversioned bool, ok bool) {
-	gvk, err := d.ObjectKind(obj)
-	if err != nil {
-		return false, false
-	}
-
-	return false, d.registered[gvk]
 }
 
 var _ runtime.ObjectTyper = &UnstructuredObjectTyper{}

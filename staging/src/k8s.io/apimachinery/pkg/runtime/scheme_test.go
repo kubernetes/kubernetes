@@ -143,6 +143,9 @@ func TestScheme(t *testing.T) {
 	if e := unstructuredObj.GetObjectKind().GroupVersionKind(); !reflect.DeepEqual(e, schema.GroupVersionKind{Group: "test.group", Version: "testExternal", Kind: "Simple"}) {
 		t.Errorf("Unexpected object kind: %#v", e)
 	}
+	if gvks, unversioned, err := scheme.ObjectKinds(unstructuredObj); err != nil || !reflect.DeepEqual(gvks[0], schema.GroupVersionKind{Group: "test.group", Version: "testExternal", Kind: "Simple"}) || unversioned {
+		t.Errorf("Scheme did not recognize unversioned: %v, %#v %t", err, gvks, unversioned)
+	}
 
 	// Test convert external to unstructured
 	unstructuredObj = &runtimetesting.Unstructured{}
@@ -187,6 +190,20 @@ func TestScheme(t *testing.T) {
 	// DecodeInto and Decode should each have caused an increment because of a conversion
 	if e, a := 2, externalToInternalCalls; e != a {
 		t.Errorf("Expected %v, got %v", e, a)
+	}
+
+	// Verify that unstructured types must have V and K set
+	emptyObj := &runtimetesting.Unstructured{Object: make(map[string]interface{})}
+	if _, _, err := scheme.ObjectKinds(emptyObj); !runtime.IsMissingKind(err) {
+		t.Errorf("unexpected error: %v", err)
+	}
+	emptyObj.SetGroupVersionKind(schema.GroupVersionKind{Kind: "Test"})
+	if _, _, err := scheme.ObjectKinds(emptyObj); !runtime.IsMissingVersion(err) {
+		t.Errorf("unexpected error: %v", err)
+	}
+	emptyObj.SetGroupVersionKind(schema.GroupVersionKind{Kind: "Test", Version: "v1"})
+	if _, _, err := scheme.ObjectKinds(emptyObj); err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }
 

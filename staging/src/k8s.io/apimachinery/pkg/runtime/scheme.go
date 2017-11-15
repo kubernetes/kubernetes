@@ -217,19 +217,22 @@ func (s *Scheme) AllKnownTypes() map[schema.GroupVersionKind]reflect.Type {
 	return s.gvkToType
 }
 
-// ObjectKind returns the group,version,kind of the go object and true if this object
-// is considered unversioned, or an error if it's not a pointer or is unregistered.
-func (s *Scheme) ObjectKind(obj Object) (schema.GroupVersionKind, bool, error) {
-	gvks, unversionedType, err := s.ObjectKinds(obj)
-	if err != nil {
-		return schema.GroupVersionKind{}, false, err
-	}
-	return gvks[0], unversionedType, nil
-}
-
 // ObjectKinds returns all possible group,version,kind of the go object, true if the
 // object is considered unversioned, or an error if it's not a pointer or is unregistered.
 func (s *Scheme) ObjectKinds(obj Object) ([]schema.GroupVersionKind, bool, error) {
+	// Unstructured objects are always considered to have their declared GVK
+	if _, ok := obj.(Unstructured); ok {
+		// we require that the GVK be populated in order to recognize the object
+		gvk := obj.GetObjectKind().GroupVersionKind()
+		if len(gvk.Kind) == 0 {
+			return nil, false, NewMissingKindErr("unstructured object has no kind")
+		}
+		if len(gvk.Version) == 0 {
+			return nil, false, NewMissingVersionErr("unstructured object has no version")
+		}
+		return []schema.GroupVersionKind{gvk}, false, nil
+	}
+
 	v, err := conversion.EnforcePtr(obj)
 	if err != nil {
 		return nil, false, err
@@ -415,10 +418,11 @@ func (s *Scheme) Convert(in, out interface{}, context interface{}) error {
 		if !ok {
 			return fmt.Errorf("unable to convert object type %T to Unstructured, must be a runtime.Object", in)
 		}
-		gvk, unversioned, err := s.ObjectKind(obj)
+		gvks, unversioned, err := s.ObjectKinds(obj)
 		if err != nil {
 			return err
 		}
+		gvk := gvks[0]
 
 		// if no conversion is necessary, convert immediately
 		if unversioned || gvk.Version != APIVersionInternal {
