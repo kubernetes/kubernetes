@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"reflect"
 	"strconv"
 	"testing"
 
@@ -25,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/informers"
@@ -46,6 +48,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/storage/install"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
+	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
 var (
@@ -120,7 +123,10 @@ func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSu
 }
 
 func newReplicaSet(d *extensions.Deployment, name string, replicas int) *extensions.ReplicaSet {
-	return &extensions.ReplicaSet{
+	selector := labelsutil.CloneSelectorAndAddLabel(d.Spec.Selector, "pod-template-hash", "396685307")
+	template := d.Spec.Template
+	template.Labels = labelsutil.CloneAndAddLabel(d.Spec.Template.Labels, "pod-template-hash", "396685307")
+	rs := &extensions.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
 			UID:             uuid.NewUUID(),
@@ -129,11 +135,14 @@ func newReplicaSet(d *extensions.Deployment, name string, replicas int) *extensi
 			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(d, controllerKind)},
 		},
 		Spec: extensions.ReplicaSetSpec{
-			Selector: d.Spec.Selector,
+			Selector: selector,
 			Replicas: func() *int32 { i := int32(replicas); return &i }(),
-			Template: d.Spec.Template,
+			Template: template,
 		},
 	}
+
+	util.SetNewReplicaSetAnnotations(d, rs, "1", false)
+	return rs
 }
 
 func getKey(d *extensions.Deployment, t *testing.T) string {
@@ -244,14 +253,57 @@ func (f *fixture) run_(deploymentName string, startInformers bool, expectError b
 		}
 
 		expectedAction := f.actions[i]
-		if !(expectedAction.Matches(action.GetVerb(), action.GetResource().Resource) && action.GetSubresource() == expectedAction.GetSubresource()) {
-			f.t.Errorf("Expected\n\t%#v\ngot\n\t%#v", expectedAction, action)
-			continue
-		}
+		checkAction(expectedAction, action, f.t)
 	}
 
 	if len(f.actions) > len(actions) {
 		f.t.Errorf("%d additional expected actions:%+v", len(f.actions)-len(actions), f.actions[len(actions):])
+	}
+}
+
+func checkAction(expected, actual core.Action, t *testing.T) {
+	if !(expected.Matches(actual.GetVerb(), actual.GetResource().Resource) && actual.GetSubresource() == expected.GetSubresource()) {
+		t.Errorf("Expected\n\t%#v\ngot\n\t%#v", expected, actual)
+		return
+	}
+
+	if reflect.TypeOf(actual) != reflect.TypeOf(expected) {
+		t.Errorf("Action has wrong type. Expected: %t. Got: %t", expected, actual)
+		return
+	}
+
+	if expected.GetSubresource() == "status" {
+		return
+	}
+
+	switch a := actual.(type) {
+	case core.CreateAction:
+		e, _ := expected.(core.CreateAction)
+		expObject := e.GetObject()
+		object := a.GetObject()
+
+		if !reflect.DeepEqual(expObject, object) {
+			t.Errorf("Action %s %s has wrong object\nDiff:\n %s",
+				a.GetVerb(), a.GetResource().Resource, diff.ObjectGoPrintDiff(expObject, object))
+		}
+	case core.UpdateAction:
+		e, _ := expected.(core.UpdateAction)
+		expObject := e.GetObject()
+		object := a.GetObject()
+
+		if !reflect.DeepEqual(expObject, object) {
+			t.Errorf("Action %s %s has wrong object\nDiff:\n %s",
+				a.GetVerb(), a.GetResource().Resource, diff.ObjectGoPrintDiff(expObject, object))
+		}
+	case core.PatchAction:
+		e, _ := expected.(core.PatchAction)
+		expPatch := e.GetPatch()
+		patch := a.GetPatch()
+
+		if !reflect.DeepEqual(expPatch, expPatch) {
+			t.Errorf("Action %s %s has wrong patch\nDiff:\n %s",
+				a.GetVerb(), a.GetResource().Resource, diff.ObjectGoPrintDiff(expPatch, patch))
+		}
 	}
 }
 
@@ -280,7 +332,8 @@ func TestSyncDeploymentCreatesReplicaSet(t *testing.T) {
 	f.dLister = append(f.dLister, d)
 	f.objects = append(f.objects, d)
 
-	rs := newReplicaSet(d, "deploymentrs-4186632231", 1)
+	rs := newReplicaSet(d, "foo-7fbbd974c", 1)
+	rs.UID = ""
 
 	f.expectCreateRSAction(rs)
 	f.expectUpdateDeploymentStatusAction(d)
@@ -354,6 +407,7 @@ func TestReentrantRollback(t *testing.T) {
 	rs1.Annotations = map[string]string{util.RevisionAnnotation: "1"}
 	one := int64(1)
 	rs1.Spec.Template.Spec.TerminationGracePeriodSeconds = &one
+	d.Spec.Template.Spec.TerminationGracePeriodSeconds = &one
 	rs1.Spec.Selector.MatchLabels[extensions.DefaultDeploymentUniqueLabelKey] = "hash"
 
 	rs2 := newReplicaSet(d, "deploymentrs-new", 1)
@@ -364,7 +418,9 @@ func TestReentrantRollback(t *testing.T) {
 	f.objects = append(f.objects, d, rs1, rs2)
 
 	// Rollback is done here
-	f.expectUpdateDeploymentAction(d)
+	d2 := d.DeepCopy()
+	d2.Spec.RollbackTo = nil // Rollback should set RollbackTo to nil
+	f.expectUpdateDeploymentAction(d2)
 	// Expect no update on replica sets though
 	f.run(getKey(d, t))
 }

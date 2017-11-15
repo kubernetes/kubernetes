@@ -294,6 +294,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 			Name:            d.Name + "-" + rand.SafeEncodeString(podTemplateSpecHash),
 			Namespace:       d.Namespace,
 			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(d, controllerKind)},
+			Labels:          d.Spec.Selector.MatchLabels,
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas:        new(int32),
