@@ -1415,7 +1415,7 @@ func TestNodeLabelPresence(t *testing.T) {
 		nodeInfo.SetNode(&node)
 
 		labelChecker := NodeLabelChecker{test.labels, test.presence}
-		fits, reasons, err := labelChecker.CheckNodeLabelPresence(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
+		fits, reasons, err := labelChecker.Predicate(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
@@ -1570,7 +1570,7 @@ func TestServiceAffinity(t *testing.T) {
 				}
 			})
 			if pmeta, ok := (PredicateMetadata(test.pod, nodeInfoMap)).(*predicateMetadata); ok {
-				fits, reasons, err := predicate(test.pod, pmeta, nodeInfo)
+				fits, reasons, err := predicate.Predicate(test.pod, pmeta, nodeInfo)
 				if err != nil {
 					t.Errorf("%s: unexpected error: %v", test.test, err)
 				}
@@ -1996,7 +1996,7 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 	for _, test := range tests {
 		os.Setenv(KubeMaxPDVols, strconv.Itoa(test.maxVols))
 		pred := NewMaxPDVolumeCountPredicate(EBSVolumeFilterType, pvInfo, pvcInfo)
-		fits, reasons, err := pred(test.newPod, PredicateMetadata(test.newPod, nil), schedulercache.NewNodeInfo(test.existingPods...))
+		fits, reasons, err := pred.Predicate(test.newPod, PredicateMetadata(test.newPod, nil), schedulercache.NewNodeInfo(test.existingPods...))
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
@@ -2122,7 +2122,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 	}
 	for _, test := range resourceTests {
 		test.nodeInfo.SetNode(test.node)
-		fits, reasons, err := GeneralPredicates(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+		fits, reasons, err := GeneralPredicates.Predicate(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
@@ -2741,7 +2741,7 @@ func TestInterPodAffinity(t *testing.T) {
 		nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
 		nodeInfo.SetNode(test.node)
 		nodeInfoMap := map[string]*schedulercache.NodeInfo{test.node.Name: nodeInfo}
-		fits, reasons, _ := fit.InterPodAffinityMatches(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
+		fits, reasons, _ := fit.Predicate(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
 		if !fits && !reflect.DeepEqual(reasons, test.expectFailureReasons) {
 			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, test.expectFailureReasons)
 		}
@@ -3163,7 +3163,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				meta = PredicateMetadata(test.pod, nodeInfoMap)
 			}
 
-			fits, reasons, _ := testFit.InterPodAffinityMatches(test.pod, meta, nodeInfo)
+			fits, reasons, _ := testFit.Predicate(test.pod, meta, nodeInfo)
 			if !fits && !reflect.DeepEqual(reasons, test.nodesExpectAffinityFailureReasons[indexNode]) {
 				t.Errorf("index: %d test: %s unexpected failure reasons: %v expect: %v", indexTest, test.test, reasons, test.nodesExpectAffinityFailureReasons[indexNode])
 			}
@@ -3776,7 +3776,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 		node := &schedulercache.NodeInfo{}
 		node.SetNode(test.Node)
 
-		fits, reasons, err := fit(test.Pod, nil, node)
+		fits, reasons, err := fit.Predicate(test.Pod, nil, node)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.Name, err)
 		}
@@ -3869,7 +3869,7 @@ func TestVolumeZonePredicateMultiZone(t *testing.T) {
 		node := &schedulercache.NodeInfo{}
 		node.SetNode(test.Node)
 
-		fits, reasons, err := fit(test.Pod, nil, node)
+		fits, reasons, err := fit.Predicate(test.Pod, nil, node)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.Name, err)
 		}
@@ -3879,7 +3879,6 @@ func TestVolumeZonePredicateMultiZone(t *testing.T) {
 		if fits != test.Fits {
 			t.Errorf("%s: expected %v got %v", test.Name, test.Fits, fits)
 		}
-
 	}
 }
 

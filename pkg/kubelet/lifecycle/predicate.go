@@ -77,7 +77,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			Message: message,
 		}
 	}
-	fit, reasons, err := predicates.GeneralPredicates(pod, nil, nodeInfo)
+	fit, reasons, err := predicates.GeneralPredicates.Predicate(pod, nil, nodeInfo)
 	if err != nil {
 		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
 		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)

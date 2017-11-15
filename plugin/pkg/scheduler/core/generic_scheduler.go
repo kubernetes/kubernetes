@@ -306,8 +306,8 @@ func findNodesThatFit(
 	return filtered, failedPredicateMap, nil
 }
 
-// Checks whether node with a given name and NodeInfo satisfies all predicateFuncs.
-func podFitsOnNode(pod *v1.Pod, meta algorithm.PredicateMetadata, info *schedulercache.NodeInfo, predicateFuncs map[string]algorithm.FitPredicate,
+// Checks whether node with a given name and NodeInfo satisfies all predicates.
+func podFitsOnNode(pod *v1.Pod, meta algorithm.PredicateMetadata, info *schedulercache.NodeInfo, predicates map[string]algorithm.FitPredicate,
 	ecache *EquivalenceCache) (bool, []algorithm.PredicateFailureReason, error) {
 	var (
 		equivalenceHash  uint64
@@ -322,7 +322,7 @@ func podFitsOnNode(pod *v1.Pod, meta algorithm.PredicateMetadata, info *schedule
 		// getHashEquivalencePod will return immediately if no equivalence pod found
 		equivalenceHash, eCacheAvailable = ecache.getHashEquivalencePod(pod)
 	}
-	for predicateKey, predicate := range predicateFuncs {
+	for predicateKey, predicate := range predicates {
 		// If equivalenceCache is available
 		if eCacheAvailable {
 			// PredicateWithECache will returns it's cached predicate results
@@ -331,7 +331,7 @@ func podFitsOnNode(pod *v1.Pod, meta algorithm.PredicateMetadata, info *schedule
 
 		if !eCacheAvailable || invalid {
 			// we need to execute predicate functions since equivalence cache does not work
-			fit, reasons, err = predicate(pod, meta, info)
+			fit, reasons, err = predicate.Predicate(pod, meta, info)
 			if err != nil {
 				return false, []algorithm.PredicateFailureReason{}, err
 			}

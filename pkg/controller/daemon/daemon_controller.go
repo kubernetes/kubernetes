@@ -1343,9 +1343,9 @@ func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 	if critical {
 		// If the pod is marked as critical and support for critical pod annotations is enabled,
 		// check predicates for critical pods only.
-		fit, reasons, err = predicates.EssentialPredicates(pod, nil, nodeInfo)
+		fit, reasons, err = predicates.EssentialPredicates.Predicate(pod, nil, nodeInfo)
 	} else {
-		fit, reasons, err = predicates.GeneralPredicates(pod, nil, nodeInfo)
+		fit, reasons, err = predicates.GeneralPredicates.Predicate(pod, nil, nodeInfo)
 	}
 	if err != nil {
 		return false, predicateFails, err
