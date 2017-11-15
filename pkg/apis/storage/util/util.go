@@ -14,28 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package util
 
 import (
-	"k8s.io/api/core/v1"
-	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/features"
 )
 
-func addDefaultingFuncs(scheme *runtime.Scheme) error {
-	return RegisterDefaults(scheme)
-}
-
-func SetDefaults_StorageClass(obj *storagev1.StorageClass) {
-	if obj.ReclaimPolicy == nil {
-		obj.ReclaimPolicy = new(v1.PersistentVolumeReclaimPolicy)
-		*obj.ReclaimPolicy = v1.PersistentVolumeReclaimDelete
-	}
-
-	if obj.VolumeBindingMode == nil && utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		obj.VolumeBindingMode = new(storagev1.VolumeBindingMode)
-		*obj.VolumeBindingMode = storagev1.VolumeBindingImmediate
+// DropDisabledAlphaFields removes disabled fields from the StorageClass object.
+func DropDisabledAlphaFields(class *storage.StorageClass) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		class.VolumeBindingMode = nil
 	}
 }
