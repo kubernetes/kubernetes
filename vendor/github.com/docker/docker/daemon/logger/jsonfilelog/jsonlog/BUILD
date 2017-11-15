@@ -3,11 +3,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "tlsconfig_clone.go",
-        "tlsconfig_clone_go17.go",
+        "jsonlog.go",
+        "jsonlogbytes.go",
+        "time_marshalling.go",
     ],
-    importpath = "github.com/docker/docker/pkg/tlsconfig",
+    importpath = "github.com/docker/docker/daemon/logger/jsonfilelog/jsonlog",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/pkg/errors:go_default_library"],
 )
 
 filegroup(

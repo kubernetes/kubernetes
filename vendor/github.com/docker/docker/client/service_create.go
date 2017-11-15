@@ -3,11 +3,12 @@ package client
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/swarm"
-	"github.com/opencontainers/go-digest"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -85,21 +86,30 @@ func (cli *Client) ServiceCreate(ctx context.Context, service swarm.ServiceSpec,
 	return response, err
 }
 
-func imageDigestAndPlatforms(ctx context.Context, cli *Client, image, encodedAuth string) (string, []swarm.Platform, error) {
+func imageDigestAndPlatforms(ctx context.Context, cli DistributionAPIClient, image, encodedAuth string) (string, []swarm.Platform, error) {
 	distributionInspect, err := cli.DistributionInspect(ctx, image, encodedAuth)
-	imageWithDigest := image
 	var platforms []swarm.Platform
 	if err != nil {
 		return "", nil, err
 	}
 
-	imageWithDigest = imageWithDigestString(image, distributionInspect.Descriptor.Digest)
+	imageWithDigest := imageWithDigestString(image, distributionInspect.Descriptor.Digest)
 
 	if len(distributionInspect.Platforms) > 0 {
 		platforms = make([]swarm.Platform, 0, len(distributionInspect.Platforms))
 		for _, p := range distributionInspect.Platforms {
+			// clear architecture field for arm. This is a temporary patch to address
+			// https://github.com/docker/swarmkit/issues/2294. The issue is that while
+			// image manifests report "arm" as the architecture, the node reports
+			// something like "armv7l" (includes the variant), which causes arm images
+			// to stop working with swarm mode. This patch removes the architecture
+			// constraint for arm images to ensure tasks get scheduled.
+			arch := p.Architecture
+			if strings.ToLower(arch) == "arm" {
+				arch = ""
+			}
 			platforms = append(platforms, swarm.Platform{
-				Architecture: p.Architecture,
+				Architecture: arch,
 				OS:           p.OS,
 			})
 		}

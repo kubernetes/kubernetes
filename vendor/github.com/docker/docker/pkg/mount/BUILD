@@ -24,7 +24,9 @@ go_library(
     cgo = True,
     importpath = "github.com/docker/docker/pkg/mount",
     visibility = ["//visibility:public"],
-    deps = select({
+    deps = [
+        "//vendor/github.com/sirupsen/logrus:go_default_library",
+    ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],

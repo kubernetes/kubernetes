@@ -10,7 +10,7 @@ It consists of various components in this repository:
 - `client/` The Go client used by the command-line client. It can also be used by third-party Go programs.
 - `daemon/` The daemon, which serves the API.
 
-## Swagger definition
+## Swagger definition
 
 The API is defined by the [Swagger](http://swagger.io/specification/) definition in `api/swagger.yaml`. This definition can be used to:
 
@@ -20,7 +20,7 @@ The API is defined by the [Swagger](http://swagger.io/specification/) definition
 
 ## Updating the API documentation
 
-The API documentation is generated entirely from `api/swagger.yaml`. If you make updates to the API, you'll need to edit this file to represent the change in the documentation.
+The API documentation is generated entirely from `api/swagger.yaml`. If you make updates to the API, edit this file to represent the change in the documentation.
 
 The file is split into two main sections:
 
@@ -29,9 +29,9 @@ The file is split into two main sections:
 
 To make an edit, first look for the endpoint you want to edit under `paths`, then make the required edits. Endpoints may reference reusable objects with `$ref`, which can be found in the `definitions` section.
 
-There is hopefully enough example material in the file for you to copy a similar pattern from elsewhere in the file (e.g. adding new fields or endpoints), but for the full reference, see the [Swagger specification](https://github.com/docker/docker/issues/27919)
+There is hopefully enough example material in the file for you to copy a similar pattern from elsewhere in the file (e.g. adding new fields or endpoints), but for the full reference, see the [Swagger specification](https://github.com/docker/docker/issues/27919).
 
-`swagger.yaml` is validated by `hack/validate/swagger` to ensure it is a valid Swagger definition. This is useful for when you are making edits to ensure you are doing the right thing.
+`swagger.yaml` is validated by `hack/validate/swagger` to ensure it is a valid Swagger definition. This is useful when making edits to ensure you are doing the right thing.
 
 ## Viewing the API documentation
 

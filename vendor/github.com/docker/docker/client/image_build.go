@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"golang.org/x/net/context"
 
@@ -29,6 +30,13 @@ func (cli *Client) ImageBuild(ctx context.Context, buildContext io.Reader, optio
 		return types.ImageBuildResponse{}, err
 	}
 	headers.Add("X-Registry-Config", base64.URLEncoding.EncodeToString(buf))
+
+	if options.Platform != "" {
+		if err := cli.NewVersionError("1.32", "platform"); err != nil {
+			return types.ImageBuildResponse{}, err
+		}
+		query.Set("platform", options.Platform)
+	}
 	headers.Set("Content-Type", "application/x-tar")
 
 	serverResp, err := cli.postRaw(ctx, "/build", query, buildContext, headers)
@@ -123,6 +131,8 @@ func (cli *Client) imageBuildOptionsToQuery(options types.ImageBuildOptions) (ur
 	if options.SessionID != "" {
 		query.Set("session", options.SessionID)
 	}
-
+	if options.Platform != "" {
+		query.Set("platform", strings.ToLower(options.Platform))
+	}
 	return query, nil
 }

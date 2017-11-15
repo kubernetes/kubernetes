@@ -20,7 +20,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    cgo = True,
     importpath = "github.com/docker/docker/pkg/term",
     visibility = ["//visibility:public"],
     deps = [
