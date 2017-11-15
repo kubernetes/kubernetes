@@ -24,7 +24,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
@@ -47,8 +46,7 @@ const (
 )
 
 // AllowBootstrapTokensToPostCSRs creates RBAC rules in a way the makes Node Bootstrap Tokens able to post CSRs
-func AllowBootstrapTokensToPostCSRs(client clientset.Interface, k8sVersion *version.Version) error {
-
+func AllowBootstrapTokensToPostCSRs(client clientset.Interface) error {
 	fmt.Println("[bootstraptoken] Configured RBAC rules to allow Node Bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials")
 
 	return apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
@@ -70,8 +68,7 @@ func AllowBootstrapTokensToPostCSRs(client clientset.Interface, k8sVersion *vers
 }
 
 // AutoApproveNodeBootstrapTokens creates RBAC rules in a way that makes Node Bootstrap Tokens' CSR auto-approved by the csrapprover controller
-func AutoApproveNodeBootstrapTokens(client clientset.Interface, k8sVersion *version.Version) error {
-
+func AutoApproveNodeBootstrapTokens(client clientset.Interface) error {
 	fmt.Println("[bootstraptoken] Configured RBAC rules to allow the csrapprover controller automatically approve CSRs from a Node Bootstrap Token")
 
 	// Always create this kubeadm-specific binding though
@@ -94,7 +91,7 @@ func AutoApproveNodeBootstrapTokens(client clientset.Interface, k8sVersion *vers
 }
 
 // AutoApproveNodeCertificateRotation creates RBAC rules in a way that makes Node certificate rotation CSR auto-approved by the csrapprover controller
-func AutoApproveNodeCertificateRotation(client clientset.Interface, k8sVersion *version.Version) error {
+func AutoApproveNodeCertificateRotation(client clientset.Interface) error {
 	fmt.Println("[bootstraptoken] Configured RBAC rules to allow certificate rotation for all node client certificates in the cluster")
 
 	return apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
