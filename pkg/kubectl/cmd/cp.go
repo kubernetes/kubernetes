@@ -88,6 +88,14 @@ var (
 	errFileCannotBeEmpty         = errors.New("Filepath can not be empty")
 	errTar126					 = errors.New("Tar command invoked but could not execute. Might be a permission problem or command is not an executable")
 	errTar127 					 = errors.New("Tar command not found, please install tar before using kubectl cp")
+	errTar2 					 = errors.New("Could be a permission problem or missing command arguments and keywords")
+	errTarGeneric 				 = errors.New("The cp command failed")
+)
+
+const (
+	exitCode126 				 = "command terminated with exit code 126"
+	exitCode127 				 = "command terminated with exit code 127"
+	exitCode2 					 = "command terminated with exit code 2"
 )
 
 func extractFileSpec(arg string) (fileSpec, error) {
@@ -215,18 +223,16 @@ func copyToPod(f cmdutil.Factory, cmd *cobra.Command, stdout, stderr io.Writer, 
 		cmdutil.CheckErr(err)
 	}()
 
-	// TODO: Improve error messages by first testing if 'tar' is present in the container?
 	if err := testTar(f, cmd, dest); err != nil {
-
-		exitCode126 := "command terminated with exit code 126"
-		exitCode127 := "command terminated with exit code 127"
 
 		if err.Error() == exitCode126 {
 			return errTar126
 		} else if err.Error() == exitCode127 {
 			return errTar127 
+		} else if err.Error() == exitCode2 {
+			return errTar2
 		} else {
-			return err
+			return errTarGeneric
 		}
 	}
 
@@ -261,15 +267,14 @@ func copyFromPod(f cmdutil.Factory, cmd *cobra.Command, cmderr io.Writer, src, d
 	// check if tar command exists in the container
 	if err := testTar(f, cmd, dest); err != nil {
 
-		exitCode126 := "command terminated with exit code 126"
-		exitCode127 := "command terminated with exit code 127"
-
 		if err.Error() == exitCode126 {
 			return errTar126
 		} else if err.Error() == exitCode127 {
 			return errTar127 
+		} else if err.Error() == exitCode2 {
+			return errTar2
 		} else {
-			return err
+			return errTarGeneric
 		}
 	}
 
@@ -284,7 +289,6 @@ func copyFromPod(f cmdutil.Factory, cmd *cobra.Command, cmderr io.Writer, src, d
 			PodName:   src.PodName,
 		},
 
-		// TODO: Improve error messages by first testing if 'tar' is present in the container?
 		Command:  []string{"tar", "cf", "-", src.File},
 		Executor: &DefaultRemoteExecutor{},
 	}
