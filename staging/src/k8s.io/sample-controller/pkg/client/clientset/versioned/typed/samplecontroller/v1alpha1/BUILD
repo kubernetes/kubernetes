@@ -11,13 +11,13 @@ go_library(
     importpath = "k8s.io/sample-controller/pkg/client/clientset/versioned/typed/samplecontroller/v1alpha1",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/apis/samplecontroller/v1alpha1:go_default_library",
+        "//pkg/client/clientset/versioned/scheme:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1:go_default_library",
-        "//vendor/k8s.io/sample-controller/pkg/client/clientset/versioned/scheme:go_default_library",
     ],
 )
 

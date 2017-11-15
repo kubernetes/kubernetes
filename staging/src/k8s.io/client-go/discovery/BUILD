@@ -1,10 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -15,7 +9,10 @@ go_library(
         "unstructured.go",
     ],
     importpath = "k8s.io/client-go/discovery",
+    visibility = ["//visibility:public"],
     deps = [
+        "//kubernetes/scheme:go_default_library",
+        "//rest:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
@@ -27,8 +24,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/version:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
 )
 
@@ -41,6 +36,10 @@ go_test(
     ],
     importpath = "k8s.io/client-go/discovery_test",
     deps = [
+        ":go_default_library",
+        "//kubernetes/scheme:go_default_library",
+        "//rest:go_default_library",
+        "//rest/fake:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
@@ -51,10 +50,6 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/version:go_default_library",
-        "//vendor/k8s.io/client-go/discovery:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/client-go/rest/fake:go_default_library",
     ],
 )
 
@@ -73,4 +68,5 @@ filegroup(
         "//staging/src/k8s.io/client-go/discovery/fake:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

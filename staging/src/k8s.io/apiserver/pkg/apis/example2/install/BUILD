@@ -1,22 +1,17 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
     srcs = ["install.go"],
     importpath = "k8s.io/apiserver/pkg/apis/example2/install",
+    visibility = ["//visibility:public"],
     deps = [
+        "//pkg/apis/example:go_default_library",
+        "//pkg/apis/example2:go_default_library",
+        "//pkg/apis/example2/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/apis/example:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/apis/example2:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/apis/example2/v1:go_default_library",
     ],
 )
 
@@ -26,8 +21,8 @@ go_test(
     importpath = "k8s.io/apiserver/pkg/apis/example2/install",
     library = ":go_default_library",
     deps = [
+        "//pkg/apis/example/fuzzer:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/testing/roundtrip:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/apis/example/fuzzer:go_default_library",
     ],
 )
 
@@ -42,4 +37,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

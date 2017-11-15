@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -12,7 +7,24 @@ go_library(
         "generic.go",
     ],
     importpath = "k8s.io/client-go/informers",
+    visibility = ["//visibility:public"],
     deps = [
+        "//informers/admissionregistration:go_default_library",
+        "//informers/apps:go_default_library",
+        "//informers/autoscaling:go_default_library",
+        "//informers/batch:go_default_library",
+        "//informers/certificates:go_default_library",
+        "//informers/core:go_default_library",
+        "//informers/extensions:go_default_library",
+        "//informers/internalinterfaces:go_default_library",
+        "//informers/networking:go_default_library",
+        "//informers/policy:go_default_library",
+        "//informers/rbac:go_default_library",
+        "//informers/scheduling:go_default_library",
+        "//informers/settings:go_default_library",
+        "//informers/storage:go_default_library",
+        "//kubernetes:go_default_library",
+        "//tools/cache:go_default_library",
         "//vendor/k8s.io/api/admissionregistration/v1alpha1:go_default_library",
         "//vendor/k8s.io/api/apps/v1:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
@@ -37,22 +49,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/client-go/informers/admissionregistration:go_default_library",
-        "//vendor/k8s.io/client-go/informers/apps:go_default_library",
-        "//vendor/k8s.io/client-go/informers/autoscaling:go_default_library",
-        "//vendor/k8s.io/client-go/informers/batch:go_default_library",
-        "//vendor/k8s.io/client-go/informers/certificates:go_default_library",
-        "//vendor/k8s.io/client-go/informers/core:go_default_library",
-        "//vendor/k8s.io/client-go/informers/extensions:go_default_library",
-        "//vendor/k8s.io/client-go/informers/internalinterfaces:go_default_library",
-        "//vendor/k8s.io/client-go/informers/networking:go_default_library",
-        "//vendor/k8s.io/client-go/informers/policy:go_default_library",
-        "//vendor/k8s.io/client-go/informers/rbac:go_default_library",
-        "//vendor/k8s.io/client-go/informers/scheduling:go_default_library",
-        "//vendor/k8s.io/client-go/informers/settings:go_default_library",
-        "//vendor/k8s.io/client-go/informers/storage:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
-        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
 
@@ -83,4 +79,5 @@ filegroup(
         "//staging/src/k8s.io/client-go/informers/storage:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

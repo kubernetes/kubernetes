@@ -41,6 +41,31 @@ gazelle fix \
     -external=vendored \
     -proto=legacy \
     -mode=fix
+
+dirs=( "k8s.io/api" \
+       "k8s.io/apiextensions-apiserver" \
+       "k8s.io/apimachinery" \
+       "k8s.io/apiserver" \
+       "k8s.io/client-go" \
+       "k8s.io/code-generator" \
+       "k8s.io/kube-aggregator" \
+       "k8s.io/metrics" \
+       "k8s.io/sample-apiserver" \
+       "k8s.io/sample-controller" )
+
+for dir in "${dirs[@]}"
+do
+   pushd "${KUBE_ROOT}/staging/src/$dir"
+   gazelle fix \
+        -repo_root="${KUBE_ROOT}/staging/src/$dir" \
+        -go_prefix=$dir \
+        -build_file_name=BUILD,BUILD.bazel \
+        -external=vendored \
+        -proto=legacy \
+        -mode=fix
+   popd
+done
+
 # gazelle gets confused by our staging/ directory, prepending an extra
 # "k8s.io/kubernetes/staging/src" to the import path.
 # gazelle won't follow the symlinks in vendor/, so we can't just exclude

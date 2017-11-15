@@ -9,11 +9,11 @@ go_library(
     importpath = "k8s.io/sample-controller/pkg/client/clientset/versioned",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/client/clientset/versioned/typed/samplecontroller/v1alpha1:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/client-go/discovery:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
-        "//vendor/k8s.io/sample-controller/pkg/client/clientset/versioned/typed/samplecontroller/v1alpha1:go_default_library",
     ],
 )
 

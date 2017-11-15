@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -12,10 +7,11 @@ go_library(
         "strategy.go",
     ],
     importpath = "k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition",
+    visibility = ["//visibility:public"],
     deps = [
-        "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
-        "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation:go_default_library",
-        "//vendor/k8s.io/apiextensions-apiserver/pkg/features:go_default_library",
+        "//pkg/apis/apiextensions:go_default_library",
+        "//pkg/apis/apiextensions/validation:go_default_library",
+        "//pkg/features:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -45,4 +41,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

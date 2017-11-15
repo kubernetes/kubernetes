@@ -1,20 +1,16 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = ["crd_finalizer.go"],
     importpath = "k8s.io/apiextensions-apiserver/pkg/controller/finalizer",
+    visibility = ["//visibility:public"],
     deps = [
+        "//pkg/apis/apiextensions:go_default_library",
+        "//pkg/client/clientset/internalclientset/typed/apiextensions/internalversion:go_default_library",
+        "//pkg/client/informers/internalversion/apiextensions/internalversion:go_default_library",
+        "//pkg/client/listers/apiextensions/internalversion:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
-        "//vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset/typed/apiextensions/internalversion:go_default_library",
-        "//vendor/k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion:go_default_library",
-        "//vendor/k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
@@ -40,4 +36,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

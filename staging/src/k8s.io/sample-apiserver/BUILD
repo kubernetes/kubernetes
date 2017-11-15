@@ -1,27 +1,23 @@
-package(default_visibility = ["//visibility:public"])
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_binary",
-    "go_library",
+go_library(
+    name = "go_default_library",
+    srcs = ["main.go"],
+    importpath = "k8s.io/sample-apiserver",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//pkg/cmd/server:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/logs:go_default_library",
+    ],
 )
 
 go_binary(
     name = "sample-apiserver",
     importpath = "k8s.io/sample-apiserver",
     library = ":go_default_library",
-)
-
-go_library(
-    name = "go_default_library",
-    srcs = ["main.go"],
-    importpath = "k8s.io/sample-apiserver",
-    deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/logs:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/cmd/server:go_default_library",
-    ],
+    visibility = ["//visibility:public"],
 )
 
 filegroup(
@@ -49,4 +45,5 @@ filegroup(
         "//staging/src/k8s.io/sample-apiserver/pkg/registry:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

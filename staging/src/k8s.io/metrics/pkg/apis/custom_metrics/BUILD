@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -14,6 +9,7 @@ go_library(
         "zz_generated.deepcopy.go",
     ],
     importpath = "k8s.io/metrics/pkg/apis/custom_metrics",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -38,4 +34,5 @@ filegroup(
         "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

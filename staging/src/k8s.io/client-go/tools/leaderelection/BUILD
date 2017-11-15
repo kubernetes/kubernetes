@@ -1,22 +1,17 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
     srcs = ["leaderelection.go"],
     importpath = "k8s.io/client-go/tools/leaderelection",
+    visibility = ["//visibility:public"],
     deps = [
+        "//tools/leaderelection/resourcelock:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//vendor/k8s.io/client-go/tools/leaderelection/resourcelock:go_default_library",
     ],
 )
 
@@ -26,14 +21,14 @@ go_test(
     importpath = "k8s.io/client-go/tools/leaderelection",
     library = ":go_default_library",
     deps = [
+        "//kubernetes/typed/core/v1/fake:go_default_library",
+        "//testing:go_default_library",
+        "//tools/leaderelection/resourcelock:go_default_library",
+        "//tools/record:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/typed/core/v1/fake:go_default_library",
-        "//vendor/k8s.io/client-go/testing:go_default_library",
-        "//vendor/k8s.io/client-go/tools/leaderelection/resourcelock:go_default_library",
-        "//vendor/k8s.io/client-go/tools/record:go_default_library",
     ],
 )
 
@@ -51,4 +46,5 @@ filegroup(
         "//staging/src/k8s.io/client-go/tools/leaderelection/resourcelock:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

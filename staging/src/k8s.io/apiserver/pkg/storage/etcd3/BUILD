@@ -1,9 +1,33 @@
-package(default_visibility = ["//visibility:public"])
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "compact.go",
+        "errors.go",
+        "event.go",
+        "store.go",
+        "watcher.go",
+    ],
+    importpath = "k8s.io/apiserver/pkg/storage/etcd3",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/storage:go_default_library",
+        "//pkg/storage/etcd:go_default_library",
+        "//pkg/storage/value:go_default_library",
+        "//pkg/util/trace:go_default_library",
+        "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
+        "//vendor/github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes:go_default_library",
+        "//vendor/github.com/coreos/etcd/mvcc/mvccpb:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/golang.org/x/net/context:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
+    ],
 )
 
 go_test(
@@ -16,6 +40,11 @@ go_test(
     importpath = "k8s.io/apiserver/pkg/storage/etcd3",
     library = ":go_default_library",
     deps = [
+        "//pkg/apis/example:go_default_library",
+        "//pkg/apis/example/v1:go_default_library",
+        "//pkg/storage:go_default_library",
+        "//pkg/storage/tests:go_default_library",
+        "//pkg/storage/value:go_default_library",
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes:go_default_library",
         "//vendor/github.com/coreos/etcd/integration:go_default_library",
@@ -32,40 +61,6 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/apis/example:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/apis/example/v1:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/storage:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/storage/tests:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library",
-    ],
-)
-
-go_library(
-    name = "go_default_library",
-    srcs = [
-        "compact.go",
-        "errors.go",
-        "event.go",
-        "store.go",
-        "watcher.go",
-    ],
-    importpath = "k8s.io/apiserver/pkg/storage/etcd3",
-    deps = [
-        "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
-        "//vendor/github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes:go_default_library",
-        "//vendor/github.com/coreos/etcd/mvcc/mvccpb:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/storage:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/storage/etcd:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/trace:go_default_library",
     ],
 )
 
@@ -83,4 +78,5 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/storage/etcd3/preflight:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
