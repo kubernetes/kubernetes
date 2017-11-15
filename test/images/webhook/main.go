@@ -28,6 +28,18 @@ import (
 	"k8s.io/api/admission/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	// TODO: try this library to see if it generates correct json patch
+	// https://github.com/mattbaird/jsonpatch
+)
+
+const (
+	patch1 string = `[
+         { "op": "add", "path": "/data/mutation-stage-1", "value": "yes" }
+     ]`
+	patch2 string = `[
+         { "op": "add", "path": "/data/mutation-stage-2", "value": "yes" }
+     ]`
 )
 
 // Config contains the server (the webhook) cert and key.
@@ -120,6 +132,64 @@ func admitConfigMaps(ar v1alpha1.AdmissionReview) *v1alpha1.AdmissionResponse {
 	return &reviewResponse
 }
 
+func mutateConfigmaps(ar v1alpha1.AdmissionReview) *v1alpha1.AdmissionResponse {
+	glog.V(2).Info("mutating configmaps")
+	configMapResource := metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}
+	if ar.Request.Resource != configMapResource {
+		glog.Errorf("expect resource to be %s", configMapResource)
+		return nil
+	}
+
+	raw := ar.Request.Object.Raw
+	configmap := corev1.ConfigMap{}
+	deserializer := codecs.UniversalDeserializer()
+	if _, _, err := deserializer.Decode(raw, nil, &configmap); err != nil {
+		glog.Error(err)
+		return toAdmissionResponse(err)
+	}
+	reviewResponse := v1alpha1.AdmissionResponse{}
+	reviewResponse.Allowed = true
+	if configmap.Data["mutation-start"] == "yes" {
+		reviewResponse.Patch = []byte(patch1)
+	}
+	if configmap.Data["mutation-stage-1"] == "yes" {
+		reviewResponse.Patch = []byte(patch2)
+	}
+
+	pt := v1alpha1.PatchTypeJSONPatch
+	reviewResponse.PatchType = &pt
+
+	return &reviewResponse
+}
+
+func mutateCRD(ar v1alpha1.AdmissionReview) *v1alpha1.AdmissionResponse {
+	glog.V(2).Info("mutating crd")
+	cr := struct {
+		metav1.ObjectMeta
+		Data map[string]string
+	}{}
+
+	raw := ar.Request.Object.Raw
+	err := json.Unmarshal(raw, &cr)
+	if err != nil {
+		glog.Error(err)
+		return toAdmissionResponse(err)
+	}
+
+	reviewResponse := v1alpha1.AdmissionResponse{}
+	reviewResponse.Allowed = true
+
+	if cr.Data["mutation-start"] == "yes" {
+		reviewResponse.Patch = []byte(patch1)
+	}
+	if cr.Data["mutation-stage-1"] == "yes" {
+		reviewResponse.Patch = []byte(patch2)
+	}
+	pt := v1alpha1.PatchTypeJSONPatch
+	reviewResponse.PatchType = &pt
+	return &reviewResponse
+}
+
 func admitCRD(ar v1alpha1.AdmissionReview) *v1alpha1.AdmissionResponse {
 	glog.V(2).Info("admitting crd")
 	cr := struct {
@@ -179,6 +249,9 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 		response.Response = reviewResponse
 		response.Response.UID = ar.Request.UID
 	}
+	// reset the Object and OldObject, they are not needed in a response.
+	ar.Request.Object = runtime.RawExtension{}
+	ar.Request.OldObject = runtime.RawExtension{}
 
 	resp, err := json.Marshal(response)
 	if err != nil {
@@ -197,8 +270,16 @@ func serveConfigmaps(w http.ResponseWriter, r *http.Request) {
 	serve(w, r, admitConfigMaps)
 }
 
+func serveMutateConfigmaps(w http.ResponseWriter, r *http.Request) {
+	serve(w, r, mutateConfigmaps)
+}
+
 func serveCRD(w http.ResponseWriter, r *http.Request) {
 	serve(w, r, admitCRD)
+}
+
+func serveMutateCRD(w http.ResponseWriter, r *http.Request) {
+	serve(w, r, mutateCRD)
 }
 
 func main() {
@@ -208,7 +289,9 @@ func main() {
 
 	http.HandleFunc("/pods", servePods)
 	http.HandleFunc("/configmaps", serveConfigmaps)
+	http.HandleFunc("/mutating-configmaps", serveMutateConfigmaps)
 	http.HandleFunc("/crd", serveCRD)
+	http.HandleFunc("/mutating-crd", serveMutateCRD)
 	clientset := getClient()
 	server := &http.Server{
 		Addr:      ":443",

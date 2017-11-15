@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validating
+package mutating
 
 import (
 	"crypto/tls"
@@ -48,7 +48,7 @@ type fakeHookSource struct {
 	err   error
 }
 
-func (f *fakeHookSource) Webhooks() (*registrationv1alpha1.ValidatingWebhookConfiguration, error) {
+func (f *fakeHookSource) Webhooks() (*registrationv1alpha1.MutatingWebhookConfiguration, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -57,7 +57,7 @@ func (f *fakeHookSource) Webhooks() (*registrationv1alpha1.ValidatingWebhookConf
 			f.hooks[i].NamespaceSelector = &metav1.LabelSelector{}
 		}
 	}
-	return &registrationv1alpha1.ValidatingWebhookConfiguration{Webhooks: f.hooks}, nil
+	return &registrationv1alpha1.MutatingWebhookConfiguration{Webhooks: f.hooks}, nil
 }
 
 func (f *fakeHookSource) Run(stopCh <-chan struct{}) {}
@@ -116,7 +116,7 @@ func (c urlConfigGenerator) ccfgURL(urlPath string) registrationv1alpha1.Webhook
 	}
 }
 
-// TestAdmit tests that GenericAdmissionWebhook#Admit works as expected
+// TestAdmit tests that MutatingWebhook#Admit works as expected
 func TestAdmit(t *testing.T) {
 	scheme := runtime.NewScheme()
 	v1alpha1.AddToScheme(scheme)
@@ -129,7 +129,7 @@ func TestAdmit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("this should never happen? %v", err)
 	}
-	wh, err := NewGenericAdmissionWebhook(nil)
+	wh, err := NewMutatingWebhook(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -361,28 +361,6 @@ func TestAdmit(t *testing.T) {
 			},
 			errorContains: "without explanation",
 		},
-		"absent response and fail open": {
-			hookSource: fakeHookSource{
-				hooks: []registrationv1alpha1.Webhook{{
-					Name:          "nilResponse",
-					ClientConfig:  ccfgURL("nilResponse"),
-					FailurePolicy: &policyIgnore,
-					Rules:         matchEverythingRules,
-				}},
-			},
-			expectAllow: true,
-		},
-		"absent response and fail closed": {
-			hookSource: fakeHookSource{
-				hooks: []registrationv1alpha1.Webhook{{
-					Name:          "nilResponse",
-					ClientConfig:  ccfgURL("nilResponse"),
-					FailurePolicy: &policyFail,
-					Rules:         matchEverythingRules,
-				}},
-			},
-			errorContains: "Webhook response was absent",
-		},
 		// No need to test everything with the url case, since only the
 		// connection is different.
 	}
@@ -410,7 +388,7 @@ func TestAdmit(t *testing.T) {
 	}
 }
 
-// TestAdmitCachedClient tests that GenericAdmissionWebhook#Admit should cache restClient
+// TestAdmitCachedClient tests that MutatingWebhook#Admit should cache restClient
 func TestAdmitCachedClient(t *testing.T) {
 	scheme := runtime.NewScheme()
 	v1alpha1.AddToScheme(scheme)
@@ -423,7 +401,7 @@ func TestAdmitCachedClient(t *testing.T) {
 	if err != nil {
 		t.Fatalf("this should never happen? %v", err)
 	}
-	wh, err := NewGenericAdmissionWebhook(nil)
+	wh, err := NewMutatingWebhook(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -631,9 +609,6 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 				Allowed: true,
 			},
 		})
-	case "/nilResposne":
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(&v1alpha1.AdmissionReview{})
 	default:
 		http.NotFound(w, r)
 	}

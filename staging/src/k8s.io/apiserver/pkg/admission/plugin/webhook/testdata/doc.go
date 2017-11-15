@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package validating makes calls to validating (i.e., non-mutating) webhooks
-// during the admission process.
-package validating // import "k8s.io/apiserver/pkg/admission/plugin/webhook/validating"
+// Package testdata contains generated key pairs used by the unit tests of
+// mutating and validating webhooks. They are for testing only.
+package testdata // import "k8s.io/apiserver/pkg/admission/plugin/webhook/testdata"
