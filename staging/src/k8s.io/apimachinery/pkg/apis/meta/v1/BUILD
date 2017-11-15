@@ -55,6 +55,7 @@ go_library(
     deps = [
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/gogo/protobuf/sortkeys:go_default_library",
+        "//vendor/github.com/golang/protobuf/jsonpb:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",

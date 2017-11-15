@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/ghodss/yaml"
+	"github.com/golang/protobuf/jsonpb"
 )
 
 type TimeHolder struct {
@@ -193,5 +194,24 @@ func TestTimeEqual(t *testing.T) {
 				t.Errorf("Failed equality test for '%v', '%v': expected %+v, got %+v", c.x, c.y, c.result, result)
 			}
 		})
+	}
+}
+
+func TestTimeJsonPB(t *testing.T) {
+	in := NewTime(time.Now())
+
+	m := jsonpb.Marshaler{}
+	jstr, err := m.MarshalToString(&in)
+	if err != nil {
+		t.Fatalf("Failed to marshal output: '%v': %v", in, err)
+	}
+
+	var out Time
+	err = jsonpb.UnmarshalString(jstr, &out)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal output: '%v': %v", jstr, err)
+	}
+	if !reflect.DeepEqual(in, out) {
+		t.Errorf("Marshal->Unmarshal is not idempotent: '%v' vs '%v'", in, out)
 	}
 }

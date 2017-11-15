@@ -18,6 +18,8 @@ package v1
 
 import (
 	"time"
+
+	"github.com/golang/protobuf/jsonpb"
 )
 
 // Timestamp is a struct that is equivalent to Time, but intended for
@@ -89,4 +91,12 @@ func (m *Time) MarshalTo(data []byte) (int, error) {
 		return 0, nil
 	}
 	return m.ProtoTime().MarshalTo(data)
+}
+
+func (t Time) MarshalJSONPB(_ *jsonpb.Marshaler) ([]byte, error) {
+	return t.MarshalJSON()
+}
+
+func (t *Time) UnmarshalJSONPB(_ *jsonpb.Unmarshaler, jstr []byte) error {
+	return t.UnmarshalJSON(jstr)
 }
