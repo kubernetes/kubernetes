@@ -10,13 +10,8 @@ load("//pkg/version:def.bzl", "version_x_defs")
 go_binary(
     name = "kube-scheduler",
     embed = [":go_default_library"],
-    gc_linkopts = [
-        "-linkmode",
-        "external",
-        "-extldflags",
-        "-static",
-    ],
     importpath = "k8s.io/kubernetes/plugin/cmd/kube-scheduler",
+    pure = "on",
     x_defs = version_x_defs(),
 )
 

@@ -8,18 +8,8 @@ load("//pkg/version:def.bzl", "version_x_defs")
 go_binary(
     name = "kubectl",
     embed = [":go_default_library"],
-    gc_linkopts = select({
-        # Mac OS X doesn't support static binaries:
-        # https://developer.apple.com/library/content/qa/qa1118/_index.html
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [],
-        "//conditions:default": [
-            "-linkmode",
-            "external",
-            "-extldflags",
-            "-static",
-        ],
-    }),
     importpath = "k8s.io/kubernetes/cmd/kubectl",
+    pure = "on",
     visibility = ["//visibility:public"],
     x_defs = version_x_defs(),
 )
