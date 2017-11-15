@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	metricsclientset "k8s.io/metrics/pkg/client/clientset_generated/clientset"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -199,6 +200,10 @@ func (f *ring0Factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, er
 
 func (f *ring0Factory) KubernetesClientSet() (*kubernetes.Clientset, error) {
 	return f.clientCache.KubernetesClientSetForVersion(nil)
+}
+
+func (f *ring0Factory) MetricsClientSet() (metricsclientset.Interface, error) {
+	return f.clientCache.MetricsClientSetForVersion(nil)
 }
 
 func (f *ring0Factory) ClientSet() (internalclientset.Interface, error) {
