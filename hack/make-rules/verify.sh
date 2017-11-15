@@ -36,6 +36,7 @@ QUICK_PATTERNS+=(
   "verify-api-groups.sh"
   "verify-bazel.sh"
   "verify-boilerplate.sh"
+  "verify-build-tags.sh"
   "verify-generated-files-remake"
   "verify-godep-licenses.sh"
   "verify-gofmt.sh"
@@ -147,7 +148,7 @@ run-checks "${KUBE_ROOT}/hack/verify-*.sh" bash
 run-checks "${KUBE_ROOT}/hack/verify-*.py" python
 
 if [[ ${ret} -eq 1 ]]; then
-    print-failed-tests 
+    print-failed-tests
 fi
 exit ${ret}
 
