@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -40,6 +41,10 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				MasqueradeAll: true,
 				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 				MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+			},
+			IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
+				MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 			},
 			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				Max:        pointer.Int32Ptr(2),
@@ -75,6 +80,10 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 				},
+				IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
+					SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
+					MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
+				},
 				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
 					Max:        pointer.Int32Ptr(2),
 					MaxPerCore: pointer.Int32Ptr(1),
@@ -98,6 +107,10 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					MasqueradeAll: true,
 					SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+				},
+				IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
+					SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
+					MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 				},
 				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
 					Max:        pointer.Int32Ptr(2),
@@ -123,6 +136,10 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 				},
+				IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
+					SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
+					MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
+				},
 				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
 					Max:        pointer.Int32Ptr(2),
 					MaxPerCore: pointer.Int32Ptr(1),
@@ -146,6 +163,10 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					MasqueradeAll: true,
 					SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+				},
+				IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
+					SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
+					MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 				},
 				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
 					Max:        pointer.Int32Ptr(2),
@@ -171,6 +192,10 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 				},
+				IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
+					SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
+					MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
+				},
 				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
 					Max:        pointer.Int32Ptr(2),
 					MaxPerCore: pointer.Int32Ptr(1),
@@ -194,6 +219,10 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					MasqueradeAll: true,
 					SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+				},
+				IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
+					SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
+					MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 				},
 				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
 					Max:        pointer.Int32Ptr(2),
@@ -269,6 +298,16 @@ func TestValidateKubeProxyIPTablesConfiguration(t *testing.T) {
 			},
 			msg: "must be within the range [0, 31]",
 		},
+		// SyncPeriod must be >= MinSyncPeriod
+		{
+			config: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+				MasqueradeBit: &valid,
+				MasqueradeAll: true,
+				SyncPeriod:    metav1.Duration{Duration: 1 * time.Second},
+				MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
+			},
+			msg: fmt.Sprintf("must be greater than or equal to %s", newPath.Child("KubeProxyIPTablesConfiguration").Child("MinSyncPeriod").String()),
+		},
 	}
 
 	for _, errorCase := range errorCases {
@@ -276,6 +315,82 @@ func TestValidateKubeProxyIPTablesConfiguration(t *testing.T) {
 			t.Errorf("expected failure for %s", errorCase.msg)
 		} else if !strings.Contains(errs[0].Error(), errorCase.msg) {
 			t.Errorf("unexpected error: %v, expected: %s", errs[0], errorCase.msg)
+		}
+	}
+}
+
+func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
+	newPath := field.NewPath("KubeProxyConfiguration")
+	testCases := []struct {
+		config    kubeproxyconfig.KubeProxyIPVSConfiguration
+		expectErr bool
+		reason    string
+	}{
+		{
+			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				SyncPeriod:    metav1.Duration{Duration: -5 * time.Second},
+				MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+			},
+			expectErr: true,
+			reason:    "SyncPeriod must be greater than 0",
+		},
+		{
+			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				SyncPeriod:    metav1.Duration{Duration: 0 * time.Second},
+				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
+			},
+			expectErr: true,
+			reason:    "SyncPeriod must be greater than 0",
+		},
+		{
+			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+				MinSyncPeriod: metav1.Duration{Duration: -1 * time.Second},
+			},
+			expectErr: true,
+			reason:    "MinSyncPeriod must be greater than or equal to 0",
+		},
+		{
+			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				SyncPeriod:    metav1.Duration{Duration: 1 * time.Second},
+				MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
+			},
+			expectErr: true,
+			reason:    "SyncPeriod must be greater than or equal to MinSyncPeriod",
+		},
+		// SyncPeriod == MinSyncPeriod
+		{
+			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
+				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
+			},
+			expectErr: false,
+		},
+		// SyncPeriod > MinSyncPeriod
+		{
+			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
+				MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
+			},
+			expectErr: false,
+		},
+		// SyncPeriod can be 0
+		{
+			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+				MinSyncPeriod: metav1.Duration{Duration: 0 * time.Second},
+			},
+			expectErr: false,
+		},
+	}
+
+	for _, test := range testCases {
+		errs := validateKubeProxyIPVSConfiguration(test.config, newPath.Child("KubeProxyIPVSConfiguration"))
+		if len(errs) == 0 && test.expectErr {
+			t.Errorf("Expect error, got nil, reason: %s", test.reason)
+		}
+		if len(errs) > 0 && !test.expectErr {
+			t.Errorf("Unexpected error: %v", errs)
 		}
 	}
 }
@@ -371,7 +486,6 @@ func TestValidateKubeProxyConntrackConfiguration(t *testing.T) {
 
 func TestValidateProxyMode(t *testing.T) {
 	newPath := field.NewPath("KubeProxyConfiguration")
-
 	successCases := []kubeproxyconfig.ProxyMode{
 		kubeproxyconfig.ProxyModeUserspace,
 		kubeproxyconfig.ProxyModeIPTables,

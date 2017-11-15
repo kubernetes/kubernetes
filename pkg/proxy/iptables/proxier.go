@@ -443,11 +443,6 @@ func NewProxier(ipt utiliptables.Interface,
 	recorder record.EventRecorder,
 	healthzServer healthcheck.HealthzUpdater,
 ) (*Proxier, error) {
-	// check valid user input
-	if minSyncPeriod > syncPeriod {
-		return nil, fmt.Errorf("minSyncPeriod (%v) must be <= syncPeriod (%v)", minSyncPeriod, syncPeriod)
-	}
-
 	// Set the route_localnet sysctl we need for
 	if err := sysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
 		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
@@ -461,9 +456,6 @@ func NewProxier(ipt utiliptables.Interface,
 	}
 
 	// Generate the masquerade mark to use for SNAT rules.
-	if masqueradeBit < 0 || masqueradeBit > 31 {
-		return nil, fmt.Errorf("invalid iptables-masquerade-bit %v not in [0, 31]", masqueradeBit)
-	}
 	masqueradeValue := 1 << uint(masqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x/%#08x", masqueradeValue, masqueradeValue)
 
