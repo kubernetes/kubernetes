@@ -31,3 +31,38 @@ const (
 func IsPVCBeingDeleted(pvc *v1.PersistentVolumeClaim) bool {
 	return pvc.ObjectMeta.DeletionTimestamp != nil
 }
+
+// IsProtectionFinalizerPresent returns true in case PVCProtectionFinalizer is
+// present among the pvc.Finalizers
+func IsProtectionFinalizerPresent(pvc *v1.PersistentVolumeClaim) bool {
+	for _, finalizer := range pvc.Finalizers {
+		if finalizer == PVCProtectionFinalizer {
+			return true
+		}
+	}
+	return false
+}
+
+// RemoveProtectionFinalizer returns pvc without PVCProtectionFinalizer in case
+// it's present in pvc.Finalizers. It expects that pvc is writable (i.e. is not
+// informer's cached copy.)
+func RemoveProtectionFinalizer(pvc *v1.PersistentVolumeClaim) {
+	newFinalizers := make([]string, 0)
+	for _, finalizer := range pvc.Finalizers {
+		if finalizer != PVCProtectionFinalizer {
+			newFinalizers = append(newFinalizers, finalizer)
+		}
+	}
+	if len(newFinalizers) == 0 {
+		// Sanitize for unit tests so we don't need to distinguish empty array
+		// and nil.
+		newFinalizers = nil
+	}
+	pvc.Finalizers = newFinalizers
+}
+
+// AddProtectionFinalizer adds PVCProtectionFinalizer to pvc. It expects that
+// pvc is writable (i.e. is not informer's cached copy.)
+func AddProtectionFinalizer(pvc *v1.PersistentVolumeClaim) {
+	pvc.Finalizers = append(pvc.Finalizers, PVCProtectionFinalizer)
+}
