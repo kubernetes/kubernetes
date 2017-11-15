@@ -39,6 +39,12 @@ const (
 	//
 	// CustomResourceSubresources defines the subresources for CustomResources
 	CustomResourceSubresources utilfeature.Feature = "CustomResourceSubresources"
+
+	// owner: @sttts, @nikhita
+	// alpha: v1.9
+	//
+	// CustomResourceDefaulting enables defaulting for CustomResources with default given in the validation schema.
+	CustomResourceDefaulting utilfeature.Feature = "CustomResourceDefaulting"
 )
 
 func init() {
@@ -51,4 +57,5 @@ func init() {
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
 	CustomResourceValidation:   {Default: true, PreRelease: utilfeature.Beta},
 	CustomResourceSubresources: {Default: false, PreRelease: utilfeature.Alpha},
+	CustomResourceDefaulting:   {Default: false, PreRelease: utilfeature.Alpha},
 }
