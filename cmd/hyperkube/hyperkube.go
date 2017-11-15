@@ -42,6 +42,7 @@ type HyperKube struct {
 	Long string // A long description of the binary.  It will be world wrapped before output.
 
 	servers             []Server
+	alphaServers        []Server
 	baseFlags           *pflag.FlagSet
 	out                 io.Writer
 	helpFlagVal         bool
@@ -54,9 +55,24 @@ func (hk *HyperKube) AddServer(s *Server) {
 	hk.servers[len(hk.servers)-1].hk = hk
 }
 
+// AddServer adds an alpha server to the HyperKube object.
+func (hk *HyperKube) AddAlphaServer(s *Server) {
+	hk.alphaServers = append(hk.alphaServers, *s)
+	hk.alphaServers[len(hk.alphaServers)-1].hk = hk
+}
+
 // FindServer will find a specific server named name.
 func (hk *HyperKube) FindServer(name string) (*Server, error) {
-	for _, s := range hk.servers {
+	return findServer(name, hk.servers)
+}
+
+// FindServer will find a specific alpha server named name.
+func (hk *HyperKube) FindAlphaServer(name string) (*Server, error) {
+	return findServer(name, hk.alphaServers)
+}
+
+func findServer(name string, servers []Server) (*Server, error) {
+	for _, s := range servers {
 		if s.Name() == name || s.AlternativeName == name {
 			return &s, nil
 		}
@@ -154,7 +170,23 @@ func (hk *HyperKube) Run(args []string, stopCh <-chan struct{}) error {
 		}
 	}
 
-	s, err := hk.FindServer(serverName)
+	var s *Server
+	var err error
+	if serverName == "alpha" {
+		if len(args) > 0 && len(args[0]) > 0 {
+			serverName = args[0]
+			args = args[1:]
+			hk.Printf("Warning: alpha command syntax is unstable!\n\n")
+		} else {
+			err = errors.New("no alpha server specified")
+			hk.Printf("Error: %v\n\n", err)
+			hk.Usage()
+			return err
+		}
+		s, err = hk.FindAlphaServer(serverName)
+	} else {
+		s, err = hk.FindServer(serverName)
+	}
 	if err != nil {
 		hk.Printf("Error: %v\n\n", err)
 		hk.Usage()
