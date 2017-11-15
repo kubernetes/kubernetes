@@ -335,7 +335,7 @@ func waitLoadbalancerActiveProvisioningStatus(client *gophercloud.ServiceClient,
 		if loadbalancer.ProvisioningStatus == activeStatus {
 			return true, nil
 		} else if loadbalancer.ProvisioningStatus == errorStatus {
-			return true, fmt.Errorf("Loadbalancer has gone into ERROR state")
+			return true, fmt.Errorf("loadbalancer has gone into ERROR state")
 		} else {
 			return false, nil
 		}
@@ -343,7 +343,7 @@ func waitLoadbalancerActiveProvisioningStatus(client *gophercloud.ServiceClient,
 	})
 
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("Loadbalancer failed to go into ACTIVE provisioning status within alloted time")
+		err = fmt.Errorf("loadbalancer failed to go into ACTIVE provisioning status within alloted time")
 	}
 	return provisioningStatus, err
 }
@@ -368,7 +368,7 @@ func waitLoadbalancerDeleted(client *gophercloud.ServiceClient, loadbalancerID s
 	})
 
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("Loadbalancer failed to delete within the alloted time")
+		err = fmt.Errorf("loadbalancer failed to delete within the alloted time")
 	}
 
 	return err
@@ -444,7 +444,7 @@ func (lbaas *LbaasV2) createLoadBalancer(service *v1.Service, name string, inter
 
 	loadbalancer, err := loadbalancers.Create(lbaas.network, createOpts).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating loadbalancer %v: %v", createOpts, err)
+		return nil, fmt.Errorf("error creating loadbalancer %v: %v", createOpts, err)
 	}
 	return loadbalancer, nil
 }
@@ -465,7 +465,7 @@ func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *v1.Service) (
 	if portID != "" {
 		floatIP, err := getFloatingIPByPortID(lbaas.network, portID)
 		if err != nil {
-			return nil, false, fmt.Errorf("Error getting floating ip for port %s: %v", portID, err)
+			return nil, false, fmt.Errorf("error getting floating ip for port %s: %v", portID, err)
 		}
 		status.Ingress = []v1.LoadBalancerIngress{{IP: floatIP.FloatingIP}}
 	} else {
