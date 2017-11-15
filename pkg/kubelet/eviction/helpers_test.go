@@ -409,17 +409,71 @@ func thresholdEqual(a evictionapi.Threshold, b evictionapi.Threshold) bool {
 		compareThresholdValue(a.Value, b.Value)
 }
 
-// TestOrderedByPriority ensures we order BestEffort < Burstable < Guaranteed
+func TestOrderedByExceedsRequestMemory(t *testing.T) {
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
+	below := newPod("below-requests", -1, []v1.Container{
+		newContainer("below-requests", newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+	}, nil)
+	exceeds := newPod("exceeds-requests", 1, []v1.Container{
+		newContainer("exceeds-requests", newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+	}, nil)
+	stats := map[*v1.Pod]statsapi.PodStats{
+		below:   newPodMemoryStats(below, resource.MustParse("199Mi")),   // -1 relative to request
+		exceeds: newPodMemoryStats(exceeds, resource.MustParse("101Mi")), // 1 relative to request
+	}
+	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
+		result, found := stats[pod]
+		return result, found
+	}
+	pods := []*v1.Pod{below, exceeds}
+	orderedBy(exceedMemoryRequests(statsFn)).Sort(pods)
+
+	expected := []*v1.Pod{exceeds, below}
+	for i := range expected {
+		if pods[i] != expected[i] {
+			t.Errorf("Expected pod: %s, but got: %s", expected[i].Name, pods[i].Name)
+		}
+	}
+}
+
+func TestOrderedByExceedsRequestDisk(t *testing.T) {
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.LocalStorageCapacityIsolation))
+	below := newPod("below-requests", -1, []v1.Container{
+		newContainer("below-requests", v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("200Mi")}, newResourceList("", "", "")),
+	}, nil)
+	exceeds := newPod("exceeds-requests", 1, []v1.Container{
+		newContainer("exceeds-requests", v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("100Mi")}, newResourceList("", "", "")),
+	}, nil)
+	stats := map[*v1.Pod]statsapi.PodStats{
+		below:   newPodDiskStats(below, resource.MustParse("100Mi"), resource.MustParse("99Mi"), resource.MustParse("0Mi")),  // -1 relative to request
+		exceeds: newPodDiskStats(exceeds, resource.MustParse("90Mi"), resource.MustParse("11Mi"), resource.MustParse("0Mi")), // 1 relative to request
+	}
+	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
+		result, found := stats[pod]
+		return result, found
+	}
+	pods := []*v1.Pod{below, exceeds}
+	orderedBy(exceedDiskRequests(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, resourceDisk)).Sort(pods)
+
+	expected := []*v1.Pod{exceeds, below}
+	for i := range expected {
+		if pods[i] != expected[i] {
+			t.Errorf("Expected pod: %s, but got: %s", expected[i].Name, pods[i].Name)
+		}
+	}
+}
+
 func TestOrderedByPriority(t *testing.T) {
-	enablePodPriority(true)
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
 	low := newPod("low-priority", -134, []v1.Container{
-		newContainer("low-priority", newResourceList("", ""), newResourceList("", "")),
+		newContainer("low-priority", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, nil)
 	medium := newPod("medium-priority", 1, []v1.Container{
-		newContainer("medium-priority", newResourceList("100m", "100Mi"), newResourceList("200m", "200Mi")),
+		newContainer("medium-priority", newResourceList("100m", "100Mi", ""), newResourceList("200m", "200Mi", "")),
 	}, nil)
 	high := newPod("high-priority", 12534, []v1.Container{
-		newContainer("high-priority", newResourceList("200m", "200Mi"), newResourceList("200m", "200Mi")),
+		newContainer("high-priority", newResourceList("200m", "200Mi", ""), newResourceList("200m", "200Mi", "")),
 	}, nil)
 
 	pods := []*v1.Pod{high, medium, low}
@@ -433,17 +487,16 @@ func TestOrderedByPriority(t *testing.T) {
 	}
 }
 
-// TestOrderedByPriority ensures we order BestEffort < Burstable < Guaranteed
 func TestOrderedByPriorityDisabled(t *testing.T) {
-	enablePodPriority(false)
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=false", features.PodPriority))
 	low := newPod("low-priority", lowPriority, []v1.Container{
-		newContainer("low-priority", newResourceList("", ""), newResourceList("", "")),
+		newContainer("low-priority", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, nil)
 	medium := newPod("medium-priority", defaultPriority, []v1.Container{
-		newContainer("medium-priority", newResourceList("100m", "100Mi"), newResourceList("200m", "200Mi")),
+		newContainer("medium-priority", newResourceList("100m", "100Mi", ""), newResourceList("200m", "200Mi", "")),
 	}, nil)
 	high := newPod("high-priority", highPriority, []v1.Container{
-		newContainer("high-priority", newResourceList("200m", "200Mi"), newResourceList("200m", "200Mi")),
+		newContainer("high-priority", newResourceList("200m", "200Mi", ""), newResourceList("200m", "200Mi", "")),
 	}, nil)
 
 	pods := []*v1.Pod{high, medium, low}
@@ -459,74 +512,64 @@ func TestOrderedByPriorityDisabled(t *testing.T) {
 }
 
 func TestOrderedbyDisk(t *testing.T) {
-	testOrderedByResource(t, resourceDisk, newPodDiskStats)
-}
-
-func TestOrderedbyInodes(t *testing.T) {
-	testOrderedByResource(t, resourceInodes, newPodInodeStats)
-}
-
-// testOrderedByDisk ensures we order pods by greediest resource consumer
-func testOrderedByResource(t *testing.T, orderedByResource v1.ResourceName,
-	newPodStatsFunc func(pod *v1.Pod, rootFsUsed, logsUsed, perLocalVolumeUsed resource.Quantity) statsapi.PodStats) {
-	enablePodPriority(true)
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.LocalStorageCapacityIsolation))
 	pod1 := newPod("best-effort-high", defaultPriority, []v1.Container{
-		newContainer("best-effort-high", newResourceList("", ""), newResourceList("", "")),
+		newContainer("best-effort-high", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	pod2 := newPod("best-effort-low", defaultPriority, []v1.Container{
-		newContainer("best-effort-low", newResourceList("", ""), newResourceList("", "")),
+		newContainer("best-effort-low", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	pod3 := newPod("burstable-high", defaultPriority, []v1.Container{
-		newContainer("burstable-high", newResourceList("100m", "100Mi"), newResourceList("200m", "1Gi")),
+		newContainer("burstable-high", newResourceList("", "", "100Mi"), newResourceList("", "", "400Mi")),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	pod4 := newPod("burstable-low", defaultPriority, []v1.Container{
-		newContainer("burstable-low", newResourceList("100m", "100Mi"), newResourceList("200m", "1Gi")),
+		newContainer("burstable-low", newResourceList("", "", "100Mi"), newResourceList("", "", "400Mi")),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	pod5 := newPod("guaranteed-high", defaultPriority, []v1.Container{
-		newContainer("guaranteed-high", newResourceList("100m", "1Gi"), newResourceList("100m", "1Gi")),
+		newContainer("guaranteed-high", newResourceList("", "", "400Mi"), newResourceList("", "", "400Mi")),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	pod6 := newPod("guaranteed-low", defaultPriority, []v1.Container{
-		newContainer("guaranteed-low", newResourceList("100m", "1Gi"), newResourceList("100m", "1Gi")),
+		newContainer("guaranteed-low", newResourceList("", "", "400Mi"), newResourceList("", "", "400Mi")),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	stats := map[*v1.Pod]statsapi.PodStats{
-		pod1: newPodStatsFunc(pod1, resource.MustParse("50Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")),  // 200Mi
-		pod2: newPodStatsFunc(pod2, resource.MustParse("100Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 300Mi
-		pod3: newPodStatsFunc(pod3, resource.MustParse("200Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 400Mi
-		pod4: newPodStatsFunc(pod4, resource.MustParse("300Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 450Mi
-		pod5: newPodStatsFunc(pod5, resource.MustParse("400Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 550Mi
-		pod6: newPodStatsFunc(pod6, resource.MustParse("500Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 650Mi
+		pod1: newPodDiskStats(pod1, resource.MustParse("50Mi"), resource.MustParse("100Mi"), resource.MustParse("150Mi")), // 300Mi - 0 = 300Mi
+		pod2: newPodDiskStats(pod2, resource.MustParse("25Mi"), resource.MustParse("25Mi"), resource.MustParse("50Mi")),   // 100Mi - 0 = 100Mi
+		pod3: newPodDiskStats(pod3, resource.MustParse("150Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 350Mi - 100Mi = 250Mi
+		pod4: newPodDiskStats(pod4, resource.MustParse("25Mi"), resource.MustParse("35Mi"), resource.MustParse("50Mi")),   // 110Mi - 100Mi = 10Mi
+		pod5: newPodDiskStats(pod5, resource.MustParse("225Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 375Mi - 400Mi = -25Mi
+		pod6: newPodDiskStats(pod6, resource.MustParse("25Mi"), resource.MustParse("45Mi"), resource.MustParse("50Mi")),   // 120Mi - 400Mi = -280Mi
 	}
 	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
 		result, found := stats[pod]
 		return result, found
 	}
 	pods := []*v1.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
-	orderedBy(disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, orderedByResource)).Sort(pods)
-	expected := []*v1.Pod{pod6, pod5, pod4, pod3, pod2, pod1}
+	orderedBy(disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, resourceDisk)).Sort(pods)
+	expected := []*v1.Pod{pod1, pod3, pod2, pod4, pod5, pod6}
 	for i := range expected {
 		if pods[i] != expected[i] {
 			t.Errorf("Expected pod[%d]: %s, but got: %s", i, expected[i].Name, pods[i].Name)
@@ -534,58 +577,244 @@ func testOrderedByResource(t *testing.T, orderedByResource v1.ResourceName,
 	}
 }
 
-func TestOrderedbyPriorityDisk(t *testing.T) {
-	testOrderedByPriorityResource(t, resourceDisk, newPodDiskStats)
-}
-
-func TestOrderedbyPriorityInodes(t *testing.T) {
-	testOrderedByPriorityResource(t, resourceInodes, newPodInodeStats)
-}
-
-// testOrderedByPriorityDisk ensures we order pods by qos and then greediest resource consumer
-func testOrderedByPriorityResource(t *testing.T, orderedByResource v1.ResourceName,
-	newPodStatsFunc func(pod *v1.Pod, rootFsUsed, logsUsed, perLocalVolumeUsed resource.Quantity) statsapi.PodStats) {
-	enablePodPriority(true)
-	pod1 := newPod("low-priority-high-usage", lowPriority, []v1.Container{
-		newContainer("low-priority-high-usage", newResourceList("", ""), newResourceList("", "")),
+// Tests that we correctly ignore disk requests when the local storage feature gate is disabled.
+func TestOrderedbyDiskDisableLocalStorage(t *testing.T) {
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=false", features.LocalStorageCapacityIsolation))
+	pod1 := newPod("best-effort-high", defaultPriority, []v1.Container{
+		newContainer("best-effort-high", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
-	pod2 := newPod("low-priority-low-usage", lowPriority, []v1.Container{
-		newContainer("low-priority-low-usage", newResourceList("", ""), newResourceList("", "")),
+	pod2 := newPod("best-effort-low", defaultPriority, []v1.Container{
+		newContainer("best-effort-low", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
-	pod3 := newPod("high-priority-high-usage", highPriority, []v1.Container{
-		newContainer("high-priority-high-usage", newResourceList("100m", "100Mi"), newResourceList("200m", "1Gi")),
+	pod3 := newPod("burstable-high", defaultPriority, []v1.Container{
+		newContainer("burstable-high", newResourceList("", "", "100Mi"), newResourceList("", "", "400Mi")),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
-	pod4 := newPod("high-priority-low-usage", highPriority, []v1.Container{
-		newContainer("high-priority-low-usage", newResourceList("100m", "100Mi"), newResourceList("200m", "1Gi")),
+	pod4 := newPod("burstable-low", defaultPriority, []v1.Container{
+		newContainer("burstable-low", newResourceList("", "", "100Mi"), newResourceList("", "", "400Mi")),
+	}, []v1.Volume{
+		newVolume("local-volume", v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		}),
+	})
+	pod5 := newPod("guaranteed-high", defaultPriority, []v1.Container{
+		newContainer("guaranteed-high", newResourceList("", "", "400Mi"), newResourceList("", "", "400Mi")),
+	}, []v1.Volume{
+		newVolume("local-volume", v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		}),
+	})
+	pod6 := newPod("guaranteed-low", defaultPriority, []v1.Container{
+		newContainer("guaranteed-low", newResourceList("", "", "400Mi"), newResourceList("", "", "400Mi")),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	stats := map[*v1.Pod]statsapi.PodStats{
-		pod1: newPodStatsFunc(pod1, resource.MustParse("50Mi"), resource.MustParse("100Mi"), resource.MustParse("250Mi")), // 400Mi
-		pod2: newPodStatsFunc(pod2, resource.MustParse("60Mi"), resource.MustParse("30Mi"), resource.MustParse("10Mi")),   // 100Mi
-		pod3: newPodStatsFunc(pod3, resource.MustParse("150Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 350Mi
-		pod4: newPodStatsFunc(pod4, resource.MustParse("10Mi"), resource.MustParse("40Mi"), resource.MustParse("100Mi")),  // 150Mi
+		pod1: newPodDiskStats(pod1, resource.MustParse("50Mi"), resource.MustParse("100Mi"), resource.MustParse("150Mi")), // 300Mi
+		pod2: newPodDiskStats(pod2, resource.MustParse("25Mi"), resource.MustParse("25Mi"), resource.MustParse("50Mi")),   // 100Mi
+		pod3: newPodDiskStats(pod3, resource.MustParse("150Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 350Mi
+		pod4: newPodDiskStats(pod4, resource.MustParse("25Mi"), resource.MustParse("35Mi"), resource.MustParse("50Mi")),   // 110Mi
+		pod5: newPodDiskStats(pod5, resource.MustParse("225Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 375Mi
+		pod6: newPodDiskStats(pod6, resource.MustParse("25Mi"), resource.MustParse("45Mi"), resource.MustParse("50Mi")),   // 120Mi
+	}
+	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
+		result, found := stats[pod]
+		return result, found
+	}
+	pods := []*v1.Pod{pod1, pod3, pod2, pod4, pod5, pod6}
+	orderedBy(disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, resourceDisk)).Sort(pods)
+	expected := []*v1.Pod{pod5, pod3, pod1, pod6, pod4, pod2}
+	for i := range expected {
+		if pods[i] != expected[i] {
+			t.Errorf("Expected pod[%d]: %s, but got: %s", i, expected[i].Name, pods[i].Name)
+		}
+	}
+}
+
+func TestOrderedbyInodes(t *testing.T) {
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.LocalStorageCapacityIsolation))
+	low := newPod("low", defaultPriority, []v1.Container{
+		newContainer("low", newResourceList("", "", ""), newResourceList("", "", "")),
+	}, []v1.Volume{
+		newVolume("local-volume", v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		}),
+	})
+	medium := newPod("medium", defaultPriority, []v1.Container{
+		newContainer("medium", newResourceList("", "", ""), newResourceList("", "", "")),
+	}, []v1.Volume{
+		newVolume("local-volume", v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		}),
+	})
+	high := newPod("high", defaultPriority, []v1.Container{
+		newContainer("high", newResourceList("", "", ""), newResourceList("", "", "")),
+	}, []v1.Volume{
+		newVolume("local-volume", v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		}),
+	})
+	stats := map[*v1.Pod]statsapi.PodStats{
+		low:    newPodInodeStats(low, resource.MustParse("50000"), resource.MustParse("100000"), resource.MustParse("50000")),     // 200000
+		medium: newPodInodeStats(medium, resource.MustParse("100000"), resource.MustParse("150000"), resource.MustParse("50000")), // 300000
+		high:   newPodInodeStats(high, resource.MustParse("200000"), resource.MustParse("150000"), resource.MustParse("50000")),   // 400000
+	}
+	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
+		result, found := stats[pod]
+		return result, found
+	}
+	pods := []*v1.Pod{low, medium, high}
+	orderedBy(disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, resourceInodes)).Sort(pods)
+	expected := []*v1.Pod{high, medium, low}
+	for i := range expected {
+		if pods[i] != expected[i] {
+			t.Errorf("Expected pod[%d]: %s, but got: %s", i, expected[i].Name, pods[i].Name)
+		}
+	}
+}
+
+// TestOrderedByPriorityDisk ensures we order pods by priority and then greediest resource consumer
+func TestOrderedByPriorityDisk(t *testing.T) {
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.LocalStorageCapacityIsolation))
+	pod1 := newPod("above-requests-low-priority-high-usage", lowPriority, []v1.Container{
+		newContainer("above-requests-low-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", "")),
+	}, []v1.Volume{
+		newVolume("local-volume", v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		}),
+	})
+	pod2 := newPod("above-requests-low-priority-low-usage", lowPriority, []v1.Container{
+		newContainer("above-requests-low-priority-low-usage", newResourceList("", "", ""), newResourceList("", "", "")),
+	}, []v1.Volume{
+		newVolume("local-volume", v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		}),
+	})
+	pod3 := newPod("above-requests-high-priority-high-usage", highPriority, []v1.Container{
+		newContainer("above-requests-high-priority-high-usage", newResourceList("", "", "100Mi"), newResourceList("", "", "")),
+	}, []v1.Volume{
+		newVolume("local-volume", v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		}),
+	})
+	pod4 := newPod("above-requests-high-priority-low-usage", highPriority, []v1.Container{
+		newContainer("above-requests-high-priority-low-usage", newResourceList("", "", "100Mi"), newResourceList("", "", "")),
+	}, []v1.Volume{
+		newVolume("local-volume", v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		}),
+	})
+	pod5 := newPod("below-requests-low-priority-high-usage", lowPriority, []v1.Container{
+		newContainer("below-requests-low-priority-high-usage", newResourceList("", "", "1Gi"), newResourceList("", "", "")),
+	}, []v1.Volume{
+		newVolume("local-volume", v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		}),
+	})
+	pod6 := newPod("below-requests-low-priority-low-usage", lowPriority, []v1.Container{
+		newContainer("below-requests-low-priority-low-usage", newResourceList("", "", "1Gi"), newResourceList("", "", "")),
+	}, []v1.Volume{
+		newVolume("local-volume", v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		}),
+	})
+	pod7 := newPod("below-requests-high-priority-high-usage", highPriority, []v1.Container{
+		newContainer("below-requests-high-priority-high-usage", newResourceList("", "", "1Gi"), newResourceList("", "", "")),
+	}, []v1.Volume{
+		newVolume("local-volume", v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		}),
+	})
+	pod8 := newPod("below-requests-high-priority-low-usage", highPriority, []v1.Container{
+		newContainer("below-requests-high-priority-low-usage", newResourceList("", "", "1Gi"), newResourceList("", "", "")),
+	}, []v1.Volume{
+		newVolume("local-volume", v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		}),
+	})
+	stats := map[*v1.Pod]statsapi.PodStats{
+		pod1: newPodDiskStats(pod1, resource.MustParse("200Mi"), resource.MustParse("100Mi"), resource.MustParse("200Mi")), // 500 relative to request
+		pod2: newPodDiskStats(pod2, resource.MustParse("10Mi"), resource.MustParse("10Mi"), resource.MustParse("30Mi")),    // 50 relative to request
+		pod3: newPodDiskStats(pod3, resource.MustParse("200Mi"), resource.MustParse("150Mi"), resource.MustParse("250Mi")), // 500 relative to request
+		pod4: newPodDiskStats(pod4, resource.MustParse("90Mi"), resource.MustParse("50Mi"), resource.MustParse("10Mi")),    // 50 relative to request
+		pod5: newPodDiskStats(pod5, resource.MustParse("500Mi"), resource.MustParse("200Mi"), resource.MustParse("100Mi")), // -200 relative to request
+		pod6: newPodDiskStats(pod6, resource.MustParse("50Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")),   // -800 relative to request
+		pod7: newPodDiskStats(pod7, resource.MustParse("250Mi"), resource.MustParse("500Mi"), resource.MustParse("50Mi")),  // -200 relative to request
+		pod8: newPodDiskStats(pod8, resource.MustParse("100Mi"), resource.MustParse("60Mi"), resource.MustParse("40Mi")),   // -800 relative to request
+	}
+	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
+		result, found := stats[pod]
+		return result, found
+	}
+	pods := []*v1.Pod{pod8, pod7, pod6, pod5, pod4, pod3, pod2, pod1}
+	expected := []*v1.Pod{pod1, pod2, pod3, pod4, pod5, pod6, pod7, pod8}
+	fsStatsToMeasure := []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}
+	orderedBy(exceedDiskRequests(statsFn, fsStatsToMeasure, resourceDisk), priority, disk(statsFn, fsStatsToMeasure, resourceDisk)).Sort(pods)
+	for i := range expected {
+		if pods[i] != expected[i] {
+			t.Errorf("Expected pod[%d]: %s, but got: %s", i, expected[i].Name, pods[i].Name)
+		}
+	}
+}
+
+// TestOrderedByPriorityInodes ensures we order pods by priority and then greediest resource consumer
+func TestOrderedByPriorityInodes(t *testing.T) {
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
+	pod1 := newPod("low-priority-high-usage", lowPriority, []v1.Container{
+		newContainer("low-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", "")),
+	}, []v1.Volume{
+		newVolume("local-volume", v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		}),
+	})
+	pod2 := newPod("low-priority-low-usage", lowPriority, []v1.Container{
+		newContainer("low-priority-low-usage", newResourceList("", "", ""), newResourceList("", "", "")),
+	}, []v1.Volume{
+		newVolume("local-volume", v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		}),
+	})
+	pod3 := newPod("high-priority-high-usage", highPriority, []v1.Container{
+		newContainer("high-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", "")),
+	}, []v1.Volume{
+		newVolume("local-volume", v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		}),
+	})
+	pod4 := newPod("high-priority-low-usage", highPriority, []v1.Container{
+		newContainer("high-priority-low-usage", newResourceList("", "", ""), newResourceList("", "", "")),
+	}, []v1.Volume{
+		newVolume("local-volume", v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		}),
+	})
+	stats := map[*v1.Pod]statsapi.PodStats{
+		pod1: newPodInodeStats(pod1, resource.MustParse("50000"), resource.MustParse("100000"), resource.MustParse("250000")), // 400000
+		pod2: newPodInodeStats(pod2, resource.MustParse("60000"), resource.MustParse("30000"), resource.MustParse("10000")),   // 100000
+		pod3: newPodInodeStats(pod3, resource.MustParse("150000"), resource.MustParse("150000"), resource.MustParse("50000")), // 350000
+		pod4: newPodInodeStats(pod4, resource.MustParse("10000"), resource.MustParse("40000"), resource.MustParse("100000")),  // 150000
 	}
 	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
 		result, found := stats[pod]
 		return result, found
 	}
 	pods := []*v1.Pod{pod4, pod3, pod2, pod1}
-	orderedBy(priority, disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, orderedByResource)).Sort(pods)
+	orderedBy(priority, disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, resourceInodes)).Sort(pods)
 	expected := []*v1.Pod{pod1, pod2, pod3, pod4}
 	for i := range expected {
 		if pods[i] != expected[i] {
@@ -597,22 +826,22 @@ func testOrderedByPriorityResource(t *testing.T, orderedByResource v1.ResourceNa
 // TestOrderedByMemory ensures we order pods by greediest memory consumer relative to request.
 func TestOrderedByMemory(t *testing.T) {
 	pod1 := newPod("best-effort-high", defaultPriority, []v1.Container{
-		newContainer("best-effort-high", newResourceList("", ""), newResourceList("", "")),
+		newContainer("best-effort-high", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, nil)
 	pod2 := newPod("best-effort-low", defaultPriority, []v1.Container{
-		newContainer("best-effort-low", newResourceList("", ""), newResourceList("", "")),
+		newContainer("best-effort-low", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, nil)
 	pod3 := newPod("burstable-high", defaultPriority, []v1.Container{
-		newContainer("burstable-high", newResourceList("100m", "100Mi"), newResourceList("200m", "1Gi")),
+		newContainer("burstable-high", newResourceList("", "100Mi", ""), newResourceList("", "1Gi", "")),
 	}, nil)
 	pod4 := newPod("burstable-low", defaultPriority, []v1.Container{
-		newContainer("burstable-low", newResourceList("100m", "100Mi"), newResourceList("200m", "1Gi")),
+		newContainer("burstable-low", newResourceList("", "100Mi", ""), newResourceList("", "1Gi", "")),
 	}, nil)
 	pod5 := newPod("guaranteed-high", defaultPriority, []v1.Container{
-		newContainer("guaranteed-high", newResourceList("100m", "1Gi"), newResourceList("100m", "1Gi")),
+		newContainer("guaranteed-high", newResourceList("", "1Gi", ""), newResourceList("", "1Gi", "")),
 	}, nil)
 	pod6 := newPod("guaranteed-low", defaultPriority, []v1.Container{
-		newContainer("guaranteed-low", newResourceList("100m", "1Gi"), newResourceList("100m", "1Gi")),
+		newContainer("guaranteed-low", newResourceList("", "1Gi", ""), newResourceList("", "1Gi", "")),
 	}, nil)
 	stats := map[*v1.Pod]statsapi.PodStats{
 		pod1: newPodMemoryStats(pod1, resource.MustParse("500Mi")), // 500 relative to request
@@ -638,30 +867,30 @@ func TestOrderedByMemory(t *testing.T) {
 
 // TestOrderedByPriorityMemory ensures we order by priority and then memory consumption relative to request.
 func TestOrderedByPriorityMemory(t *testing.T) {
-	enablePodPriority(true)
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
 	pod1 := newPod("above-requests-low-priority-high-usage", lowPriority, []v1.Container{
-		newContainer("above-requests-low-priority-high-usage", newResourceList("", ""), newResourceList("", "")),
+		newContainer("above-requests-low-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, nil)
 	pod2 := newPod("above-requests-low-priority-low-usage", lowPriority, []v1.Container{
-		newContainer("above-requests-low-priority-low-usage", newResourceList("", ""), newResourceList("", "")),
+		newContainer("above-requests-low-priority-low-usage", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, nil)
 	pod3 := newPod("above-requests-high-priority-high-usage", highPriority, []v1.Container{
-		newContainer("above-requests-high-priority-high-usage", newResourceList("", "100Mi"), newResourceList("", "")),
+		newContainer("above-requests-high-priority-high-usage", newResourceList("", "100Mi", ""), newResourceList("", "", "")),
 	}, nil)
 	pod4 := newPod("above-requests-high-priority-low-usage", highPriority, []v1.Container{
-		newContainer("above-requests-high-priority-low-usage", newResourceList("", "100Mi"), newResourceList("", "")),
+		newContainer("above-requests-high-priority-low-usage", newResourceList("", "100Mi", ""), newResourceList("", "", "")),
 	}, nil)
 	pod5 := newPod("below-requests-low-priority-high-usage", lowPriority, []v1.Container{
-		newContainer("below-requests-low-priority-high-usage", newResourceList("", "1Gi"), newResourceList("", "")),
+		newContainer("below-requests-low-priority-high-usage", newResourceList("", "1Gi", ""), newResourceList("", "", "")),
 	}, nil)
 	pod6 := newPod("below-requests-low-priority-low-usage", lowPriority, []v1.Container{
-		newContainer("below-requests-low-priority-low-usage", newResourceList("", "1Gi"), newResourceList("", "")),
+		newContainer("below-requests-low-priority-low-usage", newResourceList("", "1Gi", ""), newResourceList("", "", "")),
 	}, nil)
 	pod7 := newPod("below-requests-high-priority-high-usage", highPriority, []v1.Container{
-		newContainer("below-requests-high-priority-high-usage", newResourceList("", "1Gi"), newResourceList("", "")),
+		newContainer("below-requests-high-priority-high-usage", newResourceList("", "1Gi", ""), newResourceList("", "", "")),
 	}, nil)
 	pod8 := newPod("below-requests-high-priority-low-usage", highPriority, []v1.Container{
-		newContainer("below-requests-high-priority-low-usage", newResourceList("", "1Gi"), newResourceList("", "")),
+		newContainer("below-requests-high-priority-low-usage", newResourceList("", "1Gi", ""), newResourceList("", "", "")),
 	}, nil)
 	stats := map[*v1.Pod]statsapi.PodStats{
 		pod1: newPodMemoryStats(pod1, resource.MustParse("500Mi")), // 500 relative to request
@@ -678,7 +907,6 @@ func TestOrderedByPriorityMemory(t *testing.T) {
 		return result, found
 	}
 	pods := []*v1.Pod{pod8, pod7, pod6, pod5, pod4, pod3, pod2, pod1}
-	// pods := []*v1.Pod{pod1, pod2, pod3, pod4, pod5, pod6, pod7, pod8}
 	expected := []*v1.Pod{pod1, pod2, pod3, pod4, pod5, pod6, pod7, pod8}
 	orderedBy(exceedMemoryRequests(statsFn), priority, memory(statsFn)).Sort(pods)
 	for i := range expected {
@@ -1589,13 +1817,16 @@ func newPodMemoryStats(pod *v1.Pod, workingSet resource.Quantity) statsapi.PodSt
 	return result
 }
 
-func newResourceList(cpu, memory string) v1.ResourceList {
+func newResourceList(cpu, memory, disk string) v1.ResourceList {
 	res := v1.ResourceList{}
 	if cpu != "" {
 		res[v1.ResourceCPU] = resource.MustParse(cpu)
 	}
 	if memory != "" {
 		res[v1.ResourceMemory] = resource.MustParse(memory)
+	}
+	if disk != "" {
+		res[v1.ResourceEphemeralStorage] = resource.MustParse(disk)
 	}
 	return res
 }
@@ -1680,8 +1911,4 @@ func (s1 thresholdList) Equal(s2 thresholdList) bool {
 		}
 	}
 	return true
-}
-
-func enablePodPriority(enabled bool) {
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", features.PodPriority, enabled))
 }
