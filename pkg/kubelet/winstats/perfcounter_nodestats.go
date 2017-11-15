@@ -57,18 +57,13 @@ func (p *perfCounterNodeStatsClient) startMonitoring() error {
 		return err
 	}
 
-	iv, err := exec.Command("powershell", "-command", "(Get-CimInstance Win32_OperatingSystem).Caption").Output()
+	version, err := exec.Command("cmd", "/C", "ver").Output()
 	if err != nil {
 		return err
 	}
-	osImageVersion := strings.TrimSpace(string(iv))
 
-	kv, err := exec.Command("powershell", "-command", "[System.Environment]::OSVersion.Version.ToString()").Output()
-	if err != nil {
-		return err
-	}
-	kernelVersion := strings.TrimSpace(string(kv))
-
+	osImageVersion := strings.TrimSpace(string(version))
+	kernelVersion := extractVersionNumber(osImageVersion)
 	p.nodeInfo = nodeInfo{
 		kernelVersion:               kernelVersion,
 		osImageVersion:              osImageVersion,
