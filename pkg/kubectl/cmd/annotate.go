@@ -189,13 +189,10 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 	changeCause := f.Command(cmd, false)
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
-	b := f.NewBuilder()
-	if o.local {
-		b = b.Local()
-	} else {
-		b = b.Unstructured()
-	}
-	b = b.ContinueOnError().
+	b := f.NewBuilder().
+		Unstructured().
+		LocalParam(o.local).
+		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		IncludeUninitialized(includeUninitialized).

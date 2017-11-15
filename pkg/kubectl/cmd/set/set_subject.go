@@ -125,7 +125,14 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	}
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
-	builder := f.NewBuilder()
+	builder := f.NewBuilder().
+		LocalParam(o.Local).
+		ContinueOnError().
+		NamespaceParam(cmdNamespace).DefaultNamespace().
+		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		IncludeUninitialized(includeUninitialized).
+		Flatten()
+
 	if o.Local {
 		// if a --local flag was provided, and a resource was specified in the form
 		// <resource>/<name>, fail immediately as --local cannot query the api server
@@ -133,16 +140,7 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		if len(args) > 0 {
 			return resource.LocalResourceError
 		}
-		builder = builder.Local()
-	}
-	builder = builder.
-		ContinueOnError().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &o.FilenameOptions).
-		IncludeUninitialized(includeUninitialized).
-		Flatten()
-
-	if !o.Local {
+	} else {
 		builder = builder.
 			LabelSelectorParam(o.Selector).
 			ResourceTypeOrNameArgs(o.All, args...).

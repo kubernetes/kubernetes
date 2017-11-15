@@ -236,6 +236,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 
 	if len(o.From) != 0 {
 		b := f.NewBuilder().
+			LocalParam(o.Local).
 			ContinueOnError().
 			NamespaceParam(cmdNamespace).DefaultNamespace().
 			FilenameParam(enforceNamespace, &o.FilenameOptions).
@@ -246,8 +247,6 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 				LabelSelectorParam(o.Selector).
 				ResourceTypeOrNameArgs(o.All, o.From).
 				Latest()
-		} else {
-			b = b.Local()
 		}
 
 		infos, err := b.Do().Infos()
@@ -304,18 +303,16 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 	}
 
 	b := f.NewBuilder().
+		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		Flatten()
 
 	if !o.Local {
-		b = b.
-			LabelSelectorParam(o.Selector).
+		b.LabelSelectorParam(o.Selector).
 			ResourceTypeOrNameArgs(o.All, o.Resources...).
 			Latest()
-	} else {
-		b = b.Local()
 	}
 
 	o.Infos, err = b.Do().Infos()

@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
@@ -52,12 +51,8 @@ func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command, isLocal bool, outpu
 	var mapper meta.RESTMapper
 	var typer runtime.ObjectTyper
 
-	if isLocal {
-		mapper = legacyscheme.Registry.RESTMapper()
-		typer = legacyscheme.Scheme
-	} else {
-		mapper, typer = f.objectMappingFactory.UnstructuredObject()
-	}
+	mapper, typer = f.objectMappingFactory.Object()
+
 	// TODO: used by the custom column implementation and the name implementation, break this dependency
 	decoders := []runtime.Decoder{f.clientAccessFactory.Decoder(true), unstructured.UnstructuredJSONScheme}
 	encoder := f.clientAccessFactory.JSONEncoder()
@@ -131,12 +126,6 @@ func (f *ring2Factory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta
 	_, typer := f.objectMappingFactory.Object()
 	gvks, _, err := typer.ObjectKinds(obj)
 
-	// fall back to an unstructured object if we get something unregistered
-	if runtime.IsNotRegisteredError(err) {
-		_, typer := f.objectMappingFactory.UnstructuredObject()
-		gvks, _, err = typer.ObjectKinds(obj)
-	}
-
 	if err != nil {
 		return err
 	}
@@ -178,7 +167,6 @@ func (f *ring2Factory) NewBuilder() *resource.Builder {
 	mapper, typer := f.objectMappingFactory.Object()
 
 	unstructuredClientMapperFunc := resource.ClientMapperFunc(f.objectMappingFactory.UnstructuredClientForMapping)
-	unstructuredMapper, unstructuredTyper := f.objectMappingFactory.Object()
 
 	categoryExpander := f.objectMappingFactory.CategoryExpander()
 
@@ -190,8 +178,8 @@ func (f *ring2Factory) NewBuilder() *resource.Builder {
 			Decoder:      f.clientAccessFactory.Decoder(true),
 		},
 		&resource.Mapper{
-			RESTMapper:   unstructuredMapper,
-			ObjectTyper:  unstructuredTyper,
+			RESTMapper:   mapper,
+			ObjectTyper:  typer,
 			ClientMapper: unstructuredClientMapperFunc,
 			Decoder:      unstructured.UnstructuredJSONScheme,
 		},

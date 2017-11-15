@@ -128,22 +128,20 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.C
 	}
 
 	// build the builder
-	o.builder = f.NewBuilder()
+	o.builder = f.NewBuilder().LocalParam(o.local)
 	if !o.local {
 		schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
 		if err != nil {
 			return err
 		}
-		o.builder = o.builder.Schema(schema)
-	} else {
-		o.builder = o.builder.Local()
+		o.builder.Schema(schema)
 	}
 
 	cmdNamespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
-	o.builder = o.builder.NamespaceParam(cmdNamespace).
+	o.builder.NamespaceParam(cmdNamespace).
 		ContinueOnError().
 		FilenameParam(false, &o.FilenameOptions).
 		Flatten()

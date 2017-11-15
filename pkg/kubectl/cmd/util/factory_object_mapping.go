@@ -73,33 +73,15 @@ func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) ObjectMapp
 	return f
 }
 
+// objectLoader attempts to perform discovery against the server, and will fall back to
+// the built in mapper if necessary. It supports unstructured objects either way, since
+// the underlying Scheme supports Unstructured. The mapper will return converters that can
+// convert versioned types to unstructured and back.
 func (f *ring1Factory) objectLoader() (meta.RESTMapper, runtime.ObjectTyper, error) {
-	mapper := legacyscheme.Registry.RESTMapper()
 	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
 	if err != nil {
-		glog.V(5).Infof("Object loader was unable to retrieve a discovery client: %v", err)
-		return mapper, legacyscheme.Scheme, nil
-	}
-	mapper = meta.FirstHitRESTMapper{
-		MultiRESTMapper: meta.MultiRESTMapper{
-			discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, legacyscheme.Registry.InterfacesFor),
-			legacyscheme.Registry.RESTMapper(), // hardcoded fall back
-		},
-	}
-
-	// wrap with shortcuts, they require a discoveryClient
-	mapper = NewShortcutExpander(mapper, discoveryClient)
-	return mapper, legacyscheme.Scheme, nil
-}
-
-// TODO: unstructured and structured discovery should both gracefully degrade in the presence
-// of errors, and it should be possible to get access to the unstructured object typers no matter
-// whether the server responds or not. Make the legacy scheme recognize object typer, then we can
-// safely fall back to the built in restmapper as a last resort.
-func (f *ring1Factory) unstructuredObjectLoader() (meta.RESTMapper, runtime.ObjectTyper, error) {
-	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
-	if err != nil {
-		return nil, nil, err
+		glog.V(3).Infof("Unable to get a discovery client to find server resources, falling back to hardcoded types: %v", err)
+		return legacyscheme.Registry.RESTMapper(), legacyscheme.Scheme, nil
 	}
 
 	groupResources, err := discovery.GetAPIGroupResources(discoveryClient)
@@ -108,12 +90,14 @@ func (f *ring1Factory) unstructuredObjectLoader() (meta.RESTMapper, runtime.Obje
 		groupResources, err = discovery.GetAPIGroupResources(discoveryClient)
 	}
 	if err != nil {
-		return nil, nil, err
+		glog.V(3).Infof("Unable to retrieve API resources, falling back to hardcoded types: %v", err)
+		return legacyscheme.Registry.RESTMapper(), legacyscheme.Scheme, nil
 	}
 
 	// allow conversion between typed and unstructured objects
 	interfaces := meta.InterfacesForUnstructuredConversion(legacyscheme.Registry.InterfacesFor)
 	mapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.VersionInterfacesFunc(interfaces))
+	// TODO: should this also indicate it recognizes typed objects?
 	typer := discovery.NewUnstructuredObjectTyper(groupResources)
 	expander := NewShortcutExpander(mapper, discoveryClient)
 	return expander, typer, err
@@ -121,10 +105,6 @@ func (f *ring1Factory) unstructuredObjectLoader() (meta.RESTMapper, runtime.Obje
 
 func (f *ring1Factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 	return NewLazyObjectLoader(f.objectLoader)
-}
-
-func (f *ring1Factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper) {
-	return NewLazyObjectLoader(f.unstructuredObjectLoader)
 }
 
 func (f *ring1Factory) CategoryExpander() categories.CategoryExpander {

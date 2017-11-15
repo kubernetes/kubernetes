@@ -230,7 +230,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfig = defaultClientConfig()
 
-	mapper, _ := f.UnstructuredObject()
+	mapper, _ := f.Object()
 	m, err := mapper.RESTMapping(schema.GroupKind{Group: "apitest", Kind: "Type"})
 	if err != nil {
 		t.Fatal(err)

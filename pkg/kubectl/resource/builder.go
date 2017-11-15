@@ -177,6 +177,14 @@ func (b *Builder) Unstructured() *Builder {
 	return b
 }
 
+// LocalParam calls Local() if local is true.
+func (b *Builder) LocalParam(local bool) *Builder {
+	if local {
+		b.Local()
+	}
+	return b
+}
+
 // Local will avoid asking the server for results.
 func (b *Builder) Local() *Builder {
 	mapper := *b.mapper

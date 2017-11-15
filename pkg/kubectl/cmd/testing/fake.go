@@ -244,6 +244,7 @@ type TestFactory struct {
 	Command            string
 	TmpDir             string
 	CategoryExpander   categories.CategoryExpander
+	SkipDiscovery      bool
 
 	ClientForMappingFunc             func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	UnstructuredClientForMappingFunc func(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -282,10 +283,9 @@ func (f *FakeFactory) FlagSet() *pflag.FlagSet {
 }
 
 func (f *FakeFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
-	return legacyscheme.Registry.RESTMapper(), f.tf.Typer
-}
-
-func (f *FakeFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper) {
+	if f.tf.SkipDiscovery {
+		return legacyscheme.Registry.RESTMapper(), f.tf.Typer
+	}
 	groupResources := testDynamicResources()
 	mapper := discovery.NewRESTMapper(groupResources, meta.InterfacesForUnstructuredConversion(legacyscheme.Registry.InterfacesFor))
 	typer := discovery.NewUnstructuredObjectTyper(groupResources)
@@ -519,7 +519,6 @@ func (f *FakeFactory) PrinterForMapping(cmd *cobra.Command, isLocal bool, output
 
 func (f *FakeFactory) NewBuilder() *resource.Builder {
 	mapper, typer := f.Object()
-	unstructuredMapper, unstructuredTyper := f.UnstructuredObject()
 
 	return resource.NewBuilder(
 		&resource.Mapper{
@@ -529,8 +528,8 @@ func (f *FakeFactory) NewBuilder() *resource.Builder {
 			Decoder:      f.Decoder(true),
 		},
 		&resource.Mapper{
-			RESTMapper:   unstructuredMapper,
-			ObjectTyper:  unstructuredTyper,
+			RESTMapper:   mapper,
+			ObjectTyper:  typer,
 			ClientMapper: resource.ClientMapperFunc(f.UnstructuredClientForMapping),
 			Decoder:      unstructured.UnstructuredJSONScheme,
 		},
@@ -605,10 +604,9 @@ type fakeAPIFactory struct {
 }
 
 func (f *fakeAPIFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
-	return testapi.Default.RESTMapper(), legacyscheme.Scheme
-}
-
-func (f *fakeAPIFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper) {
+	if f.tf.SkipDiscovery {
+		return testapi.Default.RESTMapper(), legacyscheme.Scheme
+	}
 	groupResources := testDynamicResources()
 	mapper := discovery.NewRESTMapper(
 		groupResources,
@@ -800,11 +798,7 @@ func (f *fakeAPIFactory) LogsForObject(object, options runtime.Object, timeout t
 		}
 		return c.Core().Pods(f.tf.Namespace).GetLogs(t.Name, opts), nil
 	default:
-		fqKinds, _, err := legacyscheme.Scheme.ObjectKinds(object)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("cannot get the logs from %v", fqKinds[0])
+		return nil, fmt.Errorf("cannot get the logs from %T", object)
 	}
 }
 
@@ -813,11 +807,7 @@ func (f *fakeAPIFactory) AttachablePodForObject(object runtime.Object, timeout t
 	case *api.Pod:
 		return t, nil
 	default:
-		gvks, _, err := legacyscheme.Scheme.ObjectKinds(object)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("cannot attach to %v: not implemented", gvks[0])
+		return nil, fmt.Errorf("cannot attach to %T: not implemented", object)
 	}
 }
 
@@ -865,7 +855,6 @@ func (f *fakeAPIFactory) PrinterForMapping(cmd *cobra.Command, isLocal bool, out
 
 func (f *fakeAPIFactory) NewBuilder() *resource.Builder {
 	mapper, typer := f.Object()
-	unstructuredMapper, unstructuredTyper := f.UnstructuredObject()
 
 	return resource.NewBuilder(
 		&resource.Mapper{
@@ -875,8 +864,8 @@ func (f *fakeAPIFactory) NewBuilder() *resource.Builder {
 			Decoder:      f.Decoder(true),
 		},
 		&resource.Mapper{
-			RESTMapper:   unstructuredMapper,
-			ObjectTyper:  unstructuredTyper,
+			RESTMapper:   mapper,
+			ObjectTyper:  typer,
 			ClientMapper: resource.ClientMapperFunc(f.UnstructuredClientForMapping),
 			Decoder:      unstructured.UnstructuredJSONScheme,
 		},
@@ -950,6 +939,46 @@ func testDynamicResources() []*discovery.APIGroupResources {
 			VersionedResources: map[string][]metav1.APIResource{
 				"v1beta1": {
 					{Name: "deployments", Namespaced: true, Kind: "Deployment"},
+				},
+			},
+		},
+		{
+			Group: metav1.APIGroup{
+				Name: "apps",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v1beta1"},
+					{Version: "v1beta2"},
+					{Version: "v1"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1beta1": {
+					{Name: "deployments", Namespaced: true, Kind: "Deployment"},
+				},
+				"v1beta2": {
+					{Name: "deployments", Namespaced: true, Kind: "Deployment"},
+				},
+				"v1": {
+					{Name: "deployments", Namespaced: true, Kind: "Deployment"},
+				},
+			},
+		},
+		{
+			Group: metav1.APIGroup{
+				Name: "autoscaling",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v1"},
+					{Version: "v2beta1"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v2beta1"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1": {
+					{Name: "horizontalpodautoscalers", Namespaced: true, Kind: "HorizontalPodAutoscaler"},
+				},
+				"v2beta1": {
+					{Name: "horizontalpodautoscalers", Namespaced: true, Kind: "HorizontalPodAutoscaler"},
 				},
 			},
 		},

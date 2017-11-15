@@ -145,6 +145,7 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
+		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
@@ -152,19 +153,18 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 		Flatten()
 
 	if !o.Local {
-		builder = builder.
-			LabelSelectorParam(o.Selector).
+		builder.LabelSelectorParam(o.Selector).
 			ResourceTypeOrNameArgs(o.All, args...).
 			Latest()
 	} else {
 		// if a --local flag was provided, and a resource was specified in the form
 		// <resource>/<name>, fail immediately as --local cannot query the api server
 		// for the specified resource.
+		// TODO: this should be in the builder - if someone specifies tuples, fail when
+		// local is true
 		if len(args) > 0 {
 			return resource.LocalResourceError
 		}
-
-		builder = builder.Local()
 	}
 
 	o.Infos, err = builder.Do().Infos()

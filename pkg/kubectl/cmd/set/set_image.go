@@ -143,6 +143,7 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
+		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
@@ -150,8 +151,7 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		Flatten()
 
 	if !o.Local {
-		builder = builder.
-			LabelSelectorParam(o.Selector).
+		builder.LabelSelectorParam(o.Selector).
 			ResourceTypeOrNameArgs(o.All, o.Resources...).
 			Latest()
 	} else {
@@ -161,8 +161,6 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		if len(o.Resources) > 0 {
 			return resource.LocalResourceError
 		}
-
-		builder = builder.Local()
 	}
 
 	o.Infos, err = builder.Do().Infos()
