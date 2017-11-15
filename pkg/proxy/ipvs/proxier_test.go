@@ -33,6 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	netlinktest "k8s.io/kubernetes/pkg/proxy/ipvs/testing"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	utilipset "k8s.io/kubernetes/pkg/util/ipset"
+	ipsettest "k8s.io/kubernetes/pkg/util/ipset/testing"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
@@ -85,7 +87,7 @@ func (fake *fakeHealthChecker) SyncEndpoints(newEndpoints map[types.NamespacedNa
 	return nil
 }
 
-func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, nodeIPs []net.IP) *Proxier {
+func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset utilipset.Interface, nodeIPs []net.IP) *Proxier {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			func() ([]byte, error) { return []byte("dummy device have been created"), nil },
@@ -98,24 +100,34 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, nodeIPs
 		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
 	}
 	return &Proxier{
-		exec:             fexec,
-		serviceMap:       make(proxyServiceMap),
-		serviceChanges:   newServiceChangeMap(),
-		endpointsMap:     make(proxyEndpointsMap),
-		endpointsChanges: newEndpointsChangeMap(testHostname),
-		iptables:         ipt,
-		ipvs:             ipvs,
-		clusterCIDR:      "10.0.0.0/24",
-		hostname:         testHostname,
-		portsMap:         make(map[proxyutil.LocalPort]proxyutil.Closeable),
-		portMapper:       &fakePortOpener{[]*proxyutil.LocalPort{}},
-		healthChecker:    newFakeHealthChecker(),
-		ipvsScheduler:    DefaultScheduler,
-		ipGetter:         &fakeIPGetter{nodeIPs: nodeIPs},
-		iptablesData:     bytes.NewBuffer(nil),
-		natChains:        bytes.NewBuffer(nil),
-		natRules:         bytes.NewBuffer(nil),
-		netlinkHandle:    netlinktest.NewFakeNetlinkHandle(),
+		exec:               fexec,
+		serviceMap:         make(proxyServiceMap),
+		serviceChanges:     newServiceChangeMap(),
+		endpointsMap:       make(proxyEndpointsMap),
+		endpointsChanges:   newEndpointsChangeMap(testHostname),
+		iptables:           ipt,
+		ipvs:               ipvs,
+		ipset:              ipset,
+		clusterCIDR:        "10.0.0.0/24",
+		hostname:           testHostname,
+		portsMap:           make(map[proxyutil.LocalPort]proxyutil.Closeable),
+		portMapper:         &fakePortOpener{[]*proxyutil.LocalPort{}},
+		healthChecker:      newFakeHealthChecker(),
+		ipvsScheduler:      DefaultScheduler,
+		ipGetter:           &fakeIPGetter{nodeIPs: nodeIPs},
+		iptablesData:       bytes.NewBuffer(nil),
+		natChains:          bytes.NewBuffer(nil),
+		natRules:           bytes.NewBuffer(nil),
+		netlinkHandle:      netlinktest.NewFakeNetlinkHandle(),
+		loopbackSet:        NewIPSet(ipset, KubeLoopBackIPSet, utilipset.HashIPPortIP, false),
+		clusterIPSet:       NewIPSet(ipset, KubeClusterIPSet, utilipset.HashIPPort, false),
+		externalIPSet:      NewIPSet(ipset, KubeExternalIPSet, utilipset.HashIPPort, false),
+		lbIngressSet:       NewIPSet(ipset, KubeLoadBalancerSet, utilipset.HashIPPort, false),
+		lbMasqSet:          NewIPSet(ipset, KubeLoadBalancerMasqSet, utilipset.HashIPPort, false),
+		lbWhiteListIPSet:   NewIPSet(ipset, KubeLoadBalancerSourceIPSet, utilipset.HashIPPortIP, false),
+		lbWhiteListCIDRSet: NewIPSet(ipset, KubeLoadBalancerSourceCIDRSet, utilipset.HashIPPortNet, false),
+		nodePortSetTCP:     NewIPSet(ipset, KubeNodePortSetTCP, utilipset.BitmapPort, false),
+		nodePortSetUDP:     NewIPSet(ipset, KubeNodePortSetUDP, utilipset.BitmapPort, false),
 	}
 }
 
@@ -171,10 +183,11 @@ func makeTestEndpoints(namespace, name string, eptFunc func(*api.Endpoints)) *ap
 func TestNodePort(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake()
 	nodeIPv4 := net.ParseIP("100.101.102.103")
 	nodeIPv6 := net.ParseIP("2001:db8::1:1")
 	nodeIPs := sets.NewString(nodeIPv4.String(), nodeIPv6.String())
-	fp := NewFakeProxier(ipt, ipvs, []net.IP{nodeIPv4, nodeIPv6})
+	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIPv4, nodeIPv6})
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -248,8 +261,9 @@ func TestNodePort(t *testing.T) {
 func TestNodePortNoEndpoint(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake()
 	nodeIP := net.ParseIP("100.101.102.103")
-	fp := NewFakeProxier(ipt, ipvs, []net.IP{nodeIP})
+	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIP})
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -301,7 +315,8 @@ func TestNodePortNoEndpoint(t *testing.T) {
 func TestClusterIPNoEndpoint(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
-	fp := NewFakeProxier(ipt, ipvs, nil)
+	ipset := ipsettest.NewFake()
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcPortName := proxy.ServicePortName{
@@ -344,7 +359,8 @@ func TestClusterIPNoEndpoint(t *testing.T) {
 func TestClusterIP(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
-	fp := NewFakeProxier(ipt, ipvs, nil)
+	ipset := ipsettest.NewFake()
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 
 	svcIPv4 := "10.20.30.41"
 	svcPortV4 := 80
@@ -450,7 +466,8 @@ func TestClusterIP(t *testing.T) {
 func TestExternalIPsNoEndpoint(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
-	fp := NewFakeProxier(ipt, ipvs, nil)
+	ipset := ipsettest.NewFake()
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcExternalIPs := "50.60.70.81"
@@ -504,7 +521,8 @@ func TestExternalIPsNoEndpoint(t *testing.T) {
 func TestExternalIPs(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
-	fp := NewFakeProxier(ipt, ipvs, nil)
+	ipset := ipsettest.NewFake()
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcExternalIPs := sets.NewString("50.60.70.81", "2012::51")
@@ -573,7 +591,8 @@ func TestExternalIPs(t *testing.T) {
 func TestLoadBalancer(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
-	fp := NewFakeProxier(ipt, ipvs, nil)
+	ipset := ipsettest.NewFake()
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -624,8 +643,9 @@ func strPtr(s string) *string {
 func TestOnlyLocalNodePorts(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake()
 	nodeIP := net.ParseIP("100.101.102.103")
-	fp := NewFakeProxier(ipt, ipvs, []net.IP{nodeIP})
+	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIP})
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -705,7 +725,8 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 func TestOnlyLocalLoadBalancing(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
-	fp := NewFakeProxier(ipt, ipvs, nil)
+	ipset := ipsettest.NewFake()
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -769,7 +790,8 @@ func addTestPort(array []api.ServicePort, name string, protocol api.Protocol, po
 func TestBuildServiceMapAddRemove(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
-	fp := NewFakeProxier(ipt, ipvs, nil)
+	ipset := ipsettest.NewFake()
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 
 	services := []*api.Service{
 		makeTestService("somewhere-else", "cluster-ip", func(svc *api.Service) {
@@ -874,7 +896,8 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 func TestBuildServiceMapServiceHeadless(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
-	fp := NewFakeProxier(ipt, ipvs, nil)
+	ipset := ipsettest.NewFake()
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 
 	makeServiceMap(fp,
 		makeTestService("somewhere-else", "headless", func(svc *api.Service) {
@@ -907,7 +930,8 @@ func TestBuildServiceMapServiceHeadless(t *testing.T) {
 func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
-	fp := NewFakeProxier(ipt, ipvs, nil)
+	ipset := ipsettest.NewFake()
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 
 	makeServiceMap(fp,
 		makeTestService("somewhere-else", "external-name", func(svc *api.Service) {
@@ -934,7 +958,8 @@ func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
-	fp := NewFakeProxier(ipt, ipvs, nil)
+	ipset := ipsettest.NewFake()
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 
 	servicev1 := makeTestService("somewhere", "some-service", func(svc *api.Service) {
 		svc.Spec.Type = api.ServiceTypeClusterIP
@@ -1016,8 +1041,9 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 func TestSessionAffinity(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake()
 	nodeIP := net.ParseIP("100.101.102.103")
-	fp := NewFakeProxier(ipt, ipvs, []net.IP{nodeIP})
+	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIP})
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -1879,7 +1905,8 @@ func Test_updateEndpointsMap(t *testing.T) {
 	for tci, tc := range testCases {
 		ipt := iptablestest.NewFake()
 		ipvs := ipvstest.NewFake()
-		fp := NewFakeProxier(ipt, ipvs, nil)
+		ipset := ipsettest.NewFake()
+		fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 		fp.hostname = nodeName
 
 		// First check that after adding all previous versions of endpoints,

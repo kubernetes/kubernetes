@@ -19,6 +19,7 @@ package util
 import (
 	"fmt"
 	"net"
+	"strconv"
 
 	"github.com/golang/glog"
 )
@@ -38,6 +39,21 @@ func IPPart(s string) string {
 		return ""
 	}
 	return ip
+}
+
+func PortPart(s string) (int, error) {
+	// Must be IP:port
+	_, port, err := net.SplitHostPort(s)
+	if err != nil {
+		glog.Errorf("Error parsing '%s': %v", s, err)
+		return -1, err
+	}
+	portNumber, err := strconv.Atoi(port)
+	if err != nil {
+		glog.Errorf("Error parsing '%s': %v", port, err)
+		return -1, err
+	}
+	return portNumber, nil
 }
 
 // ToCIDR returns a host address of the form <ip-address>/32 for
