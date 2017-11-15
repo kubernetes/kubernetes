@@ -70,7 +70,8 @@ var (
 	labelLong = templates.LongDesc(i18n.T(`
 		Update the labels on a resource.
 
-		* A label must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
+		* A label key and value must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters each.
+		* Optionally, the key can begin with a DNS subdomain prefix and a single '/', like example.com/my-app
 		* If --overwrite is true, then existing labels can be overwritten, otherwise attempting to overwrite a label will result in an error.
 		* If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.`))
 
