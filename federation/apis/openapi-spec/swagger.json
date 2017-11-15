@@ -12273,7 +12273,7 @@
       "type": "string"
      },
      "protectionDomain": {
-      "description": "The name of the Protection Domain for the configured storage (defaults to \"default\").",
+      "description": "The name of the ScaleIO Protection Domain for the configured storage.",
       "type": "string"
      },
      "readOnly": {
@@ -12289,11 +12289,11 @@
       "type": "boolean"
      },
      "storageMode": {
-      "description": "Indicates whether the storage for a volume should be thick or thin (defaults to \"thin\").",
+      "description": "Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.",
       "type": "string"
      },
      "storagePool": {
-      "description": "The Storage Pool associated with the protection domain (defaults to \"default\").",
+      "description": "The ScaleIO Storage Pool associated with the protection domain.",
       "type": "string"
      },
      "system": {

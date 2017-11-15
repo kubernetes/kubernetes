@@ -1233,6 +1233,20 @@ func validateScaleIOVolumeSource(sio *api.ScaleIOVolumeSource, fldPath *field.Pa
 	return allErrs
 }
 
+func validateScaleIOPersistentVolumeSource(sio *api.ScaleIOPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if sio.Gateway == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("gateway"), ""))
+	}
+	if sio.System == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("system"), ""))
+	}
+	if sio.VolumeName == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("volumeName"), ""))
+	}
+	return allErrs
+}
+
 func validateLocalVolumeSource(ls *api.LocalVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if ls.Path == "" {
@@ -1477,7 +1491,7 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 			allErrs = append(allErrs, field.Forbidden(specPath.Child("scaleIO"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validateScaleIOVolumeSource(pv.Spec.ScaleIO, specPath.Child("scaleIO"))...)
+			allErrs = append(allErrs, validateScaleIOPersistentVolumeSource(pv.Spec.ScaleIO, specPath.Child("scaleIO"))...)
 		}
 	}
 	if pv.Spec.Local != nil {

@@ -20276,7 +20276,7 @@
       "description": "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine"
      },
      "scaleIO": {
-      "$ref": "v1.ScaleIOVolumeSource",
+      "$ref": "v1.ScaleIOPersistentVolumeSource",
       "description": "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes."
      },
      "local": {
@@ -20855,9 +20855,9 @@
      }
     }
    },
-   "v1.ScaleIOVolumeSource": {
-    "id": "v1.ScaleIOVolumeSource",
-    "description": "ScaleIOVolumeSource represents a persistent ScaleIO volume",
+   "v1.ScaleIOPersistentVolumeSource": {
+    "id": "v1.ScaleIOPersistentVolumeSource",
+    "description": "ScaleIOPersistentVolumeSource represents a persistent ScaleIO volume",
     "required": [
      "gateway",
      "system",
@@ -20873,7 +20873,7 @@
       "description": "The name of the storage system as configured in ScaleIO."
      },
      "secretRef": {
-      "$ref": "v1.LocalObjectReference",
+      "$ref": "v1.SecretReference",
       "description": "SecretRef references to the secret for ScaleIO user and other sensitive information. If this is not provided, Login operation will fail."
      },
      "sslEnabled": {
@@ -20882,15 +20882,15 @@
      },
      "protectionDomain": {
       "type": "string",
-      "description": "The name of the Protection Domain for the configured storage (defaults to \"default\")."
+      "description": "The name of the ScaleIO Protection Domain for the configured storage."
      },
      "storagePool": {
       "type": "string",
-      "description": "The Storage Pool associated with the protection domain (defaults to \"default\")."
+      "description": "The ScaleIO Storage Pool associated with the protection domain."
      },
      "storageMode": {
       "type": "string",
-      "description": "Indicates whether the storage for a volume should be thick or thin (defaults to \"thin\")."
+      "description": "Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned."
      },
      "volumeName": {
       "type": "string",
@@ -21626,6 +21626,57 @@
      "optional": {
       "type": "boolean",
       "description": "Specify whether the ConfigMap or it's keys must be defined"
+     }
+    }
+   },
+   "v1.ScaleIOVolumeSource": {
+    "id": "v1.ScaleIOVolumeSource",
+    "description": "ScaleIOVolumeSource represents a persistent ScaleIO volume",
+    "required": [
+     "gateway",
+     "system",
+     "secretRef"
+    ],
+    "properties": {
+     "gateway": {
+      "type": "string",
+      "description": "The host address of the ScaleIO API Gateway."
+     },
+     "system": {
+      "type": "string",
+      "description": "The name of the storage system as configured in ScaleIO."
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "SecretRef references to the secret for ScaleIO user and other sensitive information. If this is not provided, Login operation will fail."
+     },
+     "sslEnabled": {
+      "type": "boolean",
+      "description": "Flag to enable/disable SSL communication with Gateway, default false"
+     },
+     "protectionDomain": {
+      "type": "string",
+      "description": "The name of the ScaleIO Protection Domain for the configured storage."
+     },
+     "storagePool": {
+      "type": "string",
+      "description": "The ScaleIO Storage Pool associated with the protection domain."
+     },
+     "storageMode": {
+      "type": "string",
+      "description": "Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned."
+     },
+     "volumeName": {
+      "type": "string",
+      "description": "The name of a volume already created in the ScaleIO system that is associated with this volume source."
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
      }
     }
    },
