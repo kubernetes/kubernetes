@@ -31,7 +31,7 @@ import (
 )
 
 const awsChinaRegionPrefix = "cn-"
-const awsStandardDNSSuffix = "amazon.com"
+const awsStandardDNSSuffix = "amazonaws.com"
 const awsChinaDNSSuffix = "amazonaws.com.cn"
 const registryURLTemplate = "*.dkr.ecr.%s.%s"
 
