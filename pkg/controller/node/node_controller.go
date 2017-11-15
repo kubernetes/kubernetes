@@ -44,7 +44,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
-	v1node "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/node/ipam"
@@ -52,7 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/node/scheduler"
 	"k8s.io/kubernetes/pkg/controller/node/util"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -430,7 +429,7 @@ func (nc *Controller) doEvictionPass() {
 			} else if err != nil {
 				glog.Warningf("Failed to get Node %v from the nodeLister: %v", value.Value, err)
 			} else {
-				zone := utilnode.GetZoneKey(node)
+				zone := nodeutil.GetZoneKey(node)
 				evictionsNumber.WithLabelValues(zone).Inc()
 			}
 			nodeUID, _ := value.UID.(string)
@@ -522,10 +521,10 @@ func (nc *Controller) doNoExecuteTaintingPass() {
 				// retry in 50 millisecond
 				return false, 50 * time.Millisecond
 			} else {
-				zone := utilnode.GetZoneKey(node)
+				zone := nodeutil.GetZoneKey(node)
 				evictionsNumber.WithLabelValues(zone).Inc()
 			}
-			_, condition := v1node.GetNodeCondition(&node.Status, v1.NodeReady)
+			_, condition := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
 			// Because we want to mimic NodeStatus.Condition["Ready"] we make "unreachable" and "not ready" taints mutually exclusive.
 			taintToAdd := v1.Taint{}
 			oppositeTaint := v1.Taint{}
@@ -584,7 +583,7 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 
 // addPodEvictorForNewZone checks if new zone appeared, and if so add new evictor.
 func (nc *Controller) addPodEvictorForNewZone(node *v1.Node) {
-	zone := utilnode.GetZoneKey(node)
+	zone := nodeutil.GetZoneKey(node)
 	if _, found := nc.zoneStates[zone]; !found {
 		nc.zoneStates[zone] = stateInitial
 		if !nc.useTaintBasedEvictions {
@@ -662,7 +661,7 @@ func (nc *Controller) monitorNodeStatus() error {
 
 		// We do not treat a master node as a part of the cluster for network disruption checking.
 		if !system.IsMasterNode(node.Name) {
-			zoneToNodeConditions[utilnode.GetZoneKey(node)] = append(zoneToNodeConditions[utilnode.GetZoneKey(node)], currentReadyCondition)
+			zoneToNodeConditions[nodeutil.GetZoneKey(node)] = append(zoneToNodeConditions[nodeutil.GetZoneKey(node)], currentReadyCondition)
 		}
 
 		decisionTimestamp := nc.now()
@@ -906,7 +905,7 @@ func (nc *Controller) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.Node
 	var err error
 	var gracePeriod time.Duration
 	var observedReadyCondition v1.NodeCondition
-	_, currentReadyCondition := v1node.GetNodeCondition(&node.Status, v1.NodeReady)
+	_, currentReadyCondition := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
 	if currentReadyCondition == nil {
 		// If ready condition is nil, then kubelet (or nodecontroller) never posted node status.
 		// A fake ready condition is created, where LastProbeTime and LastTransitionTime is set
@@ -946,9 +945,9 @@ func (nc *Controller) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.Node
 	//     if that's the case, but it does not seem necessary.
 	var savedCondition *v1.NodeCondition
 	if found {
-		_, savedCondition = v1node.GetNodeCondition(&savedNodeStatus.status, v1.NodeReady)
+		_, savedCondition = nodeutil.GetNodeCondition(&savedNodeStatus.status, v1.NodeReady)
 	}
-	_, observedCondition := v1node.GetNodeCondition(&node.Status, v1.NodeReady)
+	_, observedCondition := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
 	if !found {
 		glog.Warningf("Missing timestamp for Node %s. Assuming now as a timestamp.", node.Name)
 		savedNodeStatus = nodeStatusData{
@@ -1030,7 +1029,7 @@ func (nc *Controller) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.Node
 
 		nowTimestamp := nc.now()
 		for _, nodeConditionType := range remainingNodeConditionTypes {
-			_, currentCondition := v1node.GetNodeCondition(&node.Status, nodeConditionType)
+			_, currentCondition := nodeutil.GetNodeCondition(&node.Status, nodeConditionType)
 			if currentCondition == nil {
 				glog.V(2).Infof("Condition %v of node %v was never updated by kubelet", nodeConditionType, node.Name)
 				node.Status.Conditions = append(node.Status.Conditions, v1.NodeCondition{
@@ -1053,7 +1052,7 @@ func (nc *Controller) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.Node
 			}
 		}
 
-		_, currentCondition := v1node.GetNodeCondition(&node.Status, v1.NodeReady)
+		_, currentCondition := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
 		if !apiequality.Semantic.DeepEqual(currentCondition, &observedReadyCondition) {
 			if _, err = nc.kubeClient.CoreV1().Nodes().UpdateStatus(node); err != nil {
 				glog.Errorf("Error updating node %s: %v", node.Name, err)
@@ -1081,7 +1080,7 @@ func (nc *Controller) classifyNodes(allNodes []*v1.Node) (added, deleted, newZon
 			added = append(added, allNodes[i])
 		} else {
 			// Currently, we only consider new zone as updated.
-			zone := utilnode.GetZoneKey(allNodes[i])
+			zone := nodeutil.GetZoneKey(allNodes[i])
 			if _, found := nc.zoneStates[zone]; !found {
 				newZoneRepresentatives = append(newZoneRepresentatives, allNodes[i])
 			}
@@ -1108,7 +1107,7 @@ func (nc *Controller) classifyNodes(allNodes []*v1.Node) (added, deleted, newZon
 // cancelPodEviction removes any queued evictions, typically because the node is available again. It
 // returns true if an eviction was queued.
 func (nc *Controller) cancelPodEviction(node *v1.Node) bool {
-	zone := utilnode.GetZoneKey(node)
+	zone := nodeutil.GetZoneKey(node)
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
 	wasDeleting := nc.zonePodEvictor[zone].Remove(node.Name)
@@ -1124,13 +1123,13 @@ func (nc *Controller) cancelPodEviction(node *v1.Node) bool {
 func (nc *Controller) evictPods(node *v1.Node) bool {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
-	return nc.zonePodEvictor[utilnode.GetZoneKey(node)].Add(node.Name, string(node.UID))
+	return nc.zonePodEvictor[nodeutil.GetZoneKey(node)].Add(node.Name, string(node.UID))
 }
 
 func (nc *Controller) markNodeForTainting(node *v1.Node) bool {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
-	return nc.zoneNoExecuteTainer[utilnode.GetZoneKey(node)].Add(node.Name, string(node.UID))
+	return nc.zoneNoExecuteTainer[nodeutil.GetZoneKey(node)].Add(node.Name, string(node.UID))
 }
 
 func (nc *Controller) markNodeAsReachable(node *v1.Node) (bool, error) {
@@ -1146,7 +1145,7 @@ func (nc *Controller) markNodeAsReachable(node *v1.Node) (bool, error) {
 		glog.Errorf("Failed to remove taint from node %v: %v", node.Name, err)
 		return false, err
 	}
-	return nc.zoneNoExecuteTainer[utilnode.GetZoneKey(node)].Remove(node.Name), nil
+	return nc.zoneNoExecuteTainer[nodeutil.GetZoneKey(node)].Remove(node.Name), nil
 }
 
 // HealthyQPSFunc returns the default value for cluster eviction rate - we take

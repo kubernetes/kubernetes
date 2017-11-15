@@ -32,16 +32,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-	clientset "k8s.io/client-go/kubernetes"
-	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
-	commontest "k8s.io/kubernetes/test/e2e/common"
-	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e_node/services"
-	"k8s.io/kubernetes/test/e2e_node/system"
-
 	"github.com/golang/glog"
 	"github.com/kardianos/osext"
 	. "github.com/onsi/ginkgo"
@@ -49,6 +39,16 @@ import (
 	morereporters "github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
 	"github.com/spf13/pflag"
+
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	clientset "k8s.io/client-go/kubernetes"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	commontest "k8s.io/kubernetes/test/e2e/common"
+	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e_node/services"
+	"k8s.io/kubernetes/test/e2e_node/system"
 )
 
 var e2es *services.E2EServices
