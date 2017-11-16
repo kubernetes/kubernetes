@@ -7,10 +7,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/syndtr/gocapability/capability"
 )
 
-const allCapabilityTypes = capability.CAPS | capability.BOUNDS
+const allCapabilityTypes = capability.CAPS | capability.BOUNDS | capability.AMBS
 
 var capabilityMap map[string]capability.Cap
 
@@ -30,40 +31,84 @@ func init() {
 	}
 }
 
-func newCapWhitelist(caps []string) (*whitelist, error) {
-	l := []capability.Cap{}
-	for _, c := range caps {
+func newContainerCapList(capConfig *configs.Capabilities) (*containerCapabilities, error) {
+	bounding := []capability.Cap{}
+	for _, c := range capConfig.Bounding {
 		v, ok := capabilityMap[c]
 		if !ok {
 			return nil, fmt.Errorf("unknown capability %q", c)
 		}
-		l = append(l, v)
+		bounding = append(bounding, v)
+	}
+	effective := []capability.Cap{}
+	for _, c := range capConfig.Effective {
+		v, ok := capabilityMap[c]
+		if !ok {
+			return nil, fmt.Errorf("unknown capability %q", c)
+		}
+		effective = append(effective, v)
+	}
+	inheritable := []capability.Cap{}
+	for _, c := range capConfig.Inheritable {
+		v, ok := capabilityMap[c]
+		if !ok {
+			return nil, fmt.Errorf("unknown capability %q", c)
+		}
+		inheritable = append(inheritable, v)
+	}
+	permitted := []capability.Cap{}
+	for _, c := range capConfig.Permitted {
+		v, ok := capabilityMap[c]
+		if !ok {
+			return nil, fmt.Errorf("unknown capability %q", c)
+		}
+		permitted = append(permitted, v)
+	}
+	ambient := []capability.Cap{}
+	for _, c := range capConfig.Ambient {
+		v, ok := capabilityMap[c]
+		if !ok {
+			return nil, fmt.Errorf("unknown capability %q", c)
+		}
+		ambient = append(ambient, v)
 	}
 	pid, err := capability.NewPid(os.Getpid())
 	if err != nil {
 		return nil, err
 	}
-	return &whitelist{
-		keep: l,
-		pid:  pid,
+	return &containerCapabilities{
+		bounding:    bounding,
+		effective:   effective,
+		inheritable: inheritable,
+		permitted:   permitted,
+		ambient:     ambient,
+		pid:         pid,
 	}, nil
 }
 
-type whitelist struct {
-	pid  capability.Capabilities
-	keep []capability.Cap
+type containerCapabilities struct {
+	pid         capability.Capabilities
+	bounding    []capability.Cap
+	effective   []capability.Cap
+	inheritable []capability.Cap
+	permitted   []capability.Cap
+	ambient     []capability.Cap
 }
 
-// dropBoundingSet drops the capability bounding set to those specified in the whitelist.
-func (w *whitelist) dropBoundingSet() error {
-	w.pid.Clear(capability.BOUNDS)
-	w.pid.Set(capability.BOUNDS, w.keep...)
-	return w.pid.Apply(capability.BOUNDS)
+// ApplyBoundingSet sets the capability bounding set to those specified in the whitelist.
+func (c *containerCapabilities) ApplyBoundingSet() error {
+	c.pid.Clear(capability.BOUNDS)
+	c.pid.Set(capability.BOUNDS, c.bounding...)
+	return c.pid.Apply(capability.BOUNDS)
 }
 
-// drop drops all capabilities for the current process except those specified in the whitelist.
-func (w *whitelist) drop() error {
-	w.pid.Clear(allCapabilityTypes)
-	w.pid.Set(allCapabilityTypes, w.keep...)
-	return w.pid.Apply(allCapabilityTypes)
+// Apply sets all the capabilities for the current process in the config.
+func (c *containerCapabilities) ApplyCaps() error {
+	c.pid.Clear(allCapabilityTypes)
+	c.pid.Set(capability.BOUNDS, c.bounding...)
+	c.pid.Set(capability.PERMITTED, c.permitted...)
+	c.pid.Set(capability.INHERITABLE, c.inheritable...)
+	c.pid.Set(capability.EFFECTIVE, c.effective...)
+	c.pid.Set(capability.AMBIENT, c.ambient...)
+	return c.pid.Apply(allCapabilityTypes)
 }

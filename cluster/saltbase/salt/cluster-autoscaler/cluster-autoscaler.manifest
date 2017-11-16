@@ -5,9 +5,9 @@
 {% if grains.cloud == 'gce' and grains.cloud_config is defined -%}
   {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
   {% set cloud_config_mount = "{\"name\": \"cloudconfigmount\",\"mountPath\": \"" + grains.cloud_config + "\", \"readOnly\": true}," -%}
-  {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\"}}," -%}
+  {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\", \"type\": \"FileOrCreate\"}}," -%}
 {% endif -%}
-{% set params = pillar['autoscaler_mig_config'] + " " + cloud_config -%}
+{% set params = pillar['autoscaler_mig_config'] + " " + cloud_config + " " + pillar.get('autoscaler_expander_config', '') -%}
 
 {
     "kind": "Pod",
@@ -25,19 +25,34 @@
         "containers": [
             {
                 "name": "cluster-autoscaler",
-                "image": "gcr.io/google_containers/cluster-autoscaler:v0.2.2",
+                "image": "gcr.io/google_containers/cluster-autoscaler:v1.1.0-alpha1",
+                "livenessProbe": {
+                    "httpGet": {
+                        "path": "/health-check",
+                        "port": 8085
+		    },
+                    "initialDelaySeconds": 600,
+                    "periodSeconds": 60
+		},
                 "command": [
-                    "/bin/sh",
-                    "-c",
-                    "./cluster-autoscaler --kubernetes=http://127.0.0.1:8080?inClusterConfig=f -v=4 {{params}} 1>>/var/log/cluster-autoscaler.log 2>&1"
+                    "./run.sh",
+                    "--kubernetes=http://127.0.0.1:8080?inClusterConfig=f",
+                    "--v=4",
+                    "--logtostderr=true",
+                    "--write-status-configmap=true",
+                    "--balance-similar-node-groups=true",
+                    "{{params}}"
                 ],
+                "env": [
+                    {
+                        "name": "LOG_OUTPUT",
+                        "value": "/var/log/cluster-autoscaler.log"
+                    }
+                ],
+                # TODO: Make resource requirements depend on the size of the cluster
                 "resources": {
-                    "limits": {
-                        "cpu": "100m",
-                        "memory": "300Mi"
-                    },
                     "requests": {
-                        "cpu": "20m",
+                        "cpu": "10m",
                         "memory": "300Mi"
                     }
                 },
@@ -47,6 +62,11 @@
                         "name": "ssl-certs",
                         "readOnly": true,
                         "mountPath": "/etc/ssl/certs"
+                    },
+                    {
+                        "name": "usrsharecacerts",
+                        "readOnly": true,
+                        "mountPath": "/usr/share/ca-certificates"
                     },
                     {
                         "name": "logfile",
@@ -67,9 +87,16 @@
                 }
             },
             {
+                "name": "usrsharecacerts",
+                "hostPath": {
+                    "path": "/usr/share/ca-certificates"
+                }
+            },
+            {
                 "name": "logfile",
                 "hostPath": {
-                    "path": "/var/log/cluster-autoscaler.log"
+                    "path": "/var/log/cluster-autoscaler.log",
+                    "type": "FileOrCreate"
                 }
             }
         ],

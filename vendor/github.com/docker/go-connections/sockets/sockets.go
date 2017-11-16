@@ -2,6 +2,7 @@
 package sockets
 
 import (
+	"errors"
 	"net"
 	"net/http"
 	"time"
@@ -10,6 +11,9 @@ import (
 // Why 32? See https://github.com/docker/docker/pull/8035.
 const defaultTimeout = 32 * time.Second
 
+// ErrProtocolNotAvailable is returned when a given transport protocol is not provided by the operating system.
+var ErrProtocolNotAvailable = errors.New("protocol not available")
+
 // ConfigureTransport configures the specified Transport according to the
 // specified proto and addr.
 // If the proto is unix (using a unix socket to communicate) or npipe the
@@ -17,17 +21,9 @@ const defaultTimeout = 32 * time.Second
 func ConfigureTransport(tr *http.Transport, proto, addr string) error {
 	switch proto {
 	case "unix":
-		// No need for compression in local communications.
-		tr.DisableCompression = true
-		tr.Dial = func(_, _ string) (net.Conn, error) {
-			return net.DialTimeout(proto, addr, defaultTimeout)
-		}
+		return configureUnixTransport(tr, proto, addr)
 	case "npipe":
-		// No need for compression in local communications.
-		tr.DisableCompression = true
-		tr.Dial = func(_, _ string) (net.Conn, error) {
-			return DialPipe(addr, defaultTimeout)
-		}
+		return configureNpipeTransport(tr, proto, addr)
 	default:
 		tr.Proxy = http.ProxyFromEnvironment
 		dialer, err := DialerFromEnvironment(&net.Dialer{

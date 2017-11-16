@@ -16,103 +16,96 @@ limitations under the License.
 
 package v1alpha1
 
-import "k8s.io/kubernetes/pkg/api/unversioned"
-
-type KubeProxyConfiguration struct {
-	unversioned.TypeMeta
-
-	// bindAddress is the IP address for the proxy server to serve on (set to 0.0.0.0
-	// for all interfaces)
-	BindAddress string `json:"bindAddress"`
-	// clusterCIDR is the CIDR range of the pods in the cluster. It is used to
-	// bridge traffic coming from outside of the cluster. If not provided,
-	// no off-cluster bridging will be performed.
-	ClusterCIDR string `json:"clusterCIDR"`
-	// healthzBindAddress is the IP address for the health check server to serve on,
-	// defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)
-	HealthzBindAddress string `json:"healthzBindAddress"`
-	// healthzPort is the port to bind the health check server. Use 0 to disable.
-	HealthzPort int32 `json:"healthzPort"`
-	// hostnameOverride, if non-empty, will be used as the identity instead of the actual hostname.
-	HostnameOverride string `json:"hostnameOverride"`
-	// iptablesMasqueradeBit is the bit of the iptables fwmark space to use for SNAT if using
-	// the pure iptables proxy mode. Values must be within the range [0, 31].
-	IPTablesMasqueradeBit *int32 `json:"iptablesMasqueradeBit"`
-	// iptablesSyncPeriod is the period that iptables rules are refreshed (e.g. '5s', '1m',
-	// '2h22m').  Must be greater than 0.
-	IPTablesSyncPeriod unversioned.Duration `json:"iptablesSyncPeriodSeconds"`
-	// kubeconfigPath is the path to the kubeconfig file with authorization information (the
-	// master location is set by the master flag).
-	KubeconfigPath string `json:"kubeconfigPath"`
-	// masqueradeAll tells kube-proxy to SNAT everything if using the pure iptables proxy mode.
-	MasqueradeAll bool `json:"masqueradeAll"`
-	// master is the address of the Kubernetes API server (overrides any value in kubeconfig)
-	Master string `json:"master"`
-	// oomScoreAdj is the oom-score-adj value for kube-proxy process. Values must be within
-	// the range [-1000, 1000]
-	OOMScoreAdj *int32 `json:"oomScoreAdj"`
-	// mode specifies which proxy mode to use.
-	Mode ProxyMode `json:"mode"`
-	// portRange is the range of host ports (beginPort-endPort, inclusive) that may be consumed
-	// in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.
-	PortRange string `json:"portRange"`
-	// resourceContainer is the bsolute name of the resource-only container to create and run
-	// the Kube-proxy in (Default: /kube-proxy).
-	ResourceContainer string `json:"resourceContainer"`
-	// udpIdleTimeout is how long an idle UDP connection will be kept open (e.g. '250ms', '2s').
-	// Must be greater than 0. Only applicable for proxyMode=userspace.
-	UDPIdleTimeout unversioned.Duration `json:"udpTimeoutMilliseconds"`
-	// conntrackMax is the maximum number of NAT connections to track (0 to leave as-is)")
-	ConntrackMax int32 `json:"conntrackMax"`
-	// conntrackTCPEstablishedTimeout is how long an idle UDP connection will be kept open
-	// (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxyMode is Userspace
-	ConntrackTCPEstablishedTimeout unversioned.Duration `json:"conntrackTCPEstablishedTimeout"`
-}
-
-// Currently two modes of proxying are available: 'userspace' (older, stable) or 'iptables'
-// (experimental). If blank, look at the Node object on the Kubernetes API and respect the
-// 'net.experimental.kubernetes.io/proxy-mode' annotation if provided.  Otherwise use the
-// best-available proxy (currently userspace, but may change in future versions).  If the
-// iptables proxy is selected, regardless of how, but the system's kernel or iptables
-// versions are insufficient, this always falls back to the userspace proxy.
-type ProxyMode string
-
-const (
-	ProxyModeUserspace ProxyMode = "userspace"
-	ProxyModeIPTables  ProxyMode = "iptables"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type KubeSchedulerConfiguration struct {
-	unversioned.TypeMeta
-
-	// port is the port that the scheduler's http service runs on.
-	Port int `json:"port"`
-	// address is the IP address to serve on.
-	Address string `json:"address"`
-	// algorithmProvider is the scheduling algorithm provider to use.
-	AlgorithmProvider string `json:"algorithmProvider"`
-	// policyConfigFile is the filepath to the scheduler policy configuration.
-	PolicyConfigFile string `json:"policyConfigFile"`
-	// enableProfiling enables profiling via web interface.
-	EnableProfiling *bool `json:"enableProfiling"`
-	// contentType is contentType of requests sent to apiserver.
+// ClientConnectionConfiguration contains details for constructing a client.
+type ClientConnectionConfiguration struct {
+	// kubeConfigFile is the path to a kubeconfig file.
+	KubeConfigFile string `json:"kubeconfig"`
+	// acceptContentTypes defines the Accept header sent by clients when connecting to a server, overriding the
+	// default value of 'application/json'. This field will control all connections to the server used by a particular
+	// client.
+	AcceptContentTypes string `json:"acceptContentTypes"`
+	// contentType is the content type used when sending data to the server from this client.
 	ContentType string `json:"contentType"`
-	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver.
-	KubeAPIQPS float32 `json:"kubeAPIQPS"`
-	// kubeAPIBurst is the QPS burst to use while talking with kubernetes apiserver.
-	KubeAPIBurst int `json:"kubeAPIBurst"`
-	// schedulerName is name of the scheduler, used to select which pods
-	// will be processed by this scheduler, based on pod's annotation with
-	// key 'scheduler.alpha.kubernetes.io/name'.
+	// cps controls the number of queries per second allowed for this connection.
+	QPS float32 `json:"qps"`
+	// burst allows extra queries to accumulate when a client is exceeding its rate.
+	Burst int32 `json:"burst"`
+}
+
+// SchedulerPolicySource configures a means to obtain a scheduler Policy. One
+// source field must be specified, and source fields are mutually exclusive.
+type SchedulerPolicySource struct {
+	// File is a file policy source.
+	File *SchedulerPolicyFileSource `json:"file,omitempty"`
+	// ConfigMap is a config map policy source.
+	ConfigMap *SchedulerPolicyConfigMapSource `json:"configMap,omitempty"`
+}
+
+// SchedulerPolicyFileSource is a policy serialized to disk and accessed via
+// path.
+type SchedulerPolicyFileSource struct {
+	// Path is the location of a serialized policy.
+	Path string `json:"path"`
+}
+
+// SchedulerPolicyConfigMapSource is a policy serialized into a config map value
+// under the SchedulerPolicyConfigMapKey key.
+type SchedulerPolicyConfigMapSource struct {
+	// Namespace is the namespace of the policy config map.
+	Namespace string `json:"namespace"`
+	// Name is the name of hte policy config map.
+	Name string `json:"name"`
+}
+
+// SchedulerAlgorithmSource is the source of a scheduler algorithm. One source
+// field must be specified, and source fields are mutually exclusive.
+type SchedulerAlgorithmSource struct {
+	// Policy is a policy based algorithm source.
+	Policy *SchedulerPolicySource `json:"policy,omitempty"`
+	// Provider is the name of a scheduling algorithm provider to use.
+	Provider *string `json:"provider,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type KubeSchedulerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// SchedulerName is name of the scheduler, used to select which pods
+	// will be processed by this scheduler, based on pod's "spec.SchedulerName".
 	SchedulerName string `json:"schedulerName"`
+	// AlgorithmSource specifies the scheduler algorithm source.
+	AlgorithmSource SchedulerAlgorithmSource `json:"algorithmSource"`
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
 	// corresponding to every RequiredDuringScheduling affinity rule.
 	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 0-100.
-	HardPodAffinitySymmetricWeight int `json:"hardPodAffinitySymmetricWeight"`
+	HardPodAffinitySymmetricWeight int32 `json:"hardPodAffinitySymmetricWeight"`
+
+	// LeaderElection defines the configuration of leader election client.
+	LeaderElection KubeSchedulerLeaderElectionConfiguration `json:"leaderElection"`
+
+	// ClientConnection specifies the kubeconfig file and client connection
+	// settings for the proxy server to use when communicating with the apiserver.
+	ClientConnection ClientConnectionConfiguration `json:"clientConnection"`
+	// HealthzBindAddress is the IP address and port for the health check server to serve on,
+	// defaulting to 0.0.0.0:10251
+	HealthzBindAddress string `json:"healthzBindAddress"`
+	// MetricsBindAddress is the IP address and port for the metrics server to
+	// serve on, defaulting to 0.0.0.0:10251.
+	MetricsBindAddress string `json:"metricsBindAddress"`
+	// EnableProfiling enables profiling via web interface on /debug/pprof
+	// handler. Profiling handlers will be handled by metrics server.
+	EnableProfiling bool `json:"enableProfiling"`
+	// EnableContentionProfiling enables lock contention profiling, if
+	// EnableProfiling is true.
+	EnableContentionProfiling bool `json:"enableContentionProfiling"`
+
 	// Indicate the "all topologies" set for empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.
 	FailureDomains string `json:"failureDomains"`
-	// leaderElection defines the configuration of leader election client.
-	LeaderElection LeaderElectionConfiguration `json:"leaderElection"`
 }
 
 // LeaderElectionConfiguration defines the configuration of leader election
@@ -128,14 +121,37 @@ type LeaderElectionConfiguration struct {
 	// maximum duration that a leader can be stopped before it is replaced
 	// by another candidate. This is only applicable if leader election is
 	// enabled.
-	LeaseDuration unversioned.Duration `json:"leaseDuration"`
+	LeaseDuration metav1.Duration `json:"leaseDuration"`
 	// renewDeadline is the interval between attempts by the acting master to
 	// renew a leadership slot before it stops leading. This must be less
 	// than or equal to the lease duration. This is only applicable if leader
 	// election is enabled.
-	RenewDeadline unversioned.Duration `json:"renewDeadline"`
+	RenewDeadline metav1.Duration `json:"renewDeadline"`
 	// retryPeriod is the duration the clients should wait between attempting
 	// acquisition and renewal of a leadership. This is only applicable if
 	// leader election is enabled.
-	RetryPeriod unversioned.Duration `json:"retryPeriod"`
+	RetryPeriod metav1.Duration `json:"retryPeriod"`
+	// resourceLock indicates the resource object type that will be used to lock
+	// during leader election cycles.
+	ResourceLock string `json:"resourceLock"`
 }
+
+// KubeSchedulerLeaderElectionConfiguration expands LeaderElectionConfiguration
+// to include scheduler specific configuration.
+type KubeSchedulerLeaderElectionConfiguration struct {
+	LeaderElectionConfiguration `json:",inline"`
+	// LockObjectNamespace defines the namespace of the lock object
+	LockObjectNamespace string `json:"lockObjectNamespace"`
+	// LockObjectName defines the lock object name
+	LockObjectName string `json:"lockObjectName"`
+}
+
+const (
+	// "kube-system" is the default scheduler lock object namespace
+	SchedulerDefaultLockObjectNamespace string = "kube-system"
+
+	// "kube-scheduler" is the default scheduler lock object name
+	SchedulerDefaultLockObjectName = "kube-scheduler"
+
+	SchedulerDefaultProviderName = "DefaultProvider"
+)

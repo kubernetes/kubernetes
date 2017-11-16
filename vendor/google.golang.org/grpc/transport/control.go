@@ -35,7 +35,9 @@ package transport
 
 import (
 	"fmt"
+	"math"
 	"sync"
+	"time"
 
 	"golang.org/x/net/http2"
 )
@@ -44,8 +46,18 @@ const (
 	// The default value of flow control window size in HTTP2 spec.
 	defaultWindowSize = 65535
 	// The initial window size for flow control.
-	initialWindowSize     = defaultWindowSize      // for an RPC
-	initialConnWindowSize = defaultWindowSize * 16 // for a connection
+	initialWindowSize             = defaultWindowSize      // for an RPC
+	initialConnWindowSize         = defaultWindowSize * 16 // for a connection
+	infinity                      = time.Duration(math.MaxInt64)
+	defaultClientKeepaliveTime    = infinity
+	defaultClientKeepaliveTimeout = time.Duration(20 * time.Second)
+	defaultMaxStreamsClient       = 100
+	defaultMaxConnectionIdle      = infinity
+	defaultMaxConnectionAge       = infinity
+	defaultMaxConnectionAgeGrace  = infinity
+	defaultServerKeepaliveTime    = time.Duration(2 * time.Hour)
+	defaultServerKeepaliveTimeout = time.Duration(20 * time.Second)
+	defaultKeepalivePolicyMinTime = time.Duration(5 * time.Minute)
 )
 
 // The following defines various control items which could flow through
@@ -56,43 +68,40 @@ type windowUpdate struct {
 	increment uint32
 }
 
-func (windowUpdate) isItem() bool {
-	return true
-}
+func (*windowUpdate) item() {}
 
 type settings struct {
 	ack bool
 	ss  []http2.Setting
 }
 
-func (settings) isItem() bool {
-	return true
-}
+func (*settings) item() {}
 
 type resetStream struct {
 	streamID uint32
 	code     http2.ErrCode
 }
 
-func (resetStream) isItem() bool {
-	return true
+func (*resetStream) item() {}
+
+type goAway struct {
+	code      http2.ErrCode
+	debugData []byte
 }
+
+func (*goAway) item() {}
 
 type flushIO struct {
 }
 
-func (flushIO) isItem() bool {
-	return true
-}
+func (*flushIO) item() {}
 
 type ping struct {
 	ack  bool
 	data [8]byte
 }
 
-func (ping) isItem() bool {
-	return true
-}
+func (*ping) item() {}
 
 // quotaPool is a pool which accumulates the quota and sends it to acquire()
 // when it is available.
@@ -116,35 +125,9 @@ func newQuotaPool(q int) *quotaPool {
 	return qb
 }
 
-// add adds n to the available quota and tries to send it on acquire.
-func (qb *quotaPool) add(n int) {
-	qb.mu.Lock()
-	defer qb.mu.Unlock()
-	qb.quota += n
-	if qb.quota <= 0 {
-		return
-	}
-	select {
-	case qb.c <- qb.quota:
-		qb.quota = 0
-	default:
-	}
-}
-
-// cancel cancels the pending quota sent on acquire, if any.
-func (qb *quotaPool) cancel() {
-	qb.mu.Lock()
-	defer qb.mu.Unlock()
-	select {
-	case n := <-qb.c:
-		qb.quota += n
-	default:
-	}
-}
-
-// reset cancels the pending quota sent on acquired, incremented by v and sends
+// add cancels the pending quota sent on acquired, incremented by v and sends
 // it back on acquire.
-func (qb *quotaPool) reset(v int) {
+func (qb *quotaPool) add(v int) {
 	qb.mu.Lock()
 	defer qb.mu.Unlock()
 	select {
@@ -156,6 +139,10 @@ func (qb *quotaPool) reset(v int) {
 	if qb.quota <= 0 {
 		return
 	}
+	// After the pool has been created, this is the only place that sends on
+	// the channel. Since mu is held at this point and any quota that was sent
+	// on the channel has been retrieved, we know that this code will always
+	// place any positive quota value on the channel.
 	select {
 	case qb.c <- qb.quota:
 		qb.quota = 0
@@ -172,10 +159,6 @@ func (qb *quotaPool) acquire() <-chan int {
 type inFlow struct {
 	// The inbound flow control limit for pending data.
 	limit uint32
-	// conn points to the shared connection-level inFlow that is shared
-	// by all streams on that conn. It is nil for the inFlow on the conn
-	// directly.
-	conn *inFlow
 
 	mu sync.Mutex
 	// pendingData is the overall data which have been received but not been
@@ -186,75 +169,39 @@ type inFlow struct {
 	pendingUpdate uint32
 }
 
-// onData is invoked when some data frame is received. It increments not only its
-// own pendingData but also that of the associated connection-level flow.
+// onData is invoked when some data frame is received. It updates pendingData.
 func (f *inFlow) onData(n uint32) error {
-	if n == 0 {
-		return nil
-	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if f.pendingData+f.pendingUpdate+n > f.limit {
-		return fmt.Errorf("recieved %d-bytes data exceeding the limit %d bytes", f.pendingData+f.pendingUpdate+n, f.limit)
-	}
-	if f.conn != nil {
-		if err := f.conn.onData(n); err != nil {
-			return ConnectionErrorf("%v", err)
-		}
-	}
 	f.pendingData += n
+	if f.pendingData+f.pendingUpdate > f.limit {
+		return fmt.Errorf("received %d-bytes data exceeding the limit %d bytes", f.pendingData+f.pendingUpdate, f.limit)
+	}
 	return nil
 }
 
-// connOnRead updates the connection level states when the application consumes data.
-func (f *inFlow) connOnRead(n uint32) uint32 {
-	if n == 0 || f.conn != nil {
-		return 0
-	}
+// onRead is invoked when the application reads the data. It returns the window size
+// to be sent to the peer.
+func (f *inFlow) onRead(n uint32) uint32 {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.pendingData == 0 {
+		return 0
+	}
 	f.pendingData -= n
 	f.pendingUpdate += n
 	if f.pendingUpdate >= f.limit/4 {
-		ret := f.pendingUpdate
+		wu := f.pendingUpdate
 		f.pendingUpdate = 0
-		return ret
+		return wu
 	}
 	return 0
 }
 
-// onRead is invoked when the application reads the data. It returns the window updates
-// for both stream and connection level.
-func (f *inFlow) onRead(n uint32) (swu, cwu uint32) {
-	if n == 0 {
-		return
-	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if f.pendingData == 0 {
-		// pendingData has been adjusted by restoreConn.
-		return
-	}
-	f.pendingData -= n
-	f.pendingUpdate += n
-	if f.pendingUpdate >= f.limit/4 {
-		swu = f.pendingUpdate
-		f.pendingUpdate = 0
-	}
-	cwu = f.conn.connOnRead(n)
-	return
-}
-
-// restoreConn is invoked when a stream is terminated. It removes its stake in
-// the connection-level flow and resets its own state.
-func (f *inFlow) restoreConn() uint32 {
-	if f.conn == nil {
-		return 0
-	}
+func (f *inFlow) resetPendingData() uint32 {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	n := f.pendingData
 	f.pendingData = 0
-	f.pendingUpdate = 0
-	return f.conn.connOnRead(n)
+	return n
 }

@@ -1,5 +1,3 @@
-// +build integration,!no-etcd
-
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -22,22 +20,23 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("pod-activedeadline-update", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
 
 	var (
 		iZero = int64(0)
@@ -46,13 +45,13 @@ func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 		iNeg  = int64(-1)
 	)
 
-	prototypePod := func() *api.Pod {
-		return &api.Pod{
-			ObjectMeta: api.ObjectMeta{
+	prototypePod := func() *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "xxx",
 			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
 					{
 						Name:  "fake-name",
 						Image: "fakeimage",
@@ -130,13 +129,13 @@ func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 		pod.Spec.ActiveDeadlineSeconds = tc.original
 		pod.ObjectMeta.Name = fmt.Sprintf("activedeadlineseconds-test-%v", i)
 
-		if _, err := client.Pods(ns.Name).Create(pod); err != nil {
+		if _, err := client.Core().Pods(ns.Name).Create(pod); err != nil {
 			t.Errorf("Failed to create pod: %v", err)
 		}
 
 		pod.Spec.ActiveDeadlineSeconds = tc.update
 
-		_, err := client.Pods(ns.Name).Update(pod)
+		_, err := client.Core().Pods(ns.Name).Update(pod)
 		if tc.valid && err != nil {
 			t.Errorf("%v: failed to update pod: %v", tc.name, err)
 		} else if !tc.valid && err == nil {
@@ -148,25 +147,25 @@ func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 }
 
 func TestPodReadOnlyFilesystem(t *testing.T) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
 	isReadOnly := true
 	ns := framework.CreateTestingNamespace("pod-readonly-root", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
 
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "xxx",
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  "fake-name",
 					Image: "fakeimage",
-					SecurityContext: &api.SecurityContext{
+					SecurityContext: &v1.SecurityContext{
 						ReadOnlyRootFilesystem: &isReadOnly,
 					},
 				},
@@ -174,7 +173,7 @@ func TestPodReadOnlyFilesystem(t *testing.T) {
 		},
 	}
 
-	if _, err := client.Pods(ns.Name).Create(pod); err != nil {
+	if _, err := client.Core().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
 

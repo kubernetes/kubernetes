@@ -14,27 +14,41 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// CAUTION: If you update code in this file, you may need to also update code
-//          in contrib/mesos/cmd/km/k8sm-scheduler.go
 package main
 
 import (
+	"flag"
+
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
-	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 )
 
 // NewScheduler creates a new hyperkube Server object that includes the
 // description and flags.
 func NewScheduler() *Server {
-	s := options.NewSchedulerServer()
+	healthz.DefaultHealthz()
+
+	command := app.NewSchedulerCommand()
 
 	hks := Server{
-		SimpleUsage: "scheduler",
-		Long:        "Implements a Kubernetes scheduler.  This will assign pods to kubelets based on capacity and constraints.",
-		Run: func(_ *Server, _ []string) error {
-			return app.Run(s)
-		},
+		name:            "scheduler",
+		AlternativeName: "kube-scheduler",
+		SimpleUsage:     "scheduler",
+		Long:            command.Long,
 	}
-	s.AddFlags(hks.Flags())
+
+	serverFlags := hks.Flags()
+	serverFlags.AddFlagSet(command.Flags())
+
+	// FIXME this is here because hyperkube does its own flag parsing, and we need
+	// the command to know about the go flag set. Remove this once hyperkube is
+	// refactored to use cobra throughout.
+	command.Flags().AddGoFlagSet(flag.CommandLine)
+
+	hks.Run = func(_ *Server, args []string, stopCh <-chan struct{}) error {
+		command.SetArgs(args)
+		return command.Execute()
+	}
+
 	return &hks
 }

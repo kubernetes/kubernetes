@@ -17,125 +17,72 @@ limitations under the License.
 package config
 
 import (
+	"reflect"
+	"sync"
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/watch"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	ktesting "k8s.io/client-go/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 )
-
-type fakeLW struct {
-	listResp  runtime.Object
-	watchResp watch.Interface
-}
-
-func (lw fakeLW) List(options api.ListOptions) (runtime.Object, error) {
-	return lw.listResp, nil
-}
-
-func (lw fakeLW) Watch(options api.ListOptions) (watch.Interface, error) {
-	return lw.watchResp, nil
-}
-
-var _ cache.ListerWatcher = fakeLW{}
 
 func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 	service1v1 := &api.Service{
-		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "s1"},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "s1"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}}}
 	service1v2 := &api.Service{
-		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "s1"},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "s1"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}}}
 	service2 := &api.Service{
-		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "s2"},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "s2"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 30}}}}
 
 	// Setup fake api client.
+	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
-	lw := fakeLW{
-		listResp:  &api.ServiceList{Items: []api.Service{}},
-		watchResp: fakeWatch,
-	}
+	client.PrependWatchReactor("services", ktesting.DefaultWatchReactor(fakeWatch, nil))
 
-	ch := make(chan ServiceUpdate)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
 
-	cache.NewReflector(lw, &api.Service{}, NewServiceStore(nil, ch), 30*time.Second).Run()
+	handler := NewServiceHandlerMock()
 
-	got, ok := <-ch
-	if !ok {
-		t.Errorf("Unable to read from channel when expected")
-	}
-	expected := ServiceUpdate{Op: SET, Services: []api.Service{}}
-	if !api.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v; Got %#v", expected, got)
-	}
+	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
+
+	serviceConfig := NewServiceConfig(sharedInformers.Core().InternalVersion().Services(), time.Minute)
+	serviceConfig.RegisterEventHandler(handler)
+	go sharedInformers.Start(stopCh)
+	go serviceConfig.Run(stopCh)
 
 	// Add the first service
 	fakeWatch.Add(service1v1)
-	got, ok = <-ch
-	if !ok {
-		t.Errorf("Unable to read from channel when expected")
-	}
-	expected = ServiceUpdate{Op: SET, Services: []api.Service{*service1v1}}
-	if !api.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v; Got %#v", expected, got)
-	}
+	handler.ValidateServices(t, []*api.Service{service1v1})
 
 	// Add another service
 	fakeWatch.Add(service2)
-	got, ok = <-ch
-	if !ok {
-		t.Errorf("Unable to read from channel when expected")
-	}
-	// Could be sorted either of these two ways:
-	expectedA := ServiceUpdate{Op: SET, Services: []api.Service{*service1v1, *service2}}
-	expectedB := ServiceUpdate{Op: SET, Services: []api.Service{*service2, *service1v1}}
-
-	if !api.Semantic.DeepEqual(expectedA, got) && !api.Semantic.DeepEqual(expectedB, got) {
-		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, got)
-	}
+	handler.ValidateServices(t, []*api.Service{service1v1, service2})
 
 	// Modify service1
 	fakeWatch.Modify(service1v2)
-	got, ok = <-ch
-	if !ok {
-		t.Errorf("Unable to read from channel when expected")
-	}
-	expectedA = ServiceUpdate{Op: SET, Services: []api.Service{*service1v2, *service2}}
-	expectedB = ServiceUpdate{Op: SET, Services: []api.Service{*service2, *service1v2}}
-
-	if !api.Semantic.DeepEqual(expectedA, got) && !api.Semantic.DeepEqual(expectedB, got) {
-		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, got)
-	}
+	handler.ValidateServices(t, []*api.Service{service1v2, service2})
 
 	// Delete service1
 	fakeWatch.Delete(service1v2)
-	got, ok = <-ch
-	if !ok {
-		t.Errorf("Unable to read from channel when expected")
-	}
-	expected = ServiceUpdate{Op: SET, Services: []api.Service{*service2}}
-	if !api.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v, Got %#v", expected, got)
-	}
+	handler.ValidateServices(t, []*api.Service{service2})
 
 	// Delete service2
 	fakeWatch.Delete(service2)
-	got, ok = <-ch
-	if !ok {
-		t.Errorf("Unable to read from channel when expected")
-	}
-	expected = ServiceUpdate{Op: SET, Services: []api.Service{}}
-	if !api.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v, Got %#v", expected, got)
-	}
+	handler.ValidateServices(t, []*api.Service{})
 }
 
 func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 	endpoints1v1 := &api.Endpoints{
-		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "e1"},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "e1"},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{
 				{IP: "1.2.3.4"},
@@ -144,7 +91,7 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 		}},
 	}
 	endpoints1v2 := &api.Endpoints{
-		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "e1"},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "e1"},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{
 				{IP: "1.2.3.4"},
@@ -154,7 +101,7 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 		}},
 	}
 	endpoints2 := &api.Endpoints{
-		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "e2"},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "e2"},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{
 				{IP: "5.6.7.8"},
@@ -164,82 +111,104 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 	}
 
 	// Setup fake api client.
+	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
-	lw := fakeLW{
-		listResp:  &api.EndpointsList{Items: []api.Endpoints{}},
-		watchResp: fakeWatch,
-	}
+	client.PrependWatchReactor("endpoints", ktesting.DefaultWatchReactor(fakeWatch, nil))
 
-	ch := make(chan EndpointsUpdate)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
 
-	cache.NewReflector(lw, &api.Endpoints{}, NewEndpointsStore(nil, ch), 30*time.Second).Run()
+	handler := NewEndpointsHandlerMock()
 
-	got, ok := <-ch
-	if !ok {
-		t.Errorf("Unable to read from channel when expected")
-	}
-	expected := EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{}}
-	if !api.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v; Got %#v", expected, got)
-	}
+	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
+
+	endpointsConfig := NewEndpointsConfig(sharedInformers.Core().InternalVersion().Endpoints(), time.Minute)
+	endpointsConfig.RegisterEventHandler(handler)
+	go sharedInformers.Start(stopCh)
+	go endpointsConfig.Run(stopCh)
 
 	// Add the first endpoints
 	fakeWatch.Add(endpoints1v1)
-	got, ok = <-ch
-	if !ok {
-		t.Errorf("Unable to read from channel when expected")
-	}
-	expected = EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints1v1}}
-	if !api.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v; Got %#v", expected, got)
-	}
+	handler.ValidateEndpoints(t, []*api.Endpoints{endpoints1v1})
 
 	// Add another endpoints
 	fakeWatch.Add(endpoints2)
-	got, ok = <-ch
-	if !ok {
-		t.Errorf("Unable to read from channel when expected")
-	}
-	// Could be sorted either of these two ways:
-	expectedA := EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints1v1, *endpoints2}}
-	expectedB := EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints2, *endpoints1v1}}
-
-	if !api.Semantic.DeepEqual(expectedA, got) && !api.Semantic.DeepEqual(expectedB, got) {
-		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, got)
-	}
+	handler.ValidateEndpoints(t, []*api.Endpoints{endpoints1v1, endpoints2})
 
 	// Modify endpoints1
 	fakeWatch.Modify(endpoints1v2)
-	got, ok = <-ch
-	if !ok {
-		t.Errorf("Unable to read from channel when expected")
-	}
-	expectedA = EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints1v2, *endpoints2}}
-	expectedB = EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints2, *endpoints1v2}}
-
-	if !api.Semantic.DeepEqual(expectedA, got) && !api.Semantic.DeepEqual(expectedB, got) {
-		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, got)
-	}
+	handler.ValidateEndpoints(t, []*api.Endpoints{endpoints1v2, endpoints2})
 
 	// Delete endpoints1
 	fakeWatch.Delete(endpoints1v2)
-	got, ok = <-ch
-	if !ok {
-		t.Errorf("Unable to read from channel when expected")
-	}
-	expected = EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints2}}
-	if !api.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v, Got %#v", expected, got)
-	}
+	handler.ValidateEndpoints(t, []*api.Endpoints{endpoints2})
 
 	// Delete endpoints2
 	fakeWatch.Delete(endpoints2)
-	got, ok = <-ch
-	if !ok {
-		t.Errorf("Unable to read from channel when expected")
+	handler.ValidateEndpoints(t, []*api.Endpoints{})
+}
+
+func newSvcHandler(t *testing.T, svcs []*api.Service, done func()) ServiceHandler {
+	shm := &ServiceHandlerMock{
+		state: make(map[types.NamespacedName]*api.Service),
 	}
-	expected = EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{}}
-	if !api.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v, Got %#v", expected, got)
+	shm.process = func(services []*api.Service) {
+		defer done()
+		if !reflect.DeepEqual(services, svcs) {
+			t.Errorf("Unexpected services: %#v, expected: %#v", services, svcs)
+		}
 	}
+	return shm
+}
+
+func newEpsHandler(t *testing.T, eps []*api.Endpoints, done func()) EndpointsHandler {
+	ehm := &EndpointsHandlerMock{
+		state: make(map[types.NamespacedName]*api.Endpoints),
+	}
+	ehm.process = func(endpoints []*api.Endpoints) {
+		defer done()
+		if !reflect.DeepEqual(eps, endpoints) {
+			t.Errorf("Unexpected endpoints: %#v, expected: %#v", endpoints, eps)
+		}
+	}
+	return ehm
+}
+
+func TestInitialSync(t *testing.T) {
+	svc1 := &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
+	}
+	svc2 := &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
+		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
+	}
+	eps1 := &api.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+	}
+	eps2 := &api.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
+	}
+
+	var wg sync.WaitGroup
+	// Wait for both services and endpoints handler.
+	wg.Add(2)
+
+	// Setup fake api client.
+	client := fake.NewSimpleClientset(svc1, svc2, eps2, eps1)
+	sharedInformers := informers.NewSharedInformerFactory(client, 0)
+
+	svcConfig := NewServiceConfig(sharedInformers.Core().InternalVersion().Services(), 0)
+	epsConfig := NewEndpointsConfig(sharedInformers.Core().InternalVersion().Endpoints(), 0)
+	svcHandler := newSvcHandler(t, []*api.Service{svc2, svc1}, wg.Done)
+	svcConfig.RegisterEventHandler(svcHandler)
+	epsHandler := newEpsHandler(t, []*api.Endpoints{eps2, eps1}, wg.Done)
+	epsConfig.RegisterEventHandler(epsHandler)
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	go sharedInformers.Start(stopCh)
+	go svcConfig.Run(stopCh)
+	go epsConfig.Run(stopCh)
+	wg.Wait()
 }

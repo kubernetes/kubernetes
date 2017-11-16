@@ -2,7 +2,7 @@
 "kind" : "Policy",
 "apiVersion" : "v1",
 "predicates" : [
-	{"name" : "PodFitsPorts"},
+	{"name" : "PodFitsHostPorts"},
 	{"name" : "PodFitsResources"},
 	{"name" : "NoDiskConflict"},
 	{"name" : "NoVolumeZoneConflict"},
@@ -14,5 +14,6 @@
 	{"name" : "BalancedResourceAllocation", "weight" : 1},
 	{"name" : "ServiceSpreadingPriority", "weight" : 1},
 	{"name" : "EqualPriority", "weight" : 1}
-	]
+	],
+"hardPodAffinitySymmetricWeight" : 10
 }

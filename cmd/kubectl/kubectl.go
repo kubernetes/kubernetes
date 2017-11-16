@@ -17,15 +17,15 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"os"
-	"runtime"
 
 	"k8s.io/kubernetes/cmd/kubectl/app"
 )
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	if err := app.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 	os.Exit(0)

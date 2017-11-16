@@ -1,2 +1,12 @@
-maintainers:
+approvers:
 - rootfs
+- saad-ali
+- jingxu97
+- humblec
+reviewers:
+- saad-ali
+- jsafrane
+- rootfs
+- humblec
+- jingxu97
+- msau42

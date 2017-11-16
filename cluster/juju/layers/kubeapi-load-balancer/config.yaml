@@ -1,0 +1,11 @@
+options:
+  port:
+    type: int
+    default: 443
+    description: The port to run the loadbalancer
+  extra_sans:
+    type: string
+    default: ""
+    description: |
+      Space-separated list of extra SAN entries to add to the x509 certificate
+      created for the load balancers.

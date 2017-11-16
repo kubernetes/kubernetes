@@ -24,25 +24,29 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/info/v1"
 )
 
 type GenericCollector struct {
-	//name of the collector
+	// name of the collector
 	name string
 
-	//holds information extracted from the config file for a collector
+	// holds information extracted from the config file for a collector
 	configFile Config
 
-	//holds information necessary to extract metrics
+	// holds information necessary to extract metrics
 	info *collectorInfo
+
+	// The Http client to use when connecting to metric endpoints
+	httpClient *http.Client
 }
 
 type collectorInfo struct {
-	//minimum polling frequency among all metrics
+	// minimum polling frequency among all metrics
 	minPollingFrequency time.Duration
 
-	//regular expresssions for all metrics
+	// regular expresssions for all metrics
 	regexps []*regexp.Regexp
 
 	// Limit for the number of srcaped metrics. If the count is higher,
@@ -50,15 +54,17 @@ type collectorInfo struct {
 	metricCountLimit int
 }
 
-//Returns a new collector using the information extracted from the configfile
-func NewCollector(collectorName string, configFile []byte, metricCountLimit int) (*GenericCollector, error) {
+// Returns a new collector using the information extracted from the configfile
+func NewCollector(collectorName string, configFile []byte, metricCountLimit int, containerHandler container.ContainerHandler, httpClient *http.Client) (*GenericCollector, error) {
 	var configInJSON Config
 	err := json.Unmarshal(configFile, &configInJSON)
 	if err != nil {
 		return nil, err
 	}
 
-	//TODO : Add checks for validity of config file (eg : Accurate JSON fields)
+	configInJSON.Endpoint.configure(containerHandler)
+
+	// TODO : Add checks for validity of config file (eg : Accurate JSON fields)
 
 	if len(configInJSON.MetricsConfig) == 0 {
 		return nil, fmt.Errorf("No metrics provided in config")
@@ -99,10 +105,11 @@ func NewCollector(collectorName string, configFile []byte, metricCountLimit int)
 			regexps:             regexprs,
 			metricCountLimit:    metricCountLimit,
 		},
+		httpClient: httpClient,
 	}, nil
 }
 
-//Returns name of the collector
+// Returns name of the collector
 func (collector *GenericCollector) Name() string {
 	return collector.name
 }
@@ -125,13 +132,13 @@ func (collector *GenericCollector) GetSpec() []v1.MetricSpec {
 	return specs
 }
 
-//Returns collected metrics and the next collection time of the collector
+// Returns collected metrics and the next collection time of the collector
 func (collector *GenericCollector) Collect(metrics map[string][]v1.MetricVal) (time.Time, map[string][]v1.MetricVal, error) {
 	currentTime := time.Now()
 	nextCollectionTime := currentTime.Add(time.Duration(collector.info.minPollingFrequency))
 
-	uri := collector.configFile.Endpoint
-	response, err := http.Get(uri)
+	uri := collector.configFile.Endpoint.URL
+	response, err := collector.httpClient.Get(uri)
 	if err != nil {
 		return nextCollectionTime, nil, err
 	}

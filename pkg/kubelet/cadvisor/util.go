@@ -17,18 +17,42 @@ limitations under the License.
 package cadvisor
 
 import (
-	cadvisorApi "github.com/google/cadvisor/info/v1"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi2 "github.com/google/cadvisor/info/v2"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 )
 
-func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) api.ResourceList {
-	c := api.ResourceList{
-		api.ResourceCPU: *resource.NewMilliQuantity(
+func CapacityFromMachineInfo(info *cadvisorapi.MachineInfo) v1.ResourceList {
+	c := v1.ResourceList{
+		v1.ResourceCPU: *resource.NewMilliQuantity(
 			int64(info.NumCores*1000),
 			resource.DecimalSI),
-		api.ResourceMemory: *resource.NewQuantity(
+		v1.ResourceMemory: *resource.NewQuantity(
 			int64(info.MemoryCapacity),
+			resource.BinarySI),
+	}
+
+	// if huge pages are enabled, we report them as a schedulable resource on the node
+	if utilfeature.DefaultFeatureGate.Enabled(features.HugePages) {
+		for _, hugepagesInfo := range info.HugePages {
+			pageSizeBytes := int64(hugepagesInfo.PageSize * 1024)
+			hugePagesBytes := pageSizeBytes * int64(hugepagesInfo.NumPages)
+			pageSizeQuantity := resource.NewQuantity(pageSizeBytes, resource.BinarySI)
+			c[v1helper.HugePageResourceName(*pageSizeQuantity)] = *resource.NewQuantity(hugePagesBytes, resource.BinarySI)
+		}
+	}
+
+	return c
+}
+
+func EphemeralStorageCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceList {
+	c := v1.ResourceList{
+		v1.ResourceEphemeralStorage: *resource.NewQuantity(
+			int64(info.Capacity),
 			resource.BinarySI),
 	}
 	return c

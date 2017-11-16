@@ -18,16 +18,18 @@ package kubectl
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
-	internal "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	api "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/runtime"
+	api "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 func encodeOrDie(obj runtime.Object) []byte {
-	data, err := runtime.Encode(internal.Codecs.LegacyCodec(api.SchemeGroupVersion), obj)
+	data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(api.SchemeGroupVersion), obj)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -38,45 +40,46 @@ func TestSortingPrinter(t *testing.T) {
 	intPtr := func(val int32) *int32 { return &val }
 
 	a := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "a",
 		},
 	}
 
 	b := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "b",
 		},
 	}
 
 	c := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "c",
 		},
 	}
 
 	tests := []struct {
-		obj   runtime.Object
-		sort  runtime.Object
-		field string
-		name  string
+		obj         runtime.Object
+		sort        runtime.Object
+		field       string
+		name        string
+		expectedErr string
 	}{
 		{
 			name: "in-order-already",
 			obj: &api.PodList{
 				Items: []api.Pod{
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "a",
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "b",
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "c",
 						},
 					},
@@ -85,17 +88,17 @@ func TestSortingPrinter(t *testing.T) {
 			sort: &api.PodList{
 				Items: []api.Pod{
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "a",
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "b",
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "c",
 						},
 					},
@@ -108,17 +111,17 @@ func TestSortingPrinter(t *testing.T) {
 			obj: &api.PodList{
 				Items: []api.Pod{
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "b",
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "c",
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "a",
 						},
 					},
@@ -127,17 +130,17 @@ func TestSortingPrinter(t *testing.T) {
 			sort: &api.PodList{
 				Items: []api.Pod{
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "a",
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "b",
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "c",
 						},
 					},
@@ -150,18 +153,18 @@ func TestSortingPrinter(t *testing.T) {
 			obj: &api.PodList{
 				Items: []api.Pod{
 					{
-						ObjectMeta: api.ObjectMeta{
-							CreationTimestamp: unversioned.Unix(300, 0),
+						ObjectMeta: metav1.ObjectMeta{
+							CreationTimestamp: metav1.Unix(300, 0),
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
-							CreationTimestamp: unversioned.Unix(100, 0),
+						ObjectMeta: metav1.ObjectMeta{
+							CreationTimestamp: metav1.Unix(100, 0),
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
-							CreationTimestamp: unversioned.Unix(200, 0),
+						ObjectMeta: metav1.ObjectMeta{
+							CreationTimestamp: metav1.Unix(200, 0),
 						},
 					},
 				},
@@ -169,18 +172,18 @@ func TestSortingPrinter(t *testing.T) {
 			sort: &api.PodList{
 				Items: []api.Pod{
 					{
-						ObjectMeta: api.ObjectMeta{
-							CreationTimestamp: unversioned.Unix(100, 0),
+						ObjectMeta: metav1.ObjectMeta{
+							CreationTimestamp: metav1.Unix(100, 0),
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
-							CreationTimestamp: unversioned.Unix(200, 0),
+						ObjectMeta: metav1.ObjectMeta{
+							CreationTimestamp: metav1.Unix(200, 0),
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
-							CreationTimestamp: unversioned.Unix(300, 0),
+						ObjectMeta: metav1.ObjectMeta{
+							CreationTimestamp: metav1.Unix(300, 0),
 						},
 					},
 				},
@@ -265,12 +268,140 @@ func TestSortingPrinter(t *testing.T) {
 			},
 			field: "{.metadata.name}",
 		},
+		{
+			name: "some-missing-fields",
+			obj: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"kind":       "List",
+					"apiVersion": "v1",
+				},
+				Items: []unstructured.Unstructured{
+					{
+						Object: map[string]interface{}{
+							"kind":       "ReplicationController",
+							"apiVersion": "v1",
+							"status": map[string]interface{}{
+								"availableReplicas": 2,
+							},
+						},
+					},
+					{
+						Object: map[string]interface{}{
+							"kind":       "ReplicationController",
+							"apiVersion": "v1",
+							"status":     map[string]interface{}{},
+						},
+					},
+					{
+						Object: map[string]interface{}{
+							"kind":       "ReplicationController",
+							"apiVersion": "v1",
+							"status": map[string]interface{}{
+								"availableReplicas": 1,
+							},
+						},
+					},
+				},
+			},
+			sort: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"kind":       "List",
+					"apiVersion": "v1",
+				},
+				Items: []unstructured.Unstructured{
+					{
+						Object: map[string]interface{}{
+							"kind":       "ReplicationController",
+							"apiVersion": "v1",
+							"status":     map[string]interface{}{},
+						},
+					},
+					{
+						Object: map[string]interface{}{
+							"kind":       "ReplicationController",
+							"apiVersion": "v1",
+							"status": map[string]interface{}{
+								"availableReplicas": 1,
+							},
+						},
+					},
+					{
+						Object: map[string]interface{}{
+							"kind":       "ReplicationController",
+							"apiVersion": "v1",
+							"status": map[string]interface{}{
+								"availableReplicas": 2,
+							},
+						},
+					},
+				},
+			},
+			field: "{.status.availableReplicas}",
+		},
+		{
+			name: "all-missing-fields",
+			obj: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"kind":       "List",
+					"apiVersion": "v1",
+				},
+				Items: []unstructured.Unstructured{
+					{
+						Object: map[string]interface{}{
+							"kind":       "ReplicationController",
+							"apiVersion": "v1",
+							"status": map[string]interface{}{
+								"replicas": 0,
+							},
+						},
+					},
+					{
+						Object: map[string]interface{}{
+							"kind":       "ReplicationController",
+							"apiVersion": "v1",
+							"status": map[string]interface{}{
+								"replicas": 0,
+							},
+						},
+					},
+				},
+			},
+			field:       "{.status.availableReplicas}",
+			expectedErr: "couldn't find any field with path \"{.status.availableReplicas}\" in the list of objects",
+		},
+		{
+			name: "model-invalid-fields",
+			obj: &api.ReplicationControllerList{
+				Items: []api.ReplicationController{
+					{
+						Status: api.ReplicationControllerStatus{},
+					},
+					{
+						Status: api.ReplicationControllerStatus{},
+					},
+					{
+						Status: api.ReplicationControllerStatus{},
+					},
+				},
+			},
+			field:       "{.invalid}",
+			expectedErr: "couldn't find any field with path \"{.invalid}\" in the list of objects",
+		},
 	}
 	for _, test := range tests {
-		sort := &SortingPrinter{SortField: test.field, Decoder: internal.Codecs.UniversalDecoder()}
-		if err := sort.sortObj(test.obj); err != nil {
-			t.Errorf("unexpected error: %v (%s)", err, test.name)
-			continue
+		sort := &SortingPrinter{SortField: test.field, Decoder: legacyscheme.Codecs.UniversalDecoder()}
+		err := sort.sortObj(test.obj)
+		if err != nil {
+			if len(test.expectedErr) > 0 {
+				if strings.Contains(err.Error(), test.expectedErr) {
+					continue
+				}
+				t.Fatalf("%s: expected error containing: %q, got: \"%v\"", test.name, test.expectedErr, err)
+			}
+			t.Fatalf("%s: unexpected error: %v", test.name, err)
+		}
+		if len(test.expectedErr) > 0 {
+			t.Fatalf("%s: expected error containing: %q, got none", test.name, test.expectedErr)
 		}
 		if !reflect.DeepEqual(test.obj, test.sort) {
 			t.Errorf("[%s]\nexpected:\n%v\nsaw:\n%v", test.name, test.sort, test.obj)

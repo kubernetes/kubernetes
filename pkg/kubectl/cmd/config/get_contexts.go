@@ -19,17 +19,20 @@ package config
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	"k8s.io/kubernetes/pkg/kubectl"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 // GetContextsOptions contains the assignable options from the args.
@@ -41,14 +44,15 @@ type GetContextsOptions struct {
 	out          io.Writer
 }
 
-const (
-	getContextsLong = `Displays one or many contexts from the kubeconfig file.`
+var (
+	getContextsLong = templates.LongDesc(`Displays one or many contexts from the kubeconfig file.`)
 
-	getContextsExample = `# List all the contexts in your kubeconfig file
-kubectl config get-contexts
+	getContextsExample = templates.Examples(`
+		# List all the contexts in your kubeconfig file
+		kubectl config get-contexts
 
-# Describe one context in your kubeconfig file.
-kubectl config get-contexts my-context`
+		# Describe one context in your kubeconfig file.
+		kubectl config get-contexts my-context`)
 )
 
 // NewCmdConfigGetContexts creates a command object for the "get-contexts" action, which
@@ -58,18 +62,18 @@ func NewCmdConfigGetContexts(out io.Writer, configAccess clientcmd.ConfigAccess)
 
 	cmd := &cobra.Command{
 		Use:     "get-contexts [(-o|--output=)name)]",
-		Short:   "Describe one or many contexts",
+		Short:   i18n.T("Describe one or many contexts"),
 		Long:    getContextsLong,
 		Example: getContextsExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			validOutputTypes := sets.NewString("", "json", "yaml", "wide", "name", "go-template", "go-template-file", "jsonpath", "jsonpath-file")
+			validOutputTypes := sets.NewString("", "json", "yaml", "wide", "name", "custom-columns", "custom-columns-file", "go-template", "go-template-file", "jsonpath", "jsonpath-file")
 			supportedOutputTypes := sets.NewString("", "name")
 			outputFormat := cmdutil.GetFlagString(cmd, "output")
 			if !validOutputTypes.Has(outputFormat) {
 				cmdutil.CheckErr(fmt.Errorf("output must be one of '' or 'name': %v", outputFormat))
 			}
 			if !supportedOutputTypes.Has(outputFormat) {
-				fmt.Fprintf(out, "--output %v is not available in kubectl config get-contexts; reseting to default output format", outputFormat)
+				fmt.Fprintf(out, "--output %v is not available in kubectl config get-contexts; resetting to default output format\n", outputFormat)
 				cmd.Flags().Set("output", "")
 			}
 			cmdutil.CheckErr(options.Complete(cmd, args, out))
@@ -106,7 +110,7 @@ func (o GetContextsOptions) RunGetContexts() error {
 
 	out, found := o.out.(*tabwriter.Writer)
 	if !found {
-		out = kubectl.GetNewTabWriter(o.out)
+		out = printers.GetNewTabWriter(o.out)
 		defer out.Flush()
 	}
 
@@ -135,6 +139,7 @@ func (o GetContextsOptions) RunGetContexts() error {
 		}
 	}
 
+	sort.Strings(toPrint)
 	for _, name := range toPrint {
 		err = printContext(name, config.Contexts[name], out, o.nameOnly, config.CurrentContext == name)
 		if err != nil {

@@ -17,33 +17,19 @@ limitations under the License.
 package v2alpha1
 
 import (
-	"k8s.io/kubernetes/pkg/runtime"
+	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func addDefaultingFuncs(scheme *runtime.Scheme) {
-	scheme.AddDefaultingFuncs(
-		SetDefaults_Job,
-		SetDefaults_ScheduledJob,
-	)
+func addDefaultingFuncs(scheme *runtime.Scheme) error {
+	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_Job(obj *Job) {
-	// For a non-parallel job, you can leave both `.spec.completions` and
-	// `.spec.parallelism` unset.  When both are unset, both are defaulted to 1.
-	if obj.Spec.Completions == nil && obj.Spec.Parallelism == nil {
-		obj.Spec.Completions = new(int32)
-		*obj.Spec.Completions = 1
-		obj.Spec.Parallelism = new(int32)
-		*obj.Spec.Parallelism = 1
-	}
-	if obj.Spec.Parallelism == nil {
-		obj.Spec.Parallelism = new(int32)
-		*obj.Spec.Parallelism = 1
-	}
-}
-
-func SetDefaults_ScheduledJob(obj *ScheduledJob) {
+func SetDefaults_CronJob(obj *batchv2alpha1.CronJob) {
 	if obj.Spec.ConcurrencyPolicy == "" {
-		obj.Spec.ConcurrencyPolicy = AllowConcurrent
+		obj.Spec.ConcurrencyPolicy = batchv2alpha1.AllowConcurrent
+	}
+	if obj.Spec.Suspend == nil {
+		obj.Spec.Suspend = new(bool)
 	}
 }

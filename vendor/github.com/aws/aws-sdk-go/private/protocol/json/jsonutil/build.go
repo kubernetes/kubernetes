@@ -1,14 +1,18 @@
-// Package jsonutil provides JSON serialisation of AWS requests and responses.
+// Package jsonutil provides JSON serialization of AWS requests and responses.
 package jsonutil
 
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
 	"strconv"
 	"time"
+
+	"github.com/aws/aws-sdk-go/private/protocol"
 )
 
 var timeType = reflect.ValueOf(time.Time{}).Type()
@@ -23,6 +27,7 @@ func BuildJSON(v interface{}) ([]byte, error) {
 }
 
 func buildAny(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) error {
+	origVal := value
 	value = reflect.Indirect(value)
 	if !value.IsValid() {
 		return nil
@@ -59,7 +64,7 @@ func buildAny(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) err
 	case "map":
 		return buildMap(value, buf, tag)
 	default:
-		return buildScalar(value, buf, tag)
+		return buildScalar(origVal, buf, tag)
 	}
 }
 
@@ -85,11 +90,12 @@ func buildStruct(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) 
 	first := true
 	for i := 0; i < t.NumField(); i++ {
 		member := value.Field(i)
-		if (member.Kind() == reflect.Ptr || member.Kind() == reflect.Slice || member.Kind() == reflect.Map) && member.IsNil() {
-			continue // ignore unset fields
-		}
 
+		// This allocates the most memory.
+		// Additionally, we cannot skip nil fields due to
+		// idempotency auto filling.
 		field := t.Field(i)
+
 		if field.PkgPath != "" {
 			continue // ignore unexported fields
 		}
@@ -98,6 +104,18 @@ func buildStruct(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) 
 		}
 		if field.Tag.Get("location") != "" {
 			continue // ignore non-body elements
+		}
+		if field.Tag.Get("ignore") != "" {
+			continue
+		}
+
+		if protocol.CanSetIdempotencyToken(member, field) {
+			token := protocol.GetIdempotencyToken()
+			member = reflect.ValueOf(&token)
+		}
+
+		if (member.Kind() == reflect.Ptr || member.Kind() == reflect.Slice || member.Kind() == reflect.Map) && member.IsNil() {
+			continue // ignore unset fields
 		}
 
 		if first {
@@ -112,7 +130,8 @@ func buildStruct(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) 
 			name = locName
 		}
 
-		fmt.Fprintf(buf, "%q:", name)
+		writeString(name, buf)
+		buf.WriteString(`:`)
 
 		err := buildAny(member, buf, field.Tag)
 		if err != nil {
@@ -151,7 +170,7 @@ func (sv sortedValues) Less(i, j int) bool { return sv[i].String() < sv[j].Strin
 func buildMap(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) error {
 	buf.WriteString("{")
 
-	var sv sortedValues = value.MapKeys()
+	sv := sortedValues(value.MapKeys())
 	sort.Sort(sv)
 
 	for i, k := range sv {
@@ -159,7 +178,9 @@ func buildMap(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) err
 			buf.WriteByte(',')
 		}
 
-		fmt.Fprintf(buf, "%q:", k)
+		writeString(k.String(), buf)
+		buf.WriteString(`:`)
+
 		buildAny(value.MapIndex(k), buf, "")
 	}
 
@@ -168,21 +189,32 @@ func buildMap(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) err
 	return nil
 }
 
-func buildScalar(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) error {
-	switch value.Kind() {
+func buildScalar(v reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) error {
+	// prevents allocation on the heap.
+	scratch := [64]byte{}
+	switch value := reflect.Indirect(v); value.Kind() {
 	case reflect.String:
 		writeString(value.String(), buf)
 	case reflect.Bool:
-		buf.WriteString(strconv.FormatBool(value.Bool()))
+		if value.Bool() {
+			buf.WriteString("true")
+		} else {
+			buf.WriteString("false")
+		}
 	case reflect.Int64:
-		buf.WriteString(strconv.FormatInt(value.Int(), 10))
+		buf.Write(strconv.AppendInt(scratch[:0], value.Int(), 10))
 	case reflect.Float64:
-		buf.WriteString(strconv.FormatFloat(value.Float(), 'f', -1, 64))
+		f := value.Float()
+		if math.IsInf(f, 0) || math.IsNaN(f) {
+			return &json.UnsupportedValueError{Value: v, Str: strconv.FormatFloat(f, 'f', -1, 64)}
+		}
+		buf.Write(strconv.AppendFloat(scratch[:0], f, 'f', -1, 64))
 	default:
 		switch value.Type() {
 		case timeType:
-			converted := value.Interface().(time.Time)
-			buf.WriteString(strconv.FormatInt(converted.UTC().Unix(), 10))
+			converted := v.Interface().(*time.Time)
+
+			buf.Write(strconv.AppendInt(scratch[:0], converted.UTC().Unix(), 10))
 		case byteSliceType:
 			if !value.IsNil() {
 				converted := value.Interface().([]byte)
@@ -208,27 +240,31 @@ func buildScalar(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) 
 	return nil
 }
 
+var hex = "0123456789abcdef"
+
 func writeString(s string, buf *bytes.Buffer) {
 	buf.WriteByte('"')
-	for _, r := range s {
-		if r == '"' {
+	for i := 0; i < len(s); i++ {
+		if s[i] == '"' {
 			buf.WriteString(`\"`)
-		} else if r == '\\' {
+		} else if s[i] == '\\' {
 			buf.WriteString(`\\`)
-		} else if r == '\b' {
+		} else if s[i] == '\b' {
 			buf.WriteString(`\b`)
-		} else if r == '\f' {
+		} else if s[i] == '\f' {
 			buf.WriteString(`\f`)
-		} else if r == '\r' {
+		} else if s[i] == '\r' {
 			buf.WriteString(`\r`)
-		} else if r == '\t' {
+		} else if s[i] == '\t' {
 			buf.WriteString(`\t`)
-		} else if r == '\n' {
+		} else if s[i] == '\n' {
 			buf.WriteString(`\n`)
-		} else if r < 32 {
-			fmt.Fprintf(buf, "\\u%0.4x", r)
+		} else if s[i] < 32 {
+			buf.WriteString("\\u00")
+			buf.WriteByte(hex[s[i]>>4])
+			buf.WriteByte(hex[s[i]&0xF])
 		} else {
-			buf.WriteRune(r)
+			buf.WriteByte(s[i])
 		}
 	}
 	buf.WriteByte('"')

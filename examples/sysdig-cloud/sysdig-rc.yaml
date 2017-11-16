@@ -1,0 +1,78 @@
+#Use this sysdig.yaml when Daemon Sets are NOT enabled on Kubernetes (minimum version 1.1.1). If Daemon Sets are available, use the other example sysdig.yaml - that is the recommended method.
+
+apiVersion: v1
+kind: ReplicationController                     
+metadata:
+  name: sysdig-agent
+  labels:
+    app: sysdig-agent
+spec:
+  replicas: 100             #REQUIRED - replace with the maximum number of slave nodes in the cluster
+  template:
+    spec:
+      volumes:
+      - name: docker-sock
+        hostPath:
+         path: /var/run/docker.sock
+         type: Socket
+      - name: dev-vol
+        hostPath:
+         path: /dev
+      - name: proc-vol
+        hostPath:
+         path: /proc
+      - name: boot-vol
+        hostPath:
+         path: /boot
+      - name: modules-vol
+        hostPath:
+         path: /lib/modules
+      - name: usr-vol
+        hostPath:
+          path: /usr
+      hostNetwork: true
+      hostPID: true
+      containers:
+      - name: sysdig-agent
+        image: sysdig/agent
+        ports:
+        - containerPort: 6666
+          hostPort: 6666
+        securityContext:
+         privileged: true
+        env:
+        - name: ACCESS_KEY                                  #REQUIRED - replace with your Sysdig Cloud access key
+          value: 8312341g-5678-abcd-4a2b2c-33bcsd655
+#        - name: K8S_DELEGATED_NODE                         #OPTIONAL - only necessary when connecting remotely to API server
+#          value: <DELEGATED NODE IP>
+#        - name: K8S_API_URI                                #OPTIONAL - only necessary when connecting remotely to API server
+#          value: "http[s]://[username:passwd@]host[:port]"
+#        - name: TAGS                                       #OPTIONAL
+#          value: linux:ubuntu,dept:dev,local:nyc 
+#        - name: COLLECTOR                                  #OPTIONAL
+#          value: 192.168.183.200 
+#        - name: SECURE                                     #OPTIONAL        
+#          value: false
+#        - name: CHECK_CERTIFICATE                          #OPTIONAL
+#          value: false
+#        - name: ADDITIONAL_CONF                            #OPTIONAL
+#          value: "app_checks:\n  - name: nginx\n    check_module: nginx\n    pattern:\n      comm: nginx\n    conf:\n      nginx_status_url: "http://localhost:{port}/nginx_status\""
+        volumeMounts:
+        - mountPath: /host/var/run/docker.sock
+          name: docker-sock
+          readOnly: false
+        - mountPath: /host/dev
+          name: dev-vol
+          readOnly: false
+        - mountPath: /host/proc
+          name: proc-vol
+          readOnly: true
+        - mountPath: /host/boot
+          name: boot-vol
+          readOnly: true
+        - mountPath: /host/lib/modules
+          name: modules-vol
+          readOnly: true
+        - mountPath: /host/usr
+          name: usr-vol
+          readOnly: true

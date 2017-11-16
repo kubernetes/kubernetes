@@ -13,8 +13,6 @@ Config                                              | GCE   | Vagrant | AWS | Az
 [debian-auto-upgrades](debian-auto-upgrades/)       | M n   | M n     | M n | M n
 [docker](docker/)                                   | M n   | M n     | M n | M n
 [etcd](etcd/)                                       | M     | M       | M   | M
-[fluentd-es](fluentd-es/) (pillar conditional)      | M n   | M n     | M n | M n
-[fluentd-gcp](fluentd-gcp/) (pillar conditional)    | M n   | M n     | M n | M n
 [generate-cert](generate-cert/)                     | M     | M       | M   | M
 [kube-addons](kube-addons/)                         | M     | M       | M   | M
 [kube-apiserver](kube-apiserver/)                   | M     | M       | M   | M
@@ -24,9 +22,6 @@ Config                                              | GCE   | Vagrant | AWS | Az
 [kubelet](kubelet/)                                 | M n   | M n     | M n | M n
 [logrotate](logrotate/)                             | M n   |   n     | M n | M n
 [supervisord](supervisor/)                          | M n   | M n     | M n | M n
-[nginx](nginx/)                                     |       |         |     | M
-[openvpn-client](openvpn-client/)                   |       |         |     |   n
-[openvpn](openvpn/)                                 |       |         |     | M
 [base](base.sls)                                    | M n   | M n     | M n | M n
 [kube-client-tools](kube-client-tools.sls)          | M     | M       | M   | M
 

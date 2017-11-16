@@ -19,15 +19,15 @@ package scdeny
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apiserver/pkg/admission"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // ensures the SecurityContext is denied if it defines anything more than Caps or Privileged
 func TestAdmission(t *testing.T) {
-	handler := NewSecurityContextDeny(nil)
+	handler := NewSecurityContextDeny()
 
-	var runAsUser int64 = 1
+	runAsUser := int64(1)
 	priv := true
 
 	cases := []struct {
@@ -82,7 +82,7 @@ func TestAdmission(t *testing.T) {
 		p.Spec.SecurityContext = tc.podSc
 		p.Spec.Containers[0].SecurityContext = tc.sc
 
-		err := handler.Admit(admission.NewAttributesRecord(p, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil))
+		err := handler.Validate(admission.NewAttributesRecord(p, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil))
 		if err != nil && !tc.expectError {
 			t.Errorf("%v: unexpected error: %v", tc.name, err)
 		} else if err == nil && tc.expectError {
@@ -96,7 +96,7 @@ func TestAdmission(t *testing.T) {
 		p.Spec.InitContainers = p.Spec.Containers
 		p.Spec.Containers = nil
 
-		err = handler.Admit(admission.NewAttributesRecord(p, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil))
+		err = handler.Validate(admission.NewAttributesRecord(p, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil))
 		if err != nil && !tc.expectError {
 			t.Errorf("%v: unexpected error: %v", tc.name, err)
 		} else if err == nil && tc.expectError {
@@ -106,7 +106,7 @@ func TestAdmission(t *testing.T) {
 }
 
 func TestPodSecurityContextAdmission(t *testing.T) {
-	handler := NewSecurityContextDeny(nil)
+	handler := NewSecurityContextDeny()
 	pod := api.Pod{
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -127,7 +127,7 @@ func TestPodSecurityContextAdmission(t *testing.T) {
 		},
 		{
 			securityContext: api.PodSecurityContext{
-				SupplementalGroups: []int64{1234},
+				SupplementalGroups: []int64{int64(1234)},
 			},
 			errorExpected: true,
 		},
@@ -140,7 +140,7 @@ func TestPodSecurityContextAdmission(t *testing.T) {
 	}
 	for _, test := range tests {
 		pod.Spec.SecurityContext = &test.securityContext
-		err := handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil))
+		err := handler.Validate(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil))
 
 		if test.errorExpected && err == nil {
 			t.Errorf("Expected error for security context %+v but did not get an error", test.securityContext)
@@ -153,7 +153,7 @@ func TestPodSecurityContextAdmission(t *testing.T) {
 }
 
 func TestHandles(t *testing.T) {
-	handler := NewSecurityContextDeny(nil)
+	handler := NewSecurityContextDeny()
 	tests := map[admission.Operation]bool{
 		admission.Update:  true,
 		admission.Create:  true,

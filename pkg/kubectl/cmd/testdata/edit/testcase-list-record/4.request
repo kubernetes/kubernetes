@@ -1,0 +1,29 @@
+{
+	"metadata": {
+		"annotations": {
+			"kubernetes.io/change-cause": "edit test cmd invocation"
+		},
+		"labels": {
+			"new-label2": "foo2"
+		}
+	},
+	"spec": {
+		"$setElementOrder/ports": [
+			{
+				"port": 82
+			}
+		],
+		"ports": [
+			{
+				"name": "80",
+				"port": 82,
+				"protocol": "TCP",
+				"targetPort": 81
+			},
+			{
+				"$patch": "delete",
+				"port": 81
+			}
+		]
+	}
+}

@@ -22,11 +22,13 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -54,12 +56,12 @@ func (plugin *cephfsPlugin) GetPluginName() string {
 }
 
 func (plugin *cephfsPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	volumeSource, _, err := getVolumeSource(spec)
+	mon, _, _, _, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
 	}
 
-	return fmt.Sprintf("%v", volumeSource.Monitors), nil
+	return fmt.Sprintf("%v", mon), nil
 }
 
 func (plugin *cephfsPlugin) CanSupport(spec *volume.Spec) bool {
@@ -70,78 +72,86 @@ func (plugin *cephfsPlugin) RequiresRemount() bool {
 	return false
 }
 
-func (plugin *cephfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
-	return []api.PersistentVolumeAccessMode{
-		api.ReadWriteOnce,
-		api.ReadOnlyMany,
-		api.ReadWriteMany,
+func (plugin *cephfsPlugin) SupportsMountOption() bool {
+	return true
+}
+
+func (plugin *cephfsPlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
+func (plugin *cephfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
+	return []v1.PersistentVolumeAccessMode{
+		v1.ReadWriteOnce,
+		v1.ReadOnlyMany,
+		v1.ReadWriteMany,
 	}
 }
 
-func (plugin *cephfsPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	cephvs, _, err := getVolumeSource(spec)
+func (plugin *cephfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+	secretName, secretNs, err := getSecretNameAndNamespace(spec, pod.Namespace)
 	if err != nil {
 		return nil, err
 	}
 	secret := ""
-	if cephvs.SecretRef != nil {
+	if len(secretName) > 0 && len(secretNs) > 0 {
+		// if secret is provideded, retrieve it
 		kubeClient := plugin.host.GetKubeClient()
 		if kubeClient == nil {
 			return nil, fmt.Errorf("Cannot get kube client")
 		}
-
-		secretName, err := kubeClient.Core().Secrets(pod.Namespace).Get(cephvs.SecretRef.Name)
+		secrets, err := kubeClient.Core().Secrets(secretNs).Get(secretName, metav1.GetOptions{})
 		if err != nil {
-			err = fmt.Errorf("Couldn't get secret %v/%v err: %v", pod.Namespace, cephvs.SecretRef, err)
+			err = fmt.Errorf("Couldn't get secret %v/%v err: %v", secretNs, secretName, err)
 			return nil, err
 		}
-		for name, data := range secretName.Data {
+		for name, data := range secrets.Data {
 			secret = string(data)
-			glog.V(1).Infof("found ceph secret info: %s", name)
+			glog.V(4).Infof("found ceph secret info: %s", name)
 		}
 	}
-	return plugin.newMounterInternal(spec, pod.UID, plugin.host.GetMounter(), secret)
+	return plugin.newMounterInternal(spec, pod.UID, plugin.host.GetMounter(plugin.GetPluginName()), secret)
 }
 
 func (plugin *cephfsPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, mounter mount.Interface, secret string) (volume.Mounter, error) {
-	cephvs, _, err := getVolumeSource(spec)
+	mon, path, id, secretFile, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
 	}
 
-	id := cephvs.User
 	if id == "" {
 		id = "admin"
 	}
-	path := cephvs.Path
 	if path == "" {
 		path = "/"
 	}
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path
 	}
-	secret_file := cephvs.SecretFile
-	if secret_file == "" {
-		secret_file = "/etc/ceph/" + id + ".secret"
+
+	if secretFile == "" {
+		secretFile = "/etc/ceph/" + id + ".secret"
 	}
 
 	return &cephfsMounter{
 		cephfs: &cephfs{
-			podUID:      podUID,
-			volName:     spec.Name(),
-			mon:         cephvs.Monitors,
-			path:        path,
-			secret:      secret,
-			id:          id,
-			secret_file: secret_file,
-			readonly:    cephvs.ReadOnly,
-			mounter:     mounter,
-			plugin:      plugin},
+			podUID:       podUID,
+			volName:      spec.Name(),
+			mon:          mon,
+			path:         path,
+			secret:       secret,
+			id:           id,
+			secret_file:  secretFile,
+			readonly:     readOnly,
+			mounter:      mounter,
+			plugin:       plugin,
+			mountOptions: volume.MountOptionFromSpec(spec),
+		},
 	}, nil
 }
 
 func (plugin *cephfsPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
-	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter())
+	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *cephfsPlugin) newUnmounterInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Unmounter, error) {
@@ -152,6 +162,19 @@ func (plugin *cephfsPlugin) newUnmounterInternal(volName string, podUID types.UI
 			mounter: mounter,
 			plugin:  plugin},
 	}, nil
+}
+
+func (plugin *cephfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	cephfsVolume := &v1.Volume{
+		Name: volumeName,
+		VolumeSource: v1.VolumeSource{
+			CephFS: &v1.CephFSVolumeSource{
+				Monitors: []string{},
+				Path:     volumeName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(cephfsVolume), nil
 }
 
 // CephFS volumes represent a bare host file or directory mount of an CephFS export.
@@ -167,6 +190,7 @@ type cephfs struct {
 	mounter     mount.Interface
 	plugin      *cephfsPlugin
 	volume.MetricsNil
+	mountOptions []string
 }
 
 type cephfsMounter struct {
@@ -181,6 +205,13 @@ func (cephfsVolume *cephfsMounter) GetAttributes() volume.Attributes {
 		Managed:         false,
 		SupportsSELinux: false,
 	}
+}
+
+// Checks prior to mount operations to verify that the required components (binaries, etc.)
+// to mount the volume are available on the underlying node.
+// If not, it returns an error
+func (cephfsMounter *cephfsMounter) CanMount() error {
+	return nil
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
@@ -206,7 +237,7 @@ func (cephfsVolume *cephfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	// cleanup upon failure
-	cephfsVolume.cleanup(dir)
+	util.UnmountPath(dir, cephfsVolume.mounter)
 	// return error
 	return err
 }
@@ -224,38 +255,13 @@ func (cephfsVolume *cephfsUnmounter) TearDown() error {
 
 // TearDownAt unmounts the bind mount
 func (cephfsVolume *cephfsUnmounter) TearDownAt(dir string) error {
-	return cephfsVolume.cleanup(dir)
+	return util.UnmountPath(dir, cephfsVolume.mounter)
 }
 
-// GatePath creates global mount path
+// GetPath creates global mount path
 func (cephfsVolume *cephfs) GetPath() string {
 	name := cephfsPluginName
 	return cephfsVolume.plugin.host.GetPodVolumeDir(cephfsVolume.podUID, utilstrings.EscapeQualifiedNameForDisk(name), cephfsVolume.volName)
-}
-
-func (cephfsVolume *cephfs) cleanup(dir string) error {
-	noMnt, err := cephfsVolume.mounter.IsLikelyNotMountPoint(dir)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("CephFS: Error checking IsLikelyNotMountPoint: %v", err)
-	}
-	if noMnt {
-		return os.RemoveAll(dir)
-	}
-
-	if err := cephfsVolume.mounter.Unmount(dir); err != nil {
-		return fmt.Errorf("CephFS: Unmounting failed: %v", err)
-	}
-	noMnt, mntErr := cephfsVolume.mounter.IsLikelyNotMountPoint(dir)
-	if mntErr != nil {
-		return fmt.Errorf("CephFS: IsMountpoint check failed: %v", mntErr)
-	}
-	if noMnt {
-		if err := os.RemoveAll(dir); err != nil {
-			return fmt.Errorf("CephFS: removeAll %s/%v", dir, err)
-		}
-	}
-
-	return nil
 }
 
 func (cephfsVolume *cephfs) execMount(mountpoint string) error {
@@ -285,20 +291,54 @@ func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 	}
 	src += hosts[i] + ":" + cephfsVolume.path
 
-	if err := cephfsVolume.mounter.Mount(src, mountpoint, "ceph", opt); err != nil {
+	mountOptions := volume.JoinMountOptions(cephfsVolume.mountOptions, opt)
+	if err := cephfsVolume.mounter.Mount(src, mountpoint, "ceph", mountOptions); err != nil {
 		return fmt.Errorf("CephFS: mount failed: %v", err)
 	}
 
 	return nil
 }
 
-func getVolumeSource(spec *volume.Spec) (*api.CephFSVolumeSource, bool, error) {
+func getVolumeSource(spec *volume.Spec) ([]string, string, string, string, bool, error) {
 	if spec.Volume != nil && spec.Volume.CephFS != nil {
-		return spec.Volume.CephFS, spec.Volume.CephFS.ReadOnly, nil
+		mon := spec.Volume.CephFS.Monitors
+		path := spec.Volume.CephFS.Path
+		user := spec.Volume.CephFS.User
+		secretFile := spec.Volume.CephFS.SecretFile
+		readOnly := spec.Volume.CephFS.ReadOnly
+		return mon, path, user, secretFile, readOnly, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.CephFS != nil {
-		return spec.PersistentVolume.Spec.CephFS, spec.ReadOnly, nil
+		mon := spec.PersistentVolume.Spec.CephFS.Monitors
+		path := spec.PersistentVolume.Spec.CephFS.Path
+		user := spec.PersistentVolume.Spec.CephFS.User
+		secretFile := spec.PersistentVolume.Spec.CephFS.SecretFile
+		readOnly := spec.PersistentVolume.Spec.CephFS.ReadOnly
+		return mon, path, user, secretFile, readOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference a CephFS volume type")
+	return nil, "", "", "", false, fmt.Errorf("Spec does not reference a CephFS volume type")
+}
+
+func getSecretNameAndNamespace(spec *volume.Spec, defaultNamespace string) (string, string, error) {
+	if spec.Volume != nil && spec.Volume.CephFS != nil {
+		localSecretRef := spec.Volume.CephFS.SecretRef
+		if localSecretRef != nil {
+			return localSecretRef.Name, defaultNamespace, nil
+		}
+		return "", "", nil
+
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.CephFS != nil {
+		secretRef := spec.PersistentVolume.Spec.CephFS.SecretRef
+		secretNs := defaultNamespace
+		if secretRef != nil {
+			if len(secretRef.Namespace) != 0 {
+				secretNs = secretRef.Namespace
+			}
+			return secretRef.Name, secretNs, nil
+		}
+		return "", "", nil
+	}
+	return "", "", fmt.Errorf("Spec does not reference an CephFS volume type")
 }

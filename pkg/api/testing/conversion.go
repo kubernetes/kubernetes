@@ -19,15 +19,15 @@ package testing
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // TestSelectableFieldLabelConversions verifies that given resource have field
 // label conversion defined for each its selectable field.
 // fields contains selectable fields of the resource.
 // labelMap maps deprecated labels to their canonical names.
-func TestSelectableFieldLabelConversionsOfKind(t *testing.T, apiVersion string, kind string, fields labels.Set, labelMap map[string]string) {
+func TestSelectableFieldLabelConversionsOfKind(t *testing.T, apiVersion string, kind string, fields fields.Set, labelMap map[string]string) {
 	badFieldLabels := []string{
 		"name",
 		".name",
@@ -46,7 +46,7 @@ func TestSelectableFieldLabelConversionsOfKind(t *testing.T, apiVersion string, 
 			t.Logf("FIXME: \"name\" is deprecated by \"metadata.name\", it should be removed from selectable fields of kind=%s", kind)
 			continue
 		}
-		newLabel, newValue, err := api.Scheme.ConvertFieldLabel(apiVersion, kind, label, value)
+		newLabel, newValue, err := legacyscheme.Scheme.ConvertFieldLabel(apiVersion, kind, label, value)
 		if err != nil {
 			t.Errorf("kind=%s label=%s: got unexpected error: %v", kind, label, err)
 		} else {
@@ -64,7 +64,7 @@ func TestSelectableFieldLabelConversionsOfKind(t *testing.T, apiVersion string, 
 	}
 
 	for _, label := range badFieldLabels {
-		_, _, err := api.Scheme.ConvertFieldLabel(apiVersion, kind, label, "value")
+		_, _, err := legacyscheme.Scheme.ConvertFieldLabel(apiVersion, kind, label, "value")
 		if err == nil {
 			t.Errorf("kind=%s label=%s: got unexpected non-error", kind, label)
 		}

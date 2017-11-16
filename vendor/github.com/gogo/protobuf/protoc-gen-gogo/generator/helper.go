@@ -1,5 +1,7 @@
-// Copyright (c) 2013, Vastech SA (PTY) LTD. All rights reserved.
-// http://github.com/gogo/protobuf/gogoproto
+// Protocol Buffers for Go with Gadgets
+//
+// Copyright (c) 2013, The GoGo Authors. All rights reserved.
+// http://github.com/gogo/protobuf
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -31,9 +33,8 @@ import (
 	"go/parser"
 	"go/printer"
 	"go/token"
-	"strings"
-
 	"path"
+	"strings"
 
 	"github.com/gogo/protobuf/gogoproto"
 	"github.com/gogo/protobuf/proto"
@@ -211,25 +212,6 @@ func (g *Generator) GetOneOfFieldName(message *Descriptor, field *descriptor.Fie
 	return fieldname
 }
 
-func GetMap(file *descriptor.FileDescriptorProto, field *descriptor.FieldDescriptorProto) *descriptor.DescriptorProto {
-	if !field.IsMessage() {
-		return nil
-	}
-	typeName := strings.TrimPrefix(field.GetTypeName(), "."+file.GetPackage()+".")
-	if strings.Contains(typeName, "Map") && !strings.HasSuffix(typeName, "Entry") {
-		typeName += "." + CamelCase(field.GetName()) + "Entry"
-	}
-	return file.GetMessage(typeName)
-}
-
-func IsMap(file *descriptor.FileDescriptorProto, field *descriptor.FieldDescriptorProto) bool {
-	msg := GetMap(file, field)
-	if msg == nil {
-		return false
-	}
-	return msg.GetOptions().GetMapEntry()
-}
-
 func (g *Generator) IsMap(field *descriptor.FieldDescriptorProto) bool {
 	if !field.IsMessage() {
 		return false
@@ -258,15 +240,35 @@ func (g *Generator) GetMapKeyField(field, keyField *descriptor.FieldDescriptorPr
 }
 
 func (g *Generator) GetMapValueField(field, valField *descriptor.FieldDescriptorProto) *descriptor.FieldDescriptorProto {
-	if !gogoproto.IsCastValue(field) && gogoproto.IsNullable(field) {
-		return valField
+	if gogoproto.IsCustomType(field) && gogoproto.IsCastValue(field) {
+		g.Fail("cannot have a customtype and casttype: ", field.String())
 	}
 	valField = proto.Clone(valField).(*descriptor.FieldDescriptorProto)
 	if valField.Options == nil {
 		valField.Options = &descriptor.FieldOptions{}
 	}
+
+	stdtime := gogoproto.IsStdTime(field)
+	if stdtime {
+		if err := proto.SetExtension(valField.Options, gogoproto.E_Stdtime, &stdtime); err != nil {
+			g.Fail(err.Error())
+		}
+	}
+
+	stddur := gogoproto.IsStdDuration(field)
+	if stddur {
+		if err := proto.SetExtension(valField.Options, gogoproto.E_Stdduration, &stddur); err != nil {
+			g.Fail(err.Error())
+		}
+	}
+
 	if valType := gogoproto.GetCastValue(field); len(valType) > 0 {
 		if err := proto.SetExtension(valField.Options, gogoproto.E_Casttype, &valType); err != nil {
+			g.Fail(err.Error())
+		}
+	}
+	if valType := gogoproto.GetCustomType(field); len(valType) > 0 {
+		if err := proto.SetExtension(valField.Options, gogoproto.E_Customtype, &valType); err != nil {
 			g.Fail(err.Error())
 		}
 	}
@@ -281,7 +283,7 @@ func (g *Generator) GetMapValueField(field, valField *descriptor.FieldDescriptor
 // GoMapValueTypes returns the map value Go type and the alias map value Go type (for casting), taking into
 // account whether the map is nullable or the value is a message.
 func GoMapValueTypes(mapField, valueField *descriptor.FieldDescriptorProto, goValueType, goValueAliasType string) (nullable bool, outGoType string, outGoAliasType string) {
-	nullable = gogoproto.IsNullable(mapField) && valueField.IsMessage()
+	nullable = gogoproto.IsNullable(mapField) && (valueField.IsMessage() || gogoproto.IsCustomType(mapField))
 	if nullable {
 		// ensure the non-aliased Go value type is a pointer for consistency
 		if strings.HasPrefix(goValueType, "*") {
@@ -314,6 +316,7 @@ func EmbedFieldName(goTyp string) string {
 }
 
 func (g *Generator) GeneratePlugin(p Plugin) {
+	plugins = []Plugin{p}
 	p.Init(g)
 	// Generate the output. The generator runs for every file, even the files
 	// that we don't generate output for, so that we can collate the full list
@@ -322,7 +325,6 @@ func (g *Generator) GeneratePlugin(p Plugin) {
 	for _, file := range g.genFiles {
 		genFileMap[file] = true
 	}
-	i := 0
 	for _, file := range g.allFiles {
 		g.Reset()
 		g.writeOutput = genFileMap[file]
@@ -330,10 +332,10 @@ func (g *Generator) GeneratePlugin(p Plugin) {
 		if !g.writeOutput {
 			continue
 		}
-		g.Response.File[i] = new(plugin.CodeGeneratorResponse_File)
-		g.Response.File[i].Name = proto.String(goFileName(*file.Name))
-		g.Response.File[i].Content = proto.String(g.String())
-		i++
+		g.Response.File = append(g.Response.File, &plugin.CodeGeneratorResponse_File{
+			Name:    proto.String(file.goFileName()),
+			Content: proto.String(g.String()),
+		})
 	}
 }
 
@@ -417,36 +419,11 @@ func getCastType(field *descriptor.FieldDescriptorProto) (packageName string, ty
 	return "", "", err
 }
 
-func getCastKey(field *descriptor.FieldDescriptorProto) (packageName string, typ string, err error) {
-	if field.Options != nil {
-		var v interface{}
-		v, err = proto.GetExtension(field.Options, gogoproto.E_Castkey)
-		if err == nil && v.(*string) != nil {
-			ctype := *(v.(*string))
-			packageName, typ = splitCPackageType(ctype)
-			return packageName, typ, nil
-		}
-	}
-	return "", "", err
-}
-
-func getCastValue(field *descriptor.FieldDescriptorProto) (packageName string, typ string, err error) {
-	if field.Options != nil {
-		var v interface{}
-		v, err = proto.GetExtension(field.Options, gogoproto.E_Castvalue)
-		if err == nil && v.(*string) != nil {
-			ctype := *(v.(*string))
-			packageName, typ = splitCPackageType(ctype)
-			return packageName, typ, nil
-		}
-	}
-	return "", "", err
-}
-
 func FileName(file *FileDescriptor) string {
 	fname := path.Base(file.FileDescriptorProto.GetName())
 	fname = strings.Replace(fname, ".proto", "", -1)
 	fname = strings.Replace(fname, "-", "_", -1)
+	fname = strings.Replace(fname, ".", "_", -1)
 	return CamelCase(fname)
 }
 
@@ -461,4 +438,10 @@ func (g *Generator) AllFiles() *descriptor.FileDescriptorSet {
 
 func (d *Descriptor) Path() string {
 	return d.path
+}
+
+func (g *Generator) useTypes() string {
+	pkg := strings.Map(badToUnderscore, "github.com/gogo/protobuf/types")
+	g.customImports = append(g.customImports, "github.com/gogo/protobuf/types")
+	return pkg
 }

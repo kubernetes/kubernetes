@@ -1,9 +1,6 @@
 package pflag
 
-import (
-	"fmt"
-	"strconv"
-)
+import "strconv"
 
 // -- count Value
 type countValue int
@@ -28,7 +25,7 @@ func (i *countValue) Type() string {
 	return "count"
 }
 
-func (i *countValue) String() string { return fmt.Sprintf("%v", *i) }
+func (i *countValue) String() string { return strconv.Itoa(int(*i)) }
 
 func countConv(sval string) (interface{}, error) {
 	i, err := strconv.Atoi(sval)

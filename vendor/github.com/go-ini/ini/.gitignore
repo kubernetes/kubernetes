@@ -2,3 +2,4 @@ testdata/conf_out.ini
 ini.sublime-project
 ini.sublime-workspace
 testdata/conf_reflect.ini
+.idea

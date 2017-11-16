@@ -26,13 +26,19 @@ import (
 	"path/filepath"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/runtime"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/util/yaml"
-	"k8s.io/kubernetes/pkg/watch"
+	"golang.org/x/text/encoding/unicode"
+	"golang.org/x/text/transform"
+
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 
 const (
@@ -78,9 +84,9 @@ type Info struct {
 	// Optional, this is the provided object in a versioned type before defaulting
 	// and conversions into its corresponding internal type. This is useful for
 	// reflecting on user intent which may be lost after defaulting and conversions.
-	VersionedObject interface{}
+	VersionedObject runtime.Object
 	// Optional, this is the most recent value returned by the server if available
-	runtime.Object
+	Object runtime.Object
 	// Optional, this is the most recent resource version the server knows about for
 	// this type of resource. It may not match the resource version of the object,
 	// but if set it should be equal to or newer than the resource version of the
@@ -110,6 +116,12 @@ func (i *Info) Visit(fn VisitorFunc) error {
 func (i *Info) Get() (err error) {
 	obj, err := NewHelper(i.Client, i.Mapping).Get(i.Namespace, i.Name, i.Export)
 	if err != nil {
+		if errors.IsNotFound(err) && len(i.Namespace) > 0 && i.Namespace != metav1.NamespaceDefault && i.Namespace != metav1.NamespaceAll {
+			err2 := i.Client.Get().AbsPath("api", "v1", "namespaces", i.Namespace).Do().Error()
+			if err2 != nil && errors.IsNotFound(err2) {
+				return err2
+			}
+		}
 		return err
 	}
 	i.Object = obj
@@ -207,10 +219,6 @@ func ValidateSchema(data []byte, schema validation.Schema) error {
 	if schema == nil {
 		return nil
 	}
-	data, err := yaml.ToJSON(data)
-	if err != nil {
-		return fmt.Errorf("error converting to YAML: %v", err)
-	}
 	if err := schema.ValidateBytes(data); err != nil {
 		return fmt.Errorf("error validating data: %v; %s", err, stopValidateMessage)
 	}
@@ -258,7 +266,7 @@ func readHttpWithRetries(get httpget, duration time.Duration, u string, attempts
 		}
 
 		// Error - Set the error condition from the StatusCode
-		if statusCode != 200 {
+		if statusCode != http.StatusOK {
 			err = fmt.Errorf("unable to read URL %q, server reported %s, status code=%d", u, status, statusCode)
 		}
 
@@ -388,8 +396,8 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 		}
 
 		// If we have a GroupVersionKind on the list, prioritize that when asking for info on the objects contained in the list
-		var preferredGVKs []unversioned.GroupVersionKind
-		if info.Mapping != nil && !info.Mapping.GroupVersionKind.IsEmpty() {
+		var preferredGVKs []schema.GroupVersionKind
+		if info.Mapping != nil && !info.Mapping.GroupVersionKind.Empty() {
 			preferredGVKs = append(preferredGVKs, info.Mapping.GroupVersionKind)
 		}
 
@@ -431,7 +439,7 @@ func FileVisitorForSTDIN(mapper *Mapper, schema validation.Schema) Visitor {
 }
 
 // ExpandPathsToFileVisitors will return a slice of FileVisitors that will handle files from the provided path.
-// After FileVisitors open the files, they will pass a io.Reader to a StreamVisitor to do the reading. (stdin
+// After FileVisitors open the files, they will pass an io.Reader to a StreamVisitor to do the reading. (stdin
 // is also taken care of). Paths argument also accepts a single file, and will return a single visitor
 func ExpandPathsToFileVisitors(mapper *Mapper, paths string, recursive bool, extensions []string, schema validation.Schema) ([]Visitor, error) {
 	var visitors []Visitor
@@ -479,12 +487,17 @@ func (v *FileVisitor) Visit(fn VisitorFunc) error {
 		f = os.Stdin
 	} else {
 		var err error
-		if f, err = os.Open(v.Path); err != nil {
+		f, err = os.Open(v.Path)
+		if err != nil {
 			return err
 		}
+		defer f.Close()
 	}
-	defer f.Close()
-	v.StreamVisitor.Reader = f
+
+	// TODO: Consider adding a flag to force to UTF16, apparently some
+	// Windows tools don't write the BOM
+	utf16bom := unicode.BOMOverride(unicode.UTF8.NewDecoder())
+	v.StreamVisitor.Reader = transform.NewReader(f, utf16bom)
 
 	return v.StreamVisitor.Visit(fn)
 }
@@ -622,13 +635,7 @@ func RetrieveLatest(info *Info, err error) error {
 	if info.Namespaced() && len(info.Namespace) == 0 {
 		return fmt.Errorf("no namespace set on resource %s %q", info.Mapping.Resource, info.Name)
 	}
-	obj, err := NewHelper(info.Client, info.Mapping).Get(info.Namespace, info.Name, info.Export)
-	if err != nil {
-		return err
-	}
-	info.Object = obj
-	info.ResourceVersion, _ = info.Mapping.MetadataAccessor.ResourceVersion(obj)
-	return nil
+	return info.Get()
 }
 
 // RetrieveLazy updates the object if it has not been loaded yet.
@@ -640,4 +647,72 @@ func RetrieveLazy(info *Info, err error) error {
 		return info.Get()
 	}
 	return nil
+}
+
+// CreateAndRefresh creates an object from input info and refreshes info with that object
+func CreateAndRefresh(info *Info) error {
+	obj, err := NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
+	if err != nil {
+		return err
+	}
+	info.Refresh(obj, true)
+	return nil
+}
+
+type FilterFunc func(info *Info, err error) (bool, error)
+
+type FilteredVisitor struct {
+	visitor Visitor
+	filters []FilterFunc
+}
+
+func NewFilteredVisitor(v Visitor, fn ...FilterFunc) Visitor {
+	if len(fn) == 0 {
+		return v
+	}
+	return FilteredVisitor{v, fn}
+}
+
+func (v FilteredVisitor) Visit(fn VisitorFunc) error {
+	return v.visitor.Visit(func(info *Info, err error) error {
+		if err != nil {
+			return err
+		}
+		for _, filter := range v.filters {
+			ok, err := filter(info, nil)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return nil
+			}
+		}
+		return fn(info, nil)
+	})
+}
+
+func FilterByLabelSelector(s labels.Selector) FilterFunc {
+	return func(info *Info, err error) (bool, error) {
+		if err != nil {
+			return false, err
+		}
+		a, err := meta.Accessor(info.Object)
+		if err != nil {
+			return false, err
+		}
+		if !s.Matches(labels.Set(a.GetLabels())) {
+			return false, nil
+		}
+		return true, nil
+	}
+}
+
+type InfoListVisitor []*Info
+
+func (infos InfoListVisitor) Visit(fn VisitorFunc) error {
+	var err error
+	for _, i := range infos {
+		err = fn(i, err)
+	}
+	return err
 }

@@ -154,7 +154,7 @@ func (w *textWriter) indent() { w.ind++ }
 
 func (w *textWriter) unindent() {
 	if w.ind == 0 {
-		log.Printf("proto: textWriter unindented too far")
+		log.Print("proto: textWriter unindented too far")
 		return
 	}
 	w.ind--
@@ -175,7 +175,93 @@ type raw interface {
 	Bytes() []byte
 }
 
-func writeStruct(w *textWriter, sv reflect.Value) error {
+func requiresQuotes(u string) bool {
+	// When type URL contains any characters except [0-9A-Za-z./\-]*, it must be quoted.
+	for _, ch := range u {
+		switch {
+		case ch == '.' || ch == '/' || ch == '_':
+			continue
+		case '0' <= ch && ch <= '9':
+			continue
+		case 'A' <= ch && ch <= 'Z':
+			continue
+		case 'a' <= ch && ch <= 'z':
+			continue
+		default:
+			return true
+		}
+	}
+	return false
+}
+
+// isAny reports whether sv is a google.protobuf.Any message
+func isAny(sv reflect.Value) bool {
+	type wkt interface {
+		XXX_WellKnownType() string
+	}
+	t, ok := sv.Addr().Interface().(wkt)
+	return ok && t.XXX_WellKnownType() == "Any"
+}
+
+// writeProto3Any writes an expanded google.protobuf.Any message.
+//
+// It returns (false, nil) if sv value can't be unmarshaled (e.g. because
+// required messages are not linked in).
+//
+// It returns (true, error) when sv was written in expanded format or an error
+// was encountered.
+func (tm *TextMarshaler) writeProto3Any(w *textWriter, sv reflect.Value) (bool, error) {
+	turl := sv.FieldByName("TypeUrl")
+	val := sv.FieldByName("Value")
+	if !turl.IsValid() || !val.IsValid() {
+		return true, errors.New("proto: invalid google.protobuf.Any message")
+	}
+
+	b, ok := val.Interface().([]byte)
+	if !ok {
+		return true, errors.New("proto: invalid google.protobuf.Any message")
+	}
+
+	parts := strings.Split(turl.String(), "/")
+	mt := MessageType(parts[len(parts)-1])
+	if mt == nil {
+		return false, nil
+	}
+	m := reflect.New(mt.Elem())
+	if err := Unmarshal(b, m.Interface().(Message)); err != nil {
+		return false, nil
+	}
+	w.Write([]byte("["))
+	u := turl.String()
+	if requiresQuotes(u) {
+		writeString(w, u)
+	} else {
+		w.Write([]byte(u))
+	}
+	if w.compact {
+		w.Write([]byte("]:<"))
+	} else {
+		w.Write([]byte("]: <\n"))
+		w.ind++
+	}
+	if err := tm.writeStruct(w, m.Elem()); err != nil {
+		return true, err
+	}
+	if w.compact {
+		w.Write([]byte("> "))
+	} else {
+		w.ind--
+		w.Write([]byte(">\n"))
+	}
+	return true, nil
+}
+
+func (tm *TextMarshaler) writeStruct(w *textWriter, sv reflect.Value) error {
+	if tm.ExpandAny && isAny(sv) {
+		if canExpand, err := tm.writeProto3Any(w, sv); canExpand {
+			return err
+		}
+	}
 	st := sv.Type()
 	sprops := GetProperties(st)
 	for i := 0; i < sv.NumField(); i++ {
@@ -227,7 +313,7 @@ func writeStruct(w *textWriter, sv reflect.Value) error {
 					}
 					continue
 				}
-				if err := writeAny(w, v, props); err != nil {
+				if err := tm.writeAny(w, v, props); err != nil {
 					return err
 				}
 				if err := w.WriteByte('\n'); err != nil {
@@ -269,7 +355,7 @@ func writeStruct(w *textWriter, sv reflect.Value) error {
 						return err
 					}
 				}
-				if err := writeAny(w, key, props.mkeyprop); err != nil {
+				if err := tm.writeAny(w, key, props.mkeyprop); err != nil {
 					return err
 				}
 				if err := w.WriteByte('\n'); err != nil {
@@ -286,7 +372,7 @@ func writeStruct(w *textWriter, sv reflect.Value) error {
 							return err
 						}
 					}
-					if err := writeAny(w, val, props.mvalprop); err != nil {
+					if err := tm.writeAny(w, val, props.mvalprop); err != nil {
 						return err
 					}
 					if err := w.WriteByte('\n'); err != nil {
@@ -358,7 +444,7 @@ func writeStruct(w *textWriter, sv reflect.Value) error {
 		}
 
 		// Enums have a String method, so writeAny will work fine.
-		if err := writeAny(w, fv, props); err != nil {
+		if err := tm.writeAny(w, fv, props); err != nil {
 			return err
 		}
 
@@ -369,8 +455,8 @@ func writeStruct(w *textWriter, sv reflect.Value) error {
 
 	// Extensions (the XXX_extensions field).
 	pv := sv.Addr()
-	if pv.Type().Implements(extendableProtoType) {
-		if err := writeExtensions(w, pv); err != nil {
+	if _, ok := extendable(pv.Interface()); ok {
+		if err := tm.writeExtensions(w, pv); err != nil {
 			return err
 		}
 	}
@@ -400,7 +486,7 @@ func writeRaw(w *textWriter, b []byte) error {
 }
 
 // writeAny writes an arbitrary field.
-func writeAny(w *textWriter, v reflect.Value, props *Properties) error {
+func (tm *TextMarshaler) writeAny(w *textWriter, v reflect.Value, props *Properties) error {
 	v = reflect.Indirect(v)
 
 	// Floats have special cases.
@@ -427,7 +513,7 @@ func writeAny(w *textWriter, v reflect.Value, props *Properties) error {
 	switch v.Kind() {
 	case reflect.Slice:
 		// Should only be a []byte; repeated fields are handled in writeStruct.
-		if err := writeString(w, string(v.Interface().([]byte))); err != nil {
+		if err := writeString(w, string(v.Bytes())); err != nil {
 			return err
 		}
 	case reflect.String:
@@ -449,15 +535,15 @@ func writeAny(w *textWriter, v reflect.Value, props *Properties) error {
 			}
 		}
 		w.indent()
-		if tm, ok := v.Interface().(encoding.TextMarshaler); ok {
-			text, err := tm.MarshalText()
+		if etm, ok := v.Interface().(encoding.TextMarshaler); ok {
+			text, err := etm.MarshalText()
 			if err != nil {
 				return err
 			}
 			if _, err = w.Write(text); err != nil {
 				return err
 			}
-		} else if err := writeStruct(w, v); err != nil {
+		} else if err := tm.writeStruct(w, v); err != nil {
 			return err
 		}
 		w.unindent()
@@ -601,19 +687,24 @@ func (s int32Slice) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
 // writeExtensions writes all the extensions in pv.
 // pv is assumed to be a pointer to a protocol message struct that is extendable.
-func writeExtensions(w *textWriter, pv reflect.Value) error {
+func (tm *TextMarshaler) writeExtensions(w *textWriter, pv reflect.Value) error {
 	emap := extensionMaps[pv.Type().Elem()]
-	ep := pv.Interface().(extendableProto)
+	ep, _ := extendable(pv.Interface())
 
 	// Order the extensions by ID.
 	// This isn't strictly necessary, but it will give us
 	// canonical output, which will also make testing easier.
-	m := ep.ExtensionMap()
+	m, mu := ep.extensionsRead()
+	if m == nil {
+		return nil
+	}
+	mu.Lock()
 	ids := make([]int32, 0, len(m))
 	for id := range m {
 		ids = append(ids, id)
 	}
 	sort.Sort(int32Slice(ids))
+	mu.Unlock()
 
 	for _, extNum := range ids {
 		ext := m[extNum]
@@ -636,13 +727,13 @@ func writeExtensions(w *textWriter, pv reflect.Value) error {
 
 		// Repeated extensions will appear as a slice.
 		if !desc.repeated() {
-			if err := writeExtension(w, desc.Name, pb); err != nil {
+			if err := tm.writeExtension(w, desc.Name, pb); err != nil {
 				return err
 			}
 		} else {
 			v := reflect.ValueOf(pb)
 			for i := 0; i < v.Len(); i++ {
-				if err := writeExtension(w, desc.Name, v.Index(i).Interface()); err != nil {
+				if err := tm.writeExtension(w, desc.Name, v.Index(i).Interface()); err != nil {
 					return err
 				}
 			}
@@ -651,7 +742,7 @@ func writeExtensions(w *textWriter, pv reflect.Value) error {
 	return nil
 }
 
-func writeExtension(w *textWriter, name string, pb interface{}) error {
+func (tm *TextMarshaler) writeExtension(w *textWriter, name string, pb interface{}) error {
 	if _, err := fmt.Fprintf(w, "[%s]:", name); err != nil {
 		return err
 	}
@@ -660,7 +751,7 @@ func writeExtension(w *textWriter, name string, pb interface{}) error {
 			return err
 		}
 	}
-	if err := writeAny(w, reflect.ValueOf(pb), nil); err != nil {
+	if err := tm.writeAny(w, reflect.ValueOf(pb), nil); err != nil {
 		return err
 	}
 	if err := w.WriteByte('\n'); err != nil {
@@ -685,7 +776,15 @@ func (w *textWriter) writeIndent() {
 	w.complete = false
 }
 
-func marshalText(w io.Writer, pb Message, compact bool) error {
+// TextMarshaler is a configurable text format marshaler.
+type TextMarshaler struct {
+	Compact   bool // use compact text format (one line).
+	ExpandAny bool // expand google.protobuf.Any messages of known types
+}
+
+// Marshal writes a given protocol buffer in text format.
+// The only errors returned are from w.
+func (tm *TextMarshaler) Marshal(w io.Writer, pb Message) error {
 	val := reflect.ValueOf(pb)
 	if pb == nil || val.IsNil() {
 		w.Write([]byte("<nil>"))
@@ -700,11 +799,11 @@ func marshalText(w io.Writer, pb Message, compact bool) error {
 	aw := &textWriter{
 		w:        ww,
 		complete: true,
-		compact:  compact,
+		compact:  tm.Compact,
 	}
 
-	if tm, ok := pb.(encoding.TextMarshaler); ok {
-		text, err := tm.MarshalText()
+	if etm, ok := pb.(encoding.TextMarshaler); ok {
+		text, err := etm.MarshalText()
 		if err != nil {
 			return err
 		}
@@ -718,7 +817,7 @@ func marshalText(w io.Writer, pb Message, compact bool) error {
 	}
 	// Dereference the received pointer so we don't have outer < and >.
 	v := reflect.Indirect(val)
-	if err := writeStruct(aw, v); err != nil {
+	if err := tm.writeStruct(aw, v); err != nil {
 		return err
 	}
 	if bw != nil {
@@ -727,25 +826,29 @@ func marshalText(w io.Writer, pb Message, compact bool) error {
 	return nil
 }
 
+// Text is the same as Marshal, but returns the string directly.
+func (tm *TextMarshaler) Text(pb Message) string {
+	var buf bytes.Buffer
+	tm.Marshal(&buf, pb)
+	return buf.String()
+}
+
+var (
+	defaultTextMarshaler = TextMarshaler{}
+	compactTextMarshaler = TextMarshaler{Compact: true}
+)
+
+// TODO: consider removing some of the Marshal functions below.
+
 // MarshalText writes a given protocol buffer in text format.
 // The only errors returned are from w.
-func MarshalText(w io.Writer, pb Message) error {
-	return marshalText(w, pb, false)
-}
+func MarshalText(w io.Writer, pb Message) error { return defaultTextMarshaler.Marshal(w, pb) }
 
 // MarshalTextString is the same as MarshalText, but returns the string directly.
-func MarshalTextString(pb Message) string {
-	var buf bytes.Buffer
-	marshalText(&buf, pb, false)
-	return buf.String()
-}
+func MarshalTextString(pb Message) string { return defaultTextMarshaler.Text(pb) }
 
 // CompactText writes a given protocol buffer in compact text format (one line).
-func CompactText(w io.Writer, pb Message) error { return marshalText(w, pb, true) }
+func CompactText(w io.Writer, pb Message) error { return compactTextMarshaler.Marshal(w, pb) }
 
 // CompactTextString is the same as CompactText, but returns the string directly.
-func CompactTextString(pb Message) string {
-	var buf bytes.Buffer
-	marshalText(&buf, pb, true)
-	return buf.String()
-}
+func CompactTextString(pb Message) string { return compactTextMarshaler.Text(pb) }

@@ -30,7 +30,7 @@ import (
 const currentApiCallMetricsVersion = "v1"
 
 // ApiCallToPerfData transforms APIResponsiveness to PerfData.
-func ApiCallToPerfData(apicalls APIResponsiveness) *perftype.PerfData {
+func ApiCallToPerfData(apicalls *APIResponsiveness) *perftype.PerfData {
 	perfData := &perftype.PerfData{Version: currentApiCallMetricsVersion}
 	for _, apicall := range apicalls.APICalls {
 		item := perftype.DataItem{
@@ -41,8 +41,11 @@ func ApiCallToPerfData(apicalls APIResponsiveness) *perftype.PerfData {
 			},
 			Unit: "ms",
 			Labels: map[string]string{
-				"Verb":     apicall.Verb,
-				"Resource": apicall.Resource,
+				"Verb":        apicall.Verb,
+				"Resource":    apicall.Resource,
+				"Subresource": apicall.Subresource,
+				"Scope":       apicall.Scope,
+				"Count":       fmt.Sprintf("%v", apicall.Count),
 			},
 		}
 		perfData.DataItems = append(perfData.DataItems, item)
@@ -50,13 +53,53 @@ func ApiCallToPerfData(apicalls APIResponsiveness) *perftype.PerfData {
 	return perfData
 }
 
-// currentKubeletPerfMetricsVersion is the current kubelet performance metrics version. We should
-// bump up the version each time we make incompatible change to the metrics.
-const currentKubeletPerfMetricsVersion = "v1"
+// PodStartupLatencyToPerfData transforms PodStartupLatency to PerfData.
+func PodStartupLatencyToPerfData(latency *PodStartupLatency) *perftype.PerfData {
+	perfData := &perftype.PerfData{Version: currentApiCallMetricsVersion}
+	item := perftype.DataItem{
+		Data: map[string]float64{
+			"Perc50":  float64(latency.Latency.Perc50) / 1000000, // us -> ms
+			"Perc90":  float64(latency.Latency.Perc90) / 1000000,
+			"Perc99":  float64(latency.Latency.Perc99) / 1000000,
+			"Perc100": float64(latency.Latency.Perc100) / 1000000,
+		},
+		Unit: "ms",
+		Labels: map[string]string{
+			"Metric": "pod_startup",
+		},
+	}
+	perfData.DataItems = append(perfData.DataItems, item)
+	return perfData
+}
+
+// CurrentKubeletPerfMetricsVersion is the current kubelet performance metrics
+// version. This is used by mutiple perf related data structures. We should
+// bump up the version each time we make an incompatible change to the metrics.
+const CurrentKubeletPerfMetricsVersion = "v2"
 
 // ResourceUsageToPerfData transforms ResourceUsagePerNode to PerfData. Notice that this function
 // only cares about memory usage, because cpu usage information will be extracted from NodesCPUSummary.
 func ResourceUsageToPerfData(usagePerNode ResourceUsagePerNode) *perftype.PerfData {
+	return ResourceUsageToPerfDataWithLabels(usagePerNode, nil)
+}
+
+// CPUUsageToPerfData transforms NodesCPUSummary to PerfData.
+func CPUUsageToPerfData(usagePerNode NodesCPUSummary) *perftype.PerfData {
+	return CPUUsageToPerfDataWithLabels(usagePerNode, nil)
+}
+
+// PrintPerfData prints the perfdata in json format with PerfResultTag prefix.
+// If an error occurs, nothing will be printed.
+func PrintPerfData(p *perftype.PerfData) {
+	// Notice that we must make sure the perftype.PerfResultEnd is in a new line.
+	if str := PrettyPrintJSON(p); str != "" {
+		Logf("%s %s\n%s", perftype.PerfResultTag, str, perftype.PerfResultEnd)
+	}
+}
+
+// ResourceUsageToPerfDataWithLabels transforms ResourceUsagePerNode to PerfData with additional labels.
+// Notice that this function only cares about memory usage, because cpu usage information will be extracted from NodesCPUSummary.
+func ResourceUsageToPerfDataWithLabels(usagePerNode ResourceUsagePerNode, labels map[string]string) *perftype.PerfData {
 	items := []perftype.DataItem{}
 	for node, usages := range usagePerNode {
 		for c, usage := range usages {
@@ -70,6 +113,7 @@ func ResourceUsageToPerfData(usagePerNode ResourceUsagePerNode) *perftype.PerfDa
 				Labels: map[string]string{
 					"node":      node,
 					"container": c,
+					"datatype":  "resource",
 					"resource":  "memory",
 				},
 			}
@@ -77,13 +121,14 @@ func ResourceUsageToPerfData(usagePerNode ResourceUsagePerNode) *perftype.PerfDa
 		}
 	}
 	return &perftype.PerfData{
-		Version:   currentKubeletPerfMetricsVersion,
+		Version:   CurrentKubeletPerfMetricsVersion,
 		DataItems: items,
+		Labels:    labels,
 	}
 }
 
-// CPUUsageToPerfData transforms NodesCPUSummary to PerfData.
-func CPUUsageToPerfData(usagePerNode NodesCPUSummary) *perftype.PerfData {
+// CPUUsageToPerfDataWithLabels transforms NodesCPUSummary to PerfData with additional labels.
+func CPUUsageToPerfDataWithLabels(usagePerNode NodesCPUSummary, labels map[string]string) *perftype.PerfData {
 	items := []perftype.DataItem{}
 	for node, usages := range usagePerNode {
 		for c, usage := range usages {
@@ -91,12 +136,14 @@ func CPUUsageToPerfData(usagePerNode NodesCPUSummary) *perftype.PerfData {
 			for perc, value := range usage {
 				data[fmt.Sprintf("Perc%02.0f", perc*100)] = value * 1000
 			}
+
 			item := perftype.DataItem{
 				Data: data,
 				Unit: "mCPU",
 				Labels: map[string]string{
 					"node":      node,
 					"container": c,
+					"datatype":  "resource",
 					"resource":  "cpu",
 				},
 			}
@@ -104,16 +151,8 @@ func CPUUsageToPerfData(usagePerNode NodesCPUSummary) *perftype.PerfData {
 		}
 	}
 	return &perftype.PerfData{
-		Version:   currentKubeletPerfMetricsVersion,
+		Version:   CurrentKubeletPerfMetricsVersion,
 		DataItems: items,
-	}
-}
-
-// PrintPerfData prints the perfdata in json format with PerfResultTag prefix.
-// If an error occurs, nothing will be printed.
-func PrintPerfData(p *perftype.PerfData) {
-	// Notice that we must make sure the perftype.PerfResultEnd is in a new line.
-	if str := PrettyPrintJSON(p); str != "" {
-		Logf("%s %s\n%s", perftype.PerfResultTag, str, perftype.PerfResultEnd)
+		Labels:    labels,
 	}
 }

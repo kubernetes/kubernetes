@@ -2,7 +2,7 @@
 "kind" : "Policy",
 "apiVersion" : "v1",
 "predicates" : [
-	{"name" : "PodFitsPorts"},
+	{"name" : "PodFitsHostPorts"},
 	{"name" : "PodFitsResources"},
 	{"name" : "NoDiskConflict"},
 	{"name" : "MatchNodeSelector"},
@@ -14,12 +14,17 @@
 	{"name" : "ServiceSpreadingPriority", "weight" : 1},
 	{"name" : "EqualPriority", "weight" : 1}
 	],
-"extender": {
-        "url": "http://127.0.0.1:12346/scheduler",
+"extenders" : [
+	{
+        "urlPrefix": "http://127.0.0.1:12346/scheduler",
         "apiVersion": "v1beta1",
         "filterVerb": "filter",
+        "bindVerb": "bind",
         "prioritizeVerb": "prioritize",
         "weight": 5,
-        "enableHttps": false
-    }
+        "enableHttps": false,
+        "nodeCacheCapable": false
+	}
+    ],
+"hardPodAffinitySymmetricWeight" : 10
 }

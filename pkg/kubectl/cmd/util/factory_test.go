@@ -18,40 +18,40 @@ package util
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"os"
-	"os/user"
-	"path"
-	"reflect"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/util/flag"
+	manualfake "k8s.io/client-go/rest/fake"
+	testcore "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/fake"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/flag"
-	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/kubectl/categories"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
 func TestNewFactoryDefaultFlagBindings(t *testing.T) {
 	factory := NewFactory(nil)
 
-	if !factory.flags.HasFlags() {
+	if !factory.FlagSet().HasFlags() {
 		t.Errorf("Expected flags, but didn't get any")
 	}
 }
@@ -60,8 +60,8 @@ func TestNewFactoryNoFlagBindings(t *testing.T) {
 	clientConfig := clientcmd.NewDefaultClientConfig(*clientcmdapi.NewConfig(), &clientcmd.ConfigOverrides{})
 	factory := NewFactory(clientConfig)
 
-	if factory.flags.HasFlags() {
-		t.Errorf("Expected zero flags, but got %v", factory.flags)
+	if factory.FlagSet().HasFlags() {
+		t.Errorf("Expected zero flags, but got %v", factory.FlagSet())
 	}
 }
 
@@ -69,7 +69,7 @@ func TestPortsForObject(t *testing.T) {
 	f := NewFactory(nil)
 
 	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
@@ -83,22 +83,16 @@ func TestPortsForObject(t *testing.T) {
 		},
 	}
 
-	expected := []string{"101"}
-	got, err := f.PortsForObject(pod)
+	expected := sets.NewString("101")
+	ports, err := f.PortsForObject(pod)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if len(expected) != len(got) {
-		t.Fatalf("Ports size mismatch! Expected %d, got %d", len(expected), len(got))
-	}
 
-	sort.Strings(expected)
-	sort.Strings(got)
+	got := sets.NewString(ports...)
 
-	for i, port := range got {
-		if port != expected[i] {
-			t.Fatalf("Port mismatch! Expected %s, got %s", expected[i], port)
-		}
+	if !expected.Equal(got) {
+		t.Fatalf("Ports mismatch! Expected %v, got %v", expected, got)
 	}
 }
 
@@ -106,7 +100,7 @@ func TestProtocolsForObject(t *testing.T) {
 	f := NewFactory(nil)
 
 	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
@@ -125,22 +119,18 @@ func TestProtocolsForObject(t *testing.T) {
 		},
 	}
 
-	expected := "101/TCP,102/UDP"
+	expected := sets.NewString("101/TCP", "102/UDP")
 	protocolsMap, err := f.ProtocolsForObject(pod)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	got := kubectl.MakeProtocols(protocolsMap)
-	expectedSlice := strings.Split(expected, ",")
-	gotSlice := strings.Split(got, ",")
 
-	sort.Strings(expectedSlice)
-	sort.Strings(gotSlice)
+	protocolsString := kubectl.MakeProtocols(protocolsMap)
+	protocolsStrings := strings.Split(protocolsString, ",")
+	got := sets.NewString(protocolsStrings...)
 
-	for i, protocol := range gotSlice {
-		if protocol != expectedSlice[i] {
-			t.Fatalf("Protocols mismatch! Expected %s, got %s", expectedSlice[i], protocol)
-		}
+	if !expected.Equal(got) {
+		t.Fatalf("Protocols mismatch! Expected %v, got %v", expected, got)
 	}
 }
 
@@ -156,8 +146,8 @@ func TestLabelsForObject(t *testing.T) {
 		{
 			name: "successful re-use of labels",
 			object: &api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", Labels: map[string]string{"svc": "test"}},
-				TypeMeta:   unversioned.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", Labels: map[string]string{"svc": "test"}},
+				TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
 			},
 			expected: "svc=test",
 			err:      nil,
@@ -165,8 +155,8 @@ func TestLabelsForObject(t *testing.T) {
 		{
 			name: "empty labels",
 			object: &api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", Labels: map[string]string{}},
-				TypeMeta:   unversioned.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", Labels: map[string]string{}},
+				TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
 			},
 			expected: "",
 			err:      nil,
@@ -174,8 +164,8 @@ func TestLabelsForObject(t *testing.T) {
 		{
 			name: "nil labels",
 			object: &api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "zen", Namespace: "test", Labels: nil},
-				TypeMeta:   unversioned.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "zen", Namespace: "test", Labels: nil},
+				TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
 			},
 			expected: "",
 			err:      nil,
@@ -198,7 +188,7 @@ func TestLabelsForObject(t *testing.T) {
 func TestCanBeExposed(t *testing.T) {
 	factory := NewFactory(nil)
 	tests := []struct {
-		kind      unversioned.GroupKind
+		kind      schema.GroupKind
 		expectErr bool
 	}{
 		{
@@ -225,206 +215,12 @@ func TestCanBeExposed(t *testing.T) {
 func TestFlagUnderscoreRenaming(t *testing.T) {
 	factory := NewFactory(nil)
 
-	factory.flags.SetNormalizeFunc(flag.WordSepNormalizeFunc)
-	factory.flags.Bool("valid_flag", false, "bool value")
+	factory.FlagSet().SetNormalizeFunc(flag.WordSepNormalizeFunc)
+	factory.FlagSet().Bool("valid_flag", false, "bool value")
 
 	// In case of failure of this test check this PR: spf13/pflag#23
-	if factory.flags.Lookup("valid_flag").Name != "valid-flag" {
-		t.Fatalf("Expected flag name to be valid-flag, got %s", factory.flags.Lookup("valid_flag").Name)
-	}
-}
-
-func loadSchemaForTest() (validation.Schema, error) {
-	pathToSwaggerSpec := "../../../../api/swagger-spec/" + testapi.Default.GroupVersion().Version + ".json"
-	data, err := ioutil.ReadFile(pathToSwaggerSpec)
-	if err != nil {
-		return nil, err
-	}
-	return validation.NewSwaggerSchemaFromBytes(data, nil)
-}
-
-func header() http.Header {
-	header := http.Header{}
-	header.Set("Content-Type", runtime.ContentTypeJSON)
-	return header
-}
-
-func TestRefetchSchemaWhenValidationFails(t *testing.T) {
-	schema, err := loadSchemaForTest()
-	if err != nil {
-		t.Errorf("Error loading schema: %v", err)
-		t.FailNow()
-	}
-	output, err := json.Marshal(schema)
-	if err != nil {
-		t.Errorf("Error serializing schema: %v", err)
-		t.FailNow()
-	}
-	requests := map[string]int{}
-
-	c := &fake.RESTClient{
-		Codec: testapi.Default.Codec(),
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case strings.HasPrefix(p, "/swaggerapi") && m == "GET":
-				requests[p] = requests[p] + 1
-				return &http.Response{StatusCode: 200, Header: header(), Body: ioutil.NopCloser(bytes.NewBuffer(output))}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-				return nil, nil
-			}
-		}),
-	}
-	dir := os.TempDir() + "/schemaCache"
-	os.RemoveAll(dir)
-
-	fullDir, err := substituteUserHome(dir)
-	if err != nil {
-		t.Errorf("Error getting fullDir: %v", err)
-		t.FailNow()
-	}
-	cacheFile := path.Join(fullDir, "foo", "bar", schemaFileName)
-	err = writeSchemaFile(output, fullDir, cacheFile, "foo", "bar")
-	if err != nil {
-		t.Errorf("Error building old cache schema: %v", err)
-		t.FailNow()
-	}
-
-	obj := &extensions.Deployment{}
-	data, err := runtime.Encode(testapi.Extensions.Codec(), obj)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-		t.FailNow()
-	}
-
-	// Re-get request, should use HTTP and write
-	if getSchemaAndValidate(c, data, "foo", "bar", dir, nil); err != nil {
-		t.Errorf("unexpected error validating: %v", err)
-	}
-	if requests["/swaggerapi/foo/bar"] != 1 {
-		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/bar"])
-	}
-}
-
-func TestValidateCachesSchema(t *testing.T) {
-	schema, err := loadSchemaForTest()
-	if err != nil {
-		t.Errorf("Error loading schema: %v", err)
-		t.FailNow()
-	}
-	output, err := json.Marshal(schema)
-	if err != nil {
-		t.Errorf("Error serializing schema: %v", err)
-		t.FailNow()
-	}
-	requests := map[string]int{}
-
-	c := &fake.RESTClient{
-		Codec: testapi.Default.Codec(),
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case strings.HasPrefix(p, "/swaggerapi") && m == "GET":
-				requests[p] = requests[p] + 1
-				return &http.Response{StatusCode: 200, Header: header(), Body: ioutil.NopCloser(bytes.NewBuffer(output))}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-				return nil, nil
-			}
-		}),
-	}
-	dir := os.TempDir() + "/schemaCache"
-	os.RemoveAll(dir)
-
-	obj := &api.Pod{}
-	data, err := runtime.Encode(testapi.Default.Codec(), obj)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-		t.FailNow()
-	}
-
-	// Initial request, should use HTTP and write
-	if getSchemaAndValidate(c, data, "foo", "bar", dir, nil); err != nil {
-		t.Errorf("unexpected error validating: %v", err)
-	}
-	if _, err := os.Stat(path.Join(dir, "foo", "bar", schemaFileName)); err != nil {
-		t.Errorf("unexpected missing cache file: %v", err)
-	}
-	if requests["/swaggerapi/foo/bar"] != 1 {
-		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/bar"])
-	}
-
-	// Same version and group, should skip HTTP
-	if getSchemaAndValidate(c, data, "foo", "bar", dir, nil); err != nil {
-		t.Errorf("unexpected error validating: %v", err)
-	}
-	if requests["/swaggerapi/foo/bar"] != 2 {
-		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/bar"])
-	}
-
-	// Different API group, should go to HTTP and write
-	if getSchemaAndValidate(c, data, "foo", "baz", dir, nil); err != nil {
-		t.Errorf("unexpected error validating: %v", err)
-	}
-	if _, err := os.Stat(path.Join(dir, "foo", "baz", schemaFileName)); err != nil {
-		t.Errorf("unexpected missing cache file: %v", err)
-	}
-	if requests["/swaggerapi/foo/baz"] != 1 {
-		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/baz"])
-	}
-
-	// Different version, should go to HTTP and write
-	if getSchemaAndValidate(c, data, "foo2", "bar", dir, nil); err != nil {
-		t.Errorf("unexpected error validating: %v", err)
-	}
-	if _, err := os.Stat(path.Join(dir, "foo2", "bar", schemaFileName)); err != nil {
-		t.Errorf("unexpected missing cache file: %v", err)
-	}
-	if requests["/swaggerapi/foo2/bar"] != 1 {
-		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo2/bar"])
-	}
-
-	// No cache dir, should go straight to HTTP and not write
-	if getSchemaAndValidate(c, data, "foo", "blah", "", nil); err != nil {
-		t.Errorf("unexpected error validating: %v", err)
-	}
-	if requests["/swaggerapi/foo/blah"] != 1 {
-		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/blah"])
-	}
-	if _, err := os.Stat(path.Join(dir, "foo", "blah", schemaFileName)); err == nil || !os.IsNotExist(err) {
-		t.Errorf("unexpected cache file error: %v", err)
-	}
-}
-
-func TestSubstitueUser(t *testing.T) {
-	usr, err := user.Current()
-	if err != nil {
-		t.Logf("SKIPPING TEST: unexpected error: %v", err)
-		return
-	}
-	tests := []struct {
-		input     string
-		expected  string
-		expectErr bool
-	}{
-		{input: "~/foo", expected: path.Join(os.Getenv("HOME"), "foo")},
-		{input: "~" + usr.Username + "/bar", expected: usr.HomeDir + "/bar"},
-		{input: "/foo/bar", expected: "/foo/bar"},
-		{input: "~doesntexit/bar", expectErr: true},
-	}
-	for _, test := range tests {
-		output, err := substituteUserHome(test.input)
-		if test.expectErr {
-			if err == nil {
-				t.Error("unexpected non-error")
-			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if output != test.expected {
-			t.Errorf("expected: %s, saw: %s", test.expected, output)
-		}
+	if factory.FlagSet().Lookup("valid_flag").Name != "valid-flag" {
+		t.Fatalf("Expected flag name to be valid-flag, got %s", factory.FlagSet().Lookup("valid_flag").Name)
 	}
 }
 
@@ -432,10 +228,10 @@ func newPodList(count, isUnready, isUnhealthy int, labels map[string]string) *ap
 	pods := []api.Pod{}
 	for i := 0; i < count; i++ {
 		newPod := api.Pod{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:              fmt.Sprintf("pod-%d", i+1),
-				Namespace:         api.NamespaceDefault,
-				CreationTimestamp: unversioned.Date(2016, time.April, 1, 1, 0, i, 0, time.UTC),
+				Namespace:         metav1.NamespaceDefault,
+				CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, i, 0, time.UTC),
 				Labels:            labels,
 			},
 			Status: api.PodStatus{
@@ -467,7 +263,7 @@ func TestGetFirstPod(t *testing.T) {
 
 		podList  *api.PodList
 		watching []watch.Event
-		sortBy   func([]*api.Pod) sort.Interface
+		sortBy   func([]*v1.Pod) sort.Interface
 
 		expected    *api.Pod
 		expectedNum int
@@ -476,12 +272,12 @@ func TestGetFirstPod(t *testing.T) {
 		{
 			name:    "kubectl logs - two ready pods",
 			podList: newPodList(2, -1, -1, labelSet),
-			sortBy:  func(pods []*api.Pod) sort.Interface { return controller.ByLogging(pods) },
+			sortBy:  func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) },
 			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pod-1",
-					Namespace:         api.NamespaceDefault,
-					CreationTimestamp: unversioned.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
+					Namespace:         metav1.NamespaceDefault,
+					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
 					Labels:            map[string]string{"test": "selector"},
 				},
 				Status: api.PodStatus{
@@ -498,12 +294,12 @@ func TestGetFirstPod(t *testing.T) {
 		{
 			name:    "kubectl logs - one unhealthy, one healthy",
 			podList: newPodList(2, -1, 1, labelSet),
-			sortBy:  func(pods []*api.Pod) sort.Interface { return controller.ByLogging(pods) },
+			sortBy:  func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) },
 			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pod-2",
-					Namespace:         api.NamespaceDefault,
-					CreationTimestamp: unversioned.Date(2016, time.April, 1, 1, 0, 1, 0, time.UTC),
+					Namespace:         metav1.NamespaceDefault,
+					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 1, 0, time.UTC),
 					Labels:            map[string]string{"test": "selector"},
 				},
 				Status: api.PodStatus{
@@ -521,12 +317,12 @@ func TestGetFirstPod(t *testing.T) {
 		{
 			name:    "kubectl attach - two ready pods",
 			podList: newPodList(2, -1, -1, labelSet),
-			sortBy:  func(pods []*api.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) },
+			sortBy:  func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) },
 			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pod-1",
-					Namespace:         api.NamespaceDefault,
-					CreationTimestamp: unversioned.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
+					Namespace:         metav1.NamespaceDefault,
+					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
 					Labels:            map[string]string{"test": "selector"},
 				},
 				Status: api.PodStatus{
@@ -547,10 +343,10 @@ func TestGetFirstPod(t *testing.T) {
 				{
 					Type: watch.Modified,
 					Object: &api.Pod{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name:              "pod-1",
-							Namespace:         api.NamespaceDefault,
-							CreationTimestamp: unversioned.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
+							Namespace:         metav1.NamespaceDefault,
+							CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
 							Labels:            map[string]string{"test": "selector"},
 						},
 						Status: api.PodStatus{
@@ -564,12 +360,12 @@ func TestGetFirstPod(t *testing.T) {
 					},
 				},
 			},
-			sortBy: func(pods []*api.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) },
+			sortBy: func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) },
 			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pod-1",
-					Namespace:         api.NamespaceDefault,
-					CreationTimestamp: unversioned.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
+					Namespace:         metav1.NamespaceDefault,
+					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
 					Labels:            map[string]string{"test": "selector"},
 				},
 				Status: api.PodStatus{
@@ -587,10 +383,7 @@ func TestGetFirstPod(t *testing.T) {
 
 	for i := range tests {
 		test := tests[i]
-		client := &testclient.Fake{}
-		client.PrependReactor("list", "pods", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
-			return true, test.podList, nil
-		})
+		fake := fake.NewSimpleClientset(test.podList)
 		if len(test.watching) > 0 {
 			watcher := watch.NewFake()
 			for _, event := range test.watching {
@@ -601,11 +394,12 @@ func TestGetFirstPod(t *testing.T) {
 					go watcher.Modify(event.Object)
 				}
 			}
-			client.PrependWatchReactor("pods", testclient.DefaultWatchReactor(watcher, nil))
+			fake.PrependWatchReactor("pods", testcore.DefaultWatchReactor(watcher, nil))
 		}
 		selector := labels.Set(labelSet).AsSelector()
 
-		pod, numPods, err := GetFirstPod(client, api.NamespaceDefault, selector, 1*time.Minute, test.sortBy)
+		pod, numPods, err := GetFirstPod(fake.Core(), metav1.NamespaceDefault, selector.String(), 1*time.Minute, test.sortBy)
+		pod.Spec.SecurityContext = nil
 		if !test.expectedErr && err != nil {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
 			continue
@@ -618,7 +412,7 @@ func TestGetFirstPod(t *testing.T) {
 			t.Errorf("%s: expected %d pods, got %d", test.name, test.expectedNum, numPods)
 			continue
 		}
-		if !reflect.DeepEqual(test.expected, pod) {
+		if !apiequality.Semantic.DeepEqual(test.expected, pod) {
 			t.Errorf("%s:\nexpected pod:\n%#v\ngot:\n%#v\n\n", test.name, test.expected, pod)
 		}
 	}
@@ -711,6 +505,50 @@ func TestMakePortsString(t *testing.T) {
 		output := makePortsString(test.ports, test.useNodePort)
 		if output != test.expectedOutput {
 			t.Errorf("expected: %s, saw: %s.", test.expectedOutput, output)
+		}
+	}
+}
+
+func fakeClient() resource.ClientMapper {
+	return resource.ClientMapperFunc(func(*meta.RESTMapping) (resource.RESTClient, error) {
+		return &manualfake.RESTClient{}, nil
+	})
+}
+
+func TestDiscoveryReplaceAliases(t *testing.T) {
+	tests := []struct {
+		name     string
+		arg      string
+		expected string
+	}{
+		{
+			name:     "no-replacement",
+			arg:      "service",
+			expected: "service",
+		},
+		{
+			name:     "all-replacement",
+			arg:      "all",
+			expected: "pods,replicationcontrollers,services,statefulsets.apps,horizontalpodautoscalers.autoscaling,jobs.batch,cronjobs.batch,daemonsets.extensions,deployments.extensions,replicasets.extensions",
+		},
+		{
+			name:     "alias-in-comma-separated-arg",
+			arg:      "all,secrets",
+			expected: "pods,replicationcontrollers,services,statefulsets.apps,horizontalpodautoscalers.autoscaling,jobs.batch,cronjobs.batch,daemonsets.extensions,deployments.extensions,replicasets.extensions,secrets",
+		},
+	}
+
+	ds := &fakeDiscoveryClient{}
+	mapper, err := NewShortcutExpander(testapi.Default.RESTMapper(), ds)
+	if err != nil {
+		t.Fatalf("Unable to create shortcut expander, err = %s", err.Error())
+	}
+	b := resource.NewBuilder(mapper, categories.LegacyCategoryExpander, legacyscheme.Scheme, fakeClient(), testapi.Default.Codec())
+
+	for _, test := range tests {
+		replaced := b.ReplaceAliases(test.arg)
+		if replaced != test.expected {
+			t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, test.expected, replaced)
 		}
 	}
 }

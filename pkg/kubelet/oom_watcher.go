@@ -20,15 +20,16 @@ import (
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/events"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
-	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
+// OOMWatcher defines the interface of OOM watchers.
 type OOMWatcher interface {
-	Start(ref *api.ObjectReference) error
+	Start(ref *v1.ObjectReference) error
 }
 
 type realOOMWatcher struct {
@@ -36,6 +37,7 @@ type realOOMWatcher struct {
 	recorder record.EventRecorder
 }
 
+// NewOOMWatcher creates and initializes a OOMWatcher based on parameters.
 func NewOOMWatcher(cadvisor cadvisor.Interface, recorder record.EventRecorder) OOMWatcher {
 	return &realOOMWatcher{
 		cadvisor: cadvisor,
@@ -46,7 +48,7 @@ func NewOOMWatcher(cadvisor cadvisor.Interface, recorder record.EventRecorder) O
 const systemOOMEvent = "SystemOOM"
 
 // Watches cadvisor for system oom's and records an event for every system oom encountered.
-func (ow *realOOMWatcher) Start(ref *api.ObjectReference) error {
+func (ow *realOOMWatcher) Start(ref *v1.ObjectReference) error {
 	request := events.Request{
 		EventType: map[cadvisorapi.EventType]bool{
 			cadvisorapi.EventOom: true,
@@ -64,7 +66,7 @@ func (ow *realOOMWatcher) Start(ref *api.ObjectReference) error {
 
 		for event := range eventChannel.GetChannel() {
 			glog.V(2).Infof("Got sys oom event from cadvisor: %v", event)
-			ow.recorder.PastEventf(ref, unversioned.Time{Time: event.Timestamp}, api.EventTypeWarning, systemOOMEvent, "System OOM encountered")
+			ow.recorder.PastEventf(ref, metav1.Time{Time: event.Timestamp}, v1.EventTypeWarning, systemOOMEvent, "System OOM encountered")
 		}
 		glog.Errorf("Unexpectedly stopped receiving OOM notifications from cAdvisor")
 	}()

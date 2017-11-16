@@ -1,3 +1,13 @@
-assignees:
-  - ArtfulCoder
-  - thockin
+approvers:
+- thockin
+- matchstick
+reviewers:
+- thockin
+- lavalamp
+- smarterclayton
+- brendandburns
+- vishh
+- justinsb
+- freehan
+- dcbw
+- m1093782566

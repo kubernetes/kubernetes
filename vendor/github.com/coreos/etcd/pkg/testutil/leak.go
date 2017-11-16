@@ -48,7 +48,7 @@ func CheckLeakedGoroutine() bool {
 	}
 
 	stackCount := make(map[string]int)
-	re := regexp.MustCompile("\\(0[0-9a-fx, ]*\\)")
+	re := regexp.MustCompile(`\(0[0-9a-fx, ]*\)`)
 	for _, g := range gs {
 		// strip out pointer arguments in first function of stack dump
 		normalized := string(re.ReplaceAll([]byte(g), []byte("(...)")))
@@ -106,6 +106,8 @@ func interestingGoroutines() (gs []string) {
 		}
 		stack := strings.TrimSpace(sl[1])
 		if stack == "" ||
+			strings.Contains(stack, "created by os/signal.init") ||
+			strings.Contains(stack, "runtime/panic.go") ||
 			strings.Contains(stack, "created by testing.RunTests") ||
 			strings.Contains(stack, "testing.Main(") ||
 			strings.Contains(stack, "runtime.goexit") ||

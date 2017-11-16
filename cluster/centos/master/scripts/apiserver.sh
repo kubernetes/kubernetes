@@ -16,7 +16,7 @@
 
 
 MASTER_ADDRESS=${1:-"8.8.8.18"}
-ETCD_SERVERS=${2:-"http://8.8.8.18:4001"}
+ETCD_SERVERS=${2:-"https://8.8.8.18:2379"}
 SERVICE_CLUSTER_IP_RANGE=${3:-"10.10.10.0/24"}
 ADMISSION_CONTROL=${4:-""}
 
@@ -27,12 +27,21 @@ KUBE_LOGTOSTDERR="--logtostderr=true"
 # --v=0: log level for V logs
 KUBE_LOG_LEVEL="--v=4"
 
-# --etcd-servers=[]: List of etcd servers to watch (http://ip:port), 
+# --etcd-servers=[]: List of etcd servers to watch (http://ip:port),
 # comma separated. Mutually exclusive with -etcd-config
 KUBE_ETCD_SERVERS="--etcd-servers=${ETCD_SERVERS}"
 
+# --etcd-cafile="": SSL Certificate Authority file used to secure etcd communication.
+KUBE_ETCD_CAFILE="--etcd-cafile=/srv/kubernetes/etcd/ca.pem"
+
+# --etcd-certfile="": SSL certification file used to secure etcd communication.
+KUBE_ETCD_CERTFILE="--etcd-certfile=/srv/kubernetes/etcd/client.pem"
+
+# --etcd-keyfile="": key file used to secure etcd communication.
+KUBE_ETCD_KEYFILE="--etcd-keyfile=/srv/kubernetes/etcd/client-key.pem"
+
 # --insecure-bind-address=127.0.0.1: The IP address on which to serve the --insecure-port.
-KUBE_API_ADDRESS="--insecure-bind-address=${MASTER_ADDRESS}"
+KUBE_API_ADDRESS="--insecure-bind-address=0.0.0.0"
 
 # --insecure-port=8080: The port on which to serve unsecured, unauthenticated access.
 KUBE_API_PORT="--insecure-port=8080"
@@ -40,23 +49,23 @@ KUBE_API_PORT="--insecure-port=8080"
 # --kubelet-port=10250: Kubelet port
 NODE_PORT="--kubelet-port=10250"
 
-# --advertise-address=<nil>: The IP address on which to advertise 
+# --advertise-address=<nil>: The IP address on which to advertise
 # the apiserver to members of the cluster.
 KUBE_ADVERTISE_ADDR="--advertise-address=${MASTER_ADDRESS}"
 
 # --allow-privileged=false: If true, allow privileged containers.
 KUBE_ALLOW_PRIV="--allow-privileged=false"
 
-# --service-cluster-ip-range=<nil>: A CIDR notation IP range from which to assign service cluster IPs. 
+# --service-cluster-ip-range=<nil>: A CIDR notation IP range from which to assign service cluster IPs.
 # This must not overlap with any IP ranges assigned to nodes for pods.
 KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
 
-# --admission-control="AlwaysAdmit": Ordered list of plug-ins 
-# to do admission control of resources into cluster. 
-# Comma-delimited list of: 
-#   LimitRanger, AlwaysDeny, SecurityContextDeny, NamespaceExists, 
-#   NamespaceLifecycle, NamespaceAutoProvision,
-#   AlwaysAdmit, ServiceAccount, ResourceQuota
+# --admission-control="AlwaysAdmit": Ordered list of plug-ins
+# to do admission control of resources into cluster.
+# Comma-delimited list of:
+#   LimitRanger, AlwaysDeny, SecurityContextDeny, NamespaceExists,
+#   NamespaceLifecycle, NamespaceAutoProvision, AlwaysAdmit,
+#   ServiceAccount, DefaultStorageClass, DefaultTolerationSeconds, ResourceQuota
 KUBE_ADMISSION_CONTROL="--admission-control=${ADMISSION_CONTROL}"
 
 # --client-ca-file="": If set, any request presenting a client certificate signed
@@ -77,6 +86,9 @@ EOF
 KUBE_APISERVER_OPTS="   \${KUBE_LOGTOSTDERR}         \\
                         \${KUBE_LOG_LEVEL}           \\
                         \${KUBE_ETCD_SERVERS}        \\
+                        \${KUBE_ETCD_CAFILE}         \\
+                        \${KUBE_ETCD_CERTFILE}       \\
+                        \${KUBE_ETCD_KEYFILE}        \\
                         \${KUBE_API_ADDRESS}         \\
                         \${KUBE_API_PORT}            \\
                         \${NODE_PORT}                \\
@@ -105,4 +117,4 @@ EOF
 
 systemctl daemon-reload
 systemctl enable kube-apiserver
-systemctl start kube-apiserver
+systemctl restart kube-apiserver

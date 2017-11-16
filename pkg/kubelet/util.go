@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,15 +18,16 @@ package kubelet
 
 import (
 	"fmt"
+	"os"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/capabilities"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
 // Check whether we have the capabilities to run the specified pod.
-func canRunPod(pod *api.Pod) error {
+func canRunPod(pod *v1.Pod) error {
 	if !capabilities.Get().AllowPrivileged {
 		for _, container := range pod.Spec.Containers {
 			if securitycontext.HasPrivilegedRequest(&container) {
@@ -40,11 +41,7 @@ func canRunPod(pod *api.Pod) error {
 		}
 	}
 
-	if pod.Spec.SecurityContext == nil {
-		return nil
-	}
-
-	if pod.Spec.SecurityContext.HostNetwork {
+	if pod.Spec.HostNetwork {
 		allowed, err := allowHostNetwork(pod)
 		if err != nil {
 			return err
@@ -54,7 +51,7 @@ func canRunPod(pod *api.Pod) error {
 		}
 	}
 
-	if pod.Spec.SecurityContext.HostPID {
+	if pod.Spec.HostPID {
 		allowed, err := allowHostPID(pod)
 		if err != nil {
 			return err
@@ -64,7 +61,7 @@ func canRunPod(pod *api.Pod) error {
 		}
 	}
 
-	if pod.Spec.SecurityContext.HostIPC {
+	if pod.Spec.HostIPC {
 		allowed, err := allowHostIPC(pod)
 		if err != nil {
 			return err
@@ -78,7 +75,7 @@ func canRunPod(pod *api.Pod) error {
 }
 
 // Determined whether the specified pod is allowed to use host networking
-func allowHostNetwork(pod *api.Pod) (bool, error) {
+func allowHostNetwork(pod *v1.Pod) (bool, error) {
 	podSource, err := kubetypes.GetPodSource(pod)
 	if err != nil {
 		return false, err
@@ -91,8 +88,8 @@ func allowHostNetwork(pod *api.Pod) (bool, error) {
 	return false, nil
 }
 
-// Determined whether the specified pod is allowed to use host networking
-func allowHostPID(pod *api.Pod) (bool, error) {
+// Determined whether the specified pod is allowed to use host PID
+func allowHostPID(pod *v1.Pod) (bool, error) {
 	podSource, err := kubetypes.GetPodSource(pod)
 	if err != nil {
 		return false, err
@@ -106,7 +103,7 @@ func allowHostPID(pod *api.Pod) (bool, error) {
 }
 
 // Determined whether the specified pod is allowed to use host ipc
-func allowHostIPC(pod *api.Pod) (bool, error) {
+func allowHostIPC(pod *v1.Pod) (bool, error) {
 	podSource, err := kubetypes.GetPodSource(pod)
 	if err != nil {
 		return false, err
@@ -118,3 +115,15 @@ func allowHostIPC(pod *api.Pod) (bool, error) {
 	}
 	return false, nil
 }
+
+// dirExists returns true if the path exists and represents a directory.
+func dirExists(path string) bool {
+	s, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return s.IsDir()
+}
+
+// empty is a placeholder type used to implement a set
+type empty struct{}

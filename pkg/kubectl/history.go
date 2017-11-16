@@ -17,98 +17,146 @@ limitations under the License.
 package kubectl
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"text/tabwriter"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/runtime"
-	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
-	sliceutil "k8s.io/kubernetes/pkg/util/slice"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/client-go/kubernetes"
+	clientappsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
+	clientextv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	kapps "k8s.io/kubernetes/pkg/kubectl/apps"
+	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 const (
 	ChangeCauseAnnotation = "kubernetes.io/change-cause"
 )
 
-// HistoryViewer provides an interface for resources that can be rolled back.
+// HistoryViewer provides an interface for resources have historical information.
 type HistoryViewer interface {
-	History(namespace, name string) (HistoryInfo, error)
+	ViewHistory(namespace, name string, revision int64) (string, error)
 }
 
-func HistoryViewerFor(kind unversioned.GroupKind, c clientset.Interface) (HistoryViewer, error) {
-	switch kind {
-	case extensions.Kind("Deployment"):
-		return &DeploymentHistoryViewer{c}, nil
+type HistoryVisitor struct {
+	clientset kubernetes.Interface
+	result    HistoryViewer
+}
+
+func (v *HistoryVisitor) VisitDeployment(elem kapps.GroupKindElement) {
+	v.result = &DeploymentHistoryViewer{v.clientset}
+}
+
+func (v *HistoryVisitor) VisitStatefulSet(kind kapps.GroupKindElement) {
+	v.result = &StatefulSetHistoryViewer{v.clientset}
+}
+
+func (v *HistoryVisitor) VisitDaemonSet(kind kapps.GroupKindElement) {
+	v.result = &DaemonSetHistoryViewer{v.clientset}
+}
+
+func (v *HistoryVisitor) VisitJob(kind kapps.GroupKindElement)                   {}
+func (v *HistoryVisitor) VisitPod(kind kapps.GroupKindElement)                   {}
+func (v *HistoryVisitor) VisitReplicaSet(kind kapps.GroupKindElement)            {}
+func (v *HistoryVisitor) VisitReplicationController(kind kapps.GroupKindElement) {}
+
+// HistoryViewerFor returns an implementation of HistoryViewer interface for the given schema kind
+func HistoryViewerFor(kind schema.GroupKind, c kubernetes.Interface) (HistoryViewer, error) {
+	elem := kapps.GroupKindElement(kind)
+	visitor := &HistoryVisitor{
+		clientset: c,
 	}
-	return nil, fmt.Errorf("no history viewer has been implemented for %q", kind)
-}
 
-// HistoryInfo stores the mapping from revision to podTemplate;
-// note that change-cause annotation should be copied to podTemplate
-type HistoryInfo struct {
-	RevisionToTemplate map[int64]*api.PodTemplateSpec
+	// Determine which HistoryViewer we need here
+	err := elem.Accept(visitor)
+
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving history for %q, %v", kind.String(), err)
+	}
+
+	if visitor.result == nil {
+		return nil, fmt.Errorf("no history viewer has been implemented for %q", kind.String())
+	}
+
+	return visitor.result, nil
 }
 
 type DeploymentHistoryViewer struct {
-	c clientset.Interface
+	c kubernetes.Interface
 }
 
-// History returns a revision-to-replicaset map as the revision history of a deployment
-func (h *DeploymentHistoryViewer) History(namespace, name string) (HistoryInfo, error) {
-	historyInfo := HistoryInfo{
-		RevisionToTemplate: make(map[int64]*api.PodTemplateSpec),
-	}
-	deployment, err := h.c.Extensions().Deployments(namespace).Get(name)
+// ViewHistory returns a revision-to-replicaset map as the revision history of a deployment
+// TODO: this should be a describer
+func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
+	versionedExtensionsClient := h.c.ExtensionsV1beta1()
+	deployment, err := versionedExtensionsClient.Deployments(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
-		return historyInfo, fmt.Errorf("failed to retrieve deployment %s: %v", name, err)
+		return "", fmt.Errorf("failed to retrieve deployment %s: %v", name, err)
 	}
-	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, h.c)
+	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, versionedExtensionsClient)
 	if err != nil {
-		return historyInfo, fmt.Errorf("failed to retrieve replica sets from deployment %s: %v", name, err)
+		return "", fmt.Errorf("failed to retrieve replica sets from deployment %s: %v", name, err)
 	}
 	allRSs := allOldRSs
 	if newRS != nil {
 		allRSs = append(allRSs, newRS)
 	}
+
+	historyInfo := make(map[int64]*v1.PodTemplateSpec)
 	for _, rs := range allRSs {
 		v, err := deploymentutil.Revision(rs)
 		if err != nil {
 			continue
 		}
-		historyInfo.RevisionToTemplate[v] = &rs.Spec.Template
+		historyInfo[v] = &rs.Spec.Template
 		changeCause := getChangeCause(rs)
-		if historyInfo.RevisionToTemplate[v].Annotations == nil {
-			historyInfo.RevisionToTemplate[v].Annotations = make(map[string]string)
+		if historyInfo[v].Annotations == nil {
+			historyInfo[v].Annotations = make(map[string]string)
 		}
 		if len(changeCause) > 0 {
-			historyInfo.RevisionToTemplate[v].Annotations[ChangeCauseAnnotation] = changeCause
+			historyInfo[v].Annotations[ChangeCauseAnnotation] = changeCause
 		}
 	}
-	return historyInfo, nil
-}
 
-// PrintRolloutHistory prints a formatted table of the input revision history of the deployment
-func PrintRolloutHistory(historyInfo HistoryInfo, resource, name string) (string, error) {
-	if len(historyInfo.RevisionToTemplate) == 0 {
-		return fmt.Sprintf("No rollout history found in %s %q", resource, name), nil
+	if len(historyInfo) == 0 {
+		return "No rollout history found.", nil
 	}
+
+	if revision > 0 {
+		// Print details of a specific revision
+		template, ok := historyInfo[revision]
+		if !ok {
+			return "", fmt.Errorf("unable to find the specified revision")
+		}
+		return printTemplate(template)
+	}
+
 	// Sort the revisionToChangeCause map by revision
-	revisions := make([]int64, 0, len(historyInfo.RevisionToTemplate))
-	for r := range historyInfo.RevisionToTemplate {
+	revisions := make([]int64, 0, len(historyInfo))
+	for r := range historyInfo {
 		revisions = append(revisions, r)
 	}
 	sliceutil.SortInts64(revisions)
 
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "%s %q:\n", resource, name)
 		fmt.Fprintf(out, "REVISION\tCHANGE-CAUSE\n")
 		for _, r := range revisions {
 			// Find the change-cause of revision r
-			changeCause := historyInfo.RevisionToTemplate[r].Annotations[ChangeCauseAnnotation]
+			changeCause := historyInfo[r].Annotations[ChangeCauseAnnotation]
 			if len(changeCause) == 0 {
 				changeCause = "<none>"
 			}
@@ -116,6 +164,205 @@ func PrintRolloutHistory(historyInfo HistoryInfo, resource, name string) (string
 		}
 		return nil
 	})
+}
+
+func printTemplate(template *v1.PodTemplateSpec) (string, error) {
+	buf := bytes.NewBuffer([]byte{})
+	internalTemplate := &api.PodTemplateSpec{}
+	if err := apiv1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(template, internalTemplate, nil); err != nil {
+		return "", fmt.Errorf("failed to convert podtemplate, %v", err)
+	}
+	w := printersinternal.NewPrefixWriter(buf)
+	printersinternal.DescribePodTemplate(internalTemplate, w)
+	return buf.String(), nil
+}
+
+type DaemonSetHistoryViewer struct {
+	c kubernetes.Interface
+}
+
+// ViewHistory returns a revision-to-history map as the revision history of a deployment
+// TODO: this should be a describer
+func (h *DaemonSetHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
+	ds, history, err := daemonSetHistory(h.c.ExtensionsV1beta1(), h.c.AppsV1beta1(), namespace, name)
+	if err != nil {
+		return "", err
+	}
+	historyInfo := make(map[int64]*appsv1beta1.ControllerRevision)
+	for _, history := range history {
+		// TODO: for now we assume revisions don't overlap, we may need to handle it
+		historyInfo[history.Revision] = history
+	}
+	if len(historyInfo) == 0 {
+		return "No rollout history found.", nil
+	}
+
+	// Print details of a specific revision
+	if revision > 0 {
+		history, ok := historyInfo[revision]
+		if !ok {
+			return "", fmt.Errorf("unable to find the specified revision")
+		}
+		dsOfHistory, err := applyDaemonSetHistory(ds, history)
+		if err != nil {
+			return "", fmt.Errorf("unable to parse history %s", history.Name)
+		}
+		return printTemplate(&dsOfHistory.Spec.Template)
+	}
+
+	// Print an overview of all Revisions
+	// Sort the revisionToChangeCause map by revision
+	revisions := make([]int64, 0, len(historyInfo))
+	for r := range historyInfo {
+		revisions = append(revisions, r)
+	}
+	sliceutil.SortInts64(revisions)
+
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "REVISION\tCHANGE-CAUSE\n")
+		for _, r := range revisions {
+			// Find the change-cause of revision r
+			changeCause := historyInfo[r].Annotations[ChangeCauseAnnotation]
+			if len(changeCause) == 0 {
+				changeCause = "<none>"
+			}
+			fmt.Fprintf(out, "%d\t%s\n", r, changeCause)
+		}
+		return nil
+	})
+}
+
+type StatefulSetHistoryViewer struct {
+	c kubernetes.Interface
+}
+
+// ViewHistory returns a list of the revision history of a statefulset
+// TODO: this should be a describer
+// TODO: needs to implement detailed revision view
+func (h *StatefulSetHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
+	_, history, err := statefulSetHistory(h.c.AppsV1beta1(), namespace, name)
+	if err != nil {
+		return "", err
+	}
+
+	if len(history) <= 0 {
+		return "No rollout history found.", nil
+	}
+	revisions := make([]int64, len(history))
+	for _, revision := range history {
+		revisions = append(revisions, revision.Revision)
+	}
+	sliceutil.SortInts64(revisions)
+
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "REVISION\n")
+		for _, r := range revisions {
+			fmt.Fprintf(out, "%d\n", r)
+		}
+		return nil
+	})
+}
+
+// controlledHistories returns all ControllerRevisions in namespace that selected by selector and owned by accessor
+func controlledHistory(
+	apps clientappsv1beta1.AppsV1beta1Interface,
+	namespace string,
+	selector labels.Selector,
+	accessor metav1.Object) ([]*appsv1beta1.ControllerRevision, error) {
+	var result []*appsv1beta1.ControllerRevision
+	historyList, err := apps.ControllerRevisions(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	if err != nil {
+		return nil, err
+	}
+	for i := range historyList.Items {
+		history := historyList.Items[i]
+		// Only add history that belongs to the API object
+		if metav1.IsControlledBy(&history, accessor) {
+			result = append(result, &history)
+		}
+	}
+	return result, nil
+}
+
+// daemonSetHistory returns the DaemonSet named name in namespace and all ControllerRevisions in its history.
+func daemonSetHistory(
+	ext clientextv1beta1.ExtensionsV1beta1Interface,
+	apps clientappsv1beta1.AppsV1beta1Interface,
+	namespace, name string) (*extensionsv1beta1.DaemonSet, []*appsv1beta1.ControllerRevision, error) {
+	ds, err := ext.DaemonSets(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to retrieve DaemonSet %s: %v", name, err)
+	}
+	selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create selector for DaemonSet %s: %v", ds.Name, err)
+	}
+	accessor, err := meta.Accessor(ds)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create accessor for DaemonSet %s: %v", ds.Name, err)
+	}
+	history, err := controlledHistory(apps, ds.Namespace, selector, accessor)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to find history controlled by DaemonSet %s: %v", ds.Name, err)
+	}
+	return ds, history, nil
+}
+
+// statefulSetHistory returns the StatefulSet named name in namespace and all ControllerRevisions in its history.
+func statefulSetHistory(
+	apps clientappsv1beta1.AppsV1beta1Interface,
+	namespace, name string) (*appsv1beta1.StatefulSet, []*appsv1beta1.ControllerRevision, error) {
+	sts, err := apps.StatefulSets(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to retrieve Statefulset %s: %s", name, err.Error())
+	}
+	selector, err := metav1.LabelSelectorAsSelector(sts.Spec.Selector)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create selector for StatefulSet %s: %s", name, err.Error())
+	}
+	accessor, err := meta.Accessor(sts)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to obtain accessor for StatefulSet %s: %s", name, err.Error())
+	}
+	history, err := controlledHistory(apps, namespace, selector, accessor)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to find history controlled by StatefulSet %s: %v", name, err)
+	}
+	return sts, history, nil
+}
+
+// applyDaemonSetHistory returns a specific revision of DaemonSet by applying the given history to a copy of the given DaemonSet
+func applyDaemonSetHistory(ds *extensionsv1beta1.DaemonSet, history *appsv1beta1.ControllerRevision) (*extensionsv1beta1.DaemonSet, error) {
+	clone := ds.DeepCopy()
+	cloneBytes, err := json.Marshal(clone)
+	if err != nil {
+		return nil, err
+	}
+	patched, err := strategicpatch.StrategicMergePatch(cloneBytes, history.Data.Raw, clone)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(patched, clone)
+	if err != nil {
+		return nil, err
+	}
+	return clone, nil
+}
+
+// TODO: copied here until this becomes a describer
+func tabbedString(f func(io.Writer) error) (string, error) {
+	out := new(tabwriter.Writer)
+	buf := &bytes.Buffer{}
+	out.Init(buf, 0, 8, 2, ' ', 0)
+
+	err := f(out)
+	if err != nil {
+		return "", err
+	}
+
+	out.Flush()
+	str := string(buf.String())
+	return str, nil
 }
 
 // getChangeCause returns the change-cause annotation of the input object

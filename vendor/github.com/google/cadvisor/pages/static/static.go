@@ -22,6 +22,8 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+
+	"github.com/golang/glog"
 )
 
 const StaticResource = "/static/"
@@ -47,16 +49,18 @@ var staticFiles = map[string][]byte{
 	"jquery-1.10.2.min.js":          jqueryJs,
 }
 
-func HandleRequest(w http.ResponseWriter, u *url.URL) error {
+func HandleRequest(w http.ResponseWriter, u *url.URL) {
 	if len(u.Path) <= len(StaticResource) {
-		return fmt.Errorf("unknown static resource %q", u.Path)
+		http.Error(w, fmt.Sprintf("unknown static resource %q", u.Path), http.StatusNotFound)
+		return
 	}
 
 	// Get the static content if it exists.
 	resource := u.Path[len(StaticResource):]
 	content, ok := staticFiles[resource]
 	if !ok {
-		return fmt.Errorf("unknown static resource %q", resource)
+		http.Error(w, fmt.Sprintf("unknown static resource %q", u.Path), http.StatusNotFound)
+		return
 	}
 
 	// Set Content-Type if we were able to detect it.
@@ -65,6 +69,7 @@ func HandleRequest(w http.ResponseWriter, u *url.URL) error {
 		w.Header().Set("Content-Type", contentType)
 	}
 
-	_, err := w.Write(content)
-	return err
+	if _, err := w.Write(content); err != nil {
+		glog.Errorf("Failed to write response: %v", err)
+	}
 }

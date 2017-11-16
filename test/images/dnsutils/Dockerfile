@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM debian:wheezy
-MAINTAINER Tim Hockin "thockin@google.com"
+FROM BASEIMAGE
 
-RUN apt-get -q update && \
-    apt-get install -y dnsutils && \
-    apt-get clean
+CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
+
+RUN apk add --no-cache bind-tools

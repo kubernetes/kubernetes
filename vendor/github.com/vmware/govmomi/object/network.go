@@ -17,27 +17,20 @@ limitations under the License.
 package object
 
 import (
-	"path"
+	"context"
 
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
 
 type Network struct {
 	Common
-
-	InventoryPath string
 }
 
 func NewNetwork(c *vim25.Client, ref types.ManagedObjectReference) *Network {
 	return &Network{
 		Common: NewCommon(c, ref),
 	}
-}
-
-func (n Network) Name() string {
-	return path.Base(n.InventoryPath)
 }
 
 // EthernetCardBackingInfo returns the VirtualDeviceBackingInfo for this Network

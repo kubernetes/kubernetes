@@ -22,6 +22,7 @@ const (
 	CertAlgoECDSA256v01 = "ecdsa-sha2-nistp256-cert-v01@openssh.com"
 	CertAlgoECDSA384v01 = "ecdsa-sha2-nistp384-cert-v01@openssh.com"
 	CertAlgoECDSA521v01 = "ecdsa-sha2-nistp521-cert-v01@openssh.com"
+	CertAlgoED25519v01  = "ssh-ed25519-cert-v01@openssh.com"
 )
 
 // Certificate types distinguish between host and user
@@ -85,46 +86,73 @@ func marshalStringList(namelist []string) []byte {
 	return to
 }
 
+type optionsTuple struct {
+	Key   string
+	Value []byte
+}
+
+type optionsTupleValue struct {
+	Value string
+}
+
+// serialize a map of critical options or extensions
+// issue #10569 - per [PROTOCOL.certkeys] and SSH implementation,
+// we need two length prefixes for a non-empty string value
 func marshalTuples(tups map[string]string) []byte {
 	keys := make([]string, 0, len(tups))
-	for k := range tups {
-		keys = append(keys, k)
+	for key := range tups {
+		keys = append(keys, key)
 	}
 	sort.Strings(keys)
 
-	var r []byte
-	for _, k := range keys {
-		s := struct{ K, V string }{k, tups[k]}
-		r = append(r, Marshal(&s)...)
+	var ret []byte
+	for _, key := range keys {
+		s := optionsTuple{Key: key}
+		if value := tups[key]; len(value) > 0 {
+			s.Value = Marshal(&optionsTupleValue{value})
+		}
+		ret = append(ret, Marshal(&s)...)
 	}
-	return r
+	return ret
 }
 
+// issue #10569 - per [PROTOCOL.certkeys] and SSH implementation,
+// we need two length prefixes for a non-empty option value
 func parseTuples(in []byte) (map[string]string, error) {
 	tups := map[string]string{}
 	var lastKey string
 	var haveLastKey bool
 
 	for len(in) > 0 {
-		nameBytes, rest, ok := parseString(in)
-		if !ok {
-			return nil, errShortRead
-		}
-		data, rest, ok := parseString(rest)
-		if !ok {
-			return nil, errShortRead
-		}
-		name := string(nameBytes)
+		var key, val, extra []byte
+		var ok bool
 
+		if key, in, ok = parseString(in); !ok {
+			return nil, errShortRead
+		}
+		keyStr := string(key)
 		// according to [PROTOCOL.certkeys], the names must be in
 		// lexical order.
-		if haveLastKey && name <= lastKey {
+		if haveLastKey && keyStr <= lastKey {
 			return nil, fmt.Errorf("ssh: certificate options are not in lexical order")
 		}
-		lastKey, haveLastKey = name, true
-
-		tups[name] = string(data)
-		in = rest
+		lastKey, haveLastKey = keyStr, true
+		// the next field is a data field, which if non-empty has a string embedded
+		if val, in, ok = parseString(in); !ok {
+			return nil, errShortRead
+		}
+		if len(val) > 0 {
+			val, extra, ok = parseString(val)
+			if !ok {
+				return nil, errShortRead
+			}
+			if len(extra) > 0 {
+				return nil, fmt.Errorf("ssh: unexpected trailing data after certificate option value")
+			}
+			tups[keyStr] = string(val)
+		} else {
+			tups[keyStr] = ""
+		}
 	}
 	return tups, nil
 }
@@ -223,10 +251,18 @@ type CertChecker struct {
 	// for user certificates.
 	SupportedCriticalOptions []string
 
-	// IsAuthority should return true if the key is recognized as
-	// an authority. This allows for certificates to be signed by other
-	// certificates.
-	IsAuthority func(auth PublicKey) bool
+	// IsUserAuthority should return true if the key is recognized as an
+	// authority for the given user certificate. This allows for
+	// certificates to be signed by other certificates. This must be set
+	// if this CertChecker will be checking user certificates.
+	IsUserAuthority func(auth PublicKey) bool
+
+	// IsHostAuthority should report whether the key is recognized as
+	// an authority for this host. This allows for certificates to be
+	// signed by other keys, and for those other keys to only be valid
+	// signers for particular hostnames. This must be set if this
+	// CertChecker will be checking host certificates.
+	IsHostAuthority func(auth PublicKey, address string) bool
 
 	// Clock is used for verifying time stamps. If nil, time.Now
 	// is used.
@@ -240,7 +276,7 @@ type CertChecker struct {
 	// HostKeyFallback is called when CertChecker.CheckHostKey encounters a
 	// public key that is not a certificate. It must implement host key
 	// validation or else, if nil, all such keys are rejected.
-	HostKeyFallback func(addr string, remote net.Addr, key PublicKey) error
+	HostKeyFallback HostKeyCallback
 
 	// IsRevoked is called for each certificate so that revocation checking
 	// can be implemented. It should return true if the given certificate
@@ -262,8 +298,17 @@ func (c *CertChecker) CheckHostKey(addr string, remote net.Addr, key PublicKey) 
 	if cert.CertType != HostCert {
 		return fmt.Errorf("ssh: certificate presented as a host key has type %d", cert.CertType)
 	}
+	if !c.IsHostAuthority(cert.SignatureKey, addr) {
+		return fmt.Errorf("ssh: no authorities for hostname: %v", addr)
+	}
 
-	return c.CheckCert(addr, cert)
+	hostname, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return err
+	}
+
+	// Pass hostname only as principal for host certificates (consistent with OpenSSH)
+	return c.CheckCert(hostname, cert)
 }
 
 // Authenticate checks a user certificate. Authenticate can be used as
@@ -279,6 +324,9 @@ func (c *CertChecker) Authenticate(conn ConnMetadata, pubKey PublicKey) (*Permis
 
 	if cert.CertType != UserCert {
 		return nil, fmt.Errorf("ssh: cert has type %d", cert.CertType)
+	}
+	if !c.IsUserAuthority(cert.SignatureKey) {
+		return nil, fmt.Errorf("ssh: certificate signed by unrecognized authority")
 	}
 
 	if err := c.CheckCert(conn.User(), cert); err != nil {
@@ -328,10 +376,6 @@ func (c *CertChecker) CheckCert(principal string, cert *Certificate) error {
 		}
 	}
 
-	if !c.IsAuthority(cert.SignatureKey) {
-		return fmt.Errorf("ssh: certificate signed by unrecognized authority")
-	}
-
 	clock := c.Clock
 	if clock == nil {
 		clock = time.Now
@@ -341,7 +385,7 @@ func (c *CertChecker) CheckCert(principal string, cert *Certificate) error {
 	if after := int64(cert.ValidAfter); after < 0 || unixNow < int64(cert.ValidAfter) {
 		return fmt.Errorf("ssh: cert is not yet valid")
 	}
-	if before := int64(cert.ValidBefore); cert.ValidBefore != CertTimeInfinity && (unixNow >= before || before < 0) {
+	if before := int64(cert.ValidBefore); cert.ValidBefore != uint64(CertTimeInfinity) && (unixNow >= before || before < 0) {
 		return fmt.Errorf("ssh: cert has expired")
 	}
 	if err := cert.SignatureKey.Verify(cert.bytesForSigning(), cert.Signature); err != nil {
@@ -374,6 +418,7 @@ var certAlgoNames = map[string]string{
 	KeyAlgoECDSA256: CertAlgoECDSA256v01,
 	KeyAlgoECDSA384: CertAlgoECDSA384v01,
 	KeyAlgoECDSA521: CertAlgoECDSA521v01,
+	KeyAlgoED25519:  CertAlgoED25519v01,
 }
 
 // certToPrivAlgo returns the underlying algorithm for a certificate algorithm.
@@ -432,7 +477,7 @@ func (c *Certificate) Marshal() []byte {
 func (c *Certificate) Type() string {
 	algo, ok := certAlgoNames[c.Key.Type()]
 	if !ok {
-		panic("unknown cert key type")
+		panic("unknown cert key type " + c.Key.Type())
 	}
 	return algo
 }

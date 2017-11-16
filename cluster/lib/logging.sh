@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Controls verbosity of the script output and logging.
+KUBE_VERBOSE="${KUBE_VERBOSE:-5}"
+
 # Handler for when we exit automatically on an error.
 # Borrowed from https://gist.github.com/ahendrix/7030300
 kube::log::errexit() {
@@ -25,7 +28,16 @@ kube::log::errexit() {
 
   set +o xtrace
   local code="${1:-1}"
-  kube::log::error_exit "'${BASH_COMMAND}' exited with status $err" "${1:-1}" 1
+  # Print out the stack trace described by $function_stack  
+  if [ ${#FUNCNAME[@]} -gt 2 ]
+  then
+    kube::log::error "Call tree:"
+    for ((i=1;i<${#FUNCNAME[@]}-1;i++))
+    do
+      kube::log::error " $i: ${BASH_SOURCE[$i+1]}:${BASH_LINENO[$i]} ${FUNCNAME[$i]}(...)"
+    done
+  fi  
+  kube::log::error_exit "Error in ${BASH_SOURCE[1]}:${BASH_LINENO[0]}. '${BASH_COMMAND}' exited with status $err" "${1:-1}" 1
 }
 
 kube::log::install_errexit() {
@@ -70,16 +82,19 @@ kube::log::error_exit() {
   local stack_skip="${3:-0}"
   stack_skip=$((stack_skip + 1))
 
-  local source_file=${BASH_SOURCE[$stack_skip]}
-  local source_line=${BASH_LINENO[$((stack_skip - 1))]}
-  echo "!!! Error in ${source_file}:${source_line}" >&2
-  [[ -z ${1-} ]] || {
-    echo "  ${1}" >&2
-  }
+  if [[ ${KUBE_VERBOSE} -ge 4 ]]; then
+    local source_file=${BASH_SOURCE[$stack_skip]}
+    local source_line=${BASH_LINENO[$((stack_skip - 1))]}
+    echo "!!! Error in ${source_file}:${source_line}" >&2
+    [[ -z ${1-} ]] || {
+      echo "  ${1}" >&2
+    }
 
-  kube::log::stack $stack_skip
+    kube::log::stack $stack_skip
 
-  echo "Exiting with status ${code}" >&2
+    echo "Exiting with status ${code}" >&2
+  fi
+
   exit "${code}"
 }
 
@@ -114,6 +129,11 @@ kube::log::usage_from_stdin() {
 
 # Print out some info that isn't a top level status line
 kube::log::info() {
+  local V="${V:-0}"
+  if [[ $KUBE_VERBOSE < $V ]]; then
+    return
+  fi
+
   for message; do
     echo "$message"
   done
@@ -137,6 +157,11 @@ kube::log::info_from_stdin() {
 
 # Print a status line.  Formatted to show up in a stream of output.
 kube::log::status() {
+  local V="${V:-0}"
+  if [[ $KUBE_VERBOSE < $V ]]; then
+    return
+  fi
+
   timestamp=$(date +"[%m%d %H:%M:%S]")
   echo "+++ $timestamp $1"
   shift

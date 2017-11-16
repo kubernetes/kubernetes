@@ -104,7 +104,7 @@ func encodeExponent(e int) string {
 			break
 		}
 	}
-	return base64.URLEncoding.EncodeToString(b[idx:])
+	return base64.RawURLEncoding.EncodeToString(b[idx:])
 }
 
 // Turns a URL encoded modulus of a key into a big int.
@@ -119,7 +119,7 @@ func decodeModulus(n string) (*big.Int, error) {
 }
 
 func encodeModulus(n *big.Int) string {
-	return base64.URLEncoding.EncodeToString(n.Bytes())
+	return base64.RawURLEncoding.EncodeToString(n.Bytes())
 }
 
 // decodeBase64URLPaddingOptional decodes Base64 whether there is padding or not.

@@ -17,6 +17,7 @@ limitations under the License.
 package object
 
 import (
+	"context"
 	"fmt"
 	"net"
 
@@ -24,37 +25,16 @@ import (
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
 
 type HostSystem struct {
 	Common
-
-	InventoryPath string
-}
-
-func (h HostSystem) String() string {
-	if h.InventoryPath == "" {
-		return h.Common.String()
-	}
-	return fmt.Sprintf("%v @ %v", h.Common, h.InventoryPath)
 }
 
 func NewHostSystem(c *vim25.Client, ref types.ManagedObjectReference) *HostSystem {
 	return &HostSystem{
 		Common: NewCommon(c, ref),
 	}
-}
-
-func (h HostSystem) Name(ctx context.Context) (string, error) {
-	var mh mo.HostSystem
-
-	err := h.Properties(ctx, h.Reference(), []string{"name"}, &mh)
-	if err != nil {
-		return "", err
-	}
-
-	return mh.Name, nil
 }
 
 func (h HostSystem) ConfigManager() *HostConfigManager {

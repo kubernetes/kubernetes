@@ -21,8 +21,8 @@ container: image
 
 image:
 	# Build new image and automatically tag it as latest
-	docker build -t $(PREFIX)/volume-rbd .
-	# Add the version tag to the latest image 
+	docker build --pull -t $(PREFIX)/volume-rbd .
+	# Add the version tag to the latest image
 	docker tag $(PREFIX)/volume-rbd $(PREFIX)/volume-rbd:$(TAG)
 
 block:
@@ -34,8 +34,8 @@ block:
 
 push: image
 	# Push image tagged as latest to repository
-	gcloud docker push $(PREFIX)/volume-rbd
+	gcloud docker -- push $(PREFIX)/volume-rbd
 	# Push version tagged image to repository (since this image is already pushed it will simply create or update version tag)
-	gcloud docker push $(PREFIX)/volume-rbd:$(TAG)
+	gcloud docker -- push $(PREFIX)/volume-rbd:$(TAG)
 
 clean:

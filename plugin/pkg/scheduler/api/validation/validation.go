@@ -19,25 +19,32 @@ package validation
 import (
 	"fmt"
 
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
 
-// Validate checks for errors in the Config
+// ValidatePolicy checks for errors in the Config
 // It does not return early so that it can find as many errors as possible
 func ValidatePolicy(policy schedulerapi.Policy) error {
-	validationErrors := make([]error, 0)
+	var validationErrors []error
 
 	for _, priority := range policy.Priorities {
-		if priority.Weight <= 0 {
-			validationErrors = append(validationErrors, fmt.Errorf("Priority %s should have a positive weight applied to it", priority.Name))
+		if priority.Weight <= 0 || priority.Weight >= schedulerapi.MaxWeight {
+			validationErrors = append(validationErrors, fmt.Errorf("Priority %s should have a positive weight applied to it or it has overflown", priority.Name))
 		}
 	}
 
+	binders := 0
 	for _, extender := range policy.ExtenderConfigs {
-		if extender.Weight < 0 {
-			validationErrors = append(validationErrors, fmt.Errorf("Priority for extender %s should have a non negative weight applied to it", extender.URLPrefix))
+		if len(extender.PrioritizeVerb) > 0 && extender.Weight <= 0 {
+			validationErrors = append(validationErrors, fmt.Errorf("Priority for extender %s should have a positive weight applied to it", extender.URLPrefix))
 		}
+		if extender.BindVerb != "" {
+			binders++
+		}
+	}
+	if binders > 1 {
+		validationErrors = append(validationErrors, fmt.Errorf("Only one extender can implement bind, found %v", binders))
 	}
 	return utilerrors.NewAggregate(validationErrors)
 }

@@ -28,7 +28,7 @@ secret:
 	go run make_secret.go -crt $(CERT) -key $(KEY) > $(SECRET)
 
 container:
-	docker build -t $(PREFIX):$(TAG) .
+	docker build --pull -t $(PREFIX):$(TAG) .
 
 push: container
 	docker push $(PREFIX):$(TAG)

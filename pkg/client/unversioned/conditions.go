@@ -19,25 +19,32 @@ package unversioned
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/kubernetes/pkg/api/pod"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/watch"
+	appsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
+	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 )
 
 // ControllerHasDesiredReplicas returns a condition that will be true if and only if
 // the desired replica count for a controller's ReplicaSelector equals the Replicas count.
-func ControllerHasDesiredReplicas(c Interface, controller *api.ReplicationController) wait.ConditionFunc {
+func ControllerHasDesiredReplicas(rcClient coreclient.ReplicationControllersGetter, controller *api.ReplicationController) wait.ConditionFunc {
 
 	// If we're given a controller where the status lags the spec, it either means that the controller is stale,
 	// or that the rc manager hasn't noticed the update yet. Polling status.Replicas is not safe in the latter case.
 	desiredGeneration := controller.Generation
 
 	return func() (bool, error) {
-		ctrl, err := c.ReplicationControllers(controller.Namespace).Get(controller.Name)
+		ctrl, err := rcClient.ReplicationControllers(controller.Namespace).Get(controller.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -51,7 +58,7 @@ func ControllerHasDesiredReplicas(c Interface, controller *api.ReplicationContro
 
 // ReplicaSetHasDesiredReplicas returns a condition that will be true if and only if
 // the desired replica count for a ReplicaSet's ReplicaSelector equals the Replicas count.
-func ReplicaSetHasDesiredReplicas(c ExtensionsInterface, replicaSet *extensions.ReplicaSet) wait.ConditionFunc {
+func ReplicaSetHasDesiredReplicas(rsClient extensionsclient.ReplicaSetsGetter, replicaSet *extensions.ReplicaSet) wait.ConditionFunc {
 
 	// If we're given a ReplicaSet where the status lags the spec, it either means that the
 	// ReplicaSet is stale, or that the ReplicaSet manager hasn't noticed the update yet.
@@ -59,7 +66,7 @@ func ReplicaSetHasDesiredReplicas(c ExtensionsInterface, replicaSet *extensions.
 	desiredGeneration := replicaSet.Generation
 
 	return func() (bool, error) {
-		rs, err := c.ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name)
+		rs, err := rsClient.ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -72,12 +79,31 @@ func ReplicaSetHasDesiredReplicas(c ExtensionsInterface, replicaSet *extensions.
 	}
 }
 
+// StatefulSetHasDesiredReplicas returns a condition that checks the number of StatefulSet replicas
+func StatefulSetHasDesiredReplicas(ssClient appsclient.StatefulSetsGetter, ss *apps.StatefulSet) wait.ConditionFunc {
+	// If we're given a StatefulSet where the status lags the spec, it either means that the
+	// StatefulSet is stale, or that the StatefulSet manager hasn't noticed the update yet.
+	// Polling status.Replicas is not safe in the latter case.
+	desiredGeneration := ss.Generation
+	return func() (bool, error) {
+		ss, err := ssClient.StatefulSets(ss.Namespace).Get(ss.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		// There's a chance a concurrent update modifies the Spec.Replicas causing this check to
+		// pass, or, after this check has passed, a modification causes the StatefulSet manager to
+		// create more pods. This will not be an issue once we've implemented graceful delete for
+		// StatefulSet, but till then concurrent stop operations on the same StatefulSet might have
+		// unintended side effects.
+		return ss.Status.ObservedGeneration != nil && *ss.Status.ObservedGeneration >= desiredGeneration && ss.Status.Replicas == ss.Spec.Replicas, nil
+	}
+}
+
 // JobHasDesiredParallelism returns a condition that will be true if the desired parallelism count
 // for a job equals the current active counts or is less by an appropriate successful/unsuccessful count.
-func JobHasDesiredParallelism(c BatchInterface, job *batch.Job) wait.ConditionFunc {
-
+func JobHasDesiredParallelism(jobClient batchclient.JobsGetter, job *batch.Job) wait.ConditionFunc {
 	return func() (bool, error) {
-		job, err := c.Jobs(job.Namespace).Get(job.Name)
+		job, err := jobClient.Jobs(job.Namespace).Get(job.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -89,18 +115,18 @@ func JobHasDesiredParallelism(c BatchInterface, job *batch.Job) wait.ConditionFu
 		if job.Spec.Completions == nil {
 			// A job without specified completions needs to wait for Active to reach Parallelism.
 			return false, nil
-		} else {
-			// otherwise count successful
-			progress := *job.Spec.Completions - job.Status.Active - job.Status.Succeeded
-			return progress == 0, nil
 		}
+
+		// otherwise count successful
+		progress := *job.Spec.Completions - job.Status.Active - job.Status.Succeeded
+		return progress == 0, nil
 	}
 }
 
 // DeploymentHasDesiredReplicas returns a condition that will be true if and only if
 // the desired replica count for a deployment equals its updated replicas count.
 // (non-terminated pods that have the desired template spec).
-func DeploymentHasDesiredReplicas(c ExtensionsInterface, deployment *extensions.Deployment) wait.ConditionFunc {
+func DeploymentHasDesiredReplicas(dClient extensionsclient.DeploymentsGetter, deployment *extensions.Deployment) wait.ConditionFunc {
 	// If we're given a deployment where the status lags the spec, it either
 	// means that the deployment is stale, or that the deployment manager hasn't
 	// noticed the update yet. Polling status.Replicas is not safe in the latter
@@ -108,7 +134,7 @@ func DeploymentHasDesiredReplicas(c ExtensionsInterface, deployment *extensions.
 	desiredGeneration := deployment.Generation
 
 	return func() (bool, error) {
-		deployment, err := c.Deployments(deployment.Namespace).Get(deployment.Name)
+		deployment, err := dClient.Deployments(deployment.Namespace).Get(deployment.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -121,12 +147,16 @@ func DeploymentHasDesiredReplicas(c ExtensionsInterface, deployment *extensions.
 // the pod has already reached completed state.
 var ErrPodCompleted = fmt.Errorf("pod ran to completion")
 
+// ErrContainerTerminated is returned by PodContainerRunning in the intermediate
+// state where the pod indicates it's still running, but its container is already terminated
+var ErrContainerTerminated = fmt.Errorf("container terminated")
+
 // PodRunning returns true if the pod is running, false if the pod has not yet reached running state,
 // returns ErrPodCompleted if the pod has run to completion, or an error in any other case.
 func PodRunning(event watch.Event) (bool, error) {
 	switch event.Type {
 	case watch.Deleted:
-		return false, errors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, "")
+		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 	}
 	switch t := event.Object.(type) {
 	case *api.Pod:
@@ -145,7 +175,7 @@ func PodRunning(event watch.Event) (bool, error) {
 func PodCompleted(event watch.Event) (bool, error) {
 	switch event.Type {
 	case watch.Deleted:
-		return false, errors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, "")
+		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 	}
 	switch t := event.Object.(type) {
 	case *api.Pod:
@@ -163,7 +193,7 @@ func PodCompleted(event watch.Event) (bool, error) {
 func PodRunningAndReady(event watch.Event) (bool, error) {
 	switch event.Type {
 	case watch.Deleted:
-		return false, errors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, "")
+		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 	}
 	switch t := event.Object.(type) {
 	case *api.Pod:
@@ -171,7 +201,7 @@ func PodRunningAndReady(event watch.Event) (bool, error) {
 		case api.PodFailed, api.PodSucceeded:
 			return false, ErrPodCompleted
 		case api.PodRunning:
-			return api.IsPodReady(t), nil
+			return pod.IsPodReady(t), nil
 		}
 	}
 	return false, nil
@@ -182,7 +212,7 @@ func PodRunningAndReady(event watch.Event) (bool, error) {
 func PodNotPending(event watch.Event) (bool, error) {
 	switch event.Type {
 	case watch.Deleted:
-		return false, errors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, "")
+		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 	}
 	switch t := event.Object.(type) {
 	case *api.Pod:
@@ -202,7 +232,7 @@ func PodContainerRunning(containerName string) watch.ConditionFunc {
 	return func(event watch.Event) (bool, error) {
 		switch event.Type {
 		case watch.Deleted:
-			return false, errors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, "")
+			return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 		}
 		switch t := event.Object.(type) {
 		case *api.Pod:
@@ -217,6 +247,18 @@ func PodContainerRunning(containerName string) watch.ConditionFunc {
 				if s.Name != containerName {
 					continue
 				}
+				if s.State.Terminated != nil {
+					return false, ErrContainerTerminated
+				}
+				return s.State.Running != nil, nil
+			}
+			for _, s := range t.Status.InitContainerStatuses {
+				if s.Name != containerName {
+					continue
+				}
+				if s.State.Terminated != nil {
+					return false, ErrContainerTerminated
+				}
 				return s.State.Running != nil, nil
 			}
 			return false, nil
@@ -230,7 +272,7 @@ func PodContainerRunning(containerName string) watch.ConditionFunc {
 func ServiceAccountHasSecrets(event watch.Event) (bool, error) {
 	switch event.Type {
 	case watch.Deleted:
-		return false, errors.NewNotFound(unversioned.GroupResource{Resource: "serviceaccounts"}, "")
+		return false, errors.NewNotFound(schema.GroupResource{Resource: "serviceaccounts"}, "")
 	}
 	switch t := event.Object.(type) {
 	case *api.ServiceAccount:

@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// CAUTION: If you update code in this file, you may need to also update code
-//          in contrib/mesos/cmd/km/k8sm-controllermanager.go
 package main
 
 import (
@@ -29,12 +27,14 @@ func NewKubeControllerManager() *Server {
 	s := options.NewCMServer()
 
 	hks := Server{
-		SimpleUsage: "controller-manager",
-		Long:        "A server that runs a set of active components. This includes replication controllers, service endpoints and nodes.",
-		Run: func(_ *Server, args []string) error {
+		name:            "controller-manager",
+		AlternativeName: "kube-controller-manager",
+		SimpleUsage:     "controller-manager",
+		Long:            "A server that runs a set of active components. This includes replication controllers, service endpoints and nodes.",
+		Run: func(_ *Server, args []string, stopCh <-chan struct{}) error {
 			return app.Run(s)
 		},
 	}
-	s.AddFlags(hks.Flags())
+	s.AddFlags(hks.Flags(), app.KnownControllers(), app.ControllersDisabledByDefault.List())
 	return &hks
 }

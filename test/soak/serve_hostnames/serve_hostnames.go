@@ -29,15 +29,18 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	clientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	e2e "k8s.io/kubernetes/test/e2e/framework"
+
+	"github.com/golang/glog"
 )
 
 var (
@@ -82,14 +85,14 @@ func main() {
 		glog.Fatalf("Failed to construct config: %v", err)
 	}
 
-	c, err := client.New(config)
+	client, err := clientset.NewForConfig(config)
 	if err != nil {
 		glog.Fatalf("Failed to make client: %v", err)
 	}
 
-	var nodes *api.NodeList
+	var nodes *v1.NodeList
 	for start := time.Now(); time.Since(start) < nodeListTimeout; time.Sleep(2 * time.Second) {
-		nodes, err = c.Nodes().List(api.ListOptions{})
+		nodes, err = client.CoreV1().Nodes().List(metav1.ListOptions{})
 		if err == nil {
 			break
 		}
@@ -111,18 +114,18 @@ func main() {
 	queries := *queriesAverage * len(nodes.Items) * *podsPerNode
 
 	// Create the namespace
-	got, err := c.Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{GenerateName: "serve-hostnames-"}})
+	got, err := client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{GenerateName: "serve-hostnames-"}})
 	if err != nil {
 		glog.Fatalf("Failed to create namespace: %v", err)
 	}
 	ns := got.Name
 	defer func(ns string) {
-		if err := c.Namespaces().Delete(ns); err != nil {
+		if err := client.CoreV1().Namespaces().Delete(ns, nil); err != nil {
 			glog.Warningf("Failed to delete namespace ns: %e", ns, err)
 		} else {
 			// wait until the namespace disappears
 			for i := 0; i < int(namespaceDeleteTimeout/time.Second); i++ {
-				if _, err := c.Namespaces().Get(ns); err != nil {
+				if _, err := client.CoreV1().Namespaces().Get(ns, metav1.GetOptions{}); err != nil {
 					if errors.IsNotFound(err) {
 						return
 					}
@@ -136,18 +139,18 @@ func main() {
 	// Create a service for these pods.
 	glog.Infof("Creating service %s/serve-hostnames", ns)
 	// Make several attempts to create a service.
-	var svc *api.Service
+	var svc *v1.Service
 	for start := time.Now(); time.Since(start) < serviceCreateTimeout; time.Sleep(2 * time.Second) {
 		t := time.Now()
-		svc, err = c.Services(ns).Create(&api.Service{
-			ObjectMeta: api.ObjectMeta{
+		svc, err = client.CoreV1().Services(ns).Create(&v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "serve-hostnames",
 				Labels: map[string]string{
 					"name": "serve-hostname",
 				},
 			},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{{
 					Protocol:   "TCP",
 					Port:       9376,
 					TargetPort: intstr.FromInt(9376),
@@ -172,7 +175,7 @@ func main() {
 		glog.Infof("Cleaning up service %s/serve-hostnames", ns)
 		// Make several attempts to delete the service.
 		for start := time.Now(); time.Since(start) < deleteTimeout; time.Sleep(1 * time.Second) {
-			if err := c.Services(ns).Delete(svc.Name); err == nil {
+			if err := client.CoreV1().Services(ns).Delete(svc.Name, nil); err == nil {
 				return
 			}
 			glog.Warningf("After %v unable to delete service %s/%s: %v", time.Since(start), ns, svc.Name, err)
@@ -189,19 +192,19 @@ func main() {
 			for start := time.Now(); time.Since(start) < podCreateTimeout; time.Sleep(2 * time.Second) {
 				glog.Infof("Creating pod %s/%s on node %s", ns, podName, node.Name)
 				t := time.Now()
-				_, err = c.Pods(ns).Create(&api.Pod{
-					ObjectMeta: api.ObjectMeta{
+				_, err = client.CoreV1().Pods(ns).Create(&v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: podName,
 						Labels: map[string]string{
 							"name": "serve-hostname",
 						},
 					},
-					Spec: api.PodSpec{
-						Containers: []api.Container{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
 							{
 								Name:  "serve-hostname",
-								Image: "gcr.io/google_containers/serve_hostname:v1.4",
-								Ports: []api.ContainerPort{{ContainerPort: 9376}},
+								Image: e2e.ServeHostnameImage,
+								Ports: []v1.ContainerPort{{ContainerPort: 9376}},
 							},
 						},
 						NodeName: node.Name,
@@ -225,7 +228,7 @@ func main() {
 		// Make several attempts to delete the pods.
 		for _, podName := range podNames {
 			for start := time.Now(); time.Since(start) < deleteTimeout; time.Sleep(1 * time.Second) {
-				if err = c.Pods(ns).Delete(podName, nil); err == nil {
+				if err = client.CoreV1().Pods(ns).Delete(podName, nil); err == nil {
 					break
 				}
 				glog.Warningf("After %v failed to delete pod %s/%s: %v", time.Since(start), ns, podName, err)
@@ -235,25 +238,30 @@ func main() {
 
 	glog.Info("Waiting for the serve-hostname pods to be ready")
 	for _, podName := range podNames {
-		var pod *api.Pod
+		var pod *v1.Pod
 		for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
-			pod, err = c.Pods(ns).Get(podName)
+			pod, err = client.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
 			if err != nil {
 				glog.Warningf("Get pod %s/%s failed, ignoring for %v: %v", ns, podName, err, podStartTimeout)
 				continue
 			}
-			if pod.Status.Phase == api.PodRunning {
+			if pod.Status.Phase == v1.PodRunning {
 				break
 			}
 		}
-		if pod.Status.Phase != api.PodRunning {
+		if pod.Status.Phase != v1.PodRunning {
 			glog.Warningf("Gave up waiting on pod %s/%s to be running (saw %v)", ns, podName, pod.Status.Phase)
 		} else {
 			glog.Infof("%s/%s is running", ns, podName)
 		}
 	}
 
-	proxyRequest, errProxy := e2e.GetServicesProxyRequest(c, c.Get())
+	rclient, err := restclient.RESTClientFor(config)
+	if err != nil {
+		glog.Warningf("Failed to build restclient: %v", err)
+		return
+	}
+	proxyRequest, errProxy := e2e.GetServicesProxyRequest(client, rclient.Get())
 	if errProxy != nil {
 		glog.Warningf("Get services proxy request failed: %v", errProxy)
 		return
@@ -269,11 +277,11 @@ func main() {
 			glog.Infof("After %v while making a proxy call got error %v", time.Since(start), err)
 			continue
 		}
-		var r unversioned.Status
-		if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), hostname, &r); err != nil {
+		var r metav1.Status
+		if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), hostname, &r); err != nil {
 			break
 		}
-		if r.Status == unversioned.StatusFailure {
+		if r.Status == metav1.StatusFailure {
 			glog.Infof("After %v got status %v", time.Since(start), string(hostname))
 			continue
 		}

@@ -23,19 +23,21 @@ import (
 	"path"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // Construct an instance of a plugin, by name.
-func makePluginUnderTest(t *testing.T, plugName, basePath, rootContext string) volume.VolumePlugin {
+func makePluginUnderTest(t *testing.T, plugName, basePath string) volume.VolumePlugin {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(basePath, nil, nil, rootContext))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(basePath, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName(plugName)
 	if err != nil {
@@ -50,15 +52,15 @@ func TestCanSupport(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir, "" /* rootContext */)
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir)
 
 	if plug.GetPluginName() != "kubernetes.io/empty-dir" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
-	if !plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}}) {
+	if !plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}}}) {
 		t.Errorf("Expected true")
 	}
-	if plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{}}}) {
+	if plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{}}}) {
 		t.Errorf("Expected false")
 	}
 }
@@ -74,45 +76,23 @@ func (fake *fakeMountDetector) GetMountMedium(path string) (storageMedium, bool,
 
 func TestPluginEmptyRootContext(t *testing.T) {
 	doTestPlugin(t, pluginTestConfig{
-		medium:                 api.StorageMediumDefault,
-		rootContext:            "",
+		medium:                 v1.StorageMediumDefault,
 		expectedSetupMounts:    0,
 		expectedTeardownMounts: 0})
 }
 
-func TestPluginRootContextSet(t *testing.T) {
-	if !selinuxEnabled() {
-		return
-	}
-
+func TestPluginHugetlbfs(t *testing.T) {
 	doTestPlugin(t, pluginTestConfig{
-		medium:                 api.StorageMediumDefault,
-		rootContext:            "user:role:type:range",
-		expectedSELinux:        "user:role:type:range",
-		expectedSetupMounts:    0,
-		expectedTeardownMounts: 0})
-}
-
-func TestPluginTmpfs(t *testing.T) {
-	if !selinuxEnabled() {
-		return
-	}
-
-	doTestPlugin(t, pluginTestConfig{
-		medium:                        api.StorageMediumMemory,
-		rootContext:                   "user:role:type:range",
-		expectedSELinux:               "user:role:type:range",
+		medium:                        v1.StorageMediumHugePages,
 		expectedSetupMounts:           1,
+		expectedTeardownMounts:        0,
 		shouldBeMountedBeforeTeardown: true,
-		expectedTeardownMounts:        1})
+	})
 }
 
 type pluginTestConfig struct {
-	medium                        api.StorageMedium
-	rootContext                   string
-	SELinuxOptions                *api.SELinuxOptions
+	medium                        v1.StorageMedium
 	idempotent                    bool
-	expectedSELinux               string
 	expectedSetupMounts           int
 	shouldBeMountedBeforeTeardown bool
 	expectedTeardownMounts        int
@@ -130,35 +110,32 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		volumePath  = path.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/test-volume")
 		metadataDir = path.Join(basePath, "pods/poduid/plugins/kubernetes.io~empty-dir/test-volume")
 
-		plug       = makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath, config.rootContext)
+		plug       = makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
 		volumeName = "test-volume"
-		spec       = &api.Volume{
+		spec       = &v1.Volume{
 			Name:         volumeName,
-			VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: config.medium}},
+			VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{Medium: config.medium}},
 		}
 
 		physicalMounter = mount.FakeMounter{}
 		mountDetector   = fakeMountDetector{}
-		pod             = &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	)
-
-	// Set up the SELinux options on the pod
-	if config.SELinuxOptions != nil {
-		pod.Spec = api.PodSpec{
-			Containers: []api.Container{
-				{
-					SecurityContext: &api.SecurityContext{
-						SELinuxOptions: config.SELinuxOptions,
-					},
-					VolumeMounts: []api.VolumeMount{
-						{
-							Name: volumeName,
+		pod             = &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID: types.UID("poduid"),
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+							},
 						},
 					},
 				},
 			},
 		}
-	}
+	)
 
 	if config.idempotent {
 		physicalMounter.MountPoints = []mount.MountPoint{
@@ -213,14 +190,14 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 	if e, a := config.expectedSetupMounts, len(physicalMounter.Log); e != a {
 		t.Errorf("Expected %v physicalMounter calls during setup, got %v", e, a)
 	} else if config.expectedSetupMounts == 1 &&
-		(physicalMounter.Log[0].Action != mount.FakeActionMount || physicalMounter.Log[0].FSType != "tmpfs") {
+		(physicalMounter.Log[0].Action != mount.FakeActionMount || (physicalMounter.Log[0].FSType != "tmpfs" && physicalMounter.Log[0].FSType != "hugetlbfs")) {
 		t.Errorf("Unexpected physicalMounter action during setup: %#v", physicalMounter.Log[0])
 	}
 	physicalMounter.ResetLog()
 
-	// Make a unmounter for the volume
+	// Make an unmounter for the volume
 	teardownMedium := mediumUnknown
-	if config.medium == api.StorageMediumMemory {
+	if config.medium == v1.StorageMediumMemory {
 		teardownMedium = mediumMemory
 	}
 	unmounterMountDetector := &fakeMountDetector{medium: teardownMedium, isMount: config.shouldBeMountedBeforeTeardown}
@@ -239,7 +216,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 	if _, err := os.Stat(volPath); err == nil {
 		t.Errorf("TearDown() failed, volume path still exists: %s", volPath)
 	} else if !os.IsNotExist(err) {
-		t.Errorf("SetUp() failed: %v", err)
+		t.Errorf("TearDown() failed: %v", err)
 	}
 
 	// Check the number of physicalMounter calls during tardown
@@ -258,18 +235,18 @@ func TestPluginBackCompat(t *testing.T) {
 	}
 	defer os.RemoveAll(basePath)
 
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath, "" /* rootContext */)
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
 
-	spec := &api.Volume{
+	spec := &v1.Volume{
 		Name: "vol1",
 	}
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
 	if mounter == nil {
-		t.Errorf("Got a nil Mounter")
+		t.Fatalf("Got a nil Mounter")
 	}
 
 	volPath := mounter.GetPath()
@@ -287,15 +264,18 @@ func TestMetrics(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir, "" /* rootContext */)
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir)
 
-	spec := &api.Volume{
+	spec := &v1.Volume{
 		Name: "vol1",
 	}
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
+	}
+	if mounter == nil {
+		t.Fatalf("Got a nil Mounter")
 	}
 
 	// Need to create the subdirectory
@@ -319,5 +299,143 @@ func TestMetrics(t *testing.T) {
 	}
 	if metrics.Available.Value() <= 0 {
 		t.Errorf("Expected Available to be greater than 0")
+	}
+}
+
+func TestGetHugePagesMountOptions(t *testing.T) {
+	testCases := map[string]struct {
+		pod            *v1.Pod
+		shouldFail     bool
+		expectedResult string
+	}{
+		"testWithProperValues": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			shouldFail:     false,
+			expectedResult: "pagesize=2Mi",
+		},
+		"testWithProperValuesAndDifferentPageSize": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-1Gi"): resource.MustParse("4Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			shouldFail:     false,
+			expectedResult: "pagesize=1Gi",
+		},
+		"InitContainerAndContainerHasProperValues": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-1Gi"): resource.MustParse("4Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			shouldFail:     false,
+			expectedResult: "pagesize=1Gi",
+		},
+		"InitContainerAndContainerHasDifferentPageSizes": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-2Mi"): resource.MustParse("2Gi"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-1Gi"): resource.MustParse("4Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			shouldFail:     true,
+			expectedResult: "",
+		},
+		"ContainersWithMultiplePageSizes": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			shouldFail:     true,
+			expectedResult: "",
+		},
+		"PodWithNoHugePagesRequest": {
+			pod:            &v1.Pod{},
+			shouldFail:     true,
+			expectedResult: "",
+		},
+	}
+
+	for testCaseName, testCase := range testCases {
+		value, err := getPageSizeMountOptionFromPod(testCase.pod)
+		if testCase.shouldFail && err == nil {
+			t.Errorf("Expected an error in %v", testCaseName)
+		} else if !testCase.shouldFail && err != nil {
+			t.Errorf("Unexpected error in %v, got %v", testCaseName, err)
+		} else if testCase.expectedResult != value {
+			t.Errorf("Unexpected mountOptions for Pod. Expected %v, got %v", testCase.expectedResult, value)
+		}
 	}
 }

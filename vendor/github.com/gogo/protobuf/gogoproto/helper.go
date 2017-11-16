@@ -1,4 +1,6 @@
-// Copyright (c) 2013, Vastech SA (PTY) LTD. All rights reserved.
+// Protocol Buffers for Go with Gadgets
+//
+// Copyright (c) 2013, The GoGo Authors. All rights reserved.
 // http://github.com/gogo/protobuf
 //
 // Redistribution and use in source and binary forms, with or without
@@ -37,6 +39,25 @@ func IsNullable(field *google_protobuf.FieldDescriptorProto) bool {
 	return proto.GetBoolExtension(field.Options, E_Nullable, true)
 }
 
+func IsStdTime(field *google_protobuf.FieldDescriptorProto) bool {
+	return proto.GetBoolExtension(field.Options, E_Stdtime, false)
+}
+
+func IsStdDuration(field *google_protobuf.FieldDescriptorProto) bool {
+	return proto.GetBoolExtension(field.Options, E_Stdduration, false)
+}
+
+func NeedsNilCheck(proto3 bool, field *google_protobuf.FieldDescriptorProto) bool {
+	nullable := IsNullable(field)
+	if field.IsMessage() || IsCustomType(field) {
+		return nullable
+	}
+	if proto3 {
+		return false
+	}
+	return nullable || *field.Type == google_protobuf.FieldDescriptorProto_TYPE_BYTES
+}
+
 func IsCustomType(field *google_protobuf.FieldDescriptorProto) bool {
 	typ := GetCustomType(field)
 	if len(typ) > 0 {
@@ -69,7 +90,18 @@ func IsCastValue(field *google_protobuf.FieldDescriptorProto) bool {
 	return false
 }
 
+func HasEnumDecl(file *google_protobuf.FileDescriptorProto, enum *google_protobuf.EnumDescriptorProto) bool {
+	return proto.GetBoolExtension(enum.Options, E_Enumdecl, proto.GetBoolExtension(file.Options, E_EnumdeclAll, true))
+}
+
+func HasTypeDecl(file *google_protobuf.FileDescriptorProto, message *google_protobuf.DescriptorProto) bool {
+	return proto.GetBoolExtension(message.Options, E_Typedecl, proto.GetBoolExtension(file.Options, E_TypedeclAll, true))
+}
+
 func GetCustomType(field *google_protobuf.FieldDescriptorProto) string {
+	if field == nil {
+		return ""
+	}
 	if field.Options != nil {
 		v, err := proto.GetExtension(field.Options, E_Customtype)
 		if err == nil && v.(*string) != nil {
@@ -80,6 +112,9 @@ func GetCustomType(field *google_protobuf.FieldDescriptorProto) string {
 }
 
 func GetCastType(field *google_protobuf.FieldDescriptorProto) string {
+	if field == nil {
+		return ""
+	}
 	if field.Options != nil {
 		v, err := proto.GetExtension(field.Options, E_Casttype)
 		if err == nil && v.(*string) != nil {
@@ -90,6 +125,9 @@ func GetCastType(field *google_protobuf.FieldDescriptorProto) string {
 }
 
 func GetCastKey(field *google_protobuf.FieldDescriptorProto) string {
+	if field == nil {
+		return ""
+	}
 	if field.Options != nil {
 		v, err := proto.GetExtension(field.Options, E_Castkey)
 		if err == nil && v.(*string) != nil {
@@ -100,6 +138,9 @@ func GetCastKey(field *google_protobuf.FieldDescriptorProto) string {
 }
 
 func GetCastValue(field *google_protobuf.FieldDescriptorProto) string {
+	if field == nil {
+		return ""
+	}
 	if field.Options != nil {
 		v, err := proto.GetExtension(field.Options, E_Castvalue)
 		if err == nil && v.(*string) != nil {
@@ -117,7 +158,26 @@ func IsCustomName(field *google_protobuf.FieldDescriptorProto) bool {
 	return false
 }
 
+func IsEnumCustomName(field *google_protobuf.EnumDescriptorProto) bool {
+	name := GetEnumCustomName(field)
+	if len(name) > 0 {
+		return true
+	}
+	return false
+}
+
+func IsEnumValueCustomName(field *google_protobuf.EnumValueDescriptorProto) bool {
+	name := GetEnumValueCustomName(field)
+	if len(name) > 0 {
+		return true
+	}
+	return false
+}
+
 func GetCustomName(field *google_protobuf.FieldDescriptorProto) string {
+	if field == nil {
+		return ""
+	}
 	if field.Options != nil {
 		v, err := proto.GetExtension(field.Options, E_Customname)
 		if err == nil && v.(*string) != nil {
@@ -127,7 +187,36 @@ func GetCustomName(field *google_protobuf.FieldDescriptorProto) string {
 	return ""
 }
 
+func GetEnumCustomName(field *google_protobuf.EnumDescriptorProto) string {
+	if field == nil {
+		return ""
+	}
+	if field.Options != nil {
+		v, err := proto.GetExtension(field.Options, E_EnumCustomname)
+		if err == nil && v.(*string) != nil {
+			return *(v.(*string))
+		}
+	}
+	return ""
+}
+
+func GetEnumValueCustomName(field *google_protobuf.EnumValueDescriptorProto) string {
+	if field == nil {
+		return ""
+	}
+	if field.Options != nil {
+		v, err := proto.GetExtension(field.Options, E_EnumvalueCustomname)
+		if err == nil && v.(*string) != nil {
+			return *(v.(*string))
+		}
+	}
+	return ""
+}
+
 func GetJsonTag(field *google_protobuf.FieldDescriptorProto) *string {
+	if field == nil {
+		return nil
+	}
 	if field.Options != nil {
 		v, err := proto.GetExtension(field.Options, E_Jsontag)
 		if err == nil && v.(*string) != nil {
@@ -138,6 +227,9 @@ func GetJsonTag(field *google_protobuf.FieldDescriptorProto) *string {
 }
 
 func GetMoreTags(field *google_protobuf.FieldDescriptorProto) *string {
+	if field == nil {
+		return nil
+	}
 	if field.Options != nil {
 		v, err := proto.GetExtension(field.Options, E_Moretags)
 		if err == nil && v.(*string) != nil {
@@ -209,6 +301,10 @@ func IsUnmarshaler(file *google_protobuf.FileDescriptorProto, message *google_pr
 	return proto.GetBoolExtension(message.Options, E_Unmarshaler, proto.GetBoolExtension(file.Options, E_UnmarshalerAll, false))
 }
 
+func IsStableMarshaler(file *google_protobuf.FileDescriptorProto, message *google_protobuf.DescriptorProto) bool {
+	return proto.GetBoolExtension(message.Options, E_StableMarshaler, proto.GetBoolExtension(file.Options, E_StableMarshalerAll, false))
+}
+
 func IsSizer(file *google_protobuf.FileDescriptorProto, message *google_protobuf.DescriptorProto) bool {
 	return proto.GetBoolExtension(message.Options, E_Sizer, proto.GetBoolExtension(file.Options, E_SizerAll, false))
 }
@@ -250,4 +346,12 @@ func IsProto3(file *google_protobuf.FileDescriptorProto) bool {
 
 func ImportsGoGoProto(file *google_protobuf.FileDescriptorProto) bool {
 	return proto.GetBoolExtension(file.Options, E_GogoprotoImport, true)
+}
+
+func HasCompare(file *google_protobuf.FileDescriptorProto, message *google_protobuf.DescriptorProto) bool {
+	return proto.GetBoolExtension(message.Options, E_Compare, proto.GetBoolExtension(file.Options, E_CompareAll, false))
+}
+
+func RegistersGolangProto(file *google_protobuf.FileDescriptorProto) bool {
+	return proto.GetBoolExtension(file.Options, E_GoprotoRegistration, false)
 }

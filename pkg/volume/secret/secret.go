@@ -20,8 +20,10 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	ioutil "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
@@ -40,13 +42,16 @@ const (
 
 // secretPlugin implements the VolumePlugin interface.
 type secretPlugin struct {
-	host volume.VolumeHost
+	host      volume.VolumeHost
+	getSecret func(namespace, name string) (*v1.Secret, error)
 }
 
 var _ volume.VolumePlugin = &secretPlugin{}
 
-var wrappedVolumeSpec = volume.Spec{
-	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},
+func wrappedVolumeSpec() volume.Spec {
+	return volume.Spec{
+		Volume: &v1.Volume{VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory}}},
+	}
 }
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
@@ -55,6 +60,7 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 
 func (plugin *secretPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	plugin.getSecret = host.GetSecretFunc()
 	return nil
 }
 
@@ -79,19 +85,28 @@ func (plugin *secretPlugin) RequiresRemount() bool {
 	return true
 }
 
-func (plugin *secretPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *secretPlugin) SupportsMountOption() bool {
+	return false
+}
+
+func (plugin *secretPlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
+func (plugin *secretPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return &secretVolumeMounter{
 		secretVolume: &secretVolume{
 			spec.Name(),
 			pod.UID,
 			plugin,
-			plugin.host.GetMounter(),
+			plugin.host.GetMounter(plugin.GetPluginName()),
 			plugin.host.GetWriter(),
 			volume.NewCachedMetrics(volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host))),
 		},
-		source: *spec.Volume.Secret,
-		pod:    *pod,
-		opts:   &opts,
+		source:    *spec.Volume.Secret,
+		pod:       *pod,
+		opts:      &opts,
+		getSecret: plugin.getSecret,
 	}, nil
 }
 
@@ -101,11 +116,23 @@ func (plugin *secretPlugin) NewUnmounter(volName string, podUID types.UID) (volu
 			volName,
 			podUID,
 			plugin,
-			plugin.host.GetMounter(),
+			plugin.host.GetMounter(plugin.GetPluginName()),
 			plugin.host.GetWriter(),
 			volume.NewCachedMetrics(volume.NewMetricsDu(getPath(podUID, volName, plugin.host))),
 		},
 	}, nil
+}
+
+func (plugin *secretPlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
+	secretVolume := &v1.Volume{
+		Name: volName,
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName: volName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(secretVolume), nil
 }
 
 type secretVolume struct {
@@ -128,9 +155,10 @@ func (sv *secretVolume) GetPath() string {
 type secretVolumeMounter struct {
 	*secretVolume
 
-	source api.SecretVolumeSource
-	pod    api.Pod
-	opts   *volume.VolumeOptions
+	source    v1.SecretVolumeSource
+	pod       v1.Pod
+	opts      *volume.VolumeOptions
+	getSecret func(namespace, name string) (*v1.Secret, error)
 }
 
 var _ volume.Mounter = &secretVolumeMounter{}
@@ -142,6 +170,14 @@ func (sv *secretVolume) GetAttributes() volume.Attributes {
 		SupportsSELinux: true,
 	}
 }
+
+// Checks prior to mount operations to verify that the required components (binaries, etc.)
+// to mount the volume are available on the underlying node.
+// If not, it returns an error
+func (b *secretVolumeMounter) CanMount() error {
+	return nil
+}
+
 func (b *secretVolumeMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
@@ -150,7 +186,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	glog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
-	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec, &b.pod, *b.opts)
+	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), &b.pod, *b.opts)
 	if err != nil {
 		return err
 	}
@@ -158,15 +194,19 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	kubeClient := b.plugin.host.GetKubeClient()
-	if kubeClient == nil {
-		return fmt.Errorf("Cannot setup secret volume %v because kube client is not configured", b.volName)
-	}
-
-	secret, err := kubeClient.Core().Secrets(b.pod.Namespace).Get(b.source.SecretName)
+	optional := b.source.Optional != nil && *b.source.Optional
+	secret, err := b.getSecret(b.pod.Namespace, b.source.SecretName)
 	if err != nil {
-		glog.Errorf("Couldn't get secret %v/%v", b.pod.Namespace, b.source.SecretName)
-		return err
+		if !(errors.IsNotFound(err) && optional) {
+			glog.Errorf("Couldn't get secret %v/%v: %v", b.pod.Namespace, b.source.SecretName, err)
+			return err
+		}
+		secret = &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: b.pod.Namespace,
+				Name:      b.source.SecretName,
+			},
+		}
 	}
 
 	totalBytes := totalSecretBytes(secret)
@@ -176,7 +216,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		len(secret.Data),
 		totalBytes)
 
-	payload, err := makePayload(b.source.Items, secret)
+	payload, err := MakePayload(b.source.Items, secret, b.source.DefaultMode, optional)
 	if err != nil {
 		return err
 	}
@@ -203,29 +243,46 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	return nil
 }
 
-func makePayload(mappings []api.KeyToPath, secret *api.Secret) (map[string][]byte, error) {
-	payload := make(map[string][]byte, len(secret.Data))
+// Note: this function is exported so that it can be called from the projection volume driver
+func MakePayload(mappings []v1.KeyToPath, secret *v1.Secret, defaultMode *int32, optional bool) (map[string]volumeutil.FileProjection, error) {
+	if defaultMode == nil {
+		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
+	}
+
+	payload := make(map[string]volumeutil.FileProjection, len(secret.Data))
+	var fileProjection volumeutil.FileProjection
 
 	if len(mappings) == 0 {
 		for name, data := range secret.Data {
-			payload[name] = []byte(data)
+			fileProjection.Data = []byte(data)
+			fileProjection.Mode = *defaultMode
+			payload[name] = fileProjection
 		}
 	} else {
 		for _, ktp := range mappings {
 			content, ok := secret.Data[ktp.Key]
 			if !ok {
-				glog.Errorf("references non-existent secret key")
-				return nil, fmt.Errorf("references non-existent secret key")
+				if optional {
+					continue
+				}
+				err_msg := "references non-existent secret key"
+				glog.Errorf(err_msg)
+				return nil, fmt.Errorf(err_msg)
 			}
 
-			payload[ktp.Path] = []byte(content)
+			fileProjection.Data = []byte(content)
+			if ktp.Mode != nil {
+				fileProjection.Mode = *ktp.Mode
+			} else {
+				fileProjection.Mode = *defaultMode
+			}
+			payload[ktp.Path] = fileProjection
 		}
 	}
-
 	return payload, nil
 }
 
-func totalSecretBytes(secret *api.Secret) int {
+func totalSecretBytes(secret *v1.Secret) int {
 	totalSize := 0
 	for _, bytes := range secret.Data {
 		totalSize += len(bytes)
@@ -246,19 +303,12 @@ func (c *secretVolumeUnmounter) TearDown() error {
 }
 
 func (c *secretVolumeUnmounter) TearDownAt(dir string) error {
-	glog.V(3).Infof("Tearing down volume %v for pod %v at %v", c.volName, c.podUID, dir)
-
-	// Wrap EmptyDir, let it do the teardown.
-	wrapped, err := c.plugin.host.NewWrapperUnmounter(c.volName, wrappedVolumeSpec, c.podUID)
-	if err != nil {
-		return err
-	}
-	return wrapped.TearDownAt(dir)
+	return volume.UnmountViaEmptyDir(dir, c.plugin.host, c.volName, wrappedVolumeSpec(), c.podUID)
 }
 
-func getVolumeSource(spec *volume.Spec) (*api.SecretVolumeSource, bool) {
+func getVolumeSource(spec *volume.Spec) (*v1.SecretVolumeSource, bool) {
 	var readOnly bool
-	var volumeSource *api.SecretVolumeSource
+	var volumeSource *v1.SecretVolumeSource
 
 	if spec.Volume != nil && spec.Volume.Secret != nil {
 		volumeSource = spec.Volume.Secret

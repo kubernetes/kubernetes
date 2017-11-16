@@ -1,4 +1,3 @@
-# This file should be kept in sync with cluster/gce/coreos/kube-manifests/addons/dashboard/dashboard-service.yaml
 apiVersion: v1
 kind: Service
 metadata:
@@ -7,6 +6,7 @@ metadata:
   labels:
     k8s-app: kubernetes-dashboard
     kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
 spec:
   selector:
     k8s-app: kubernetes-dashboard

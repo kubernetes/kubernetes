@@ -1,0 +1,1 @@
+This file has moved to [https://github.com/kubernetes/examples/blob/master/staging/storage/cassandra/java/README.md](https://github.com/kubernetes/examples/blob/master/staging/storage/cassandra/java/README.md)

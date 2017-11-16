@@ -19,36 +19,11 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/build/common.sh"
 
-kube::golang::setup_env
+# NOTE: All output from this script needs to be copied back to the calling
+# source tree.  This is managed in kube::build::copy_output in build/common.sh.
+# If the output set is changed update that function.
 
-function prereqs() {
-  kube::log::status "Verifying Prerequisites...."
-  kube::build::ensure_docker_in_path || return 1
-  if kube::build::is_osx; then
-      kube::build::docker_available_on_osx || return 1
-  fi
-  kube::build::ensure_docker_daemon_connectivity || return 1
-
-  KUBE_ROOT_HASH=$(kube::build::short_hash "${HOSTNAME:-}:${REPO_DIR:-${KUBE_ROOT}}")
-  KUBE_BUILD_IMAGE_TAG="build-${KUBE_ROOT_HASH}"
-  KUBE_BUILD_IMAGE="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
-  KUBE_BUILD_CONTAINER_NAME="kube-build-${KUBE_ROOT_HASH}"
-  KUBE_BUILD_DATA_CONTAINER_NAME="kube-build-data-${KUBE_ROOT_HASH}"
-  DOCKER_MOUNT_ARGS=(
-    --volume "${REPO_DIR:-${KUBE_ROOT}}:/go/src/${KUBE_GO_PACKAGE}"
-    --volume /etc/localtime:/etc/localtime:ro
-    --volumes-from "${KUBE_BUILD_DATA_CONTAINER_NAME}"
-  )
-  LOCAL_OUTPUT_BUILD_CONTEXT="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_BUILD_IMAGE}"
-}
-
-prereqs
-mkdir -p "${LOCAL_OUTPUT_BUILD_CONTEXT}"
-cp "${KUBE_ROOT}/cmd/libs/go2idl/go-to-protobuf/build-image/Dockerfile" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
-kube::build::update_dockerfile
-kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false'
-kube::build::run_build_command hack/update-generated-protobuf-dockerized.sh "$@"
+"${KUBE_ROOT}/build/run.sh" hack/update-generated-protobuf-dockerized.sh "$@"
 
 # ex: ts=2 sw=2 et filetype=sh

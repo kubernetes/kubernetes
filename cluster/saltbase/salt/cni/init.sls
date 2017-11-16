@@ -1,4 +1,4 @@
-/opt/cni:
+/home/kubernetes:
   file.directory:
     - user: root
     - group: root
@@ -17,21 +17,21 @@ cni-tar:
   archive:
     - extracted
     - user: root
-    - name: /opt/cni
+    - name: /home/kubernetes/bin
     - makedirs: True
-    - source: https://storage.googleapis.com/kubernetes-release/network-plugins/cni-c864f0e1ea73719b8f4582402b0847064f9883b0.tar.gz
+    - source: https://storage.googleapis.com/kubernetes-release/network-plugins/cni-plugins-amd64-v0.6.0.tgz
     - tar_options: v
-    - source_hash: md5=5f71ea8046930357e0ca83088064db93
+    - source_hash: md5=9534876FAE7DBE813CDAB404DC1F9219
     - archive_format: tar
-    - if_missing: /opt/cni/bin
+    - if_missing: /home/kubernetes/bin
 
 {% if grains['cloud'] is defined and grains.cloud in [ 'vagrant' ]  %}
 # Install local CNI network plugins in a Vagrant environment
 cmd-local-cni-plugins:
    cmd.run:
       - name: |
-         cp -v /vagrant/cluster/network-plugins/cni/bin/* /opt/cni/bin/.
-         chmod +x /opt/cni/bin/*
+         cp -v /vagrant/cluster/network-plugins/cni/bin/* /home/kubernetes/bin/.
+         chmod +x /home/kubernetes/bin/*
 cmd-local-cni-config:
    cmd.run:
       - name: |

@@ -19,24 +19,32 @@ import (
 	"fmt"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 
-	dockertypes "github.com/docker/engine-api/types"
+	"github.com/blang/semver"
+	dockertypes "github.com/docker/docker/api/types"
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/devicemapper"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
+	"github.com/google/cadvisor/machine"
 	"github.com/google/cadvisor/manager/watcher"
 	dockerutil "github.com/google/cadvisor/utils/docker"
+	"github.com/google/cadvisor/zfs"
 
-	docker "github.com/docker/engine-api/client"
+	docker "github.com/docker/docker/client"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 )
 
 var ArgDockerEndpoint = flag.String("docker", "unix:///var/run/docker.sock", "docker endpoint")
+var ArgDockerTLS = flag.Bool("docker-tls", false, "use TLS to connect to docker")
+var ArgDockerCert = flag.String("docker-tls-cert", "cert.pem", "path to client certificate")
+var ArgDockerKey = flag.String("docker-tls-key", "key.pem", "path to private key")
+var ArgDockerCA = flag.String("docker-tls-ca", "ca.pem", "path to trusted CA")
 
 // The namespace under which Docker aliases are unique.
 const DockerNamespace = "docker"
@@ -54,6 +62,12 @@ var (
 	dockerRootDirFlag = flag.String("docker_root", "/var/lib/docker", "DEPRECATED: docker root is read from docker info (this is a fallback, default: /var/lib/docker)")
 
 	dockerRootDirOnce sync.Once
+
+	// flag that controls globally disabling thin_ls pending future enhancements.
+	// in production, it has been found that thin_ls makes excessive use of iops.
+	// in an iops restricted environment, usage of thin_ls must be controlled via blkio.
+	// pending that enhancement, disable its usage.
+	disableThinLs = true
 )
 
 func RootDir() string {
@@ -74,6 +88,7 @@ const (
 	devicemapperStorageDriver storageDriver = "devicemapper"
 	aufsStorageDriver         storageDriver = "aufs"
 	overlayStorageDriver      storageDriver = "overlay"
+	overlay2StorageDriver     storageDriver = "overlay2"
 	zfsStorageDriver          storageDriver = "zfs"
 )
 
@@ -93,9 +108,14 @@ type dockerFactory struct {
 
 	dockerVersion []int
 
+	dockerAPIVersion []int
+
 	ignoreMetrics container.MetricSet
 
+	thinPoolName    string
 	thinPoolWatcher *devicemapper.ThinPoolWatcher
+
+	zfsWatcher *zfs.ZfsWatcher
 }
 
 func (self *dockerFactory) String() string {
@@ -122,7 +142,9 @@ func (self *dockerFactory) NewContainerHandler(name string, inHostNamespace bool
 		metadataEnvs,
 		self.dockerVersion,
 		self.ignoreMetrics,
+		self.thinPoolName,
 		self.thinPoolWatcher,
+		self.zfsWatcher,
 	)
 	return
 }
@@ -138,17 +160,21 @@ func ContainerNameToDockerId(name string) string {
 	return id
 }
 
+// isContainerName returns true if the cgroup with associated name
+// corresponds to a docker container.
 func isContainerName(name string) bool {
+	// always ignore .mount cgroup even if associated with docker and delegate to systemd
+	if strings.HasSuffix(name, ".mount") {
+		return false
+	}
 	return dockerCgroupRegexp.MatchString(path.Base(name))
 }
 
 // Docker handles all containers under /docker
 func (self *dockerFactory) CanHandleAndAccept(name string) (bool, bool, error) {
-	// docker factory accepts all containers it can handle.
-	canAccept := true
-
+	// if the container is not associated with docker, we can't handle it or accept it.
 	if !isContainerName(name) {
-		return false, canAccept, fmt.Errorf("invalid container name")
+		return false, false, nil
 	}
 
 	// Check if the container is known to docker and it is active.
@@ -157,10 +183,10 @@ func (self *dockerFactory) CanHandleAndAccept(name string) (bool, bool, error) {
 	// We assume that if Inspect fails then the container is not known to docker.
 	ctnr, err := self.client.ContainerInspect(context.Background(), id)
 	if err != nil || !ctnr.State.Running {
-		return false, canAccept, fmt.Errorf("error inspecting container: %v", err)
+		return false, true, fmt.Errorf("error inspecting container: %v", err)
 	}
 
-	return true, canAccept, nil
+	return true, true, nil
 }
 
 func (self *dockerFactory) DebugInfo() map[string][]string {
@@ -168,14 +194,24 @@ func (self *dockerFactory) DebugInfo() map[string][]string {
 }
 
 var (
-	version_regexp_string = `(\d+)\.(\d+)\.(\d+)`
-	version_re            = regexp.MustCompile(version_regexp_string)
+	version_regexp_string    = `(\d+)\.(\d+)\.(\d+)`
+	version_re               = regexp.MustCompile(version_regexp_string)
+	apiversion_regexp_string = `(\d+)\.(\d+)`
+	apiversion_re            = regexp.MustCompile(apiversion_regexp_string)
 )
 
 func startThinPoolWatcher(dockerInfo *dockertypes.Info) (*devicemapper.ThinPoolWatcher, error) {
 	_, err := devicemapper.ThinLsBinaryPresent()
 	if err != nil {
 		return nil, err
+	}
+
+	if err := ensureThinLsKernelVersion(machine.KernelVersion()); err != nil {
+		return nil, err
+	}
+
+	if disableThinLs {
+		return nil, fmt.Errorf("usage of thin_ls is disabled to preserve iops")
 	}
 
 	dockerThinPoolName, err := dockerutil.DockerThinPoolName(*dockerInfo)
@@ -197,6 +233,81 @@ func startThinPoolWatcher(dockerInfo *dockertypes.Info) (*devicemapper.ThinPoolW
 	return thinPoolWatcher, nil
 }
 
+func startZfsWatcher(dockerInfo *dockertypes.Info) (*zfs.ZfsWatcher, error) {
+	filesystem, err := dockerutil.DockerZfsFilesystem(*dockerInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	zfsWatcher, err := zfs.NewZfsWatcher(filesystem)
+	if err != nil {
+		return nil, err
+	}
+
+	go zfsWatcher.Start()
+	return zfsWatcher, nil
+}
+
+func ensureThinLsKernelVersion(kernelVersion string) error {
+	// kernel 4.4.0 has the proper bug fixes to allow thin_ls to work without corrupting the thin pool
+	minKernelVersion := semver.MustParse("4.4.0")
+	// RHEL 7 kernel 3.10.0 release >= 366 has the proper bug fixes backported from 4.4.0 to allow
+	// thin_ls to work without corrupting the thin pool
+	minRhel7KernelVersion := semver.MustParse("3.10.0")
+
+	matches := version_re.FindStringSubmatch(kernelVersion)
+	if len(matches) < 4 {
+		return fmt.Errorf("error parsing kernel version: %q is not a semver", kernelVersion)
+	}
+
+	sem, err := semver.Make(matches[0])
+	if err != nil {
+		return err
+	}
+
+	if sem.GTE(minKernelVersion) {
+		// kernel 4.4+ - good
+		return nil
+	}
+
+	// Certain RHEL/Centos 7.x kernels have a backport to fix the corruption bug
+	if !strings.Contains(kernelVersion, ".el7") {
+		// not a RHEL 7.x kernel - won't work
+		return fmt.Errorf("kernel version 4.4.0 or later is required to use thin_ls - you have %q", kernelVersion)
+	}
+
+	// RHEL/Centos 7.x from here on
+	if sem.Major != 3 {
+		// only 3.x kernels *may* work correctly
+		return fmt.Errorf("RHEL/Centos 7.x kernel version 3.10.0-366 or later is required to use thin_ls - you have %q", kernelVersion)
+	}
+
+	if sem.GT(minRhel7KernelVersion) {
+		// 3.10.1+ - good
+		return nil
+	}
+
+	if sem.EQ(minRhel7KernelVersion) {
+		// need to check release
+		releaseRE := regexp.MustCompile(`^[^-]+-([0-9]+)\.`)
+		releaseMatches := releaseRE.FindStringSubmatch(kernelVersion)
+		if len(releaseMatches) != 2 {
+			return fmt.Errorf("unable to determine RHEL/Centos 7.x kernel release from %q", kernelVersion)
+		}
+
+		release, err := strconv.Atoi(releaseMatches[1])
+		if err != nil {
+			return fmt.Errorf("error parsing release %q: %v", releaseMatches[1], err)
+		}
+
+		if release >= 366 {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("RHEL/Centos 7.x kernel version 3.10.0-366 or later is required to use thin_ls - you have %q", kernelVersion)
+}
+
 // Register root container before running this function!
 func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics container.MetricSet) error {
 	client, err := Client()
@@ -210,18 +321,34 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics c
 	}
 
 	// Version already validated above, assume no error here.
-	dockerVersion, _ := parseDockerVersion(dockerInfo.ServerVersion)
+	dockerVersion, _ := parseVersion(dockerInfo.ServerVersion, version_re, 3)
+
+	dockerAPIVersion, _ := APIVersion()
 
 	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems()
 	if err != nil {
 		return fmt.Errorf("failed to get cgroup subsystems: %v", err)
 	}
 
-	var thinPoolWatcher *devicemapper.ThinPoolWatcher
+	var (
+		thinPoolWatcher *devicemapper.ThinPoolWatcher
+		thinPoolName    string
+	)
 	if storageDriver(dockerInfo.Driver) == devicemapperStorageDriver {
 		thinPoolWatcher, err = startThinPoolWatcher(dockerInfo)
 		if err != nil {
 			glog.Errorf("devicemapper filesystem stats will not be reported: %v", err)
+		}
+
+		status := StatusFromDockerInfo(*dockerInfo)
+		thinPoolName = status.DriverStatus[dockerutil.DriverStatusPoolName]
+	}
+
+	var zfsWatcher *zfs.ZfsWatcher
+	if storageDriver(dockerInfo.Driver) == zfsStorageDriver {
+		zfsWatcher, err = startZfsWatcher(dockerInfo)
+		if err != nil {
+			glog.Errorf("zfs filesystem stats will not be reported: %v", err)
 		}
 	}
 
@@ -230,12 +357,15 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics c
 		cgroupSubsystems:   cgroupSubsystems,
 		client:             client,
 		dockerVersion:      dockerVersion,
+		dockerAPIVersion:   dockerAPIVersion,
 		fsInfo:             fsInfo,
 		machineInfoFactory: factory,
 		storageDriver:      storageDriver(dockerInfo.Driver),
 		storageDir:         RootDir(),
 		ignoreMetrics:      ignoreMetrics,
+		thinPoolName:       thinPoolName,
 		thinPoolWatcher:    thinPoolWatcher,
+		zfsWatcher:         zfsWatcher,
 	}
 
 	container.RegisterContainerHandlerFactory(f, []watcher.ContainerWatchSource{watcher.Raw})

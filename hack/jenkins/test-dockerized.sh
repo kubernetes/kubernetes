@@ -29,7 +29,7 @@ retry() {
 # Runs the unit and integration tests, producing JUnit-style XML test
 # reports in ${WORKSPACE}/artifacts. This script is intended to be run from
 # kubekins-test container with a kubernetes repo mapped in. See
-# hack/jenkins/gotest-dockerized.sh
+# k8s.io/test-infra/scenarios/kubernetes_verify.py
 
 export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
@@ -50,12 +50,11 @@ export KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4
 export LOG_LEVEL=4
 
 cd /go/src/k8s.io/kubernetes
-rm -rf Godeps/_workspace # Temporary until _workspace is fully obliterated
 
+make generated_files
 go install ./cmd/...
 ./hack/install-etcd.sh
 
-./hack/test-go.sh
-./hack/test-cmd.sh
-./hack/test-integration.sh
+make test-cmd
+make test-integration
 ./hack/test-update-storage-objects.sh

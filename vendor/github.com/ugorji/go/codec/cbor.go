@@ -188,6 +188,13 @@ func (d *cborDecDriver) readNextBd() {
 	d.bdRead = true
 }
 
+func (d *cborDecDriver) uncacheRead() {
+	if d.bdRead {
+		d.r.unreadn1()
+		d.bdRead = false
+	}
+}
+
 func (d *cborDecDriver) ContainerType() (vt valueType) {
 	if d.bd == cborBdNil {
 		return valueTypeNil

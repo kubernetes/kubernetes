@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,6 +34,9 @@ func NewTimeoutTransport(info TLSInfo, dialtimeoutd, rdtimeoutd, wtimeoutd time.
 		// the timed out connection will timeout soon after it is idle.
 		// it should not be put back to http transport as an idle connection for future usage.
 		tr.MaxIdleConnsPerHost = -1
+	} else {
+		// allow more idle connections between peers to avoid unnecessary port allocation.
+		tr.MaxIdleConnsPerHost = 1024
 	}
 
 	tr.Dial = (&rwTimeoutDialer{

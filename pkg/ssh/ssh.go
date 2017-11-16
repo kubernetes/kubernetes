@@ -32,6 +32,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -39,9 +40,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/ssh"
 
-	utilnet "k8s.io/kubernetes/pkg/util/net"
-	"k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 var (
@@ -99,8 +100,9 @@ func NewSSHTunnelFromBytes(user string, privateKey []byte, host string) (*SSHTun
 
 func makeSSHTunnel(user string, signer ssh.Signer, host string) (*SSHTunnel, error) {
 	config := ssh.ClientConfig{
-		User: user,
-		Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		User:            user,
+		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 	return &SSHTunnel{
 		Config:  &config,
@@ -160,7 +162,17 @@ type realSSHDialer struct{}
 var _ sshDialer = &realSSHDialer{}
 
 func (d *realSSHDialer) Dial(network, addr string, config *ssh.ClientConfig) (*ssh.Client, error) {
-	return ssh.Dial(network, addr, config)
+	conn, err := net.DialTimeout(network, addr, config.Timeout)
+	if err != nil {
+		return nil, err
+	}
+	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+	c, chans, reqs, err := ssh.NewClientConn(conn, addr, config)
+	if err != nil {
+		return nil, err
+	}
+	conn.SetReadDeadline(time.Time{})
+	return ssh.NewClient(c, chans, reqs), nil
 }
 
 // timeoutDialer wraps an sshDialer with a timeout around Dial(). The golang
@@ -179,20 +191,8 @@ const sshDialTimeout = 150 * time.Second
 var realTimeoutDialer sshDialer = &timeoutDialer{&realSSHDialer{}, sshDialTimeout}
 
 func (d *timeoutDialer) Dial(network, addr string, config *ssh.ClientConfig) (*ssh.Client, error) {
-	var client *ssh.Client
-	errCh := make(chan error, 1)
-	go func() {
-		defer runtime.HandleCrash()
-		var err error
-		client, err = d.dialer.Dial(network, addr, config)
-		errCh <- err
-	}()
-	select {
-	case err := <-errCh:
-		return client, err
-	case <-time.After(d.timeout):
-		return nil, fmt.Errorf("timed out dialing %s:%s", network, addr)
-	}
+	config.Timeout = d.timeout
+	return d.dialer.Dial(network, addr, config)
 }
 
 // RunSSHCommand returns the stdout, stderr, and exit code from running cmd on
@@ -209,15 +209,16 @@ func runSSHCommand(dialer sshDialer, cmd, user, host string, signer ssh.Signer, 
 	}
 	// Setup the config, dial the server, and open a session.
 	config := &ssh.ClientConfig{
-		User: user,
-		Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		User:            user,
+		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 	client, err := dialer.Dial("tcp", host, config)
 	if err != nil && retry {
 		err = wait.Poll(5*time.Second, 20*time.Second, func() (bool, error) {
 			fmt.Printf("error dialing %s@%s: '%v', retrying\n", user, host, err)
 			if client, err = dialer.Dial("tcp", host, config); err != nil {
-				return false, nil
+				return false, err
 			}
 			return true, nil
 		})
@@ -276,6 +277,9 @@ func ParsePublicKeyFromFile(keyFile string) (*rsa.PublicKey, error) {
 		return nil, fmt.Errorf("error reading SSH key %s: '%v'", keyFile, err)
 	}
 	keyBlock, _ := pem.Decode(buffer)
+	if keyBlock == nil {
+		return nil, fmt.Errorf("error parsing SSH key %s: 'invalid PEM format'", keyFile)
+	}
 	key, err := x509.ParsePKIXPublicKey(keyBlock.Bytes)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing SSH key %s: '%v'", keyFile, err)
@@ -360,6 +364,9 @@ func (l *SSHTunnelList) healthCheck(e sshTunnelEntry) error {
 		Dial: e.Tunnel.Dial,
 		// TODO(cjcullen): Plumb real TLS options through.
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		// We don't reuse the clients, so disable the keep-alive to properly
+		// close the connection.
+		DisableKeepAlives: true,
 	})
 	client := &http.Client{Transport: transport}
 	resp, err := client.Get(l.healthCheckURL.String())
@@ -373,15 +380,18 @@ func (l *SSHTunnelList) healthCheck(e sshTunnelEntry) error {
 func (l *SSHTunnelList) removeAndReAdd(e sshTunnelEntry) {
 	// Find the entry to replace.
 	l.tunnelsLock.Lock()
-	defer l.tunnelsLock.Unlock()
 	for i, entry := range l.entries {
 		if entry.Tunnel == e.Tunnel {
 			l.entries = append(l.entries[:i], l.entries[i+1:]...)
 			l.adding[e.Address] = true
-			go l.createAndAddTunnel(e.Address)
-			return
+			break
 		}
 	}
+	l.tunnelsLock.Unlock()
+	if err := e.Tunnel.Close(); err != nil {
+		glog.Infof("Failed to close removed tunnel: %v", err)
+	}
+	go l.createAndAddTunnel(e.Address)
 }
 
 func (l *SSHTunnelList) Dial(net, addr string) (net.Conn, error) {
@@ -391,19 +401,27 @@ func (l *SSHTunnelList) Dial(net, addr string) (net.Conn, error) {
 	defer func() {
 		glog.Infof("[%x: %v] Dialed in %v.", id, addr, time.Now().Sub(start))
 	}()
-	tunnel, err := l.pickRandomTunnel()
+	tunnel, err := l.pickTunnel(strings.Split(addr, ":")[0])
 	if err != nil {
 		return nil, err
 	}
 	return tunnel.Dial(net, addr)
 }
 
-func (l *SSHTunnelList) pickRandomTunnel() (tunnel, error) {
+func (l *SSHTunnelList) pickTunnel(addr string) (tunnel, error) {
 	l.tunnelsLock.Lock()
 	defer l.tunnelsLock.Unlock()
 	if len(l.entries) == 0 {
 		return nil, fmt.Errorf("No SSH tunnels currently open. Were the targets able to accept an ssh-key for user %q?", l.user)
 	}
+	// Prefer same tunnel as kubelet
+	// TODO: Change l.entries to a map of address->tunnel
+	for _, entry := range l.entries {
+		if entry.Address == addr {
+			return entry.Tunnel, nil
+		}
+	}
+	glog.Warningf("SSH tunnel not found for address %q, picking random node", addr)
 	n := mathrand.Intn(len(l.entries))
 	return l.entries[n].Tunnel, nil
 }

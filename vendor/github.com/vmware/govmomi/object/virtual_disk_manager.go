@@ -17,10 +17,11 @@ limitations under the License.
 package object
 
 import (
+	"context"
+
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
 
 type VirtualDiskManager struct {
@@ -142,4 +143,28 @@ func (m VirtualDiskManager) DeleteVirtualDisk(ctx context.Context, name string, 
 	}
 
 	return NewTask(m.c, res.Returnval), nil
+}
+
+// Queries virtual disk uuid
+func (m VirtualDiskManager) QueryVirtualDiskUuid(ctx context.Context, name string, dc *Datacenter) (string, error) {
+	req := types.QueryVirtualDiskUuid{
+		This: m.Reference(),
+		Name: name,
+	}
+
+	if dc != nil {
+		ref := dc.Reference()
+		req.Datacenter = &ref
+	}
+
+	res, err := methods.QueryVirtualDiskUuid(ctx, m.c, &req)
+	if err != nil {
+		return "", err
+	}
+
+	if res == nil {
+		return "", nil
+	}
+
+	return res.Returnval, nil
 }

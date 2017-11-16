@@ -247,7 +247,7 @@ func yaml_parser_update_buffer(parser *yaml_parser_t, length int) bool {
 				if parser.encoding == yaml_UTF16LE_ENCODING {
 					low, high = 0, 1
 				} else {
-					low, high = 1, 0
+					high, low = 1, 0
 				}
 
 				// The UTF-16 encoding is not as simple as one might
@@ -357,26 +357,23 @@ func yaml_parser_update_buffer(parser *yaml_parser_t, length int) bool {
 			if value <= 0x7F {
 				// 0000 0000-0000 007F . 0xxxxxxx
 				parser.buffer[buffer_len+0] = byte(value)
-				buffer_len += 1
 			} else if value <= 0x7FF {
 				// 0000 0080-0000 07FF . 110xxxxx 10xxxxxx
 				parser.buffer[buffer_len+0] = byte(0xC0 + (value >> 6))
 				parser.buffer[buffer_len+1] = byte(0x80 + (value & 0x3F))
-				buffer_len += 2
 			} else if value <= 0xFFFF {
 				// 0000 0800-0000 FFFF . 1110xxxx 10xxxxxx 10xxxxxx
 				parser.buffer[buffer_len+0] = byte(0xE0 + (value >> 12))
 				parser.buffer[buffer_len+1] = byte(0x80 + ((value >> 6) & 0x3F))
 				parser.buffer[buffer_len+2] = byte(0x80 + (value & 0x3F))
-				buffer_len += 3
 			} else {
 				// 0001 0000-0010 FFFF . 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
 				parser.buffer[buffer_len+0] = byte(0xF0 + (value >> 18))
 				parser.buffer[buffer_len+1] = byte(0x80 + ((value >> 12) & 0x3F))
 				parser.buffer[buffer_len+2] = byte(0x80 + ((value >> 6) & 0x3F))
 				parser.buffer[buffer_len+3] = byte(0x80 + (value & 0x3F))
-				buffer_len += 4
 			}
+			buffer_len += width
 
 			parser.unread++
 		}

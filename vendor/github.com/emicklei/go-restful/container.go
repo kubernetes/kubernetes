@@ -25,24 +25,24 @@ type Container struct {
 	ServeMux               *http.ServeMux
 	isRegisteredOnRoot     bool
 	containerFilters       []FilterFunction
-	doNotRecover           bool // default is false
+	doNotRecover           bool // default is true
 	recoverHandleFunc      RecoverHandleFunction
 	serviceErrorHandleFunc ServiceErrorHandleFunction
-	router                 RouteSelector // default is a RouterJSR311, CurlyRouter is the faster alternative
+	router                 RouteSelector // default is a CurlyRouter (RouterJSR311 is a slower alternative)
 	contentEncodingEnabled bool          // default is false
 }
 
-// NewContainer creates a new Container using a new ServeMux and default router (RouterJSR311)
+// NewContainer creates a new Container using a new ServeMux and default router (CurlyRouter)
 func NewContainer() *Container {
 	return &Container{
 		webServices:            []*WebService{},
 		ServeMux:               http.NewServeMux(),
 		isRegisteredOnRoot:     false,
 		containerFilters:       []FilterFunction{},
-		doNotRecover:           false,
+		doNotRecover:           true,
 		recoverHandleFunc:      logStackOnRecover,
 		serviceErrorHandleFunc: writeServiceError,
-		router:                 RouterJSR311{},
+		router:                 CurlyRouter{},
 		contentEncodingEnabled: false}
 }
 
@@ -69,12 +69,12 @@ func (c *Container) ServiceErrorHandler(handler ServiceErrorHandleFunction) {
 
 // DoNotRecover controls whether panics will be caught to return HTTP 500.
 // If set to true, Route functions are responsible for handling any error situation.
-// Default value is false = recover from panics. This has performance implications.
+// Default value is true.
 func (c *Container) DoNotRecover(doNot bool) {
 	c.doNotRecover = doNot
 }
 
-// Router changes the default Router (currently RouterJSR311)
+// Router changes the default Router (currently CurlyRouter)
 func (c *Container) Router(aRouter RouteSelector) {
 	c.router = aRouter
 }
@@ -189,6 +189,17 @@ func writeServiceError(err ServiceError, req *Request, resp *Response) {
 }
 
 // Dispatch the incoming Http Request to a matching WebService.
+func (c *Container) Dispatch(httpWriter http.ResponseWriter, httpRequest *http.Request) {
+	if httpWriter == nil {
+		panic("httpWriter cannot be nil")
+	}
+	if httpRequest == nil {
+		panic("httpRequest cannot be nil")
+	}
+	c.dispatch(httpWriter, httpRequest)
+}
+
+// Dispatch the incoming Http Request to a matching WebService.
 func (c *Container) dispatch(httpWriter http.ResponseWriter, httpRequest *http.Request) {
 	writer := httpWriter
 
@@ -208,12 +219,6 @@ func (c *Container) dispatch(httpWriter http.ResponseWriter, httpRequest *http.R
 			}
 		}()
 	}
-	// Install closing the request body (if any)
-	defer func() {
-		if nil != httpRequest.Body {
-			httpRequest.Body.Close()
-		}
-	}()
 
 	// Detect if compression is needed
 	// assume without compression, test for override
@@ -283,12 +288,12 @@ func fixedPrefixPath(pathspec string) string {
 }
 
 // ServeHTTP implements net/http.Handler therefore a Container can be a Handler in a http.Server
-func (c Container) ServeHTTP(httpwriter http.ResponseWriter, httpRequest *http.Request) {
+func (c *Container) ServeHTTP(httpwriter http.ResponseWriter, httpRequest *http.Request) {
 	c.ServeMux.ServeHTTP(httpwriter, httpRequest)
 }
 
 // Handle registers the handler for the given pattern. If a handler already exists for pattern, Handle panics.
-func (c Container) Handle(pattern string, handler http.Handler) {
+func (c *Container) Handle(pattern string, handler http.Handler) {
 	c.ServeMux.Handle(pattern, handler)
 }
 
@@ -318,7 +323,7 @@ func (c *Container) Filter(filter FilterFunction) {
 }
 
 // RegisteredWebServices returns the collections of added WebServices
-func (c Container) RegisteredWebServices() []*WebService {
+func (c *Container) RegisteredWebServices() []*WebService {
 	c.webServicesLock.RLock()
 	defer c.webServicesLock.RUnlock()
 	result := make([]*WebService, len(c.webServices))
@@ -329,7 +334,7 @@ func (c Container) RegisteredWebServices() []*WebService {
 }
 
 // computeAllowedMethods returns a list of HTTP methods that are valid for a Request
-func (c Container) computeAllowedMethods(req *Request) []string {
+func (c *Container) computeAllowedMethods(req *Request) []string {
 	// Go through all RegisteredWebServices() and all its Routes to collect the options
 	methods := []string{}
 	requestPath := req.Request.URL.Path

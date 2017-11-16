@@ -36,13 +36,15 @@ tar xzf kubernetes-salt.tar.gz
 ./kubernetes/saltbase/install.sh kubernetes-server.tar.gz
 
 if ! which salt-call >/dev/null 2>&1; then
-  # Install salt binaries
-  curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s
+  echo "+++ Install salt binaries from https://bootstrap.saltstack.com"
+  # Install salt binaries but do not start daemon after installation
+  curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- "-X"
 fi
 
 # Salt server runs at locahost
 echo "127.0.0.1 salt" >> /etc/hosts
 
+echo "+++ run salt-call and finalize installation"
 # Run salt-call
 # salt-call wants to start docker daemon but is unable to.
 # See <https://github.com/projectatomic/docker-storage-setup/issues/77>.

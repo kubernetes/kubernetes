@@ -31,7 +31,6 @@ set -o xtrace
 # space.
 export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
 export PATH=$PATH:/usr/local/go/bin
-export KUBE_SKIP_CONFIRMATIONS=y
 
 # Skip gcloud update checking
 export CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true
@@ -43,7 +42,6 @@ export KUBE_RELEASE_RUN_TESTS
 # state.
 rm -rf ~/.kube*
 make clean
-git clean -fdx
 
 # Uncomment if you want to purge the Docker cache completely each
 # build. It costs about 150s each build to pull the golang image and
@@ -52,11 +50,25 @@ git clean -fdx
 # docker images -q | xargs -r docker rmi
 
 # Build
-go run ./hack/e2e.go -v --build
+# Jobs explicitly set KUBE_FASTBUILD to desired settings.
+make release
 
-[[ ${KUBE_SKIP_PUSH_GCS:-} =~ ^[yY]$ ]] || {
-    # Push to GCS
-    ./build/push-ci-build.sh
-}
+# Push to GCS?
+if [[ ${KUBE_SKIP_PUSH_GCS:-} =~ ^[yY]$ ]]; then
+  echo "Not pushed to GCS..."
+else
+  readonly release_infra_clone="${WORKSPACE}/_tmp/release.git"
+  mkdir -p ${WORKSPACE}/_tmp
+  git clone https://github.com/kubernetes/release ${release_infra_clone}
+
+  push_build=${release_infra_clone}/push-build.sh
+
+  [[ -n "${KUBE_GCS_RELEASE_BUCKET-}" ]] \
+    && bucket_flag="--bucket=${KUBE_GCS_RELEASE_BUCKET-}"
+  [[ -n "${KUBE_GCS_RELEASE_SUFFIX-}" ]] \
+    && gcs_suffix_flag="--gcs-suffix=${KUBE_GCS_RELEASE_SUFFIX-}"
+  ${push_build} ${bucket_flag-} ${gcs_suffix_flag-} \
+    --nomock --verbose --ci
+fi
 
 sha256sum _output/release-tars/kubernetes*.tar.gz

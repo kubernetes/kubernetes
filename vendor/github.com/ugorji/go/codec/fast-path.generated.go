@@ -23,7 +23,7 @@ package codec
 // Currently support
 //    - slice of all builtin types,
 //    - map of all builtin types to string or interface value
-//    - symetrical maps of all builtin types (e.g. str-str, uint8-uint8)
+//    - symmetrical maps of all builtin types (e.g. str-str, uint8-uint8)
 // This should provide adequate "typical" implementations.
 //
 // Note that fast track decode functions must handle values for which an address cannot be obtained.
@@ -37,6 +37,8 @@ import (
 	"reflect"
 	"sort"
 )
+
+const fastpathEnabled = true
 
 const fastpathCheckNilFalse = false // for reflect
 const fastpathCheckNilTrue = true   // for type switch
@@ -81,9 +83,6 @@ var fastpathAV fastpathA
 
 // due to possible initialization loop error, make fastpath in an init()
 func init() {
-	if !fastpathEnabled {
-		return
-	}
 	i := 0
 	fn := func(v interface{}, fe func(*encFnInfo, reflect.Value), fd func(*decFnInfo, reflect.Value)) (f fastpathE) {
 		xrt := reflect.TypeOf(v)
@@ -373,9 +372,6 @@ func init() {
 
 // -- -- fast path type switch
 func fastpathEncodeTypeSwitch(iv interface{}, e *Encoder) bool {
-	if !fastpathEnabled {
-		return false
-	}
 	switch v := iv.(type) {
 
 	case []interface{}:
@@ -1741,9 +1737,6 @@ func fastpathEncodeTypeSwitch(iv interface{}, e *Encoder) bool {
 }
 
 func fastpathEncodeTypeSwitchSlice(iv interface{}, e *Encoder) bool {
-	if !fastpathEnabled {
-		return false
-	}
 	switch v := iv.(type) {
 
 	case []interface{}:
@@ -1829,9 +1822,6 @@ func fastpathEncodeTypeSwitchSlice(iv interface{}, e *Encoder) bool {
 }
 
 func fastpathEncodeTypeSwitchMap(iv interface{}, e *Encoder) bool {
-	if !fastpathEnabled {
-		return false
-	}
 	switch v := iv.(type) {
 
 	case map[interface{}]interface{}:
@@ -15954,9 +15944,6 @@ func (_ fastpathT) EncMapBoolBoolV(v map[bool]bool, checkNil bool, e *Encoder) {
 
 // -- -- fast path type switch
 func fastpathDecodeTypeSwitch(iv interface{}, d *Decoder) bool {
-	if !fastpathEnabled {
-		return false
-	}
 	switch v := iv.(type) {
 
 	case []interface{}:

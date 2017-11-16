@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
@@ -53,6 +53,27 @@ func Test_NewGoRoutineMap_Positive_SingleOp(t *testing.T) {
 	// Assert
 	if err != nil {
 		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err)
+	}
+}
+
+func Test_NewGoRoutineMap_Positive_TwoOps(t *testing.T) {
+	// Arrange
+	grm := NewGoRoutineMap(false /* exponentialBackOffOnError */)
+	operation1Name := "operation1-name"
+	operation2Name := "operation2-name"
+	operation := func() error { return nil }
+
+	// Act
+	err1 := grm.Run(operation1Name, operation)
+	err2 := grm.Run(operation2Name, operation)
+
+	// Assert
+	if err1 != nil {
+		t.Fatalf("NewGoRoutine %q failed. Expected: <no error> Actual: <%v>", operation1Name, err1)
+	}
+
+	if err2 != nil {
+		t.Fatalf("NewGoRoutine %q failed. Expected: <no error> Actual: <%v>", operation2Name, err2)
 	}
 }
 
@@ -427,10 +448,45 @@ func Test_NewGoRoutineMap_Positive_WaitWithExpBackoff(t *testing.T) {
 	}
 }
 
+func Test_NewGoRoutineMap_WaitForCompletionWithExpBackoff(t *testing.T) {
+	grm := NewGoRoutineMap(true /* exponentialBackOffOnError */)
+	operationName := "operation-err"
+
+	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1 := generateErrorFunc(operation1DoneCh)
+	err := grm.Run(operationName, operation1)
+	if err != nil {
+		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	// Act
+	waitDoneCh := make(chan interface{}, 1)
+	go func() {
+		grm.WaitForCompletion()
+		waitDoneCh <- true
+	}()
+
+	// Finish the operation
+	operation1DoneCh <- true
+
+	// Assert that WaitForCompletion returns even if scheduled op had error
+	err = waitChannelWithTimeout(waitDoneCh, testTimeout)
+	if err != nil {
+		t.Fatalf("Error waiting for GoRoutineMap.Wait: %v", err)
+	}
+}
+
 func generateCallbackFunc(done chan<- interface{}) func() error {
 	return func() error {
 		done <- true
 		return nil
+	}
+}
+
+func generateErrorFunc(done <-chan interface{}) func() error {
+	return func() error {
+		<-done
+		return fmt.Errorf("Generic error")
 	}
 }
 
@@ -463,6 +519,7 @@ func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.Conditio
 
 func waitChannelWithTimeout(ch <-chan interface{}, timeout time.Duration) error {
 	timer := time.NewTimer(timeout)
+	defer timer.Stop()
 
 	select {
 	case <-ch:

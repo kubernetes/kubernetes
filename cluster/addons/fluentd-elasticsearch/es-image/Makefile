@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors.
+# Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,20 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY:	elasticsearch_logging_discovery build push
+.PHONY:	binary build push
 
-# The current value of the tag to be used for building and
-# pushing an image to gcr.io
-TAG = 1.9
+PREFIX = gcr.io/google-containers
+IMAGE = elasticsearch
+TAG = v5.6.2
 
-build:	elasticsearch_logging_discovery
-	docker build -t gcr.io/google_containers/elasticsearch:$(TAG) .
+build:
+	docker build --pull -t $(PREFIX)/$(IMAGE):$(TAG) .
 
 push:
-	gcloud docker push gcr.io/google_containers/elasticsearch:$(TAG)
+	gcloud docker -- push $(PREFIX)/$(IMAGE):$(TAG)
 
-elasticsearch_logging_discovery:
-	go build elasticsearch_logging_discovery.go
+binary:
+	CGO_ENABLED=0 GOOS=linux go build -a -ldflags "-w" elasticsearch_logging_discovery.go
 
 clean:
 	rm elasticsearch_logging_discovery

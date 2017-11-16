@@ -1,4 +1,4 @@
-// Copyright 2016 CoreOS, Inc.
+// Copyright 2016 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,6 +36,8 @@ func Compare(cmp Cmp, result string, v interface{}) Cmp {
 	switch result {
 	case "=":
 		r = pb.Compare_EQUAL
+	case "!=":
+		r = pb.Compare_NOT_EQUAL
 	case ">":
 		r = pb.Compare_GREATER
 	case "<":

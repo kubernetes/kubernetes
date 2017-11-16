@@ -19,6 +19,7 @@ package raw
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
 	"strings"
 
@@ -26,8 +27,8 @@ import (
 	"github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/manager/watcher"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/golang/glog"
-	"golang.org/x/exp/inotify"
 )
 
 type rawContainerWatcher struct {
@@ -120,7 +121,7 @@ func (self *rawContainerWatcher) watchDirectory(dir string, containerName string
 		if cleanup {
 			_, err := self.watcher.RemoveWatch(containerName, dir)
 			if err != nil {
-				glog.Warningf("Failed to remove inotify watch for %q: %v", dir, err)
+				glog.Warningf("Failed to remove fsnotify watch for %q: %v", dir, err)
 			}
 		}
 	}()
@@ -133,9 +134,15 @@ func (self *rawContainerWatcher) watchDirectory(dir string, containerName string
 	}
 	for _, entry := range entries {
 		if entry.IsDir() {
-			// TODO(vmarmol): We don't have to fail here, maybe we can recover and try to get as many registrations as we can.
-			_, err = self.watchDirectory(path.Join(dir, entry.Name()), path.Join(containerName, entry.Name()))
+			entryPath := path.Join(dir, entry.Name())
+			_, err = self.watchDirectory(entryPath, path.Join(containerName, entry.Name()))
 			if err != nil {
+				glog.Errorf("Failed to watch directory %q: %v", entryPath, err)
+				if os.IsNotExist(err) {
+					// The directory may have been removed before watching. Try to watch the other
+					// subdirectories. (https://github.com/kubernetes/kubernetes/issues/28997)
+					continue
+				}
 				return alreadyWatching, err
 			}
 		}
@@ -145,18 +152,16 @@ func (self *rawContainerWatcher) watchDirectory(dir string, containerName string
 	return alreadyWatching, nil
 }
 
-func (self *rawContainerWatcher) processEvent(event *inotify.Event, events chan watcher.ContainerEvent) error {
-	// Convert the inotify event type to a container create or delete.
+func (self *rawContainerWatcher) processEvent(event fsnotify.Event, events chan watcher.ContainerEvent) error {
+	// Convert the fsnotify event type to a container create or delete.
 	var eventType watcher.ContainerEventType
 	switch {
-	case (event.Mask & inotify.IN_CREATE) > 0:
+	case event.Op == fsnotify.Create:
 		eventType = watcher.ContainerAdd
-	case (event.Mask & inotify.IN_DELETE) > 0:
+	case event.Op == fsnotify.Remove:
 		eventType = watcher.ContainerDelete
-	case (event.Mask & inotify.IN_MOVED_FROM) > 0:
+	case event.Op == fsnotify.Rename:
 		eventType = watcher.ContainerDelete
-	case (event.Mask & inotify.IN_MOVED_TO) > 0:
-		eventType = watcher.ContainerAdd
 	default:
 		// Ignore other events.
 		return nil

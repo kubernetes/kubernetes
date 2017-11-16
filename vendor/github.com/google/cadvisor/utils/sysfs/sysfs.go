@@ -70,8 +70,8 @@ type SysFs interface {
 
 type realSysFs struct{}
 
-func NewRealSysFs() (SysFs, error) {
-	return &realSysFs{}, nil
+func NewRealSysFs() SysFs {
+	return &realSysFs{}
 }
 
 func (self *realSysFs) GetBlockDevices() ([]os.FileInfo, error) {

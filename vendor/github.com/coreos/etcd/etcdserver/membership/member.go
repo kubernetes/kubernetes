@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import (
 )
 
 var (
-	plog = capnslog.NewPackageLogger("github.com/coreos/etcd/etcdserver", "membership")
+	plog = capnslog.NewPackageLogger("github.com/coreos/etcd", "etcdserver/membership")
 )
 
 // RaftAttributes represents the raft related attributes of an etcd member.

@@ -12,7 +12,6 @@ import (
 	"io"
 	"io/ioutil"
 	"math/rand"
-	"os"
 	"reflect"
 	"regexp"
 	"sort"
@@ -28,6 +27,7 @@ import (
 // ---------------------------------------------------
 // codecgen supports the full cycle of reflection-based codec:
 //    - RawExt
+//    - Raw
 //    - Builtins
 //    - Extensions
 //    - (Binary|Text|JSON)(Unm|M)arshal
@@ -78,7 +78,7 @@ import (
 // codecgen will panic if the file was generated with an old version of the library in use.
 //
 // Note:
-//   It was a concious decision to have gen.go always explicitly call EncodeNil or TryDecodeAsNil.
+//   It was a conscious decision to have gen.go always explicitly call EncodeNil or TryDecodeAsNil.
 //   This way, there isn't a function call overhead just to see that we should not enter a block of code.
 
 // GenVersion is the current version of codecgen.
@@ -126,6 +126,7 @@ var (
 	genExpectArrayOrMapErr = errors.New("unexpected type. Expecting array/map/slice")
 	genBase64enc           = base64.NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789__")
 	genQNameRegex          = regexp.MustCompile(`[A-Za-z_.]+`)
+	genCheckVendor         bool
 )
 
 // genRunner holds some state used during a Gen run.
@@ -164,6 +165,10 @@ type genRunner struct {
 //
 // Library users: *DO NOT USE IT DIRECTLY. IT WILL CHANGE CONTINOUSLY WITHOUT NOTICE.*
 func Gen(w io.Writer, buildTags, pkgName, uid string, useUnsafe bool, ti *TypeInfos, typ ...reflect.Type) {
+	// All types passed to this method do not have a codec.Selfer method implemented directly.
+	// codecgen already checks the AST and skips any types that define the codec.Selfer methods.
+	// Consequently, there's no need to check and trim them if they implement codec.Selfer
+
 	if len(typ) == 0 {
 		return
 	}
@@ -201,7 +206,7 @@ func Gen(w io.Writer, buildTags, pkgName, uid string, useUnsafe bool, ti *TypeIn
 		x.genRefPkgs(t)
 	}
 	if buildTags != "" {
-		x.line("//+build " + buildTags)
+		x.line("// +build " + buildTags)
 		x.line("")
 	}
 	x.line(`
@@ -691,13 +696,17 @@ func (x *genRunner) enc(varname string, t reflect.Type) {
 	}
 
 	// check if
-	//   - type is RawExt
+	//   - type is RawExt, Raw
 	//   - the type implements (Text|JSON|Binary)(Unm|M)arshal
 	x.linef("%sm%s := z.EncBinary()", genTempVarPfx, mi)
 	x.linef("_ = %sm%s", genTempVarPfx, mi)
 	x.line("if false {")           //start if block
 	defer func() { x.line("}") }() //end if block
 
+	if t == rawTyp {
+		x.linef("} else { z.EncRaw(%v)", varname)
+		return
+	}
 	if t == rawExtTyp {
 		x.linef("} else { r.EncodeRawExt(%v, e)", varname)
 		return
@@ -977,6 +986,14 @@ func (x *genRunner) encStruct(varname string, rtid uintptr, t reflect.Type) {
 }
 
 func (x *genRunner) encListFallback(varname string, t reflect.Type) {
+	if t.AssignableTo(uint8SliceTyp) {
+		x.linef("r.EncodeStringBytes(codecSelferC_RAW%s, []byte(%s))", x.xs, varname)
+		return
+	}
+	if t.Kind() == reflect.Array && t.Elem().Kind() == reflect.Uint8 {
+		x.linef("r.EncodeStringBytes(codecSelferC_RAW%s, ([%v]byte(%s))[:])", x.xs, t.Len(), varname)
+		return
+	}
 	i := x.varsfx()
 	g := genTempVarPfx
 	x.line("r.EncodeArrayStart(len(" + varname + "))")
@@ -1113,7 +1130,7 @@ func (x *genRunner) dec(varname string, t reflect.Type) {
 	}
 
 	// check if
-	//   - type is RawExt
+	//   - type is Raw, RawExt
 	//   - the type implements (Text|JSON|Binary)(Unm|M)arshal
 	mi := x.varsfx()
 	x.linef("%sm%s := z.DecBinary()", genTempVarPfx, mi)
@@ -1121,6 +1138,10 @@ func (x *genRunner) dec(varname string, t reflect.Type) {
 	x.line("if false {")           //start if block
 	defer func() { x.line("}") }() //end if block
 
+	if t == rawTyp {
+		x.linef("} else { *%v = z.DecRaw()", varname)
+		return
+	}
 	if t == rawExtTyp {
 		x.linef("} else { r.DecodeExt(%v, 0, nil)", varname)
 		return
@@ -1246,59 +1267,49 @@ func (x *genRunner) dec(varname string, t reflect.Type) {
 }
 
 func (x *genRunner) decTryAssignPrimitive(varname string, t reflect.Type) (tryAsPtr bool) {
-	// We have to use the actual type name when doing a direct assignment.
-	// We don't have the luxury of casting the pointer to the underlying type.
-	//
-	// Consequently, in the situation of a
-	//     type Message int32
-	//     var x Message
-	//     var i int32 = 32
-	//     x = i // this will bomb
-	//     x = Message(i) // this will work
-	//     *((*int32)(&x)) = i // this will work
-	//
-	// Consequently, we replace:
-	//      case reflect.Uint32: x.line(varname + " = uint32(r.DecodeUint(32))")
-	// with:
-	//      case reflect.Uint32: x.line(varname + " = " + genTypeNamePrim(t, x.tc) + "(r.DecodeUint(32))")
+	// This should only be used for exact primitives (ie un-named types).
+	// Named types may be implementations of Selfer, Unmarshaler, etc.
+	// They should be handled by dec(...)
 
-	xfn := func(t reflect.Type) string {
-		return x.genTypeNamePrim(t)
+	if t.Name() != "" {
+		tryAsPtr = true
+		return
 	}
+
 	switch t.Kind() {
 	case reflect.Int:
-		x.linef("%s = %s(r.DecodeInt(codecSelferBitsize%s))", varname, xfn(t), x.xs)
+		x.linef("%s = r.DecodeInt(codecSelferBitsize%s)", varname, x.xs)
 	case reflect.Int8:
-		x.linef("%s = %s(r.DecodeInt(8))", varname, xfn(t))
+		x.linef("%s = r.DecodeInt(8)", varname)
 	case reflect.Int16:
-		x.linef("%s = %s(r.DecodeInt(16))", varname, xfn(t))
+		x.linef("%s = r.DecodeInt(16)", varname)
 	case reflect.Int32:
-		x.linef("%s = %s(r.DecodeInt(32))", varname, xfn(t))
+		x.linef("%s = r.DecodeInt(32)", varname)
 	case reflect.Int64:
-		x.linef("%s = %s(r.DecodeInt(64))", varname, xfn(t))
+		x.linef("%s = r.DecodeInt(64)", varname)
 
 	case reflect.Uint:
-		x.linef("%s = %s(r.DecodeUint(codecSelferBitsize%s))", varname, xfn(t), x.xs)
+		x.linef("%s = r.DecodeUint(codecSelferBitsize%s)", varname, x.xs)
 	case reflect.Uint8:
-		x.linef("%s = %s(r.DecodeUint(8))", varname, xfn(t))
+		x.linef("%s = r.DecodeUint(8)", varname)
 	case reflect.Uint16:
-		x.linef("%s = %s(r.DecodeUint(16))", varname, xfn(t))
+		x.linef("%s = r.DecodeUint(16)", varname)
 	case reflect.Uint32:
-		x.linef("%s = %s(r.DecodeUint(32))", varname, xfn(t))
+		x.linef("%s = r.DecodeUint(32)", varname)
 	case reflect.Uint64:
-		x.linef("%s = %s(r.DecodeUint(64))", varname, xfn(t))
+		x.linef("%s = r.DecodeUint(64)", varname)
 	case reflect.Uintptr:
-		x.linef("%s = %s(r.DecodeUint(codecSelferBitsize%s))", varname, xfn(t), x.xs)
+		x.linef("%s = r.DecodeUint(codecSelferBitsize%s)", varname, x.xs)
 
 	case reflect.Float32:
-		x.linef("%s = %s(r.DecodeFloat(true))", varname, xfn(t))
+		x.linef("%s = r.DecodeFloat(true)", varname)
 	case reflect.Float64:
-		x.linef("%s = %s(r.DecodeFloat(false))", varname, xfn(t))
+		x.linef("%s = r.DecodeFloat(false)", varname)
 
 	case reflect.Bool:
-		x.linef("%s = %s(r.DecodeBool())", varname, xfn(t))
+		x.linef("%s = r.DecodeBool()", varname)
 	case reflect.String:
-		x.linef("%s = %s(r.DecodeString())", varname, xfn(t))
+		x.linef("%s = r.DecodeString()", varname)
 	default:
 		tryAsPtr = true
 	}
@@ -1306,6 +1317,14 @@ func (x *genRunner) decTryAssignPrimitive(varname string, t reflect.Type) (tryAs
 }
 
 func (x *genRunner) decListFallback(varname string, rtid uintptr, t reflect.Type) {
+	if t.AssignableTo(uint8SliceTyp) {
+		x.line("*" + varname + " = r.DecodeBytes(*((*[]byte)(" + varname + ")), false, false)")
+		return
+	}
+	if t.Kind() == reflect.Array && t.Elem().Kind() == reflect.Uint8 {
+		x.linef("r.DecodeBytes( ((*[%s]byte)(%s))[:], false, true)", t.Len(), varname)
+		return
+	}
 	type tstruc struct {
 		TempVar   string
 		Rand      string
@@ -1421,7 +1440,7 @@ func (x *genRunner) decStructMapSwitch(kName string, varname string, rtid uintpt
 		if si.i != -1 {
 			t2 = t.Field(int(si.i))
 		} else {
-			//we must accomodate anonymous fields, where the embedded field is a nil pointer in the value.
+			//we must accommodate anonymous fields, where the embedded field is a nil pointer in the value.
 			// t2 = t.FieldByIndex(si.is)
 			t2typ := t
 			varname3 := varname
@@ -1509,7 +1528,7 @@ func (x *genRunner) decStructArray(varname, lenvarname, breakString string, rtid
 		if si.i != -1 {
 			t2 = t.Field(int(si.i))
 		} else {
-			//we must accomodate anonymous fields, where the embedded field is a nil pointer in the value.
+			//we must accommodate anonymous fields, where the embedded field is a nil pointer in the value.
 			// t2 = t.FieldByIndex(si.is)
 			t2typ := t
 			varname3 := varname
@@ -1626,8 +1645,6 @@ func (x *genV) MethodNamePfx(prefix string, prim bool) string {
 
 }
 
-var genCheckVendor = os.Getenv("GO15VENDOREXPERIMENT") == "1"
-
 // genImportPath returns import path of a non-predeclared named typed, or an empty string otherwise.
 //
 // This handles the misbehaviour that occurs when 1.5-style vendoring is enabled,
@@ -1678,7 +1695,7 @@ func genNonPtr(t reflect.Type) reflect.Type {
 
 func genTitleCaseName(s string) string {
 	switch s {
-	case "interface{}":
+	case "interface{}", "interface {}":
 		return "Intf"
 	default:
 		return strings.ToUpper(s[0:1]) + s[1:]
@@ -1781,7 +1798,7 @@ func (x genInternal) FastpathLen() (l int) {
 
 func genInternalZeroValue(s string) string {
 	switch s {
-	case "interface{}":
+	case "interface{}", "interface {}":
 		return "nil"
 	case "bool":
 		return "false"
@@ -1933,7 +1950,7 @@ func genInternalInit() {
 	}
 	var gt genInternal
 
-	// For each slice or map type, there must be a (symetrical) Encode and Decode fast-path function
+	// For each slice or map type, there must be a (symmetrical) Encode and Decode fast-path function
 	for _, s := range types {
 		gt.Values = append(gt.Values, genV{Primitive: s, Size: mapvaltypes2[s]})
 		if s != "uint8" { // do not generate fast path for slice of bytes. Treat specially already.

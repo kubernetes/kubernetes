@@ -6,6 +6,7 @@ package googleapi
 
 import (
 	"encoding/json"
+	"errors"
 	"strconv"
 )
 
@@ -147,6 +148,25 @@ func (s Float64s) MarshalJSON() ([]byte, error) {
 	return quotedList(len(s), func(dst []byte, i int) []byte {
 		return strconv.AppendFloat(dst, s[i], 'g', -1, 64)
 	})
+}
+
+// RawMessage is a raw encoded JSON value.
+// It is identical to json.RawMessage, except it does not suffer from
+// https://golang.org/issue/14493.
+type RawMessage []byte
+
+// MarshalJSON returns m.
+func (m RawMessage) MarshalJSON() ([]byte, error) {
+	return m, nil
+}
+
+// UnmarshalJSON sets *m to a copy of data.
+func (m *RawMessage) UnmarshalJSON(data []byte) error {
+	if m == nil {
+		return errors.New("googleapi.RawMessage: UnmarshalJSON on nil pointer")
+	}
+	*m = append((*m)[:0], data...)
+	return nil
 }
 
 /*

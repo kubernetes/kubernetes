@@ -34,4 +34,4 @@ export PATH=${GOPATH}/bin:${HOME}/third_party/etcd:/usr/local/go/bin:$PATH
 command -v etcd &>/dev/null || ./hack/install-etcd.sh
 go get -u github.com/tools/godep
 
-./hack/verify-all.sh -v
+make verify

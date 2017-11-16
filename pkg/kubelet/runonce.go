@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/api/core/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -35,8 +35,9 @@ const (
 	runOnceRetryDelayBackoff = 2
 )
 
+// RunPodResult defines the running results of a Pod.
 type RunPodResult struct {
-	Pod *api.Pod
+	Pod *v1.Pod
 	Err error
 }
 
@@ -48,9 +49,9 @@ func (kl *Kubelet) RunOnce(updates <-chan kubetypes.PodUpdate) ([]RunPodResult, 
 	}
 
 	// If the container logs directory does not exist, create it.
-	if _, err := os.Stat(containerLogsDir); err != nil {
-		if err := kl.os.MkdirAll(containerLogsDir, 0755); err != nil {
-			glog.Errorf("Failed to create directory %q: %v", containerLogsDir, err)
+	if _, err := os.Stat(ContainerLogsDir); err != nil {
+		if err := kl.os.MkdirAll(ContainerLogsDir, 0755); err != nil {
+			glog.Errorf("Failed to create directory %q: %v", ContainerLogsDir, err)
 		}
 	}
 
@@ -66,25 +67,27 @@ func (kl *Kubelet) RunOnce(updates <-chan kubetypes.PodUpdate) ([]RunPodResult, 
 }
 
 // runOnce runs a given set of pods and returns their status.
-func (kl *Kubelet) runOnce(pods []*api.Pod, retryDelay time.Duration) (results []RunPodResult, err error) {
+func (kl *Kubelet) runOnce(pods []*v1.Pod, retryDelay time.Duration) (results []RunPodResult, err error) {
 	ch := make(chan RunPodResult)
-	admitted := []*api.Pod{}
+	admitted := []*v1.Pod{}
 	for _, pod := range pods {
 		// Check if we can admit the pod.
-		if ok, reason, message := kl.canAdmitPod(append(admitted, pod), pod); !ok {
+		if ok, reason, message := kl.canAdmitPod(admitted, pod); !ok {
 			kl.rejectPod(pod, reason, message)
-		} else {
-			admitted = append(admitted, pod)
+			results = append(results, RunPodResult{pod, nil})
+			continue
 		}
-		go func(pod *api.Pod) {
+
+		admitted = append(admitted, pod)
+		go func(pod *v1.Pod) {
 			err := kl.runPod(pod, retryDelay)
 			ch <- RunPodResult{pod, err}
 		}(pod)
 	}
 
-	glog.Infof("waiting for %d pods", len(pods))
+	glog.Infof("Waiting for %d pods", len(admitted))
 	failedPods := []string{}
-	for i := 0; i < len(pods); i++ {
+	for i := 0; i < len(admitted); i++ {
 		res := <-ch
 		results = append(results, res)
 		if res.Err != nil {
@@ -103,7 +106,7 @@ func (kl *Kubelet) runOnce(pods []*api.Pod, retryDelay time.Duration) (results [
 }
 
 // runPod runs a single pod and wait until all containers are running.
-func (kl *Kubelet) runPod(pod *api.Pod, retryDelay time.Duration) error {
+func (kl *Kubelet) runPod(pod *v1.Pod, retryDelay time.Duration) error {
 	delay := retryDelay
 	retry := 0
 	for {
@@ -143,7 +146,7 @@ func (kl *Kubelet) runPod(pod *api.Pod, retryDelay time.Duration) error {
 }
 
 // isPodRunning returns true if all containers of a manifest are running.
-func (kl *Kubelet) isPodRunning(pod *api.Pod, status *kubecontainer.PodStatus) bool {
+func (kl *Kubelet) isPodRunning(pod *v1.Pod, status *kubecontainer.PodStatus) bool {
 	for _, c := range pod.Spec.Containers {
 		cs := status.FindContainerStatusByName(c.Name)
 		if cs == nil || cs.State != kubecontainer.ContainerStateRunning {

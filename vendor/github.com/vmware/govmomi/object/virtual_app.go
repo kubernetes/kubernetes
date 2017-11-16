@@ -17,13 +17,10 @@ limitations under the License.
 package object
 
 import (
-	"fmt"
-
-	"golang.org/x/net/context"
+	"context"
 
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
-	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
 )
 
@@ -37,25 +34,7 @@ func NewVirtualApp(c *vim25.Client, ref types.ManagedObjectReference) *VirtualAp
 	}
 }
 
-func (p VirtualApp) String() string {
-	if p.InventoryPath == "" {
-		return p.Common.String()
-	}
-	return fmt.Sprintf("%v @ %v", p.Common, p.InventoryPath)
-}
-
-func (p VirtualApp) Name(ctx context.Context) (string, error) {
-	var o mo.VirtualApp
-
-	err := p.Properties(ctx, p.Reference(), []string{"name"}, &o)
-	if err != nil {
-		return "", err
-	}
-
-	return o.Name, nil
-}
-
-func (p VirtualApp) CreateChildVM_Task(ctx context.Context, config types.VirtualMachineConfigSpec, host *HostSystem) (*Task, error) {
+func (p VirtualApp) CreateChildVM(ctx context.Context, config types.VirtualMachineConfigSpec, host *HostSystem) (*Task, error) {
 	req := types.CreateChildVM_Task{
 		This:   p.Reference(),
 		Config: config,
@@ -74,7 +53,7 @@ func (p VirtualApp) CreateChildVM_Task(ctx context.Context, config types.Virtual
 	return NewTask(p.c, res.Returnval), nil
 }
 
-func (p VirtualApp) UpdateVAppConfig(ctx context.Context, spec types.VAppConfigSpec) error {
+func (p VirtualApp) UpdateConfig(ctx context.Context, spec types.VAppConfigSpec) error {
 	req := types.UpdateVAppConfig{
 		This: p.Reference(),
 		Spec: spec,
@@ -84,7 +63,7 @@ func (p VirtualApp) UpdateVAppConfig(ctx context.Context, spec types.VAppConfigS
 	return err
 }
 
-func (p VirtualApp) PowerOnVApp_Task(ctx context.Context) (*Task, error) {
+func (p VirtualApp) PowerOn(ctx context.Context) (*Task, error) {
 	req := types.PowerOnVApp_Task{
 		This: p.Reference(),
 	}
@@ -97,7 +76,7 @@ func (p VirtualApp) PowerOnVApp_Task(ctx context.Context) (*Task, error) {
 	return NewTask(p.c, res.Returnval), nil
 }
 
-func (p VirtualApp) PowerOffVApp_Task(ctx context.Context, force bool) (*Task, error) {
+func (p VirtualApp) PowerOff(ctx context.Context, force bool) (*Task, error) {
 	req := types.PowerOffVApp_Task{
 		This:  p.Reference(),
 		Force: force,
@@ -112,7 +91,7 @@ func (p VirtualApp) PowerOffVApp_Task(ctx context.Context, force bool) (*Task, e
 
 }
 
-func (p VirtualApp) SuspendVApp_Task(ctx context.Context) (*Task, error) {
+func (p VirtualApp) Suspend(ctx context.Context) (*Task, error) {
 	req := types.SuspendVApp_Task{
 		This: p.Reference(),
 	}

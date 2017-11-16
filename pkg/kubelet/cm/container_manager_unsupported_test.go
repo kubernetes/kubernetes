@@ -1,4 +1,4 @@
-// +build !linux
+// +build !linux,!windows
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -40,8 +40,52 @@ func (mi *fakeMountInterface) List() ([]mount.MountPoint, error) {
 	return mi.mountPoints, nil
 }
 
+func (mi *fakeMountInterface) IsMountPointMatch(mp mount.MountPoint, dir string) bool {
+	return (mp.Path == dir)
+}
+
+func (mi *fakeMountInterface) IsNotMountPoint(dir string) (bool, error) {
+	return false, fmt.Errorf("unsupported")
+}
+
 func (mi *fakeMountInterface) IsLikelyNotMountPoint(file string) (bool, error) {
 	return false, fmt.Errorf("unsupported")
+}
+func (mi *fakeMountInterface) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
+	return "", nil
+}
+
+func (mi *fakeMountInterface) DeviceOpened(pathname string) (bool, error) {
+	for _, mp := range mi.mountPoints {
+		if mp.Device == pathname {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (mi *fakeMountInterface) PathIsDevice(pathname string) (bool, error) {
+	return true, nil
+}
+
+func (mi *fakeMountInterface) MakeRShared(path string) error {
+	return nil
+}
+
+func (mi *fakeMountInterface) GetFileType(pathname string) (mount.FileType, error) {
+	return mount.FileType("fake"), nil
+}
+
+func (mi *fakeMountInterface) MakeDir(pathname string) error {
+	return nil
+}
+
+func (mi *fakeMountInterface) MakeFile(pathname string) error {
+	return nil
+}
+
+func (mi *fakeMountInterface) ExistsPath(pathname string) bool {
+	return true
 }
 
 func fakeContainerMgrMountInt() mount.Interface {

@@ -20,37 +20,111 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"github.com/stretchr/testify/assert"
+	"k8s.io/api/core/v1"
 )
 
-func TestSortInitContainerStatuses(t *testing.T) {
-	pod := api.Pod{
-		Spec: api.PodSpec{},
-	}
+func TestConvertToTimestamp(t *testing.T) {
+	timestamp := "2017-02-17T15:34:49.830882016+08:00"
+	convertedTimeStamp := ConvertToTimestamp(timestamp).GetString()
+	assert.Equal(t, timestamp, convertedTimeStamp)
+}
+
+func TestLen(t *testing.T) {
 	var cases = []struct {
-		containers     []api.Container
-		statuses       []api.ContainerStatus
-		sortedStatuses []api.ContainerStatus
+		statuses SortedContainerStatuses
+		expected int
 	}{
 		{
-			containers:     []api.Container{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
-			statuses:       []api.ContainerStatus{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
-			sortedStatuses: []api.ContainerStatus{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
+			statuses: SortedContainerStatuses{{Name: "first"}},
+			expected: 1,
 		},
 		{
-			containers:     []api.Container{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
-			statuses:       []api.ContainerStatus{{Name: "second"}, {Name: "first"}, {Name: "fourth"}, {Name: "third"}},
-			sortedStatuses: []api.ContainerStatus{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
+			statuses: SortedContainerStatuses{{Name: "first"}, {Name: "second"}},
+			expected: 2,
+		},
+	}
+	for _, data := range cases {
+		assert.Equal(t, data.expected, data.statuses.Len())
+	}
+}
+
+func TestSwap(t *testing.T) {
+	var cases = []struct {
+		statuses SortedContainerStatuses
+		expected SortedContainerStatuses
+	}{
+		{
+			statuses: SortedContainerStatuses{{Name: "first"}, {Name: "second"}},
+			expected: SortedContainerStatuses{{Name: "second"}, {Name: "first"}},
+		},
+	}
+	for _, data := range cases {
+		data.statuses.Swap(0, 1)
+		if !reflect.DeepEqual(data.statuses, data.expected) {
+			t.Errorf(
+				"failed Swap:\n\texpected: %v\n\t  actual: %v",
+				data.expected,
+				data.statuses,
+			)
+		}
+	}
+}
+
+func TestLess(t *testing.T) {
+	var cases = []struct {
+		statuses SortedContainerStatuses
+		expected bool
+	}{
+		{
+			statuses: SortedContainerStatuses{{Name: "first"}, {Name: "second"}},
+			expected: true,
 		},
 		{
-			containers:     []api.Container{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
-			statuses:       []api.ContainerStatus{{Name: "fourth"}, {Name: "first"}},
-			sortedStatuses: []api.ContainerStatus{{Name: "first"}, {Name: "fourth"}},
+			statuses: SortedContainerStatuses{{Name: "second"}, {Name: "first"}},
+			expected: false,
+		},
+	}
+	for _, data := range cases {
+		actual := data.statuses.Less(0, 1)
+		if actual != data.expected {
+			t.Errorf(
+				"failed Less:\n\texpected: %t\n\t  actual: %t",
+				data.expected,
+				actual,
+			)
+		}
+	}
+}
+
+func TestSortInitContainerStatuses(t *testing.T) {
+	pod := v1.Pod{
+		Spec: v1.PodSpec{},
+	}
+	var cases = []struct {
+		containers     []v1.Container
+		statuses       []v1.ContainerStatus
+		sortedStatuses []v1.ContainerStatus
+	}{
+		{
+			containers:     []v1.Container{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
+			statuses:       []v1.ContainerStatus{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
+			sortedStatuses: []v1.ContainerStatus{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
 		},
 		{
-			containers:     []api.Container{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
-			statuses:       []api.ContainerStatus{{Name: "first"}, {Name: "third"}},
-			sortedStatuses: []api.ContainerStatus{{Name: "first"}, {Name: "third"}},
+			containers:     []v1.Container{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
+			statuses:       []v1.ContainerStatus{{Name: "second"}, {Name: "first"}, {Name: "fourth"}, {Name: "third"}},
+			sortedStatuses: []v1.ContainerStatus{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
+		},
+		{
+			containers:     []v1.Container{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
+			statuses:       []v1.ContainerStatus{{Name: "fourth"}, {Name: "first"}},
+			sortedStatuses: []v1.ContainerStatus{{Name: "first"}, {Name: "fourth"}},
+		},
+		{
+			containers:     []v1.Container{{Name: "first"}, {Name: "second"}, {Name: "third"}, {Name: "fourth"}},
+			statuses:       []v1.ContainerStatus{{Name: "first"}, {Name: "third"}},
+			sortedStatuses: []v1.ContainerStatus{{Name: "first"}, {Name: "third"}},
 		},
 	}
 	for _, data := range cases {

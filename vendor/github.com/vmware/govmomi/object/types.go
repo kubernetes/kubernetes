@@ -47,7 +47,7 @@ func NewReference(c *vim25.Client, e types.ManagedObjectReference) Reference {
 		return NewClusterComputeResource(c, e)
 	case "HostSystem":
 		return NewHostSystem(c, e)
-	case "Network":
+	case "Network", "OpaqueNetwork":
 		return NewNetwork(c, e)
 	case "ResourcePool":
 		return NewResourcePool(c, e)

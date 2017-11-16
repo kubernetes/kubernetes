@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // namespace contains a controller that handles namespace lifecycle
-package namespace
+package namespace // import "k8s.io/kubernetes/pkg/controller/namespace"

@@ -20,9 +20,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
 
-	kruntime "k8s.io/kubernetes/pkg/runtime"
+	kruntime "k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
@@ -35,7 +34,6 @@ var (
 )
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	flag.Parse()
 
 	if *typeSrc == "" {

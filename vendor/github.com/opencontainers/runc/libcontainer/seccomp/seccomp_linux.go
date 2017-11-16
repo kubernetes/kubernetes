@@ -5,24 +5,21 @@ package seccomp
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"os"
 	"strings"
-	"syscall"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
 	libseccomp "github.com/seccomp/libseccomp-golang"
+
+	"golang.org/x/sys/unix"
 )
 
 var (
 	actAllow = libseccomp.ActAllow
 	actTrap  = libseccomp.ActTrap
 	actKill  = libseccomp.ActKill
-	actTrace = libseccomp.ActTrace.SetReturnCode(int16(syscall.EPERM))
-	actErrno = libseccomp.ActErrno.SetReturnCode(int16(syscall.EPERM))
-
-	// SeccompModeFilter refers to the syscall argument SECCOMP_MODE_FILTER.
-	SeccompModeFilter = uintptr(2)
+	actTrace = libseccomp.ActTrace.SetReturnCode(int16(unix.EPERM))
+	actErrno = libseccomp.ActErrno.SetReturnCode(int16(unix.EPERM))
 )
 
 // Filters given syscalls in a container, preventing them from being used
@@ -85,9 +82,9 @@ func IsEnabled() bool {
 	s, err := parseStatusFile("/proc/self/status")
 	if err != nil {
 		// Check if Seccomp is supported, via CONFIG_SECCOMP.
-		if _, _, err := syscall.RawSyscall(syscall.SYS_PRCTL, syscall.PR_GET_SECCOMP, 0, 0); err != syscall.EINVAL {
+		if err := unix.Prctl(unix.PR_GET_SECCOMP, 0, 0, 0, 0); err != unix.EINVAL {
 			// Make sure the kernel has CONFIG_SECCOMP_FILTER.
-			if _, _, err := syscall.RawSyscall(syscall.SYS_PRCTL, syscall.PR_SET_SECCOMP, SeccompModeFilter, 0); err != syscall.EINVAL {
+			if err := unix.Prctl(unix.PR_SET_SECCOMP, unix.SECCOMP_MODE_FILTER, 0, 0, 0); err != unix.EINVAL {
 				return true
 			}
 		}
@@ -167,7 +164,6 @@ func matchCall(filter *libseccomp.ScmpFilter, call *configs.Syscall) error {
 	// Ignore it, don't error out
 	callNum, err := libseccomp.GetSyscallFromName(call.Name)
 	if err != nil {
-		log.Printf("Error resolving syscall name %s: %s - ignoring syscall.", call.Name, err)
 		return nil
 	}
 
@@ -214,10 +210,6 @@ func parseStatusFile(path string) (map[string]string, error) {
 	status := make(map[string]string)
 
 	for s.Scan() {
-		if err := s.Err(); err != nil {
-			return nil, err
-		}
-
 		text := s.Text()
 		parts := strings.Split(text, ":")
 
@@ -227,5 +219,9 @@ func parseStatusFile(path string) (map[string]string, error) {
 
 		status[parts[0]] = parts[1]
 	}
+	if err := s.Err(); err != nil {
+		return nil, err
+	}
+
 	return status, nil
 }

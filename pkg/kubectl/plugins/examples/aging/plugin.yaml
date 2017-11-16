@@ -1,0 +1,5 @@
+name: "aging"
+shortDesc: "Aging shows pods by age"
+longDesc: >
+  Aging shows pods from the current namespace by age.
+command: ./aging.rb

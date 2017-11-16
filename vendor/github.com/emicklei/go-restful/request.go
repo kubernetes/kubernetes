@@ -5,20 +5,15 @@ package restful
 // that can be found in the LICENSE file.
 
 import (
-	"bytes"
 	"compress/zlib"
-	"io/ioutil"
 	"net/http"
 )
 
 var defaultRequestContentType string
 
-var doCacheReadEntityBytes = true
-
 // Request is a wrapper for a http Request that provides convenience methods
 type Request struct {
 	Request           *http.Request
-	bodyContent       *[]byte // to cache the request body for multiple reads of ReadEntity
 	pathParameters    map[string]string
 	attributes        map[string]interface{} // for storing request-scoped values
 	selectedRoutePath string                 // root path + route path that matched the request, e.g. /meetings/{id}/attendees
@@ -39,12 +34,6 @@ func NewRequest(httpRequest *http.Request) *Request {
 // 	restful.DefaultRequestContentType(restful.MIME_JSON)
 func DefaultRequestContentType(mime string) {
 	defaultRequestContentType = mime
-}
-
-// SetCacheReadEntity controls whether the response data ([]byte) is cached such that ReadEntity is repeatable.
-// Default is true (due to backwardcompatibility). For better performance, you should set it to false if you don't need it.
-func SetCacheReadEntity(doCache bool) {
-	doCacheReadEntityBytes = doCache
 }
 
 // PathParameter accesses the Path parameter value by its name
@@ -81,18 +70,6 @@ func (r *Request) ReadEntity(entityPointer interface{}) (err error) {
 	contentType := r.Request.Header.Get(HEADER_ContentType)
 	contentEncoding := r.Request.Header.Get(HEADER_ContentEncoding)
 
-	// OLD feature, cache the body for reads
-	if doCacheReadEntityBytes {
-		if r.bodyContent == nil {
-			data, err := ioutil.ReadAll(r.Request.Body)
-			if err != nil {
-				return err
-			}
-			r.bodyContent = &data
-		}
-		r.Request.Body = ioutil.NopCloser(bytes.NewReader(*r.bodyContent))
-	}
-
 	// check if the request body needs decompression
 	if ENCODING_GZIP == contentEncoding {
 		gzipReader := currentCompressorProvider.AcquireGzipReader()
@@ -107,10 +84,15 @@ func (r *Request) ReadEntity(entityPointer interface{}) (err error) {
 		r.Request.Body = zlibReader
 	}
 
-	// lookup the EntityReader
+	// lookup the EntityReader, use defaultRequestContentType if needed and provided
 	entityReader, ok := entityAccessRegistry.accessorAt(contentType)
 	if !ok {
-		return NewError(http.StatusBadRequest, "Unable to unmarshal content of type:"+contentType)
+		if len(defaultRequestContentType) != 0 {
+			entityReader, ok = entityAccessRegistry.accessorAt(defaultRequestContentType)
+		}
+		if !ok {
+			return NewError(http.StatusBadRequest, "Unable to unmarshal content of type:"+contentType)
+		}
 	}
 	return entityReader.Read(r, entityPointer)
 }

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2014-2016 VMware, Inc. All Rights Reserved.
+Copyright (c) 2014-2017 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,13 +39,14 @@ func init() {
 type ActionType string
 
 const (
-	ActionTypeMigrationV1        = ActionType("MigrationV1")
-	ActionTypeVmPowerV1          = ActionType("VmPowerV1")
-	ActionTypeHostPowerV1        = ActionType("HostPowerV1")
-	ActionTypeHostMaintenanceV1  = ActionType("HostMaintenanceV1")
-	ActionTypeStorageMigrationV1 = ActionType("StorageMigrationV1")
-	ActionTypeStoragePlacementV1 = ActionType("StoragePlacementV1")
-	ActionTypePlacementV1        = ActionType("PlacementV1")
+	ActionTypeMigrationV1         = ActionType("MigrationV1")
+	ActionTypeVmPowerV1           = ActionType("VmPowerV1")
+	ActionTypeHostPowerV1         = ActionType("HostPowerV1")
+	ActionTypeHostMaintenanceV1   = ActionType("HostMaintenanceV1")
+	ActionTypeStorageMigrationV1  = ActionType("StorageMigrationV1")
+	ActionTypeStoragePlacementV1  = ActionType("StoragePlacementV1")
+	ActionTypePlacementV1         = ActionType("PlacementV1")
+	ActionTypeHostInfraUpdateHaV1 = ActionType("HostInfraUpdateHaV1")
 )
 
 func init() {
@@ -118,6 +119,18 @@ const (
 
 func init() {
 	t["AutoStartWaitHeartbeatSetting"] = reflect.TypeOf((*AutoStartWaitHeartbeatSetting)(nil)).Elem()
+}
+
+type BaseConfigInfoDiskFileBackingInfoProvisioningType string
+
+const (
+	BaseConfigInfoDiskFileBackingInfoProvisioningTypeThin             = BaseConfigInfoDiskFileBackingInfoProvisioningType("thin")
+	BaseConfigInfoDiskFileBackingInfoProvisioningTypeEagerZeroedThick = BaseConfigInfoDiskFileBackingInfoProvisioningType("eagerZeroedThick")
+	BaseConfigInfoDiskFileBackingInfoProvisioningTypeLazyZeroedThick  = BaseConfigInfoDiskFileBackingInfoProvisioningType("lazyZeroedThick")
+)
+
+func init() {
+	t["BaseConfigInfoDiskFileBackingInfoProvisioningType"] = reflect.TypeOf((*BaseConfigInfoDiskFileBackingInfoProvisioningType)(nil)).Elem()
 }
 
 type BatchResultResult string
@@ -281,14 +294,50 @@ type ClusterDasVmSettingsRestartPriority string
 
 const (
 	ClusterDasVmSettingsRestartPriorityDisabled               = ClusterDasVmSettingsRestartPriority("disabled")
+	ClusterDasVmSettingsRestartPriorityLowest                 = ClusterDasVmSettingsRestartPriority("lowest")
 	ClusterDasVmSettingsRestartPriorityLow                    = ClusterDasVmSettingsRestartPriority("low")
 	ClusterDasVmSettingsRestartPriorityMedium                 = ClusterDasVmSettingsRestartPriority("medium")
 	ClusterDasVmSettingsRestartPriorityHigh                   = ClusterDasVmSettingsRestartPriority("high")
+	ClusterDasVmSettingsRestartPriorityHighest                = ClusterDasVmSettingsRestartPriority("highest")
 	ClusterDasVmSettingsRestartPriorityClusterRestartPriority = ClusterDasVmSettingsRestartPriority("clusterRestartPriority")
 )
 
 func init() {
 	t["ClusterDasVmSettingsRestartPriority"] = reflect.TypeOf((*ClusterDasVmSettingsRestartPriority)(nil)).Elem()
+}
+
+type ClusterHostInfraUpdateHaModeActionOperationType string
+
+const (
+	ClusterHostInfraUpdateHaModeActionOperationTypeEnterQuarantine  = ClusterHostInfraUpdateHaModeActionOperationType("enterQuarantine")
+	ClusterHostInfraUpdateHaModeActionOperationTypeExitQuarantine   = ClusterHostInfraUpdateHaModeActionOperationType("exitQuarantine")
+	ClusterHostInfraUpdateHaModeActionOperationTypeEnterMaintenance = ClusterHostInfraUpdateHaModeActionOperationType("enterMaintenance")
+)
+
+func init() {
+	t["ClusterHostInfraUpdateHaModeActionOperationType"] = reflect.TypeOf((*ClusterHostInfraUpdateHaModeActionOperationType)(nil)).Elem()
+}
+
+type ClusterInfraUpdateHaConfigInfoBehaviorType string
+
+const (
+	ClusterInfraUpdateHaConfigInfoBehaviorTypeManual    = ClusterInfraUpdateHaConfigInfoBehaviorType("Manual")
+	ClusterInfraUpdateHaConfigInfoBehaviorTypeAutomated = ClusterInfraUpdateHaConfigInfoBehaviorType("Automated")
+)
+
+func init() {
+	t["ClusterInfraUpdateHaConfigInfoBehaviorType"] = reflect.TypeOf((*ClusterInfraUpdateHaConfigInfoBehaviorType)(nil)).Elem()
+}
+
+type ClusterInfraUpdateHaConfigInfoRemediationType string
+
+const (
+	ClusterInfraUpdateHaConfigInfoRemediationTypeQuarantineMode  = ClusterInfraUpdateHaConfigInfoRemediationType("QuarantineMode")
+	ClusterInfraUpdateHaConfigInfoRemediationTypeMaintenanceMode = ClusterInfraUpdateHaConfigInfoRemediationType("MaintenanceMode")
+)
+
+func init() {
+	t["ClusterInfraUpdateHaConfigInfoRemediationType"] = reflect.TypeOf((*ClusterInfraUpdateHaConfigInfoRemediationType)(nil)).Elem()
 }
 
 type ClusterPowerOnVmOption string
@@ -339,6 +388,20 @@ const (
 
 func init() {
 	t["ClusterVmComponentProtectionSettingsVmReactionOnAPDCleared"] = reflect.TypeOf((*ClusterVmComponentProtectionSettingsVmReactionOnAPDCleared)(nil)).Elem()
+}
+
+type ClusterVmReadinessReadyCondition string
+
+const (
+	ClusterVmReadinessReadyConditionNone               = ClusterVmReadinessReadyCondition("none")
+	ClusterVmReadinessReadyConditionPoweredOn          = ClusterVmReadinessReadyCondition("poweredOn")
+	ClusterVmReadinessReadyConditionGuestHbStatusGreen = ClusterVmReadinessReadyCondition("guestHbStatusGreen")
+	ClusterVmReadinessReadyConditionAppHbStatusGreen   = ClusterVmReadinessReadyCondition("appHbStatusGreen")
+	ClusterVmReadinessReadyConditionUseClusterDefault  = ClusterVmReadinessReadyCondition("useClusterDefault")
+)
+
+func init() {
+	t["ClusterVmReadinessReadyCondition"] = reflect.TypeOf((*ClusterVmReadinessReadyCondition)(nil)).Elem()
 }
 
 type ComplianceResultStatus string
@@ -732,6 +795,19 @@ func init() {
 	t["DrsRecommendationReasonCode"] = reflect.TypeOf((*DrsRecommendationReasonCode)(nil)).Elem()
 }
 
+type DvsEventPortBlockState string
+
+const (
+	DvsEventPortBlockStateUnset     = DvsEventPortBlockState("unset")
+	DvsEventPortBlockStateBlocked   = DvsEventPortBlockState("blocked")
+	DvsEventPortBlockStateUnblocked = DvsEventPortBlockState("unblocked")
+	DvsEventPortBlockStateUnknown   = DvsEventPortBlockState("unknown")
+)
+
+func init() {
+	t["DvsEventPortBlockState"] = reflect.TypeOf((*DvsEventPortBlockState)(nil)).Elem()
+}
+
 type DvsFilterOnFailure string
 
 const (
@@ -931,6 +1007,20 @@ func init() {
 	t["GuestRegKeyWowSpec"] = reflect.TypeOf((*GuestRegKeyWowSpec)(nil)).Elem()
 }
 
+type HealthUpdateInfoComponentType string
+
+const (
+	HealthUpdateInfoComponentTypeMemory  = HealthUpdateInfoComponentType("Memory")
+	HealthUpdateInfoComponentTypePower   = HealthUpdateInfoComponentType("Power")
+	HealthUpdateInfoComponentTypeFan     = HealthUpdateInfoComponentType("Fan")
+	HealthUpdateInfoComponentTypeNetwork = HealthUpdateInfoComponentType("Network")
+	HealthUpdateInfoComponentTypeStorage = HealthUpdateInfoComponentType("Storage")
+)
+
+func init() {
+	t["HealthUpdateInfoComponentType"] = reflect.TypeOf((*HealthUpdateInfoComponentType)(nil)).Elem()
+}
+
 type HostAccessMode string
 
 const (
@@ -1062,6 +1152,18 @@ const (
 
 func init() {
 	t["HostCpuPowerManagementInfoPolicyType"] = reflect.TypeOf((*HostCpuPowerManagementInfoPolicyType)(nil)).Elem()
+}
+
+type HostCryptoState string
+
+const (
+	HostCryptoStateIncapable = HostCryptoState("incapable")
+	HostCryptoStatePrepared  = HostCryptoState("prepared")
+	HostCryptoStateSafe      = HostCryptoState("safe")
+)
+
+func init() {
+	t["HostCryptoState"] = reflect.TypeOf((*HostCryptoState)(nil)).Elem()
 }
 
 type HostDasErrorEventHostDasErrorReason string
@@ -1199,12 +1301,35 @@ func init() {
 	t["HostFirewallRuleProtocol"] = reflect.TypeOf((*HostFirewallRuleProtocol)(nil)).Elem()
 }
 
+type HostGraphicsConfigGraphicsType string
+
+const (
+	HostGraphicsConfigGraphicsTypeShared       = HostGraphicsConfigGraphicsType("shared")
+	HostGraphicsConfigGraphicsTypeSharedDirect = HostGraphicsConfigGraphicsType("sharedDirect")
+)
+
+func init() {
+	t["HostGraphicsConfigGraphicsType"] = reflect.TypeOf((*HostGraphicsConfigGraphicsType)(nil)).Elem()
+}
+
+type HostGraphicsConfigSharedPassthruAssignmentPolicy string
+
+const (
+	HostGraphicsConfigSharedPassthruAssignmentPolicyPerformance   = HostGraphicsConfigSharedPassthruAssignmentPolicy("performance")
+	HostGraphicsConfigSharedPassthruAssignmentPolicyConsolidation = HostGraphicsConfigSharedPassthruAssignmentPolicy("consolidation")
+)
+
+func init() {
+	t["HostGraphicsConfigSharedPassthruAssignmentPolicy"] = reflect.TypeOf((*HostGraphicsConfigSharedPassthruAssignmentPolicy)(nil)).Elem()
+}
+
 type HostGraphicsInfoGraphicsType string
 
 const (
-	HostGraphicsInfoGraphicsTypeBasic  = HostGraphicsInfoGraphicsType("basic")
-	HostGraphicsInfoGraphicsTypeShared = HostGraphicsInfoGraphicsType("shared")
-	HostGraphicsInfoGraphicsTypeDirect = HostGraphicsInfoGraphicsType("direct")
+	HostGraphicsInfoGraphicsTypeBasic        = HostGraphicsInfoGraphicsType("basic")
+	HostGraphicsInfoGraphicsTypeShared       = HostGraphicsInfoGraphicsType("shared")
+	HostGraphicsInfoGraphicsTypeDirect       = HostGraphicsInfoGraphicsType("direct")
+	HostGraphicsInfoGraphicsTypeSharedDirect = HostGraphicsInfoGraphicsType("sharedDirect")
 )
 
 func init() {
@@ -1451,8 +1576,9 @@ func init() {
 type HostNasVolumeSecurityType string
 
 const (
-	HostNasVolumeSecurityTypeAUTH_SYS = HostNasVolumeSecurityType("AUTH_SYS")
-	HostNasVolumeSecurityTypeSEC_KRB5 = HostNasVolumeSecurityType("SEC_KRB5")
+	HostNasVolumeSecurityTypeAUTH_SYS  = HostNasVolumeSecurityType("AUTH_SYS")
+	HostNasVolumeSecurityTypeSEC_KRB5  = HostNasVolumeSecurityType("SEC_KRB5")
+	HostNasVolumeSecurityTypeSEC_KRB5I = HostNasVolumeSecurityType("SEC_KRB5I")
 )
 
 func init() {
@@ -1503,6 +1629,14 @@ const (
 	HostNumericSensorTypeTemperature = HostNumericSensorType("temperature")
 	HostNumericSensorTypeVoltage     = HostNumericSensorType("voltage")
 	HostNumericSensorTypeOther       = HostNumericSensorType("other")
+	HostNumericSensorTypeProcessor   = HostNumericSensorType("processor")
+	HostNumericSensorTypeMemory      = HostNumericSensorType("memory")
+	HostNumericSensorTypeStorage     = HostNumericSensorType("storage")
+	HostNumericSensorTypeSystemBoard = HostNumericSensorType("systemBoard")
+	HostNumericSensorTypeBattery     = HostNumericSensorType("battery")
+	HostNumericSensorTypeBios        = HostNumericSensorType("bios")
+	HostNumericSensorTypeCable       = HostNumericSensorType("cable")
+	HostNumericSensorTypeWatchdog    = HostNumericSensorType("watchdog")
 )
 
 func init() {
@@ -1606,6 +1740,18 @@ const (
 
 func init() {
 	t["HostProtocolEndpointPEType"] = reflect.TypeOf((*HostProtocolEndpointPEType)(nil)).Elem()
+}
+
+type HostProtocolEndpointProtocolEndpointType string
+
+const (
+	HostProtocolEndpointProtocolEndpointTypeScsi  = HostProtocolEndpointProtocolEndpointType("scsi")
+	HostProtocolEndpointProtocolEndpointTypeNfs   = HostProtocolEndpointProtocolEndpointType("nfs")
+	HostProtocolEndpointProtocolEndpointTypeNfs4x = HostProtocolEndpointProtocolEndpointType("nfs4x")
+)
+
+func init() {
+	t["HostProtocolEndpointProtocolEndpointType"] = reflect.TypeOf((*HostProtocolEndpointProtocolEndpointType)(nil)).Elem()
 }
 
 type HostReplayUnsupportedReason string
@@ -1742,6 +1888,7 @@ const (
 	HostVirtualNicManagerNicTypeManagement            = HostVirtualNicManagerNicType("management")
 	HostVirtualNicManagerNicTypeVsan                  = HostVirtualNicManagerNicType("vsan")
 	HostVirtualNicManagerNicTypeVSphereProvisioning   = HostVirtualNicManagerNicType("vSphereProvisioning")
+	HostVirtualNicManagerNicTypeVsanWitness           = HostVirtualNicManagerNicType("vsanWitness")
 )
 
 func init() {
@@ -1758,6 +1905,17 @@ const (
 
 func init() {
 	t["HostVmciAccessManagerMode"] = reflect.TypeOf((*HostVmciAccessManagerMode)(nil)).Elem()
+}
+
+type HostVmfsVolumeUnmapPriority string
+
+const (
+	HostVmfsVolumeUnmapPriorityNone = HostVmfsVolumeUnmapPriority("none")
+	HostVmfsVolumeUnmapPriorityLow  = HostVmfsVolumeUnmapPriority("low")
+)
+
+func init() {
+	t["HostVmfsVolumeUnmapPriority"] = reflect.TypeOf((*HostVmfsVolumeUnmapPriority)(nil)).Elem()
 }
 
 type HttpNfcLeaseState string
@@ -1829,6 +1987,22 @@ const (
 
 func init() {
 	t["IoFilterOperation"] = reflect.TypeOf((*IoFilterOperation)(nil)).Elem()
+}
+
+type IoFilterType string
+
+const (
+	IoFilterTypeCache              = IoFilterType("cache")
+	IoFilterTypeReplication        = IoFilterType("replication")
+	IoFilterTypeEncryption         = IoFilterType("encryption")
+	IoFilterTypeCompression        = IoFilterType("compression")
+	IoFilterTypeInspection         = IoFilterType("inspection")
+	IoFilterTypeDatastoreIoControl = IoFilterType("datastoreIoControl")
+	IoFilterTypeDataProvider       = IoFilterType("dataProvider")
+)
+
+func init() {
+	t["IoFilterType"] = reflect.TypeOf((*IoFilterType)(nil)).Elem()
 }
 
 type IscsiPortInfoPathStatus string
@@ -2330,6 +2504,18 @@ func init() {
 	t["PropertyChangeOp"] = reflect.TypeOf((*PropertyChangeOp)(nil)).Elem()
 }
 
+type QuarantineModeFaultFaultType string
+
+const (
+	QuarantineModeFaultFaultTypeNoCompatibleNonQuarantinedHost = QuarantineModeFaultFaultType("NoCompatibleNonQuarantinedHost")
+	QuarantineModeFaultFaultTypeCorrectionDisallowed           = QuarantineModeFaultFaultType("CorrectionDisallowed")
+	QuarantineModeFaultFaultTypeCorrectionImpact               = QuarantineModeFaultFaultType("CorrectionImpact")
+)
+
+func init() {
+	t["QuarantineModeFaultFaultType"] = reflect.TypeOf((*QuarantineModeFaultFaultType)(nil)).Elem()
+}
+
 type QuiesceMode string
 
 const (
@@ -2371,6 +2557,10 @@ const (
 	RecommendationReasonCodeIolbDisabledInternal            = RecommendationReasonCode("iolbDisabledInternal")
 	RecommendationReasonCodeXvmotionPlacement               = RecommendationReasonCode("xvmotionPlacement")
 	RecommendationReasonCodeNetworkBandwidthReservation     = RecommendationReasonCode("networkBandwidthReservation")
+	RecommendationReasonCodeHostInDegradation               = RecommendationReasonCode("hostInDegradation")
+	RecommendationReasonCodeHostExitDegradation             = RecommendationReasonCode("hostExitDegradation")
+	RecommendationReasonCodeMaxVmsConstraint                = RecommendationReasonCode("maxVmsConstraint")
+	RecommendationReasonCodeFtConstraints                   = RecommendationReasonCode("ftConstraints")
 )
 
 func init() {
@@ -2420,6 +2610,7 @@ const (
 	ReplicationVmConfigFaultReasonForFaultInvalidPriorConfiguration                = ReplicationVmConfigFaultReasonForFault("invalidPriorConfiguration")
 	ReplicationVmConfigFaultReasonForFaultReplicationNotEnabled                    = ReplicationVmConfigFaultReasonForFault("replicationNotEnabled")
 	ReplicationVmConfigFaultReasonForFaultReplicationConfigurationFailed           = ReplicationVmConfigFaultReasonForFault("replicationConfigurationFailed")
+	ReplicationVmConfigFaultReasonForFaultEncryptedVm                              = ReplicationVmConfigFaultReasonForFault("encryptedVm")
 )
 
 func init() {
@@ -2436,6 +2627,7 @@ const (
 	ReplicationVmFaultReasonForFaultOfflineReplicating = ReplicationVmFaultReasonForFault("offlineReplicating")
 	ReplicationVmFaultReasonForFaultInvalidState       = ReplicationVmFaultReasonForFault("invalidState")
 	ReplicationVmFaultReasonForFaultInvalidInstanceId  = ReplicationVmFaultReasonForFault("invalidInstanceId")
+	ReplicationVmFaultReasonForFaultCloseDiskError     = ReplicationVmFaultReasonForFault("closeDiskError")
 )
 
 func init() {
@@ -2491,6 +2683,19 @@ const (
 
 func init() {
 	t["ScheduledHardwareUpgradeInfoHardwareUpgradeStatus"] = reflect.TypeOf((*ScheduledHardwareUpgradeInfoHardwareUpgradeStatus)(nil)).Elem()
+}
+
+type ScsiDiskType string
+
+const (
+	ScsiDiskTypeNative512   = ScsiDiskType("native512")
+	ScsiDiskTypeEmulated512 = ScsiDiskType("emulated512")
+	ScsiDiskTypeNative4k    = ScsiDiskType("native4k")
+	ScsiDiskTypeUnknown     = ScsiDiskType("unknown")
+)
+
+func init() {
+	t["ScsiDiskType"] = reflect.TypeOf((*ScsiDiskType)(nil)).Elem()
 }
 
 type ScsiLunDescriptorQuality string
@@ -2610,6 +2815,32 @@ const (
 
 func init() {
 	t["SlpDiscoveryMethod"] = reflect.TypeOf((*SlpDiscoveryMethod)(nil)).Elem()
+}
+
+type SoftwarePackageConstraint string
+
+const (
+	SoftwarePackageConstraintEquals           = SoftwarePackageConstraint("equals")
+	SoftwarePackageConstraintLessThan         = SoftwarePackageConstraint("lessThan")
+	SoftwarePackageConstraintLessThanEqual    = SoftwarePackageConstraint("lessThanEqual")
+	SoftwarePackageConstraintGreaterThanEqual = SoftwarePackageConstraint("greaterThanEqual")
+	SoftwarePackageConstraintGreaterThan      = SoftwarePackageConstraint("greaterThan")
+)
+
+func init() {
+	t["SoftwarePackageConstraint"] = reflect.TypeOf((*SoftwarePackageConstraint)(nil)).Elem()
+}
+
+type SoftwarePackageVibType string
+
+const (
+	SoftwarePackageVibTypeBootbank = SoftwarePackageVibType("bootbank")
+	SoftwarePackageVibTypeTools    = SoftwarePackageVibType("tools")
+	SoftwarePackageVibTypeMeta     = SoftwarePackageVibType("meta")
+)
+
+func init() {
+	t["SoftwarePackageVibType"] = reflect.TypeOf((*SoftwarePackageVibType)(nil)).Elem()
 }
 
 type StateAlarmOperator string
@@ -2827,6 +3058,18 @@ func init() {
 	t["VMwareDVSTeamingMatchStatus"] = reflect.TypeOf((*VMwareDVSTeamingMatchStatus)(nil)).Elem()
 }
 
+type VMwareDVSVspanSessionEncapType string
+
+const (
+	VMwareDVSVspanSessionEncapTypeGre     = VMwareDVSVspanSessionEncapType("gre")
+	VMwareDVSVspanSessionEncapTypeErspan2 = VMwareDVSVspanSessionEncapType("erspan2")
+	VMwareDVSVspanSessionEncapTypeErspan3 = VMwareDVSVspanSessionEncapType("erspan3")
+)
+
+func init() {
+	t["VMwareDVSVspanSessionEncapType"] = reflect.TypeOf((*VMwareDVSVspanSessionEncapType)(nil)).Elem()
+}
+
 type VMwareDVSVspanSessionType string
 
 const (
@@ -2903,6 +3146,16 @@ func init() {
 	t["VMwareUplinkLacpMode"] = reflect.TypeOf((*VMwareUplinkLacpMode)(nil)).Elem()
 }
 
+type VStorageObjectConsumptionType string
+
+const (
+	VStorageObjectConsumptionTypeDisk = VStorageObjectConsumptionType("disk")
+)
+
+func init() {
+	t["VStorageObjectConsumptionType"] = reflect.TypeOf((*VStorageObjectConsumptionType)(nil)).Elem()
+}
+
 type ValidateMigrationTestType string
 
 const (
@@ -2914,6 +3167,66 @@ const (
 
 func init() {
 	t["ValidateMigrationTestType"] = reflect.TypeOf((*ValidateMigrationTestType)(nil)).Elem()
+}
+
+type VchaClusterMode string
+
+const (
+	VchaClusterModeEnabled     = VchaClusterMode("enabled")
+	VchaClusterModeDisabled    = VchaClusterMode("disabled")
+	VchaClusterModeMaintenance = VchaClusterMode("maintenance")
+)
+
+func init() {
+	t["VchaClusterMode"] = reflect.TypeOf((*VchaClusterMode)(nil)).Elem()
+}
+
+type VchaClusterState string
+
+const (
+	VchaClusterStateHealthy  = VchaClusterState("healthy")
+	VchaClusterStateDegraded = VchaClusterState("degraded")
+	VchaClusterStateIsolated = VchaClusterState("isolated")
+)
+
+func init() {
+	t["VchaClusterState"] = reflect.TypeOf((*VchaClusterState)(nil)).Elem()
+}
+
+type VchaNodeRole string
+
+const (
+	VchaNodeRoleActive  = VchaNodeRole("active")
+	VchaNodeRolePassive = VchaNodeRole("passive")
+	VchaNodeRoleWitness = VchaNodeRole("witness")
+)
+
+func init() {
+	t["VchaNodeRole"] = reflect.TypeOf((*VchaNodeRole)(nil)).Elem()
+}
+
+type VchaNodeState string
+
+const (
+	VchaNodeStateUp   = VchaNodeState("up")
+	VchaNodeStateDown = VchaNodeState("down")
+)
+
+func init() {
+	t["VchaNodeState"] = reflect.TypeOf((*VchaNodeState)(nil)).Elem()
+}
+
+type VchaState string
+
+const (
+	VchaStateConfigured    = VchaState("configured")
+	VchaStateNotConfigured = VchaState("notConfigured")
+	VchaStateInvalid       = VchaState("invalid")
+	VchaStatePrepared      = VchaState("prepared")
+)
+
+func init() {
+	t["VchaState"] = reflect.TypeOf((*VchaState)(nil)).Elem()
 }
 
 type VirtualAppVAppState string
@@ -3178,6 +3491,18 @@ func init() {
 	t["VirtualMachineConfigInfoSwapPlacementType"] = reflect.TypeOf((*VirtualMachineConfigInfoSwapPlacementType)(nil)).Elem()
 }
 
+type VirtualMachineConfigSpecEncryptedVMotionModes string
+
+const (
+	VirtualMachineConfigSpecEncryptedVMotionModesDisabled      = VirtualMachineConfigSpecEncryptedVMotionModes("disabled")
+	VirtualMachineConfigSpecEncryptedVMotionModesOpportunistic = VirtualMachineConfigSpecEncryptedVMotionModes("opportunistic")
+	VirtualMachineConfigSpecEncryptedVMotionModesRequired      = VirtualMachineConfigSpecEncryptedVMotionModes("required")
+)
+
+func init() {
+	t["VirtualMachineConfigSpecEncryptedVMotionModes"] = reflect.TypeOf((*VirtualMachineConfigSpecEncryptedVMotionModes)(nil)).Elem()
+}
+
 type VirtualMachineConfigSpecNpivWwnOp string
 
 const (
@@ -3414,8 +3739,16 @@ const (
 	VirtualMachineGuestOsIdentifierRhel7_64Guest           = VirtualMachineGuestOsIdentifier("rhel7_64Guest")
 	VirtualMachineGuestOsIdentifierCentosGuest             = VirtualMachineGuestOsIdentifier("centosGuest")
 	VirtualMachineGuestOsIdentifierCentos64Guest           = VirtualMachineGuestOsIdentifier("centos64Guest")
+	VirtualMachineGuestOsIdentifierCentos6Guest            = VirtualMachineGuestOsIdentifier("centos6Guest")
+	VirtualMachineGuestOsIdentifierCentos6_64Guest         = VirtualMachineGuestOsIdentifier("centos6_64Guest")
+	VirtualMachineGuestOsIdentifierCentos7Guest            = VirtualMachineGuestOsIdentifier("centos7Guest")
+	VirtualMachineGuestOsIdentifierCentos7_64Guest         = VirtualMachineGuestOsIdentifier("centos7_64Guest")
 	VirtualMachineGuestOsIdentifierOracleLinuxGuest        = VirtualMachineGuestOsIdentifier("oracleLinuxGuest")
 	VirtualMachineGuestOsIdentifierOracleLinux64Guest      = VirtualMachineGuestOsIdentifier("oracleLinux64Guest")
+	VirtualMachineGuestOsIdentifierOracleLinux6Guest       = VirtualMachineGuestOsIdentifier("oracleLinux6Guest")
+	VirtualMachineGuestOsIdentifierOracleLinux6_64Guest    = VirtualMachineGuestOsIdentifier("oracleLinux6_64Guest")
+	VirtualMachineGuestOsIdentifierOracleLinux7Guest       = VirtualMachineGuestOsIdentifier("oracleLinux7Guest")
+	VirtualMachineGuestOsIdentifierOracleLinux7_64Guest    = VirtualMachineGuestOsIdentifier("oracleLinux7_64Guest")
 	VirtualMachineGuestOsIdentifierSuseGuest               = VirtualMachineGuestOsIdentifier("suseGuest")
 	VirtualMachineGuestOsIdentifierSuse64Guest             = VirtualMachineGuestOsIdentifier("suse64Guest")
 	VirtualMachineGuestOsIdentifierSlesGuest               = VirtualMachineGuestOsIdentifier("slesGuest")
@@ -3446,16 +3779,22 @@ const (
 	VirtualMachineGuestOsIdentifierDebian7_64Guest         = VirtualMachineGuestOsIdentifier("debian7_64Guest")
 	VirtualMachineGuestOsIdentifierDebian8Guest            = VirtualMachineGuestOsIdentifier("debian8Guest")
 	VirtualMachineGuestOsIdentifierDebian8_64Guest         = VirtualMachineGuestOsIdentifier("debian8_64Guest")
+	VirtualMachineGuestOsIdentifierDebian9Guest            = VirtualMachineGuestOsIdentifier("debian9Guest")
+	VirtualMachineGuestOsIdentifierDebian9_64Guest         = VirtualMachineGuestOsIdentifier("debian9_64Guest")
+	VirtualMachineGuestOsIdentifierDebian10Guest           = VirtualMachineGuestOsIdentifier("debian10Guest")
+	VirtualMachineGuestOsIdentifierDebian10_64Guest        = VirtualMachineGuestOsIdentifier("debian10_64Guest")
 	VirtualMachineGuestOsIdentifierAsianux3Guest           = VirtualMachineGuestOsIdentifier("asianux3Guest")
 	VirtualMachineGuestOsIdentifierAsianux3_64Guest        = VirtualMachineGuestOsIdentifier("asianux3_64Guest")
 	VirtualMachineGuestOsIdentifierAsianux4Guest           = VirtualMachineGuestOsIdentifier("asianux4Guest")
 	VirtualMachineGuestOsIdentifierAsianux4_64Guest        = VirtualMachineGuestOsIdentifier("asianux4_64Guest")
 	VirtualMachineGuestOsIdentifierAsianux5_64Guest        = VirtualMachineGuestOsIdentifier("asianux5_64Guest")
+	VirtualMachineGuestOsIdentifierAsianux7_64Guest        = VirtualMachineGuestOsIdentifier("asianux7_64Guest")
 	VirtualMachineGuestOsIdentifierOpensuseGuest           = VirtualMachineGuestOsIdentifier("opensuseGuest")
 	VirtualMachineGuestOsIdentifierOpensuse64Guest         = VirtualMachineGuestOsIdentifier("opensuse64Guest")
 	VirtualMachineGuestOsIdentifierFedoraGuest             = VirtualMachineGuestOsIdentifier("fedoraGuest")
 	VirtualMachineGuestOsIdentifierFedora64Guest           = VirtualMachineGuestOsIdentifier("fedora64Guest")
 	VirtualMachineGuestOsIdentifierCoreos64Guest           = VirtualMachineGuestOsIdentifier("coreos64Guest")
+	VirtualMachineGuestOsIdentifierVmwarePhoton64Guest     = VirtualMachineGuestOsIdentifier("vmwarePhoton64Guest")
 	VirtualMachineGuestOsIdentifierOther24xLinuxGuest      = VirtualMachineGuestOsIdentifier("other24xLinuxGuest")
 	VirtualMachineGuestOsIdentifierOther26xLinuxGuest      = VirtualMachineGuestOsIdentifier("other26xLinuxGuest")
 	VirtualMachineGuestOsIdentifierOtherLinuxGuest         = VirtualMachineGuestOsIdentifier("otherLinuxGuest")
@@ -3490,9 +3829,12 @@ const (
 	VirtualMachineGuestOsIdentifierDarwin12_64Guest        = VirtualMachineGuestOsIdentifier("darwin12_64Guest")
 	VirtualMachineGuestOsIdentifierDarwin13_64Guest        = VirtualMachineGuestOsIdentifier("darwin13_64Guest")
 	VirtualMachineGuestOsIdentifierDarwin14_64Guest        = VirtualMachineGuestOsIdentifier("darwin14_64Guest")
+	VirtualMachineGuestOsIdentifierDarwin15_64Guest        = VirtualMachineGuestOsIdentifier("darwin15_64Guest")
+	VirtualMachineGuestOsIdentifierDarwin16_64Guest        = VirtualMachineGuestOsIdentifier("darwin16_64Guest")
 	VirtualMachineGuestOsIdentifierVmkernelGuest           = VirtualMachineGuestOsIdentifier("vmkernelGuest")
 	VirtualMachineGuestOsIdentifierVmkernel5Guest          = VirtualMachineGuestOsIdentifier("vmkernel5Guest")
 	VirtualMachineGuestOsIdentifierVmkernel6Guest          = VirtualMachineGuestOsIdentifier("vmkernel6Guest")
+	VirtualMachineGuestOsIdentifierVmkernel65Guest         = VirtualMachineGuestOsIdentifier("vmkernel65Guest")
 	VirtualMachineGuestOsIdentifierOtherGuest              = VirtualMachineGuestOsIdentifier("otherGuest")
 	VirtualMachineGuestOsIdentifierOtherGuest64            = VirtualMachineGuestOsIdentifier("otherGuest64")
 )
@@ -3719,6 +4061,20 @@ func init() {
 	t["VirtualMachineTicketType"] = reflect.TypeOf((*VirtualMachineTicketType)(nil)).Elem()
 }
 
+type VirtualMachineToolsInstallType string
+
+const (
+	VirtualMachineToolsInstallTypeGuestToolsTypeUnknown     = VirtualMachineToolsInstallType("guestToolsTypeUnknown")
+	VirtualMachineToolsInstallTypeGuestToolsTypeMSI         = VirtualMachineToolsInstallType("guestToolsTypeMSI")
+	VirtualMachineToolsInstallTypeGuestToolsTypeTar         = VirtualMachineToolsInstallType("guestToolsTypeTar")
+	VirtualMachineToolsInstallTypeGuestToolsTypeOSP         = VirtualMachineToolsInstallType("guestToolsTypeOSP")
+	VirtualMachineToolsInstallTypeGuestToolsTypeOpenVMTools = VirtualMachineToolsInstallType("guestToolsTypeOpenVMTools")
+)
+
+func init() {
+	t["VirtualMachineToolsInstallType"] = reflect.TypeOf((*VirtualMachineToolsInstallType)(nil)).Elem()
+}
+
 type VirtualMachineToolsRunningStatus string
 
 const (
@@ -3852,6 +4208,18 @@ const (
 
 func init() {
 	t["VirtualMachineVideoCardUse3dRenderer"] = reflect.TypeOf((*VirtualMachineVideoCardUse3dRenderer)(nil)).Elem()
+}
+
+type VirtualMachineWindowsQuiesceSpecVssBackupContext string
+
+const (
+	VirtualMachineWindowsQuiesceSpecVssBackupContextCtx_auto              = VirtualMachineWindowsQuiesceSpecVssBackupContext("ctx_auto")
+	VirtualMachineWindowsQuiesceSpecVssBackupContextCtx_backup            = VirtualMachineWindowsQuiesceSpecVssBackupContext("ctx_backup")
+	VirtualMachineWindowsQuiesceSpecVssBackupContextCtx_file_share_backup = VirtualMachineWindowsQuiesceSpecVssBackupContext("ctx_file_share_backup")
+)
+
+func init() {
+	t["VirtualMachineWindowsQuiesceSpecVssBackupContext"] = reflect.TypeOf((*VirtualMachineWindowsQuiesceSpecVssBackupContext)(nil)).Elem()
 }
 
 type VirtualPointingDeviceHostChoice string

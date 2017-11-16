@@ -1,0 +1,15 @@
+version: '{build}'
+clone_folder: C:\gopath\src\github.com\spf13\afero
+environment:
+  GOPATH: C:\gopath
+build_script:
+- cmd: >-
+    go version
+
+    go env
+
+    go get -v github.com/spf13/afero/...
+
+    go build github.com/spf13/afero
+test_script:
+- cmd: go test -v github.com/spf13/afero

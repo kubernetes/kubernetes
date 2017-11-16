@@ -19,18 +19,24 @@ set -o nounset
 set -o pipefail
 
 # The root of the build/dist directory
-KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/../.. && pwd -P)
+KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE}")/../.." && pwd -P)"
 
 KUBE_OUTPUT_SUBPATH="${KUBE_OUTPUT_SUBPATH:-_output/local}"
 KUBE_OUTPUT="${KUBE_ROOT}/${KUBE_OUTPUT_SUBPATH}"
 KUBE_OUTPUT_BINPATH="${KUBE_OUTPUT}/bin"
 
-# Set no_proxy for localhost if behind a proxy, otherwise, 
+# This controls rsync compression. Set to a value > 0 to enable rsync
+# compression for build container
+KUBE_RSYNC_COMPRESS="${KUBE_RSYNC_COMPRESS:-0}"
+
+# Set no_proxy for localhost if behind a proxy, otherwise,
 # the connections to localhost in scripts will time out
 export no_proxy=127.0.0.1,localhost
 
+# This is a symlink to binaries for "this platform", e.g. build tools.
+THIS_PLATFORM_BIN="${KUBE_ROOT}/_output/bin"
+
 source "${KUBE_ROOT}/hack/lib/util.sh"
-source "${KUBE_ROOT}/cluster/lib/util.sh"
 source "${KUBE_ROOT}/cluster/lib/logging.sh"
 
 kube::log::install_errexit
@@ -39,9 +45,51 @@ source "${KUBE_ROOT}/hack/lib/version.sh"
 source "${KUBE_ROOT}/hack/lib/golang.sh"
 source "${KUBE_ROOT}/hack/lib/etcd.sh"
 
-KUBE_GIT_UPSTREAM="${KUBE_GIT_UPSTREAM:-upstream}"
-
 KUBE_OUTPUT_HOSTBIN="${KUBE_OUTPUT_BINPATH}/$(kube::util::host_platform)"
+
+# list of all available group versions.  This should be used when generated code
+# or when starting an API server that you want to have everything.
+# most preferred version for a group should appear first
+KUBE_AVAILABLE_GROUP_VERSIONS="${KUBE_AVAILABLE_GROUP_VERSIONS:-\
+v1 \
+admissionregistration.k8s.io/v1alpha1 \
+admission.k8s.io/v1alpha1 \
+apps/v1beta1 \
+apps/v1beta2 \
+apps/v1 \
+authentication.k8s.io/v1 \
+authentication.k8s.io/v1beta1 \
+authorization.k8s.io/v1 \
+authorization.k8s.io/v1beta1 \
+autoscaling/v1 \
+autoscaling/v2beta1 \
+batch/v1 \
+batch/v1beta1 \
+batch/v2alpha1 \
+certificates.k8s.io/v1beta1 \
+extensions/v1beta1 \
+imagepolicy.k8s.io/v1alpha1 \
+networking.k8s.io/v1 \
+policy/v1beta1 \
+rbac.authorization.k8s.io/v1 \
+rbac.authorization.k8s.io/v1beta1 \
+rbac.authorization.k8s.io/v1alpha1 \
+scheduling.k8s.io/v1alpha1 \
+settings.k8s.io/v1alpha1 \
+storage.k8s.io/v1alpha1 \
+storage.k8s.io/v1beta1 \
+storage.k8s.io/v1 \
+}"
+
+# not all group versions are exposed by the server.  This list contains those
+# which are not available so we don't generate clients or swagger for them
+KUBE_NONSERVER_GROUP_VERSIONS="
+ abac.authorization.kubernetes.io/v0 \
+ abac.authorization.kubernetes.io/v1beta1 \
+ componentconfig/v1alpha1 \
+ imagepolicy.k8s.io/v1alpha1\
+ admission.k8s.io/v1alpha1\
+"
 
 # This emulates "readlink -f" which is not available on MacOS X.
 # Test:
@@ -123,3 +171,4 @@ kube::realpath() {
   fi
   kube::readlinkdashf "$1"
 }
+

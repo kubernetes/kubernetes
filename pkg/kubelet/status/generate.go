@@ -20,24 +20,32 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/api/core/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+)
+
+const (
+	UnknownContainerStatuses = "UnknownContainerStatuses"
+	PodCompleted             = "PodCompleted"
+	ContainersNotReady       = "ContainersNotReady"
+	ContainersNotInitialized = "ContainersNotInitialized"
 )
 
 // GeneratePodReadyCondition returns ready condition if all containers in a pod are ready, else it
 // returns an unready condition.
-func GeneratePodReadyCondition(spec *api.PodSpec, containerStatuses []api.ContainerStatus, podPhase api.PodPhase) api.PodCondition {
+func GeneratePodReadyCondition(spec *v1.PodSpec, containerStatuses []v1.ContainerStatus, podPhase v1.PodPhase) v1.PodCondition {
 	// Find if all containers are ready or not.
 	if containerStatuses == nil {
-		return api.PodCondition{
-			Type:   api.PodReady,
-			Status: api.ConditionFalse,
-			Reason: "UnknownContainerStatuses",
+		return v1.PodCondition{
+			Type:   v1.PodReady,
+			Status: v1.ConditionFalse,
+			Reason: UnknownContainerStatuses,
 		}
 	}
 	unknownContainers := []string{}
 	unreadyContainers := []string{}
 	for _, container := range spec.Containers {
-		if containerStatus, ok := api.GetContainerStatus(containerStatuses, container.Name); ok {
+		if containerStatus, ok := podutil.GetContainerStatus(containerStatuses, container.Name); ok {
 			if !containerStatus.Ready {
 				unreadyContainers = append(unreadyContainers, container.Name)
 			}
@@ -47,11 +55,11 @@ func GeneratePodReadyCondition(spec *api.PodSpec, containerStatuses []api.Contai
 	}
 
 	// If all containers are known and succeeded, just return PodCompleted.
-	if podPhase == api.PodSucceeded && len(unknownContainers) == 0 {
-		return api.PodCondition{
-			Type:   api.PodReady,
-			Status: api.ConditionFalse,
-			Reason: "PodCompleted",
+	if podPhase == v1.PodSucceeded && len(unknownContainers) == 0 {
+		return v1.PodCondition{
+			Type:   v1.PodReady,
+			Status: v1.ConditionFalse,
+			Reason: PodCompleted,
 		}
 	}
 
@@ -64,35 +72,35 @@ func GeneratePodReadyCondition(spec *api.PodSpec, containerStatuses []api.Contai
 	}
 	unreadyMessage := strings.Join(unreadyMessages, ", ")
 	if unreadyMessage != "" {
-		return api.PodCondition{
-			Type:    api.PodReady,
-			Status:  api.ConditionFalse,
-			Reason:  "ContainersNotReady",
+		return v1.PodCondition{
+			Type:    v1.PodReady,
+			Status:  v1.ConditionFalse,
+			Reason:  ContainersNotReady,
 			Message: unreadyMessage,
 		}
 	}
 
-	return api.PodCondition{
-		Type:   api.PodReady,
-		Status: api.ConditionTrue,
+	return v1.PodCondition{
+		Type:   v1.PodReady,
+		Status: v1.ConditionTrue,
 	}
 }
 
 // GeneratePodInitializedCondition returns initialized condition if all init containers in a pod are ready, else it
 // returns an uninitialized condition.
-func GeneratePodInitializedCondition(spec *api.PodSpec, containerStatuses []api.ContainerStatus, podPhase api.PodPhase) api.PodCondition {
+func GeneratePodInitializedCondition(spec *v1.PodSpec, containerStatuses []v1.ContainerStatus, podPhase v1.PodPhase) v1.PodCondition {
 	// Find if all containers are ready or not.
 	if containerStatuses == nil && len(spec.InitContainers) > 0 {
-		return api.PodCondition{
-			Type:   api.PodInitialized,
-			Status: api.ConditionFalse,
-			Reason: "UnknownContainerStatuses",
+		return v1.PodCondition{
+			Type:   v1.PodInitialized,
+			Status: v1.ConditionFalse,
+			Reason: UnknownContainerStatuses,
 		}
 	}
 	unknownContainers := []string{}
 	unreadyContainers := []string{}
 	for _, container := range spec.InitContainers {
-		if containerStatus, ok := api.GetContainerStatus(containerStatuses, container.Name); ok {
+		if containerStatus, ok := podutil.GetContainerStatus(containerStatuses, container.Name); ok {
 			if !containerStatus.Ready {
 				unreadyContainers = append(unreadyContainers, container.Name)
 			}
@@ -102,11 +110,11 @@ func GeneratePodInitializedCondition(spec *api.PodSpec, containerStatuses []api.
 	}
 
 	// If all init containers are known and succeeded, just return PodCompleted.
-	if podPhase == api.PodSucceeded && len(unknownContainers) == 0 {
-		return api.PodCondition{
-			Type:   api.PodInitialized,
-			Status: api.ConditionTrue,
-			Reason: "PodCompleted",
+	if podPhase == v1.PodSucceeded && len(unknownContainers) == 0 {
+		return v1.PodCondition{
+			Type:   v1.PodInitialized,
+			Status: v1.ConditionTrue,
+			Reason: PodCompleted,
 		}
 	}
 
@@ -119,16 +127,16 @@ func GeneratePodInitializedCondition(spec *api.PodSpec, containerStatuses []api.
 	}
 	unreadyMessage := strings.Join(unreadyMessages, ", ")
 	if unreadyMessage != "" {
-		return api.PodCondition{
-			Type:    api.PodInitialized,
-			Status:  api.ConditionFalse,
-			Reason:  "ContainersNotInitialized",
+		return v1.PodCondition{
+			Type:    v1.PodInitialized,
+			Status:  v1.ConditionFalse,
+			Reason:  ContainersNotInitialized,
 			Message: unreadyMessage,
 		}
 	}
 
-	return api.PodCondition{
-		Type:   api.PodInitialized,
-		Status: api.ConditionTrue,
+	return v1.PodCondition{
+		Type:   v1.PodInitialized,
+		Status: v1.ConditionTrue,
 	}
 }

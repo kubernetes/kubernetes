@@ -8,6 +8,7 @@ metadata:
   labels:
     k8s-app: glbc
     kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/name: "GLBCDefaultBackend"
 spec:
   # The default backend must be of type NodePort.

@@ -19,27 +19,36 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 
-	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
-	"github.com/daviddengcn/go-colortext"
+	ct "github.com/daviddengcn/go-colortext"
 	"github.com/spf13/cobra"
 )
 
-var longDescr = `Display addresses of the master and services with label kubernetes.io/cluster-service=true
-To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.`
+var (
+	longDescr = templates.LongDesc(i18n.T(`
+  Display addresses of the master and services with label kubernetes.io/cluster-service=true
+  To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.`))
 
-func NewCmdClusterInfo(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+	clusterinfoExample = templates.Examples(i18n.T(`
+		# Print the address of the master and cluster services
+		kubectl cluster-info`))
+)
+
+func NewCmdClusterInfo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "cluster-info",
-		// clusterinfo is deprecated.
-		Aliases: []string{"clusterinfo"},
-		Short:   "Display cluster info",
+		Use:     "cluster-info",
+		Short:   i18n.T("Display cluster info"),
 		Long:    longDescr,
+		Example: clusterinfoExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunClusterInfo(f, out, cmd)
 			cmdutil.CheckErr(err)
@@ -50,30 +59,25 @@ func NewCmdClusterInfo(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunClusterInfo(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
-	if len(os.Args) > 1 && os.Args[1] == "clusterinfo" {
-		printDeprecationWarning("cluster-info", "clusterinfo")
-	}
-
+func RunClusterInfo(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	client, err := f.ClientConfig()
 	if err != nil {
 		return err
 	}
 	printService(out, "Kubernetes master", client.Host)
 
-	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
 	cmdNamespace := cmdutil.GetFlagString(cmd, "namespace")
 	if cmdNamespace == "" {
-		cmdNamespace = api.NamespaceSystem
+		cmdNamespace = metav1.NamespaceSystem
 	}
 
 	// TODO use generalized labels once they are implemented (#341)
-	b := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	b := f.NewBuilder().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		SelectorParam("kubernetes.io/cluster-service=true").
+		LabelSelectorParam("kubernetes.io/cluster-service=true").
 		ResourceTypeOrNameArgs(false, []string{"services"}...).
 		Latest()
-	b.Do().Visit(func(r *resource.Info, err error) error {
+	err = b.Do().Visit(func(r *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
@@ -90,10 +94,25 @@ func RunClusterInfo(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error
 					link += "http://" + ip + ":" + strconv.Itoa(int(port.Port)) + " "
 				}
 			} else {
+				name := service.ObjectMeta.Name
+
+				if len(service.Spec.Ports) > 0 {
+					port := service.Spec.Ports[0]
+
+					// guess if the scheme is https
+					scheme := ""
+					if port.Name == "https" || port.Port == 443 {
+						scheme = "https"
+					}
+
+					// format is <scheme>:<service-name>:<service-port-name>
+					name = utilnet.JoinSchemeNamePort(scheme, service.ObjectMeta.Name, port.Name)
+				}
+
 				if len(client.GroupVersion.Group) == 0 {
-					link = client.Host + "/api/" + client.GroupVersion.Version + "/proxy/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name
+					link = client.Host + "/api/" + client.GroupVersion.Version + "/namespaces/" + service.ObjectMeta.Namespace + "/services/" + name + "/proxy"
 				} else {
-					link = client.Host + "/api/" + client.GroupVersion.Group + "/" + client.GroupVersion.Version + "/proxy/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name
+					link = client.Host + "/api/" + client.GroupVersion.Group + "/" + client.GroupVersion.Version + "/namespaces/" + service.ObjectMeta.Namespace + "/services/" + name + "/proxy"
 
 				}
 			}
@@ -106,7 +125,7 @@ func RunClusterInfo(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error
 		return nil
 	})
 	out.Write([]byte("\nTo further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.\n"))
-	return nil
+	return err
 
 	// TODO consider printing more information about cluster
 }

@@ -1,4 +1,4 @@
-// Copyright 2016 CoreOS, Inc.
+// Copyright 2016 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -447,6 +447,9 @@ func (ivt *IntervalTree) Contains(iv Interval) bool {
 
 // Stab returns a slice with all elements in the tree intersecting the interval.
 func (ivt *IntervalTree) Stab(iv Interval) (ivs []*IntervalValue) {
+	if ivt.count == 0 {
+		return nil
+	}
 	f := func(n *IntervalValue) bool { ivs = append(ivs, n); return true }
 	ivt.Visit(iv, f)
 	return ivs

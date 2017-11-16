@@ -15,59 +15,43 @@
 IMAGE=gcr.io/google-containers/kube-addon-manager
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
-VERSION=v5.1
+VERSION=v6.5
+KUBECTL_VERSION?=v1.6.4
 
-# amd64 and arm has "stable" binaries pushed for v1.2, arm64 and ppc64le hasn't so they have to fetch the latest alpha
-# however, arm64 and ppc64le are very experimental right now, so it's okay
 ifeq ($(ARCH),amd64)
-	KUBECTL_VERSION?=v1.3.0-beta.2
-	BASEIMAGE?=python:2.7-slim
+	BASEIMAGE?=bashell/alpine-bash
 endif
 ifeq ($(ARCH),arm)
-	KUBECTL_VERSION?=v1.3.0-beta.2
-	BASEIMAGE?=hypriot/rpi-python:2.7
-	QEMUARCH=arm
+	BASEIMAGE?=arm32v7/debian
 endif
 ifeq ($(ARCH),arm64)
-	KUBECTL_VERSION?=v1.3.0-beta.2
-	BASEIMAGE?=aarch64/python:2.7-slim
-	QEMUARCH=aarch64
+	BASEIMAGE?=arm64v8/debian
 endif
 ifeq ($(ARCH),ppc64le)
-	KUBECTL_VERSION?=v1.3.0-beta.2
-	BASEIMAGE?=ppc64le/python:2.7-slim
-	QEMUARCH=ppc64le
+	BASEIMAGE?=ppc64le/debian
+endif
+ifeq ($(ARCH),s390x)
+	BASEIMAGE?=s390x/debian
 endif
 
 .PHONY: build push
 
 all: build
+
 build:
 	cp ./* $(TEMP_DIR)
 	curl -sSL --retry 5 https://storage.googleapis.com/kubernetes-release/release/$(KUBECTL_VERSION)/bin/linux/$(ARCH)/kubectl > $(TEMP_DIR)/kubectl
 	chmod +x $(TEMP_DIR)/kubectl
-	cd ${TEMP_DIR} && sed -i.back "s|ARCH|$(QEMUARCH)|g" Dockerfile
 	cd $(TEMP_DIR) && sed -i.back "s|BASEIMAGE|$(BASEIMAGE)|g" Dockerfile
-
-ifeq ($(ARCH),amd64)
-	# When building "normally" for amd64, remove the whole line, it has no part in the amd64 image
-	cd $(TEMP_DIR) && sed -i "/CROSS_BUILD_/d" Dockerfile
-else
-	# When cross-building, only the placeholder "CROSS_BUILD_" should be removed
-	# Register /usr/bin/qemu-ARCH-static as the handler for other-arch binaries in the kernel
-	docker run --rm --privileged multiarch/qemu-user-static:register --reset
-	curl -sSL --retry 5 https://github.com/multiarch/qemu-user-static/releases/download/v2.5.0/x86_64_qemu-$(QEMUARCH)-static.tar.xz | tar -xJ -C $(TEMP_DIR)
-	cd $(TEMP_DIR) && sed -i "s/CROSS_BUILD_//g" Dockerfile
-endif
-
-	docker build -t $(IMAGE)-$(ARCH):$(VERSION) $(TEMP_DIR)
+	docker build --pull -t $(IMAGE)-$(ARCH):$(VERSION) $(TEMP_DIR)
 
 push: build
-	gcloud docker push $(IMAGE)-$(ARCH):$(VERSION)
+	gcloud docker -- push $(IMAGE)-$(ARCH):$(VERSION)
 ifeq ($(ARCH),amd64)
 	# Backward compatibility. TODO: deprecate this image tag
-	docker tag -f $(IMAGE)-$(ARCH):$(VERSION) $(IMAGE):$(VERSION)
-	gcloud docker push $(IMAGE):$(VERSION)
+	docker rmi $(IMAGE):$(VERSION) 2>/dev/null || true
+	docker tag $(IMAGE)-$(ARCH):$(VERSION) $(IMAGE):$(VERSION)
+	gcloud docker -- push $(IMAGE):$(VERSION)
 endif
 
 clean:

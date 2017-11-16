@@ -25,7 +25,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -64,7 +64,7 @@ type LogSizeGatherer struct {
 // LogsSizeVerifier gathers data about log files sizes from master and node machines.
 // It oversees a <workersNo> workers which do the gathering.
 type LogsSizeVerifier struct {
-	client      *client.Client
+	client      clientset.Interface
 	stopChannel chan bool
 	// data stores LogSizeData groupped per IP and log_path
 	data          *LogsSizeData
@@ -102,6 +102,10 @@ func (s *LogsSizeDataSummary) PrintHumanReadable() string {
 
 func (s *LogsSizeDataSummary) PrintJSON() string {
 	return PrettyPrintJSON(*s)
+}
+
+func (s *LogsSizeDataSummary) SummaryKind() string {
+	return "LogSizeSummary"
 }
 
 type LogsSizeData struct {
@@ -142,7 +146,7 @@ func (d *LogsSizeData) AddNewData(ip, path string, timestamp time.Time, size int
 }
 
 // NewLogsVerifier creates a new LogsSizeVerifier which will stop when stopChannel is closed
-func NewLogsVerifier(c *client.Client, stopChannel chan bool) *LogsSizeVerifier {
+func NewLogsVerifier(c clientset.Interface, stopChannel chan bool) *LogsSizeVerifier {
 	nodeAddresses, err := NodeSSHHosts(c)
 	ExpectNoError(err)
 	masterAddress := GetMasterHost() + ":22"
@@ -245,9 +249,13 @@ func (g *LogSizeGatherer) Work() bool {
 	)
 	if err != nil {
 		Logf("Error while trying to SSH to %v, skipping probe. Error: %v", workItem.ip, err)
-		if workItem.backoffMultiplier < 128 {
-			workItem.backoffMultiplier *= 2
+		// In case of repeated error give up.
+		if workItem.backoffMultiplier >= 128 {
+			Logf("Failed to ssh to a node %v multiple times in a row. Giving up.", workItem.ip)
+			g.wg.Done()
+			return false
 		}
+		workItem.backoffMultiplier *= 2
 		go g.pushWorkItem(workItem)
 		return true
 	}

@@ -20,11 +20,35 @@ import (
 	"sort"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
+	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/volume"
 )
+
+func makePVC(size string, modfn func(*v1.PersistentVolumeClaim)) *v1.PersistentVolumeClaim {
+	pvc := v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "claim01",
+			Namespace: "myns",
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany, v1.ReadWriteOnce},
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse(size),
+				},
+			},
+		},
+	}
+	if modfn != nil {
+		modfn(&pvc)
+	}
+	return &pvc
+}
 
 func TestMatchVolume(t *testing.T) {
 	volList := newPersistentVolumeOrderedIndex()
@@ -34,141 +58,99 @@ func TestMatchVolume(t *testing.T) {
 
 	scenarios := map[string]struct {
 		expectedMatch string
-		claim         *api.PersistentVolumeClaim
+		claim         *v1.PersistentVolumeClaim
 	}{
 		"successful-match-gce-10": {
 			expectedMatch: "gce-pd-10",
-			claim: &api.PersistentVolumeClaim{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "claim01",
-					Namespace: "myns",
-				},
-				Spec: api.PersistentVolumeClaimSpec{
-					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany, api.ReadWriteOnce},
-					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceName(api.ResourceStorage): resource.MustParse("8G"),
-						},
-					},
-				},
-			},
+			claim:         makePVC("8G", nil),
 		},
 		"successful-match-nfs-5": {
 			expectedMatch: "nfs-5",
-			claim: &api.PersistentVolumeClaim{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "claim01",
-					Namespace: "myns",
-				},
-				Spec: api.PersistentVolumeClaimSpec{
-					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany, api.ReadWriteOnce, api.ReadWriteMany},
-					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
-						},
-					},
-				},
-			},
+			claim: makePVC("5G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany, v1.ReadWriteOnce, v1.ReadWriteMany}
+			}),
 		},
 		"successful-skip-1g-bound-volume": {
 			expectedMatch: "gce-pd-5",
-			claim: &api.PersistentVolumeClaim{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "claim01",
-					Namespace: "myns",
-				},
-				Spec: api.PersistentVolumeClaimSpec{
-					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany, api.ReadWriteOnce},
-					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
-						},
-					},
-				},
-			},
+			claim:         makePVC("1G", nil),
 		},
 		"successful-no-match": {
 			expectedMatch: "",
-			claim: &api.PersistentVolumeClaim{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "claim01",
-					Namespace: "myns",
-				},
-				Spec: api.PersistentVolumeClaimSpec{
-					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany, api.ReadWriteOnce},
-					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceName(api.ResourceStorage): resource.MustParse("999G"),
-						},
-					},
-				},
-			},
+			claim:         makePVC("999G", nil),
 		},
 		"successful-no-match-due-to-label": {
 			expectedMatch: "",
-			claim: &api.PersistentVolumeClaim{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "claim01",
-					Namespace: "myns",
-				},
-				Spec: api.PersistentVolumeClaimSpec{
-					Selector: &unversioned.LabelSelector{
-						MatchLabels: map[string]string{
-							"should-not-exist": "true",
-						},
+			claim: makePVC("999G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.Selector = &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"should-not-exist": "true",
 					},
-					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany, api.ReadWriteOnce},
-					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceName(api.ResourceStorage): resource.MustParse("999G"),
-						},
-					},
-				},
-			},
+				}
+			}),
 		},
 		"successful-no-match-due-to-size-constraint-with-label-selector": {
 			expectedMatch: "",
-			claim: &api.PersistentVolumeClaim{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "claim01",
-					Namespace: "myns",
-				},
-				Spec: api.PersistentVolumeClaimSpec{
-					Selector: &unversioned.LabelSelector{
-						MatchLabels: map[string]string{
-							"should-exist": "true",
-						},
+			claim: makePVC("20000G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.Selector = &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"should-exist": "true",
 					},
-					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany, api.ReadWriteOnce},
-					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceName(api.ResourceStorage): resource.MustParse("20000G"),
-						},
-					},
-				},
-			},
+				}
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany, v1.ReadWriteOnce}
+			}),
 		},
 		"successful-match-due-with-constraint-and-label-selector": {
 			expectedMatch: "gce-pd-2",
-			claim: &api.PersistentVolumeClaim{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "claim01",
-					Namespace: "myns",
-				},
-				Spec: api.PersistentVolumeClaimSpec{
-					Selector: &unversioned.LabelSelector{
-						MatchLabels: map[string]string{
-							"should-exist": "true",
-						},
+			claim: makePVC("20000G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.Selector = &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"should-exist": "true",
 					},
-					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceName(api.ResourceStorage): resource.MustParse("10000G"),
-						},
+				}
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+			}),
+		},
+		"successful-match-with-class": {
+			expectedMatch: "gce-pd-silver1",
+			claim: makePVC("1G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.Selector = &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"should-exist": "true",
 					},
-				},
-			},
+				}
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+				pvc.Spec.StorageClassName = &classSilver
+			}),
+		},
+		"successful-match-with-class-and-labels": {
+			expectedMatch: "gce-pd-silver2",
+			claim: makePVC("1G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+				pvc.Spec.StorageClassName = &classSilver
+			}),
+		},
+		"successful-match-very-large": {
+			expectedMatch: "local-pd-very-large",
+			// we keep the pvc size less than int64 so that in case the pv overflows
+			// the pvc does not overflow equally and give us false matching signals.
+			claim: makePVC("1E", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+				pvc.Spec.StorageClassName = &classLarge
+			}),
+		},
+		"successful-match-exact-extremely-large": {
+			expectedMatch: "local-pd-extremely-large",
+			claim: makePVC("800E", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+				pvc.Spec.StorageClassName = &classLarge
+			}),
+		},
+		"successful-no-match-way-too-large": {
+			expectedMatch: "",
+			claim: makePVC("950E", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+				pvc.Spec.StorageClassName = &classLarge
+			}),
 		},
 	}
 
@@ -184,7 +166,7 @@ func TestMatchVolume(t *testing.T) {
 			t.Errorf("Expected %s but got volume %s in scenario %s", scenario.expectedMatch, volume.UID, name)
 		}
 		if len(scenario.expectedMatch) == 0 && volume != nil {
-			t.Errorf("Unexpected match for scenario: %s", name)
+			t.Errorf("Unexpected match for scenario: %s, matched with %s instead", name, volume.UID)
 		}
 	}
 }
@@ -192,53 +174,53 @@ func TestMatchVolume(t *testing.T) {
 func TestMatchingWithBoundVolumes(t *testing.T) {
 	volumeIndex := newPersistentVolumeOrderedIndex()
 	// two similar volumes, one is bound
-	pv1 := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
+	pv1 := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:  "gce-pd-1",
 			Name: "gce001",
 		},
-		Spec: api.PersistentVolumeSpec{
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+		Spec: v1.PersistentVolumeSpec{
+			Capacity: v1.ResourceList{
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse("1G"),
 			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
 			},
-			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce, api.ReadOnlyMany},
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
 			// this one we're pretending is already bound
-			ClaimRef: &api.ObjectReference{UID: "abc123"},
+			ClaimRef: &v1.ObjectReference{UID: "abc123"},
 		},
 	}
 
-	pv2 := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
+	pv2 := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:  "gce-pd-2",
 			Name: "gce002",
 		},
-		Spec: api.PersistentVolumeSpec{
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+		Spec: v1.PersistentVolumeSpec{
+			Capacity: v1.ResourceList{
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse("1G"),
 			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
 			},
-			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce, api.ReadOnlyMany},
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
 		},
 	}
 
 	volumeIndex.store.Add(pv1)
 	volumeIndex.store.Add(pv2)
 
-	claim := &api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{
+	claim := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "claim01",
 			Namespace: "myns",
 		},
-		Spec: api.PersistentVolumeClaimSpec{
-			AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany, api.ReadWriteOnce},
-			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany, v1.ReadWriteOnce},
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("1G"),
 				},
 			},
 		},
@@ -262,7 +244,7 @@ func TestListByAccessModes(t *testing.T) {
 		volList.store.Add(pv)
 	}
 
-	volumes, err := volList.listByAccessModes([]api.PersistentVolumeAccessMode{api.ReadWriteOnce, api.ReadOnlyMany})
+	volumes, err := volList.listByAccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany})
 	if err != nil {
 		t.Error("Unexpected error retrieving volumes by access modes:", err)
 	}
@@ -274,13 +256,13 @@ func TestListByAccessModes(t *testing.T) {
 		}
 	}
 
-	volumes, err = volList.listByAccessModes([]api.PersistentVolumeAccessMode{api.ReadWriteOnce, api.ReadOnlyMany, api.ReadWriteMany})
+	volumes, err = volList.listByAccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany, v1.ReadWriteMany})
 	if err != nil {
 		t.Error("Unexpected error retrieving volumes by access modes:", err)
 	}
 	sort.Sort(byCapacity{volumes})
 
-	for i, expected := range []string{"nfs-1", "nfs-5", "nfs-10"} {
+	for i, expected := range []string{"nfs-1", "nfs-5", "nfs-10", "local-pd-very-large", "local-pd-extremely-large"} {
 		if string(volumes[i].UID) != expected {
 			t.Errorf("Incorrect ordering of persistent volumes.  Expected %s but got %s", expected, volumes[i].UID)
 		}
@@ -294,71 +276,71 @@ func TestAllPossibleAccessModes(t *testing.T) {
 	}
 
 	// the mock PVs creates contain 2 types of accessmodes:   RWO+ROX and RWO+ROW+RWX
-	possibleModes := index.allPossibleMatchingAccessModes([]api.PersistentVolumeAccessMode{api.ReadWriteOnce})
+	possibleModes := index.allPossibleMatchingAccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOnce})
 	if len(possibleModes) != 3 {
 		t.Errorf("Expected 3 arrays of modes that match RWO, but got %v", len(possibleModes))
 	}
 	for _, m := range possibleModes {
-		if !contains(m, api.ReadWriteOnce) {
-			t.Errorf("AccessModes does not contain %s", api.ReadWriteOnce)
+		if !volume.AccessModesContains(m, v1.ReadWriteOnce) {
+			t.Errorf("AccessModes does not contain %s", v1.ReadWriteOnce)
 		}
 	}
 
-	possibleModes = index.allPossibleMatchingAccessModes([]api.PersistentVolumeAccessMode{api.ReadWriteMany})
+	possibleModes = index.allPossibleMatchingAccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany})
 	if len(possibleModes) != 1 {
 		t.Errorf("Expected 1 array of modes that match RWX, but got %v", len(possibleModes))
 	}
-	if !contains(possibleModes[0], api.ReadWriteMany) {
-		t.Errorf("AccessModes does not contain %s", api.ReadWriteOnce)
+	if !volume.AccessModesContains(possibleModes[0], v1.ReadWriteMany) {
+		t.Errorf("AccessModes does not contain %s", v1.ReadWriteOnce)
 	}
 
 }
 
 func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
-	gce := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{UID: "001", Name: "gce"},
-		Spec: api.PersistentVolumeSpec{
-			Capacity:               api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("10G")},
-			PersistentVolumeSource: api.PersistentVolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}},
-			AccessModes: []api.PersistentVolumeAccessMode{
-				api.ReadWriteOnce,
-				api.ReadOnlyMany,
+	gce := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{UID: "001", Name: "gce"},
+		Spec: v1.PersistentVolumeSpec{
+			Capacity:               v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G")},
+			PersistentVolumeSource: v1.PersistentVolumeSource{GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{}},
+			AccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+				v1.ReadOnlyMany,
 			},
 		},
 	}
 
-	ebs := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{UID: "002", Name: "ebs"},
-		Spec: api.PersistentVolumeSpec{
-			Capacity:               api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("10G")},
-			PersistentVolumeSource: api.PersistentVolumeSource{AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{}},
-			AccessModes: []api.PersistentVolumeAccessMode{
-				api.ReadWriteOnce,
+	ebs := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{UID: "002", Name: "ebs"},
+		Spec: v1.PersistentVolumeSpec{
+			Capacity:               v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G")},
+			PersistentVolumeSource: v1.PersistentVolumeSource{AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{}},
+			AccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
 			},
 		},
 	}
 
-	nfs := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{UID: "003", Name: "nfs"},
-		Spec: api.PersistentVolumeSpec{
-			Capacity:               api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("10G")},
-			PersistentVolumeSource: api.PersistentVolumeSource{NFS: &api.NFSVolumeSource{}},
-			AccessModes: []api.PersistentVolumeAccessMode{
-				api.ReadWriteOnce,
-				api.ReadOnlyMany,
-				api.ReadWriteMany,
+	nfs := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{UID: "003", Name: "nfs"},
+		Spec: v1.PersistentVolumeSpec{
+			Capacity:               v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G")},
+			PersistentVolumeSource: v1.PersistentVolumeSource{NFS: &v1.NFSVolumeSource{}},
+			AccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+				v1.ReadOnlyMany,
+				v1.ReadWriteMany,
 			},
 		},
 	}
 
-	claim := &api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{
+	claim := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "claim01",
 			Namespace: "myns",
 		},
-		Spec: api.PersistentVolumeClaimSpec{
-			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-			Resources:   api.ResourceRequirements{Requests: api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("1G")}},
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+			Resources:   v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse("1G")}},
 		},
 	}
 
@@ -372,37 +354,37 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 		t.Errorf("Expected %s but got volume %s instead", ebs.Name, volume.Name)
 	}
 
-	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadWriteOnce, api.ReadOnlyMany}
+	claim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}
 	volume, _ = index.findBestMatchForClaim(claim)
 	if volume.Name != gce.Name {
 		t.Errorf("Expected %s but got volume %s instead", gce.Name, volume.Name)
 	}
 
 	// order of the requested modes should not matter
-	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadWriteMany, api.ReadWriteOnce, api.ReadOnlyMany}
+	claim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteMany, v1.ReadWriteOnce, v1.ReadOnlyMany}
 	volume, _ = index.findBestMatchForClaim(claim)
 	if volume.Name != nfs.Name {
 		t.Errorf("Expected %s but got volume %s instead", nfs.Name, volume.Name)
 	}
 
 	// fewer modes requested should still match
-	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadWriteMany}
+	claim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteMany}
 	volume, _ = index.findBestMatchForClaim(claim)
 	if volume.Name != nfs.Name {
 		t.Errorf("Expected %s but got volume %s instead", nfs.Name, volume.Name)
 	}
 
 	// pretend the exact match is bound.  should get the next level up of modes.
-	ebs.Spec.ClaimRef = &api.ObjectReference{}
-	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadWriteOnce}
+	ebs.Spec.ClaimRef = &v1.ObjectReference{}
+	claim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
 	volume, _ = index.findBestMatchForClaim(claim)
 	if volume.Name != gce.Name {
 		t.Errorf("Expected %s but got volume %s instead", gce.Name, volume.Name)
 	}
 
 	// continue up the levels of modes.
-	gce.Spec.ClaimRef = &api.ObjectReference{}
-	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadWriteOnce}
+	gce.Spec.ClaimRef = &v1.ObjectReference{}
+	claim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
 	volume, _ = index.findBestMatchForClaim(claim)
 	if volume.Name != nfs.Name {
 		t.Errorf("Expected %s but got volume %s instead", nfs.Name, volume.Name)
@@ -410,199 +392,296 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 
 	// partial mode request
 	gce.Spec.ClaimRef = nil
-	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadOnlyMany}
+	claim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}
 	volume, _ = index.findBestMatchForClaim(claim)
 	if volume.Name != gce.Name {
 		t.Errorf("Expected %s but got volume %s instead", gce.Name, volume.Name)
 	}
 }
 
-func createTestVolumes() []*api.PersistentVolume {
+func createTestVolumes() []*v1.PersistentVolume {
 	// these volumes are deliberately out-of-order to test indexing and sorting
-	return []*api.PersistentVolume{
+	return []*v1.PersistentVolume{
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:  "gce-pd-10",
 				Name: "gce003",
 			},
-			Spec: api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G"),
 				},
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
 				},
-				AccessModes: []api.PersistentVolumeAccessMode{
-					api.ReadWriteOnce,
-					api.ReadOnlyMany,
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+					v1.ReadOnlyMany,
 				},
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:  "gce-pd-20",
 				Name: "gce004",
 			},
-			Spec: api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("20G"),
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("20G"),
 				},
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
 				},
-				AccessModes: []api.PersistentVolumeAccessMode{
-					api.ReadWriteOnce,
-					api.ReadOnlyMany,
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+					v1.ReadOnlyMany,
 				},
 				// this one we're pretending is already bound
-				ClaimRef: &api.ObjectReference{UID: "def456"},
+				ClaimRef: &v1.ObjectReference{UID: "def456"},
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:  "nfs-5",
 				Name: "nfs002",
 			},
-			Spec: api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("5G"),
 				},
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					Glusterfs: &api.GlusterfsVolumeSource{},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					Glusterfs: &v1.GlusterfsVolumeSource{},
 				},
-				AccessModes: []api.PersistentVolumeAccessMode{
-					api.ReadWriteOnce,
-					api.ReadOnlyMany,
-					api.ReadWriteMany,
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+					v1.ReadOnlyMany,
+					v1.ReadWriteMany,
 				},
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:  "gce-pd-1",
 				Name: "gce001",
 			},
-			Spec: api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("1G"),
 				},
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
 				},
-				AccessModes: []api.PersistentVolumeAccessMode{
-					api.ReadWriteOnce,
-					api.ReadOnlyMany,
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+					v1.ReadOnlyMany,
 				},
 				// this one we're pretending is already bound
-				ClaimRef: &api.ObjectReference{UID: "abc123"},
+				ClaimRef: &v1.ObjectReference{UID: "abc123"},
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:  "nfs-10",
 				Name: "nfs003",
 			},
-			Spec: api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G"),
 				},
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					Glusterfs: &api.GlusterfsVolumeSource{},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					Glusterfs: &v1.GlusterfsVolumeSource{},
 				},
-				AccessModes: []api.PersistentVolumeAccessMode{
-					api.ReadWriteOnce,
-					api.ReadOnlyMany,
-					api.ReadWriteMany,
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+					v1.ReadOnlyMany,
+					v1.ReadWriteMany,
 				},
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:  "gce-pd-5",
 				Name: "gce002",
 			},
-			Spec: api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("5G"),
 				},
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
 				},
-				AccessModes: []api.PersistentVolumeAccessMode{
-					api.ReadWriteOnce,
-					api.ReadOnlyMany,
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+					v1.ReadOnlyMany,
 				},
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:  "nfs-1",
 				Name: "nfs001",
 			},
-			Spec: api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("1G"),
 				},
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					Glusterfs: &api.GlusterfsVolumeSource{},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					Glusterfs: &v1.GlusterfsVolumeSource{},
 				},
-				AccessModes: []api.PersistentVolumeAccessMode{
-					api.ReadWriteOnce,
-					api.ReadOnlyMany,
-					api.ReadWriteMany,
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+					v1.ReadOnlyMany,
+					v1.ReadWriteMany,
 				},
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:  "gce-pd-2",
 				Name: "gce0022",
 				Labels: map[string]string{
 					"should-exist": "true",
 				},
 			},
-			Spec: api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10000G"),
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("20000G"),
 				},
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
 				},
-				AccessModes: []api.PersistentVolumeAccessMode{
-					api.ReadWriteOnce,
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
 				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:  "gce-pd-silver1",
+				Name: "gce0023",
+				Labels: map[string]string{
+					"should-exist": "true",
+				},
+			},
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("10000G"),
+				},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
+				},
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+				},
+				StorageClassName: classSilver,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:  "gce-pd-silver2",
+				Name: "gce0024",
+			},
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("100G"),
+				},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
+				},
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+				},
+				StorageClassName: classSilver,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:  "gce-pd-gold",
+				Name: "gce0025",
+			},
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("50G"),
+				},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
+				},
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+				},
+				StorageClassName: classGold,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:  "local-pd-very-large",
+				Name: "local001",
+			},
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("200E"),
+				},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					Local: &v1.LocalVolumeSource{},
+				},
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+					v1.ReadOnlyMany,
+					v1.ReadWriteMany,
+				},
+				StorageClassName: classLarge,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:  "local-pd-extremely-large",
+				Name: "local002",
+			},
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("800E"),
+				},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					Local: &v1.LocalVolumeSource{},
+				},
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+					v1.ReadOnlyMany,
+					v1.ReadWriteMany,
+				},
+				StorageClassName: classLarge,
 			},
 		},
 	}
 }
 
-func testVolume(name, size string) *api.PersistentVolume {
-	return &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
+func testVolume(name, size string) *v1.PersistentVolume {
+	return &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Annotations: map[string]string{},
 		},
-		Spec: api.PersistentVolumeSpec{
-			Capacity:               api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse(size)},
-			PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{}},
-			AccessModes:            []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+		Spec: v1.PersistentVolumeSpec{
+			Capacity:               v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse(size)},
+			PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{}},
+			AccessModes:            []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 		},
 	}
 }
 
 func TestFindingPreboundVolumes(t *testing.T) {
-	claim := &api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{
+	claim := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "claim01",
 			Namespace: "myns",
 			SelfLink:  testapi.Default.SelfLink("pvc", ""),
 		},
-		Spec: api.PersistentVolumeClaimSpec{
-			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-			Resources:   api.ResourceRequirements{Requests: api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("1Gi")}},
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+			Resources:   v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse("1Gi")}},
 		},
 	}
-	claimRef, err := api.GetReference(claim)
+	claimRef, err := ref.GetReference(scheme.Scheme, claim)
 	if err != nil {
 		t.Errorf("error getting claimRef: %v", err)
 	}
@@ -610,11 +689,16 @@ func TestFindingPreboundVolumes(t *testing.T) {
 	pv1 := testVolume("pv1", "1Gi")
 	pv5 := testVolume("pv5", "5Gi")
 	pv8 := testVolume("pv8", "8Gi")
+	pvBadSize := testVolume("pvBadSize", "1Mi")
+	pvBadMode := testVolume("pvBadMode", "1Gi")
+	pvBadMode.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}
 
 	index := newPersistentVolumeOrderedIndex()
 	index.store.Add(pv1)
 	index.store.Add(pv5)
 	index.store.Add(pv8)
+	index.store.Add(pvBadSize)
+	index.store.Add(pvBadMode)
 
 	// expected exact match on size
 	volume, _ := index.findBestMatchForClaim(claim)
@@ -623,7 +707,7 @@ func TestFindingPreboundVolumes(t *testing.T) {
 	}
 
 	// pretend the exact match is pre-bound.  should get the next size up.
-	pv1.Spec.ClaimRef = &api.ObjectReference{Name: "foo", Namespace: "bar"}
+	pv1.Spec.ClaimRef = &v1.ObjectReference{Name: "foo", Namespace: "bar"}
 	volume, _ = index.findBestMatchForClaim(claim)
 	if volume.Name != pv5.Name {
 		t.Errorf("Expected %s but got volume %s instead", pv5.Name, volume.Name)
@@ -636,11 +720,27 @@ func TestFindingPreboundVolumes(t *testing.T) {
 	if volume.Name != pv8.Name {
 		t.Errorf("Expected %s but got volume %s instead", pv8.Name, volume.Name)
 	}
+
+	// pretend the volume with too small a size is pre-bound to the claim. should get the exact match.
+	pv8.Spec.ClaimRef = nil
+	pvBadSize.Spec.ClaimRef = claimRef
+	volume, _ = index.findBestMatchForClaim(claim)
+	if volume.Name != pv1.Name {
+		t.Errorf("Expected %s but got volume %s instead", pv1.Name, volume.Name)
+	}
+
+	// pretend the volume without the right access mode is pre-bound to the claim. should get the exact match.
+	pvBadSize.Spec.ClaimRef = nil
+	pvBadMode.Spec.ClaimRef = claimRef
+	volume, _ = index.findBestMatchForClaim(claim)
+	if volume.Name != pv1.Name {
+		t.Errorf("Expected %s but got volume %s instead", pv1.Name, volume.Name)
+	}
 }
 
 // byCapacity is used to order volumes by ascending storage size
 type byCapacity struct {
-	volumes []*api.PersistentVolume
+	volumes []*v1.PersistentVolume
 }
 
 func (c byCapacity) Less(i, j int) bool {
@@ -653,4 +753,11 @@ func (c byCapacity) Swap(i, j int) {
 
 func (c byCapacity) Len() int {
 	return len(c.volumes)
+}
+
+// matchStorageCapacity is a matchPredicate used to sort and find volumes
+func matchStorageCapacity(pvA, pvB *v1.PersistentVolume) bool {
+	aQty := pvA.Spec.Capacity[v1.ResourceStorage]
+	bQty := pvB.Spec.Capacity[v1.ResourceStorage]
+	return aQty.Cmp(bQty) <= 0
 }

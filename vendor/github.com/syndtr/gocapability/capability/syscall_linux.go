@@ -38,6 +38,15 @@ func capset(hdr *capHeader, data *capData) (err error) {
 	return
 }
 
+// not yet in syscall
+const (
+	pr_CAP_AMBIENT           = 47
+	pr_CAP_AMBIENT_IS_SET    = uintptr(1)
+	pr_CAP_AMBIENT_RAISE     = uintptr(2)
+	pr_CAP_AMBIENT_LOWER     = uintptr(3)
+	pr_CAP_AMBIENT_CLEAR_ALL = uintptr(4)
+)
+
 func prctl(option int, arg2, arg3, arg4, arg5 uintptr) (err error) {
 	_, _, e1 := syscall.Syscall6(syscall.SYS_PRCTL, uintptr(option), arg2, arg3, arg4, arg5, 0)
 	if e1 != 0 {

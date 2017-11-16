@@ -24,20 +24,19 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 
-	"k8s.io/kubernetes/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/admission"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	testcore "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	testcore "k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/quota"
-	"k8s.io/kubernetes/pkg/quota/evaluator/core"
-	"k8s.io/kubernetes/pkg/quota/generic"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/quota/install"
-	"k8s.io/kubernetes/pkg/runtime"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
+	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
 )
 
 func getResourceList(cpu, memory string) api.ResourceList {
@@ -60,7 +59,7 @@ func getResourceRequirements(requests, limits api.ResourceList) api.ResourceRequ
 
 func validPod(name string, numContainers int, resources api.ResourceRequirements) *api.Pod {
 	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: name, Namespace: "test"},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test"},
 		Spec:       api.PodSpec{},
 	}
 	pod.Spec.Containers = make([]api.Container, 0, numContainers)
@@ -71,6 +70,15 @@ func validPod(name string, numContainers int, resources api.ResourceRequirements
 		})
 	}
 	return pod
+}
+
+func validPersistentVolumeClaim(name string, resources api.ResourceRequirements) *api.PersistentVolumeClaim {
+	return &api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test"},
+		Spec: api.PersistentVolumeClaimSpec{
+			Resources: resources,
+		},
+	}
 }
 
 func TestPrettyPrint(t *testing.T) {
@@ -115,15 +123,24 @@ func TestPrettyPrint(t *testing.T) {
 
 // TestAdmissionIgnoresDelete verifies that the admission controller ignores delete operations
 func TestAdmissionIgnoresDelete(t *testing.T) {
-	kubeClient := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	handler, err := NewResourceQuota(kubeClient, install.NewRegistry(kubeClient), 5, stopCh)
-	if err != nil {
-		t.Errorf("Unexpected error %v", err)
+
+	kubeClient := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	config := &resourcequotaapi.Configuration{}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
+
+	handler := &QuotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
 	}
 	namespace := "default"
-	err = handler.Admit(admission.NewAttributesRecord(nil, nil, api.Kind("Pod").WithVersion("version"), namespace, "name", api.Resource("pods").WithVersion("version"), "", admission.Delete, nil))
+	err := handler.Validate(admission.NewAttributesRecord(nil, nil, api.Kind("Pod").WithVersion("version"), namespace, "name", api.Resource("pods").WithVersion("version"), "", admission.Delete, nil))
 	if err != nil {
 		t.Errorf("ResourceQuota should admit all deletes: %v", err)
 	}
@@ -142,28 +159,29 @@ func TestAdmissionIgnoresSubresources(t *testing.T) {
 	}
 	resourceQuota.Status.Hard[api.ResourceMemory] = resource.MustParse("2Gi")
 	resourceQuota.Status.Used[api.ResourceMemory] = resource.MustParse("1Gi")
-	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+	kubeClient := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	config := &resourcequotaapi.Configuration{}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	defer utilruntime.HandleCrash()
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	indexer.Add(resourceQuota)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("123", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
-	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected an error because the pod exceeded allowed quota")
 	}
-	err = handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "subresource", admission.Create, nil))
+	err = handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "subresource", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Did not expect an error because the action went to a subresource: %v", err)
 	}
@@ -172,7 +190,7 @@ func TestAdmissionIgnoresSubresources(t *testing.T) {
 // TestAdmitBelowQuotaLimit verifies that a pod when created has its usage reflected on the quota
 func TestAdmitBelowQuotaLimit(t *testing.T) {
 	resourceQuota := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
 		Status: api.ResourceQuotaStatus{
 			Hard: api.ResourceList{
 				api.ResourceCPU:    resource.MustParse("3"),
@@ -186,24 +204,25 @@ func TestAdmitBelowQuotaLimit(t *testing.T) {
 			},
 		},
 	}
-	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	config := &resourcequotaapi.Configuration{}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	defer utilruntime.HandleCrash()
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	indexer.Add(resourceQuota)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
-	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -253,7 +272,7 @@ func TestAdmitBelowQuotaLimit(t *testing.T) {
 func TestAdmitHandlesOldObjects(t *testing.T) {
 	// in this scenario, the old quota was based on a service type=loadbalancer
 	resourceQuota := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
 		Status: api.ResourceQuotaStatus{
 			Hard: api.ResourceList{
 				api.ResourceServices:              resource.MustParse("10"),
@@ -269,32 +288,37 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 	}
 
 	// start up quota system
-	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	config := &resourcequotaapi.Configuration{}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	indexer.Add(resourceQuota)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 
 	// old service was a load balancer, but updated version is a node port.
-	oldService := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "service", Namespace: "test"},
+	existingService := &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "service", Namespace: "test", ResourceVersion: "1"},
 		Spec:       api.ServiceSpec{Type: api.ServiceTypeLoadBalancer},
 	}
 	newService := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "service", Namespace: "test"},
-		Spec:       api.ServiceSpec{Type: api.ServiceTypeNodePort},
+		ObjectMeta: metav1.ObjectMeta{Name: "service", Namespace: "test"},
+		Spec: api.ServiceSpec{
+			Type:  api.ServiceTypeNodePort,
+			Ports: []api.ServicePort{{Port: 1234}},
+		},
 	}
-	err := handler.Admit(admission.NewAttributesRecord(newService, oldService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, api.Resource("services").WithVersion("version"), "", admission.Update, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newService, existingService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, api.Resource("services").WithVersion("version"), "", admission.Update, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -318,6 +342,9 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 	decimatedActions := removeListWatch(kubeClient.Actions())
 	lastActionIndex := len(decimatedActions) - 1
 	usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*api.ResourceQuota)
+
+	// Verify service usage. Since we don't add negative values, the api.ResourceServicesLoadBalancers
+	// will remain on last reported value
 	expectedUsage := api.ResourceQuota{
 		Status: api.ResourceQuotaStatus{
 			Hard: api.ResourceList{
@@ -327,7 +354,277 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 			},
 			Used: api.ResourceList{
 				api.ResourceServices:              resource.MustParse("1"),
-				api.ResourceServicesLoadBalancers: resource.MustParse("0"),
+				api.ResourceServicesLoadBalancers: resource.MustParse("1"),
+				api.ResourceServicesNodePorts:     resource.MustParse("1"),
+			},
+		},
+	}
+	for k, v := range expectedUsage.Status.Used {
+		actual := usage.Status.Used[k]
+		actualValue := actual.String()
+		expectedValue := v.String()
+		if expectedValue != actualValue {
+			t.Errorf("Usage Used: Key: %v, Expected: %v, Actual: %v", k, expectedValue, actualValue)
+		}
+	}
+}
+
+func TestAdmitHandlesNegativePVCUpdates(t *testing.T) {
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourcePersistentVolumeClaims: resource.MustParse("3"),
+				api.ResourceRequestsStorage:        resource.MustParse("100Gi"),
+			},
+			Used: api.ResourceList{
+				api.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				api.ResourceRequestsStorage:        resource.MustParse("10Gi"),
+			},
+		},
+	}
+
+	// start up quota system
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	err := utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for LocalPersistentVolumes: %v", err)
+		return
+	}
+
+	defer func() {
+		utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=false")
+	}()
+
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	config := &resourcequotaapi.Configuration{}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
+
+	handler := &QuotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
+
+	oldPVC := &api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "pvc-to-update", Namespace: "test", ResourceVersion: "1"},
+		Spec: api.PersistentVolumeClaimSpec{
+			Resources: getResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("10Gi")}, api.ResourceList{}),
+		},
+	}
+
+	newPVC := &api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "pvc-to-update", Namespace: "test"},
+		Spec: api.PersistentVolumeClaimSpec{
+			Resources: getResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("5Gi")}, api.ResourceList{}),
+		},
+	}
+
+	err = handler.Validate(admission.NewAttributesRecord(newPVC, oldPVC, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPVC.Namespace, newPVC.Name, api.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Update, nil))
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if len(kubeClient.Actions()) != 0 {
+		t.Errorf("No client action should be taken in case of negative updates")
+	}
+}
+
+func TestAdmitHandlesPVCUpdates(t *testing.T) {
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourcePersistentVolumeClaims: resource.MustParse("3"),
+				api.ResourceRequestsStorage:        resource.MustParse("100Gi"),
+			},
+			Used: api.ResourceList{
+				api.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				api.ResourceRequestsStorage:        resource.MustParse("10Gi"),
+			},
+		},
+	}
+
+	err := utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for LocalPersistentVolumes: %v", err)
+		return
+	}
+
+	defer func() {
+		utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=false")
+	}()
+
+	// start up quota system
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	config := &resourcequotaapi.Configuration{}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
+
+	handler := &QuotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
+
+	oldPVC := &api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "pvc-to-update", Namespace: "test", ResourceVersion: "1"},
+		Spec: api.PersistentVolumeClaimSpec{
+			Resources: getResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("10Gi")}, api.ResourceList{}),
+		},
+	}
+
+	newPVC := &api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "pvc-to-update", Namespace: "test"},
+		Spec: api.PersistentVolumeClaimSpec{
+			Resources: getResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("15Gi")}, api.ResourceList{}),
+		},
+	}
+
+	err = handler.Validate(admission.NewAttributesRecord(newPVC, oldPVC, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPVC.Namespace, newPVC.Name, api.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Update, nil))
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if len(kubeClient.Actions()) == 0 {
+		t.Errorf("Expected a client action")
+	}
+
+	// the only action should have been to update the quota (since we should not have fetched the previous item)
+	expectedActionSet := sets.NewString(
+		strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+	)
+	actionSet := sets.NewString()
+	for _, action := range kubeClient.Actions() {
+		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
+	}
+	if !actionSet.HasAll(expectedActionSet.List()...) {
+		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, expectedActionSet.Difference(actionSet))
+	}
+
+	decimatedActions := removeListWatch(kubeClient.Actions())
+	lastActionIndex := len(decimatedActions) - 1
+	usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*api.ResourceQuota)
+	expectedUsage := api.ResourceQuota{
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourcePersistentVolumeClaims: resource.MustParse("3"),
+				api.ResourceRequestsStorage:        resource.MustParse("100Gi"),
+			},
+			Used: api.ResourceList{
+				api.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				api.ResourceRequestsStorage:        resource.MustParse("15Gi"),
+			},
+		},
+	}
+	for k, v := range expectedUsage.Status.Used {
+		actual := usage.Status.Used[k]
+		actualValue := actual.String()
+		expectedValue := v.String()
+		if expectedValue != actualValue {
+			t.Errorf("Usage Used: Key: %v, Expected: %v, Actual: %v", k, expectedValue, actualValue)
+		}
+	}
+
+}
+
+// TestAdmitHandlesCreatingUpdates verifies that admit handles updates which behave as creates
+func TestAdmitHandlesCreatingUpdates(t *testing.T) {
+	// in this scenario, there is an existing service
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceServices:              resource.MustParse("10"),
+				api.ResourceServicesLoadBalancers: resource.MustParse("10"),
+				api.ResourceServicesNodePorts:     resource.MustParse("10"),
+			},
+			Used: api.ResourceList{
+				api.ResourceServices:              resource.MustParse("1"),
+				api.ResourceServicesLoadBalancers: resource.MustParse("1"),
+				api.ResourceServicesNodePorts:     resource.MustParse("0"),
+			},
+		},
+	}
+
+	// start up quota system
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	config := &resourcequotaapi.Configuration{}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
+
+	handler := &QuotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
+
+	// old service didn't exist, so this update is actually a create
+	oldService := &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "service", Namespace: "test", ResourceVersion: ""},
+		Spec:       api.ServiceSpec{Type: api.ServiceTypeLoadBalancer},
+	}
+	newService := &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "service", Namespace: "test"},
+		Spec: api.ServiceSpec{
+			Type:  api.ServiceTypeNodePort,
+			Ports: []api.ServicePort{{Port: 1234}},
+		},
+	}
+	err := handler.Validate(admission.NewAttributesRecord(newService, oldService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, api.Resource("services").WithVersion("version"), "", admission.Update, nil))
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if len(kubeClient.Actions()) == 0 {
+		t.Errorf("Expected a client action")
+	}
+
+	// the only action should have been to update the quota (since we should not have fetched the previous item)
+	expectedActionSet := sets.NewString(
+		strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+	)
+	actionSet := sets.NewString()
+	for _, action := range kubeClient.Actions() {
+		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
+	}
+	if !actionSet.HasAll(expectedActionSet.List()...) {
+		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, expectedActionSet.Difference(actionSet))
+	}
+
+	// verify that the "old" object was ignored for calculating the new usage
+	decimatedActions := removeListWatch(kubeClient.Actions())
+	lastActionIndex := len(decimatedActions) - 1
+	usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*api.ResourceQuota)
+	expectedUsage := api.ResourceQuota{
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceServices:              resource.MustParse("10"),
+				api.ResourceServicesLoadBalancers: resource.MustParse("10"),
+				api.ResourceServicesNodePorts:     resource.MustParse("10"),
+			},
+			Used: api.ResourceList{
+				api.ResourceServices:              resource.MustParse("2"),
+				api.ResourceServicesLoadBalancers: resource.MustParse("1"),
 				api.ResourceServicesNodePorts:     resource.MustParse("1"),
 			},
 		},
@@ -345,7 +642,7 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 // TestAdmitExceedQuotaLimit verifies that if a pod exceeded allowed usage that its rejected during admission.
 func TestAdmitExceedQuotaLimit(t *testing.T) {
 	resourceQuota := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
 		Status: api.ResourceQuotaStatus{
 			Hard: api.ResourceList{
 				api.ResourceCPU:    resource.MustParse("3"),
@@ -359,24 +656,25 @@ func TestAdmitExceedQuotaLimit(t *testing.T) {
 			},
 		},
 	}
-	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	config := &resourcequotaapi.Configuration{}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	defer utilruntime.HandleCrash()
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	indexer.Add(resourceQuota)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
-	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected an error exceeding quota")
 	}
@@ -387,7 +685,7 @@ func TestAdmitExceedQuotaLimit(t *testing.T) {
 // We ensure that a pod that does not specify a memory limit that it fails in admission.
 func TestAdmitEnforceQuotaConstraints(t *testing.T) {
 	resourceQuota := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
 		Status: api.ResourceQuotaStatus{
 			Hard: api.ResourceList{
 				api.ResourceCPU:          resource.MustParse("3"),
@@ -403,31 +701,32 @@ func TestAdmitEnforceQuotaConstraints(t *testing.T) {
 			},
 		},
 	}
-	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	config := &resourcequotaapi.Configuration{}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	defer utilruntime.HandleCrash()
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	indexer.Add(resourceQuota)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	// verify all values are specified as required on the quota
 	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("200m", "")))
-	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected an error because the pod does not specify a memory limit")
 	}
 	// verify the requests and limits are actually valid (in this case, we fail because the limits < requests)
 	newPod = validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("200m", "2Gi"), getResourceList("100m", "1Gi")))
-	err = handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err = handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected an error because the pod does not specify a memory limit")
 	}
@@ -436,7 +735,7 @@ func TestAdmitEnforceQuotaConstraints(t *testing.T) {
 // TestAdmitPodInNamespaceWithoutQuota ensures that if a namespace has no quota, that a pod can get in
 func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
 	resourceQuota := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "other", ResourceVersion: "124"},
+		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "other", ResourceVersion: "124"},
 		Status: api.ResourceQuotaStatus{
 			Hard: api.ResourceList{
 				api.ResourceCPU:          resource.MustParse("3"),
@@ -452,8 +751,6 @@ func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
 			},
 		},
 	}
-	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	liveLookupCache, err := lru.New(100)
 	if err != nil {
 		t.Fatal(err)
@@ -461,23 +758,26 @@ func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	quotaAccessor.liveLookupCache = liveLookupCache
-	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+	config := &resourcequotaapi.Configuration{}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	defer utilruntime.HandleCrash()
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
 	// Add to the index
-	indexer.Add(resourceQuota)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("200m", "")))
 	// Add to the lru cache so we do not do a live client lookup
 	liveLookupCache.Add(newPod.Namespace, liveLookupEntry{expiry: time.Now().Add(time.Duration(30 * time.Second)), items: []*api.ResourceQuota{}})
-	err = handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err = handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Did not expect an error because the pod is in a different namespace than the quota")
 	}
@@ -488,7 +788,7 @@ func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
 // It ensures that the terminating quota is incremented, and the non-terminating quota is not.
 func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 	resourceQuotaNonTerminating := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{Name: "quota-non-terminating", Namespace: "test", ResourceVersion: "124"},
+		ObjectMeta: metav1.ObjectMeta{Name: "quota-non-terminating", Namespace: "test", ResourceVersion: "124"},
 		Spec: api.ResourceQuotaSpec{
 			Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeNotTerminating},
 		},
@@ -506,7 +806,7 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 		},
 	}
 	resourceQuotaTerminating := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{Name: "quota-terminating", Namespace: "test", ResourceVersion: "124"},
+		ObjectMeta: metav1.ObjectMeta{Name: "quota-terminating", Namespace: "test", ResourceVersion: "124"},
 		Spec: api.ResourceQuotaSpec{
 			Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeTerminating},
 		},
@@ -523,29 +823,30 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 			},
 		},
 	}
-	kubeClient := fake.NewSimpleClientset(resourceQuotaTerminating, resourceQuotaNonTerminating)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+	kubeClient := fake.NewSimpleClientset(resourceQuotaTerminating, resourceQuotaNonTerminating)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	config := &resourcequotaapi.Configuration{}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	defer utilruntime.HandleCrash()
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	indexer.Add(resourceQuotaNonTerminating)
-	indexer.Add(resourceQuotaTerminating)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaNonTerminating)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaTerminating)
 
 	// create a pod that has an active deadline
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
 	activeDeadlineSeconds := int64(30)
 	newPod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
-	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -601,7 +902,7 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 // It verifies that best effort pods are properly scoped to the best effort quota document.
 func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
 	resourceQuotaBestEffort := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{Name: "quota-besteffort", Namespace: "test", ResourceVersion: "124"},
+		ObjectMeta: metav1.ObjectMeta{Name: "quota-besteffort", Namespace: "test", ResourceVersion: "124"},
 		Spec: api.ResourceQuotaSpec{
 			Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeBestEffort},
 		},
@@ -615,7 +916,7 @@ func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
 		},
 	}
 	resourceQuotaNotBestEffort := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{Name: "quota-not-besteffort", Namespace: "test", ResourceVersion: "124"},
+		ObjectMeta: metav1.ObjectMeta{Name: "quota-not-besteffort", Namespace: "test", ResourceVersion: "124"},
 		Spec: api.ResourceQuotaSpec{
 			Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeNotBestEffort},
 		},
@@ -628,27 +929,28 @@ func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
 			},
 		},
 	}
-	kubeClient := fake.NewSimpleClientset(resourceQuotaBestEffort, resourceQuotaNotBestEffort)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+	kubeClient := fake.NewSimpleClientset(resourceQuotaBestEffort, resourceQuotaNotBestEffort)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	config := &resourcequotaapi.Configuration{}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	defer utilruntime.HandleCrash()
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	indexer.Add(resourceQuotaBestEffort)
-	indexer.Add(resourceQuotaNotBestEffort)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaBestEffort)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaNotBestEffort)
 
 	// create a pod that is best effort because it does not make a request for anything
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")))
-	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -707,7 +1009,7 @@ func removeListWatch(in []testcore.Action) []testcore.Action {
 // guaranteed pod.
 func TestAdmitBestEffortQuotaLimitIgnoresBurstable(t *testing.T) {
 	resourceQuota := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{Name: "quota-besteffort", Namespace: "test", ResourceVersion: "124"},
+		ObjectMeta: metav1.ObjectMeta{Name: "quota-besteffort", Namespace: "test", ResourceVersion: "124"},
 		Spec: api.ResourceQuotaSpec{
 			Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeBestEffort},
 		},
@@ -720,24 +1022,25 @@ func TestAdmitBestEffortQuotaLimitIgnoresBurstable(t *testing.T) {
 			},
 		},
 	}
-	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	config := &resourcequotaapi.Configuration{}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	defer utilruntime.HandleCrash()
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	indexer.Add(resourceQuota)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")))
-	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -794,77 +1097,356 @@ func TestHasUsageStats(t *testing.T) {
 func TestAdmissionSetsMissingNamespace(t *testing.T) {
 	namespace := "test"
 	resourceQuota := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: namespace, ResourceVersion: "124"},
+		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: namespace, ResourceVersion: "124"},
 		Status: api.ResourceQuotaStatus{
 			Hard: api.ResourceList{
-				api.ResourceCPU: resource.MustParse("3"),
+				api.ResourcePods: resource.MustParse("3"),
 			},
 			Used: api.ResourceList{
-				api.ResourceCPU: resource.MustParse("1"),
+				api.ResourcePods: resource.MustParse("1"),
 			},
 		},
 	}
-	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 
-	computeResources := []api.ResourceName{
-		api.ResourcePods,
-		api.ResourceCPU,
-	}
-
-	usageFunc := func(object runtime.Object) api.ResourceList {
-		pod, ok := object.(*api.Pod)
-		if !ok {
-			t.Fatalf("Expected pod, got %T", object)
-		}
-		if pod.Namespace != namespace {
-			t.Errorf("Expected pod with different namespace: %q != %q", pod.Namespace, namespace)
-		}
-		return core.PodUsageFunc(pod)
-	}
-
-	podEvaluator := &generic.GenericEvaluator{
-		Name:              "Test-Evaluator.Pod",
-		InternalGroupKind: api.Kind("Pod"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
-			admission.Create: computeResources,
-		},
-		ConstraintsFunc:      core.PodConstraintsFunc,
-		MatchedResourceNames: computeResources,
-		MatchesScopeFunc:     core.PodMatchesScopeFunc,
-		UsageFunc:            usageFunc,
-	}
-
-	registry := &generic.GenericRegistry{
-		InternalEvaluators: map[unversioned.GroupKind]quota.Evaluator{
-			podEvaluator.GroupKind(): podEvaluator,
-		},
-	}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
-	evaluator.(*quotaEvaluator).registry = registry
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	config := &resourcequotaapi.Configuration{}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	defer utilruntime.HandleCrash()
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	indexer.Add(resourceQuota)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("pod-without-namespace", 1, getResourceRequirements(getResourceList("1", "2Gi"), getResourceList("", "")))
 
 	// unset the namespace
 	newPod.ObjectMeta.Namespace = ""
 
-	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Got unexpected error: %v", err)
 	}
 	if newPod.Namespace != namespace {
 		t.Errorf("Got unexpected pod namespace: %q != %q", newPod.Namespace, namespace)
+	}
+}
+
+// TestAdmitRejectsNegativeUsage verifies that usage for any measured resource cannot be negative.
+func TestAdmitRejectsNegativeUsage(t *testing.T) {
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourcePersistentVolumeClaims: resource.MustParse("3"),
+				api.ResourceRequestsStorage:        resource.MustParse("100Gi"),
+			},
+			Used: api.ResourceList{
+				api.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				api.ResourceRequestsStorage:        resource.MustParse("10Gi"),
+			},
+		},
+	}
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	config := &resourcequotaapi.Configuration{}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
+
+	handler := &QuotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
+	// verify quota rejects negative pvc storage requests
+	newPvc := validPersistentVolumeClaim("not-allowed-pvc", getResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("-1Gi")}, api.ResourceList{}))
+	err := handler.Validate(admission.NewAttributesRecord(newPvc, nil, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPvc.Namespace, newPvc.Name, api.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Create, nil))
+	if err == nil {
+		t.Errorf("Expected an error because the pvc has negative storage usage")
+	}
+
+	// verify quota accepts non-negative pvc storage requests
+	newPvc = validPersistentVolumeClaim("not-allowed-pvc", getResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("1Gi")}, api.ResourceList{}))
+	err = handler.Validate(admission.NewAttributesRecord(newPvc, nil, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPvc.Namespace, newPvc.Name, api.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Create, nil))
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
+// TestAdmitWhenUnrelatedResourceExceedsQuota verifies that if resource X exceeds quota, it does not prohibit resource Y from admission.
+func TestAdmitWhenUnrelatedResourceExceedsQuota(t *testing.T) {
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceServices: resource.MustParse("3"),
+				api.ResourcePods:     resource.MustParse("4"),
+			},
+			Used: api.ResourceList{
+				api.ResourceServices: resource.MustParse("4"),
+				api.ResourcePods:     resource.MustParse("1"),
+			},
+		},
+	}
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	config := &resourcequotaapi.Configuration{}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
+
+	handler := &QuotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
+
+	// create a pod that should pass existing quota
+	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
+// TestAdmitLimitedResourceNoQuota verifies if a limited resource is configured with no quota, it cannot be consumed.
+func TestAdmitLimitedResourceNoQuota(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+
+	// disable consumption of cpu unless there is a covering quota.
+	config := &resourcequotaapi.Configuration{
+		LimitedResources: []resourcequotaapi.LimitedResource{
+			{
+				Resource:      "pods",
+				MatchContains: []string{"cpu"},
+			},
+		},
+	}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
+
+	handler := &QuotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	if err == nil {
+		t.Errorf("Expected an error for consuming a limited resource without quota.")
+	}
+}
+
+// TestAdmitLimitedResourceNoQuotaIgnoresNonMatchingResources shows it ignores non matching resources in config.
+func TestAdmitLimitedResourceNoQuotaIgnoresNonMatchingResources(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+
+	// disable consumption of cpu unless there is a covering quota.
+	config := &resourcequotaapi.Configuration{
+		LimitedResources: []resourcequotaapi.LimitedResource{
+			{
+				Resource:      "services",
+				MatchContains: []string{"services"},
+			},
+		},
+	}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
+
+	handler := &QuotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+}
+
+// TestAdmitLimitedResourceWithQuota verifies if a limited resource is configured with quota, it can be consumed.
+func TestAdmitLimitedResourceWithQuota(t *testing.T) {
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceRequestsCPU: resource.MustParse("10"),
+			},
+			Used: api.ResourceList{
+				api.ResourceRequestsCPU: resource.MustParse("1"),
+			},
+		},
+	}
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+
+	// disable consumption of cpu unless there is a covering quota.
+	// disable consumption of cpu unless there is a covering quota.
+	config := &resourcequotaapi.Configuration{
+		LimitedResources: []resourcequotaapi.LimitedResource{
+			{
+				Resource:      "pods",
+				MatchContains: []string{"requests.cpu"}, // match on "requests.cpu" only
+			},
+		},
+	}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
+
+	handler := &QuotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+	indexer.Add(resourceQuota)
+	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// TestAdmitLimitedResourceWithMultipleQuota verifies if a limited resource is configured with quota, it can be consumed if one matches.
+func TestAdmitLimitedResourceWithMultipleQuota(t *testing.T) {
+	resourceQuota1 := &api.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "quota1", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceRequestsCPU: resource.MustParse("10"),
+			},
+			Used: api.ResourceList{
+				api.ResourceRequestsCPU: resource.MustParse("1"),
+			},
+		},
+	}
+	resourceQuota2 := &api.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "quota2", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceMemory: resource.MustParse("10Gi"),
+			},
+			Used: api.ResourceList{
+				api.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+	}
+	kubeClient := fake.NewSimpleClientset(resourceQuota1, resourceQuota2)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+
+	// disable consumption of cpu unless there is a covering quota.
+	// disable consumption of cpu unless there is a covering quota.
+	config := &resourcequotaapi.Configuration{
+		LimitedResources: []resourcequotaapi.LimitedResource{
+			{
+				Resource:      "pods",
+				MatchContains: []string{"requests.cpu"}, // match on "requests.cpu" only
+			},
+		},
+	}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
+
+	handler := &QuotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+	indexer.Add(resourceQuota1)
+	indexer.Add(resourceQuota2)
+	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// TestAdmitLimitedResourceWithQuotaThatDoesNotCover verifies if a limited resource is configured the quota must cover the resource.
+func TestAdmitLimitedResourceWithQuotaThatDoesNotCover(t *testing.T) {
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceMemory: resource.MustParse("10Gi"),
+			},
+			Used: api.ResourceList{
+				api.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+	}
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+
+	// disable consumption of cpu unless there is a covering quota.
+	// disable consumption of cpu unless there is a covering quota.
+	config := &resourcequotaapi.Configuration{
+		LimitedResources: []resourcequotaapi.LimitedResource{
+			{
+				Resource:      "pods",
+				MatchContains: []string{"cpu"}, // match on "cpu" only
+			},
+		},
+	}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
+
+	handler := &QuotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+	indexer.Add(resourceQuota)
+	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	if err == nil {
+		t.Fatalf("Expected an error since the quota did not cover cpu")
 	}
 }

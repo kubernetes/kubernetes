@@ -26,14 +26,14 @@ func (l *LogLevelType) Value() LogLevelType {
 
 // Matches returns true if the v LogLevel is enabled by this LogLevel. Should be
 // used with logging sub levels. Is safe to use on nil value LogLevelTypes. If
-// LogLevel is nill, will default to LogOff comparison.
+// LogLevel is nil, will default to LogOff comparison.
 func (l *LogLevelType) Matches(v LogLevelType) bool {
 	c := l.Value()
 	return c&v == v
 }
 
 // AtLeast returns true if this LogLevel is at least high enough to satisfies v.
-// Is safe to use on nil value LogLevelTypes. If LogLevel is nill, will default
+// Is safe to use on nil value LogLevelTypes. If LogLevel is nil, will default
 // to LogOff comparison.
 func (l *LogLevelType) AtLeast(v LogLevelType) bool {
 	c := l.Value()
@@ -77,6 +77,20 @@ const (
 // be used to provide custom logging writers for the SDK to use.
 type Logger interface {
 	Log(...interface{})
+}
+
+// A LoggerFunc is a convenience type to convert a function taking a variadic
+// list of arguments and wrap it so the Logger interface can be used.
+//
+// Example:
+//     s3.New(sess, &aws.Config{Logger: aws.LoggerFunc(func(args ...interface{}) {
+//         fmt.Fprintln(os.Stdout, args...)
+//     })})
+type LoggerFunc func(...interface{})
+
+// Log calls the wrapped function with the arguments provided
+func (f LoggerFunc) Log(args ...interface{}) {
+	f(args...)
 }
 
 // NewDefaultLogger returns a Logger which will write log messages to stdout, and

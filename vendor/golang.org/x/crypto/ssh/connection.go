@@ -23,17 +23,16 @@ func (e *OpenChannelError) Error() string {
 // ConnMetadata holds metadata for the connection.
 type ConnMetadata interface {
 	// User returns the user ID for this connection.
-	// It is empty if no authentication is used.
 	User() string
 
-	// SessionID returns the sesson hash, also denoted by H.
+	// SessionID returns the session hash, also denoted by H.
 	SessionID() []byte
 
 	// ClientVersion returns the client's version string as hashed
 	// into the session ID.
 	ClientVersion() []byte
 
-	// ServerVersion returns the client's version string as hashed
+	// ServerVersion returns the server's version string as hashed
 	// into the session ID.
 	ServerVersion() []byte
 

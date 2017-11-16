@@ -17,10 +17,8 @@ limitations under the License.
 package volume
 
 import (
-	"errors"
-	"fmt"
-
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -43,12 +41,17 @@ func NewMetricsDu(path string) MetricsProvider {
 // and gathering filesystem info for the Volume path.
 // See MetricsProvider.GetMetrics
 func (md *metricsDu) GetMetrics() (*Metrics, error) {
-	metrics := &Metrics{}
+	metrics := &Metrics{Time: metav1.Now()}
 	if md.path == "" {
-		return metrics, errors.New("no path defined for disk usage metrics.")
+		return metrics, NewNoPathDefinedError()
 	}
 
 	err := md.runDu(metrics)
+	if err != nil {
+		return metrics, err
+	}
+
+	err = md.runFind(metrics)
 	if err != nil {
 		return metrics, err
 	}
@@ -71,14 +74,26 @@ func (md *metricsDu) runDu(metrics *Metrics) error {
 	return nil
 }
 
+// runFind executes the "find" command and writes the results to metrics.InodesUsed
+func (md *metricsDu) runFind(metrics *Metrics) error {
+	inodesUsed, err := util.Find(md.path)
+	if err != nil {
+		return err
+	}
+	metrics.InodesUsed = resource.NewQuantity(inodesUsed, resource.BinarySI)
+	return nil
+}
+
 // getFsInfo writes metrics.Capacity and metrics.Available from the filesystem
 // info
 func (md *metricsDu) getFsInfo(metrics *Metrics) error {
-	available, capacity, _, err := util.FsInfo(md.path)
+	available, capacity, _, inodes, inodesFree, _, err := util.FsInfo(md.path)
 	if err != nil {
-		return fmt.Errorf("Failed to get FsInfo due to error %v", err)
+		return NewFsInfoFailedError(err)
 	}
 	metrics.Available = resource.NewQuantity(available, resource.BinarySI)
 	metrics.Capacity = resource.NewQuantity(capacity, resource.BinarySI)
+	metrics.Inodes = resource.NewQuantity(inodes, resource.BinarySI)
+	metrics.InodesFree = resource.NewQuantity(inodesFree, resource.BinarySI)
 	return nil
 }

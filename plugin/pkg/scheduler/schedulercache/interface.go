@@ -17,9 +17,12 @@ limitations under the License.
 package schedulercache
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
+	"k8s.io/apimachinery/pkg/labels"
 )
+
+type PodFilter func(*v1.Pod) bool
 
 // Cache collects pods' information and provides node-level aggregated information.
 // It's intended for generic scheduler to do efficient lookup.
@@ -36,13 +39,13 @@ import (
 //   |                                           |  |    | Update
 //   +      Assume                Add            v  v    |
 //Initial +--------> Assumed +------------+---> Added <--+
-//                      +                 |       +
-//                      |                 |       |
-//                      |             Add |       | Remove
-//                      |                 |       |
-//                      |                 +       |
-//                      +-------------> Expired   +----> Deleted
-//                          Expire
+//   ^                +   +               |       +
+//   |                |   |               |       |
+//   |                |   |           Add |       | Remove
+//   |                |   |               |       |
+//   |                |   |               +       |
+//   +----------------+   +-----------> Expired   +----> Deleted
+//         Forget             Expire
 //
 //
 // Note that an assumed pod can expire, because if we haven't received Add event notifying us
@@ -59,31 +62,60 @@ type Cache interface {
 	// AssumePod assumes a pod scheduled and aggregates the pod's information into its node.
 	// The implementation also decides the policy to expire pod before being confirmed (receiving Add event).
 	// After expiration, its information would be subtracted.
-	AssumePod(pod *api.Pod) error
+	AssumePod(pod *v1.Pod) error
+
+	// FinishBinding signals that cache for assumed pod can be expired
+	FinishBinding(pod *v1.Pod) error
+
+	// ForgetPod removes an assumed pod from cache.
+	ForgetPod(pod *v1.Pod) error
 
 	// AddPod either confirms a pod if it's assumed, or adds it back if it's expired.
 	// If added back, the pod's information would be added again.
-	AddPod(pod *api.Pod) error
+	AddPod(pod *v1.Pod) error
 
 	// UpdatePod removes oldPod's information and adds newPod's information.
-	UpdatePod(oldPod, newPod *api.Pod) error
+	UpdatePod(oldPod, newPod *v1.Pod) error
 
 	// RemovePod removes a pod. The pod's information would be subtracted from assigned node.
-	RemovePod(pod *api.Pod) error
+	RemovePod(pod *v1.Pod) error
+
+	// GetPod returns the pod from the cache with the same namespace and the
+	// same name of the specified pod.
+	GetPod(pod *v1.Pod) (*v1.Pod, error)
+
+	// IsAssumedPod returns true if the pod is assumed and not expired.
+	IsAssumedPod(pod *v1.Pod) (bool, error)
 
 	// AddNode adds overall information about node.
-	AddNode(node *api.Node) error
+	AddNode(node *v1.Node) error
 
 	// UpdateNode updates overall information about node.
-	UpdateNode(oldNode, newNode *api.Node) error
+	UpdateNode(oldNode, newNode *v1.Node) error
 
 	// RemoveNode removes overall information about node.
-	RemoveNode(node *api.Node) error
+	RemoveNode(node *v1.Node) error
 
-	// GetNodeNameToInfoMap returns a map of node names to node info. The node info contains
-	// aggregated information of pods scheduled (including assumed to be) on this node.
-	GetNodeNameToInfoMap() (map[string]*NodeInfo, error)
+	// AddPDB adds a PodDisruptionBudget object to the cache.
+	AddPDB(pdb *policy.PodDisruptionBudget) error
+
+	// UpdatePDB updates a PodDisruptionBudget object in the cache.
+	UpdatePDB(oldPDB, newPDB *policy.PodDisruptionBudget) error
+
+	// RemovePDB removes a PodDisruptionBudget object from the cache.
+	RemovePDB(pdb *policy.PodDisruptionBudget) error
+
+	// List lists all cached PDBs matching the selector.
+	ListPDBs(selector labels.Selector) ([]*policy.PodDisruptionBudget, error)
+
+	// UpdateNodeNameToInfoMap updates the passed infoMap to the current contents of Cache.
+	// The node info contains aggregated information of pods scheduled (including assumed to be)
+	// on this node.
+	UpdateNodeNameToInfoMap(infoMap map[string]*NodeInfo) error
 
 	// List lists all cached pods (including assumed ones).
-	List(labels.Selector) ([]*api.Pod, error)
+	List(labels.Selector) ([]*v1.Pod, error)
+
+	// FilteredList returns all cached pods that pass the filter.
+	FilteredList(filter PodFilter, selector labels.Selector) ([]*v1.Pod, error)
 }

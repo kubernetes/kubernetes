@@ -24,15 +24,21 @@ import (
 	"net/url"
 	"time"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/probe"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
+	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/golang/glog"
 )
 
 func New() HTTPProber {
 	tlsConfig := &tls.Config{InsecureSkipVerify: true}
-	transport := utilnet.SetTransportDefaults(&http.Transport{TLSClientConfig: tlsConfig, DisableKeepAlives: true})
+	return NewWithTLSConfig(tlsConfig)
+}
+
+// NewWithTLSConfig takes tls config as parameter.
+func NewWithTLSConfig(config *tls.Config) HTTPProber {
+	transport := utilnet.SetTransportDefaults(&http.Transport{TLSClientConfig: config, DisableKeepAlives: true})
 	return httpProber{transport}
 }
 
@@ -62,6 +68,14 @@ func DoHTTPProbe(url *url.URL, headers http.Header, client HTTPGetInterface) (pr
 	if err != nil {
 		// Convert errors into failures to catch timeouts.
 		return probe.Failure, err.Error(), nil
+	}
+	if _, ok := headers["User-Agent"]; !ok {
+		if headers == nil {
+			headers = http.Header{}
+		}
+		// explicitly set User-Agent so it's not set to default Go value
+		v := version.Get()
+		headers.Set("User-Agent", fmt.Sprintf("kube-probe/%s.%s", v.Major, v.Minor))
 	}
 	req.Header = headers
 	if headers.Get("Host") != "" {

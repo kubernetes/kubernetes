@@ -1,0 +1,48 @@
+restart:
+  description: Restart the Kubernetes master services on demand.
+create-rbd-pv:
+  description: Create RADOS Block Device (RDB) volume in Ceph and creates PersistentVolume.
+  params:
+    name:
+      type: string
+      description: Name the persistent volume.
+      minLength: 1
+    size:
+      type: integer
+      description: Size in MB of the RBD volume.
+      minimum: 1
+    mode:
+      type: string
+      default: ReadWriteOnce
+      description: Access mode for the persistent volume.
+    filesystem:
+      type: string
+      default: xfs
+      description: File system type to format the volume.
+    skip-size-check:
+      type: boolean
+      default: false
+      description: Allow creation of overprovisioned RBD.
+  required:
+    - name
+    - size
+namespace-list:
+  description: List existing k8s namespaces
+namespace-create:
+  description: Create new namespace
+  params:
+    name:
+      type: string
+      description: Namespace name eg. staging
+      minLength: 2
+  required:
+    - name
+namespace-delete:
+  description: Delete namespace
+  params:
+    name:
+      type: string
+      description: Namespace name eg. staging
+      minLength: 2
+  required:
+    - name

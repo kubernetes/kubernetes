@@ -17,82 +17,208 @@ limitations under the License.
 package cm
 
 import (
+	"bufio"
 	"fmt"
-	"path"
+	"os"
+	"path/filepath"
+	"strconv"
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
-	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
-	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
+
+	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/api/v1/resource"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 )
 
-// cgroupSubsystems holds information about the mounted cgroup subsytems
-type cgroupSubsystems struct {
-	// Cgroup subsystem mounts.
-	// e.g.: "/sys/fs/cgroup/cpu" -> ["cpu", "cpuacct"]
-	mounts []libcontainercgroups.Mount
+const (
+	// Taken from lmctfy https://github.com/google/lmctfy/blob/master/lmctfy/controllers/cpu_controller.cc
+	MinShares     = 2
+	SharesPerCPU  = 1024
+	MilliCPUToCPU = 1000
 
-	// Cgroup subsystem to their mount location.
-	// e.g.: "cpu" -> "/sys/fs/cgroup/cpu"
-	mountPoints map[string]string
+	// 100000 is equivalent to 100ms
+	QuotaPeriod    = 100000
+	MinQuotaPeriod = 1000
+)
+
+// MilliCPUToQuota converts milliCPU to CFS quota and period values.
+func MilliCPUToQuota(milliCPU int64) (quota int64, period uint64) {
+	// CFS quota is measured in two values:
+	//  - cfs_period_us=100ms (the amount of time to measure usage across)
+	//  - cfs_quota=20ms (the amount of cpu time allowed to be used across a period)
+	// so in the above example, you are limited to 20% of a single CPU
+	// for multi-cpu environments, you just scale equivalent amounts
+
+	if milliCPU == 0 {
+		return
+	}
+
+	// we set the period to 100ms by default
+	period = QuotaPeriod
+
+	// we then convert your milliCPU to a value normalized over a period
+	quota = (milliCPU * QuotaPeriod) / MilliCPUToCPU
+
+	// quota needs to be a minimum of 1ms.
+	if quota < MinQuotaPeriod {
+		quota = MinQuotaPeriod
+	}
+
+	return
+}
+
+// MilliCPUToShares converts the milliCPU to CFS shares.
+func MilliCPUToShares(milliCPU int64) uint64 {
+	if milliCPU == 0 {
+		// Docker converts zero milliCPU to unset, which maps to kernel default
+		// for unset: 1024. Return 2 here to really match kernel default for
+		// zero milliCPU.
+		return MinShares
+	}
+	// Conceptually (milliCPU / milliCPUToCPU) * sharesPerCPU, but factored to improve rounding.
+	shares := (milliCPU * SharesPerCPU) / MilliCPUToCPU
+	if shares < MinShares {
+		return MinShares
+	}
+	return uint64(shares)
+}
+
+// HugePageLimits converts the API representation to a map
+// from huge page size (in bytes) to huge page limit (in bytes).
+func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
+	hugePageLimits := map[int64]int64{}
+	for k, v := range resourceList {
+		if v1helper.IsHugePageResourceName(k) {
+			pageSize, _ := v1helper.HugePageSizeFromResourceName(k)
+			if value, exists := hugePageLimits[pageSize.Value()]; exists {
+				hugePageLimits[pageSize.Value()] = value + v.Value()
+			} else {
+				hugePageLimits[pageSize.Value()] = v.Value()
+			}
+		}
+	}
+	return hugePageLimits
+}
+
+// ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
+func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
+	// sum requests and limits.
+	reqs, limits := resource.PodRequestsAndLimits(pod)
+
+	cpuRequests := int64(0)
+	cpuLimits := int64(0)
+	memoryLimits := int64(0)
+	if request, found := reqs[v1.ResourceCPU]; found {
+		cpuRequests = request.MilliValue()
+	}
+	if limit, found := limits[v1.ResourceCPU]; found {
+		cpuLimits = limit.MilliValue()
+	}
+	if limit, found := limits[v1.ResourceMemory]; found {
+		memoryLimits = limit.Value()
+	}
+
+	// convert to CFS values
+	cpuShares := MilliCPUToShares(cpuRequests)
+	cpuQuota, cpuPeriod := MilliCPUToQuota(cpuLimits)
+
+	// track if limits were applied for each resource.
+	memoryLimitsDeclared := true
+	cpuLimitsDeclared := true
+	// map hugepage pagesize (bytes) to limits (bytes)
+	hugePageLimits := map[int64]int64{}
+	for _, container := range pod.Spec.Containers {
+		if container.Resources.Limits.Cpu().IsZero() {
+			cpuLimitsDeclared = false
+		}
+		if container.Resources.Limits.Memory().IsZero() {
+			memoryLimitsDeclared = false
+		}
+		containerHugePageLimits := HugePageLimits(container.Resources.Requests)
+		for k, v := range containerHugePageLimits {
+			if value, exists := hugePageLimits[k]; exists {
+				hugePageLimits[k] = value + v
+			} else {
+				hugePageLimits[k] = v
+			}
+		}
+	}
+
+	// determine the qos class
+	qosClass := v1qos.GetPodQOS(pod)
+
+	// build the result
+	result := &ResourceConfig{}
+	if qosClass == v1.PodQOSGuaranteed {
+		result.CpuShares = &cpuShares
+		result.CpuQuota = &cpuQuota
+		result.CpuPeriod = &cpuPeriod
+		result.Memory = &memoryLimits
+	} else if qosClass == v1.PodQOSBurstable {
+		result.CpuShares = &cpuShares
+		if cpuLimitsDeclared {
+			result.CpuQuota = &cpuQuota
+			result.CpuPeriod = &cpuPeriod
+		}
+		if memoryLimitsDeclared {
+			result.Memory = &memoryLimits
+		}
+	} else {
+		shares := uint64(MinShares)
+		result.CpuShares = &shares
+	}
+	result.HugePageLimit = hugePageLimits
+	return result
 }
 
 // GetCgroupSubsystems returns information about the mounted cgroup subsystems
-func getCgroupSubsystems() (*cgroupSubsystems, error) {
-	// Get all cgroup mounts.
-	allCgroups, err := libcontainercgroups.GetCgroupMounts()
+func GetCgroupSubsystems() (*CgroupSubsystems, error) {
+	// get all cgroup mounts.
+	allCgroups, err := libcontainercgroups.GetCgroupMounts(true)
 	if err != nil {
-		return &cgroupSubsystems{}, err
+		return &CgroupSubsystems{}, err
 	}
 	if len(allCgroups) == 0 {
-		return &cgroupSubsystems{}, fmt.Errorf("failed to find cgroup mounts")
+		return &CgroupSubsystems{}, fmt.Errorf("failed to find cgroup mounts")
 	}
-
-	//TODO(@dubstack) should we trim to only the supported ones
 	mountPoints := make(map[string]string, len(allCgroups))
 	for _, mount := range allCgroups {
 		for _, subsystem := range mount.Subsystems {
 			mountPoints[subsystem] = mount.Mountpoint
 		}
 	}
-	return &cgroupSubsystems{
-		mounts:      allCgroups,
-		mountPoints: mountPoints,
+	return &CgroupSubsystems{
+		Mounts:      allCgroups,
+		MountPoints: mountPoints,
 	}, nil
 }
 
-// getLibcontainerCgroupManager returns libcontainer's cgroups manager
-// object with the specified cgroup configuration
-func getLibcontainerCgroupManager(cgroupConfig *CgroupConfig, subsystems *cgroupSubsystems) (*cgroupfs.Manager, error) {
-	// get cgroup name
-	name := cgroupConfig.Name
+// getCgroupProcs takes a cgroup directory name as an argument
+// reads through the cgroup's procs file and returns a list of tgid's.
+// It returns an empty list if a procs file doesn't exists
+func getCgroupProcs(dir string) ([]int, error) {
+	procsFile := filepath.Join(dir, "cgroup.procs")
+	f, err := os.Open(procsFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// The procsFile does not exist, So no pids attached to this directory
+			return []int{}, nil
+		}
+		return nil, err
+	}
+	defer f.Close()
 
-	// Get map of all cgroup paths on the system for the particular cgroup
-	cgroupPaths := make(map[string]string, len(subsystems.mountPoints))
-	for key, val := range subsystems.mountPoints {
-		cgroupPaths[key] = path.Join(val, name)
+	s := bufio.NewScanner(f)
+	out := []int{}
+	for s.Scan() {
+		if t := s.Text(); t != "" {
+			pid, err := strconv.Atoi(t)
+			if err != nil {
+				return nil, fmt.Errorf("unexpected line in %v; could not convert to pid: %v", procsFile, err)
+			}
+			out = append(out, pid)
+		}
 	}
-
-	// Extract the cgroup resource parameters
-	resourceConfig := cgroupConfig.ResourceParameters
-	resources := &libcontainerconfigs.Resources{}
-	resources.AllowAllDevices = true
-	if resourceConfig.Memory != nil {
-		resources.Memory = *resourceConfig.Memory
-	}
-	if resourceConfig.CpuShares != nil {
-		resources.CpuShares = *resourceConfig.CpuShares
-	}
-	if resourceConfig.CpuQuota != nil {
-		resources.CpuQuota = *resourceConfig.CpuQuota
-	}
-	// Initialize libcontainer's cgroup config
-	libcontainerCgroupConfig := &libcontainerconfigs.Cgroup{
-		Name:      path.Base(name),
-		Parent:    path.Dir(name),
-		Resources: resources,
-	}
-	return &cgroupfs.Manager{
-		Cgroups: libcontainerCgroupConfig,
-		Paths:   cgroupPaths,
-	}, nil
+	return out, nil
 }

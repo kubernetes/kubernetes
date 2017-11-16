@@ -6,7 +6,7 @@
 package blowfish
 
 // The code is a port of Bruce Schneier's C implementation.
-// See http://www.schneier.com/blowfish.html.
+// See https://www.schneier.com/blowfish.html.
 
 import "strconv"
 
@@ -39,7 +39,7 @@ func NewCipher(key []byte) (*Cipher, error) {
 
 // NewSaltedCipher creates a returns a Cipher that folds a salt into its key
 // schedule. For most purposes, NewCipher, instead of NewSaltedCipher, is
-// sufficient and desirable. For bcrypt compatiblity, the key can be over 56
+// sufficient and desirable. For bcrypt compatibility, the key can be over 56
 // bytes.
 func NewSaltedCipher(key, salt []byte) (*Cipher, error) {
 	if len(salt) == 0 {

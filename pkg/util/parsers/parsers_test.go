@@ -29,12 +29,12 @@ func TestParseImageName(t *testing.T) {
 		Tag    string
 		Digest string
 	}{
-		{Input: "root", Repo: "root", Tag: "latest"},
-		{Input: "root:tag", Repo: "root", Tag: "tag"},
-		{Input: "root@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Repo: "root", Digest: "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
-		{Input: "user/repo", Repo: "user/repo", Tag: "latest"},
-		{Input: "user/repo:tag", Repo: "user/repo", Tag: "tag"},
-		{Input: "user/repo@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Repo: "user/repo", Digest: "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+		{Input: "root", Repo: "docker.io/library/root", Tag: "latest"},
+		{Input: "root:tag", Repo: "docker.io/library/root", Tag: "tag"},
+		{Input: "root@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Repo: "docker.io/library/root", Digest: "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+		{Input: "user/repo", Repo: "docker.io/user/repo", Tag: "latest"},
+		{Input: "user/repo:tag", Repo: "docker.io/user/repo", Tag: "tag"},
+		{Input: "user/repo@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Repo: "docker.io/user/repo", Digest: "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
 		{Input: "url:5000/repo", Repo: "url:5000/repo", Tag: "latest"},
 		{Input: "url:5000/repo:tag", Repo: "url:5000/repo", Tag: "tag"},
 		{Input: "url:5000/repo@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Repo: "url:5000/repo", Digest: "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},

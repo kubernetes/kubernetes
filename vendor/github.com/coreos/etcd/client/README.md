@@ -4,9 +4,11 @@ etcd/client is the Go client library for etcd.
 
 [![GoDoc](https://godoc.org/github.com/coreos/etcd/client?status.png)](https://godoc.org/github.com/coreos/etcd/client)
 
-etcd uses go's `vendor` directory to manage external dependencies. If `client` is imported
-outside of etcd, simply copy `client` to the `vendor` directory or use tools like godep to
-manage your own dependency, as in [vendor directories](https://golang.org/cmd/go/#hdr-Vendor_Directories).
+etcd uses `cmd/vendor` directory to store external dependencies, which are
+to be compiled into etcd release binaries. `client` can be imported without
+vendoring. For full compatibility, it is recommended to vendor builds using
+etcd's vendored packages, using tools like godep, as in
+[vendor directories](https://golang.org/cmd/go/#hdr-Vendor_Directories).
 For more detail, please read [Go vendor design](https://golang.org/s/go15vendor).
 
 ## Install
@@ -112,4 +114,4 @@ if err != nil {
 
 3. Default etcd/client cannot handle the case that the remote server is SIGSTOPed now. TCP keepalive mechanism doesn't help in this scenario because operating system may still send TCP keep-alive packets. Over time we'd like to improve this functionality, but solving this issue isn't high priority because a real-life case in which a server is stopped, but the connection is kept alive, hasn't been brought to our attention.
 
-4. etcd/client cannot detect whether the member in use is healthy when doing read requests. If the member is isolated from the cluster, etcd/client may retrieve outdated data. As a workaround, users could monitor experimental /health endpoint for member healthy information. We are improving it at [#3265](https://github.com/coreos/etcd/issues/3265).
+4. etcd/client cannot detect whether a member is healthy with watches and non-quorum read requests. If the member is isolated from the cluster, etcd/client may retrieve outdated data. Instead, users can either issue quorum read requests or monitor the /health endpoint for member health information.

@@ -6,6 +6,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 )
 
+// EnvProviderName provides a name of Env provider
+const EnvProviderName = "EnvProvider"
+
 var (
 	// ErrAccessKeyIDNotFound is returned when the AWS Access Key ID can't be
 	// found in the process's environment.
@@ -26,6 +29,7 @@ var (
 // Environment variables used:
 //
 // * Access Key ID:     AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY
+//
 // * Secret Access Key: AWS_SECRET_ACCESS_KEY or AWS_SECRET_KEY
 type EnvProvider struct {
 	retrieved bool
@@ -52,11 +56,11 @@ func (e *EnvProvider) Retrieve() (Value, error) {
 	}
 
 	if id == "" {
-		return Value{}, ErrAccessKeyIDNotFound
+		return Value{ProviderName: EnvProviderName}, ErrAccessKeyIDNotFound
 	}
 
 	if secret == "" {
-		return Value{}, ErrSecretAccessKeyNotFound
+		return Value{ProviderName: EnvProviderName}, ErrSecretAccessKeyNotFound
 	}
 
 	e.retrieved = true
@@ -64,6 +68,7 @@ func (e *EnvProvider) Retrieve() (Value, error) {
 		AccessKeyID:     id,
 		SecretAccessKey: secret,
 		SessionToken:    os.Getenv("AWS_SESSION_TOKEN"),
+		ProviderName:    EnvProviderName,
 	}, nil
 }
 

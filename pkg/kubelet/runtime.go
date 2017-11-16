@@ -23,13 +23,29 @@ import (
 )
 
 type runtimeState struct {
-	sync.Mutex
+	sync.RWMutex
 	lastBaseRuntimeSync      time.Time
 	baseRuntimeSyncThreshold time.Duration
 	networkError             error
 	internalError            error
 	cidr                     string
 	initError                error
+	healthChecks             []*healthCheck
+}
+
+// A health check function should be efficient and not rely on external
+// components (e.g., container runtime).
+type healthCheckFnType func() (bool, error)
+
+type healthCheck struct {
+	name string
+	fn   healthCheckFnType
+}
+
+func (s *runtimeState) addHealthCheck(name string, f healthCheckFnType) {
+	s.Lock()
+	defer s.Unlock()
+	s.healthChecks = append(s.healthChecks, &healthCheck{name: name, fn: f})
 }
 
 func (s *runtimeState) setRuntimeSync(t time.Time) {
@@ -57,8 +73,8 @@ func (s *runtimeState) setPodCIDR(cidr string) {
 }
 
 func (s *runtimeState) podCIDR() string {
-	s.Lock()
-	defer s.Unlock()
+	s.RLock()
+	defer s.RUnlock()
 	return s.cidr
 }
 
@@ -68,21 +84,34 @@ func (s *runtimeState) setInitError(err error) {
 	s.initError = err
 }
 
-func (s *runtimeState) errors() []string {
-	s.Lock()
-	defer s.Unlock()
+func (s *runtimeState) runtimeErrors() []string {
+	s.RLock()
+	defer s.RUnlock()
 	var ret []string
 	if s.initError != nil {
 		ret = append(ret, s.initError.Error())
-	}
-	if s.networkError != nil {
-		ret = append(ret, s.networkError.Error())
 	}
 	if !s.lastBaseRuntimeSync.Add(s.baseRuntimeSyncThreshold).After(time.Now()) {
 		ret = append(ret, "container runtime is down")
 	}
 	if s.internalError != nil {
 		ret = append(ret, s.internalError.Error())
+	}
+	for _, hc := range s.healthChecks {
+		if ok, err := hc.fn(); !ok {
+			ret = append(ret, fmt.Sprintf("%s is not healthy: %v", hc.name, err))
+		}
+	}
+
+	return ret
+}
+
+func (s *runtimeState) networkErrors() []string {
+	s.RLock()
+	defer s.RUnlock()
+	var ret []string
+	if s.networkError != nil {
+		ret = append(ret, s.networkError.Error())
 	}
 	return ret
 }

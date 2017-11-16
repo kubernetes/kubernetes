@@ -17,36 +17,28 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/watch/versioned"
+	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = unversioned.GroupVersion{Group: rbac.GroupName, Version: "v1alpha1"}
+const GroupName = "rbac.authorization.k8s.io"
 
-func AddToScheme(scheme *runtime.Scheme) {
-	addKnownTypes(scheme)
+// SchemeGroupVersion is group version used to register these objects
+var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}
+
+// Resource takes an unqualified resource and returns a Group qualified GroupResource
+func Resource(resource string) schema.GroupResource {
+	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
-// Adds the list of known types to api.Scheme.
-func addKnownTypes(scheme *runtime.Scheme) {
-	scheme.AddKnownTypes(SchemeGroupVersion,
-		&Role{},
-		&RoleBinding{},
-		&RoleBindingList{},
-		&RoleList{},
+var (
+	localSchemeBuilder = &rbacv1alpha1.SchemeBuilder
+	AddToScheme        = localSchemeBuilder.AddToScheme
+)
 
-		&ClusterRole{},
-		&ClusterRoleBinding{},
-		&ClusterRoleBindingList{},
-		&ClusterRoleList{},
-
-		&v1.ListOptions{},
-		&v1.DeleteOptions{},
-		&v1.ExportOptions{},
-	)
-	versioned.AddToGroupVersion(scheme, SchemeGroupVersion)
+func init() {
+	// We only register manually written functions here. The registration of the
+	// generated functions takes place in the generated files. The separation
+	// makes the code compile even when the generated files are missing.
+	localSchemeBuilder.Register(addDefaultingFuncs)
 }

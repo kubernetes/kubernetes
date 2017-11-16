@@ -29,12 +29,28 @@ func (c *Cloud) findRouteTable(clusterName string) (*ec2.RouteTable, error) {
 	// This should be unnecessary (we already filter on TagNameKubernetesCluster,
 	// and something is broken if cluster name doesn't match, but anyway...
 	// TODO: All clouds should be cluster-aware by default
-	filters := []*ec2.Filter{newEc2Filter("tag:"+TagNameKubernetesCluster, clusterName)}
-	request := &ec2.DescribeRouteTablesInput{Filters: c.addFilters(filters)}
+	var tables []*ec2.RouteTable
 
-	tables, err := c.ec2.DescribeRouteTables(request)
-	if err != nil {
-		return nil, err
+	if c.cfg.Global.RouteTableID != "" {
+		request := &ec2.DescribeRouteTablesInput{Filters: []*ec2.Filter{newEc2Filter("route-table-id", c.cfg.Global.RouteTableID)}}
+		response, err := c.ec2.DescribeRouteTables(request)
+		if err != nil {
+			return nil, err
+		}
+
+		tables = response
+	} else {
+		request := &ec2.DescribeRouteTablesInput{Filters: c.tagging.addFilters(nil)}
+		response, err := c.ec2.DescribeRouteTables(request)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, table := range response {
+			if c.tagging.hasClusterTag(table.Tags) {
+				tables = append(tables, table)
+			}
+		}
 	}
 
 	if len(tables) == 0 {
@@ -59,7 +75,7 @@ func (c *Cloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
 	var instanceIDs []*string
 
 	for _, r := range table.Routes {
-		instanceID := orEmpty(r.InstanceId)
+		instanceID := aws.StringValue(r.InstanceId)
 
 		if instanceID == "" {
 			continue
@@ -74,21 +90,34 @@ func (c *Cloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
 	}
 
 	for _, r := range table.Routes {
-		instanceID := orEmpty(r.InstanceId)
-		destinationCIDR := orEmpty(r.DestinationCidrBlock)
-
-		if instanceID == "" || destinationCIDR == "" {
+		destinationCIDR := aws.StringValue(r.DestinationCidrBlock)
+		if destinationCIDR == "" {
 			continue
 		}
 
-		instance, found := instances[instanceID]
-		if !found {
-			glog.Warningf("unable to find instance ID %s in the list of instances being routed to", instanceID)
+		route := &cloudprovider.Route{
+			Name:            clusterName + "-" + destinationCIDR,
+			DestinationCIDR: destinationCIDR,
+		}
+
+		// Capture blackhole routes
+		if aws.StringValue(r.State) == ec2.RouteStateBlackhole {
+			route.Blackhole = true
+			routes = append(routes, route)
 			continue
 		}
-		instanceName := orEmpty(instance.PrivateDnsName)
-		routeName := clusterName + "-" + destinationCIDR
-		routes = append(routes, &cloudprovider.Route{Name: routeName, TargetInstance: instanceName, DestinationCIDR: destinationCIDR})
+
+		// Capture instance routes
+		instanceID := aws.StringValue(r.InstanceId)
+		if instanceID != "" {
+			instance, found := instances[instanceID]
+			if found {
+				route.TargetNode = mapInstanceToNodeName(instance)
+				routes = append(routes, route)
+			} else {
+				glog.Warningf("unable to find instance ID %s in the list of instances being routed to", instanceID)
+			}
+		}
 	}
 
 	return routes, nil
@@ -102,7 +131,7 @@ func (c *Cloud) configureInstanceSourceDestCheck(instanceID string, sourceDestCh
 
 	_, err := c.ec2.ModifyInstanceAttribute(request)
 	if err != nil {
-		return fmt.Errorf("error configuring source-dest-check on instance %s: %v", instanceID, err)
+		return fmt.Errorf("error configuring source-dest-check on instance %s: %q", instanceID, err)
 	}
 	return nil
 }
@@ -110,14 +139,14 @@ func (c *Cloud) configureInstanceSourceDestCheck(instanceID string, sourceDestCh
 // CreateRoute implements Routes.CreateRoute
 // Create the described route
 func (c *Cloud) CreateRoute(clusterName string, nameHint string, route *cloudprovider.Route) error {
-	instance, err := c.getInstanceByNodeName(route.TargetInstance)
+	instance, err := c.getInstanceByNodeName(route.TargetNode)
 	if err != nil {
 		return err
 	}
 
 	// In addition to configuring the route itself, we also need to configure the instance to accept that traffic
 	// On AWS, this requires turning source-dest checks off
-	err = c.configureInstanceSourceDestCheck(orEmpty(instance.InstanceId), false)
+	err = c.configureInstanceSourceDestCheck(aws.StringValue(instance.InstanceId), false)
 	if err != nil {
 		return err
 	}
@@ -149,7 +178,7 @@ func (c *Cloud) CreateRoute(clusterName string, nameHint string, route *cloudpro
 
 		_, err = c.ec2.DeleteRoute(request)
 		if err != nil {
-			return fmt.Errorf("error deleting blackholed AWS route (%s): %v", aws.StringValue(deleteRoute.DestinationCidrBlock), err)
+			return fmt.Errorf("error deleting blackholed AWS route (%s): %q", aws.StringValue(deleteRoute.DestinationCidrBlock), err)
 		}
 	}
 
@@ -161,7 +190,7 @@ func (c *Cloud) CreateRoute(clusterName string, nameHint string, route *cloudpro
 
 	_, err = c.ec2.CreateRoute(request)
 	if err != nil {
-		return fmt.Errorf("error creating AWS route (%s): %v", route.DestinationCIDR, err)
+		return fmt.Errorf("error creating AWS route (%s): %q", route.DestinationCIDR, err)
 	}
 
 	return nil
@@ -181,7 +210,7 @@ func (c *Cloud) DeleteRoute(clusterName string, route *cloudprovider.Route) erro
 
 	_, err = c.ec2.DeleteRoute(request)
 	if err != nil {
-		return fmt.Errorf("error deleting AWS route (%s): %v", route.DestinationCIDR, err)
+		return fmt.Errorf("error deleting AWS route (%s): %q", route.DestinationCIDR, err)
 	}
 
 	return nil

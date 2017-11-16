@@ -17,13 +17,12 @@ limitations under the License.
 package volume
 
 import (
-	"io/ioutil"
-	"os"
-	"path"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // Volume represents a directory used by pods or hosts on a node. All method
@@ -41,13 +40,16 @@ type Volume interface {
 // MetricsProvider exposes metrics (e.g. used,available space) related to a
 // Volume.
 type MetricsProvider interface {
-	// GetMetrics returns the Metrics for the Volume.  Maybe expensive for
+	// GetMetrics returns the Metrics for the Volume. Maybe expensive for
 	// some implementations.
 	GetMetrics() (*Metrics, error)
 }
 
 // Metrics represents the used and available bytes of the Volume.
 type Metrics struct {
+	// The time at which these stats were updated.
+	Time metav1.Time
+
 	// Used represents the total bytes used by the Volume.
 	// Note: For block devices this maybe more than the total size of the files.
 	Used *resource.Quantity
@@ -63,6 +65,20 @@ type Metrics struct {
 	// emptydir, hostpath), this is the available space on the underlying
 	// storage, and is shared with host processes and other Volumes.
 	Available *resource.Quantity
+
+	// InodesUsed represents the total inodes used by the Volume.
+	InodesUsed *resource.Quantity
+
+	// Inodes represents the total number of inodes available in the volume.
+	// For volumes that share a filesystem with the host (e.g. emptydir, hostpath),
+	// this is the inodes available in the underlying storage,
+	// and will not equal InodesUsed + InodesFree as the fs is shared.
+	Inodes *resource.Quantity
+
+	// InodesFree represent the inodes available for the volume.  For Volumes that share
+	// a filesystem with the host (e.g. emptydir, hostpath), this is the free inodes
+	// on the underlying storage, and is shared with host processes and other volumes
+	InodesFree *resource.Quantity
 }
 
 // Attributes represents the attributes of this mounter.
@@ -76,6 +92,18 @@ type Attributes struct {
 type Mounter interface {
 	// Uses Interface to provide the path for Docker binds.
 	Volume
+
+	// CanMount is called immediately prior to Setup to check if
+	// the required components (binaries, etc.) are available on
+	// the underlying node to complete the subsequent SetUp (mount)
+	// operation. If CanMount returns error, the mount operation is
+	// aborted and an event is generated indicating that the node
+	// does not have the required binaries to complete the mount.
+	// If CanMount succeeds, the mount operation continues
+	// normally. The CanMount check can be enabled or disabled
+	// using the experimental-check-mount-binaries binary flag
+	CanMount() error
+
 	// SetUp prepares and mounts/unpacks the volume to a
 	// self-determined directory path. The mount point and its
 	// content should be owned by 'fsGroup' so that it can be
@@ -104,46 +132,48 @@ type Unmounter interface {
 	TearDownAt(dir string) error
 }
 
-// Recycler provides methods to reclaim the volume resource.
-type Recycler interface {
-	Volume
-	// Recycle reclaims the resource.  Calls to this method should block until
-	// the recycling task is complete. Any error returned indicates the volume
-	// has failed to be reclaimed.  A nil return indicates success.
-	Recycle() error
-}
-
 // Provisioner is an interface that creates templates for PersistentVolumes
 // and can create the volume as a new resource in the infrastructure provider.
 type Provisioner interface {
 	// Provision creates the resource by allocating the underlying volume in a
 	// storage system. This method should block until completion and returns
 	// PersistentVolume representing the created storage resource.
-	Provision() (*api.PersistentVolume, error)
+	Provision() (*v1.PersistentVolume, error)
 }
 
-// Deleter removes the resource from the underlying storage provider.  Calls
+// Deleter removes the resource from the underlying storage provider. Calls
 // to this method should block until the deletion is complete. Any error
 // returned indicates the volume has failed to be reclaimed. A nil return
 // indicates success.
 type Deleter interface {
 	Volume
 	// This method should block until completion.
+	// deletedVolumeInUseError returned from this function will not be reported
+	// as error and it will be sent as "Info" event to the PV being deleted. The
+	// volume controller will retry deleting the volume in the next periodic
+	// sync. This can be used to postpone deletion of a volume that is being
+	// detached from a node. Deletion of such volume would fail anyway and such
+	// error would confuse users.
 	Delete() error
 }
 
 // Attacher can attach a volume to a node.
 type Attacher interface {
-	// Attaches the volume specified by the given spec to the given host.
-	// On success, returns the device path where the device was attache don the
+	// Attaches the volume specified by the given spec to the node with the given Name.
+	// On success, returns the device path where the device was attached on the
 	// node.
-	Attach(spec *Spec, hostName string) (string, error)
+	Attach(spec *Spec, nodeName types.NodeName) (string, error)
+
+	// VolumesAreAttached checks whether the list of volumes still attached to the specified
+	// node. It returns a map which maps from the volume spec to the checking result.
+	// If an error is occurred during checking, the error will be returned
+	VolumesAreAttached(specs []*Spec, nodeName types.NodeName) (map[*Spec]bool, error)
 
 	// WaitForAttach blocks until the device is attached to this
 	// node. If it successfully attaches, the path to the device
 	// is returned. Otherwise, if the device does not attach after
 	// the given timeout period, an error will be returned.
-	WaitForAttach(spec *Spec, devicePath string, timeout time.Duration) (string, error)
+	WaitForAttach(spec *Spec, devicePath string, pod *v1.Pod, timeout time.Duration) (string, error)
 
 	// GetDeviceMountPath returns a path where the device should
 	// be mounted after it is attached. This is a global mount
@@ -155,15 +185,20 @@ type Attacher interface {
 	MountDevice(spec *Spec, devicePath string, deviceMountPath string) error
 }
 
+type BulkVolumeVerifier interface {
+	// BulkVerifyVolumes checks whether the list of volumes still attached to the
+	// the clusters in the node. It returns a map which maps from the volume spec to the checking result.
+	// If an error occurs during check - error should be returned and volume on nodes
+	// should be assumed as still attached.
+	BulkVerifyVolumes(volumesByNode map[types.NodeName][]*Spec) (map[types.NodeName]map[*Spec]bool, error)
+}
+
 // Detacher can detach a volume from a node.
 type Detacher interface {
-	// Detach the given device from the given host.
-	Detach(deviceName, hostName string) error
-
-	// WaitForDetach blocks until the device is detached from this
-	// node. If the device does not detach within the given timeout
-	// period an error is returned.
-	WaitForDetach(devicePath string, timeout time.Duration) error
+	// Detach the given volume from the node with the given Name.
+	// volumeName is name of the volume as returned from plugin's
+	// GetVolumeName().
+	Detach(volumeName string, nodeName types.NodeName) error
 
 	// UnmountDevice unmounts the global mount of the disk. This
 	// should only be called once all bind mounts have been
@@ -171,14 +206,27 @@ type Detacher interface {
 	UnmountDevice(deviceMountPath string) error
 }
 
-func RenameDirectory(oldPath, newName string) (string, error) {
-	newPath, err := ioutil.TempDir(path.Dir(oldPath), newName)
-	if err != nil {
-		return "", err
+// NewDeletedVolumeInUseError returns a new instance of DeletedVolumeInUseError
+// error.
+func NewDeletedVolumeInUseError(message string) error {
+	return deletedVolumeInUseError(message)
+}
+
+type deletedVolumeInUseError string
+
+var _ error = deletedVolumeInUseError("")
+
+// IsDeletedVolumeInUse returns true if an error returned from Delete() is
+// deletedVolumeInUseError
+func IsDeletedVolumeInUse(err error) bool {
+	switch err.(type) {
+	case deletedVolumeInUseError:
+		return true
+	default:
+		return false
 	}
-	err = os.Rename(oldPath, newPath)
-	if err != nil {
-		return "", err
-	}
-	return newPath, nil
+}
+
+func (err deletedVolumeInUseError) Error() string {
+	return string(err)
 }

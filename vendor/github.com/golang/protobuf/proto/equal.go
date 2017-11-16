@@ -54,13 +54,17 @@ Equality is defined in this way:
     in a proto3 .proto file, fields are not "set"; specifically,
     zero length proto3 "bytes" fields are equal (nil == {}).
   - Two repeated fields are equal iff their lengths are the same,
-    and their corresponding elements are equal (a "bytes" field,
-    although represented by []byte, is not a repeated field)
+    and their corresponding elements are equal. Note a "bytes" field,
+    although represented by []byte, is not a repeated field and the
+    rule for the scalar fields described above applies.
   - Two unset fields are equal.
   - Two unknown field sets are equal if their current
     encoded state is equal.
   - Two extension sets are equal iff they have corresponding
     elements that are pairwise equal.
+  - Two map fields are equal iff their lengths are the same,
+    and they contain the same set of elements. Zero-length map
+    fields are equal.
   - Every other combination of things are not equal.
 
 The return value is undefined if a and b are not protocol buffers.
@@ -121,9 +125,16 @@ func equalStruct(v1, v2 reflect.Value) bool {
 		}
 	}
 
+	if em1 := v1.FieldByName("XXX_InternalExtensions"); em1.IsValid() {
+		em2 := v2.FieldByName("XXX_InternalExtensions")
+		if !equalExtensions(v1.Type(), em1.Interface().(XXX_InternalExtensions), em2.Interface().(XXX_InternalExtensions)) {
+			return false
+		}
+	}
+
 	if em1 := v1.FieldByName("XXX_extensions"); em1.IsValid() {
 		em2 := v2.FieldByName("XXX_extensions")
-		if !equalExtensions(v1.Type(), em1.Interface().(map[int32]Extension), em2.Interface().(map[int32]Extension)) {
+		if !equalExtMap(v1.Type(), em1.Interface().(map[int32]Extension), em2.Interface().(map[int32]Extension)) {
 			return false
 		}
 	}
@@ -184,6 +195,13 @@ func equalAny(v1, v2 reflect.Value, prop *Properties) bool {
 		}
 		return true
 	case reflect.Ptr:
+		// Maps may have nil values in them, so check for nil.
+		if v1.IsNil() && v2.IsNil() {
+			return true
+		}
+		if v1.IsNil() != v2.IsNil() {
+			return false
+		}
 		return equalAny(v1.Elem(), v2.Elem(), prop)
 	case reflect.Slice:
 		if v1.Type().Elem().Kind() == reflect.Uint8 {
@@ -223,8 +241,14 @@ func equalAny(v1, v2 reflect.Value, prop *Properties) bool {
 }
 
 // base is the struct type that the extensions are based on.
-// em1 and em2 are extension maps.
-func equalExtensions(base reflect.Type, em1, em2 map[int32]Extension) bool {
+// x1 and x2 are InternalExtensions.
+func equalExtensions(base reflect.Type, x1, x2 XXX_InternalExtensions) bool {
+	em1, _ := x1.extensionsRead()
+	em2, _ := x2.extensionsRead()
+	return equalExtMap(base, em1, em2)
+}
+
+func equalExtMap(base reflect.Type, em1, em2 map[int32]Extension) bool {
 	if len(em1) != len(em2) {
 		return false
 	}

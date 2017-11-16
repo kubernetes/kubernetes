@@ -26,8 +26,8 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -51,22 +51,14 @@ type ActualStateOfWorld interface {
 	// operationexecutor to interact with it.
 	operationexecutor.ActualStateOfWorldAttacherUpdater
 
-	// AddVolume adds the given volume to the cache indicating the specified
-	// volume is attached to this node. A unique volume name is generated from
-	// the volumeSpec and returned on success.
-	// If a volume with the same generated name already exists, this is a noop.
-	// If no volume plugin can support the given volumeSpec or more than one
-	// plugin can support it, an error is returned.
-	AddVolume(volumeSpec *volume.Spec, devicePath string) (api.UniqueVolumeName, error)
-
 	// AddPodToVolume adds the given pod to the given volume in the cache
 	// indicating the specified volume has been successfully mounted to the
 	// specified pod.
 	// If a pod with the same unique name already exists under the specified
-	// volume, this is a no-op.
+	// volume, reset the pod's remountRequired value.
 	// If a volume with the name volumeName does not exist in the list of
 	// attached volumes, an error is returned.
-	AddPodToVolume(podName volumetypes.UniquePodName, podUID types.UID, volumeName api.UniqueVolumeName, mounter volume.Mounter, outerVolumeSpecName string, volumeGidValue string) error
+	AddPodToVolume(podName volumetypes.UniquePodName, podUID types.UID, volumeName v1.UniqueVolumeName, mounter volume.Mounter, outerVolumeSpecName string, volumeGidValue string) error
 
 	// MarkRemountRequired marks each volume that is successfully attached and
 	// mounted for the specified pod as requiring remount (if the plugin for the
@@ -81,7 +73,7 @@ type ActualStateOfWorld interface {
 	// must unmounted prior to detach.
 	// If a volume with the name volumeName does not exist in the list of
 	// attached volumes, an error is returned.
-	SetVolumeGloballyMounted(volumeName api.UniqueVolumeName, globallyMounted bool) error
+	SetVolumeGloballyMounted(volumeName v1.UniqueVolumeName, globallyMounted bool) error
 
 	// DeletePodFromVolume removes the given pod from the given volume in the
 	// cache indicating the volume has been successfully unmounted from the pod.
@@ -89,7 +81,7 @@ type ActualStateOfWorld interface {
 	// volume, this is a no-op.
 	// If a volume with the name volumeName does not exist in the list of
 	// attached volumes, an error is returned.
-	DeletePodFromVolume(podName volumetypes.UniquePodName, volumeName api.UniqueVolumeName) error
+	DeletePodFromVolume(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error
 
 	// DeleteVolume removes the given volume from the list of attached volumes
 	// in the cache indicating the volume has been successfully detached from
@@ -98,7 +90,7 @@ type ActualStateOfWorld interface {
 	// attached volumes, this is a no-op.
 	// If a volume with the name volumeName exists and its list of mountedPods
 	// is not empty, an error is returned.
-	DeleteVolume(volumeName api.UniqueVolumeName) error
+	DeleteVolume(volumeName v1.UniqueVolumeName) error
 
 	// PodExistsInVolume returns true if the given pod exists in the list of
 	// mountedPods for the given volume in the cache, indicating that the volume
@@ -115,12 +107,12 @@ type ActualStateOfWorld interface {
 	// volumes, depend on this to update the contents of the volume.
 	// All volume mounting calls should be idempotent so a second mount call for
 	// volumes that do not need to update contents should not fail.
-	PodExistsInVolume(podName volumetypes.UniquePodName, volumeName api.UniqueVolumeName) (bool, string, error)
+	PodExistsInVolume(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) (bool, string, error)
 
 	// VolumeExists returns true if the given volume exists in the list of
 	// attached volumes in the cache, indicating the volume is attached to this
 	// node.
-	VolumeExists(volumeName api.UniqueVolumeName) bool
+	VolumeExists(volumeName v1.UniqueVolumeName) bool
 
 	// GetMountedVolumes generates and returns a list of volumes and the pods
 	// they are successfully attached and mounted for based on the current
@@ -144,6 +136,11 @@ type ActualStateOfWorld interface {
 	// have no mountedPods. This list can be used to determine which volumes are
 	// no longer referenced and may be globally unmounted and detached.
 	GetUnmountedVolumes() []AttachedVolume
+
+	// GetPods generates and returns a map of pods in which map is indexed
+	// with pod's unique name. This map can be used to determine which pod is currently
+	// in actual state of world.
+	GetPods() map[volumetypes.UniquePodName]bool
 }
 
 // MountedVolume represents a volume that has successfully been mounted to a pod.
@@ -163,11 +160,11 @@ type AttachedVolume struct {
 
 // NewActualStateOfWorld returns a new instance of ActualStateOfWorld.
 func NewActualStateOfWorld(
-	nodeName string,
+	nodeName types.NodeName,
 	volumePluginMgr *volume.VolumePluginMgr) ActualStateOfWorld {
 	return &actualStateOfWorld{
 		nodeName:        nodeName,
-		attachedVolumes: make(map[api.UniqueVolumeName]attachedVolume),
+		attachedVolumes: make(map[v1.UniqueVolumeName]attachedVolume),
 		volumePluginMgr: volumePluginMgr,
 	}
 }
@@ -188,14 +185,16 @@ func IsRemountRequiredError(err error) bool {
 
 type actualStateOfWorld struct {
 	// nodeName is the name of this node. This value is passed to Attach/Detach
-	nodeName string
+	nodeName types.NodeName
+
 	// attachedVolumes is a map containing the set of volumes the kubelet volume
 	// manager believes to be successfully attached to this node. Volume types
 	// that do not implement an attacher interface are assumed to be in this
 	// state by default.
 	// The key in this map is the name of the volume and the value is an object
 	// containing more information about the attached volume.
-	attachedVolumes map[api.UniqueVolumeName]attachedVolume
+	attachedVolumes map[v1.UniqueVolumeName]attachedVolume
+
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
 	volumePluginMgr *volume.VolumePluginMgr
@@ -207,7 +206,7 @@ type actualStateOfWorld struct {
 // implement an attacher are assumed to be in this state.
 type attachedVolume struct {
 	// volumeName contains the unique identifier for this volume.
-	volumeName api.UniqueVolumeName
+	volumeName v1.UniqueVolumeName
 
 	// mountedPods is a map containing the set of pods that this volume has been
 	// successfully mounted to. The key in this map is the name of the pod and
@@ -274,20 +273,19 @@ type mountedPod struct {
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsAttached(
-	volumeSpec *volume.Spec, nodeName string, devicePath string) error {
-	_, err := asw.AddVolume(volumeSpec, devicePath)
-	return err
+	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, _ types.NodeName, devicePath string) error {
+	return asw.addVolume(volumeName, volumeSpec, devicePath)
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsDetached(
-	volumeName api.UniqueVolumeName, nodeName string) {
+	volumeName v1.UniqueVolumeName, nodeName types.NodeName) {
 	asw.DeleteVolume(volumeName)
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsMounted(
 	podName volumetypes.UniquePodName,
 	podUID types.UID,
-	volumeName api.UniqueVolumeName,
+	volumeName v1.UniqueVolumeName,
 	mounter volume.Mounter,
 	outerVolumeSpecName string,
 	volumeGidValue string) error {
@@ -300,42 +298,58 @@ func (asw *actualStateOfWorld) MarkVolumeAsMounted(
 		volumeGidValue)
 }
 
+func (asw *actualStateOfWorld) AddVolumeToReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName) {
+	// no operation for kubelet side
+}
+
+func (asw *actualStateOfWorld) RemoveVolumeFromReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName) error {
+	// no operation for kubelet side
+	return nil
+}
+
 func (asw *actualStateOfWorld) MarkVolumeAsUnmounted(
-	podName volumetypes.UniquePodName, volumeName api.UniqueVolumeName) error {
+	podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error {
 	return asw.DeletePodFromVolume(podName, volumeName)
 }
 
 func (asw *actualStateOfWorld) MarkDeviceAsMounted(
-	volumeName api.UniqueVolumeName) error {
+	volumeName v1.UniqueVolumeName) error {
 	return asw.SetVolumeGloballyMounted(volumeName, true /* globallyMounted */)
 }
 
 func (asw *actualStateOfWorld) MarkDeviceAsUnmounted(
-	volumeName api.UniqueVolumeName) error {
+	volumeName v1.UniqueVolumeName) error {
 	return asw.SetVolumeGloballyMounted(volumeName, false /* globallyMounted */)
 }
 
-func (asw *actualStateOfWorld) AddVolume(
-	volumeSpec *volume.Spec, devicePath string) (api.UniqueVolumeName, error) {
+// addVolume adds the given volume to the cache indicating the specified
+// volume is attached to this node. If no volume name is supplied, a unique
+// volume name is generated from the volumeSpec and returned on success. If a
+// volume with the same generated name already exists, this is a noop. If no
+// volume plugin can support the given volumeSpec or more than one plugin can
+// support it, an error is returned.
+func (asw *actualStateOfWorld) addVolume(
+	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, devicePath string) error {
 	asw.Lock()
 	defer asw.Unlock()
 
 	volumePlugin, err := asw.volumePluginMgr.FindPluginBySpec(volumeSpec)
 	if err != nil || volumePlugin == nil {
-		return "", fmt.Errorf(
+		return fmt.Errorf(
 			"failed to get Plugin from volumeSpec for volume %q err=%v",
 			volumeSpec.Name(),
 			err)
 	}
 
-	volumeName, err :=
-		volumehelper.GetUniqueVolumeNameFromSpec(volumePlugin, volumeSpec)
-	if err != nil {
-		return "", fmt.Errorf(
-			"failed to GetUniqueVolumeNameFromSpec for volumeSpec %q using volume plugin %q err=%v",
-			volumeSpec.Name(),
-			volumePlugin.GetPluginName(),
-			err)
+	if len(volumeName) == 0 {
+		volumeName, err = volumehelper.GetUniqueVolumeNameFromSpec(volumePlugin, volumeSpec)
+		if err != nil {
+			return fmt.Errorf(
+				"failed to GetUniqueVolumeNameFromSpec for volumeSpec %q using volume plugin %q err=%v",
+				volumeSpec.Name(),
+				volumePlugin.GetPluginName(),
+				err)
+		}
 	}
 
 	pluginIsAttachable := false
@@ -354,16 +368,22 @@ func (asw *actualStateOfWorld) AddVolume(
 			globallyMounted:    false,
 			devicePath:         devicePath,
 		}
-		asw.attachedVolumes[volumeName] = volumeObj
+	} else {
+		// If volume object already exists, update the fields such as device path
+		volumeObj.devicePath = devicePath
+		glog.V(2).Infof("Volume %q is already added to attachedVolume list, update device path %q",
+			volumeName,
+			devicePath)
 	}
+	asw.attachedVolumes[volumeName] = volumeObj
 
-	return volumeObj.volumeName, nil
+	return nil
 }
 
 func (asw *actualStateOfWorld) AddPodToVolume(
 	podName volumetypes.UniquePodName,
 	podUID types.UID,
-	volumeName api.UniqueVolumeName,
+	volumeName v1.UniqueVolumeName,
 	mounter volume.Mounter,
 	outerVolumeSpecName string,
 	volumeGidValue string) error {
@@ -427,7 +447,7 @@ func (asw *actualStateOfWorld) MarkRemountRequired(
 }
 
 func (asw *actualStateOfWorld) SetVolumeGloballyMounted(
-	volumeName api.UniqueVolumeName, globallyMounted bool) error {
+	volumeName v1.UniqueVolumeName, globallyMounted bool) error {
 	asw.Lock()
 	defer asw.Unlock()
 
@@ -444,7 +464,7 @@ func (asw *actualStateOfWorld) SetVolumeGloballyMounted(
 }
 
 func (asw *actualStateOfWorld) DeletePodFromVolume(
-	podName volumetypes.UniquePodName, volumeName api.UniqueVolumeName) error {
+	podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error {
 	asw.Lock()
 	defer asw.Unlock()
 
@@ -463,7 +483,7 @@ func (asw *actualStateOfWorld) DeletePodFromVolume(
 	return nil
 }
 
-func (asw *actualStateOfWorld) DeleteVolume(volumeName api.UniqueVolumeName) error {
+func (asw *actualStateOfWorld) DeleteVolume(volumeName v1.UniqueVolumeName) error {
 	asw.Lock()
 	defer asw.Unlock()
 
@@ -485,7 +505,7 @@ func (asw *actualStateOfWorld) DeleteVolume(volumeName api.UniqueVolumeName) err
 
 func (asw *actualStateOfWorld) PodExistsInVolume(
 	podName volumetypes.UniquePodName,
-	volumeName api.UniqueVolumeName) (bool, string, error) {
+	volumeName v1.UniqueVolumeName) (bool, string, error) {
 	asw.RLock()
 	defer asw.RUnlock()
 
@@ -503,7 +523,7 @@ func (asw *actualStateOfWorld) PodExistsInVolume(
 }
 
 func (asw *actualStateOfWorld) VolumeExists(
-	volumeName api.UniqueVolumeName) bool {
+	volumeName v1.UniqueVolumeName) bool {
 	asw.RLock()
 	defer asw.RUnlock()
 
@@ -575,6 +595,21 @@ func (asw *actualStateOfWorld) GetUnmountedVolumes() []AttachedVolume {
 	return unmountedVolumes
 }
 
+func (asw *actualStateOfWorld) GetPods() map[volumetypes.UniquePodName]bool {
+	asw.RLock()
+	defer asw.RUnlock()
+
+	podList := make(map[volumetypes.UniquePodName]bool)
+	for _, volumeObj := range asw.attachedVolumes {
+		for podName := range volumeObj.mountedPods {
+			if !podList[podName] {
+				podList[podName] = true
+			}
+		}
+	}
+	return podList
+}
+
 func (asw *actualStateOfWorld) newAttachedVolume(
 	attachedVolume *attachedVolume) AttachedVolume {
 	return AttachedVolume{
@@ -582,7 +617,8 @@ func (asw *actualStateOfWorld) newAttachedVolume(
 			VolumeName:         attachedVolume.volumeName,
 			VolumeSpec:         attachedVolume.spec,
 			NodeName:           asw.nodeName,
-			PluginIsAttachable: attachedVolume.pluginIsAttachable},
+			PluginIsAttachable: attachedVolume.pluginIsAttachable,
+			DevicePath:         attachedVolume.devicePath},
 		GloballyMounted: attachedVolume.globallyMounted}
 }
 
@@ -592,7 +628,7 @@ var _ error = volumeNotAttachedError{}
 // volumeNotAttachedError is an error returned when PodExistsInVolume() fails to
 // find specified volume in the list of attached volumes.
 type volumeNotAttachedError struct {
-	volumeName api.UniqueVolumeName
+	volumeName v1.UniqueVolumeName
 }
 
 func (err volumeNotAttachedError) Error() string {
@@ -601,7 +637,7 @@ func (err volumeNotAttachedError) Error() string {
 		err.volumeName)
 }
 
-func newVolumeNotAttachedError(volumeName api.UniqueVolumeName) error {
+func newVolumeNotAttachedError(volumeName v1.UniqueVolumeName) error {
 	return volumeNotAttachedError{
 		volumeName: volumeName,
 	}
@@ -615,7 +651,7 @@ var _ error = remountRequiredError{}
 // given volume should be remounted to the pod to reflect changes in the
 // referencing pod.
 type remountRequiredError struct {
-	volumeName api.UniqueVolumeName
+	volumeName v1.UniqueVolumeName
 	podName    volumetypes.UniquePodName
 }
 
@@ -626,7 +662,7 @@ func (err remountRequiredError) Error() string {
 }
 
 func newRemountRequiredError(
-	volumeName api.UniqueVolumeName, podName volumetypes.UniquePodName) error {
+	volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) error {
 	return remountRequiredError{
 		volumeName: volumeName,
 		podName:    podName,

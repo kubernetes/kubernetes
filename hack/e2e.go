@@ -14,219 +14,155 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// e2e.go runs the e2e test suite. No non-standard package dependencies; call with "go run".
+// User-interface for test-infra/kubetest/e2e.go
+// Equivalent to go get -u k8s.io/test-infra/kubetest && kubetest "${@}"
 package main
 
 import (
 	"flag"
+	"fmt"
+	"go/build"
 	"log"
 	"os"
 	"os/exec"
-	"path"
+	"os/signal"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 )
 
-var (
-	isup             = flag.Bool("isup", false, "Check to see if the e2e cluster is up, then exit.")
-	build            = flag.Bool("build", false, "If true, build a new release. Otherwise, use whatever is there.")
-	up               = flag.Bool("up", false, "If true, start the the e2e cluster. If cluster is already up, recreate it.")
-	push             = flag.Bool("push", false, "If true, push to e2e cluster. Has no effect if -up is true.")
-	pushup           = flag.Bool("pushup", false, "If true, push to e2e cluster if it's up, otherwise start the e2e cluster.")
-	down             = flag.Bool("down", false, "If true, tear down the cluster before exiting.")
-	test             = flag.Bool("test", false, "Run Ginkgo tests.")
-	testArgs         = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
-	root             = flag.String("root", absOrDie(filepath.Clean(filepath.Join(path.Base(os.Args[0]), ".."))), "Root directory of kubernetes repository.")
-	verbose          = flag.Bool("v", false, "If true, print all command output.")
-	checkVersionSkew = flag.Bool("check_version_skew", true, ""+
-		"By default, verify that client and server have exact version match. "+
-		"You can explicitly set to false if you're, e.g., testing client changes "+
-		"for which the server version doesn't make a difference.")
-	checkNodeCount = flag.Bool("check_node_count", true, ""+
-		"By default, verify that the cluster has at least two nodes."+
-		"You can explicitly set to false if you're, e.g., testing single-node clusters "+
-		"for which the node count is supposed to be one.")
-
-	ctlCmd = flag.String("ctl", "", "If nonempty, pass this as an argument, and call kubectl. Implies -v. (-test, -cfg, -ctl are mutually exclusive)")
-)
+type flags struct {
+	get  bool
+	old  time.Duration
+	args []string
+}
 
 const (
-	minNodeCount = 2
+	getDefault = true
+	oldDefault = 24 * time.Hour
 )
 
-func absOrDie(path string) string {
-	out, err := filepath.Abs(path)
-	if err != nil {
-		panic(err)
+func parse(args []string) (flags, error) {
+	fs := flag.NewFlagSet(args[0], flag.ContinueOnError)
+	get := fs.Bool("get", getDefault, "go get -u kubetest if old or not installed")
+	old := fs.Duration("old", oldDefault, "Consider kubetest old if it exceeds this")
+	var a []string
+	if err := fs.Parse(args[1:]); err == flag.ErrHelp {
+		os.Stderr.WriteString("  -- kubetestArgs\n")
+		os.Stderr.WriteString("        All flags after -- are passed to the kubetest program\n")
+		return flags{}, err
+	} else if err != nil {
+		log.Print("NOTICE: go run hack/e2e.go is now a shim for test-infra/kubetest")
+		log.Printf("  Usage: go run hack/e2e.go [--get=%v] [--old=%v] -- [KUBETEST_ARGS]", getDefault, oldDefault)
+		log.Print("  The separator is required to use --get or --old flags")
+		log.Print("  The -- flag separator also suppresses this message")
+		a = args[len(args)-fs.NArg()-1:]
+	} else {
+		a = fs.Args()
 	}
-	return out
+	return flags{*get, *old, a}, nil
 }
-
-type TestResult struct {
-	Pass int
-	Fail int
-}
-
-type ResultsByTest map[string]TestResult
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	flag.Parse()
-
-	if *isup {
-		status := 1
-		if IsUp() {
-			status = 0
-			log.Printf("Cluster is UP")
-		} else {
-			log.Printf("Cluster is DOWN")
-		}
-		os.Exit(status)
-	}
-
-	if *build {
-		// The build-release script needs stdin to ask the user whether
-		// it's OK to download the docker image.
-		cmd := exec.Command(path.Join(*root, "hack/e2e-internal/build-release.sh"))
-		cmd.Stdin = os.Stdin
-		if !finishRunning("build-release", cmd) {
-			log.Fatal("Error building. Aborting.")
-		}
-	}
-
-	os.Setenv("KUBECTL", *root+`/cluster/kubectl.sh`+kubectlArgs())
-
-	if *pushup {
-		if IsUp() {
-			log.Printf("e2e cluster is up, pushing.")
-			*up = false
-			*push = true
-		} else {
-			log.Printf("e2e cluster is down, creating.")
-			*up = true
-			*push = false
-		}
-	}
-	if *up {
-		if !Up() {
-			log.Fatal("Error starting e2e cluster. Aborting.")
-		}
-	} else if *push {
-		if !finishRunning("push", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-push.sh"))) {
-			log.Fatal("Error pushing e2e cluster. Aborting.")
-		}
-	}
-
-	success := true
-	switch {
-	case *ctlCmd != "":
-		ctlArgs := strings.Fields(*ctlCmd)
-		os.Setenv("KUBE_CONFIG_FILE", "config-test.sh")
-		success = finishRunning("'kubectl "+*ctlCmd+"'", exec.Command(path.Join(*root, "cluster/kubectl.sh"), ctlArgs...))
-	case *test:
-		success = Test()
-	}
-
-	if *down {
-		TearDown()
-	}
-
-	if !success {
-		os.Exit(1)
-	}
-}
-
-func TearDown() bool {
-	return finishRunning("teardown", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-down.sh")))
-}
-
-// Up brings an e2e cluster up, recreating it if one is already running.
-func Up() bool {
-	if IsUp() {
-		log.Printf("e2e cluster already running; will teardown")
-		if res := TearDown(); !res {
-			return false
-		}
-	}
-	return finishRunning("up", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-up.sh")))
-}
-
-// Ensure that the cluster is large engough to run the e2e tests.
-func ValidateClusterSize() {
-	if os.Getenv("FEDERATION") == "true" {
-		//TODO(colhom): federated equivalent of  ValidateClusterSize
-		return
-	}
-	// Check that there are at least minNodeCount nodes running
-	cmd := exec.Command(path.Join(*root, "hack/e2e-internal/e2e-cluster-size.sh"))
-	if *verbose {
-		cmd.Stderr = os.Stderr
-	}
-	stdout, err := cmd.Output()
+	f, err := parse(os.Args)
 	if err != nil {
-		log.Fatalf("Could not get nodes to validate cluster size (%s)", err)
+		os.Exit(2)
 	}
-
-	numNodes, err := strconv.Atoi(strings.TrimSpace(string(stdout)))
+	t := newTester()
+	k, err := t.getKubetest(f.get, f.old)
 	if err != nil {
-		log.Fatalf("Could not count number of nodes to validate cluster size (%s)", err)
+		log.Fatalf("err: %v", err)
 	}
-
-	if numNodes < minNodeCount {
-		log.Fatalf("Cluster size (%d) is too small to run e2e tests.  %d Nodes are required.", numNodes, minNodeCount)
+	log.Printf("Calling kubetest %v...", strings.Join(f.args, " "))
+	if err = t.wait(k, f.args...); err != nil {
+		log.Fatalf("err: %v", err)
 	}
+	log.Print("Done")
 }
 
-// Is the e2e cluster up?
-func IsUp() bool {
-	return finishRunning("get status", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-status.sh")))
+func wait(cmd string, args ...string) error {
+	sigChannel := make(chan os.Signal, 1)
+	signal.Notify(sigChannel, os.Interrupt)
+
+	c := exec.Command(cmd, args...)
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	if err := c.Start(); err != nil {
+		return err
+	}
+	go func() {
+		sig := <-sigChannel
+		if err := c.Process.Signal(sig); err != nil {
+			log.Fatalf("could not send %s signal %s: %v", cmd, sig, err)
+		}
+	}()
+	return c.Wait()
 }
 
-func Test() bool {
-	if !IsUp() {
-		log.Fatal("Testing requested, but e2e cluster not up!")
+// Struct that allows unit tests to override functionality.
+type tester struct {
+	// os.Stat
+	stat func(string) (os.FileInfo, error)
+	// exec.LookPath
+	lookPath func(string) (string, error)
+	// build.Default.GOPATH
+	goPath string
+	wait   func(string, ...string) error
+}
+
+func newTester() tester {
+	return tester{os.Stat, exec.LookPath, build.Default.GOPATH, wait}
+}
+
+// Try to find kubetest, either GOPATH/bin/kubetest or PATH
+func (t tester) lookKubetest() (string, error) {
+	// Check for kubetest in GOPATH/bin
+	if t.goPath != "" {
+		p := filepath.Join(t.goPath, "bin", "kubetest")
+		_, err := t.stat(p)
+		if err == nil {
+			return p, nil
+		}
 	}
 
-	if *checkNodeCount {
-		ValidateClusterSize()
-	}
+	// Check for kubetest in PATH
+	p, err := t.lookPath("kubetest")
+	return p, err
+}
 
-	if os.Getenv("FEDERATION") == "" {
-		return finishRunning("Ginkgo tests", exec.Command(filepath.Join(*root, "hack/ginkgo-e2e.sh"), strings.Fields(*testArgs)...))
+// Upgrade if kubetest does not exist or has not been updated today
+func (t tester) getKubetest(get bool, old time.Duration) (string, error) {
+	// Find kubetest installation
+	p, err := t.lookKubetest()
+	if err == nil && !get {
+		return p, nil // Installed, Skip update
+	}
+	if err == nil {
+		// Installed recently?
+		if s, err := t.stat(p); err != nil {
+			return p, err // Cannot stat
+		} else if time.Since(s.ModTime()) <= old {
+			return p, nil // Recently updated
+		} else if t.goPath == "" {
+			log.Print("Skipping kubetest upgrade because $GOPATH is empty")
+			return p, nil
+		}
+		log.Printf("The kubetest binary is older than %s.", old)
+	}
+	if t.goPath == "" {
+		return "", fmt.Errorf("Cannot install kubetest until $GOPATH is set")
+	}
+	log.Print("Updating kubetest binary...")
+	cmd := []string{"go", "get", "-u", "k8s.io/test-infra/kubetest"}
+	if err = t.wait(cmd[0], cmd[1:]...); err != nil {
+		return "", fmt.Errorf("%s: %v", strings.Join(cmd, " "), err) // Could not upgrade
+	}
+	if p, err = t.lookKubetest(); err != nil {
+		return "", err // Cannot find kubetest
+	} else if err = t.wait("touch", p); err != nil {
+		return "", err // Could not touch
 	} else {
-
-		if *testArgs == "" {
-			*testArgs = "--ginkgo.focus=\\[Feature:Federation\\]"
-		}
-		return finishRunning("Federated Ginkgo tests", exec.Command(filepath.Join(*root, "hack/federated-ginkgo-e2e.sh"), strings.Fields(*testArgs)...))
+		return p, nil // Updated modtime
 	}
-}
-
-func finishRunning(stepName string, cmd *exec.Cmd) bool {
-	if *verbose {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-	}
-	log.Printf("Running: %v", stepName)
-	defer func(start time.Time) {
-		log.Printf("Step '%s' finished in %s", stepName, time.Since(start))
-	}(time.Now())
-
-	if err := cmd.Run(); err != nil {
-		log.Printf("Error running %v: %v", stepName, err)
-		return false
-	}
-	return true
-}
-
-// returns either "", or a list of args intended for appending with the
-// kubectl command (beginning with a space).
-func kubectlArgs() string {
-	args := []string{""}
-	if *checkVersionSkew {
-		args = append(args, "--match-server-version")
-	}
-	return strings.Join(args, " ")
 }

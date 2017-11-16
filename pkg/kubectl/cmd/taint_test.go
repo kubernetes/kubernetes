@@ -18,61 +18,45 @@ package cmd
 
 import (
 	"bytes"
-	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"reflect"
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/fake"
-	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/client-go/rest/fake"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func generateNodeAndTaintedNode(oldTaints []api.Taint, newTaints []api.Taint) (*api.Node, *api.Node) {
-	var taintedNode *api.Node
+func generateNodeAndTaintedNode(oldTaints []v1.Taint, newTaints []v1.Taint) (*v1.Node, *v1.Node) {
+	var taintedNode *v1.Node
 
-	oldTaintsData, _ := json.Marshal(oldTaints)
 	// Create a node.
-	node := &api.Node{
-		ObjectMeta: api.ObjectMeta{
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              "node-name",
-			CreationTimestamp: unversioned.Time{Time: time.Now()},
-			Annotations: map[string]string{
-				api.TaintsAnnotationKey: string(oldTaintsData),
-			},
+			CreationTimestamp: metav1.Time{Time: time.Now()},
 		},
-		Spec: api.NodeSpec{
+		Spec: v1.NodeSpec{
 			ExternalID: "node-name",
+			Taints:     oldTaints,
 		},
-		Status: api.NodeStatus{},
+		Status: v1.NodeStatus{},
 	}
-	clone, _ := conversion.NewCloner().DeepCopy(node)
 
-	newTaintsData, _ := json.Marshal(newTaints)
 	// A copy of the same node, but tainted.
-	taintedNode = clone.(*api.Node)
-	taintedNode.Annotations = map[string]string{
-		api.TaintsAnnotationKey: string(newTaintsData),
-	}
+	taintedNode = node.DeepCopy()
+	taintedNode.Spec.Taints = newTaints
 
 	return node, taintedNode
 }
 
-func AnnotationsHaveEqualTaints(annotationA map[string]string, annotationB map[string]string) bool {
-	taintsA, err := api.GetTaintsFromNodeAnnotations(annotationA)
-	if err != nil {
-		return false
-	}
-	taintsB, err := api.GetTaintsFromNodeAnnotations(annotationB)
-	if err != nil {
-		return false
-	}
-
+func equalTaints(taintsA, taintsB []v1.Taint) bool {
 	if len(taintsA) != len(taintsB) {
 		return false
 	}
@@ -95,16 +79,17 @@ func AnnotationsHaveEqualTaints(annotationA map[string]string, annotationB map[s
 func TestTaint(t *testing.T) {
 	tests := []struct {
 		description string
-		oldTaints   []api.Taint
-		newTaints   []api.Taint
+		oldTaints   []v1.Taint
+		newTaints   []v1.Taint
 		args        []string
 		expectFatal bool
 		expectTaint bool
+		selector    bool
 	}{
 		// success cases
 		{
 			description: "taints a node with effect NoSchedule",
-			newTaints: []api.Taint{{
+			newTaints: []v1.Taint{{
 				Key:    "foo",
 				Value:  "bar",
 				Effect: "NoSchedule",
@@ -115,7 +100,7 @@ func TestTaint(t *testing.T) {
 		},
 		{
 			description: "taints a node with effect PreferNoSchedule",
-			newTaints: []api.Taint{{
+			newTaints: []v1.Taint{{
 				Key:    "foo",
 				Value:  "bar",
 				Effect: "PreferNoSchedule",
@@ -125,24 +110,24 @@ func TestTaint(t *testing.T) {
 			expectTaint: true,
 		},
 		{
-			description: "update an existing taint on the node, change the effect from NoSchedule to PreferNoSchedule",
-			oldTaints: []api.Taint{{
+			description: "update an existing taint on the node, change the value from bar to barz",
+			oldTaints: []v1.Taint{{
 				Key:    "foo",
 				Value:  "bar",
 				Effect: "NoSchedule",
 			}},
-			newTaints: []api.Taint{{
+			newTaints: []v1.Taint{{
 				Key:    "foo",
-				Value:  "bar",
-				Effect: "PreferNoSchedule",
+				Value:  "barz",
+				Effect: "NoSchedule",
 			}},
-			args:        []string{"node", "node-name", "foo=bar:PreferNoSchedule", "--overwrite"},
+			args:        []string{"node", "node-name", "foo=barz:NoSchedule", "--overwrite"},
 			expectFatal: false,
 			expectTaint: true,
 		},
 		{
 			description: "taints a node with two taints",
-			newTaints: []api.Taint{{
+			newTaints: []v1.Taint{{
 				Key:    "dedicated",
 				Value:  "namespaceA",
 				Effect: "NoSchedule",
@@ -156,28 +141,44 @@ func TestTaint(t *testing.T) {
 			expectTaint: true,
 		},
 		{
-			description: "node has two taints, remove one of them",
-			oldTaints: []api.Taint{{
+			description: "node has two taints with the same key but different effect, remove one of them by indicating exact key and effect",
+			oldTaints: []v1.Taint{{
 				Key:    "dedicated",
 				Value:  "namespaceA",
 				Effect: "NoSchedule",
 			}, {
-				Key:    "foo",
-				Value:  "bar",
+				Key:    "dedicated",
+				Value:  "namespaceA",
 				Effect: "PreferNoSchedule",
 			}},
-			newTaints: []api.Taint{{
-				Key:    "foo",
-				Value:  "bar",
+			newTaints: []v1.Taint{{
+				Key:    "dedicated",
+				Value:  "namespaceA",
 				Effect: "PreferNoSchedule",
 			}},
+			args:        []string{"node", "node-name", "dedicated:NoSchedule-"},
+			expectFatal: false,
+			expectTaint: true,
+		},
+		{
+			description: "node has two taints with the same key but different effect, remove all of them with wildcard",
+			oldTaints: []v1.Taint{{
+				Key:    "dedicated",
+				Value:  "namespaceA",
+				Effect: "NoSchedule",
+			}, {
+				Key:    "dedicated",
+				Value:  "namespaceA",
+				Effect: "PreferNoSchedule",
+			}},
+			newTaints:   []v1.Taint{},
 			args:        []string{"node", "node-name", "dedicated-"},
 			expectFatal: false,
 			expectTaint: true,
 		},
 		{
 			description: "node has two taints, update one of them and remove the other",
-			oldTaints: []api.Taint{{
+			oldTaints: []v1.Taint{{
 				Key:    "dedicated",
 				Value:  "namespaceA",
 				Effect: "NoSchedule",
@@ -186,12 +187,12 @@ func TestTaint(t *testing.T) {
 				Value:  "bar",
 				Effect: "PreferNoSchedule",
 			}},
-			newTaints: []api.Taint{{
+			newTaints: []v1.Taint{{
 				Key:    "foo",
-				Value:  "bar",
-				Effect: "NoSchedule",
+				Value:  "barz",
+				Effect: "PreferNoSchedule",
 			}},
-			args:        []string{"node", "node-name", "dedicated-", "foo=bar:NoSchedule", "--overwrite"},
+			args:        []string{"node", "node-name", "dedicated:NoSchedule-", "foo=barz:PreferNoSchedule", "--overwrite"},
 			expectFatal: false,
 			expectTaint: true,
 		},
@@ -210,18 +211,24 @@ func TestTaint(t *testing.T) {
 			expectTaint: false,
 		},
 		{
+			description: "duplicated taints with the same key and effect should be rejected",
+			args:        []string{"node", "node-name", "foo=bar:NoExcute", "foo=barz:NoExcute"},
+			expectFatal: true,
+			expectTaint: false,
+		},
+		{
 			description: "can't update existing taint on the node, since 'overwrite' flag is not set",
-			oldTaints: []api.Taint{{
+			oldTaints: []v1.Taint{{
 				Key:    "foo",
 				Value:  "bar",
 				Effect: "NoSchedule",
 			}},
-			newTaints: []api.Taint{{
+			newTaints: []v1.Taint{{
 				Key:    "foo",
 				Value:  "bar",
 				Effect: "NoSchedule",
 			}},
-			args:        []string{"node", "node-name", "foo=bar:PreferNoSchedule"},
+			args:        []string{"node", "node-name", "foo=bar:NoSchedule"},
 			expectFatal: true,
 			expectTaint: false,
 		},
@@ -229,19 +236,46 @@ func TestTaint(t *testing.T) {
 
 	for _, test := range tests {
 		oldNode, expectNewNode := generateNodeAndTaintedNode(test.oldTaints, test.newTaints)
-
-		new_node := &api.Node{}
+		new_node := &v1.Node{}
 		tainted := false
-		f, tf, codec := NewAPIFactory()
+		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 
 		tf.Client = &fake.RESTClient{
-			Codec: codec,
+			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				m := &MyReq{req}
 				switch {
+				case m.isFor("GET", "/nodes"):
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, oldNode)}, nil
 				case m.isFor("GET", "/nodes/node-name"):
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, oldNode)}, nil
-				case m.isFor("PATCH", "/nodes/node-name"), m.isFor("PUT", "/nodes/node-name"):
+				case m.isFor("PATCH", "/nodes/node-name"):
+					tainted = true
+					data, err := ioutil.ReadAll(req.Body)
+					if err != nil {
+						t.Fatalf("%s: unexpected error: %v", test.description, err)
+					}
+					defer req.Body.Close()
+
+					// apply the patch
+					oldJSON, err := runtime.Encode(codec, oldNode)
+					if err != nil {
+						t.Fatalf("%s: unexpected error: %v", test.description, err)
+					}
+					appliedPatch, err := strategicpatch.StrategicMergePatch(oldJSON, data, &v1.Node{})
+					if err != nil {
+						t.Fatalf("%s: unexpected error: %v", test.description, err)
+					}
+
+					// decode the patch
+					if err := runtime.DecodeInto(codec, appliedPatch, new_node); err != nil {
+						t.Fatalf("%s: unexpected error: %v", test.description, err)
+					}
+					if !equalTaints(expectNewNode.Spec.Taints, new_node.Spec.Taints) {
+						t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, expectNewNode.Spec.Taints, new_node.Spec.Taints)
+					}
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
+				case m.isFor("PUT", "/nodes/node-name"):
 					tainted = true
 					data, err := ioutil.ReadAll(req.Body)
 					if err != nil {
@@ -251,8 +285,8 @@ func TestTaint(t *testing.T) {
 					if err := runtime.DecodeInto(codec, data, new_node); err != nil {
 						t.Fatalf("%s: unexpected error: %v", test.description, err)
 					}
-					if !AnnotationsHaveEqualTaints(expectNewNode.Annotations, new_node.Annotations) {
-						t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, expectNewNode.Annotations, new_node.Annotations)
+					if !equalTaints(expectNewNode.Spec.Taints, new_node.Spec.Taints) {
+						t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, expectNewNode.Spec.Taints, new_node.Spec.Taints)
 					}
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
 				default:
@@ -274,7 +308,7 @@ func TestTaint(t *testing.T) {
 				// Restore cmdutil behavior
 				cmdutil.DefaultBehaviorOnFatal()
 			}()
-			cmdutil.BehaviorOnFatal(func(e string) { saw_fatal = true; panic(e) })
+			cmdutil.BehaviorOnFatal(func(e string, code int) { saw_fatal = true; panic(e) })
 			cmd.SetArgs(test.args)
 			cmd.Execute()
 		}()
@@ -293,6 +327,53 @@ func TestTaint(t *testing.T) {
 		if !test.expectTaint {
 			if tainted {
 				t.Fatalf("%s: unexpected taint", test.description)
+			}
+		}
+	}
+}
+
+func TestValidateFlags(t *testing.T) {
+	tests := []struct {
+		taintOpts   TaintOptions
+		description string
+		expectFatal bool
+	}{
+
+		{
+			taintOpts:   TaintOptions{selector: "myLabel=X", all: false},
+			description: "With Selector and without All flag",
+			expectFatal: false,
+		},
+		{
+			taintOpts:   TaintOptions{selector: "", all: true},
+			description: "Without selector and All flag",
+			expectFatal: false,
+		},
+		{
+			taintOpts:   TaintOptions{selector: "myLabel=X", all: true},
+			description: "With Selector and with All flag",
+			expectFatal: true,
+		},
+		{
+			taintOpts:   TaintOptions{selector: "", all: false, resources: []string{"node"}},
+			description: "Without Selector and All flags and if node name is not provided",
+			expectFatal: true,
+		},
+		{
+			taintOpts:   TaintOptions{selector: "", all: false, resources: []string{"node", "node-name"}},
+			description: "Without Selector and ALL flags and if node name is provided",
+			expectFatal: false,
+		},
+	}
+	for _, test := range tests {
+		sawFatal := false
+		err := test.taintOpts.validateFlags()
+		if err != nil {
+			sawFatal = true
+		}
+		if test.expectFatal {
+			if !sawFatal {
+				t.Fatalf("%s expected not to fail", test.description)
 			}
 		}
 	}

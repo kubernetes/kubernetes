@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ package rafthttp
 
 import (
 	"encoding/binary"
+	"errors"
 	"io"
 
 	"github.com/coreos/etcd/pkg/pbutil"
@@ -28,11 +29,11 @@ type messageEncoder struct {
 	w io.Writer
 }
 
-func (enc *messageEncoder) encode(m raftpb.Message) error {
+func (enc *messageEncoder) encode(m *raftpb.Message) error {
 	if err := binary.Write(enc.w, binary.BigEndian, uint64(m.Size())); err != nil {
 		return err
 	}
-	_, err := enc.w.Write(pbutil.MustMarshal(&m))
+	_, err := enc.w.Write(pbutil.MustMarshal(m))
 	return err
 }
 
@@ -41,11 +42,23 @@ type messageDecoder struct {
 	r io.Reader
 }
 
+var (
+	readBytesLimit     uint64 = 512 * 1024 * 1024 // 512 MB
+	ErrExceedSizeLimit        = errors.New("rafthttp: error limit exceeded")
+)
+
 func (dec *messageDecoder) decode() (raftpb.Message, error) {
+	return dec.decodeLimit(readBytesLimit)
+}
+
+func (dec *messageDecoder) decodeLimit(numBytes uint64) (raftpb.Message, error) {
 	var m raftpb.Message
 	var l uint64
 	if err := binary.Read(dec.r, binary.BigEndian, &l); err != nil {
 		return m, err
+	}
+	if l > numBytes {
+		return m, ErrExceedSizeLimit
 	}
 	buf := make([]byte, int(l))
 	if _, err := io.ReadFull(dec.r, buf); err != nil {

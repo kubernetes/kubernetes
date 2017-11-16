@@ -1,0 +1,36 @@
+repo: https://github.com/kubernetes/kubernetes.git
+includes:
+  - 'layer:basic'
+  - 'layer:debug'
+  - 'layer:snap'
+  - 'layer:docker'
+  - 'layer:metrics'
+  - 'layer:nagios'
+  - 'layer:tls-client'
+  - 'layer:nvidia-cuda'
+  - 'layer:cdk-service-kicker'
+  - 'interface:http'
+  - 'interface:kubernetes-cni'
+  - 'interface:kube-dns'
+  - 'interface:kube-control'
+config:
+  deletes:
+    - install_from_upstream
+options:
+  basic:
+    packages:
+      - 'cifs-utils'
+      - 'ceph-common'
+      - 'nfs-common'
+      - 'socat'
+      - 'virt-what'
+  tls-client:
+    ca_certificate_path: '/root/cdk/ca.crt'
+    server_certificate_path: '/root/cdk/server.crt'
+    server_key_path: '/root/cdk/server.key'
+    client_certificate_path: '/root/cdk/client.crt'
+    client_key_path: '/root/cdk/client.key'
+  cdk-service-kicker:
+    services:
+      - 'snap.kubelet.daemon'
+      - 'snap.kube-proxy.daemon'

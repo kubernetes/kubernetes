@@ -1,9 +1,6 @@
 package pflag
 
-import (
-	"fmt"
-	"strconv"
-)
+import "strconv"
 
 // -- int32 Value
 type int32Value int32
@@ -23,7 +20,7 @@ func (i *int32Value) Type() string {
 	return "int32"
 }
 
-func (i *int32Value) String() string { return fmt.Sprintf("%v", *i) }
+func (i *int32Value) String() string { return strconv.FormatInt(int64(*i), 10) }
 
 func int32Conv(sval string) (interface{}, error) {
 	v, err := strconv.ParseInt(sval, 0, 32)

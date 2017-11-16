@@ -16,6 +16,7 @@ write_files:
       clusters:
         - name: local
           cluster:
+            server: https://$MASTER_IP
             insecure-skip-tls-verify: true
       contexts:
         - context:

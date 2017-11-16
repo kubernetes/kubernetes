@@ -1,9 +1,25 @@
 package types
 
-import "time"
+import (
+	"strconv"
+	"time"
+)
 
 const GINKGO_FOCUS_EXIT_CODE = 197
 
+/*
+SuiteSummary represents the a summary of the test suite and is passed to both
+Reporter.SpecSuiteWillBegin
+Reporter.SpecSuiteDidEnd
+
+this is unfortunate as these two methods should receive different objects.  When running in parallel
+each node does not deterministically know how many specs it will end up running.
+
+Unfortunately making such a change would break backward compatibility.
+
+Until Ginkgo 2.0 comes out we will continue to reuse this struct but populate unkown fields
+with -1.
+*/
 type SuiteSummary struct {
 	SuiteDescription string
 	SuiteSucceeded   bool
@@ -16,7 +32,10 @@ type SuiteSummary struct {
 	NumberOfSkippedSpecs               int
 	NumberOfPassedSpecs                int
 	NumberOfFailedSpecs                int
-	RunTime                            time.Duration
+	// Flaked specs are those that failed initially, but then passed on a
+	// subsequent try.
+	NumberOfFlakedSpecs int
+	RunTime             time.Duration
 }
 
 type SpecSummary struct {
@@ -100,6 +119,17 @@ type SpecMeasurement struct {
 	LargestLabel  string
 	AverageLabel  string
 	Units         string
+	Precision     int
+}
+
+func (s SpecMeasurement) PrecisionFmt() string {
+	if s.Precision == 0 {
+		return "%f"
+	}
+
+	str := strconv.Itoa(s.Precision)
+
+	return "%." + str + "f"
 }
 
 type SpecState uint

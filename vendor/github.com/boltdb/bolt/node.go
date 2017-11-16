@@ -201,6 +201,11 @@ func (n *node) write(p *page) {
 	}
 	p.count = uint16(len(n.inodes))
 
+	// Stop here if there are no items to write.
+	if p.count == 0 {
+		return
+	}
+
 	// Loop over each item and write it to the page.
 	b := (*[maxAllocSize]byte)(unsafe.Pointer(&p.ptr))[n.pageElementSize()*len(n.inodes):]
 	for i, item := range n.inodes {
@@ -461,43 +466,6 @@ func (n *node) rebalance() {
 		target = n.nextSibling()
 	} else {
 		target = n.prevSibling()
-	}
-
-	// If target node has extra nodes then just move one over.
-	if target.numChildren() > target.minKeys() {
-		if useNextSibling {
-			// Reparent and move node.
-			if child, ok := n.bucket.nodes[target.inodes[0].pgid]; ok {
-				child.parent.removeChild(child)
-				child.parent = n
-				child.parent.children = append(child.parent.children, child)
-			}
-			n.inodes = append(n.inodes, target.inodes[0])
-			target.inodes = target.inodes[1:]
-
-			// Update target key on parent.
-			target.parent.put(target.key, target.inodes[0].key, nil, target.pgid, 0)
-			target.key = target.inodes[0].key
-			_assert(len(target.key) > 0, "rebalance(1): zero-length node key")
-		} else {
-			// Reparent and move node.
-			if child, ok := n.bucket.nodes[target.inodes[len(target.inodes)-1].pgid]; ok {
-				child.parent.removeChild(child)
-				child.parent = n
-				child.parent.children = append(child.parent.children, child)
-			}
-			n.inodes = append(n.inodes, inode{})
-			copy(n.inodes[1:], n.inodes)
-			n.inodes[0] = target.inodes[len(target.inodes)-1]
-			target.inodes = target.inodes[:len(target.inodes)-1]
-		}
-
-		// Update parent key for node.
-		n.parent.put(n.key, n.inodes[0].key, nil, n.pgid, 0)
-		n.key = n.inodes[0].key
-		_assert(len(n.key) > 0, "rebalance(2): zero-length node key")
-
-		return
 	}
 
 	// If both this node and the target node are too small then merge them.

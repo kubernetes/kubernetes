@@ -61,7 +61,6 @@ var ErrInternalBadWireType = errors.New("proto: internal error: bad wiretype for
 // int32, int64, uint32, uint64, bool, and enum
 // protocol buffer types.
 func DecodeVarint(buf []byte) (x uint64, n int) {
-	// x, n already 0
 	for shift := uint(0); shift < 64; shift += 7 {
 		if n >= len(buf) {
 			return 0, 0
@@ -78,13 +77,7 @@ func DecodeVarint(buf []byte) (x uint64, n int) {
 	return 0, 0
 }
 
-// DecodeVarint reads a varint-encoded integer from the Buffer.
-// This is the format for the
-// int32, int64, uint32, uint64, bool, and enum
-// protocol buffer types.
-func (p *Buffer) DecodeVarint() (x uint64, err error) {
-	// x, err already 0
-
+func (p *Buffer) decodeVarintSlow() (x uint64, err error) {
 	i := p.index
 	l := len(p.buf)
 
@@ -105,6 +98,107 @@ func (p *Buffer) DecodeVarint() (x uint64, err error) {
 	// The number is too large to represent in a 64-bit value.
 	err = errOverflow
 	return
+}
+
+// DecodeVarint reads a varint-encoded integer from the Buffer.
+// This is the format for the
+// int32, int64, uint32, uint64, bool, and enum
+// protocol buffer types.
+func (p *Buffer) DecodeVarint() (x uint64, err error) {
+	i := p.index
+	buf := p.buf
+
+	if i >= len(buf) {
+		return 0, io.ErrUnexpectedEOF
+	} else if buf[i] < 0x80 {
+		p.index++
+		return uint64(buf[i]), nil
+	} else if len(buf)-i < 10 {
+		return p.decodeVarintSlow()
+	}
+
+	var b uint64
+	// we already checked the first byte
+	x = uint64(buf[i]) - 0x80
+	i++
+
+	b = uint64(buf[i])
+	i++
+	x += b << 7
+	if b&0x80 == 0 {
+		goto done
+	}
+	x -= 0x80 << 7
+
+	b = uint64(buf[i])
+	i++
+	x += b << 14
+	if b&0x80 == 0 {
+		goto done
+	}
+	x -= 0x80 << 14
+
+	b = uint64(buf[i])
+	i++
+	x += b << 21
+	if b&0x80 == 0 {
+		goto done
+	}
+	x -= 0x80 << 21
+
+	b = uint64(buf[i])
+	i++
+	x += b << 28
+	if b&0x80 == 0 {
+		goto done
+	}
+	x -= 0x80 << 28
+
+	b = uint64(buf[i])
+	i++
+	x += b << 35
+	if b&0x80 == 0 {
+		goto done
+	}
+	x -= 0x80 << 35
+
+	b = uint64(buf[i])
+	i++
+	x += b << 42
+	if b&0x80 == 0 {
+		goto done
+	}
+	x -= 0x80 << 42
+
+	b = uint64(buf[i])
+	i++
+	x += b << 49
+	if b&0x80 == 0 {
+		goto done
+	}
+	x -= 0x80 << 49
+
+	b = uint64(buf[i])
+	i++
+	x += b << 56
+	if b&0x80 == 0 {
+		goto done
+	}
+	x -= 0x80 << 56
+
+	b = uint64(buf[i])
+	i++
+	x += b << 63
+	if b&0x80 == 0 {
+		goto done
+	}
+	// x -= 0x80 << 63 // Always zero.
+
+	return 0, errOverflow
+
+done:
+	p.index = i
+	return x, nil
 }
 
 // DecodeFixed64 reads a 64-bit integer from the Buffer.
@@ -340,6 +434,8 @@ func (p *Buffer) DecodeGroup(pb Message) error {
 // Buffer and places the decoded result in pb.  If the struct
 // underlying pb does not match the data in the buffer, the results can be
 // unpredictable.
+//
+// Unlike proto.Unmarshal, this does not reset pb before starting to unmarshal.
 func (p *Buffer) Unmarshal(pb Message) error {
 	// If the object can unmarshal itself, let it.
 	if u, ok := pb.(Unmarshaler); ok {
@@ -378,6 +474,11 @@ func (o *Buffer) unmarshalType(st reflect.Type, prop *StructProperties, is_group
 		wire := int(u & 0x7)
 		if wire == WireEndGroup {
 			if is_group {
+				if required > 0 {
+					// Not enough information to determine the exact field.
+					// (See below.)
+					return &RequiredNotSetError{"{Unknown}"}
+				}
 				return nil // input is satisfied
 			}
 			return fmt.Errorf("proto: %s: wiretype end group for non-group", st)
@@ -390,11 +491,12 @@ func (o *Buffer) unmarshalType(st reflect.Type, prop *StructProperties, is_group
 		if !ok {
 			// Maybe it's an extension?
 			if prop.extendable {
-				if e := structPointer_Interface(base, st).(extendableProto); isExtensionField(e, int32(tag)) {
+				if e, _ := extendable(structPointer_Interface(base, st)); isExtensionField(e, int32(tag)) {
 					if err = o.skip(st, tag, wire); err == nil {
-						ext := e.ExtensionMap()[int32(tag)] // may be missing
+						extmap := e.extensionsWrite()
+						ext := extmap[int32(tag)] // may be missing
 						ext.enc = append(ext.enc, o.buf[oi:o.index]...)
-						e.ExtensionMap()[int32(tag)] = ext
+						extmap[int32(tag)] = ext
 					}
 					continue
 				}
@@ -768,10 +870,11 @@ func (o *Buffer) dec_new_map(p *Properties, base structPointer) error {
 		}
 	}
 	keyelem, valelem := keyptr.Elem(), valptr.Elem()
-	if !keyelem.IsValid() || !valelem.IsValid() {
-		// We did not decode the key or the value in the map entry.
-		// Either way, it's an invalid map entry.
-		return fmt.Errorf("proto: bad map data: missing key/val")
+	if !keyelem.IsValid() {
+		keyelem = reflect.Zero(p.mtype.Key())
+	}
+	if !valelem.IsValid() {
+		valelem = reflect.Zero(p.mtype.Elem())
 	}
 
 	v.SetMapIndex(keyelem, valelem)

@@ -1,5 +1,4 @@
-assignees:
-  - fejta
-  - ixdy
-  - rmmh
-  - spxtr
+approvers:
+- sig-testing-approvers
+reviewers:
+- sig-testing-reviewers

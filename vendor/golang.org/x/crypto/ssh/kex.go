@@ -9,17 +9,21 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/subtle"
 	"errors"
 	"io"
 	"math/big"
+
+	"golang.org/x/crypto/curve25519"
 )
 
 const (
-	kexAlgoDH1SHA1  = "diffie-hellman-group1-sha1"
-	kexAlgoDH14SHA1 = "diffie-hellman-group14-sha1"
-	kexAlgoECDH256  = "ecdh-sha2-nistp256"
-	kexAlgoECDH384  = "ecdh-sha2-nistp384"
-	kexAlgoECDH521  = "ecdh-sha2-nistp521"
+	kexAlgoDH1SHA1          = "diffie-hellman-group1-sha1"
+	kexAlgoDH14SHA1         = "diffie-hellman-group14-sha1"
+	kexAlgoECDH256          = "ecdh-sha2-nistp256"
+	kexAlgoECDH384          = "ecdh-sha2-nistp384"
+	kexAlgoECDH521          = "ecdh-sha2-nistp521"
+	kexAlgoCurve25519SHA256 = "curve25519-sha256@libssh.org"
 )
 
 // kexResult captures the outcome of a key exchange.
@@ -42,7 +46,7 @@ type kexResult struct {
 	Hash crypto.Hash
 
 	// The session ID, which is the first H computed. This is used
-	// to signal data inside transport.
+	// to derive key material inside the transport.
 	SessionID []byte
 }
 
@@ -73,11 +77,11 @@ type kexAlgorithm interface {
 
 // dhGroup is a multiplicative group suitable for implementing Diffie-Hellman key agreement.
 type dhGroup struct {
-	g, p *big.Int
+	g, p, pMinus1 *big.Int
 }
 
 func (group *dhGroup) diffieHellman(theirPublic, myPrivate *big.Int) (*big.Int, error) {
-	if theirPublic.Sign() <= 0 || theirPublic.Cmp(group.p) >= 0 {
+	if theirPublic.Cmp(bigOne) <= 0 || theirPublic.Cmp(group.pMinus1) >= 0 {
 		return nil, errors.New("ssh: DH parameter out of bounds")
 	}
 	return new(big.Int).Exp(theirPublic, myPrivate, group.p), nil
@@ -86,10 +90,17 @@ func (group *dhGroup) diffieHellman(theirPublic, myPrivate *big.Int) (*big.Int, 
 func (group *dhGroup) Client(c packetConn, randSource io.Reader, magics *handshakeMagics) (*kexResult, error) {
 	hashFunc := crypto.SHA1
 
-	x, err := rand.Int(randSource, group.p)
-	if err != nil {
-		return nil, err
+	var x *big.Int
+	for {
+		var err error
+		if x, err = rand.Int(randSource, group.pMinus1); err != nil {
+			return nil, err
+		}
+		if x.Sign() > 0 {
+			break
+		}
 	}
+
 	X := new(big.Int).Exp(group.g, x, group.p)
 	kexDHInit := kexDHInitMsg{
 		X: X,
@@ -142,9 +153,14 @@ func (group *dhGroup) Server(c packetConn, randSource io.Reader, magics *handsha
 		return
 	}
 
-	y, err := rand.Int(randSource, group.p)
-	if err != nil {
-		return
+	var y *big.Int
+	for {
+		if y, err = rand.Int(randSource, group.pMinus1); err != nil {
+			return
+		}
+		if y.Sign() > 0 {
+			break
+		}
 	}
 
 	Y := new(big.Int).Exp(group.g, y, group.p)
@@ -367,8 +383,9 @@ func init() {
 	// 4253 and Oakley Group 2 in RFC 2409.
 	p, _ := new(big.Int).SetString("FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381FFFFFFFFFFFFFFFF", 16)
 	kexAlgoMap[kexAlgoDH1SHA1] = &dhGroup{
-		g: new(big.Int).SetInt64(2),
-		p: p,
+		g:       new(big.Int).SetInt64(2),
+		p:       p,
+		pMinus1: new(big.Int).Sub(p, bigOne),
 	}
 
 	// This is the group called diffie-hellman-group14-sha1 in RFC
@@ -376,11 +393,148 @@ func init() {
 	p, _ = new(big.Int).SetString("FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA18217C32905E462E36CE3BE39E772C180E86039B2783A2EC07A28FB5C55DF06F4C52C9DE2BCBF6955817183995497CEA956AE515D2261898FA051015728E5A8AACAA68FFFFFFFFFFFFFFFF", 16)
 
 	kexAlgoMap[kexAlgoDH14SHA1] = &dhGroup{
-		g: new(big.Int).SetInt64(2),
-		p: p,
+		g:       new(big.Int).SetInt64(2),
+		p:       p,
+		pMinus1: new(big.Int).Sub(p, bigOne),
 	}
 
 	kexAlgoMap[kexAlgoECDH521] = &ecdh{elliptic.P521()}
 	kexAlgoMap[kexAlgoECDH384] = &ecdh{elliptic.P384()}
 	kexAlgoMap[kexAlgoECDH256] = &ecdh{elliptic.P256()}
+	kexAlgoMap[kexAlgoCurve25519SHA256] = &curve25519sha256{}
+}
+
+// curve25519sha256 implements the curve25519-sha256@libssh.org key
+// agreement protocol, as described in
+// https://git.libssh.org/projects/libssh.git/tree/doc/curve25519-sha256@libssh.org.txt
+type curve25519sha256 struct{}
+
+type curve25519KeyPair struct {
+	priv [32]byte
+	pub  [32]byte
+}
+
+func (kp *curve25519KeyPair) generate(rand io.Reader) error {
+	if _, err := io.ReadFull(rand, kp.priv[:]); err != nil {
+		return err
+	}
+	curve25519.ScalarBaseMult(&kp.pub, &kp.priv)
+	return nil
+}
+
+// curve25519Zeros is just an array of 32 zero bytes so that we have something
+// convenient to compare against in order to reject curve25519 points with the
+// wrong order.
+var curve25519Zeros [32]byte
+
+func (kex *curve25519sha256) Client(c packetConn, rand io.Reader, magics *handshakeMagics) (*kexResult, error) {
+	var kp curve25519KeyPair
+	if err := kp.generate(rand); err != nil {
+		return nil, err
+	}
+	if err := c.writePacket(Marshal(&kexECDHInitMsg{kp.pub[:]})); err != nil {
+		return nil, err
+	}
+
+	packet, err := c.readPacket()
+	if err != nil {
+		return nil, err
+	}
+
+	var reply kexECDHReplyMsg
+	if err = Unmarshal(packet, &reply); err != nil {
+		return nil, err
+	}
+	if len(reply.EphemeralPubKey) != 32 {
+		return nil, errors.New("ssh: peer's curve25519 public value has wrong length")
+	}
+
+	var servPub, secret [32]byte
+	copy(servPub[:], reply.EphemeralPubKey)
+	curve25519.ScalarMult(&secret, &kp.priv, &servPub)
+	if subtle.ConstantTimeCompare(secret[:], curve25519Zeros[:]) == 1 {
+		return nil, errors.New("ssh: peer's curve25519 public value has wrong order")
+	}
+
+	h := crypto.SHA256.New()
+	magics.write(h)
+	writeString(h, reply.HostKey)
+	writeString(h, kp.pub[:])
+	writeString(h, reply.EphemeralPubKey)
+
+	kInt := new(big.Int).SetBytes(secret[:])
+	K := make([]byte, intLength(kInt))
+	marshalInt(K, kInt)
+	h.Write(K)
+
+	return &kexResult{
+		H:         h.Sum(nil),
+		K:         K,
+		HostKey:   reply.HostKey,
+		Signature: reply.Signature,
+		Hash:      crypto.SHA256,
+	}, nil
+}
+
+func (kex *curve25519sha256) Server(c packetConn, rand io.Reader, magics *handshakeMagics, priv Signer) (result *kexResult, err error) {
+	packet, err := c.readPacket()
+	if err != nil {
+		return
+	}
+	var kexInit kexECDHInitMsg
+	if err = Unmarshal(packet, &kexInit); err != nil {
+		return
+	}
+
+	if len(kexInit.ClientPubKey) != 32 {
+		return nil, errors.New("ssh: peer's curve25519 public value has wrong length")
+	}
+
+	var kp curve25519KeyPair
+	if err := kp.generate(rand); err != nil {
+		return nil, err
+	}
+
+	var clientPub, secret [32]byte
+	copy(clientPub[:], kexInit.ClientPubKey)
+	curve25519.ScalarMult(&secret, &kp.priv, &clientPub)
+	if subtle.ConstantTimeCompare(secret[:], curve25519Zeros[:]) == 1 {
+		return nil, errors.New("ssh: peer's curve25519 public value has wrong order")
+	}
+
+	hostKeyBytes := priv.PublicKey().Marshal()
+
+	h := crypto.SHA256.New()
+	magics.write(h)
+	writeString(h, hostKeyBytes)
+	writeString(h, kexInit.ClientPubKey)
+	writeString(h, kp.pub[:])
+
+	kInt := new(big.Int).SetBytes(secret[:])
+	K := make([]byte, intLength(kInt))
+	marshalInt(K, kInt)
+	h.Write(K)
+
+	H := h.Sum(nil)
+
+	sig, err := signAndMarshal(priv, rand, H)
+	if err != nil {
+		return nil, err
+	}
+
+	reply := kexECDHReplyMsg{
+		EphemeralPubKey: kp.pub[:],
+		HostKey:         hostKeyBytes,
+		Signature:       sig,
+	}
+	if err := c.writePacket(Marshal(&reply)); err != nil {
+		return nil, err
+	}
+	return &kexResult{
+		H:         H,
+		K:         K,
+		HostKey:   hostKeyBytes,
+		Signature: sig,
+		Hash:      crypto.SHA256,
+	}, nil
 }

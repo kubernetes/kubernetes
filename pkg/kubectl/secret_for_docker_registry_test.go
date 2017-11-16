@@ -20,7 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestSecretForDockerRegistryGenerate(t *testing.T) {
@@ -29,10 +30,14 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	secretDataNoEmail, err := handleDockercfgContent(username, password, "", server)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
 	tests := map[string]struct {
 		params    map[string]interface{}
-		expected  *api.Secret
+		expected  *v1.Secret
 		expectErr bool
 	}{
 		"test-valid-use": {
@@ -43,14 +48,52 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 				"docker-password": password,
 				"docker-email":    email,
 			},
-			expected: &api.Secret{
-				ObjectMeta: api.ObjectMeta{
+			expected: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Data: map[string][]byte{
-					api.DockerConfigKey: secretData,
+					v1.DockerConfigKey: secretData,
 				},
-				Type: api.SecretTypeDockercfg,
+				Type: v1.SecretTypeDockercfg,
+			},
+			expectErr: false,
+		},
+		"test-valid-use-append-hash": {
+			params: map[string]interface{}{
+				"name":            "foo",
+				"docker-server":   server,
+				"docker-username": username,
+				"docker-password": password,
+				"docker-email":    email,
+				"append-hash":     true,
+			},
+			expected: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo-94759gc65b",
+				},
+				Data: map[string][]byte{
+					v1.DockerConfigKey: secretData,
+				},
+				Type: v1.SecretTypeDockercfg,
+			},
+			expectErr: false,
+		},
+		"test-valid-use-no-email": {
+			params: map[string]interface{}{
+				"name":            "foo",
+				"docker-server":   server,
+				"docker-username": username,
+				"docker-password": password,
+			},
+			expected: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Data: map[string][]byte{
+					v1.DockerConfigKey: secretDataNoEmail,
+				},
+				Type: v1.SecretTypeDockercfg,
 			},
 			expectErr: false,
 		},
@@ -74,8 +117,8 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 		if test.expectErr && err != nil {
 			continue
 		}
-		if !reflect.DeepEqual(obj.(*api.Secret), test.expected) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*api.Secret))
+		if !reflect.DeepEqual(obj.(*v1.Secret), test.expected) {
+			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*v1.Secret))
 		}
 	}
 }

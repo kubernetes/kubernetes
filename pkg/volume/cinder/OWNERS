@@ -1,3 +1,13 @@
-maintainers:
+approvers:
 - jsafrane
-- spothanis
+- anguslees
+- dims
+- FengyunPan
+reviewers:
+- anguslees
+- rootfs
+- saad-ali
+- jsafrane
+- jingxu97
+- msau42
+- FengyunPan

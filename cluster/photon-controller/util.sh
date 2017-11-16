@@ -34,8 +34,8 @@ readonly PHOTON="photon -n"
 readonly MASTER_NAME="${INSTANCE_PREFIX}-master"
 
 # shell check claims this doesn't work because you can't use a variable in a brace
-# range. It does work because we're calling eval. 
-# shellcheck disable=SC2051 
+# range. It does work because we're calling eval.
+# shellcheck disable=SC2051
 readonly NODE_NAMES=($(eval echo "${INSTANCE_PREFIX}"-node-{1.."${NUM_NODES}"}))
 
 #####################################################################
@@ -156,7 +156,7 @@ function kube-up {
   verify-prereqs
   verify-ssh-prereqs
   verify-photon-config
-  ensure-temp-dir
+  kube::util::ensure-temp-dir
 
   find-release-tars
   find-image-id
@@ -284,7 +284,7 @@ function pc-create-vm {
 
    # Wait for the VM to be started and connected to the network
   have_network=0
-  for i in $(seq 120); do
+  for i in {1..120}; do
     # photon -n vm networks print several fields:
     # NETWORK MAC IP GATEWAY CONNECTED?
     # We wait until CONNECTED is True
@@ -432,6 +432,7 @@ function gen-master-start {
     echo "readonly MY_NAME=${MASTER_NAME}"
     grep -v "^#" "${KUBE_ROOT}/cluster/photon-controller/templates/hostname.sh"
     echo "cd /home/kube/cache/kubernetes-install"
+    echo "readonly KUBE_MASTER_IP='{$KUBE_MASTER_IP}'"
     echo "readonly MASTER_NAME='${MASTER_NAME}'"
     echo "readonly MASTER_IP_RANGE='${MASTER_IP_RANGE}'"
     echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
@@ -495,20 +496,20 @@ function gen-node-salt {
   done
 }
 
-# 
+#
 # Shared implementation for gen-master-salt and gen-node-salt
 # Writes a script that installs Kubernetes with salt
 # The core of the script is simple (run 'salt ... state.highstate')
 # We also do a bit of logging so we can debug problems
 #
-# There is also a funky workaround for an issue with docker 1.9 
-# (elsewhere we peg ourselves to docker 1.9). It's fixed in 1.10, 
+# There is also a funky workaround for an issue with docker 1.9
+# (elsewhere we peg ourselves to docker 1.9). It's fixed in 1.10,
 # so we should be able to remove it in the future
 # https://github.com/docker/docker/issues/18113
 # The problem is that sometimes the install (with apt-get) of
 # docker fails. Deleting a file and retrying fixes it.
 #
-# Tell shellcheck to ignore our variables within single quotes: 
+# Tell shellcheck to ignore our variables within single quotes:
 # We're writing a script, not executing it, so this is normal
 # shellcheck disable=SC2016
 function gen-salt {
@@ -564,7 +565,7 @@ function gen-add-route {
 
 #
 # Create the Kubernetes master VM
-# Sets global variables: 
+# Sets global variables:
 # - KUBE_MASTER    (Name)
 # - KUBE_MASTER_ID (Photon VM ID)
 # - KUBE_MASTER_IP (IP address)
@@ -577,7 +578,7 @@ function create-master-vm {
   KUBE_MASTER_IP=${_VM_IP}
 }
 
-# 
+#
 # Install salt on the Kubernetes master
 # Relies on the master-start.sh script created in gen-master-start
 #
@@ -635,7 +636,7 @@ function install-kubernetes-on-master {
 }
 
 #
-# Install Kubernetes on the the nodes in parallel
+# Install Kubernetes on the nodes in parallel
 # This uses the kubernetes-master-salt.sh script created by gen-node-salt
 # That script uses salt to install Kubernetes
 #
@@ -1028,18 +1029,6 @@ function verify-cmd-in-path {
     kube::log::error "Can't find ${cmd} in PATH, please install and retry."
     exit 1
   }
-}
-
-#
-# Checks that KUBE_TEMP is set, or sets it
-# If it sets it, it also creates the temporary directory
-# and sets up a trap so that we delete it when we exit
-#
-function ensure-temp-dir {
-  if [[ -z ${KUBE_TEMP-} ]]; then
-    KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
-    trap-add "rm -rf '${KUBE_TEMP}'" EXIT
-  fi
 }
 
 #

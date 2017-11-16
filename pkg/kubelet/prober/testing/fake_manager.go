@@ -17,19 +17,19 @@ limitations under the License.
 package testing
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 type FakeManager struct{}
 
 // Unused methods.
-func (_ FakeManager) AddPod(_ *api.Pod)        {}
-func (_ FakeManager) RemovePod(_ *api.Pod)     {}
-func (_ FakeManager) CleanupPods(_ []*api.Pod) {}
-func (_ FakeManager) Start()                   {}
+func (_ FakeManager) AddPod(_ *v1.Pod)        {}
+func (_ FakeManager) RemovePod(_ *v1.Pod)     {}
+func (_ FakeManager) CleanupPods(_ []*v1.Pod) {}
+func (_ FakeManager) Start()                  {}
 
-func (_ FakeManager) UpdatePodStatus(_ types.UID, podStatus *api.PodStatus) {
+func (_ FakeManager) UpdatePodStatus(_ types.UID, podStatus *v1.PodStatus) {
 	for i := range podStatus.ContainerStatuses {
 		podStatus.ContainerStatuses[i].Ready = true
 	}

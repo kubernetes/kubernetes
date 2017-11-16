@@ -17,35 +17,101 @@ limitations under the License.
 package garbagecollector
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
 
-	_ "k8s.io/kubernetes/pkg/api/install"
-
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta/metatypes"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/typed/dynamic"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/json"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/workqueue"
+
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
+
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 )
 
-func TestNewGarbageCollector(t *testing.T) {
-	clientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc)
-	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
-	gc, err := NewGarbageCollector(clientPool, podResource)
+type testRESTMapper struct {
+	meta.RESTMapper
+}
+
+func (_ *testRESTMapper) Reset() {}
+
+func TestGarbageCollectorConstruction(t *testing.T) {
+	config := &restclient.Config{}
+	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
+	tweakableRM := meta.NewDefaultRESTMapper(nil, nil)
+	rm := &testRESTMapper{meta.MultiRESTMapper{tweakableRM, legacyscheme.Registry.RESTMapper()}}
+	metaOnlyClientPool := dynamic.NewClientPool(config, rm, dynamic.LegacyAPIPathResolverFunc)
+	config.ContentConfig.NegotiatedSerializer = nil
+	clientPool := dynamic.NewClientPool(config, rm, dynamic.LegacyAPIPathResolverFunc)
+	podResource := map[schema.GroupVersionResource]struct{}{
+		{Version: "v1", Resource: "pods"}: {},
+	}
+	twoResources := map[schema.GroupVersionResource]struct{}{
+		{Version: "v1", Resource: "pods"}:                     {},
+		{Group: "tpr.io", Version: "v1", Resource: "unknown"}: {},
+	}
+	client := fake.NewSimpleClientset()
+	sharedInformers := informers.NewSharedInformerFactory(client, 0)
+
+	// No monitor will be constructed for the non-core resource, but the GC
+	// construction will not fail.
+	alwaysStarted := make(chan struct{})
+	close(alwaysStarted)
+	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, rm, twoResources, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, 1, len(gc.monitors))
+	assert.Equal(t, 1, len(gc.dependencyGraphBuilder.monitors))
+
+	// Make sure resource monitor syncing creates and stops resource monitors.
+	tweakableRM.Add(schema.GroupVersionKind{Group: "tpr.io", Version: "v1", Kind: "unknown"}, nil)
+	err = gc.resyncMonitors(twoResources)
+	if err != nil {
+		t.Errorf("Failed adding a monitor: %v", err)
+	}
+	assert.Equal(t, 2, len(gc.dependencyGraphBuilder.monitors))
+
+	err = gc.resyncMonitors(podResource)
+	if err != nil {
+		t.Errorf("Failed removing a monitor: %v", err)
+	}
+	assert.Equal(t, 1, len(gc.dependencyGraphBuilder.monitors))
+
+	// Make sure the syncing mechanism also works after Run() has been called
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	go gc.Run(1, stopCh)
+
+	err = gc.resyncMonitors(twoResources)
+	if err != nil {
+		t.Errorf("Failed adding a monitor: %v", err)
+	}
+	assert.Equal(t, 2, len(gc.dependencyGraphBuilder.monitors))
+
+	err = gc.resyncMonitors(podResource)
+	if err != nil {
+		t.Errorf("Failed removing a monitor: %v", err)
+	}
+	assert.Equal(t, 1, len(gc.dependencyGraphBuilder.monitors))
 }
 
 // fakeAction records information about requests to aid in testing.
@@ -85,6 +151,7 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 		fakeResponse.statusCode = 200
 		fakeResponse.content = []byte("{\"kind\": \"List\"}")
 	}
+	response.Header().Set("Content-Type", "application/json")
 	response.WriteHeader(fakeResponse.statusCode)
 	response.Write(fakeResponse.content)
 }
@@ -98,34 +165,62 @@ func testServerAndClientConfig(handler func(http.ResponseWriter, *http.Request))
 	return srv, config
 }
 
-func newDanglingPod() *v1.Pod {
+type garbageCollector struct {
+	*GarbageCollector
+	stop chan struct{}
+}
+
+func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
+	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
+	metaOnlyClientPool := dynamic.NewClientPool(config, legacyscheme.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
+	config.ContentConfig.NegotiatedSerializer = nil
+	clientPool := dynamic.NewClientPool(config, legacyscheme.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
+	podResource := map[schema.GroupVersionResource]struct{}{{Version: "v1", Resource: "pods"}: {}}
+	client := fake.NewSimpleClientset()
+	sharedInformers := informers.NewSharedInformerFactory(client, 0)
+	alwaysStarted := make(chan struct{})
+	close(alwaysStarted)
+	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, &testRESTMapper{legacyscheme.Registry.RESTMapper()}, podResource, ignoredResources, sharedInformers, alwaysStarted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stop := make(chan struct{})
+	go sharedInformers.Start(stop)
+	return garbageCollector{gc, stop}
+}
+
+func getPod(podName string, ownerReferences []metav1.OwnerReference) *v1.Pod {
 	return &v1.Pod{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
-			Name:      "ToBeDeletedPod",
-			Namespace: "ns1",
-			OwnerReferences: []v1.OwnerReference{
-				{
-					Kind:       "ReplicationController",
-					Name:       "owner1",
-					UID:        "123",
-					APIVersion: "v1",
-				},
-			},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            podName,
+			Namespace:       "ns1",
+			OwnerReferences: ownerReferences,
 		},
 	}
 }
 
-// test the processItem function making the expected actions.
-func TestProcessItem(t *testing.T) {
-	pod := newDanglingPod()
-	podBytes, err := json.Marshal(pod)
+func serilizeOrDie(t *testing.T, object interface{}) []byte {
+	data, err := json.Marshal(object)
 	if err != nil {
 		t.Fatal(err)
 	}
+	return data
+}
+
+// test the attemptToDeleteItem function making the expected actions.
+func TestAttemptToDeleteItem(t *testing.T) {
+	pod := getPod("ToBeDeletedPod", []metav1.OwnerReference{
+		{
+			Kind:       "ReplicationController",
+			Name:       "owner1",
+			UID:        "123",
+			APIVersion: "v1",
+		},
+	})
 	testHandler := &fakeActionHandler{
 		response: map[string]FakeResponse{
 			"GET" + "/api/v1/namespaces/ns1/replicationcontrollers/owner1": {
@@ -134,21 +229,19 @@ func TestProcessItem(t *testing.T) {
 			},
 			"GET" + "/api/v1/namespaces/ns1/pods/ToBeDeletedPod": {
 				200,
-				podBytes,
+				serilizeOrDie(t, pod),
 			},
 		},
 	}
-	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
 	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
 	defer srv.Close()
-	clientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc)
-	gc, err := NewGarbageCollector(clientPool, podResource)
-	if err != nil {
-		t.Fatal(err)
-	}
+
+	gc := setupGC(t, clientConfig)
+	defer close(gc.stop)
+
 	item := &node{
 		identity: objectReference{
-			OwnerReference: metatypes.OwnerReference{
+			OwnerReference: metav1.OwnerReference{
 				Kind:       pod.Kind,
 				APIVersion: pod.APIVersion,
 				Name:       pod.Name,
@@ -156,10 +249,10 @@ func TestProcessItem(t *testing.T) {
 			},
 			Namespace: pod.Namespace,
 		},
-		// owners are intentionally left empty. The processItem routine should get the latest item from the server.
+		// owners are intentionally left empty. The attemptToDeleteItem routine should get the latest item from the server.
 		owners: nil,
 	}
-	err = gc.processItem(item)
+	err := gc.attemptToDeleteItem(item)
 	if err != nil {
 		t.Errorf("Unexpected Error: %v", err)
 	}
@@ -209,14 +302,14 @@ func verifyGraphInvariants(scenario string, uidToNode map[types.UID]*node, t *te
 }
 
 func createEvent(eventType eventType, selfUID string, owners []string) event {
-	var ownerReferences []api.OwnerReference
+	var ownerReferences []metav1.OwnerReference
 	for i := 0; i < len(owners); i++ {
-		ownerReferences = append(ownerReferences, api.OwnerReference{UID: types.UID(owners[i])})
+		ownerReferences = append(ownerReferences, metav1.OwnerReference{UID: types.UID(owners[i])})
 	}
 	return event{
 		eventType: eventType,
-		obj: &api.Pod{
-			ObjectMeta: api.ObjectMeta{
+		obj: &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:             types.UID(selfUID),
 				OwnerReferences: ownerReferences,
 			},
@@ -228,7 +321,7 @@ func TestProcessEvent(t *testing.T) {
 	var testScenarios = []struct {
 		name string
 		// a series of events that will be supplied to the
-		// Propagator.eventQueue.
+		// GraphBuilder.graphChanges.
 		events []event
 	}{
 		{
@@ -271,21 +364,23 @@ func TestProcessEvent(t *testing.T) {
 		},
 	}
 
+	alwaysStarted := make(chan struct{})
+	close(alwaysStarted)
 	for _, scenario := range testScenarios {
-		propagator := &Propagator{
-			eventQueue: workqueue.New(),
+		dependencyGraphBuilder := &GraphBuilder{
+			informersStarted: alwaysStarted,
+			graphChanges:     workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 			uidToNode: &concurrentUIDToNode{
-				RWMutex:   &sync.RWMutex{},
-				uidToNode: make(map[types.UID]*node),
+				uidToNodeLock: sync.RWMutex{},
+				uidToNode:     make(map[types.UID]*node),
 			},
-			gc: &GarbageCollector{
-				dirtyQueue: workqueue.New(),
-			},
+			attemptToDelete:  workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+			absentOwnerCache: NewUIDCache(2),
 		}
 		for i := 0; i < len(scenario.events); i++ {
-			propagator.eventQueue.Add(scenario.events[i])
-			propagator.processEvent()
-			verifyGraphInvariants(scenario.name, propagator.uidToNode.uidToNode, t)
+			dependencyGraphBuilder.graphChanges.Add(&scenario.events[i])
+			dependencyGraphBuilder.processGraphChanges()
+			verifyGraphInvariants(scenario.name, dependencyGraphBuilder.uidToNode.uidToNode, t)
 		}
 	}
 }
@@ -293,28 +388,24 @@ func TestProcessEvent(t *testing.T) {
 // TestDependentsRace relies on golang's data race detector to check if there is
 // data race among in the dependents field.
 func TestDependentsRace(t *testing.T) {
-	clientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc)
-	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
-	gc, err := NewGarbageCollector(clientPool, podResource)
-	if err != nil {
-		t.Fatal(err)
-	}
+	gc := setupGC(t, &restclient.Config{})
+	defer close(gc.stop)
 
 	const updates = 100
-	owner := &node{dependentsLock: &sync.RWMutex{}, dependents: make(map[*node]struct{})}
+	owner := &node{dependents: make(map[*node]struct{})}
 	ownerUID := types.UID("owner")
-	gc.propagator.uidToNode.Write(owner)
+	gc.dependencyGraphBuilder.uidToNode.Write(owner)
 	go func() {
 		for i := 0; i < updates; i++ {
 			dependent := &node{}
-			gc.propagator.addDependentToOwners(dependent, []metatypes.OwnerReference{{UID: ownerUID}})
-			gc.propagator.removeDependentFromOwners(dependent, []metatypes.OwnerReference{{UID: ownerUID}})
+			gc.dependencyGraphBuilder.addDependentToOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
+			gc.dependencyGraphBuilder.removeDependentFromOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
 		}
 	}()
 	go func() {
-		gc.orphanQueue.Add(owner)
+		gc.attemptToOrphan.Add(owner)
 		for i := 0; i < updates; i++ {
-			gc.orphanFinalizer()
+			gc.attemptToOrphanWorker()
 		}
 	}()
 }
@@ -324,22 +415,367 @@ func TestGCListWatcher(t *testing.T) {
 	testHandler := &fakeActionHandler{}
 	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
 	defer srv.Close()
-	clientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc)
-	podResource := unversioned.GroupVersionResource{Version: "v1", Resource: "pods"}
-	client, err := clientPool.ClientForGroupVersion(podResource.GroupVersion())
+	clientPool := dynamic.NewClientPool(clientConfig, legacyscheme.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
+	podResource := schema.GroupVersionResource{Version: "v1", Resource: "pods"}
+	client, err := clientPool.ClientForGroupVersionResource(podResource)
 	if err != nil {
 		t.Fatal(err)
 	}
-	lw := gcListWatcher(client, podResource)
-	lw.Watch(api.ListOptions{ResourceVersion: "1"})
-	lw.List(api.ListOptions{ResourceVersion: "1"})
+	lw := listWatcher(client, podResource)
+	lw.DisableChunking = true
+	if _, err := lw.Watch(metav1.ListOptions{ResourceVersion: "1"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := lw.List(metav1.ListOptions{ResourceVersion: "1"}); err != nil {
+		t.Fatal(err)
+	}
 	if e, a := 2, len(testHandler.actions); e != a {
 		t.Errorf("expect %d requests, got %d", e, a)
 	}
-	if e, a := "resourceVersion=1", testHandler.actions[0].query; e != a {
+	if e, a := "resourceVersion=1&watch=true", testHandler.actions[0].query; e != a {
 		t.Errorf("expect %s, got %s", e, a)
 	}
 	if e, a := "resourceVersion=1", testHandler.actions[1].query; e != a {
 		t.Errorf("expect %s, got %s", e, a)
 	}
+}
+
+func podToGCNode(pod *v1.Pod) *node {
+	return &node{
+		identity: objectReference{
+			OwnerReference: metav1.OwnerReference{
+				Kind:       pod.Kind,
+				APIVersion: pod.APIVersion,
+				Name:       pod.Name,
+				UID:        pod.UID,
+			},
+			Namespace: pod.Namespace,
+		},
+		// owners are intentionally left empty. The attemptToDeleteItem routine should get the latest item from the server.
+		owners: nil,
+	}
+}
+
+func TestAbsentUIDCache(t *testing.T) {
+	rc1Pod1 := getPod("rc1Pod1", []metav1.OwnerReference{
+		{
+			Kind:       "ReplicationController",
+			Name:       "rc1",
+			UID:        "1",
+			APIVersion: "v1",
+		},
+	})
+	rc1Pod2 := getPod("rc1Pod2", []metav1.OwnerReference{
+		{
+			Kind:       "ReplicationController",
+			Name:       "rc1",
+			UID:        "1",
+			APIVersion: "v1",
+		},
+	})
+	rc2Pod1 := getPod("rc2Pod1", []metav1.OwnerReference{
+		{
+			Kind:       "ReplicationController",
+			Name:       "rc2",
+			UID:        "2",
+			APIVersion: "v1",
+		},
+	})
+	rc3Pod1 := getPod("rc3Pod1", []metav1.OwnerReference{
+		{
+			Kind:       "ReplicationController",
+			Name:       "rc3",
+			UID:        "3",
+			APIVersion: "v1",
+		},
+	})
+	testHandler := &fakeActionHandler{
+		response: map[string]FakeResponse{
+			"GET" + "/api/v1/namespaces/ns1/pods/rc1Pod1": {
+				200,
+				serilizeOrDie(t, rc1Pod1),
+			},
+			"GET" + "/api/v1/namespaces/ns1/pods/rc1Pod2": {
+				200,
+				serilizeOrDie(t, rc1Pod2),
+			},
+			"GET" + "/api/v1/namespaces/ns1/pods/rc2Pod1": {
+				200,
+				serilizeOrDie(t, rc2Pod1),
+			},
+			"GET" + "/api/v1/namespaces/ns1/pods/rc3Pod1": {
+				200,
+				serilizeOrDie(t, rc3Pod1),
+			},
+			"GET" + "/api/v1/namespaces/ns1/replicationcontrollers/rc1": {
+				404,
+				[]byte{},
+			},
+			"GET" + "/api/v1/namespaces/ns1/replicationcontrollers/rc2": {
+				404,
+				[]byte{},
+			},
+			"GET" + "/api/v1/namespaces/ns1/replicationcontrollers/rc3": {
+				404,
+				[]byte{},
+			},
+		},
+	}
+	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
+	defer srv.Close()
+	gc := setupGC(t, clientConfig)
+	defer close(gc.stop)
+	gc.absentOwnerCache = NewUIDCache(2)
+	gc.attemptToDeleteItem(podToGCNode(rc1Pod1))
+	gc.attemptToDeleteItem(podToGCNode(rc2Pod1))
+	// rc1 should already be in the cache, no request should be sent. rc1 should be promoted in the UIDCache
+	gc.attemptToDeleteItem(podToGCNode(rc1Pod2))
+	// after this call, rc2 should be evicted from the UIDCache
+	gc.attemptToDeleteItem(podToGCNode(rc3Pod1))
+	// check cache
+	if !gc.absentOwnerCache.Has(types.UID("1")) {
+		t.Errorf("expected rc1 to be in the cache")
+	}
+	if gc.absentOwnerCache.Has(types.UID("2")) {
+		t.Errorf("expected rc2 to not exist in the cache")
+	}
+	if !gc.absentOwnerCache.Has(types.UID("3")) {
+		t.Errorf("expected rc3 to be in the cache")
+	}
+	// check the request sent to the server
+	count := 0
+	for _, action := range testHandler.actions {
+		if action.String() == "GET=/api/v1/namespaces/ns1/replicationcontrollers/rc1" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("expected only 1 GET rc1 request, got %d", count)
+	}
+}
+
+func TestDeleteOwnerRefPatch(t *testing.T) {
+	original := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "100",
+			OwnerReferences: []metav1.OwnerReference{
+				{UID: "1"},
+				{UID: "2"},
+				{UID: "3"},
+			},
+		},
+	}
+	originalData := serilizeOrDie(t, original)
+	expected := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "100",
+			OwnerReferences: []metav1.OwnerReference{
+				{UID: "1"},
+			},
+		},
+	}
+	patch := deleteOwnerRefPatch("100", "2", "3")
+	patched, err := strategicpatch.StrategicMergePatch(originalData, patch, v1.Pod{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got v1.Pod
+	if err := json.Unmarshal(patched, &got); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(expected, got) {
+		t.Errorf("expected: %#v,\ngot: %#v", expected, got)
+	}
+}
+
+func TestUnblockOwnerReference(t *testing.T) {
+	trueVar := true
+	falseVar := false
+	original := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "100",
+			OwnerReferences: []metav1.OwnerReference{
+				{UID: "1", BlockOwnerDeletion: &trueVar},
+				{UID: "2", BlockOwnerDeletion: &falseVar},
+				{UID: "3"},
+			},
+		},
+	}
+	originalData := serilizeOrDie(t, original)
+	expected := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "100",
+			OwnerReferences: []metav1.OwnerReference{
+				{UID: "1", BlockOwnerDeletion: &falseVar},
+				{UID: "2", BlockOwnerDeletion: &falseVar},
+				{UID: "3"},
+			},
+		},
+	}
+	accessor, err := meta.Accessor(&original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := node{
+		owners: accessor.GetOwnerReferences(),
+	}
+	patch, err := n.patchToUnblockOwnerReferences()
+	if err != nil {
+		t.Fatal(err)
+	}
+	patched, err := strategicpatch.StrategicMergePatch(originalData, patch, v1.Pod{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got v1.Pod
+	if err := json.Unmarshal(patched, &got); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(expected, got) {
+		t.Errorf("expected: %#v,\ngot: %#v", expected, got)
+		t.Errorf("expected: %#v,\ngot: %#v", expected.OwnerReferences, got.OwnerReferences)
+		for _, ref := range got.OwnerReferences {
+			t.Errorf("ref.UID=%s, ref.BlockOwnerDeletion=%v", ref.UID, *ref.BlockOwnerDeletion)
+		}
+	}
+}
+
+func TestOrphanDependentsFailure(t *testing.T) {
+	testHandler := &fakeActionHandler{
+		response: map[string]FakeResponse{
+			"PATCH" + "/api/v1/namespaces/ns1/pods/pod": {
+				409,
+				[]byte{},
+			},
+		},
+	}
+	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
+	defer srv.Close()
+
+	gc := setupGC(t, clientConfig)
+	defer close(gc.stop)
+
+	dependents := []*node{
+		{
+			identity: objectReference{
+				OwnerReference: metav1.OwnerReference{
+					Kind:       "Pod",
+					APIVersion: "v1",
+					Name:       "pod",
+				},
+				Namespace: "ns1",
+			},
+		},
+	}
+	err := gc.orphanDependents(objectReference{}, dependents)
+	expected := `the server reported a conflict (patch pods pod)`
+	if err == nil || !strings.Contains(err.Error(), expected) {
+		t.Errorf("expected error contains text %s, got %v", expected, err)
+	}
+}
+
+// TestGetDeletableResources ensures GetDeletableResources always returns
+// something usable regardless of discovery output.
+func TestGetDeletableResources(t *testing.T) {
+	tests := map[string]struct {
+		serverResources    []*metav1.APIResourceList
+		err                error
+		deletableResources map[schema.GroupVersionResource]struct{}
+	}{
+		"no error": {
+			serverResources: []*metav1.APIResourceList{
+				{
+					// Valid GroupVersion
+					GroupVersion: "apps/v1",
+					APIResources: []metav1.APIResource{
+						{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: metav1.Verbs{"delete"}},
+						{Name: "services", Namespaced: true, Kind: "Service"},
+					},
+				},
+				{
+					// Invalid GroupVersion, should be ignored
+					GroupVersion: "foo//whatever",
+					APIResources: []metav1.APIResource{
+						{Name: "bars", Namespaced: true, Kind: "Bar", Verbs: metav1.Verbs{"delete"}},
+					},
+				},
+			},
+			err: nil,
+			deletableResources: map[schema.GroupVersionResource]struct{}{
+				{Group: "apps", Version: "v1", Resource: "pods"}: {},
+			},
+		},
+		"nonspecific failure, includes usable results": {
+			serverResources: []*metav1.APIResourceList{
+				{
+					GroupVersion: "apps/v1",
+					APIResources: []metav1.APIResource{
+						{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: metav1.Verbs{"delete"}},
+						{Name: "services", Namespaced: true, Kind: "Service"},
+					},
+				},
+			},
+			err: fmt.Errorf("internal error"),
+			deletableResources: map[schema.GroupVersionResource]struct{}{
+				{Group: "apps", Version: "v1", Resource: "pods"}: {},
+			},
+		},
+		"partial discovery failure, includes usable results": {
+			serverResources: []*metav1.APIResourceList{
+				{
+					GroupVersion: "apps/v1",
+					APIResources: []metav1.APIResource{
+						{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: metav1.Verbs{"delete"}},
+						{Name: "services", Namespaced: true, Kind: "Service"},
+					},
+				},
+			},
+			err: &discovery.ErrGroupDiscoveryFailed{
+				Groups: map[schema.GroupVersion]error{
+					{Group: "foo", Version: "v1"}: fmt.Errorf("discovery failure"),
+				},
+			},
+			deletableResources: map[schema.GroupVersionResource]struct{}{
+				{Group: "apps", Version: "v1", Resource: "pods"}: {},
+			},
+		},
+		"discovery failure, no results": {
+			serverResources:    nil,
+			err:                fmt.Errorf("internal error"),
+			deletableResources: map[schema.GroupVersionResource]struct{}{},
+		},
+	}
+
+	for name, test := range tests {
+		t.Logf("testing %q", name)
+		client := &fakeServerResources{
+			PreferredResources: test.serverResources,
+			Error:              test.err,
+		}
+		actual := GetDeletableResources(client)
+		if !reflect.DeepEqual(test.deletableResources, actual) {
+			t.Errorf("expected resources:\n%v\ngot:\n%v", test.deletableResources, actual)
+		}
+	}
+}
+
+type fakeServerResources struct {
+	PreferredResources []*metav1.APIResourceList
+	Error              error
+}
+
+func (_ *fakeServerResources) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
+	return nil, nil
+}
+
+func (_ *fakeServerResources) ServerResources() ([]*metav1.APIResourceList, error) {
+	return nil, nil
+}
+
+func (f *fakeServerResources) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
+	return f.PreferredResources, f.Error
+}
+
+func (_ *fakeServerResources) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
+	return nil, nil
 }

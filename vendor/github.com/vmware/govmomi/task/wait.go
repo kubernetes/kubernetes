@@ -17,10 +17,11 @@ limitations under the License.
 package task
 
 import (
+	"context"
+
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25/progress"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
 
 type taskProgress struct {
@@ -65,6 +66,11 @@ func (t *taskCallback) fn(pc []types.PropertyChange) bool {
 
 		ti := c.Val.(types.TaskInfo)
 		t.info = &ti
+	}
+
+	// t.info could be nil if pc can't satify the rules above
+	if t.info == nil {
+		return false
 	}
 
 	pr := taskProgress{t.info}

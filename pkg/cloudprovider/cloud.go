@@ -21,11 +21,16 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 // Interface is an abstract, pluggable interface for cloud providers.
 type Interface interface {
+	// Initialize provides the cloud with a kubernetes client builder and may spawn goroutines
+	// to perform housekeeping activities within the cloud provider.
+	Initialize(clientBuilder controller.ControllerClientBuilder)
 	// LoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
 	LoadBalancer() (LoadBalancer, bool)
 	// Instances returns an instances interface. Also returns true if the interface is supported, false otherwise.
@@ -40,6 +45,8 @@ type Interface interface {
 	ProviderName() string
 	// ScrubDNS provides an opportunity for cloud-provider-specific code to process DNS settings for pods.
 	ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string)
+	// HasClusterID returns true if a ClusterID is required and set
+	HasClusterID() bool
 }
 
 // Clusters is an abstract, pluggable interface for clusters of containers.
@@ -52,7 +59,7 @@ type Clusters interface {
 
 // TODO(#6812): Use a shorter name that's less likely to be longer than cloud
 // providers' name length limits.
-func GetLoadBalancerName(service *api.Service) string {
+func GetLoadBalancerName(service *v1.Service) string {
 	//GCE requires that the name of a load balancer starts with a lower case letter.
 	ret := "a" + string(service.UID)
 	ret = strings.Replace(ret, "-", "", -1)
@@ -63,7 +70,8 @@ func GetLoadBalancerName(service *api.Service) string {
 	return ret
 }
 
-func GetInstanceProviderID(cloud Interface, nodeName string) (string, error) {
+// GetInstanceProviderID builds a ProviderID for a node in a cloud.
+func GetInstanceProviderID(cloud Interface, nodeName types.NodeName) (string, error) {
 	instances, ok := cloud.Instances()
 	if !ok {
 		return "", fmt.Errorf("failed to get instances from cloud provider")
@@ -80,22 +88,28 @@ type LoadBalancer interface {
 	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 	// GetLoadBalancer returns whether the specified load balancer exists, and
 	// if so, what its status is.
-	// Implementations must treat the *api.Service parameter as read-only and not modify it.
-	GetLoadBalancer(service *api.Service) (status *api.LoadBalancerStatus, exists bool, err error)
+	// Implementations must treat the *v1.Service parameter as read-only and not modify it.
+	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
+	GetLoadBalancer(clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error)
 	// EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
-	// Implementations must treat the *api.Service parameter as read-only and not modify it.
-	EnsureLoadBalancer(service *api.Service, hosts []string) (*api.LoadBalancerStatus, error)
+	// Implementations must treat the *v1.Service and *v1.Node
+	// parameters as read-only and not modify them.
+	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
+	EnsureLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error)
 	// UpdateLoadBalancer updates hosts under the specified load balancer.
-	// Implementations must treat the *api.Service parameter as read-only and not modify it.
-	UpdateLoadBalancer(service *api.Service, hosts []string) error
+	// Implementations must treat the *v1.Service and *v1.Node
+	// parameters as read-only and not modify them.
+	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
+	UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error
 	// EnsureLoadBalancerDeleted deletes the specified load balancer if it
 	// exists, returning nil if the load balancer specified either didn't exist or
 	// was successfully deleted.
 	// This construction is useful because many cloud providers' load balancers
 	// have multiple underlying components, meaning a Get could say that the LB
 	// doesn't exist even if some part of it is still laying around.
-	// Implementations must treat the *api.Service parameter as read-only and not modify it.
-	EnsureLoadBalancerDeleted(service *api.Service) error
+	// Implementations must treat the *v1.Service parameter as read-only and not modify it.
+	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
+	EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error
 }
 
 // Instances is an abstract, pluggable interface for sets of instances.
@@ -104,23 +118,31 @@ type Instances interface {
 	// TODO(roberthbailey): This currently is only used in such a way that it
 	// returns the address of the calling instance. We should do a rename to
 	// make this clearer.
-	NodeAddresses(name string) ([]api.NodeAddress, error)
-	// ExternalID returns the cloud provider ID of the specified instance (deprecated).
-	ExternalID(name string) (string, error)
-	// InstanceID returns the cloud provider ID of the specified instance.
+	NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error)
+	// NodeAddressesByProviderID returns the addresses of the specified instance.
+	// The instance is specified using the providerID of the node. The
+	// ProviderID is a unique identifier of the node. This will not be called
+	// from the node whose nodeaddresses are being queried. i.e. local metadata
+	// services cannot be used in this method to obtain nodeaddresses
+	NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error)
+	// ExternalID returns the cloud provider ID of the node with the specified NodeName.
 	// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
-	InstanceID(name string) (string, error)
+	ExternalID(nodeName types.NodeName) (string, error)
+	// InstanceID returns the cloud provider ID of the node with the specified NodeName.
+	InstanceID(nodeName types.NodeName) (string, error)
 	// InstanceType returns the type of the specified instance.
-	// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
-	InstanceType(name string) (string, error)
-	// List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)
-	List(filter string) ([]string, error)
+	InstanceType(name types.NodeName) (string, error)
+	// InstanceTypeByProviderID returns the type of the specified instance.
+	InstanceTypeByProviderID(providerID string) (string, error)
 	// AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances
 	// expected format for the key is standard ssh-keygen format: <protocol> <blob>
 	AddSSHKeyToAllInstances(user string, keyData []byte) error
 	// CurrentNodeName returns the name of the node we are currently running on
 	// On most clouds (e.g. GCE) this is the hostname, so we provide the hostname
-	CurrentNodeName(hostname string) (string, error)
+	CurrentNodeName(hostname string) (types.NodeName, error)
+	// InstanceExistsByProviderID returns true if the instance for the given provider id still is running.
+	// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
+	InstanceExistsByProviderID(providerID string) (bool, error)
 }
 
 // Route is a representation of an advanced routing rule.
@@ -128,12 +150,14 @@ type Route struct {
 	// Name is the name of the routing rule in the cloud-provider.
 	// It will be ignored in a Create (although nameHint may influence it)
 	Name string
-	// TargetInstance is the name of the instance as specified in routing rules
-	// for the cloud-provider (in gce: the Instance Name).
-	TargetInstance string
+	// TargetNode is the NodeName of the target instance.
+	TargetNode types.NodeName
 	// DestinationCIDR is the CIDR format IP range that this routing rule
 	// applies to.
 	DestinationCIDR string
+	// Blackhole is set to true if this is a blackhole route
+	// The node controller will delete the route if it is in the managed range.
+	Blackhole bool
 }
 
 // Routes is an abstract, pluggable interface for advanced routing rules.
@@ -149,7 +173,11 @@ type Routes interface {
 	DeleteRoute(clusterName string, route *Route) error
 }
 
-var InstanceNotFound = errors.New("instance not found")
+var (
+	InstanceNotFound = errors.New("instance not found")
+	DiskNotFound     = errors.New("disk is not found")
+	NotImplemented   = errors.New("unimplemented")
+)
 
 // Zone represents the location of a particular machine.
 type Zone struct {
@@ -160,5 +188,23 @@ type Zone struct {
 // Zones is an abstract, pluggable interface for zone enumeration.
 type Zones interface {
 	// GetZone returns the Zone containing the current failure zone and locality region that the program is running in
+	// In most cases, this method is called from the kubelet querying a local metadata service to aquire its zone.
+	// For the case of external cloud providers, use GetZoneByProviderID or GetZoneByNodeName since GetZone
+	// can no longer be called from the kubelets.
 	GetZone() (Zone, error)
+
+	// GetZoneByProviderID returns the Zone containing the current zone and locality region of the node specified by providerId
+	// This method is particularly used in the context of external cloud providers where node initialization must be down
+	// outside the kubelets.
+	GetZoneByProviderID(providerID string) (Zone, error)
+
+	// GetZoneByNodeName returns the Zone containing the current zone and locality region of the node specified by node name
+	// This method is particularly used in the context of external cloud providers where node initialization must be down
+	// outside the kubelets.
+	GetZoneByNodeName(nodeName types.NodeName) (Zone, error)
+}
+
+// PVLabeler is an abstract, pluggable interface for fetching labels for volumes
+type PVLabeler interface {
+	GetLabelsForVolume(pv *v1.PersistentVolume) (map[string]string, error)
 }

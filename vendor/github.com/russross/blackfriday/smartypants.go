@@ -378,10 +378,12 @@ func smartypants(flags int) *smartypantsRenderer {
 	}
 	r['\''] = smartSingleQuote
 	r['('] = smartParens
-	if flags&HTML_SMARTYPANTS_LATEX_DASHES == 0 {
-		r['-'] = smartDash
-	} else {
-		r['-'] = smartDashLatex
+	if flags&HTML_SMARTYPANTS_DASHES != 0 {
+		if flags&HTML_SMARTYPANTS_LATEX_DASHES == 0 {
+			r['-'] = smartDash
+		} else {
+			r['-'] = smartDashLatex
+		}
 	}
 	r['.'] = smartPeriod
 	if flags&HTML_SMARTYPANTS_FRACTIONS == 0 {

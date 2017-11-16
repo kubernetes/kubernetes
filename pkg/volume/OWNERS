@@ -1,4 +1,17 @@
-assignees:
-  - saad-ali
-  - thockin
-  - pmorie
+approvers:
+- saad-ali
+- thockin
+- jsafrane
+- matchstick
+- rootfs
+- gnufied
+- childsb
+reviewers:
+- saad-ali
+- jsafrane
+- rootfs
+- jingxu97
+- msau42
+- gnufied
+- verult
+- davidz627

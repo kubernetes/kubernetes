@@ -39,7 +39,15 @@ type ContainerGCPolicy struct {
 // Implementation is thread-compatible.
 type ContainerGC interface {
 	// Garbage collect containers.
-	GarbageCollect(allSourcesReady bool) error
+	GarbageCollect() error
+	// Deletes all unused containers, including containers belonging to pods that are terminated but not deleted
+	DeleteAllUnusedContainers() error
+}
+
+// SourcesReadyProvider knows how to determine if configuration sources are ready
+type SourcesReadyProvider interface {
+	// AllReady returns true if the currently configured sources have all been seen.
+	AllReady() bool
 }
 
 // TODO(vmarmol): Preferentially remove pod infra containers.
@@ -49,20 +57,28 @@ type realContainerGC struct {
 
 	// Policy for garbage collection.
 	policy ContainerGCPolicy
+
+	// sourcesReadyProvider provides the readyness of kubelet configuration sources.
+	sourcesReadyProvider SourcesReadyProvider
 }
 
 // New ContainerGC instance with the specified policy.
-func NewContainerGC(runtime Runtime, policy ContainerGCPolicy) (ContainerGC, error) {
+func NewContainerGC(runtime Runtime, policy ContainerGCPolicy, sourcesReadyProvider SourcesReadyProvider) (ContainerGC, error) {
 	if policy.MinAge < 0 {
 		return nil, fmt.Errorf("invalid minimum garbage collection age: %v", policy.MinAge)
 	}
 
 	return &realContainerGC{
-		runtime: runtime,
-		policy:  policy,
+		runtime:              runtime,
+		policy:               policy,
+		sourcesReadyProvider: sourcesReadyProvider,
 	}, nil
 }
 
-func (cgc *realContainerGC) GarbageCollect(allSourcesReady bool) error {
-	return cgc.runtime.GarbageCollect(cgc.policy, allSourcesReady)
+func (cgc *realContainerGC) GarbageCollect() error {
+	return cgc.runtime.GarbageCollect(cgc.policy, cgc.sourcesReadyProvider.AllReady(), false)
+}
+
+func (cgc *realContainerGC) DeleteAllUnusedContainers() error {
+	return cgc.runtime.GarbageCollect(cgc.policy, cgc.sourcesReadyProvider.AllReady(), true)
 }

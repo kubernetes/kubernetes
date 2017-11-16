@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: exclusive-1
+spec:
+  containers:
+  - image: quay.io/connordoyle/cpuset-visualizer
+    name: exclusive-1
+    resources:
+      requests:
+        cpu: 1
+        memory: "256M"
+      limits:
+        cpu: 1
+        memory: "256M"

@@ -1,0 +1,14 @@
+repo: https://github.com/kubernetes/kubernetes.git
+includes:
+  - 'layer:metrics'
+  - 'layer:nagios'
+  - 'layer:nginx'
+  - 'layer:tls-client'
+  - 'interface:public-address'
+options:
+  tls-client:
+    ca_certificate_path: '/srv/kubernetes/ca.crt'
+    server_certificate_path: '/srv/kubernetes/server.crt'
+    server_key_path: '/srv/kubernetes/server.key'
+    client_certificate_path: '/srv/kubernetes/client.crt'
+    client_key_path: '/srv/kubernetes/client.key'

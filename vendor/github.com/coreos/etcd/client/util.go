@@ -1,4 +1,4 @@
-// Copyright 2016 CoreOS, Inc.
+// Copyright 2016 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,10 +14,40 @@
 
 package client
 
+import (
+	"regexp"
+)
+
+var (
+	roleNotFoundRegExp *regexp.Regexp
+	userNotFoundRegExp *regexp.Regexp
+)
+
+func init() {
+	roleNotFoundRegExp = regexp.MustCompile("auth: Role .* does not exist.")
+	userNotFoundRegExp = regexp.MustCompile("auth: User .* does not exist.")
+}
+
 // IsKeyNotFound returns true if the error code is ErrorCodeKeyNotFound.
 func IsKeyNotFound(err error) bool {
 	if cErr, ok := err.(Error); ok {
 		return cErr.Code == ErrorCodeKeyNotFound
+	}
+	return false
+}
+
+// IsRoleNotFound returns true if the error means role not found of v2 API.
+func IsRoleNotFound(err error) bool {
+	if ae, ok := err.(authError); ok {
+		return roleNotFoundRegExp.MatchString(ae.Message)
+	}
+	return false
+}
+
+// IsUserNotFound returns true if the error means user not found of v2 API.
+func IsUserNotFound(err error) bool {
+	if ae, ok := err.(authError); ok {
+		return userNotFoundRegExp.MatchString(ae.Message)
 	}
 	return false
 }

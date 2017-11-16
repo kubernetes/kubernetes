@@ -561,6 +561,13 @@ func (d *msgpackDecDriver) readNextBd() {
 	d.bdRead = true
 }
 
+func (d *msgpackDecDriver) uncacheRead() {
+	if d.bdRead {
+		d.r.unreadn1()
+		d.bdRead = false
+	}
+}
+
 func (d *msgpackDecDriver) ContainerType() (vt valueType) {
 	bd := d.bd
 	if bd == mpNil {

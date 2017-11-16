@@ -19,7 +19,7 @@ package openshift
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/genericapiserver"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/kubernetes/pkg/master"
 )
 
@@ -27,15 +27,16 @@ import (
 // are not referenced directly by a master.
 func TestMasterExportsSymbols(t *testing.T) {
 	_ = &master.Config{
-		Config: &genericapiserver.Config{
-			EnableUISupport:      false,
-			EnableSwaggerSupport: false,
-			RestfulContainer:     nil,
+		GenericConfig: &genericapiserver.Config{
+			EnableMetrics: true,
 		},
-		EnableCoreControllers: false,
+		ExtraConfig: master.ExtraConfig{
+			EnableCoreControllers: false,
+			EnableUISupport:       false,
+			EnableLogsSupport:     false,
+		},
 	}
-	m := &master.Master{
+	_ = &master.Master{
 		GenericAPIServer: &genericapiserver.GenericAPIServer{},
 	}
-	_ = (m).NewBootstrapController(master.EndpointReconcilerConfig{})
 }

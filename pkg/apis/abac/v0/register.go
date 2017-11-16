@@ -17,17 +17,46 @@ limitations under the License.
 package v0
 
 import (
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	api "k8s.io/kubernetes/pkg/apis/abac"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/apis/abac"
 )
 
+const GroupName = "abac.authorization.kubernetes.io"
+
 // GroupVersion is the API group and version for abac v0
-var GroupVersion = unversioned.GroupVersion{Group: api.Group, Version: "v0"}
+var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v0"}
 
 func init() {
-	api.Scheme.AddKnownTypes(GroupVersion,
-		&Policy{},
-	)
+	// TODO: Delete this init function, abac should not have its own scheme.
+	if err := addKnownTypes(abac.Scheme); err != nil {
+		// Programmer error.
+		panic(err)
+	}
+	if err := addConversionFuncs(abac.Scheme); err != nil {
+		// Programmer error.
+		panic(err)
+	}
 }
 
-func (obj *Policy) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+var (
+	// TODO: move SchemeBuilder with zz_generated.deepcopy.go to k8s.io/api.
+	// localSchemeBuilder and AddToScheme will stay in k8s.io/kubernetes.
+	SchemeBuilder      runtime.SchemeBuilder
+	localSchemeBuilder = &SchemeBuilder
+	AddToScheme        = localSchemeBuilder.AddToScheme
+)
+
+func init() {
+	// We only register manually written functions here. The registration of the
+	// generated functions takes place in the generated files. The separation
+	// makes the code compile even when the generated files are missing.
+	localSchemeBuilder.Register(addKnownTypes, addConversionFuncs)
+}
+
+func addKnownTypes(scheme *runtime.Scheme) error {
+	scheme.AddKnownTypes(SchemeGroupVersion,
+		&Policy{},
+	)
+	return nil
+}

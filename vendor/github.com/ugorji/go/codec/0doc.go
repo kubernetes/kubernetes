@@ -68,7 +68,7 @@ Rich Feature Set includes:
   - Encode/Decode from/to chan types (for iterative streaming support)
   - Drop-in replacement for encoding/json. `json:` key in struct tag supported.
   - Provides a RPC Server and Client Codec for net/rpc communication protocol.
-  - Handle unique idiosynchracies of codecs e.g. 
+  - Handle unique idiosyncrasies of codecs e.g. 
     - For messagepack, configure how ambiguities in handling raw bytes are resolved 
     - For messagepack, provide rpc server/client codec to support 
       msgpack-rpc protocol defined at:
@@ -181,7 +181,7 @@ package codec
 //   - Decoding using a chan is good, but incurs concurrency costs.
 //     This is because there's no fast way to use a channel without it
 //     having to switch goroutines constantly.
-//     Callback pattern is still the best. Maybe cnsider supporting something like:
+//     Callback pattern is still the best. Maybe consider supporting something like:
 //        type X struct {
 //             Name string
 //             Ys []Y

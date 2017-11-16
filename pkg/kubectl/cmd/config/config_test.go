@@ -26,10 +26,11 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	"k8s.io/kubernetes/pkg/util/diff"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 func newRedFederalCowHammerConfig() clientcmdapi.Config {
@@ -107,13 +108,30 @@ func TestSetCurrentContext(t *testing.T) {
 
 func TestSetNonExistentContext(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
+
 	test := configCommandTest{
-		args:            []string{"use-context", "non-existent-config"},
-		startingConfig:  expectedConfig,
-		expectedConfig:  expectedConfig,
-		expectedOutputs: []string{`no context exists with the name: "non-existent-config"`},
+		args:           []string{"use-context", "non-existent-config"},
+		startingConfig: expectedConfig,
+		expectedConfig: expectedConfig,
 	}
-	test.run(t)
+
+	func() {
+		defer func() {
+			// Restore cmdutil behavior.
+			cmdutil.DefaultBehaviorOnFatal()
+		}()
+
+		// Check exit code.
+		cmdutil.BehaviorOnFatal(func(e string, code int) {
+			if code != 1 {
+				t.Errorf("The exit code is %d, expected 1", code)
+			}
+			expectedOutputs := []string{`no context exists with the name: "non-existent-config"`}
+			test.checkOutput(e, expectedOutputs, t)
+		})
+
+		test.run(t)
+	}()
 }
 
 func TestSetIntoExistingStruct(t *testing.T) {
@@ -283,18 +301,33 @@ func TestEmbedClientKey(t *testing.T) {
 func TestEmbedNoKeyOrCertDisallowed(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
 	test := configCommandTest{
-		args:            []string{"set-credentials", "another-user", "--" + clientcmd.FlagEmbedCerts + "=true"},
-		startingConfig:  newRedFederalCowHammerConfig(),
-		expectedConfig:  expectedConfig,
-		expectedOutputs: []string{"--client-certificate", "--client-key", "embed"},
+		args:           []string{"set-credentials", "another-user", "--" + clientcmd.FlagEmbedCerts + "=true"},
+		startingConfig: newRedFederalCowHammerConfig(),
+		expectedConfig: expectedConfig,
 	}
 
-	test.run(t)
+	func() {
+		defer func() {
+			// Restore cmdutil behavior.
+			cmdutil.DefaultBehaviorOnFatal()
+		}()
+
+		// Check exit code.
+		cmdutil.BehaviorOnFatal(func(e string, code int) {
+			if code != 1 {
+				t.Errorf("The exit code is %d, expected 1", code)
+			}
+			expectedOutputs := []string{"--client-certificate", "--client-key", "embed"}
+			test.checkOutput(e, expectedOutputs, t)
+		})
+
+		test.run(t)
+	}()
 }
 
 func TestEmptyTokenAndCertAllowed(t *testing.T) {
 	fakeCertFile, _ := ioutil.TempFile("", "cert-file")
-
+	defer os.Remove(fakeCertFile.Name())
 	expectedConfig := newRedFederalCowHammerConfig()
 	authInfo := clientcmdapi.NewAuthInfo()
 	authInfo.ClientCertificate = path.Base(fakeCertFile.Name())
@@ -327,13 +360,29 @@ func TestTokenAndCertAllowed(t *testing.T) {
 func TestTokenAndBasicDisallowed(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
 	test := configCommandTest{
-		args:            []string{"set-credentials", "another-user", "--" + clientcmd.FlagUsername + "=myuser", "--" + clientcmd.FlagBearerToken + "=token"},
-		startingConfig:  newRedFederalCowHammerConfig(),
-		expectedConfig:  expectedConfig,
-		expectedOutputs: []string{"--token", "--username"},
+		args:           []string{"set-credentials", "another-user", "--" + clientcmd.FlagUsername + "=myuser", "--" + clientcmd.FlagBearerToken + "=token"},
+		startingConfig: newRedFederalCowHammerConfig(),
+		expectedConfig: expectedConfig,
 	}
 
-	test.run(t)
+	func() {
+		defer func() {
+			// Restore cmdutil behavior.
+			cmdutil.DefaultBehaviorOnFatal()
+		}()
+
+		// Check exit code.
+		cmdutil.BehaviorOnFatal(func(e string, code int) {
+			if code != 1 {
+				t.Errorf("The exit code is %d, expected 1", code)
+			}
+
+			expectedOutputs := []string{"--token", "--username"}
+			test.checkOutput(e, expectedOutputs, t)
+		})
+
+		test.run(t)
+	}()
 }
 
 func TestBasicClearsToken(t *testing.T) {
@@ -445,7 +494,21 @@ func TestSetBytesBad(t *testing.T) {
 		expectedConfig: startingConfig,
 	}
 
-	test.run(t)
+	func() {
+		defer func() {
+			// Restore cmdutil behavior.
+			cmdutil.DefaultBehaviorOnFatal()
+		}()
+
+		// Check exit code.
+		cmdutil.BehaviorOnFatal(func(e string, code int) {
+			if code != 1 {
+				t.Errorf("The exit code is %d, expected 1", code)
+			}
+		})
+
+		test.run(t)
+	}()
 }
 
 func TestSetBytes(t *testing.T) {
@@ -507,7 +570,7 @@ func TestUnsetBytes(t *testing.T) {
 
 func TestCAClearsInsecure(t *testing.T) {
 	fakeCAFile, _ := ioutil.TempFile("", "ca-file")
-
+	defer os.Remove(fakeCAFile.Name())
 	clusterInfoWithInsecure := clientcmdapi.NewCluster()
 	clusterInfoWithInsecure.InsecureSkipTLSVerify = true
 
@@ -604,24 +667,56 @@ func TestCADataClearsCA(t *testing.T) {
 func TestEmbedNoCADisallowed(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
 	test := configCommandTest{
-		args:            []string{"set-cluster", "another-cluster", "--" + clientcmd.FlagEmbedCerts + "=true"},
-		startingConfig:  newRedFederalCowHammerConfig(),
-		expectedConfig:  expectedConfig,
-		expectedOutputs: []string{"--certificate-authority", "embed"},
+		args:           []string{"set-cluster", "another-cluster", "--" + clientcmd.FlagEmbedCerts + "=true"},
+		startingConfig: newRedFederalCowHammerConfig(),
+		expectedConfig: expectedConfig,
 	}
 
-	test.run(t)
+	func() {
+		defer func() {
+			// Restore cmdutil behavior.
+			cmdutil.DefaultBehaviorOnFatal()
+		}()
+
+		// Check exit code.
+		cmdutil.BehaviorOnFatal(func(e string, code int) {
+			if code != 1 {
+				t.Errorf("The exit code is %d, expected 1", code)
+			}
+
+			expectedOutputs := []string{"--certificate-authority", "embed"}
+			test.checkOutput(e, expectedOutputs, t)
+		})
+
+		test.run(t)
+	}()
 }
 
 func TestCAAndInsecureDisallowed(t *testing.T) {
 	test := configCommandTest{
-		args:            []string{"set-cluster", "another-cluster", "--" + clientcmd.FlagCAFile + "=cafile", "--" + clientcmd.FlagInsecure + "=true"},
-		startingConfig:  newRedFederalCowHammerConfig(),
-		expectedConfig:  newRedFederalCowHammerConfig(),
-		expectedOutputs: []string{"certificate", "insecure"},
+		args:           []string{"set-cluster", "another-cluster", "--" + clientcmd.FlagCAFile + "=cafile", "--" + clientcmd.FlagInsecure + "=true"},
+		startingConfig: newRedFederalCowHammerConfig(),
+		expectedConfig: newRedFederalCowHammerConfig(),
 	}
 
-	test.run(t)
+	func() {
+		defer func() {
+			// Restore cmdutil behavior.
+			cmdutil.DefaultBehaviorOnFatal()
+		}()
+
+		// Check exit code.
+		cmdutil.BehaviorOnFatal(func(e string, code int) {
+			if code != 1 {
+				t.Errorf("The exit code is %d, expected 1", code)
+			}
+
+			expectedOutputs := []string{"certificate", "insecure"}
+			test.checkOutput(e, expectedOutputs, t)
+		})
+
+		test.run(t)
+	}()
 }
 
 func TestMergeExistingAuth(t *testing.T) {
@@ -770,7 +865,7 @@ func testConfigCommand(args []string, startingConfig clientcmdapi.Config, t *tes
 
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdConfig(clientcmd.NewDefaultPathOptions(), buf)
+	cmd := NewCmdConfig(clientcmd.NewDefaultPathOptions(), buf, buf)
 	cmd.SetArgs(argsToUse)
 	cmd.Execute()
 
@@ -787,6 +882,14 @@ type configCommandTest struct {
 	expectedOutputs []string
 }
 
+func (test configCommandTest) checkOutput(out string, expectedOutputs []string, t *testing.T) {
+	for _, expectedOutput := range expectedOutputs {
+		if !strings.Contains(out, expectedOutput) {
+			t.Errorf("expected '%s' in output, got '%s'", expectedOutput, out)
+		}
+	}
+}
+
 func (test configCommandTest) run(t *testing.T) string {
 	out, actualConfig := testConfigCommand(test.args, test.startingConfig, t)
 
@@ -794,16 +897,12 @@ func (test configCommandTest) run(t *testing.T) string {
 	testSetNilMapsToEmpties(reflect.ValueOf(&actualConfig))
 	testClearLocationOfOrigin(&actualConfig)
 
-	if !api.Semantic.DeepEqual(test.expectedConfig, actualConfig) {
+	if !apiequality.Semantic.DeepEqual(test.expectedConfig, actualConfig) {
 		t.Errorf("diff: %v", diff.ObjectDiff(test.expectedConfig, actualConfig))
 		t.Errorf("expected: %#v\n actual:   %#v", test.expectedConfig, actualConfig)
 	}
 
-	for _, expectedOutput := range test.expectedOutputs {
-		if !strings.Contains(out, expectedOutput) {
-			t.Errorf("expected '%s' in output, got '%s'", expectedOutput, out)
-		}
-	}
+	test.checkOutput(out, test.expectedOutputs, t)
 
 	return out
 }

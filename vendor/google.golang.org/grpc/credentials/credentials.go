@@ -40,11 +40,11 @@ package credentials
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"strings"
-	"time"
 
 	"golang.org/x/net/context"
 )
@@ -54,9 +54,9 @@ var (
 	alpnProtoStr = []string{"h2"}
 )
 
-// Credentials defines the common interface all supported credentials must
-// implement.
-type Credentials interface {
+// PerRPCCredentials defines the common interface for the credentials which need to
+// attach security information to every RPC (e.g., oauth2).
+type PerRPCCredentials interface {
 	// GetRequestMetadata gets the current request metadata, refreshing
 	// tokens if required. This should be called by the transport layer on
 	// each request, and the data should be populated in headers or other
@@ -66,13 +66,13 @@ type Credentials interface {
 	// TODO(zhaoq): Define the set of the qualified keys instead of leaving
 	// it as an arbitrary string.
 	GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error)
-	// RequireTransportSecurity indicates whether the credentails requires
+	// RequireTransportSecurity indicates whether the credentials requires
 	// transport security.
 	RequireTransportSecurity() bool
 }
 
 // ProtocolInfo provides information regarding the gRPC wire protocol version,
-// security protocol, security protocol version in use, etc.
+// security protocol, security protocol version in use, server name, etc.
 type ProtocolInfo struct {
 	// ProtocolVersion is the gRPC wire protocol version.
 	ProtocolVersion string
@@ -80,6 +80,8 @@ type ProtocolInfo struct {
 	SecurityProtocol string
 	// SecurityVersion is the security protocol version.
 	SecurityVersion string
+	// ServerName is the user-configured server name.
+	ServerName string
 }
 
 // AuthInfo defines the common interface for the auth information the users are interested in.
@@ -87,20 +89,36 @@ type AuthInfo interface {
 	AuthType() string
 }
 
-// TransportAuthenticator defines the common interface for all the live gRPC wire
+var (
+	// ErrConnDispatched indicates that rawConn has been dispatched out of gRPC
+	// and the caller should not close rawConn.
+	ErrConnDispatched = errors.New("credentials: rawConn is dispatched out of gRPC")
+)
+
+// TransportCredentials defines the common interface for all the live gRPC wire
 // protocols and supported transport security protocols (e.g., TLS, SSL).
-type TransportAuthenticator interface {
+type TransportCredentials interface {
 	// ClientHandshake does the authentication handshake specified by the corresponding
 	// authentication protocol on rawConn for clients. It returns the authenticated
 	// connection and the corresponding auth information about the connection.
-	ClientHandshake(addr string, rawConn net.Conn, timeout time.Duration) (net.Conn, AuthInfo, error)
+	// Implementations must use the provided context to implement timely cancellation.
+	// gRPC will try to reconnect if the error returned is a temporary error
+	// (io.EOF, context.DeadlineExceeded or err.Temporary() == true).
+	// If the returned error is a wrapper error, implementations should make sure that
+	// the error implements Temporary() to have the correct retry behaviors.
+	ClientHandshake(context.Context, string, net.Conn) (net.Conn, AuthInfo, error)
 	// ServerHandshake does the authentication handshake for servers. It returns
 	// the authenticated connection and the corresponding auth information about
 	// the connection.
-	ServerHandshake(rawConn net.Conn) (net.Conn, AuthInfo, error)
-	// Info provides the ProtocolInfo of this TransportAuthenticator.
+	ServerHandshake(net.Conn) (net.Conn, AuthInfo, error)
+	// Info provides the ProtocolInfo of this TransportCredentials.
 	Info() ProtocolInfo
-	Credentials
+	// Clone makes a copy of this TransportCredentials.
+	Clone() TransportCredentials
+	// OverrideServerName overrides the server name used to verify the hostname on the returned certificates from the server.
+	// gRPC internals also use it to override the virtual hosting name if it is set.
+	// It must be called before dialing. Currently, this is only used by grpclb.
+	OverrideServerName(string) error
 }
 
 // TLSInfo contains the auth information for a TLS authenticated connection.
@@ -109,6 +127,7 @@ type TLSInfo struct {
 	State tls.ConnectionState
 }
 
+// AuthType returns the type of TLSInfo as a string.
 func (t TLSInfo) AuthType() string {
 	return "tls"
 }
@@ -116,89 +135,78 @@ func (t TLSInfo) AuthType() string {
 // tlsCreds is the credentials required for authenticating a connection using TLS.
 type tlsCreds struct {
 	// TLS configuration
-	config tls.Config
+	config *tls.Config
 }
 
 func (c tlsCreds) Info() ProtocolInfo {
 	return ProtocolInfo{
 		SecurityProtocol: "tls",
 		SecurityVersion:  "1.2",
+		ServerName:       c.config.ServerName,
 	}
 }
 
-// GetRequestMetadata returns nil, nil since TLS credentials does not have
-// metadata.
-func (c *tlsCreds) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
-	return nil, nil
-}
-
-func (c *tlsCreds) RequireTransportSecurity() bool {
-	return true
-}
-
-type timeoutError struct{}
-
-func (timeoutError) Error() string   { return "credentials: Dial timed out" }
-func (timeoutError) Timeout() bool   { return true }
-func (timeoutError) Temporary() bool { return true }
-
-func (c *tlsCreds) ClientHandshake(addr string, rawConn net.Conn, timeout time.Duration) (_ net.Conn, _ AuthInfo, err error) {
-	// borrow some code from tls.DialWithDialer
-	var errChannel chan error
-	if timeout != 0 {
-		errChannel = make(chan error, 2)
-		time.AfterFunc(timeout, func() {
-			errChannel <- timeoutError{}
-		})
-	}
-	if c.config.ServerName == "" {
+func (c *tlsCreds) ClientHandshake(ctx context.Context, addr string, rawConn net.Conn) (_ net.Conn, _ AuthInfo, err error) {
+	// use local cfg to avoid clobbering ServerName if using multiple endpoints
+	cfg := cloneTLSConfig(c.config)
+	if cfg.ServerName == "" {
 		colonPos := strings.LastIndex(addr, ":")
 		if colonPos == -1 {
 			colonPos = len(addr)
 		}
-		c.config.ServerName = addr[:colonPos]
+		cfg.ServerName = addr[:colonPos]
 	}
-	conn := tls.Client(rawConn, &c.config)
-	if timeout == 0 {
-		err = conn.Handshake()
-	} else {
-		go func() {
-			errChannel <- conn.Handshake()
-		}()
-		err = <-errChannel
+	conn := tls.Client(rawConn, cfg)
+	errChannel := make(chan error, 1)
+	go func() {
+		errChannel <- conn.Handshake()
+	}()
+	select {
+	case err := <-errChannel:
+		if err != nil {
+			return nil, nil, err
+		}
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
 	}
-	if err != nil {
-		rawConn.Close()
-		return nil, nil, err
-	}
-	// TODO(zhaoq): Omit the auth info for client now. It is more for
-	// information than anything else.
-	return conn, nil, nil
+	return conn, TLSInfo{conn.ConnectionState()}, nil
 }
 
 func (c *tlsCreds) ServerHandshake(rawConn net.Conn) (net.Conn, AuthInfo, error) {
-	conn := tls.Server(rawConn, &c.config)
+	conn := tls.Server(rawConn, c.config)
 	if err := conn.Handshake(); err != nil {
-		rawConn.Close()
 		return nil, nil, err
 	}
 	return conn, TLSInfo{conn.ConnectionState()}, nil
 }
 
-// NewTLS uses c to construct a TransportAuthenticator based on TLS.
-func NewTLS(c *tls.Config) TransportAuthenticator {
-	tc := &tlsCreds{*c}
+func (c *tlsCreds) Clone() TransportCredentials {
+	return NewTLS(c.config)
+}
+
+func (c *tlsCreds) OverrideServerName(serverNameOverride string) error {
+	c.config.ServerName = serverNameOverride
+	return nil
+}
+
+// NewTLS uses c to construct a TransportCredentials based on TLS.
+func NewTLS(c *tls.Config) TransportCredentials {
+	tc := &tlsCreds{cloneTLSConfig(c)}
 	tc.config.NextProtos = alpnProtoStr
 	return tc
 }
 
 // NewClientTLSFromCert constructs a TLS from the input certificate for client.
-func NewClientTLSFromCert(cp *x509.CertPool, serverName string) TransportAuthenticator {
-	return NewTLS(&tls.Config{ServerName: serverName, RootCAs: cp})
+// serverNameOverride is for testing only. If set to a non empty string,
+// it will override the virtual host name of authority (e.g. :authority header field) in requests.
+func NewClientTLSFromCert(cp *x509.CertPool, serverNameOverride string) TransportCredentials {
+	return NewTLS(&tls.Config{ServerName: serverNameOverride, RootCAs: cp})
 }
 
 // NewClientTLSFromFile constructs a TLS from the input certificate file for client.
-func NewClientTLSFromFile(certFile, serverName string) (TransportAuthenticator, error) {
+// serverNameOverride is for testing only. If set to a non empty string,
+// it will override the virtual host name of authority (e.g. :authority header field) in requests.
+func NewClientTLSFromFile(certFile, serverNameOverride string) (TransportCredentials, error) {
 	b, err := ioutil.ReadFile(certFile)
 	if err != nil {
 		return nil, err
@@ -207,17 +215,17 @@ func NewClientTLSFromFile(certFile, serverName string) (TransportAuthenticator, 
 	if !cp.AppendCertsFromPEM(b) {
 		return nil, fmt.Errorf("credentials: failed to append certificates")
 	}
-	return NewTLS(&tls.Config{ServerName: serverName, RootCAs: cp}), nil
+	return NewTLS(&tls.Config{ServerName: serverNameOverride, RootCAs: cp}), nil
 }
 
 // NewServerTLSFromCert constructs a TLS from the input certificate for server.
-func NewServerTLSFromCert(cert *tls.Certificate) TransportAuthenticator {
+func NewServerTLSFromCert(cert *tls.Certificate) TransportCredentials {
 	return NewTLS(&tls.Config{Certificates: []tls.Certificate{*cert}})
 }
 
 // NewServerTLSFromFile constructs a TLS from the input certificate file and key
 // file for server.
-func NewServerTLSFromFile(certFile, keyFile string) (TransportAuthenticator, error) {
+func NewServerTLSFromFile(certFile, keyFile string) (TransportCredentials, error) {
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
 		return nil, err

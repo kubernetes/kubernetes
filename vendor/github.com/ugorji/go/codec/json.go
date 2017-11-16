@@ -197,12 +197,20 @@ func (e *jsonEncDriver) EncodeBool(b bool) {
 }
 
 func (e *jsonEncDriver) EncodeFloat32(f float32) {
-	e.w.writeb(strconv.AppendFloat(e.b[:0], float64(f), 'E', -1, 32))
+	e.encodeFloat(float64(f), 32)
 }
 
 func (e *jsonEncDriver) EncodeFloat64(f float64) {
 	// e.w.writestr(strconv.FormatFloat(f, 'E', -1, 64))
-	e.w.writeb(strconv.AppendFloat(e.b[:0], f, 'E', -1, 64))
+	e.encodeFloat(f, 64)
+}
+
+func (e *jsonEncDriver) encodeFloat(f float64, numbits int) {
+	x := strconv.AppendFloat(e.b[:0], f, 'G', -1, numbits)
+	e.w.writeb(x)
+	if bytes.IndexByte(x, 'E') == -1 && bytes.IndexByte(x, '.') == -1 {
+		e.w.writen2('.', '0')
+	}
 }
 
 func (e *jsonEncDriver) EncodeInt(v int64) {
@@ -923,6 +931,11 @@ func (d *jsonDecDriver) DecodeBytes(bs []byte, isstring, zerocopy bool) (bsOut [
 	if isstring {
 		return d.bs
 	}
+	// if appendStringAsBytes returned a zero-len slice, then treat as nil.
+	// This should only happen for null, and "".
+	if len(d.bs) == 0 {
+		return nil
+	}
 	bs0 := d.bs
 	slen := base64.StdEncoding.DecodedLen(len(bs0))
 	if slen <= cap(bs) {
@@ -960,6 +973,14 @@ func (d *jsonDecDriver) appendStringAsBytes() {
 		}
 		d.tok = b
 	}
+
+	// handle null as a string
+	if d.tok == 'n' {
+		d.readStrIdx(10, 13) // ull
+		d.bs = d.bs[:0]
+		return
+	}
+
 	if d.tok != '"' {
 		d.d.errorf("json: expect char '%c' but got char '%c'", '"', d.tok)
 	}

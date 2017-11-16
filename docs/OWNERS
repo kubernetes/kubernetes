@@ -1,5 +1,9 @@
-assignees:
-  - bgrant0607
+reviewers:
   - brendandburns
   - smarterclayton
   - thockin
+approvers:
+  - brendandburns
+  - smarterclayton
+  - thockin
+  - pwittrock

@@ -1,0 +1,37 @@
+kind: Deployment
+apiVersion: extensions/v1beta1
+metadata:
+  name: calico-node-vertical-autoscaler
+  namespace: kube-system
+  labels:
+    k8s-app: calico-node-autoscaler
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        k8s-app: calico-node-autoscaler
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+    spec:
+      containers:
+        - image: gcr.io/google_containers/cpvpa-amd64:v0.6.0
+          name: autoscaler
+          command:
+            - /cpvpa
+            - --target=daemonset/calico-node
+            - --namespace=kube-system
+            - --logtostderr=true
+            - --poll-period-seconds=30
+            - --v=2
+            - --config-file=/etc/config/node-autoscaler
+          volumeMounts:
+            - name: config
+              mountPath: /etc/config
+      volumes:
+        - name: config
+          configMap:
+            name: calico-node-vertical-autoscaler
+      serviceAccountName: calico-cpva

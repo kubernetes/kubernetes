@@ -19,9 +19,9 @@ IMAGE = example-dns-backend
 all: push
 
 image:
-	docker build -t $(PREFIX)/$(IMAGE):$(TAG) .
+	docker build --pull -t $(PREFIX)/$(IMAGE):$(TAG) .
 
 push: image
-	gcloud docker push $(PREFIX)/$(IMAGE)
+	gcloud docker -- push $(PREFIX)/$(IMAGE)
 
 clean:

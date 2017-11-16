@@ -1,6 +1,7 @@
 # OAuth2 for Go
 
 [![Build Status](https://travis-ci.org/golang/oauth2.svg?branch=master)](https://travis-ci.org/golang/oauth2)
+[![GoDoc](https://godoc.org/golang.org/x/oauth2?status.svg)](https://godoc.org/golang.org/x/oauth2)
 
 oauth2 package contains a client implementation for OAuth 2.0 spec.
 
@@ -62,3 +63,12 @@ with the `oauth2` package.
 		client.Get("...")
 	}
 
+## Contributing
+
+We appreciate your help!
+
+To contribute, please read the contribution guidelines:
+	https://golang.org/doc/contribute.html
+
+Note that the Go project does not use GitHub pull requests but
+uses Gerrit for code reviews. See the contribution guide for details.

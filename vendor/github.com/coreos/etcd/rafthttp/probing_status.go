@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ var (
 	// Or the connection will time-out.
 	proberInterval           = ConnReadTimeout - time.Second
 	statusMonitoringInterval = 30 * time.Second
+	statusErrorInterval      = 5 * time.Second
 )
 
 func addPeerToProber(p probing.Prober, id string, us []string) {
@@ -44,15 +45,21 @@ func addPeerToProber(p probing.Prober, id string, us []string) {
 }
 
 func monitorProbingStatus(s probing.Status, id string) {
+	// set the first interval short to log error early.
+	interval := statusErrorInterval
 	for {
 		select {
-		case <-time.After(statusMonitoringInterval):
+		case <-time.After(interval):
 			if !s.Health() {
-				plog.Warningf("the connection to peer %s is unhealthy", id)
+				plog.Warningf("health check for peer %s could not connect: %v", id, s.Err())
+				interval = statusErrorInterval
+			} else {
+				interval = statusMonitoringInterval
 			}
 			if s.ClockDiff() > time.Second {
 				plog.Warningf("the clock difference against peer %s is too high [%v > %v]", id, s.ClockDiff(), time.Second)
 			}
+			rtts.WithLabelValues(id).Observe(s.SRTT().Seconds())
 		case <-s.StopNotify():
 			return
 		}

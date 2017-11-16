@@ -19,21 +19,28 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 	"sort"
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
-func NewCmdApiVersions(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+var (
+	apiversionsExample = templates.Examples(i18n.T(`
+		# Print the supported API versions
+		kubectl api-versions`))
+)
+
+func NewCmdApiVersions(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "api-versions",
-		// apiversions is deprecated.
-		Aliases: []string{"apiversions"},
+		Use:     "api-versions",
 		Short:   "Print the supported API versions on the server, in the form of \"group/version\"",
+		Long:    "Print the supported API versions on the server, in the form of \"group/version\"",
+		Example: apiversionsExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunApiVersions(f, out)
 			cmdutil.CheckErr(err)
@@ -42,21 +49,20 @@ func NewCmdApiVersions(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunApiVersions(f *cmdutil.Factory, w io.Writer) error {
-	if len(os.Args) > 1 && os.Args[1] == "apiversions" {
-		printDeprecationWarning("api-versions", "apiversions")
-	}
-
-	client, err := f.Client()
+func RunApiVersions(f cmdutil.Factory, w io.Writer) error {
+	discoveryclient, err := f.DiscoveryClient()
 	if err != nil {
 		return err
 	}
 
-	groupList, err := client.Discovery().ServerGroups()
+	// Always request fresh data from the server
+	discoveryclient.Invalidate()
+
+	groupList, err := discoveryclient.ServerGroups()
 	if err != nil {
 		return fmt.Errorf("Couldn't get available api versions from server: %v\n", err)
 	}
-	apiVersions := unversioned.ExtractGroupVersions(groupList)
+	apiVersions := metav1.ExtractGroupVersions(groupList)
 	sort.Strings(apiVersions)
 	for _, v := range apiVersions {
 		fmt.Fprintln(w, v)

@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 type Wait interface {
 	Register(id uint64) <-chan interface{}
 	Trigger(id uint64, x interface{})
+	IsRegistered(id uint64) bool
 }
 
 type List struct {
@@ -59,6 +60,13 @@ func (w *List) Trigger(id uint64, x interface{}) {
 	}
 }
 
+func (w *List) IsRegistered(id uint64) bool {
+	w.l.Lock()
+	defer w.l.Unlock()
+	_, ok := w.m[id]
+	return ok
+}
+
 type waitWithResponse struct {
 	ch <-chan interface{}
 }
@@ -71,3 +79,6 @@ func (w *waitWithResponse) Register(id uint64) <-chan interface{} {
 	return w.ch
 }
 func (w *waitWithResponse) Trigger(id uint64, x interface{}) {}
+func (w *waitWithResponse) IsRegistered(id uint64) bool {
+	panic("waitWithResponse.IsRegistered() shouldn't be called")
+}

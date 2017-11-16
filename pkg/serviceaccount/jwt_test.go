@@ -17,17 +17,15 @@ limitations under the License.
 package serviceaccount_test
 
 import (
-	"crypto/rsa"
-	"io/ioutil"
-	"os"
 	"reflect"
 	"testing"
 
-	"github.com/dgrijalva/jwt-go"
-
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
+	certutil "k8s.io/client-go/util/cert"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
@@ -42,7 +40,7 @@ gPZm7ZsipmfbZK2Tkhnpsa4QxDg7zHJPMsB5kxRXW0cQipXcC3baDyN9KBApNXa0
 PwIDAQAB
 -----END PUBLIC KEY-----`
 
-const publicKey = `-----BEGIN PUBLIC KEY-----
+const rsaPublicKey = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA249XwEo9k4tM8fMxV7zx
 OhcrP+WvXn917koM5Qr2ZXs4vo26e4ytdlrV0bQ9SlcLpQVSYjIxNfhTZdDt+ecI
 zshKuv1gKIxbbLQMOuK1eA/4HALyEkFgmS/tleLJrhc65tKPMGD+pKQ/xhmzRuCG
@@ -53,7 +51,7 @@ WwIDAQAB
 -----END PUBLIC KEY-----
 `
 
-const privateKey = `-----BEGIN RSA PRIVATE KEY-----
+const rsaPrivateKey = `-----BEGIN RSA PRIVATE KEY-----
 MIIEowIBAAKCAQEA249XwEo9k4tM8fMxV7zxOhcrP+WvXn917koM5Qr2ZXs4vo26
 e4ytdlrV0bQ9SlcLpQVSYjIxNfhTZdDt+ecIzshKuv1gKIxbbLQMOuK1eA/4HALy
 EkFgmS/tleLJrhc65tKPMGD+pKQ/xhmzRuCG51RoiMgbQxaCyYxGfNLpLAZK9L0T
@@ -82,85 +80,94 @@ X024wzbiw1q07jFCyfQmODzURAx1VNT7QVUMdz/N8vy47/H40AZJ
 -----END RSA PRIVATE KEY-----
 `
 
-func getPrivateKey(data string) *rsa.PrivateKey {
-	key, _ := jwt.ParseRSAPrivateKeyFromPEM([]byte(data))
+// openssl ecparam -name prime256v1 -genkey -out ecdsa256params.pem
+const ecdsaPrivateKeyWithParams = `-----BEGIN EC PARAMETERS-----
+BggqhkjOPQMBBw==
+-----END EC PARAMETERS-----
+-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIJ9LWDj3ZWe9CksPV7mZjD2dYXG9icfzxadCRwd3vr1toAoGCCqGSM49
+AwEHoUQDQgAEaLNEpzbaaNTCkKjBVj7sxpfJ1ifJQGNvcck4nrzcwFRuujwVDDJh
+95iIGwKCQeSg+yhdN6Q/p2XaxNIZlYmUhg==
+-----END EC PRIVATE KEY-----
+`
+
+// openssl ecparam -name prime256v1 -genkey -noout -out ecdsa256.pem
+const ecdsaPrivateKey = `-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIEZmTmUhuanLjPA2CLquXivuwBDHTt5XYwgIr/kA1LtRoAoGCCqGSM49
+AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
+/IR3qCXyThP/dbCiHrF3v1cuhBOHY8CLVg==
+-----END EC PRIVATE KEY-----`
+
+// openssl ec -in ecdsa256.pem -pubout -out ecdsa256pub.pem
+const ecdsaPublicKey = `-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPL
+X2i8uIp/C/ASqiIGUeeKQtX0/IR3qCXyThP/dbCiHrF3v1cuhBOHY8CLVg==
+-----END PUBLIC KEY-----`
+
+func getPrivateKey(data string) interface{} {
+	key, _ := certutil.ParsePrivateKeyPEM([]byte(data))
 	return key
 }
 
-func getPublicKey(data string) *rsa.PublicKey {
-	key, _ := jwt.ParseRSAPublicKeyFromPEM([]byte(data))
-	return key
+func getPublicKey(data string) interface{} {
+	keys, _ := certutil.ParsePublicKeysPEM([]byte(data))
+	return keys[0]
 }
-
-func TestReadPrivateKey(t *testing.T) {
-	f, err := ioutil.TempFile("", "")
-	if err != nil {
-		t.Fatalf("error creating tmpfile: %v", err)
-	}
-	defer os.Remove(f.Name())
-
-	if err := ioutil.WriteFile(f.Name(), []byte(privateKey), os.FileMode(0600)); err != nil {
-		t.Fatalf("error writing private key to tmpfile: %v", err)
-	}
-
-	if _, err := serviceaccount.ReadPrivateKey(f.Name()); err != nil {
-		t.Fatalf("error reading private key: %v", err)
-	}
-}
-
-func TestReadPublicKey(t *testing.T) {
-	f, err := ioutil.TempFile("", "")
-	if err != nil {
-		t.Fatalf("error creating tmpfile: %v", err)
-	}
-	defer os.Remove(f.Name())
-
-	if err := ioutil.WriteFile(f.Name(), []byte(publicKey), os.FileMode(0600)); err != nil {
-		t.Fatalf("error writing public key to tmpfile: %v", err)
-	}
-
-	if _, err := serviceaccount.ReadPublicKey(f.Name()); err != nil {
-		t.Fatalf("error reading public key: %v", err)
-	}
-}
-
 func TestTokenGenerateAndValidate(t *testing.T) {
 	expectedUserName := "system:serviceaccount:test:my-service-account"
 	expectedUserUID := "12345"
 
 	// Related API objects
-	serviceAccount := &api.ServiceAccount{
-		ObjectMeta: api.ObjectMeta{
+	serviceAccount := &v1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "my-service-account",
 			UID:       "12345",
 			Namespace: "test",
 		},
 	}
-	secret := &api.Secret{
-		ObjectMeta: api.ObjectMeta{
-			Name:      "my-secret",
+	rsaSecret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-rsa-secret",
+			Namespace: "test",
+		},
+	}
+	ecdsaSecret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-ecdsa-secret",
 			Namespace: "test",
 		},
 	}
 
-	// Generate the token
-	generator := serviceaccount.JWTTokenGenerator(getPrivateKey(privateKey))
-	token, err := generator.GenerateToken(*serviceAccount, *secret)
+	// Generate the RSA token
+	rsaGenerator := serviceaccount.JWTTokenGenerator(getPrivateKey(rsaPrivateKey))
+	rsaToken, err := rsaGenerator.GenerateToken(*serviceAccount, *rsaSecret)
 	if err != nil {
 		t.Fatalf("error generating token: %v", err)
 	}
-	if len(token) == 0 {
+	if len(rsaToken) == 0 {
 		t.Fatalf("no token generated")
 	}
+	rsaSecret.Data = map[string][]byte{
+		"token": []byte(rsaToken),
+	}
 
-	// "Save" the token
-	secret.Data = map[string][]byte{
-		"token": []byte(token),
+	// Generate the ECDSA token
+	ecdsaGenerator := serviceaccount.JWTTokenGenerator(getPrivateKey(ecdsaPrivateKey))
+	ecdsaToken, err := ecdsaGenerator.GenerateToken(*serviceAccount, *ecdsaSecret)
+	if err != nil {
+		t.Fatalf("error generating token: %v", err)
+	}
+	if len(ecdsaToken) == 0 {
+		t.Fatalf("no token generated")
+	}
+	ecdsaSecret.Data = map[string][]byte{
+		"token": []byte(ecdsaToken),
 	}
 
 	testCases := map[string]struct {
 		Client clientset.Interface
-		Keys   []*rsa.PublicKey
+		Keys   []interface{}
+		Token  string
 
 		ExpectedErr      bool
 		ExpectedOK       bool
@@ -169,29 +176,60 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 		ExpectedGroups   []string
 	}{
 		"no keys": {
+			Token:       rsaToken,
 			Client:      nil,
-			Keys:        []*rsa.PublicKey{},
+			Keys:        []interface{}{},
 			ExpectedErr: false,
 			ExpectedOK:  false,
 		},
-		"invalid keys": {
+		"invalid keys (rsa)": {
+			Token:       rsaToken,
 			Client:      nil,
-			Keys:        []*rsa.PublicKey{getPublicKey(otherPublicKey)},
+			Keys:        []interface{}{getPublicKey(otherPublicKey), getPublicKey(ecdsaPublicKey)},
 			ExpectedErr: true,
 			ExpectedOK:  false,
 		},
-		"valid key": {
+		"invalid keys (ecdsa)": {
+			Token:       ecdsaToken,
+			Client:      nil,
+			Keys:        []interface{}{getPublicKey(otherPublicKey), getPublicKey(rsaPublicKey)},
+			ExpectedErr: true,
+			ExpectedOK:  false,
+		},
+		"valid key (rsa)": {
+			Token:            rsaToken,
 			Client:           nil,
-			Keys:             []*rsa.PublicKey{getPublicKey(publicKey)},
+			Keys:             []interface{}{getPublicKey(rsaPublicKey)},
 			ExpectedErr:      false,
 			ExpectedOK:       true,
 			ExpectedUserName: expectedUserName,
 			ExpectedUserUID:  expectedUserUID,
 			ExpectedGroups:   []string{"system:serviceaccounts", "system:serviceaccounts:test"},
 		},
-		"rotated keys": {
+		"valid key (ecdsa)": {
+			Token:            ecdsaToken,
 			Client:           nil,
-			Keys:             []*rsa.PublicKey{getPublicKey(otherPublicKey), getPublicKey(publicKey)},
+			Keys:             []interface{}{getPublicKey(ecdsaPublicKey)},
+			ExpectedErr:      false,
+			ExpectedOK:       true,
+			ExpectedUserName: expectedUserName,
+			ExpectedUserUID:  expectedUserUID,
+			ExpectedGroups:   []string{"system:serviceaccounts", "system:serviceaccounts:test"},
+		},
+		"rotated keys (rsa)": {
+			Token:            rsaToken,
+			Client:           nil,
+			Keys:             []interface{}{getPublicKey(otherPublicKey), getPublicKey(ecdsaPublicKey), getPublicKey(rsaPublicKey)},
+			ExpectedErr:      false,
+			ExpectedOK:       true,
+			ExpectedUserName: expectedUserName,
+			ExpectedUserUID:  expectedUserUID,
+			ExpectedGroups:   []string{"system:serviceaccounts", "system:serviceaccounts:test"},
+		},
+		"rotated keys (ecdsa)": {
+			Token:            ecdsaToken,
+			Client:           nil,
+			Keys:             []interface{}{getPublicKey(otherPublicKey), getPublicKey(rsaPublicKey), getPublicKey(ecdsaPublicKey)},
 			ExpectedErr:      false,
 			ExpectedOK:       true,
 			ExpectedUserName: expectedUserName,
@@ -199,8 +237,9 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			ExpectedGroups:   []string{"system:serviceaccounts", "system:serviceaccounts:test"},
 		},
 		"valid lookup": {
-			Client:           fake.NewSimpleClientset(serviceAccount, secret),
-			Keys:             []*rsa.PublicKey{getPublicKey(publicKey)},
+			Token:            rsaToken,
+			Client:           fake.NewSimpleClientset(serviceAccount, rsaSecret, ecdsaSecret),
+			Keys:             []interface{}{getPublicKey(rsaPublicKey)},
 			ExpectedErr:      false,
 			ExpectedOK:       true,
 			ExpectedUserName: expectedUserName,
@@ -208,14 +247,16 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			ExpectedGroups:   []string{"system:serviceaccounts", "system:serviceaccounts:test"},
 		},
 		"invalid secret lookup": {
+			Token:       rsaToken,
 			Client:      fake.NewSimpleClientset(serviceAccount),
-			Keys:        []*rsa.PublicKey{getPublicKey(publicKey)},
+			Keys:        []interface{}{getPublicKey(rsaPublicKey)},
 			ExpectedErr: true,
 			ExpectedOK:  false,
 		},
 		"invalid serviceaccount lookup": {
-			Client:      fake.NewSimpleClientset(secret),
-			Keys:        []*rsa.PublicKey{getPublicKey(publicKey)},
+			Token:       rsaToken,
+			Client:      fake.NewSimpleClientset(rsaSecret, ecdsaSecret),
+			Keys:        []interface{}{getPublicKey(rsaPublicKey)},
 			ExpectedErr: true,
 			ExpectedOK:  false,
 		},
@@ -225,7 +266,13 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 		getter := serviceaccountcontroller.NewGetterFromClient(tc.Client)
 		authenticator := serviceaccount.JWTTokenAuthenticator(tc.Keys, tc.Client != nil, getter)
 
-		user, ok, err := authenticator.AuthenticateToken(token)
+		// An invalid, non-JWT token should always fail
+		if _, ok, err := authenticator.AuthenticateToken("invalid token"); err != nil || ok {
+			t.Errorf("%s: Expected err=nil, ok=false for non-JWT token", k)
+			continue
+		}
+
+		user, ok, err := authenticator.AuthenticateToken(tc.Token)
 		if (err != nil) != tc.ExpectedErr {
 			t.Errorf("%s: Expected error=%v, got %v", k, tc.ExpectedErr, err)
 			continue
@@ -256,8 +303,8 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 }
 
 func TestMakeSplitUsername(t *testing.T) {
-	username := serviceaccount.MakeUsername("ns", "name")
-	ns, name, err := serviceaccount.SplitUsername(username)
+	username := apiserverserviceaccount.MakeUsername("ns", "name")
+	ns, name, err := apiserverserviceaccount.SplitUsername(username)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -267,7 +314,7 @@ func TestMakeSplitUsername(t *testing.T) {
 
 	invalid := []string{"test", "system:serviceaccount", "system:serviceaccount:", "system:serviceaccount:ns", "system:serviceaccount:ns:name:extra"}
 	for _, n := range invalid {
-		_, _, err := serviceaccount.SplitUsername("test")
+		_, _, err := apiserverserviceaccount.SplitUsername("test")
 		if err == nil {
 			t.Errorf("Expected error for %s", n)
 		}

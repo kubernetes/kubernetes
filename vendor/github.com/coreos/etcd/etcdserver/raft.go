@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@ package etcdserver
 import (
 	"encoding/json"
 	"expvar"
-	"os"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -99,18 +98,25 @@ type raftNode struct {
 	// last lead elected time
 	lt time.Time
 
+	// to check if msg receiver is removed from cluster
+	isIDRemoved func(id uint64) bool
+
 	raft.Node
+
+	// a chan to send/receive snapshot
+	msgSnapC chan raftpb.Message
 
 	// a chan to send out apply
 	applyc chan apply
 
-	// TODO: remove the etcdserver related logic from raftNode
-	// TODO: add a state machine interface to apply the commit entries
-	// and do snapshot/recover
-	s *EtcdServer
+	// a chan to send out readState
+	readStateC chan raft.ReadState
 
 	// utility
-	ticker      <-chan time.Time
+	ticker <-chan time.Time
+	// contention detectors for raft heartbeat message
+	td          *contention.TimeoutDetector
+	heartbeat   time.Duration // for logging
 	raftStorage *raft.MemoryStorage
 	storage     Storage
 	// transport specifies the transport to send and receive msgs to members.
@@ -119,32 +125,19 @@ type raftNode struct {
 	// If transport is nil, server will panic.
 	transport rafthttp.Transporter
 
-	td *contention.TimeoutDetector
-
 	stopped chan struct{}
 	done    chan struct{}
 }
 
 // start prepares and starts raftNode in a new goroutine. It is no longer safe
 // to modify the fields after it has been started.
-// TODO: Ideally raftNode should get rid of the passed in server structure.
-func (r *raftNode) start(s *EtcdServer) {
-	r.s = s
+func (r *raftNode) start(rh *raftReadyHandler) {
 	r.applyc = make(chan apply)
 	r.stopped = make(chan struct{})
 	r.done = make(chan struct{})
-
-	heartbeat := 200 * time.Millisecond
-	if s.cfg != nil {
-		heartbeat = time.Duration(s.cfg.TickMs) * time.Millisecond
-	}
-	// set up contention detectors for raft heartbeat message.
-	// expect to send a heartbeat within 2 heartbeat intervals.
-	r.td = contention.NewTimeoutDetector(2 * heartbeat)
+	internalTimeout := time.Second
 
 	go func() {
-		var syncC <-chan time.Time
-
 		defer r.onStop()
 		islead := false
 
@@ -158,34 +151,27 @@ func (r *raftNode) start(s *EtcdServer) {
 						r.mu.Lock()
 						r.lt = time.Now()
 						r.mu.Unlock()
+						leaderChanges.Inc()
 					}
-					atomic.StoreUint64(&r.lead, rd.SoftState.Lead)
-					if rd.RaftState == raft.StateLeader {
-						islead = true
-						// TODO: raft should send server a notification through chan when
-						// it promotes or demotes instead of modifying server directly.
-						syncC = r.s.SyncTicker
-						if r.s.lessor != nil {
-							r.s.lessor.Promote(r.s.cfg.electionTimeout())
-						}
-						// TODO: remove the nil checking
-						// current test utility does not provide the stats
-						if r.s.stats != nil {
-							r.s.stats.BecomeLeader()
-						}
-						if r.s.compactor != nil {
-							r.s.compactor.Resume()
-						}
-						r.td.Reset()
+
+					if rd.SoftState.Lead == raft.None {
+						hasLeader.Set(0)
 					} else {
-						islead = false
-						if r.s.lessor != nil {
-							r.s.lessor.Demote()
-						}
-						if r.s.compactor != nil {
-							r.s.compactor.Pause()
-						}
-						syncC = nil
+						hasLeader.Set(1)
+					}
+
+					atomic.StoreUint64(&r.lead, rd.SoftState.Lead)
+					islead = rd.RaftState == raft.StateLeader
+					rh.updateLeadership()
+				}
+
+				if len(rd.ReadStates) != 0 {
+					select {
+					case r.readStateC <- rd.ReadStates[len(rd.ReadStates)-1]:
+					case <-time.After(internalTimeout):
+						plog.Warningf("timed out sending read state")
+					case <-r.stopped:
+						return
 					}
 				}
 
@@ -195,6 +181,8 @@ func (r *raftNode) start(s *EtcdServer) {
 					snapshot: rd.Snapshot,
 					raftDone: raftDone,
 				}
+
+				updateCommittedIndex(&ap, rh)
 
 				select {
 				case r.applyc <- ap:
@@ -206,33 +194,96 @@ func (r *raftNode) start(s *EtcdServer) {
 				// writing to their disks.
 				// For more details, check raft thesis 10.2.1
 				if islead {
-					r.s.send(rd.Messages)
+					// gofail: var raftBeforeLeaderSend struct{}
+					r.sendMessages(rd.Messages)
 				}
 
-				if !raft.IsEmptySnap(rd.Snapshot) {
-					if err := r.storage.SaveSnap(rd.Snapshot); err != nil {
-						plog.Fatalf("raft save snapshot error: %v", err)
-					}
-					r.raftStorage.ApplySnapshot(rd.Snapshot)
-					plog.Infof("raft applied incoming snapshot at index %d", rd.Snapshot.Metadata.Index)
-				}
+				// gofail: var raftBeforeSave struct{}
 				if err := r.storage.Save(rd.HardState, rd.Entries); err != nil {
 					plog.Fatalf("raft save state and entries error: %v", err)
 				}
+				if !raft.IsEmptyHardState(rd.HardState) {
+					proposalsCommitted.Set(float64(rd.HardState.Commit))
+				}
+				// gofail: var raftAfterSave struct{}
+
+				if !raft.IsEmptySnap(rd.Snapshot) {
+					// gofail: var raftBeforeSaveSnap struct{}
+					if err := r.storage.SaveSnap(rd.Snapshot); err != nil {
+						plog.Fatalf("raft save snapshot error: %v", err)
+					}
+					// gofail: var raftAfterSaveSnap struct{}
+					r.raftStorage.ApplySnapshot(rd.Snapshot)
+					plog.Infof("raft applied incoming snapshot at index %d", rd.Snapshot.Metadata.Index)
+					// gofail: var raftAfterApplySnap struct{}
+				}
+
 				r.raftStorage.Append(rd.Entries)
 
 				if !islead {
-					r.s.send(rd.Messages)
+					// gofail: var raftBeforeFollowerSend struct{}
+					r.sendMessages(rd.Messages)
 				}
 				raftDone <- struct{}{}
 				r.Advance()
-			case <-syncC:
-				r.s.sync(r.s.cfg.ReqTimeout())
 			case <-r.stopped:
 				return
 			}
 		}
 	}()
+}
+
+func updateCommittedIndex(ap *apply, rh *raftReadyHandler) {
+	var ci uint64
+	if len(ap.entries) != 0 {
+		ci = ap.entries[len(ap.entries)-1].Index
+	}
+	if ap.snapshot.Metadata.Index > ci {
+		ci = ap.snapshot.Metadata.Index
+	}
+	if ci != 0 {
+		rh.updateCommittedIndex(ci)
+	}
+}
+
+func (r *raftNode) sendMessages(ms []raftpb.Message) {
+	sentAppResp := false
+	for i := len(ms) - 1; i >= 0; i-- {
+		if r.isIDRemoved(ms[i].To) {
+			ms[i].To = 0
+		}
+
+		if ms[i].Type == raftpb.MsgAppResp {
+			if sentAppResp {
+				ms[i].To = 0
+			} else {
+				sentAppResp = true
+			}
+		}
+
+		if ms[i].Type == raftpb.MsgSnap {
+			// There are two separate data store: the store for v2, and the KV for v3.
+			// The msgSnap only contains the most recent snapshot of store without KV.
+			// So we need to redirect the msgSnap to etcd server main loop for merging in the
+			// current store snapshot and KV snapshot.
+			select {
+			case r.msgSnapC <- ms[i]:
+			default:
+				// drop msgSnap if the inflight chan if full.
+			}
+			ms[i].To = 0
+		}
+		if ms[i].Type == raftpb.MsgHeartbeat {
+			ok, exceed := r.td.Observe(ms[i].To)
+			if !ok {
+				// TODO: limit request rate.
+				plog.Warningf("failed to send out heartbeat on time (exceeded the %v timeout for %v)", r.heartbeat, exceed)
+				plog.Warningf("server is likely overloaded")
+			}
+		}
+	}
+
+	r.transport.Send(ms)
 }
 
 func (r *raftNode) apply() chan apply {
@@ -289,9 +340,6 @@ func startNode(cfg *ServerConfig, cl *membership.RaftCluster, ids []types.ID) (i
 			ClusterID: uint64(cl.ID()),
 		},
 	)
-	if err = os.MkdirAll(cfg.SnapDir(), privateDirMode); err != nil {
-		plog.Fatalf("create snapshot directory error: %v", err)
-	}
 	if w, err = wal.Create(cfg.WALDir(), metadata); err != nil {
 		plog.Fatalf("create wal error: %v", err)
 	}
@@ -438,7 +486,7 @@ func getIDs(snap *raftpb.Snapshot, ents []raftpb.Entry) []uint64 {
 			plog.Panicf("ConfChange Type should be either ConfChangeAddNode or ConfChangeRemoveNode!")
 		}
 	}
-	sids := make(types.Uint64Slice, 0)
+	sids := make(types.Uint64Slice, 0, len(ids))
 	for id := range ids {
 		sids = append(sids, id)
 	}
@@ -476,7 +524,7 @@ func createConfigChangeEnts(ids []uint64, self uint64, term, index uint64) []raf
 	if !found {
 		m := membership.Member{
 			ID:             types.ID(self),
-			RaftAttributes: membership.RaftAttributes{PeerURLs: []string{"http://localhost:7001", "http://localhost:2380"}},
+			RaftAttributes: membership.RaftAttributes{PeerURLs: []string{"http://localhost:2380"}},
 		}
 		ctx, err := json.Marshal(m)
 		if err != nil {

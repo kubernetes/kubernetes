@@ -420,23 +420,30 @@ func (self *version2_0) HandleRequest(requestType string, request []string, m ma
 		}
 		return writeResult(specs, w)
 	case storageApi:
-		var err error
-		fi := []v2.FsInfo{}
 		label := r.URL.Query().Get("label")
-		if len(label) == 0 {
-			// Get all global filesystems info.
-			fi, err = m.GetFsInfo("")
+		uuid := r.URL.Query().Get("uuid")
+		switch {
+		case uuid != "":
+			fi, err := m.GetFsInfoByFsUUID(uuid)
 			if err != nil {
 				return err
 			}
-		} else {
+			return writeResult(fi, w)
+		case label != "":
 			// Get a specific label.
-			fi, err = m.GetFsInfo(label)
+			fi, err := m.GetFsInfo(label)
 			if err != nil {
 				return err
 			}
+			return writeResult(fi, w)
+		default:
+			// Get all global filesystems info.
+			fi, err := m.GetFsInfo("")
+			if err != nil {
+				return err
+			}
+			return writeResult(fi, w)
 		}
-		return writeResult(fi, w)
 	case eventsApi:
 		return handleEventRequest(request, m, w, r)
 	case psApi:
@@ -509,7 +516,7 @@ func (self *version2_1) HandleRequest(requestType string, request []string, m ma
 			}
 			contStats[name] = v2.ContainerInfo{
 				Spec:  v2.ContainerSpecFromV1(&cont.Spec, cont.Aliases, cont.Namespace),
-				Stats: v2.ContainerStatsFromV1(&cont.Spec, cont.Stats),
+				Stats: v2.ContainerStatsFromV1(name, &cont.Spec, cont.Stats),
 			}
 		}
 		return writeResult(contStats, w)

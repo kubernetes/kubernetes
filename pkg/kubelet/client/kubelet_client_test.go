@@ -17,50 +17,17 @@ limitations under the License.
 package client
 
 import (
-	"encoding/json"
-	"net/http/httptest"
-	"net/url"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/probe"
-	utiltesting "k8s.io/kubernetes/pkg/util/testing"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	restclient "k8s.io/client-go/rest"
 )
 
-func TestHTTPKubeletClient(t *testing.T) {
-	expectObj := probe.Success
-	body, err := json.Marshal(expectObj)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+// Ensure a node client can be used as a NodeGetter.
+// This allows anyone with a node client to easily construct a NewNodeConnectionInfoGetter.
+var _ = NodeGetter(v1core.NodeInterface(nil))
 
-	fakeHandler := utiltesting.FakeHandler{
-		StatusCode:   200,
-		ResponseBody: string(body),
-	}
-	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
-
-	if _, err := url.Parse(testServer.URL); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-}
-
-func TestNewKubeletClient(t *testing.T) {
-	config := &KubeletClientConfig{
-		EnableHttps: false,
-	}
-
-	client, err := NewStaticKubeletClient(config)
-	if err != nil {
-		t.Errorf("Error while trying to create a client: %v", err)
-	}
-	if client == nil {
-		t.Error("client is nil.")
-	}
-}
-
-func TestNewKubeletClientTLSInvalid(t *testing.T) {
+func TestMakeTransportInvalid(t *testing.T) {
 	config := &KubeletClientConfig{
 		EnableHttps: true,
 		//Invalid certificate and key path
@@ -71,16 +38,16 @@ func TestNewKubeletClientTLSInvalid(t *testing.T) {
 		},
 	}
 
-	client, err := NewStaticKubeletClient(config)
+	rt, err := MakeTransport(config)
 	if err == nil {
 		t.Errorf("Expected an error")
 	}
-	if client != nil {
-		t.Error("client should be nil as we provided invalid cert file")
+	if rt != nil {
+		t.Error("rt should be nil as we provided invalid cert file")
 	}
 }
 
-func TestNewKubeletClientTLSValid(t *testing.T) {
+func TestMakeTransportValid(t *testing.T) {
 	config := &KubeletClientConfig{
 		Port:        1234,
 		EnableHttps: true,
@@ -93,34 +60,11 @@ func TestNewKubeletClientTLSValid(t *testing.T) {
 		},
 	}
 
-	client, err := NewStaticKubeletClient(config)
+	rt, err := MakeTransport(config)
 	if err != nil {
 		t.Errorf("Not expecting an error #%v", err)
 	}
-	if client == nil {
-		t.Error("client should not be nil")
-	}
-
-	{
-		scheme, port, transport, err := client.GetConnectionInfo(nil, "foo")
-		if err != nil {
-			t.Errorf("Error getting info: %v", err)
-		}
-		if scheme != "https" {
-			t.Errorf("Expected https, got %s", scheme)
-		}
-		if port != 1234 {
-			t.Errorf("Expected 1234, got %d", port)
-		}
-		if transport == nil {
-			t.Errorf("Expected transport, got nil")
-		}
-	}
-
-	{
-		_, _, _, err := client.GetConnectionInfo(nil, "foo bar")
-		if err == nil {
-			t.Errorf("Expected error getting connection info for invalid node name, got none")
-		}
+	if rt == nil {
+		t.Error("rt should not be nil")
 	}
 }

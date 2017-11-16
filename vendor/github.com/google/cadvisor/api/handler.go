@@ -85,7 +85,7 @@ func handleRequest(supportedApiVersions map[string]ApiVersion, m manager.Manager
 			versions = append(versions, v)
 		}
 		sort.Strings(versions)
-		fmt.Fprintf(w, "Supported API versions: %s", strings.Join(versions, ","))
+		http.Error(w, fmt.Sprintf("Supported API versions: %s", strings.Join(versions, ",")), http.StatusBadRequest)
 		return nil
 	}
 
@@ -109,7 +109,7 @@ func handleRequest(supportedApiVersions map[string]ApiVersion, m manager.Manager
 	if requestType == "" {
 		requestTypes := versionHandler.SupportedRequestTypes()
 		sort.Strings(requestTypes)
-		fmt.Fprintf(w, "Supported request types: %q", strings.Join(requestTypes, ","))
+		http.Error(w, fmt.Sprintf("Supported request types: %q", strings.Join(requestTypes, ",")), http.StatusBadRequest)
 		return nil
 	}
 

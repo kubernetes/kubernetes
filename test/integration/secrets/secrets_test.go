@@ -1,5 +1,3 @@
-// +build integration,!no-etcd
-
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -23,26 +21,27 @@ package secrets
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func deleteSecretOrErrorf(t *testing.T, c *client.Client, ns, name string) {
-	if err := c.Secrets(ns).Delete(name); err != nil {
+func deleteSecretOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
+	if err := c.CoreV1().Secrets(ns).Delete(name, nil); err != nil {
 		t.Errorf("unable to delete secret %v: %v", name, err)
 	}
 }
 
 // TestSecrets tests apiserver-side behavior of creation of secret objects and their use by pods.
 func TestSecrets(t *testing.T) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
-	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
 
 	ns := framework.CreateTestingNamespace("secret", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -51,10 +50,10 @@ func TestSecrets(t *testing.T) {
 }
 
 // DoTestSecrets test secrets for one api version.
-func DoTestSecrets(t *testing.T, client *client.Client, ns *api.Namespace) {
+func DoTestSecrets(t *testing.T, client clientset.Interface, ns *v1.Namespace) {
 	// Make a secret object.
-	s := api.Secret{
-		ObjectMeta: api.ObjectMeta{
+	s := v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "secret",
 			Namespace: ns.Name,
 		},
@@ -63,33 +62,33 @@ func DoTestSecrets(t *testing.T, client *client.Client, ns *api.Namespace) {
 		},
 	}
 
-	if _, err := client.Secrets(s.Namespace).Create(&s); err != nil {
+	if _, err := client.CoreV1().Secrets(s.Namespace).Create(&s); err != nil {
 		t.Errorf("unable to create test secret: %v", err)
 	}
 	defer deleteSecretOrErrorf(t, client, s.Namespace, s.Name)
 
 	// Template for pods that use a secret.
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "XXX",
 			Namespace: ns.Name,
 		},
-		Spec: api.PodSpec{
-			Volumes: []api.Volume{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
 				{
 					Name: "secvol",
-					VolumeSource: api.VolumeSource{
-						Secret: &api.SecretVolumeSource{
+					VolumeSource: v1.VolumeSource{
+						Secret: &v1.SecretVolumeSource{
 							SecretName: "secret",
 						},
 					},
 				},
 			},
-			Containers: []api.Container{
+			Containers: []v1.Container{
 				{
 					Name:  "fake-name",
 					Image: "fakeimage",
-					VolumeMounts: []api.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "secvol",
 							MountPath: "/fake/path",
@@ -103,14 +102,14 @@ func DoTestSecrets(t *testing.T, client *client.Client, ns *api.Namespace) {
 
 	// Create a pod to consume secret.
 	pod.ObjectMeta.Name = "uses-secret"
-	if _, err := client.Pods(ns.Name).Create(pod); err != nil {
+	if _, err := client.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
 	defer integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
 
 	// Create a pod that consumes non-existent secret.
 	pod.ObjectMeta.Name = "uses-non-existent-secret"
-	if _, err := client.Pods(ns.Name).Create(pod); err != nil {
+	if _, err := client.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
 	defer integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)

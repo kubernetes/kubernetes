@@ -19,70 +19,145 @@ package kubemark
 import (
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/cmd/kubelet/app/options"
+	"k8s.io/kubernetes/pkg/kubelet"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kubeio "k8s.io/kubernetes/pkg/util/io"
+	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
+	"k8s.io/kubernetes/pkg/volume/secret"
 	"k8s.io/kubernetes/test/utils"
 
 	"github.com/golang/glog"
 )
 
 type HollowKubelet struct {
-	KubeletConfig *kubeletapp.KubeletConfig
+	KubeletFlags         *options.KubeletFlags
+	KubeletConfiguration *kubeletconfig.KubeletConfiguration
+	KubeletDeps          *kubelet.Dependencies
 }
 
 func NewHollowKubelet(
 	nodeName string,
 	client *clientset.Clientset,
 	cadvisorInterface cadvisor.Interface,
-	dockerClient dockertools.DockerInterface,
+	dockerClientConfig *dockershim.ClientConfig,
 	kubeletPort, kubeletReadOnlyPort int,
 	containerManager cm.ContainerManager,
 	maxPods int, podsPerCore int,
 ) *HollowKubelet {
-	testRootDir := utils.MakeTempDirOrDie("hollow-kubelet.", "")
-	manifestFilePath := utils.MakeTempDirOrDie("manifest", testRootDir)
-	glog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
+	// -----------------
+	// Static config
+	// -----------------
+	f, c := GetHollowKubeletConfig(nodeName, kubeletPort, kubeletReadOnlyPort, maxPods, podsPerCore)
+
+	// -----------------
+	// Injected objects
+	// -----------------
+	volumePlugins := empty_dir.ProbeVolumePlugins()
+	volumePlugins = append(volumePlugins, secret.ProbeVolumePlugins()...)
+	d := &kubelet.Dependencies{
+		KubeClient:         client,
+		HeartbeatClient:    client.CoreV1(),
+		DockerClientConfig: dockerClientConfig,
+		CAdvisorInterface:  cadvisorInterface,
+		Cloud:              nil,
+		OSInterface:        &containertest.FakeOS{},
+		ContainerManager:   containerManager,
+		VolumePlugins:      volumePlugins,
+		TLSOptions:         nil,
+		OOMAdjuster:        oom.NewFakeOOMAdjuster(),
+		Writer:             &kubeio.StdWriter{},
+		Mounter:            mount.New("" /* default mount path */),
+	}
 
 	return &HollowKubelet{
-		KubeletConfig: kubeletapp.SimpleKubelet(
-			client,
-			dockerClient,
-			nodeName,
-			testRootDir,
-			"",        /* manifest-url */
-			"0.0.0.0", /* bind address */
-			uint(kubeletPort),
-			uint(kubeletReadOnlyPort),
-			api.NamespaceDefault,
-			empty_dir.ProbeVolumePlugins(),
-			nil, /* tls-options */
-			cadvisorInterface,
-			manifestFilePath,
-			nil, /* cloud-provider */
-			&containertest.FakeOS{}, /* os-interface */
-			20*time.Second,          /* FileCheckFrequency */
-			20*time.Second,          /* HTTPCheckFrequency */
-			1*time.Minute,           /* MinimumGCAge */
-			10*time.Second,          /* NodeStatusUpdateFrequency */
-			10*time.Second,          /* SyncFrequency */
-			5*time.Minute,           /* OutOfDiskTransitionFrequency */
-			5*time.Minute,           /* EvictionPressureTransitionPeriod */
-			maxPods,
-			podsPerCore,
-			containerManager,
-			nil,
-		),
+		KubeletFlags:         f,
+		KubeletConfiguration: c,
+		KubeletDeps:          d,
 	}
 }
 
 // Starts this HollowKubelet and blocks.
 func (hk *HollowKubelet) Run() {
-	kubeletapp.RunKubelet(hk.KubeletConfig)
+	if err := kubeletapp.RunKubelet(hk.KubeletFlags, hk.KubeletConfiguration, hk.KubeletDeps, false); err != nil {
+		glog.Fatalf("Failed to run HollowKubelet: %v. Exiting.", err)
+	}
 	select {}
+}
+
+// Builds a KubeletConfiguration for the HollowKubelet, ensuring that the
+// usual defaults are applied for fields we do not override.
+func GetHollowKubeletConfig(
+	nodeName string,
+	kubeletPort int,
+	kubeletReadOnlyPort int,
+	maxPods int,
+	podsPerCore int) (*options.KubeletFlags, *kubeletconfig.KubeletConfiguration) {
+
+	testRootDir := utils.MakeTempDirOrDie("hollow-kubelet.", "")
+	manifestFilePath := utils.MakeTempDirOrDie("manifest", testRootDir)
+	glog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
+
+	// Flags struct
+	f := options.NewKubeletFlags()
+	f.RootDirectory = testRootDir
+	f.HostnameOverride = nodeName
+	f.MinimumGCAge = metav1.Duration{Duration: 1 * time.Minute}
+	f.MaxContainerCount = 100
+	f.MaxPerPodContainerCount = 2
+	f.RegisterSchedulable = true
+
+	// Config struct
+	c, err := options.NewKubeletConfiguration()
+	if err != nil {
+		panic(err)
+	}
+
+	c.ManifestURL = ""
+	c.Address = "0.0.0.0" /* bind address */
+	c.Port = int32(kubeletPort)
+	c.ReadOnlyPort = int32(kubeletReadOnlyPort)
+	c.PodManifestPath = manifestFilePath
+	c.FileCheckFrequency.Duration = 20 * time.Second
+	c.HTTPCheckFrequency.Duration = 20 * time.Second
+	c.NodeStatusUpdateFrequency.Duration = 10 * time.Second
+	c.SyncFrequency.Duration = 10 * time.Second
+	c.EvictionPressureTransitionPeriod.Duration = 5 * time.Minute
+	c.MaxPods = int32(maxPods)
+	c.PodsPerCore = int32(podsPerCore)
+	c.ClusterDNS = []string{}
+	c.ImageGCHighThresholdPercent = 90
+	c.ImageGCLowThresholdPercent = 80
+	c.VolumeStatsAggPeriod.Duration = time.Minute
+	c.CgroupRoot = ""
+	c.CPUCFSQuota = true
+	c.EnableControllerAttachDetach = false
+	c.EnableDebuggingHandlers = true
+	c.EnableServer = true
+	c.CgroupsPerQOS = false
+	// hairpin-veth is used to allow hairpin packets. Note that this deviates from
+	// what the "real" kubelet currently does, because there's no way to
+	// set promiscuous mode on docker0.
+	c.HairpinMode = kubeletconfig.HairpinVeth
+	c.MaxOpenFiles = 1024
+	c.RegisterNode = true
+	c.RegistryBurst = 10
+	c.RegistryPullQPS = 5.0
+	c.ResolverConfig = kubetypes.ResolvConfDefault
+	c.KubeletCgroups = "/kubelet"
+	c.SerializeImagePulls = true
+	c.SystemCgroups = ""
+	c.ProtectKernelDefaults = false
+
+	return f, c
 }

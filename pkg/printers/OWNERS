@@ -1,0 +1,6 @@
+approvers:
+- smarterclayton
+- sig-cli-maintainers
+reviewers:
+- smarterclayton
+- sig-cli

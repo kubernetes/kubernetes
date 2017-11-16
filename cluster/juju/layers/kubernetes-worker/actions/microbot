@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+
+# Copyright 2015 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import os
+import sys
+
+from charmhelpers.core.hookenv import action_get
+from charmhelpers.core.hookenv import action_set
+from charmhelpers.core.hookenv import unit_public_ip
+from charms.templating.jinja2 import render
+from subprocess import call
+
+os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
+
+context = {}
+context['replicas'] = action_get('replicas')
+context['delete'] = action_get('delete')
+context['public_address'] = unit_public_ip()
+
+if not context['replicas']:
+    context['replicas'] = 3
+
+# Declare a kubectl template when invoking kubectl
+kubectl = ['kubectl', '--kubeconfig=/root/.kube/config']
+
+# Remove deployment if requested
+if context['delete']:
+    service_del = kubectl + ['delete', 'svc', 'microbot']
+    service_response = call(service_del)
+    deploy_del = kubectl + ['delete', 'deployment', 'microbot']
+    deploy_response = call(deploy_del)
+    ingress_del = kubectl + ['delete', 'ing', 'microbot-ingress']
+    ingress_response = call(ingress_del)
+
+    if ingress_response != 0:
+        action_set({'microbot-ing':
+                   'Failed removal of microbot ingress resource.'})
+    if deploy_response != 0:
+        action_set({'microbot-deployment':
+                   'Failed removal of microbot deployment resource.'})
+    if service_response != 0:
+        action_set({'microbot-service':
+                   'Failed removal of microbot service resource.'})
+    sys.exit(0)
+
+# Creation request
+
+render('microbot-example.yaml', '/root/cdk/addons/microbot.yaml',
+       context)
+
+create_command = kubectl + ['create', '-f',
+                            '/root/cdk/addons/microbot.yaml']
+
+create_response = call(create_command)
+
+if create_response == 0:
+    action_set({'address':
+               'microbot.{}.xip.io'.format(context['public_address'])})
+else:
+    action_set({'microbot-create': 'Failed microbot creation.'})

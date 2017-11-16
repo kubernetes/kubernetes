@@ -20,46 +20,21 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/coreos/go-semver/semver"
 	rktapi "github.com/coreos/rkt/api/v1alpha"
-	"github.com/golang/glog"
 	"golang.org/x/net/context"
+
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
 
 type versions struct {
 	sync.RWMutex
-	binVersion     rktVersion
-	apiVersion     rktVersion
+	binVersion     *utilversion.Version
+	apiVersion     *utilversion.Version
 	systemdVersion systemdVersion
 }
 
-// rktVersion implementes kubecontainer.Version interface by implementing
-// Compare() and String() (which is implemented by the underlying semver.Version)
-type rktVersion struct {
-	*semver.Version
-}
-
-func newRktVersion(version string) (rktVersion, error) {
-	sem, err := semver.NewVersion(version)
-	if err != nil {
-		return rktVersion{}, err
-	}
-	return rktVersion{sem}, nil
-}
-
-func (r rktVersion) Compare(other string) (int, error) {
-	v, err := semver.NewVersion(other)
-	if err != nil {
-		return -1, err
-	}
-
-	if r.LessThan(*v) {
-		return -1, nil
-	}
-	if v.LessThan(*r.Version) {
-		return 1, nil
-	}
-	return 0, nil
+func newRktVersion(version string) (*utilversion.Version, error) {
+	return utilversion.ParseSemantic(version)
 }
 
 func (r *Runtime) getVersions() error {
@@ -98,7 +73,7 @@ func (r *Runtime) getVersions() error {
 
 // checkVersion tests whether the rkt/systemd/rkt-api-service that meet the version requirement.
 // If all version requirements are met, it returns nil.
-func (r *Runtime) checkVersion(minimumRktBinVersion, recommendedRktBinVersion, minimumRktApiVersion, minimumSystemdVersion string) error {
+func (r *Runtime) checkVersion(minimumRktBinVersion, minimumRktApiVersion, minimumSystemdVersion string) error {
 	if err := r.getVersions(); err != nil {
 		return err
 	}
@@ -122,14 +97,6 @@ func (r *Runtime) checkVersion(minimumRktBinVersion, recommendedRktBinVersion, m
 	}
 	if result < 0 {
 		return fmt.Errorf("rkt: binary version is too old(%v), requires at least %v", r.versions.binVersion, minimumRktBinVersion)
-	}
-	result, err = r.versions.binVersion.Compare(recommendedRktBinVersion)
-	if err != nil {
-		return err
-	}
-	if result != 0 {
-		// TODO(yifan): Record an event to expose the information.
-		glog.Warningf("rkt: current binary version %q is not recommended (recommended version %q)", r.versions.binVersion, recommendedRktBinVersion)
 	}
 
 	// Check rkt API version.

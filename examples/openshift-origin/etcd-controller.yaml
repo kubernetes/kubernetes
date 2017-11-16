@@ -1,20 +1,16 @@
-kind: ReplicationController
-apiVersion: v1
+apiVersion: extensions/v1beta1
+kind: Deployment
 metadata:
   name: etcd
-  creationTimestamp: 
 spec:
   strategy:
     type: Recreate
-    resources: {}
-  triggers:
-  - type: ConfigChange
   replicas: 3
   selector:
-    name: etcd
+    matchLabels:
+      name: etcd
   template:
     metadata:
-      creationTimestamp: 
       labels:
         name: etcd
     spec:
@@ -47,7 +43,6 @@ spec:
         resources: {}
         terminationMessagePath: "/dev/termination-log"
         imagePullPolicy: IfNotPresent
-        capabilities: {}
         securityContext:
           capabilities: {}
           privileged: false

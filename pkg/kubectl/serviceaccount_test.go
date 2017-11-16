@@ -20,19 +20,20 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestServiceAccountGenerate(t *testing.T) {
 	tests := []struct {
 		name      string
-		expected  *api.ServiceAccount
+		expected  *v1.ServiceAccount
 		expectErr bool
 	}{
 		{
 			name: "foo",
-			expected: &api.ServiceAccount{
-				ObjectMeta: api.ObjectMeta{
+			expected: &v1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 			},
@@ -53,8 +54,8 @@ func TestServiceAccountGenerate(t *testing.T) {
 		if test.expectErr && err != nil {
 			continue
 		}
-		if !reflect.DeepEqual(obj.(*api.ServiceAccount), test.expected) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*api.ServiceAccount))
+		if !reflect.DeepEqual(obj.(*v1.ServiceAccount), test.expected) {
+			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*v1.ServiceAccount))
 		}
 	}
 }

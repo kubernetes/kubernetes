@@ -1,5 +1,131 @@
 # changelog
 
+### 0.14.0 (2017-04-08)
+
+* Add view.ContainerView type and methods
+
+* Add Collector.RetrieveWithFilter method
+
+* Add property.Filter type
+
+* Implement EthernetCardBackingInfo for OpaqueNetwork
+
+* Finder: support changing object root in find mode
+
+* Add VirtualDiskManager.QueryVirtualDiskInfo
+
+* Add performance.Manager APIs
+
+### 0.13.0 (2017-03-02)
+
+* Add DatastoreFileManager API wrapper
+
+* Add HostVsanInternalSystem API wrappers
+
+* Add Container support to view package
+
+* Finder supports Folder recursion without specifying a path
+
+* Add VirtualMachine.QueryConfigTarget method
+
+* Add device option to VirtualMachine.WaitForNetIP
+
+* Remove _Task suffix from vapp methods
+
+### 0.12.1 (2016-12-19)
+
+* Add DiagnosticLog helper
+
+* Add DatastorePath helper
+
+### 0.12.0 (2016-12-01)
+
+* Disable use of service ticket for datastore HTTP access by default
+
+* Attach context to HTTP requests for cancellations
+
+* Update to vim25/6.5 API
+
+### 0.11.4 (2016-11-15)
+
+* Add object.AuthorizationManager methods: RetrieveRolePermissions, RetrieveAllPermissions, AddRole, RemoveRole, UpdateRole
+
+### 0.11.3 (2016-11-08)
+
+* Allow DatastoreFile.Follow reader to drain current body after stopping
+
+### 0.11.2 (2016-11-01)
+
+* Avoid possible NPE in VirtualMachine.Device method
+
+* Add support for OpaqueNetwork type to Finder
+
+* Add HostConfigManager.AccountManager support for ESX 5.5
+
+### 0.11.1 (2016-10-27)
+
+* Add Finder.ResourcePoolListAll method
+
+### 0.11.0 (2016-10-25)
+
+* Add object.DistributedVirtualPortgroup.Reconfigure method
+
+### 0.10.0 (2016-10-20)
+
+* Add option to set soap.Client.UserAgent
+
+* Add service ticket thumbprint validation
+
+* Update use of http.DefaultTransport fields to 1.7
+
+* Set default locale to en_US (override with GOVMOMI_LOCALE env var)
+
+* Add object.HostCertificateInfo (types.HostCertificateManagerCertificateInfo helpers)
+
+* Add object.HostCertificateManager type and HostConfigManager.CertificateManager method
+
+* Add soap.Client SetRootCAs and SetDialTLS methods
+
+### 0.9.0 (2016-09-09)
+
+* Add object.DatastoreFile helpers for streaming and tailing datastore files
+
+* Add object VirtualMachine.Unregister method
+
+* Add object.ListView methods: Add, Remove, Reset
+
+* Update to Go 1.7 - using stdlib's context package
+
+### 0.8.0 (2016-06-30)
+
+* Add session.Manager.AcquireLocalTicket
+
+* Include StoragePod in Finder.FolderList
+
+* Add Finder methods for finding by ManagedObjectReference: Element, ObjectReference
+
+* Add mo.ManagedObjectReference methods: Reference, String, FromString
+
+* Add support using SessionManagerGenericServiceTicket.HostName for Datastore HTTP access
+
+### 0.7.1 (2016-06-03)
+
+* Fix object.ObjectName method
+
+### 0.7.0 (2016-06-02)
+
+* Move InventoryPath field to object.Common
+
+* Add HostDatastoreSystem.CreateLocalDatastore method
+
+* Add DatastoreNamespaceManager methods: CreateDirectory, DeleteDirectory
+
+* Add HostServiceSystem
+
+* Add HostStorageSystem methods: MarkAsSdd, MarkAsNonSdd, MarkAsLocal, MarkAsNonLocal
+
+* Add HostStorageSystem.RescanAllHba method
+
 ### 0.6.2 (2016-05-11)
 
 * Get complete file details in Datastore.Stat

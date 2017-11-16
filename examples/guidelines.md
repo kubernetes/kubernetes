@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/examples/guidelines.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Example Guidelines
 
 ## An Example Is
@@ -42,11 +8,9 @@ Kubernetes in a meaningful way. It is educational and informative.
 Examples are not:
 
 * Full app deployments, ready to use, with no explanation. These
-  belong either
-  [here](https://github.com/kubernetes/application-dm-templates) or in
-  something like [Helm](https://github.com/helm/charts).
+  belong to [Helm charts](https://github.com/kubernetes/charts).
 * Simple toys to show how to use a Kubernetes feature. These belong in
-  the [user guide](../docs/user-guide/).
+  the [user guide](https://kubernetes.io/docs/user-guide/).
 * Demos that follow a script to show a Kubernetes feature in
   action. Example: killing a node to demonstrate controller
   self-healing.
@@ -64,8 +28,8 @@ Examples are not:
   commands (TL;DR / quickstart), without cloning the repo (kubectl
   apply -f http://...).
 * Points to documentation of prerequisites.
-  * [Create a cluster](../docs/getting-started-guides/) (e.g., single-node docker).
-  * [Setup kubectl](../docs/user-guide/prereqs.md).
+  * [Create a cluster](https://kubernetes.io/docs/getting-started-guides/) (e.g., single-node docker).
+  * [Setup kubectl](https://kubernetes.io/docs/user-guide/prereqs.md).
   * etc.
 * Should specify which release of Kubernetes is required and any other
   prerequisites, such as DNS, a cloudprovider with PV provisioning, a
@@ -78,21 +42,21 @@ Examples are not:
 ### Throughout
 
 * Should point to documentation on first mention:
-  [kubectl](../docs/user-guide/kubectl-overview.md),
-  [pods](../docs/user-guide/pods.md),
-  [services](../docs/user-guide/services.md),
-  [deployments](../docs/user-guide/deployments.md),
-  [replication controllers](../docs/user-guide/replication-controller.md),
-  [jobs](../docs/user-guide/jobs.md),
-  [labels](../docs/user-guide/labels.md),
-  [persistent volumes](../docs/user-guide/persistent-volumes.md),
+  [kubectl](https://kubernetes.io/docs/user-guide/kubectl-overview.md),
+  [pods](https://kubernetes.io/docs/user-guide/pods.md),
+  [services](https://kubernetes.io/docs/user-guide/services.md),
+  [deployments](https://kubernetes.io/docs/user-guide/deployments.md),
+  [replication controllers](https://kubernetes.io/docs/user-guide/replication-controller.md),
+  [jobs](https://kubernetes.io/docs/user-guide/jobs.md),
+  [labels](https://kubernetes.io/docs/user-guide/labels.md),
+  [persistent volumes](https://kubernetes.io/docs/user-guide/persistent-volumes.md),
   etc.
 * Most examples should be cloudprovider-independent (e.g., using PVCs, not PDs).
   * Other examples with cloudprovider-specific bits could be somewhere else.
 * Actually show the app working -- console output, and or screenshots.
   * Ascii animations and screencasts are recommended.
-* Follows [config best practices](../docs/user-guide/config-best-practices.md).
-* Shouldn't duplicate the [thorough walk-through](../docs/user-guide/#thorough-walkthrough).
+* Follows [config best practices](https://kubernetes.io/docs/user-guide/config-best-practices.md).
+* Shouldn't duplicate the [thorough walk-through](https://kubernetes.io/docs/user-guide/#thorough-walkthrough).
 * Docker images are pre-built, and source is contained in a subfolder.
   * Source is the Dockerfile and any custom files needed beyond the
     upstream app being packaged.
@@ -102,7 +66,7 @@ Examples are not:
     in the example config.
 * Only use the code highlighting types
   [supported by Rouge](https://github.com/jneen/rouge/wiki/list-of-supported-languages-and-lexers),
-  as this is what Github Pages uses.
+  as this is what GitHub Pages uses.
 * Commands to be copied use the `shell` syntax highlighting type, and
   do not include any kind of prompt.
 * Example output is in a separate block quote to distinguish it from

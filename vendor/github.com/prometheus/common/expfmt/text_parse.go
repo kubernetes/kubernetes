@@ -47,7 +47,7 @@ func (e ParseError) Error() string {
 }
 
 // TextParser is used to parse the simple and flat text-based exchange format. Its
-// nil value is ready to use.
+// zero value is ready to use.
 type TextParser struct {
 	metricFamiliesByName map[string]*dto.MetricFamily
 	buf                  *bufio.Reader // Where the parsed input is read through.

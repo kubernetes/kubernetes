@@ -26,8 +26,8 @@ import (
 	"golang.org/x/net/context"
 
 	rktapi "github.com/coreos/rkt/api/v1alpha"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
@@ -37,7 +37,7 @@ const (
 )
 
 // processLines write the lines into stdout in the required format.
-func processLines(lines []string, logOptions *api.PodLogOptions, stdout, stderr io.Writer) {
+func processLines(lines []string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) {
 	msgKey := "MESSAGE="
 
 	for _, line := range lines {
@@ -75,7 +75,7 @@ func processLines(lines []string, logOptions *api.PodLogOptions, stdout, stderr 
 // "100" or "all") to tail the log.
 //
 // TODO(yifan): This doesn't work with lkvm stage1 yet.
-func (r *Runtime) GetContainerLogs(pod *api.Pod, containerID kubecontainer.ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) error {
+func (r *Runtime) GetContainerLogs(pod *v1.Pod, containerID kubecontainer.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error {
 	id, err := parseContainerID(containerID)
 	if err != nil {
 		return err
@@ -83,7 +83,7 @@ func (r *Runtime) GetContainerLogs(pod *api.Pod, containerID kubecontainer.Conta
 
 	var since int64
 	if logOptions.SinceSeconds != nil {
-		t := unversioned.Now().Add(-time.Duration(*logOptions.SinceSeconds) * time.Second)
+		t := metav1.Now().Add(-time.Duration(*logOptions.SinceSeconds) * time.Second)
 		since = t.Unix()
 	}
 	if logOptions.SinceTime != nil {

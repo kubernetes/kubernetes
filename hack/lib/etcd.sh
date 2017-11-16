@@ -16,38 +16,56 @@
 
 # A set of helpers for starting/running etcd for tests
 
-ETCD_VERSION=${ETCD_VERSION:-2.2.1}
+ETCD_VERSION=${ETCD_VERSION:-3.1.10}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
-ETCD_PORT=${ETCD_PORT:-4001}
+ETCD_PORT=${ETCD_PORT:-2379}
 
-kube::etcd::start() {
+kube::etcd::validate() {
+  # validate if in path
   which etcd >/dev/null || {
     kube::log::usage "etcd must be in your PATH"
     exit 1
   }
 
-  if pgrep etcd >/dev/null 2>&1; then
-    kube::log::usage "etcd appears to already be running on this machine (`pgrep -l etcd`) (or its a zombie and you need to kill its parent)."
+  # validate it is not running
+  if pgrep -x etcd >/dev/null 2>&1; then
+    kube::log::usage "etcd appears to already be running on this machine (`pgrep -xl etcd`) (or its a zombie and you need to kill its parent)."
     kube::log::usage "retry after you resolve this etcd error."
     exit 1
   fi
 
-  version=$(etcd -version | cut -d " " -f 3)
-  if [[ "${version}" < "${ETCD_VERSION}" ]]; then
-   kube::log::usage "etcd version ${ETCD_VERSION} or greater required."
-   kube::log::info "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
-   exit 1
+  # validate installed version is at least equal to minimum
+  version=$(etcd --version | tail -n +1 | head -n 1 | cut -d " " -f 3)
+  if [[ $(kube::etcd::version $ETCD_VERSION) -gt $(kube::etcd::version $version) ]]; then
+   export PATH=$KUBE_ROOT/third_party/etcd:$PATH
+   hash etcd
+   echo $PATH
+   version=$(etcd --version | head -n 1 | cut -d " " -f 3)
+   if [[ $(kube::etcd::version $ETCD_VERSION) -gt $(kube::etcd::version $version) ]]; then
+    kube::log::usage "etcd version ${ETCD_VERSION} or greater required."
+    kube::log::info "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
+    exit 1
+   fi
   fi
+}
+
+kube::etcd::version() {
+  printf '%s\n' "${@}" | awk -F . '{ printf("%d%03d%03d\n", $1, $2, $3) }'
+}
+
+kube::etcd::start() {
+  # validate before running
+  kube::etcd::validate
 
   # Start etcd
-  ETCD_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t test-etcd.XXXXXX)
+  ETCD_DIR=${ETCD_DIR:-$(mktemp -d 2>/dev/null || mktemp -d -t test-etcd.XXXXXX)}
   if [[ -d "${ARTIFACTS_DIR:-}" ]]; then
     ETCD_LOGFILE="${ARTIFACTS_DIR}/etcd.$(uname -n).$(id -un).log.DEBUG.$(date +%Y%m%d-%H%M%S).$$"
   else
     ETCD_LOGFILE=/dev/null
   fi
-  kube::log::info "etcd -addr ${ETCD_HOST}:${ETCD_PORT} -data-dir ${ETCD_DIR} --bind-addr ${ETCD_HOST}:${ETCD_PORT} --debug > \"${ETCD_LOGFILE}\" 2>/dev/null"
-  etcd -addr ${ETCD_HOST}:${ETCD_PORT} -data-dir ${ETCD_DIR} --bind-addr ${ETCD_HOST}:${ETCD_PORT} --debug 2> "${ETCD_LOGFILE}" >/dev/null &
+  kube::log::info "etcd --advertise-client-urls http://${ETCD_HOST}:${ETCD_PORT} --data-dir ${ETCD_DIR} --listen-client-urls http://${ETCD_HOST}:${ETCD_PORT} --debug > \"${ETCD_LOGFILE}\" 2>/dev/null"
+  etcd --advertise-client-urls http://${ETCD_HOST}:${ETCD_PORT} --data-dir ${ETCD_DIR} --listen-client-urls http://${ETCD_HOST}:${ETCD_PORT} --debug 2> "${ETCD_LOGFILE}" >/dev/null &
   ETCD_PID=$!
 
   echo "Waiting for etcd to come up."
@@ -74,15 +92,19 @@ kube::etcd::install() {
     cd "${KUBE_ROOT}/third_party"
     if [[ $(uname) == "Darwin" ]]; then
       download_file="etcd-v${ETCD_VERSION}-darwin-amd64.zip"
-      curl -fsSLO --retry 3 --keepalive-time 2 https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/"${download_file}"
+      url="https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/${download_file}"
+      kube::util::download_file "${url}" "${download_file}"
       unzip -o "${download_file}"
       ln -fns "etcd-v${ETCD_VERSION}-darwin-amd64" etcd
       rm "${download_file}"
     else
-      curl -fsSL --retry 3 --keepalive-time 2 https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-amd64.tar.gz | tar xzf -
+      url="https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-amd64.tar.gz"
+      download_file="etcd-v${ETCD_VERSION}-linux-amd64.tar.gz"
+      kube::util::download_file "${url}" "${download_file}"
+      tar xzf "${download_file}"
       ln -fns "etcd-v${ETCD_VERSION}-linux-amd64" etcd
     fi
     kube::log::info "etcd v${ETCD_VERSION} installed. To use:"
-    kube::log::info "export PATH=\${PATH}:$(pwd)/etcd"
+    kube::log::info "export PATH=$(pwd)/etcd:\${PATH}"
   )
 }

@@ -18,8 +18,9 @@ package keymutex
 
 import (
 	"fmt"
-	"github.com/golang/glog"
 	"sync"
+
+	"github.com/golang/glog"
 )
 
 // KeyMutex is a thread-safe interface for acquiring locks on arbitrary strings.

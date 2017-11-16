@@ -8,9 +8,11 @@ package stenographer
 
 import (
 	"fmt"
+	"io"
 	"runtime"
 	"strings"
 
+	"github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable"
 	"github.com/onsi/ginkgo/types"
 )
 
@@ -35,7 +37,8 @@ const (
 type Stenographer interface {
 	AnnounceSuite(description string, randomSeed int64, randomizingAll bool, succinct bool)
 	AnnounceAggregatedParallelRun(nodes int, succinct bool)
-	AnnounceParallelRun(node int, nodes int, specsToRun int, totalSpecs int, succinct bool)
+	AnnounceParallelRun(node int, nodes int, succinct bool)
+	AnnounceTotalNumberOfSpecs(total int, succinct bool)
 	AnnounceNumberOfSpecs(specsToRun int, total int, succinct bool)
 	AnnounceSpecRunCompletion(summary *types.SuiteSummary, succinct bool)
 
@@ -59,22 +62,26 @@ type Stenographer interface {
 	SummarizeFailures(summaries []*types.SpecSummary)
 }
 
-func New(color bool) Stenographer {
+func New(color bool, enableFlakes bool) Stenographer {
 	denoter := "•"
 	if runtime.GOOS == "windows" {
 		denoter = "+"
 	}
 	return &consoleStenographer{
-		color:       color,
-		denoter:     denoter,
-		cursorState: cursorStateTop,
+		color:        color,
+		denoter:      denoter,
+		cursorState:  cursorStateTop,
+		enableFlakes: enableFlakes,
+		w:            colorable.NewColorableStdout(),
 	}
 }
 
 type consoleStenographer struct {
-	color       bool
-	denoter     string
-	cursorState cursorStateType
+	color        bool
+	denoter      string
+	cursorState  cursorStateType
+	enableFlakes bool
+	w            io.Writer
 }
 
 var alternatingColors = []string{defaultStyle, grayColor}
@@ -92,17 +99,15 @@ func (s *consoleStenographer) AnnounceSuite(description string, randomSeed int64
 	s.printNewLine()
 }
 
-func (s *consoleStenographer) AnnounceParallelRun(node int, nodes int, specsToRun int, totalSpecs int, succinct bool) {
+func (s *consoleStenographer) AnnounceParallelRun(node int, nodes int, succinct bool) {
 	if succinct {
 		s.print(0, "- node #%d ", node)
 		return
 	}
 	s.println(0,
-		"Parallel test node %s/%s. Assigned %s of %s specs.",
+		"Parallel test node %s/%s.",
 		s.colorize(boldStyle, "%d", node),
 		s.colorize(boldStyle, "%d", nodes),
-		s.colorize(boldStyle, "%d", specsToRun),
-		s.colorize(boldStyle, "%d", totalSpecs),
 	)
 	s.printNewLine()
 }
@@ -134,6 +139,20 @@ func (s *consoleStenographer) AnnounceNumberOfSpecs(specsToRun int, total int, s
 	s.printNewLine()
 }
 
+func (s *consoleStenographer) AnnounceTotalNumberOfSpecs(total int, succinct bool) {
+	if succinct {
+		s.print(0, "- %d specs ", total)
+		s.stream()
+		return
+	}
+	s.println(0,
+		"Will run %s specs",
+		s.colorize(boldStyle, "%d", total),
+	)
+
+	s.printNewLine()
+}
+
 func (s *consoleStenographer) AnnounceSpecRunCompletion(summary *types.SuiteSummary, succinct bool) {
 	if succinct && summary.SuiteSucceeded {
 		s.print(0, " %s %s ", s.colorize(greenColor, "SUCCESS!"), summary.RunTime)
@@ -153,11 +172,16 @@ func (s *consoleStenographer) AnnounceSpecRunCompletion(summary *types.SuiteSumm
 		status = s.colorize(boldStyle+redColor, "FAIL!")
 	}
 
+	flakes := ""
+	if s.enableFlakes {
+		flakes = " | " + s.colorize(yellowColor+boldStyle, "%d Flaked", summary.NumberOfFlakedSpecs)
+	}
+
 	s.print(0,
 		"%s -- %s | %s | %s | %s ",
 		status,
 		s.colorize(greenColor+boldStyle, "%d Passed", summary.NumberOfPassedSpecs),
-		s.colorize(redColor+boldStyle, "%d Failed", summary.NumberOfFailedSpecs),
+		s.colorize(redColor+boldStyle, "%d Failed", summary.NumberOfFailedSpecs)+flakes,
 		s.colorize(yellowColor+boldStyle, "%d Pending", summary.NumberOfPendingSpecs),
 		s.colorize(cyanColor+boldStyle, "%d Skipped", summary.NumberOfSkippedSpecs),
 	)
@@ -506,15 +530,15 @@ func (s *consoleStenographer) measurementReport(spec *types.SpecSummary, succinc
 			message = append(message, fmt.Sprintf("  %s - %s: %s%s, %s: %s%s ± %s%s, %s: %s%s",
 				s.colorize(boldStyle, "%s", measurement.Name),
 				measurement.SmallestLabel,
-				s.colorize(greenColor, "%.3f", measurement.Smallest),
+				s.colorize(greenColor, measurement.PrecisionFmt(), measurement.Smallest),
 				measurement.Units,
 				measurement.AverageLabel,
-				s.colorize(cyanColor, "%.3f", measurement.Average),
+				s.colorize(cyanColor, measurement.PrecisionFmt(), measurement.Average),
 				measurement.Units,
-				s.colorize(cyanColor, "%.3f", measurement.StdDeviation),
+				s.colorize(cyanColor, measurement.PrecisionFmt(), measurement.StdDeviation),
 				measurement.Units,
 				measurement.LargestLabel,
-				s.colorize(redColor, "%.3f", measurement.Largest),
+				s.colorize(redColor, measurement.PrecisionFmt(), measurement.Largest),
 				measurement.Units,
 			))
 		}
@@ -531,15 +555,15 @@ func (s *consoleStenographer) measurementReport(spec *types.SpecSummary, succinc
 				s.colorize(boldStyle, "%s", measurement.Name),
 				info,
 				measurement.SmallestLabel,
-				s.colorize(greenColor, "%.3f", measurement.Smallest),
+				s.colorize(greenColor, measurement.PrecisionFmt(), measurement.Smallest),
 				measurement.Units,
 				measurement.LargestLabel,
-				s.colorize(redColor, "%.3f", measurement.Largest),
+				s.colorize(redColor, measurement.PrecisionFmt(), measurement.Largest),
 				measurement.Units,
 				measurement.AverageLabel,
-				s.colorize(cyanColor, "%.3f", measurement.Average),
+				s.colorize(cyanColor, measurement.PrecisionFmt(), measurement.Average),
 				measurement.Units,
-				s.colorize(cyanColor, "%.3f", measurement.StdDeviation),
+				s.colorize(cyanColor, measurement.PrecisionFmt(), measurement.StdDeviation),
 				measurement.Units,
 			))
 		}

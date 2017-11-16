@@ -1,7 +1,5 @@
 package pflag
 
-import "fmt"
-
 // -- string Value
 type stringValue string
 
@@ -18,7 +16,7 @@ func (s *stringValue) Type() string {
 	return "string"
 }
 
-func (s *stringValue) String() string { return fmt.Sprintf("%s", *s) }
+func (s *stringValue) String() string { return string(*s) }
 
 func stringConv(sval string) (interface{}, error) {
 	return sval, nil

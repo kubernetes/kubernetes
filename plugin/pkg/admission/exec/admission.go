@@ -20,31 +20,33 @@ import (
 	"fmt"
 	"io"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-
-	"k8s.io/kubernetes/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/registry/rest"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
-func init() {
-	admission.RegisterPlugin("DenyEscalatingExec", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
-		return NewDenyEscalatingExec(client), nil
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register("DenyEscalatingExec", func(config io.Reader) (admission.Interface, error) {
+		return NewDenyEscalatingExec(), nil
 	})
 
 	// This is for legacy support of the DenyExecOnPrivileged admission controller.  Most
 	// of the time DenyEscalatingExec should be preferred.
-	admission.RegisterPlugin("DenyExecOnPrivileged", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
-		return NewDenyExecOnPrivileged(client), nil
+	plugins.Register("DenyExecOnPrivileged", func(config io.Reader) (admission.Interface, error) {
+		return NewDenyExecOnPrivileged(), nil
 	})
 }
 
-// denyExec is an implementation of admission.Interface which says no to a pod/exec on
+// DenyExec is an implementation of admission.Interface which says no to a pod/exec on
 // a pod using host based configurations.
-type denyExec struct {
+type DenyExec struct {
 	*admission.Handler
-	client clientset.Interface
+	client internalclientset.Interface
 
 	// these flags control which items will be checked to deny exec/attach
 	hostIPC    bool
@@ -52,12 +54,15 @@ type denyExec struct {
 	privileged bool
 }
 
+var _ admission.ValidationInterface = &DenyExec{}
+
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&DenyExec{})
+
 // NewDenyEscalatingExec creates a new admission controller that denies an exec operation on a pod
 // using host based configurations.
-func NewDenyEscalatingExec(client clientset.Interface) admission.Interface {
-	return &denyExec{
+func NewDenyEscalatingExec() *DenyExec {
+	return &DenyExec{
 		Handler:    admission.NewHandler(admission.Connect),
-		client:     client,
 		hostIPC:    true,
 		hostPID:    true,
 		privileged: true,
@@ -67,17 +72,17 @@ func NewDenyEscalatingExec(client clientset.Interface) admission.Interface {
 // NewDenyExecOnPrivileged creates a new admission controller that is only checking the privileged
 // option.  This is for legacy support of the DenyExecOnPrivileged admission controller.  Most
 // of the time NewDenyEscalatingExec should be preferred.
-func NewDenyExecOnPrivileged(client clientset.Interface) admission.Interface {
-	return &denyExec{
+func NewDenyExecOnPrivileged() *DenyExec {
+	return &DenyExec{
 		Handler:    admission.NewHandler(admission.Connect),
-		client:     client,
 		hostIPC:    false,
 		hostPID:    false,
 		privileged: true,
 	}
 }
 
-func (d *denyExec) Admit(a admission.Attributes) (err error) {
+// Validate makes an admission decision based on the request attributes
+func (d *DenyExec) Validate(a admission.Attributes) (err error) {
 	connectRequest, ok := a.GetObject().(*rest.ConnectRequest)
 	if !ok {
 		return errors.NewBadRequest("a connect request was received, but could not convert the request object.")
@@ -86,21 +91,21 @@ func (d *denyExec) Admit(a admission.Attributes) (err error) {
 	if connectRequest.ResourcePath != "pods/exec" && connectRequest.ResourcePath != "pods/attach" {
 		return nil
 	}
-	pod, err := d.client.Core().Pods(a.GetNamespace()).Get(connectRequest.Name)
+	pod, err := d.client.Core().Pods(a.GetNamespace()).Get(connectRequest.Name, metav1.GetOptions{})
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
 
 	if d.hostPID && pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostPID {
-		return admission.NewForbidden(a, fmt.Errorf("Cannot exec into or attach to a container using host pid"))
+		return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a container using host pid"))
 	}
 
 	if d.hostIPC && pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostIPC {
-		return admission.NewForbidden(a, fmt.Errorf("Cannot exec into or attach to a container using host ipc"))
+		return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a container using host ipc"))
 	}
 
 	if d.privileged && isPrivileged(pod) {
-		return admission.NewForbidden(a, fmt.Errorf("Cannot exec into or attach to a privileged container"))
+		return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a privileged container"))
 	}
 
 	return nil
@@ -109,7 +114,7 @@ func (d *denyExec) Admit(a admission.Attributes) (err error) {
 // isPrivileged will return true a pod has any privileged containers
 func isPrivileged(pod *api.Pod) bool {
 	for _, c := range pod.Spec.InitContainers {
-		if c.SecurityContext == nil {
+		if c.SecurityContext == nil || c.SecurityContext.Privileged == nil {
 			continue
 		}
 		if *c.SecurityContext.Privileged {
@@ -117,7 +122,7 @@ func isPrivileged(pod *api.Pod) bool {
 		}
 	}
 	for _, c := range pod.Spec.Containers {
-		if c.SecurityContext == nil {
+		if c.SecurityContext == nil || c.SecurityContext.Privileged == nil {
 			continue
 		}
 		if *c.SecurityContext.Privileged {
@@ -125,4 +130,17 @@ func isPrivileged(pod *api.Pod) bool {
 		}
 	}
 	return false
+}
+
+// SetInternalKubeClientSet implements the WantsInternalKubeClientSet interface.
+func (d *DenyExec) SetInternalKubeClientSet(client internalclientset.Interface) {
+	d.client = client
+}
+
+// ValidateInitialization implements the InitializationValidator interface.
+func (d *DenyExec) ValidateInitialization() error {
+	if d.client == nil {
+		return fmt.Errorf("missing client")
+	}
+	return nil
 }

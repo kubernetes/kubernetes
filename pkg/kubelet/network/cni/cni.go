@@ -17,16 +17,19 @@ limitations under the License.
 package cni
 
 import (
+	"errors"
 	"fmt"
 	"sort"
+	"strings"
+	"sync"
 
-	"github.com/appc/cni/libcni"
-	cnitypes "github.com/appc/cni/pkg/types"
+	"github.com/containernetworking/cni/libcni"
+	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
-	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	utilexec "k8s.io/utils/exec"
 )
 
 const (
@@ -39,39 +42,61 @@ const (
 type cniNetworkPlugin struct {
 	network.NoopNetworkPlugin
 
+	loNetwork *cniNetwork
+
+	sync.RWMutex
 	defaultNetwork *cniNetwork
-	host           network.Host
-	execer         utilexec.Interface
-	nsenterPath    string
+
+	host               network.Host
+	execer             utilexec.Interface
+	nsenterPath        string
+	pluginDir          string
+	binDir             string
+	vendorCNIDirPrefix string
 }
 
 type cniNetwork struct {
 	name          string
-	NetworkConfig *libcni.NetworkConfig
-	CNIConfig     *libcni.CNIConfig
+	NetworkConfig *libcni.NetworkConfigList
+	CNIConfig     libcni.CNI
 }
 
-func probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir, vendorCNIDirPrefix string) []network.NetworkPlugin {
-	configList := make([]network.NetworkPlugin, 0)
-	network, err := getDefaultCNINetwork(pluginDir, vendorCNIDirPrefix)
-	if err != nil {
-		return configList
+// cniPortMapping maps to the standard CNI portmapping Capability
+// see: https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md
+type cniPortMapping struct {
+	HostPort      int32  `json:"hostPort"`
+	ContainerPort int32  `json:"containerPort"`
+	Protocol      string `json:"protocol"`
+	HostIP        string `json:"hostIP"`
+}
+
+func probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir, binDir, vendorCNIDirPrefix string) []network.NetworkPlugin {
+	if binDir == "" {
+		binDir = DefaultCNIDir
 	}
-	return append(configList, &cniNetworkPlugin{
-		defaultNetwork: network,
-		execer:         utilexec.New(),
-	})
+	plugin := &cniNetworkPlugin{
+		defaultNetwork:     nil,
+		loNetwork:          getLoNetwork(binDir, vendorCNIDirPrefix),
+		execer:             utilexec.New(),
+		pluginDir:          pluginDir,
+		binDir:             binDir,
+		vendorCNIDirPrefix: vendorCNIDirPrefix,
+	}
+
+	// sync NetworkConfig in best effort during probing.
+	plugin.syncNetworkConfig()
+	return []network.NetworkPlugin{plugin}
 }
 
-func ProbeNetworkPlugins(pluginDir string) []network.NetworkPlugin {
-	return probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir, "")
+func ProbeNetworkPlugins(pluginDir, binDir string) []network.NetworkPlugin {
+	return probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir, binDir, "")
 }
 
-func getDefaultCNINetwork(pluginDir, vendorCNIDirPrefix string) (*cniNetwork, error) {
+func getDefaultCNINetwork(pluginDir, binDir, vendorCNIDirPrefix string) (*cniNetwork, error) {
 	if pluginDir == "" {
 		pluginDir = DefaultNetDir
 	}
-	files, err := libcni.ConfFiles(pluginDir)
+	files, err := libcni.ConfFiles(pluginDir, []string{".conf", ".conflist", ".json"})
 	switch {
 	case err != nil:
 		return nil, err
@@ -81,30 +106,90 @@ func getDefaultCNINetwork(pluginDir, vendorCNIDirPrefix string) (*cniNetwork, er
 
 	sort.Strings(files)
 	for _, confFile := range files {
-		conf, err := libcni.ConfFromFile(confFile)
-		if err != nil {
-			glog.Warningf("Error loading CNI config file %s: %v", confFile, err)
+		var confList *libcni.NetworkConfigList
+		if strings.HasSuffix(confFile, ".conflist") {
+			confList, err = libcni.ConfListFromFile(confFile)
+			if err != nil {
+				glog.Warningf("Error loading CNI config list file %s: %v", confFile, err)
+				continue
+			}
+		} else {
+			conf, err := libcni.ConfFromFile(confFile)
+			if err != nil {
+				glog.Warningf("Error loading CNI config file %s: %v", confFile, err)
+				continue
+			}
+			// Ensure the config has a "type" so we know what plugin to run.
+			// Also catches the case where somebody put a conflist into a conf file.
+			if conf.Network.Type == "" {
+				glog.Warningf("Error loading CNI config file %s: no 'type'; perhaps this is a .conflist?", confFile)
+				continue
+			}
+
+			confList, err = libcni.ConfListFromConf(conf)
+			if err != nil {
+				glog.Warningf("Error converting CNI config file %s to list: %v", confFile, err)
+				continue
+			}
+		}
+		if len(confList.Plugins) == 0 {
+			glog.Warningf("CNI config list %s has no networks, skipping", confFile)
 			continue
 		}
+		confType := confList.Plugins[0].Network.Type
+
 		// Search for vendor-specific plugins as well as default plugins in the CNI codebase.
-		vendorCNIDir := fmt.Sprintf(VendorCNIDirTemplate, vendorCNIDirPrefix, conf.Network.Type)
+		vendorDir := vendorCNIDir(vendorCNIDirPrefix, confType)
 		cninet := &libcni.CNIConfig{
-			Path: []string{DefaultCNIDir, vendorCNIDir},
+			Path: []string{vendorDir, binDir},
 		}
-		network := &cniNetwork{name: conf.Network.Name, NetworkConfig: conf, CNIConfig: cninet}
+		network := &cniNetwork{name: confList.Name, NetworkConfig: confList, CNIConfig: cninet}
 		return network, nil
 	}
 	return nil, fmt.Errorf("No valid networks found in %s", pluginDir)
 }
 
-func (plugin *cniNetworkPlugin) Init(host network.Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string) error {
-	var err error
-	plugin.nsenterPath, err = plugin.execer.LookPath("nsenter")
+func vendorCNIDir(prefix, pluginType string) string {
+	return fmt.Sprintf(VendorCNIDirTemplate, prefix, pluginType)
+}
+
+func (plugin *cniNetworkPlugin) Init(host network.Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
+	err := plugin.platformInit()
 	if err != nil {
 		return err
 	}
 
 	plugin.host = host
+
+	plugin.syncNetworkConfig()
+	return nil
+}
+
+func (plugin *cniNetworkPlugin) syncNetworkConfig() {
+	network, err := getDefaultCNINetwork(plugin.pluginDir, plugin.binDir, plugin.vendorCNIDirPrefix)
+	if err != nil {
+		glog.Warningf("Unable to update cni config: %s", err)
+		return
+	}
+	plugin.setDefaultNetwork(network)
+}
+
+func (plugin *cniNetworkPlugin) getDefaultNetwork() *cniNetwork {
+	plugin.RLock()
+	defer plugin.RUnlock()
+	return plugin.defaultNetwork
+}
+
+func (plugin *cniNetworkPlugin) setDefaultNetwork(n *cniNetwork) {
+	plugin.Lock()
+	defer plugin.Unlock()
+	plugin.defaultNetwork = n
+}
+
+func (plugin *cniNetworkPlugin) checkInitialized() error {
+	if plugin.getDefaultNetwork() == nil {
+		return errors.New("cni config uninitialized")
+	}
 	return nil
 }
 
@@ -112,13 +197,32 @@ func (plugin *cniNetworkPlugin) Name() string {
 	return CNIPluginName
 }
 
-func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
-	netnsPath, err := plugin.host.GetRuntime().GetNetNS(id)
+func (plugin *cniNetworkPlugin) Status() error {
+	// sync network config from pluginDir periodically to detect network config updates
+	plugin.syncNetworkConfig()
+
+	// Can't set up pods if we don't have any CNI network configs yet
+	return plugin.checkInitialized()
+}
+
+func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID, annotations map[string]string) error {
+	if err := plugin.checkInitialized(); err != nil {
+		return err
+	}
+	netnsPath, err := plugin.host.GetNetNS(id.ID)
 	if err != nil {
 		return fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
 	}
 
-	_, err = plugin.defaultNetwork.addToNetwork(name, namespace, id, netnsPath)
+	// Windows doesn't have loNetwork. It comes only with Linux
+	if plugin.loNetwork != nil {
+		if _, err = plugin.addToNetwork(plugin.loNetwork, name, namespace, id, netnsPath); err != nil {
+			glog.Errorf("Error while adding to cni lo network: %s", err)
+			return err
+		}
+	}
+
+	_, err = plugin.addToNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath)
 	if err != nil {
 		glog.Errorf("Error while adding to cni network: %s", err)
 		return err
@@ -128,40 +232,29 @@ func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubec
 }
 
 func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.ContainerID) error {
-	netnsPath, err := plugin.host.GetRuntime().GetNetNS(id)
-	if err != nil {
-		return fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
+	if err := plugin.checkInitialized(); err != nil {
+		return err
 	}
 
-	return plugin.defaultNetwork.deleteFromNetwork(name, namespace, id, netnsPath)
+	// Lack of namespace should not be fatal on teardown
+	netnsPath, err := plugin.host.GetNetNS(id.ID)
+	if err != nil {
+		glog.Warningf("CNI failed to retrieve network namespace path: %v", err)
+	}
+
+	return plugin.deleteFromNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath)
 }
 
-// TODO: Use the addToNetwork function to obtain the IP of the Pod. That will assume idempotent ADD call to the plugin.
-// Also fix the runtime's call to Status function to be done only in the case that the IP is lost, no need to do periodic calls
-func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
-	netnsPath, err := plugin.host.GetRuntime().GetNetNS(id)
+func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string, podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string) (cnitypes.Result, error) {
+	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podSandboxID, podNetnsPath)
 	if err != nil {
-		return nil, fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
-	}
-
-	ip, err := network.GetPodIP(plugin.execer, plugin.nsenterPath, netnsPath, network.DefaultInterfaceName)
-	if err != nil {
+		glog.Errorf("Error adding network when building cni runtime conf: %v", err)
 		return nil, err
 	}
 
-	return &network.PodNetworkStatus{IP: ip}, nil
-}
-
-func (network *cniNetwork) addToNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (*cnitypes.Result, error) {
-	rt, err := buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath)
-	if err != nil {
-		glog.Errorf("Error adding network: %v", err)
-		return nil, err
-	}
-
-	netconf, cninet := network.NetworkConfig, network.CNIConfig
-	glog.V(4).Infof("About to run with conf.Network.Type=%v, c.Path=%v", netconf.Network.Type, cninet.Path)
-	res, err := cninet.AddNetwork(netconf, rt)
+	netConf, cniNet := network.NetworkConfig, network.CNIConfig
+	glog.V(4).Infof("About to add CNI network %v (type=%v)", netConf.Name, netConf.Plugins[0].Network.Type)
+	res, err := cniNet.AddNetworkList(netConf, rt)
 	if err != nil {
 		glog.Errorf("Error adding network: %v", err)
 		return nil, err
@@ -170,16 +263,16 @@ func (network *cniNetwork) addToNetwork(podName string, podNamespace string, pod
 	return res, nil
 }
 
-func (network *cniNetwork) deleteFromNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) error {
-	rt, err := buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath)
+func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName string, podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string) error {
+	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podSandboxID, podNetnsPath)
 	if err != nil {
-		glog.Errorf("Error deleting network: %v", err)
+		glog.Errorf("Error deleting network when building cni runtime conf: %v", err)
 		return err
 	}
 
-	netconf, cninet := network.NetworkConfig, network.CNIConfig
-	glog.V(4).Infof("About to run with conf.Network.Type=%v, c.Path=%v", netconf.Network.Type, cninet.Path)
-	err = cninet.DelNetwork(netconf, rt)
+	netConf, cniNet := network.NetworkConfig, network.CNIConfig
+	glog.V(4).Infof("About to del CNI network %v (type=%v)", netConf.Name, netConf.Plugins[0].Network.Type)
+	err = cniNet.DelNetworkList(netConf, rt)
 	if err != nil {
 		glog.Errorf("Error deleting network: %v", err)
 		return err
@@ -187,20 +280,42 @@ func (network *cniNetwork) deleteFromNetwork(podName string, podNamespace string
 	return nil
 }
 
-func buildCNIRuntimeConf(podName string, podNs string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (*libcni.RuntimeConf, error) {
+func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string, podSandboxID kubecontainer.ContainerID, podNetnsPath string) (*libcni.RuntimeConf, error) {
 	glog.V(4).Infof("Got netns path %v", podNetnsPath)
-	glog.V(4).Infof("Using netns path %v", podNs)
+	glog.V(4).Infof("Using podns path %v", podNs)
 
 	rt := &libcni.RuntimeConf{
-		ContainerID: podInfraContainerID.ID,
+		ContainerID: podSandboxID.ID,
 		NetNS:       podNetnsPath,
 		IfName:      network.DefaultInterfaceName,
 		Args: [][2]string{
 			{"IgnoreUnknown", "1"},
 			{"K8S_POD_NAMESPACE", podNs},
 			{"K8S_POD_NAME", podName},
-			{"K8S_POD_INFRA_CONTAINER_ID", podInfraContainerID.ID},
+			{"K8S_POD_INFRA_CONTAINER_ID", podSandboxID.ID},
 		},
+	}
+
+	// port mappings are a cni capability-based args, rather than parameters
+	// to a specific plugin
+	portMappings, err := plugin.host.GetPodPortMappings(podSandboxID.ID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve port mappings: %v", err)
+	}
+	portMappingsParam := make([]cniPortMapping, 0, len(portMappings))
+	for _, p := range portMappings {
+		if p.HostPort <= 0 {
+			continue
+		}
+		portMappingsParam = append(portMappingsParam, cniPortMapping{
+			HostPort:      p.HostPort,
+			ContainerPort: p.ContainerPort,
+			Protocol:      strings.ToLower(string(p.Protocol)),
+			HostIP:        p.HostIP,
+		})
+	}
+	rt.CapabilityArgs = map[string]interface{}{
+		"portMappings": portMappingsParam,
 	}
 
 	return rt, nil

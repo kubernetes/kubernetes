@@ -6,12 +6,9 @@ package pflag
 
 import (
 	goflag "flag"
-	"fmt"
 	"reflect"
 	"strings"
 )
-
-var _ = fmt.Print
 
 // flagValueWrapper implements pflag.Value around a flag.Value.  The main
 // difference here is the addition of the Type method that returns a string
@@ -61,6 +58,9 @@ func (v *flagValueWrapper) Type() string {
 }
 
 // PFlagFromGoFlag will return a *pflag.Flag given a *flag.Flag
+// If the *flag.Flag.Name was a single character (ex: `v`) it will be accessiblei
+// with both `-v` and `--v` in flags. If the golang flag was more than a single
+// character (ex: `verbose`) it will only be accessible via `--verbose`
 func PFlagFromGoFlag(goflag *goflag.Flag) *Flag {
 	// Remember the default value as a string; it won't change.
 	flag := &Flag{
@@ -70,6 +70,10 @@ func PFlagFromGoFlag(goflag *goflag.Flag) *Flag {
 		// Looks like golang flags don't set DefValue correctly  :-(
 		//DefValue: goflag.DefValue,
 		DefValue: goflag.Value.String(),
+	}
+	// Ex: if the golang flag was -v, allow both -v and --v to work
+	if len(flag.Name) == 1 {
+		flag.Shorthand = flag.Name
 	}
 	if fv, ok := goflag.Value.(goBoolFlag); ok && fv.IsBoolFlag() {
 		flag.NoOptDefVal = "true"

@@ -17,24 +17,27 @@ limitations under the License.
 package client
 
 import (
-	"errors"
-	"fmt"
-	"net"
 	"net/http"
-	"strings"
+	"strconv"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/transport"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/transport"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 type KubeletClientConfig struct {
 	// Default port - used if no information about Kubelet port can be found in Node.NodeStatus.DaemonEndpoints.
-	Port        uint
-	EnableHttps bool
+	Port         uint
+	ReadOnlyPort uint
+	EnableHttps  bool
+
+	// PreferredAddressTypes - used to select an address from Node.NodeStatus.Addresses
+	PreferredAddressTypes []string
 
 	// TLSClientConfig contains settings to enable transport layer security
 	restclient.TLSClientConfig
@@ -46,22 +49,20 @@ type KubeletClientConfig struct {
 	HTTPTimeout time.Duration
 
 	// Dial is a custom dialer used for the client
-	Dial func(net, addr string) (net.Conn, error)
+	Dial utilnet.DialFunc
 }
 
-// KubeletClient is an interface for all kubelet functionality
-type KubeletClient interface {
-	ConnectionInfoGetter
+// ConnectionInfo provides the information needed to connect to a kubelet
+type ConnectionInfo struct {
+	Scheme    string
+	Hostname  string
+	Port      string
+	Transport http.RoundTripper
 }
 
+// ConnectionInfoGetter provides ConnectionInfo for the kubelet running on a named node
 type ConnectionInfoGetter interface {
-	GetConnectionInfo(ctx api.Context, nodeName string) (scheme string, port uint, transport http.RoundTripper, err error)
-}
-
-// HTTPKubeletClient is the default implementation of KubeletHealthchecker, accesses the kubelet over HTTP.
-type HTTPKubeletClient struct {
-	Client *http.Client
-	Config *KubeletClientConfig
+	GetConnectionInfo(nodeName types.NodeName) (*ConnectionInfo, error)
 }
 
 func MakeTransport(config *KubeletClientConfig) (http.RoundTripper, error) {
@@ -81,43 +82,6 @@ func MakeTransport(config *KubeletClientConfig) (http.RoundTripper, error) {
 	return transport.HTTPWrappersForConfig(config.transportConfig(), rt)
 }
 
-// TODO: this structure is questionable, it should be using client.Config and overriding defaults.
-func NewStaticKubeletClient(config *KubeletClientConfig) (KubeletClient, error) {
-	transport, err := MakeTransport(config)
-	if err != nil {
-		return nil, err
-	}
-	c := &http.Client{
-		Transport: transport,
-		Timeout:   config.HTTPTimeout,
-	}
-	return &HTTPKubeletClient{
-		Client: c,
-		Config: config,
-	}, nil
-}
-
-// In default HTTPKubeletClient ctx is unused.
-func (c *HTTPKubeletClient) GetConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
-	if errs := validation.ValidateNodeName(nodeName, false); len(errs) != 0 {
-		return "", 0, nil, fmt.Errorf("invalid node name: %s", strings.Join(errs, ";"))
-	}
-	scheme := "http"
-	if c.Config.EnableHttps {
-		scheme = "https"
-	}
-	return scheme, c.Config.Port, c.Client.Transport, nil
-}
-
-// FakeKubeletClient is a fake implementation of KubeletClient which returns an error
-// when called.  It is useful to pass to the master in a test configuration with
-// no kubelets.
-type FakeKubeletClient struct{}
-
-func (c FakeKubeletClient) GetConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
-	return "", 0, nil, errors.New("Not Implemented")
-}
-
 // transportConfig converts a client config to an appropriate transport config.
 func (c *KubeletClientConfig) transportConfig() *transport.Config {
 	cfg := &transport.Config{
@@ -135,4 +99,82 @@ func (c *KubeletClientConfig) transportConfig() *transport.Config {
 		cfg.TLS.Insecure = true
 	}
 	return cfg
+}
+
+// NodeGetter defines an interface for looking up a node by name
+type NodeGetter interface {
+	Get(name string, options metav1.GetOptions) (*v1.Node, error)
+}
+
+// NodeGetterFunc allows implementing NodeGetter with a function
+type NodeGetterFunc func(name string, options metav1.GetOptions) (*v1.Node, error)
+
+func (f NodeGetterFunc) Get(name string, options metav1.GetOptions) (*v1.Node, error) {
+	return f(name, options)
+}
+
+// NodeConnectionInfoGetter obtains connection info from the status of a Node API object
+type NodeConnectionInfoGetter struct {
+	// nodes is used to look up Node objects
+	nodes NodeGetter
+	// scheme is the scheme to use to connect to all kubelets
+	scheme string
+	// defaultPort is the port to use if no Kubelet endpoint port is recorded in the node status
+	defaultPort int
+	// transport is the transport to use to send a request to all kubelets
+	transport http.RoundTripper
+	// preferredAddressTypes specifies the preferred order to use to find a node address
+	preferredAddressTypes []v1.NodeAddressType
+}
+
+func NewNodeConnectionInfoGetter(nodes NodeGetter, config KubeletClientConfig) (ConnectionInfoGetter, error) {
+	scheme := "http"
+	if config.EnableHttps {
+		scheme = "https"
+	}
+
+	transport, err := MakeTransport(&config)
+	if err != nil {
+		return nil, err
+	}
+
+	types := []v1.NodeAddressType{}
+	for _, t := range config.PreferredAddressTypes {
+		types = append(types, v1.NodeAddressType(t))
+	}
+
+	return &NodeConnectionInfoGetter{
+		nodes:       nodes,
+		scheme:      scheme,
+		defaultPort: int(config.Port),
+		transport:   transport,
+
+		preferredAddressTypes: types,
+	}, nil
+}
+
+func (k *NodeConnectionInfoGetter) GetConnectionInfo(nodeName types.NodeName) (*ConnectionInfo, error) {
+	node, err := k.nodes.Get(string(nodeName), metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	// Find a kubelet-reported address, using preferred address type
+	host, err := nodeutil.GetPreferredNodeAddress(node, k.preferredAddressTypes)
+	if err != nil {
+		return nil, err
+	}
+
+	// Use the kubelet-reported port, if present
+	port := int(node.Status.DaemonEndpoints.KubeletEndpoint.Port)
+	if port <= 0 {
+		port = k.defaultPort
+	}
+
+	return &ConnectionInfo{
+		Scheme:    k.scheme,
+		Hostname:  host,
+		Port:      strconv.Itoa(port),
+		Transport: k.transport,
+	}, nil
 }

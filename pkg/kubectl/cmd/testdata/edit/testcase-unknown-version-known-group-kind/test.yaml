@@ -1,0 +1,25 @@
+description: edit an unknown version of a known group/kind
+mode: edit
+args:
+- storageclasses.v0.storage.k8s.io/foo
+namespace: default
+expectedStdout:
+- "storageclass \"foo\" edited"
+expectedExitCode: 0
+steps:
+- type: request
+  expectedMethod: GET
+  expectedPath: /apis/storage.k8s.io/v0/storageclasses/foo
+  expectedInput: 0.request
+  resultingStatusCode: 200
+  resultingOutput: 0.response
+- type: edit
+  expectedInput: 1.original
+  resultingOutput: 1.edited
+- type: request
+  expectedMethod: PATCH
+  expectedPath: /apis/storage.k8s.io/v0/storageclasses/foo
+  expectedContentType: application/merge-patch+json
+  expectedInput: 2.request
+  resultingStatusCode: 200
+  resultingOutput: 2.response

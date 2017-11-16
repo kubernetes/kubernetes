@@ -80,7 +80,7 @@ func parseThinLsOutput(output []byte) map[string]uint64 {
 		deviceID := fields[0]
 		usage, err := strconv.ParseUint(fields[1], 10, 64)
 		if err != nil {
-			glog.Warning("unexpected error parsing thin_ls output: %v", err)
+			glog.Warningf("unexpected error parsing thin_ls output: %v", err)
 			continue
 		}
 

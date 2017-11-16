@@ -1,5 +1,3 @@
-// +build linux
-
 /*
 Copyright 2014 The Kubernetes Authors.
 
@@ -23,18 +21,36 @@ import (
 	"os"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/client-go/kubernetes/fake"
+	utilfile "k8s.io/kubernetes/pkg/util/file"
+	utilmount "k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
+func newHostPathType(pathType string) *v1.HostPathType {
+	hostPathType := new(v1.HostPathType)
+	*hostPathType = v1.HostPathType(pathType)
+	return hostPathType
+}
+
+func newHostPathTypeList(pathType ...string) []*v1.HostPathType {
+	typeList := []*v1.HostPathType{}
+	for _, ele := range pathType {
+		typeList = append(typeList, newHostPathType(ele))
+	}
+
+	return typeList
+}
+
 func TestCanSupport(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volumetest.NewFakeVolumeHost("fake", nil, nil, "" /* rootContext */))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost("fake", nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/host-path")
 	if err != nil {
@@ -43,55 +59,45 @@ func TestCanSupport(t *testing.T) {
 	if plug.GetPluginName() != "kubernetes.io/host-path" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
-	if !plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{}}}}) {
+	if !plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{}}}}) {
 		t.Errorf("Expected true")
 	}
-	if !plug.CanSupport(&volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{}}}}}) {
+	if !plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{}}}}}) {
 		t.Errorf("Expected true")
 	}
-	if plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{}}}) {
+	if plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{}}}) {
 		t.Errorf("Expected false")
 	}
 }
 
 func TestGetAccessModes(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil, "" /* rootContext */))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/host-path")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if len(plug.GetAccessModes()) != 1 || plug.GetAccessModes()[0] != api.ReadWriteOnce {
-		t.Errorf("Expected %s PersistentVolumeAccessMode", api.ReadWriteOnce)
+	if len(plug.GetAccessModes()) != 1 || plug.GetAccessModes()[0] != v1.ReadWriteOnce {
+		t.Errorf("Expected %s PersistentVolumeAccessMode", v1.ReadWriteOnce)
 	}
 }
 
 func TestRecycler(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
-	pluginHost := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil, "" /* rootContext */)
-	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, volumetest.NewFakeRecycler, nil, nil, volume.VolumeConfig{}}}, pluginHost)
+	pluginHost := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil)
+	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, volume.VolumeConfig{}}}, nil, pluginHost)
 
-	spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/foo"}}}}}
-	plug, err := plugMgr.FindRecyclablePluginBySpec(spec)
+	spec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/foo"}}}}}
+	_, err := plugMgr.FindRecyclablePluginBySpec(spec)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
-	}
-	recycler, err := plug.NewRecycler("pv-name", spec)
-	if err != nil {
-		t.Errorf("Failed to make a new Recyler: %v", err)
-	}
-	if recycler.GetPath() != spec.PersistentVolume.Spec.HostPath.Path {
-		t.Errorf("Expected %s but got %s", spec.PersistentVolume.Spec.HostPath.Path, recycler.GetPath())
-	}
-	if err := recycler.Recycle(); err != nil {
-		t.Errorf("Mock Recycler expected to return nil but got %s", err)
 	}
 }
 
 func TestDeleter(t *testing.T) {
 	// Deleter has a hard-coded regex for "/tmp".
-	tempPath := fmt.Sprintf("/tmp/hostpath/%s", util.NewUUID())
+	tempPath := fmt.Sprintf("/tmp/hostpath/%s", uuid.NewUUID())
 	defer os.RemoveAll(tempPath)
 	err := os.MkdirAll(tempPath, 0750)
 	if err != nil {
@@ -99,9 +105,9 @@ func TestDeleter(t *testing.T) {
 	}
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil, "" /* rootContext */))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil))
 
-	spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: tempPath}}}}}
+	spec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: tempPath}}}}}
 	plug, err := plugMgr.FindDeletablePluginBySpec(spec)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -116,7 +122,7 @@ func TestDeleter(t *testing.T) {
 	if err := deleter.Delete(); err != nil {
 		t.Errorf("Mock Recycler expected to return nil but got %s", err)
 	}
-	if exists, _ := util.FileExists("foo"); exists {
+	if exists, _ := utilfile.FileExists(tempPath); exists {
 		t.Errorf("Temp path expected to be deleted, but was found at %s", tempPath)
 	}
 }
@@ -133,8 +139,8 @@ func TestDeleterTempDir(t *testing.T) {
 
 	for name, test := range tests {
 		plugMgr := volume.VolumePluginMgr{}
-		plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil, "" /* rootContext */))
-		spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: test.path}}}}}
+		plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil))
+		spec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: test.path}}}}}
 		plug, _ := plugMgr.FindDeletablePluginBySpec(spec)
 		deleter, _ := plug.NewDeleter(spec)
 		err := deleter.Delete()
@@ -148,18 +154,26 @@ func TestDeleterTempDir(t *testing.T) {
 }
 
 func TestProvisioner(t *testing.T) {
-	tempPath := fmt.Sprintf("/tmp/hostpath/%s", util.NewUUID())
+	tempPath := fmt.Sprintf("/tmp/hostpath/%s", uuid.NewUUID())
 	defer os.RemoveAll(tempPath)
 	err := os.MkdirAll(tempPath, 0750)
-
+	if err != nil {
+		t.Errorf("Failed to create tempPath %s error:%v", tempPath, err)
+	}
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil, "" /* rootContext */))
-	spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: tempPath}}}}}
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{ProvisioningEnabled: true}),
+		nil,
+		volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	spec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: tempPath}}}}}
 	plug, err := plugMgr.FindCreatablePluginBySpec(spec)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	creater, err := plug.NewProvisioner(volume.VolumeOptions{Capacity: resource.MustParse("1Gi"), PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete})
+	options := volume.VolumeOptions{
+		PVC: volumetest.CreateTestPVC("1Gi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+	}
+	creater, err := plug.NewProvisioner(options)
 	if err != nil {
 		t.Errorf("Failed to make a new Provisioner: %v", err)
 	}
@@ -171,43 +185,71 @@ func TestProvisioner(t *testing.T) {
 		t.Errorf("Expected pv.Spec.HostPath.Path to not be empty: %#v", pv)
 	}
 	expectedCapacity := resource.NewQuantity(1*1024*1024*1024, resource.BinarySI)
-	actualCapacity := pv.Spec.Capacity[api.ResourceStorage]
+	actualCapacity := pv.Spec.Capacity[v1.ResourceStorage]
 	expectedAmt := expectedCapacity.Value()
 	actualAmt := actualCapacity.Value()
 	if expectedAmt != actualAmt {
 		t.Errorf("Expected capacity %+v but got %+v", expectedAmt, actualAmt)
 	}
 
-	if pv.Spec.PersistentVolumeReclaimPolicy != api.PersistentVolumeReclaimDelete {
-		t.Errorf("Expected reclaim policy %+v but got %+v", api.PersistentVolumeReclaimDelete, pv.Spec.PersistentVolumeReclaimPolicy)
+	if pv.Spec.PersistentVolumeReclaimPolicy != v1.PersistentVolumeReclaimDelete {
+		t.Errorf("Expected reclaim policy %+v but got %+v", v1.PersistentVolumeReclaimDelete, pv.Spec.PersistentVolumeReclaimPolicy)
 	}
 
 	os.RemoveAll(pv.Spec.HostPath.Path)
 }
 
+func TestInvalidHostPath(t *testing.T) {
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost("fake", nil, nil))
+
+	plug, err := plugMgr.FindPluginByName(hostPathPluginName)
+	if err != nil {
+		t.Fatalf("Unable to find plugin %s by name: %v", hostPathPluginName, err)
+	}
+	spec := &v1.Volume{
+		Name:         "vol1",
+		VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/no/backsteps/allowed/.."}},
+	}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
+	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = mounter.SetUp(nil)
+	expectedMsg := "invalid HostPath `/no/backsteps/allowed/..`: must not contain '..'"
+	if err.Error() != expectedMsg {
+		t.Fatalf("expected error `%s` but got `%s`", expectedMsg, err)
+	}
+}
+
 func TestPlugin(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volumetest.NewFakeVolumeHost("fake", nil, nil, "" /* rootContext */))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost("fake", nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/host-path")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	spec := &api.Volume{
+
+	volPath := "/tmp/vol1"
+	spec := &v1.Volume{
 		Name:         "vol1",
-		VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/vol1"}},
+		VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: volPath, Type: newHostPathType(string(v1.HostPathDirectoryOrCreate))}},
 	}
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
+	defer os.RemoveAll(volPath)
 	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
 	if mounter == nil {
-		t.Errorf("Got a nil Mounter")
+		t.Fatalf("Got a nil Mounter")
 	}
 
 	path := mounter.GetPath()
-	if path != "/vol1" {
+	if path != volPath {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
@@ -220,7 +262,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}
 	if unmounter == nil {
-		t.Errorf("Got a nil Unmounter")
+		t.Fatalf("Got a nil Unmounter")
 	}
 
 	if err := unmounter.TearDown(); err != nil {
@@ -229,45 +271,392 @@ func TestPlugin(t *testing.T) {
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
-	pv := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "pvA",
 		},
-		Spec: api.PersistentVolumeSpec{
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				HostPath: &api.HostPathVolumeSource{Path: "foo"},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				HostPath: &v1.HostPathVolumeSource{Path: "foo", Type: newHostPathType(string(v1.HostPathDirectoryOrCreate))},
 			},
-			ClaimRef: &api.ObjectReference{
+			ClaimRef: &v1.ObjectReference{
 				Name: "claimA",
 			},
 		},
 	}
+	defer os.RemoveAll("foo")
 
-	claim := &api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{
+	claim := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "claimA",
 			Namespace: "nsA",
 		},
-		Spec: api.PersistentVolumeClaimSpec{
+		Spec: v1.PersistentVolumeClaimSpec{
 			VolumeName: "pvA",
 		},
-		Status: api.PersistentVolumeClaimStatus{
-			Phase: api.ClaimBound,
+		Status: v1.PersistentVolumeClaimStatus{
+			Phase: v1.ClaimBound,
 		},
 	}
 
 	client := fake.NewSimpleClientset(pv, claim)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volumetest.NewFakeVolumeHost("/tmp/fake", client, nil, "" /* rootContext */))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost("/tmp/fake", client, nil))
 	plug, _ := plugMgr.FindPluginByName(hostPathPluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes
 	spec := volume.NewSpecFromPersistentVolume(pv, true)
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, _ := plug.NewMounter(spec, pod, volume.VolumeOptions{})
+	if mounter == nil {
+		t.Fatalf("Got a nil Mounter")
+	}
 
 	if !mounter.GetAttributes().ReadOnly {
 		t.Errorf("Expected true for mounter.IsReadOnly")
 	}
+}
+
+type fakeFileTypeChecker struct {
+	desiredType string
+}
+
+func (fftc *fakeFileTypeChecker) Mount(source string, target string, fstype string, options []string) error {
+	return nil
+}
+
+func (fftc *fakeFileTypeChecker) Unmount(target string) error {
+	return nil
+}
+
+func (fftc *fakeFileTypeChecker) List() ([]utilmount.MountPoint, error) {
+	return nil, nil
+}
+func (fftc *fakeFileTypeChecker) IsMountPointMatch(mp utilmount.MountPoint, dir string) bool {
+	return false
+}
+
+func (fftc *fakeFileTypeChecker) IsNotMountPoint(file string) (bool, error) {
+	return false, nil
+}
+
+func (fftc *fakeFileTypeChecker) IsLikelyNotMountPoint(file string) (bool, error) {
+	return false, nil
+}
+
+func (fftc *fakeFileTypeChecker) DeviceOpened(pathname string) (bool, error) {
+	return false, nil
+}
+func (fftc *fakeFileTypeChecker) PathIsDevice(pathname string) (bool, error) {
+	return false, nil
+}
+
+func (fftc *fakeFileTypeChecker) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
+	return "fake", nil
+}
+
+func (fftc *fakeFileTypeChecker) MakeRShared(path string) error {
+	return nil
+}
+
+func (fftc *fakeFileTypeChecker) MakeFile(pathname string) error {
+	return nil
+}
+
+func (fftc *fakeFileTypeChecker) MakeDir(pathname string) error {
+	return nil
+}
+
+func (fftc *fakeFileTypeChecker) ExistsPath(pathname string) bool {
+	return true
+}
+
+func (fftc *fakeFileTypeChecker) GetFileType(_ string) (utilmount.FileType, error) {
+	return utilmount.FileType(fftc.desiredType), nil
+}
+
+func setUp() error {
+	err := os.MkdirAll("/tmp/ExistingFolder", os.FileMode(0755))
+	if err != nil {
+		return err
+	}
+
+	f, err := os.OpenFile("/tmp/ExistingFolder/foo", os.O_CREATE, os.FileMode(0644))
+	defer f.Close()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func tearDown() {
+	os.RemoveAll("/tmp/ExistingFolder")
+}
+
+func TestOSFileTypeChecker(t *testing.T) {
+	err := setUp()
+	if err != nil {
+		t.Error(err)
+	}
+	defer tearDown()
+	testCases := []struct {
+		name        string
+		path        string
+		desiredType string
+		isDir       bool
+		isFile      bool
+		isSocket    bool
+		isBlock     bool
+		isChar      bool
+	}{
+		{
+			name:        "Existing Folder",
+			path:        "/tmp/ExistingFolder",
+			desiredType: string(utilmount.FileTypeDirectory),
+			isDir:       true,
+		},
+		{
+			name:        "Existing File",
+			path:        "/tmp/ExistingFolder/foo",
+			desiredType: string(utilmount.FileTypeFile),
+			isFile:      true,
+		},
+		{
+			name:        "Existing Socket File",
+			path:        "/tmp/ExistingFolder/foo",
+			desiredType: string(v1.HostPathSocket),
+			isSocket:    true,
+		},
+		{
+			name:        "Existing Character Device",
+			path:        "/tmp/ExistingFolder/foo",
+			desiredType: string(v1.HostPathCharDev),
+			isChar:      true,
+		},
+		{
+			name:        "Existing Block Device",
+			path:        "/tmp/ExistingFolder/foo",
+			desiredType: string(v1.HostPathBlockDev),
+			isBlock:     true,
+		},
+	}
+
+	for i, tc := range testCases {
+		fakeFTC := &fakeFileTypeChecker{desiredType: tc.desiredType}
+		oftc := newFileTypeChecker(tc.path, fakeFTC)
+
+		path := oftc.GetPath()
+		if path != tc.path {
+			t.Errorf("[%d: %q] got unexpected path: %s", i, tc.name, path)
+		}
+
+		exist := oftc.Exists()
+		if !exist {
+			t.Errorf("[%d: %q] path: %s does not exist", i, tc.name, path)
+		}
+
+		if tc.isDir {
+			if !oftc.IsDir() {
+				t.Errorf("[%d: %q] expected folder, got unexpected: %s", i, tc.name, path)
+			}
+			if oftc.IsFile() {
+				t.Errorf("[%d: %q] expected folder, got unexpected file: %s", i, tc.name, path)
+			}
+			if oftc.IsSocket() {
+				t.Errorf("[%d: %q] expected folder, got unexpected socket file: %s", i, tc.name, path)
+			}
+			if oftc.IsBlock() {
+				t.Errorf("[%d: %q] expected folder, got unexpected block device: %s", i, tc.name, path)
+			}
+			if oftc.IsChar() {
+				t.Errorf("[%d: %q] expected folder, got unexpected character device: %s", i, tc.name, path)
+			}
+		}
+
+		if tc.isFile {
+			if !oftc.IsFile() {
+				t.Errorf("[%d: %q] expected file, got unexpected: %s", i, tc.name, path)
+			}
+			if oftc.IsDir() {
+				t.Errorf("[%d: %q] expected file, got unexpected folder: %s", i, tc.name, path)
+			}
+			if oftc.IsSocket() {
+				t.Errorf("[%d: %q] expected file, got unexpected socket file: %s", i, tc.name, path)
+			}
+			if oftc.IsBlock() {
+				t.Errorf("[%d: %q] expected file, got unexpected block device: %s", i, tc.name, path)
+			}
+			if oftc.IsChar() {
+				t.Errorf("[%d: %q] expected file, got unexpected character device: %s", i, tc.name, path)
+			}
+		}
+
+		if tc.isSocket {
+			if !oftc.IsSocket() {
+				t.Errorf("[%d: %q] expected socket file, got unexpected: %s", i, tc.name, path)
+			}
+			if oftc.IsDir() {
+				t.Errorf("[%d: %q] expected socket file, got unexpected folder: %s", i, tc.name, path)
+			}
+			if !oftc.IsFile() {
+				t.Errorf("[%d: %q] expected socket file, got unexpected file: %s", i, tc.name, path)
+			}
+			if oftc.IsBlock() {
+				t.Errorf("[%d: %q] expected socket file, got unexpected block device: %s", i, tc.name, path)
+			}
+			if oftc.IsChar() {
+				t.Errorf("[%d: %q] expected socket file, got unexpected character device: %s", i, tc.name, path)
+			}
+		}
+
+		if tc.isChar {
+			if !oftc.IsChar() {
+				t.Errorf("[%d: %q] expected character device, got unexpected: %s", i, tc.name, path)
+			}
+			if oftc.IsDir() {
+				t.Errorf("[%d: %q] expected character device, got unexpected folder: %s", i, tc.name, path)
+			}
+			if !oftc.IsFile() {
+				t.Errorf("[%d: %q] expected character device, got unexpected file: %s", i, tc.name, path)
+			}
+			if oftc.IsSocket() {
+				t.Errorf("[%d: %q] expected character device, got unexpected socket file: %s", i, tc.name, path)
+			}
+			if oftc.IsBlock() {
+				t.Errorf("[%d: %q] expected character device, got unexpected block device: %s", i, tc.name, path)
+			}
+		}
+
+		if tc.isBlock {
+			if !oftc.IsBlock() {
+				t.Errorf("[%d: %q] expected block device, got unexpected: %s", i, tc.name, path)
+			}
+			if oftc.IsDir() {
+				t.Errorf("[%d: %q] expected block device, got unexpected folder: %s", i, tc.name, path)
+			}
+			if !oftc.IsFile() {
+				t.Errorf("[%d: %q] expected block device, got unexpected file: %s", i, tc.name, path)
+			}
+			if oftc.IsSocket() {
+				t.Errorf("[%d: %q] expected block device, got unexpected socket file: %s", i, tc.name, path)
+			}
+			if oftc.IsChar() {
+				t.Errorf("[%d: %q] expected block device, got unexpected character device: %s", i, tc.name, path)
+			}
+		}
+	}
+
+}
+
+type fakeHostPathTypeChecker struct {
+	name            string
+	path            string
+	exists          bool
+	isDir           bool
+	isFile          bool
+	isSocket        bool
+	isBlock         bool
+	isChar          bool
+	validpathType   []*v1.HostPathType
+	invalidpathType []*v1.HostPathType
+}
+
+func (ftc *fakeHostPathTypeChecker) MakeFile() error { return nil }
+func (ftc *fakeHostPathTypeChecker) MakeDir() error  { return nil }
+func (ftc *fakeHostPathTypeChecker) Exists() bool    { return ftc.exists }
+func (ftc *fakeHostPathTypeChecker) IsFile() bool    { return ftc.isFile }
+func (ftc *fakeHostPathTypeChecker) IsDir() bool     { return ftc.isDir }
+func (ftc *fakeHostPathTypeChecker) IsBlock() bool   { return ftc.isBlock }
+func (ftc *fakeHostPathTypeChecker) IsChar() bool    { return ftc.isChar }
+func (ftc *fakeHostPathTypeChecker) IsSocket() bool  { return ftc.isSocket }
+func (ftc *fakeHostPathTypeChecker) GetPath() string { return ftc.path }
+
+func TestHostPathTypeCheckerInternal(t *testing.T) {
+	testCases := []fakeHostPathTypeChecker{
+		{
+			name:          "Existing Folder",
+			path:          "/existingFolder",
+			isDir:         true,
+			exists:        true,
+			validpathType: newHostPathTypeList(string(v1.HostPathDirectoryOrCreate), string(v1.HostPathDirectory)),
+			invalidpathType: newHostPathTypeList(string(v1.HostPathFileOrCreate), string(v1.HostPathFile),
+				string(v1.HostPathSocket), string(v1.HostPathCharDev), string(v1.HostPathBlockDev)),
+		},
+		{
+			name:          "New Folder",
+			path:          "/newFolder",
+			isDir:         false,
+			exists:        false,
+			validpathType: newHostPathTypeList(string(v1.HostPathDirectoryOrCreate)),
+			invalidpathType: newHostPathTypeList(string(v1.HostPathDirectory), string(v1.HostPathFile),
+				string(v1.HostPathSocket), string(v1.HostPathCharDev), string(v1.HostPathBlockDev)),
+		},
+		{
+			name:          "Existing File",
+			path:          "/existingFile",
+			isFile:        true,
+			exists:        true,
+			validpathType: newHostPathTypeList(string(v1.HostPathFileOrCreate), string(v1.HostPathFile)),
+			invalidpathType: newHostPathTypeList(string(v1.HostPathDirectoryOrCreate), string(v1.HostPathDirectory),
+				string(v1.HostPathSocket), string(v1.HostPathCharDev), string(v1.HostPathBlockDev)),
+		},
+		{
+			name:          "New File",
+			path:          "/newFile",
+			isFile:        false,
+			exists:        false,
+			validpathType: newHostPathTypeList(string(v1.HostPathFileOrCreate)),
+			invalidpathType: newHostPathTypeList(string(v1.HostPathDirectory),
+				string(v1.HostPathSocket), string(v1.HostPathCharDev), string(v1.HostPathBlockDev)),
+		},
+		{
+			name:          "Existing Socket",
+			path:          "/existing.socket",
+			isSocket:      true,
+			isFile:        true,
+			exists:        true,
+			validpathType: newHostPathTypeList(string(v1.HostPathSocket), string(v1.HostPathFileOrCreate), string(v1.HostPathFile)),
+			invalidpathType: newHostPathTypeList(string(v1.HostPathDirectoryOrCreate), string(v1.HostPathDirectory),
+				string(v1.HostPathCharDev), string(v1.HostPathBlockDev)),
+		},
+		{
+			name:          "Existing Character Device",
+			path:          "/existing.char",
+			isChar:        true,
+			isFile:        true,
+			exists:        true,
+			validpathType: newHostPathTypeList(string(v1.HostPathCharDev), string(v1.HostPathFileOrCreate), string(v1.HostPathFile)),
+			invalidpathType: newHostPathTypeList(string(v1.HostPathDirectoryOrCreate), string(v1.HostPathDirectory),
+				string(v1.HostPathSocket), string(v1.HostPathBlockDev)),
+		},
+		{
+			name:          "Existing Block Device",
+			path:          "/existing.block",
+			isBlock:       true,
+			isFile:        true,
+			exists:        true,
+			validpathType: newHostPathTypeList(string(v1.HostPathBlockDev), string(v1.HostPathFileOrCreate), string(v1.HostPathFile)),
+			invalidpathType: newHostPathTypeList(string(v1.HostPathDirectoryOrCreate), string(v1.HostPathDirectory),
+				string(v1.HostPathSocket), string(v1.HostPathCharDev)),
+		},
+	}
+
+	for i, tc := range testCases {
+		for _, pathType := range tc.validpathType {
+			err := checkTypeInternal(&tc, pathType)
+			if err != nil {
+				t.Errorf("[%d: %q] [%q] expected nil, got %v", i, tc.name, string(*pathType), err)
+			}
+		}
+
+		for _, pathType := range tc.invalidpathType {
+			checkResult := checkTypeInternal(&tc, pathType)
+			if checkResult == nil {
+				t.Errorf("[%d: %q] [%q] expected error, got nil", i, tc.name, string(*pathType))
+			}
+		}
+	}
+
 }

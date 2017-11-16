@@ -17,10 +17,11 @@ limitations under the License.
 package quota
 
 import (
-	"k8s.io/kubernetes/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/client-go/tools/cache"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // UsageStatsOptions is an options structs that describes how stats should be calculated
@@ -29,6 +30,8 @@ type UsageStatsOptions struct {
 	Namespace string
 	// Scopes that must match counted objects
 	Scopes []api.ResourceQuotaScope
+	// Resources are the set of resources to include in the measurement
+	Resources []api.ResourceName
 }
 
 // UsageStats is result of measuring observed resource use in the system
@@ -37,30 +40,44 @@ type UsageStats struct {
 	Used api.ResourceList
 }
 
-// Evaluator knows how to evaluate quota usage for a particular group kind
+// Evaluator knows how to evaluate quota usage for a particular group resource
 type Evaluator interface {
 	// Constraints ensures that each required resource is present on item
 	Constraints(required []api.ResourceName, item runtime.Object) error
-	// Get returns the object with specified namespace and name
-	Get(namespace, name string) (runtime.Object, error)
-	// GroupKind returns the groupKind that this object knows how to evaluate
-	GroupKind() unversioned.GroupKind
-	// MatchesResources is the list of resources that this evaluator matches
-	MatchesResources() []api.ResourceName
+	// GroupResource returns the groupResource that this object knows how to evaluate
+	GroupResource() schema.GroupResource
+	// Handles determines if quota could be impacted by the specified attribute.
+	// If true, admission control must perform quota processing for the operation, otherwise it is safe to ignore quota.
+	Handles(operation admission.Attributes) bool
 	// Matches returns true if the specified quota matches the input item
-	Matches(resourceQuota *api.ResourceQuota, item runtime.Object) bool
-	// OperationResources returns the set of resources that could be updated for the
-	// specified operation for this kind.  If empty, admission control will ignore
-	// quota processing for the operation.
-	OperationResources(operation admission.Operation) []api.ResourceName
+	Matches(resourceQuota *api.ResourceQuota, item runtime.Object) (bool, error)
+	// MatchingResources takes the input specified list of resources and returns the set of resources evaluator matches.
+	MatchingResources(input []api.ResourceName) []api.ResourceName
 	// Usage returns the resource usage for the specified object
-	Usage(object runtime.Object) api.ResourceList
+	Usage(item runtime.Object) (api.ResourceList, error)
 	// UsageStats calculates latest observed usage stats for all objects
 	UsageStats(options UsageStatsOptions) (UsageStats, error)
 }
 
-// Registry holds the list of evaluators associated to a particular group kind
-type Registry interface {
-	// Evaluators returns the set Evaluator objects registered to a groupKind
-	Evaluators() map[unversioned.GroupKind]Evaluator
+// Configuration defines how the quota system is configured.
+type Configuration interface {
+	// IgnoredResources are ignored by quota.
+	IgnoredResources() map[schema.GroupResource]struct{}
+	// Evaluators for quota evaluation.
+	Evaluators() []Evaluator
 }
+
+// Registry maintains a list of evaluators
+type Registry interface {
+	// Add to registry
+	Add(e Evaluator)
+	// Remove from registry
+	Remove(e Evaluator)
+	// Get by group resource
+	Get(gr schema.GroupResource) Evaluator
+	// List from registry
+	List() []Evaluator
+}
+
+// ListerForResourceFunc knows how to get a lister for a specific resource
+type ListerForResourceFunc func(schema.GroupVersionResource) (cache.GenericLister, error)

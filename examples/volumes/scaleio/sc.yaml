@@ -1,0 +1,11 @@
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: sio-small
+provisioner: kubernetes.io/scaleio
+parameters:
+  gateway: https://localhost:443/api 
+  system: scaleio
+  protectionDomain: default
+  secretRef: sio-secret
+  fsType: xfs

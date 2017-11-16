@@ -9,11 +9,8 @@ import (
 
 type RunWatchAndBuildCommandFlags struct {
 	Recurse     bool
-	Race        bool
-	Cover       bool
-	CoverPkg    string
 	SkipPackage string
-	Tags        string
+	GoOpts      map[string]interface{}
 
 	//for run and watch commands
 	NumCPU         int
@@ -87,15 +84,57 @@ func (c *RunWatchAndBuildCommandFlags) computeNodes() {
 	}
 }
 
+func (c *RunWatchAndBuildCommandFlags) stringSlot(slot string) *string {
+	var opt string
+	c.GoOpts[slot] = &opt
+	return &opt
+}
+
+func (c *RunWatchAndBuildCommandFlags) boolSlot(slot string) *bool {
+	var opt bool
+	c.GoOpts[slot] = &opt
+	return &opt
+}
+
+func (c *RunWatchAndBuildCommandFlags) intSlot(slot string) *int {
+	var opt int
+	c.GoOpts[slot] = &opt
+	return &opt
+}
+
 func (c *RunWatchAndBuildCommandFlags) flags(mode int) {
+	c.GoOpts = make(map[string]interface{})
+
 	onWindows := (runtime.GOOS == "windows")
 
-	c.FlagSet.BoolVar(&(c.Recurse), "r", false, "Find and run test suites under the current directory recursively")
-	c.FlagSet.BoolVar(&(c.Race), "race", false, "Run tests with race detection enabled")
-	c.FlagSet.BoolVar(&(c.Cover), "cover", false, "Run tests with coverage analysis, will generate coverage profiles with the package name in the current directory")
-	c.FlagSet.StringVar(&(c.CoverPkg), "coverpkg", "", "Run tests with coverage on the given external modules")
+	c.FlagSet.BoolVar(&(c.Recurse), "r", false, "Find and run test suites under the current directory recursively.")
+	c.FlagSet.BoolVar(c.boolSlot("race"), "race", false, "Run tests with race detection enabled.")
+	c.FlagSet.BoolVar(c.boolSlot("cover"), "cover", false, "Run tests with coverage analysis, will generate coverage profiles with the package name in the current directory.")
+	c.FlagSet.StringVar(c.stringSlot("coverpkg"), "coverpkg", "", "Run tests with coverage on the given external modules.")
 	c.FlagSet.StringVar(&(c.SkipPackage), "skipPackage", "", "A comma-separated list of package names to be skipped.  If any part of the package's path matches, that package is ignored.")
-	c.FlagSet.StringVar(&(c.Tags), "tags", "", "A list of build tags to consider satisfied during the build")
+	c.FlagSet.StringVar(c.stringSlot("tags"), "tags", "", "A list of build tags to consider satisfied during the build.")
+	c.FlagSet.StringVar(c.stringSlot("gcflags"), "gcflags", "", "Arguments to pass on each go tool compile invocation.")
+	c.FlagSet.StringVar(c.stringSlot("covermode"), "covermode", "", "Set the mode for coverage analysis.")
+	c.FlagSet.BoolVar(c.boolSlot("a"), "a", false, "Force rebuilding of packages that are already up-to-date.")
+	c.FlagSet.BoolVar(c.boolSlot("n"), "n", false, "Have `go test` print the commands but do not run them.")
+	c.FlagSet.BoolVar(c.boolSlot("msan"), "msan", false, "Enable interoperation with memory sanitizer.")
+	c.FlagSet.BoolVar(c.boolSlot("x"), "x", false, "Have `go test` print the commands.")
+	c.FlagSet.BoolVar(c.boolSlot("work"), "work", false, "Print the name of the temporary work directory and do not delete it when exiting.")
+	c.FlagSet.StringVar(c.stringSlot("asmflags"), "asmflags", "", "Arguments to pass on each go tool asm invocation.")
+	c.FlagSet.StringVar(c.stringSlot("buildmode"), "buildmode", "", "Build mode to use. See 'go help buildmode' for more.")
+	c.FlagSet.StringVar(c.stringSlot("compiler"), "compiler", "", "Name of compiler to use, as in runtime.Compiler (gccgo or gc).")
+	c.FlagSet.StringVar(c.stringSlot("gccgoflags"), "gccgoflags", "", "Arguments to pass on each gccgo compiler/linker invocation.")
+	c.FlagSet.StringVar(c.stringSlot("installsuffix"), "installsuffix", "", "A suffix to use in the name of the package installation directory.")
+	c.FlagSet.StringVar(c.stringSlot("ldflags"), "ldflags", "", "Arguments to pass on each go tool link invocation.")
+	c.FlagSet.BoolVar(c.boolSlot("linkshared"), "linkshared", false, "Link against shared libraries previously created with -buildmode=shared.")
+	c.FlagSet.StringVar(c.stringSlot("pkgdir"), "pkgdir", "", "install and load all packages from the given dir instead of the usual locations.")
+	c.FlagSet.StringVar(c.stringSlot("toolexec"), "toolexec", "", "a program to use to invoke toolchain programs like vet and asm.")
+	c.FlagSet.IntVar(c.intSlot("blockprofilerate"), "blockprofilerate", 1, "Control the detail provided in goroutine blocking profiles by calling runtime.SetBlockProfileRate with the given value.")
+	c.FlagSet.StringVar(c.stringSlot("coverprofile"), "coverprofile", "", "Write a coverage profile to the specified file after all tests have passed.")
+	c.FlagSet.StringVar(c.stringSlot("cpuprofile"), "cpuprofile", "", "Write a CPU profile to the specified file before exiting.")
+	c.FlagSet.StringVar(c.stringSlot("memprofile"), "memprofile", "", "Write a memory profile to the specified file after all tests have passed.")
+	c.FlagSet.IntVar(c.intSlot("memprofilerate"), "memprofilerate", 0, "Enable more precise (and expensive) memory profiles by setting runtime.MemProfileRate.")
+	c.FlagSet.StringVar(c.stringSlot("outputdir"), "outputdir", "", "Place output files from profiling in the specified directory.")
 
 	if mode == runMode || mode == watchMode {
 		config.Flags(c.FlagSet, "", false)

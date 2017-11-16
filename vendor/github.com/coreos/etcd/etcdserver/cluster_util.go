@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -73,6 +73,7 @@ func getClusterFromRemotePeers(urls []string, timeout time.Duration, logerr bool
 			continue
 		}
 		b, err := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
 		if err != nil {
 			if logerr {
 				plog.Warningf("could not read the body of cluster response: %v", err)
@@ -93,7 +94,16 @@ func getClusterFromRemotePeers(urls []string, timeout time.Duration, logerr bool
 			}
 			continue
 		}
-		return membership.NewClusterFromMembers("", id, membs), nil
+
+		// check the length of membership members
+		// if the membership members are present then prepare and return raft cluster
+		// if membership members are not present then the raft cluster formed will be
+		// an invalid empty cluster hence return failed to get raft cluster member(s) from the given urls error
+		if len(membs) > 0 {
+			return membership.NewClusterFromMembers("", id, membs), nil
+		}
+
+		return nil, fmt.Errorf("failed to get raft cluster member(s) from the given urls.")
 	}
 	return nil, fmt.Errorf("could not retrieve cluster information from the given urls")
 }

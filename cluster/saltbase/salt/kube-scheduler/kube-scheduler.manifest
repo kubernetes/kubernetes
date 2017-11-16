@@ -1,11 +1,22 @@
-{% set params = "" -%}
+{% set params = "--master=127.0.0.1:8080" -%}
+{% set srv_kube_path = "/srv/kubernetes" -%}
 
 {% set log_level = pillar['log_level'] -%}
 {% if pillar['scheduler_test_log_level'] is defined -%}
   {% set log_level = pillar['scheduler_test_log_level'] -%}
 {% endif -%}
 
-{% set params = params + log_level -%}
+{% set feature_gates = "" -%}
+{% if grains.feature_gates is defined -%}
+  {% set feature_gates = "--feature-gates=" + grains.feature_gates -%}
+{% endif -%}
+
+{% set scheduling_algorithm_provider = "" -%}
+{% if grains.scheduling_algorithm_provider is defined -%}
+  {% set scheduling_algorithm_provider = "--algorithm-provider=" + grains.scheduling_algorithm_provider -%}
+{% endif -%}
+
+{% set params = params + log_level + " " + feature_gates + " " + scheduling_algorithm_provider -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
 {% if pillar['scheduler_test_args'] is defined -%}
@@ -18,6 +29,9 @@
 "metadata": {
   "name":"kube-scheduler",
   "namespace": "kube-system",
+  "annotations": {
+    "scheduler.alpha.kubernetes.io/critical-pod": ""
+  },
   "labels": {
     "tier": "control-plane",
     "component": "kube-scheduler"
@@ -31,13 +45,13 @@
     "image": "{{pillar['kube_docker_registry']}}/kube-scheduler:{{pillar['kube-scheduler_docker_tag']}}",
     "resources": {
       "requests": {
-        "cpu": "100m"
+        "cpu": "75m"
       }
     },
     "command": [
                  "/bin/sh",
                  "-c",
-                 "/usr/local/bin/kube-scheduler --master=127.0.0.1:8080 {{params}} 1>>/var/log/kube-scheduler.log 2>&1"
+                 "/usr/local/bin/kube-scheduler {{params}} 1>>/var/log/kube-scheduler.log 2>&1"
                ],
     "livenessProbe": {
       "httpGet": {
@@ -53,14 +67,23 @@
           "name": "logfile",
           "mountPath": "/var/log/kube-scheduler.log",
           "readOnly": false
+        },
+        {
+          "name": "srvkube",
+          "mountPath": "{{srv_kube_path}}",
+          "readOnly": true
         }
       ]
     }
 ],
 "volumes":[
-  { "name": "logfile",
-    "hostPath": {
-        "path": "/var/log/kube-scheduler.log"}
+  {
+    "name": "srvkube",
+    "hostPath": {"path": "{{srv_kube_path}}"}
+  },
+  {
+    "name": "logfile",
+    "hostPath": {"path": "/var/log/kube-scheduler.log", "type": "FileOrCreate"}
   }
 ]
 }}

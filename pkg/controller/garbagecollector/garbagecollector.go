@@ -18,304 +18,536 @@ package garbagecollector
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/meta/metatypes"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/typed/dynamic"
-	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/types"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/util/workqueue"
-	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
+	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration
+	// install the prometheus plugin
+	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus"
+	// import known versions
+	_ "k8s.io/client-go/kubernetes"
 )
 
-const ResourceResyncTime = 60 * time.Second
+const ResourceResyncTime time.Duration = 0
 
-type monitor struct {
-	store      cache.Store
-	controller *framework.Controller
+// GarbageCollector runs reflectors to watch for changes of managed API
+// objects, funnels the results to a single-threaded dependencyGraphBuilder,
+// which builds a graph caching the dependencies among objects. Triggered by the
+// graph changes, the dependencyGraphBuilder enqueues objects that can
+// potentially be garbage-collected to the `attemptToDelete` queue, and enqueues
+// objects whose dependents need to be orphaned to the `attemptToOrphan` queue.
+// The GarbageCollector has workers who consume these two queues, send requests
+// to the API server to delete/update the objects accordingly.
+// Note that having the dependencyGraphBuilder notify the garbage collector
+// ensures that the garbage collector operates with a graph that is at least as
+// up to date as the notification is sent.
+type GarbageCollector struct {
+	restMapper resettableRESTMapper
+	// clientPool uses the regular dynamicCodec. We need it to update
+	// finalizers. It can be removed if we support patching finalizers.
+	clientPool dynamic.ClientPool
+	// garbage collector attempts to delete the items in attemptToDelete queue when the time is ripe.
+	attemptToDelete workqueue.RateLimitingInterface
+	// garbage collector attempts to orphan the dependents of the items in the attemptToOrphan queue, then deletes the items.
+	attemptToOrphan        workqueue.RateLimitingInterface
+	dependencyGraphBuilder *GraphBuilder
+	// GC caches the owners that do not exist according to the API server.
+	absentOwnerCache *UIDCache
+	sharedInformers  informers.SharedInformerFactory
+
+	workerLock sync.RWMutex
 }
 
-type objectReference struct {
-	metatypes.OwnerReference
-	// This is needed by the dynamic client
-	Namespace string
-}
-
-func (s objectReference) String() string {
-	return fmt.Sprintf("[%s/%s, namespace: %s, name: %s, uid: %s]", s.APIVersion, s.Kind, s.Namespace, s.Name, s.UID)
-}
-
-// node does not require a lock to protect. The single-threaded
-// Propagator.processEvent() is the sole writer of the nodes. The multi-threaded
-// GarbageCollector.processItem() reads the nodes, but it only reads the fields
-// that never get changed by Propagator.processEvent().
-type node struct {
-	identity objectReference
-	// dependents will be read by the orphan() routine, we need to protect it with a lock.
-	dependentsLock *sync.RWMutex
-	dependents     map[*node]struct{}
-	// When processing an Update event, we need to compare the updated
-	// ownerReferences with the owners recorded in the graph.
-	owners []metatypes.OwnerReference
-}
-
-func (ownerNode *node) addDependent(dependent *node) {
-	ownerNode.dependentsLock.Lock()
-	defer ownerNode.dependentsLock.Unlock()
-	ownerNode.dependents[dependent] = struct{}{}
-}
-
-func (ownerNode *node) deleteDependent(dependent *node) {
-	ownerNode.dependentsLock.Lock()
-	defer ownerNode.dependentsLock.Unlock()
-	delete(ownerNode.dependents, dependent)
-}
-
-type eventType int
-
-const (
-	addEvent eventType = iota
-	updateEvent
-	deleteEvent
-)
-
-type event struct {
-	eventType eventType
-	obj       interface{}
-	// the update event comes with an old object, but it's not used by the garbage collector.
-	oldObj interface{}
-}
-
-type concurrentUIDToNode struct {
-	*sync.RWMutex
-	uidToNode map[types.UID]*node
-}
-
-func (m *concurrentUIDToNode) Write(node *node) {
-	m.Lock()
-	defer m.Unlock()
-	m.uidToNode[node.identity.UID] = node
-}
-
-func (m *concurrentUIDToNode) Read(uid types.UID) (*node, bool) {
-	m.RLock()
-	defer m.RUnlock()
-	n, ok := m.uidToNode[uid]
-	return n, ok
-}
-
-func (m *concurrentUIDToNode) Delete(uid types.UID) {
-	m.Lock()
-	defer m.Unlock()
-	delete(m.uidToNode, uid)
-}
-
-type Propagator struct {
-	eventQueue *workqueue.Type
-	// uidToNode doesn't require a lock to protect, because only the
-	// single-threaded Propagator.processEvent() reads/writes it.
-	uidToNode *concurrentUIDToNode
-	gc        *GarbageCollector
-}
-
-// addDependentToOwners adds n to owners' dependents list. If the owner does not
-// exist in the p.uidToNode yet, a "virtual" node will be created to represent
-// the owner. The "virtual" node will be enqueued to the dirtyQueue, so that
-// processItem() will verify if the owner exists according to the API server.
-func (p *Propagator) addDependentToOwners(n *node, owners []metatypes.OwnerReference) {
-	for _, owner := range owners {
-		ownerNode, ok := p.uidToNode.Read(owner.UID)
-		if !ok {
-			// Create a "virtual" node in the graph for the owner if it doesn't
-			// exist in the graph yet. Then enqueue the virtual node into the
-			// dirtyQueue. The garbage processor will enqueue a virtual delete
-			// event to delete it from the graph if API server confirms this
-			// owner doesn't exist.
-			ownerNode = &node{
-				identity: objectReference{
-					OwnerReference: owner,
-					Namespace:      n.identity.Namespace,
-				},
-				dependentsLock: &sync.RWMutex{},
-				dependents:     make(map[*node]struct{}),
-			}
-			p.uidToNode.Write(ownerNode)
-			p.gc.dirtyQueue.Add(ownerNode)
-		}
-		ownerNode.addDependent(n)
+func NewGarbageCollector(
+	metaOnlyClientPool dynamic.ClientPool,
+	clientPool dynamic.ClientPool,
+	mapper resettableRESTMapper,
+	deletableResources map[schema.GroupVersionResource]struct{},
+	ignoredResources map[schema.GroupResource]struct{},
+	sharedInformers informers.SharedInformerFactory,
+	informersStarted <-chan struct{},
+) (*GarbageCollector, error) {
+	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
+	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
+	absentOwnerCache := NewUIDCache(500)
+	gc := &GarbageCollector{
+		clientPool:       clientPool,
+		restMapper:       mapper,
+		attemptToDelete:  attemptToDelete,
+		attemptToOrphan:  attemptToOrphan,
+		absentOwnerCache: absentOwnerCache,
 	}
+	gb := &GraphBuilder{
+		metaOnlyClientPool: metaOnlyClientPool,
+		informersStarted:   informersStarted,
+		restMapper:         mapper,
+		graphChanges:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),
+		uidToNode: &concurrentUIDToNode{
+			uidToNode: make(map[types.UID]*node),
+		},
+		attemptToDelete:  attemptToDelete,
+		attemptToOrphan:  attemptToOrphan,
+		absentOwnerCache: absentOwnerCache,
+		sharedInformers:  sharedInformers,
+		ignoredResources: ignoredResources,
+	}
+	if err := gb.syncMonitors(deletableResources); err != nil {
+		utilruntime.HandleError(fmt.Errorf("failed to sync all monitors: %v", err))
+	}
+	gc.dependencyGraphBuilder = gb
+
+	return gc, nil
 }
 
-// insertNode insert the node to p.uidToNode; then it finds all owners as listed
-// in n.owners, and adds the node to their dependents list.
-func (p *Propagator) insertNode(n *node) {
-	p.uidToNode.Write(n)
-	p.addDependentToOwners(n, n.owners)
-}
-
-// removeDependentFromOwners remove n from owners' dependents list.
-func (p *Propagator) removeDependentFromOwners(n *node, owners []metatypes.OwnerReference) {
-	for _, owner := range owners {
-		ownerNode, ok := p.uidToNode.Read(owner.UID)
-		if !ok {
-			continue
-		}
-		ownerNode.deleteDependent(n)
+// resyncMonitors starts or stops resource monitors as needed to ensure that all
+// (and only) those resources present in the map are monitored.
+func (gc *GarbageCollector) resyncMonitors(deletableResources map[schema.GroupVersionResource]struct{}) error {
+	if err := gc.dependencyGraphBuilder.syncMonitors(deletableResources); err != nil {
+		return err
 	}
-}
-
-// removeNode removes the node from p.uidToNode, then finds all
-// owners as listed in n.owners, and removes n from their dependents list.
-func (p *Propagator) removeNode(n *node) {
-	p.uidToNode.Delete(n.identity.UID)
-	p.removeDependentFromOwners(n, n.owners)
-}
-
-// TODO: profile this function to see if a naive N^2 algorithm performs better
-// when the number of references is small.
-func referencesDiffs(old []metatypes.OwnerReference, new []metatypes.OwnerReference) (added []metatypes.OwnerReference, removed []metatypes.OwnerReference) {
-	oldUIDToRef := make(map[string]metatypes.OwnerReference)
-	for i := 0; i < len(old); i++ {
-		oldUIDToRef[string(old[i].UID)] = old[i]
-	}
-	oldUIDSet := sets.StringKeySet(oldUIDToRef)
-	newUIDToRef := make(map[string]metatypes.OwnerReference)
-	for i := 0; i < len(new); i++ {
-		newUIDToRef[string(new[i].UID)] = new[i]
-	}
-	newUIDSet := sets.StringKeySet(newUIDToRef)
-
-	addedUID := newUIDSet.Difference(oldUIDSet)
-	removedUID := oldUIDSet.Difference(newUIDSet)
-
-	for uid := range addedUID {
-		added = append(added, newUIDToRef[uid])
-	}
-	for uid := range removedUID {
-		removed = append(removed, oldUIDToRef[uid])
-	}
-	return added, removed
-}
-
-func shouldOrphanDependents(e event, accessor meta.Object) bool {
-	// The delta_fifo may combine the creation and update of the object into one
-	// event, so we need to check AddEvent as well.
-	if e.oldObj == nil {
-		if accessor.GetDeletionTimestamp() == nil {
-			return false
-		}
-	} else {
-		oldAccessor, err := meta.Accessor(e.oldObj)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("cannot access oldObj: %v", err))
-			return false
-		}
-		// ignore the event if it's not updating DeletionTimestamp from non-nil to nil.
-		if accessor.GetDeletionTimestamp() == nil || oldAccessor.GetDeletionTimestamp() != nil {
-			return false
-		}
-	}
-	finalizers := accessor.GetFinalizers()
-	for _, finalizer := range finalizers {
-		if finalizer == api.FinalizerOrphan {
-			return true
-		}
-	}
-	return false
-}
-
-// dependents are copies of pointers to the owner's dependents, they don't need to be locked.
-func (gc *GarbageCollector) orhpanDependents(owner objectReference, dependents []*node) error {
-	var failedDependents []objectReference
-	var errorsSlice []error
-	for _, dependent := range dependents {
-		// the dependent.identity.UID is used as precondition
-		deleteOwnerRefPatch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"$patch":"delete","uid":"%s"}],"uid":"%s"}}`, owner.UID, dependent.identity.UID)
-		_, err := gc.patchObject(dependent.identity, []byte(deleteOwnerRefPatch))
-		// note that if the target ownerReference doesn't exist in the
-		// dependent, strategic merge patch will NOT return an error.
-		if err != nil && !errors.IsNotFound(err) {
-			errorsSlice = append(errorsSlice, fmt.Errorf("orphaning %s failed with %v", dependent.identity, err))
-		}
-	}
-	if len(failedDependents) != 0 {
-		return fmt.Errorf("failed to orphan dependents of owner %s, got errors: %s", owner, utilerrors.NewAggregate(errorsSlice).Error())
-	}
-	glog.V(6).Infof("successfully updated all dependents")
+	gc.dependencyGraphBuilder.startMonitors()
 	return nil
 }
 
-// TODO: Using Patch when strategicmerge supports deleting an entry from a
-// slice of a base type.
-func (gc *GarbageCollector) removeOrphanFinalizer(owner *node) error {
-	const retries = 5
-	for count := 0; count < retries; count++ {
-		ownerObject, err := gc.getObject(owner.identity)
-		if err != nil {
-			return fmt.Errorf("cannot finalize owner %s, because cannot get it. The garbage collector will retry later.", owner.identity)
-		}
-		accessor, err := meta.Accessor(ownerObject)
-		if err != nil {
-			return fmt.Errorf("cannot access the owner object: %v. The garbage collector will retry later.", err)
-		}
-		finalizers := accessor.GetFinalizers()
-		var newFinalizers []string
-		found := false
-		for _, f := range finalizers {
-			if f == api.FinalizerOrphan {
-				found = true
-			} else {
-				newFinalizers = append(newFinalizers, f)
-			}
-		}
-		if !found {
-			glog.V(6).Infof("the orphan finalizer is already removed from object %s", owner.identity)
-			return nil
-		}
-		// remove the owner from dependent's OwnerReferences
-		ownerObject.SetFinalizers(newFinalizers)
-		_, err = gc.updateObject(owner.identity, ownerObject)
-		if err == nil {
-			return nil
-		}
-		if err != nil && !errors.IsConflict(err) {
-			return fmt.Errorf("cannot update the finalizers of owner %s, with error: %v, tried %d times", owner.identity, err, count+1)
-		}
-		// retry if it's a conflict
-		glog.V(6).Infof("got conflict updating the owner object %s, tried %d times", owner.identity, count+1)
-	}
-	return fmt.Errorf("updateMaxRetries(%d) has reached. The garbage collector will retry later for owner %v.", retries, owner.identity)
-}
+func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
+	defer utilruntime.HandleCrash()
+	defer gc.attemptToDelete.ShutDown()
+	defer gc.attemptToOrphan.ShutDown()
+	defer gc.dependencyGraphBuilder.graphChanges.ShutDown()
 
-// orphanFinalizer dequeues a node from the orphanQueue, then finds its dependents
-// based on the graph maintained by the GC, then removes it from the
-// OwnerReferences of its dependents, and finally updates the owner to remove
-// the "Orphan" finalizer. The node is add back into the orphanQueue if any of
-// these steps fail.
-func (gc *GarbageCollector) orphanFinalizer() {
-	key, quit := gc.orphanQueue.Get()
-	if quit {
+	glog.Infof("Starting garbage collector controller")
+	defer glog.Infof("Shutting down garbage collector controller")
+
+	go gc.dependencyGraphBuilder.Run(stopCh)
+
+	if !controller.WaitForCacheSync("garbage collector", stopCh, gc.dependencyGraphBuilder.IsSynced) {
 		return
 	}
-	defer gc.orphanQueue.Done(key)
-	owner, ok := key.(*node)
+
+	glog.Infof("Garbage collector: all resource monitors have synced. Proceeding to collect garbage")
+
+	// gc workers
+	for i := 0; i < workers; i++ {
+		go wait.Until(gc.runAttemptToDeleteWorker, 1*time.Second, stopCh)
+		go wait.Until(gc.runAttemptToOrphanWorker, 1*time.Second, stopCh)
+	}
+
+	<-stopCh
+}
+
+// resettableRESTMapper is a RESTMapper which is capable of resetting itself
+// from discovery.
+type resettableRESTMapper interface {
+	meta.RESTMapper
+	Reset()
+}
+
+// Sync periodically resyncs the garbage collector when new resources are
+// observed from discovery. When new resources are detected, Sync will stop all
+// GC workers, reset gc.restMapper, and resync the monitors.
+//
+// Note that discoveryClient should NOT be shared with gc.restMapper, otherwise
+// the mapper's underlying discovery client will be unnecessarily reset during
+// the course of detecting new resources.
+func (gc *GarbageCollector) Sync(discoveryClient discovery.DiscoveryInterface, period time.Duration, stopCh <-chan struct{}) {
+	oldResources := make(map[schema.GroupVersionResource]struct{})
+	wait.Until(func() {
+		// Get the current resource list from discovery.
+		newResources := GetDeletableResources(discoveryClient)
+
+		// Detect first or abnormal sync and try again later.
+		if oldResources == nil || len(oldResources) == 0 {
+			oldResources = newResources
+			return
+		}
+
+		// Decide whether discovery has reported a change.
+		if reflect.DeepEqual(oldResources, newResources) {
+			glog.V(5).Infof("no resource updates from discovery, skipping garbage collector sync")
+			return
+		}
+
+		// Something has changed, so track the new state and perform a sync.
+		glog.V(2).Infof("syncing garbage collector with updated resources from discovery: %v", newResources)
+		oldResources = newResources
+
+		// Ensure workers are paused to avoid processing events before informers
+		// have resynced.
+		gc.workerLock.Lock()
+		defer gc.workerLock.Unlock()
+
+		// Resetting the REST mapper will also invalidate the underlying discovery
+		// client. This is a leaky abstraction and assumes behavior about the REST
+		// mapper, but we'll deal with it for now.
+		gc.restMapper.Reset()
+
+		// Perform the monitor resync and wait for controllers to report cache sync.
+		//
+		// NOTE: It's possible that newResources will diverge from the resources
+		// discovered by restMapper during the call to Reset, since they are
+		// distinct discovery clients invalidated at different times. For example,
+		// newResources may contain resources not returned in the restMapper's
+		// discovery call if the resources appeared inbetween the calls. In that
+		// case, the restMapper will fail to map some of newResources until the next
+		// sync period.
+		if err := gc.resyncMonitors(newResources); err != nil {
+			utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors: %v", err))
+			return
+		}
+		if !controller.WaitForCacheSync("garbage collector", stopCh, gc.dependencyGraphBuilder.IsSynced) {
+			utilruntime.HandleError(fmt.Errorf("timed out waiting for dependency graph builder sync during GC sync"))
+		}
+	}, period, stopCh)
+}
+
+func (gc *GarbageCollector) IsSynced() bool {
+	return gc.dependencyGraphBuilder.IsSynced()
+}
+
+func (gc *GarbageCollector) runAttemptToDeleteWorker() {
+	for gc.attemptToDeleteWorker() {
+	}
+}
+
+func (gc *GarbageCollector) attemptToDeleteWorker() bool {
+	item, quit := gc.attemptToDelete.Get()
+	gc.workerLock.RLock()
+	defer gc.workerLock.RUnlock()
+	if quit {
+		return false
+	}
+	defer gc.attemptToDelete.Done(item)
+	n, ok := item.(*node)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", key))
+		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", item))
+		return true
+	}
+	err := gc.attemptToDeleteItem(n)
+	if err != nil {
+		if _, ok := err.(*restMappingError); ok {
+			// There are at least two ways this can happen:
+			// 1. The reference is to an object of a custom type that has not yet been
+			//    recognized by gc.restMapper (this is a transient error).
+			// 2. The reference is to an invalid group/version. We don't currently
+			//    have a way to distinguish this from a valid type we will recognize
+			//    after the next discovery sync.
+			// For now, record the error and retry.
+			glog.V(5).Infof("error syncing item %s: %v", n, err)
+		} else {
+			utilruntime.HandleError(fmt.Errorf("error syncing item %s: %v", n, err))
+		}
+		// retry if garbage collection of an object failed.
+		gc.attemptToDelete.AddRateLimited(item)
+	}
+	return true
+}
+
+func objectReferenceToMetadataOnlyObject(ref objectReference) *metaonly.MetadataOnlyObject {
+	return &metaonly.MetadataOnlyObject{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: ref.APIVersion,
+			Kind:       ref.Kind,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: ref.Namespace,
+			UID:       ref.UID,
+			Name:      ref.Name,
+		},
+	}
+}
+
+// isDangling check if a reference is pointing to an object that doesn't exist.
+// If isDangling looks up the referenced object at the API server, it also
+// returns its latest state.
+func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *node) (
+	dangling bool, owner *unstructured.Unstructured, err error) {
+	if gc.absentOwnerCache.Has(reference.UID) {
+		glog.V(5).Infof("according to the absentOwnerCache, object %s's owner %s/%s, %s does not exist", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+		return true, nil, nil
+	}
+	// TODO: we need to verify the reference resource is supported by the
+	// system. If it's not a valid resource, the garbage collector should i)
+	// ignore the reference when decide if the object should be deleted, and
+	// ii) should update the object to remove such references. This is to
+	// prevent objects having references to an old resource from being
+	// deleted during a cluster upgrade.
+	fqKind := schema.FromAPIVersionAndKind(reference.APIVersion, reference.Kind)
+	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
+	if err != nil {
+		return false, nil, err
+	}
+	resource, err := gc.apiResource(reference.APIVersion, reference.Kind, len(item.identity.Namespace) != 0)
+	if err != nil {
+		return false, nil, err
+	}
+	// TODO: It's only necessary to talk to the API server if the owner node
+	// is a "virtual" node. The local graph could lag behind the real
+	// status, but in practice, the difference is small.
+	owner, err = client.Resource(resource, item.identity.Namespace).Get(reference.Name, metav1.GetOptions{})
+	switch {
+	case errors.IsNotFound(err):
+		gc.absentOwnerCache.Add(reference.UID)
+		glog.V(5).Infof("object %s's owner %s/%s, %s is not found", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+		return true, nil, nil
+	case err != nil:
+		return false, nil, err
+	}
+
+	if owner.GetUID() != reference.UID {
+		glog.V(5).Infof("object %s's owner %s/%s, %s is not found, UID mismatch", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+		gc.absentOwnerCache.Add(reference.UID)
+		return true, nil, nil
+	}
+	return false, owner, nil
+}
+
+// classify the latestReferences to three categories:
+// solid: the owner exists, and is not "waitingForDependentsDeletion"
+// dangling: the owner does not exist
+// waitingForDependentsDeletion: the owner exists, its deletionTimestamp is non-nil, and it has
+// FinalizerDeletingDependents
+// This function communicates with the server.
+func (gc *GarbageCollector) classifyReferences(item *node, latestReferences []metav1.OwnerReference) (
+	solid, dangling, waitingForDependentsDeletion []metav1.OwnerReference, err error) {
+	for _, reference := range latestReferences {
+		isDangling, owner, err := gc.isDangling(reference, item)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		if isDangling {
+			dangling = append(dangling, reference)
+			continue
+		}
+
+		ownerAccessor, err := meta.Accessor(owner)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		if ownerAccessor.GetDeletionTimestamp() != nil && hasDeleteDependentsFinalizer(ownerAccessor) {
+			waitingForDependentsDeletion = append(waitingForDependentsDeletion, reference)
+		} else {
+			solid = append(solid, reference)
+		}
+	}
+	return solid, dangling, waitingForDependentsDeletion, nil
+}
+
+func (gc *GarbageCollector) generateVirtualDeleteEvent(identity objectReference) {
+	event := &event{
+		eventType: deleteEvent,
+		obj:       objectReferenceToMetadataOnlyObject(identity),
+	}
+	glog.V(5).Infof("generating virtual delete event for %s\n\n", event.obj)
+	gc.dependencyGraphBuilder.enqueueChanges(event)
+}
+
+func ownerRefsToUIDs(refs []metav1.OwnerReference) []types.UID {
+	var ret []types.UID
+	for _, ref := range refs {
+		ret = append(ret, ref.UID)
+	}
+	return ret
+}
+
+func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
+	glog.V(2).Infof("processing item %s", item.identity)
+	// "being deleted" is an one-way trip to the final deletion. We'll just wait for the final deletion, and then process the object's dependents.
+	if item.isBeingDeleted() && !item.isDeletingDependents() {
+		glog.V(5).Infof("processing item %s returned at once, because its DeletionTimestamp is non-nil", item.identity)
+		return nil
+	}
+	// TODO: It's only necessary to talk to the API server if this is a
+	// "virtual" node. The local graph could lag behind the real status, but in
+	// practice, the difference is small.
+	latest, err := gc.getObject(item.identity)
+	switch {
+	case errors.IsNotFound(err):
+		// the GraphBuilder can add "virtual" node for an owner that doesn't
+		// exist yet, so we need to enqueue a virtual Delete event to remove
+		// the virtual node from GraphBuilder.uidToNode.
+		glog.V(5).Infof("item %v not found, generating a virtual delete event", item.identity)
+		gc.generateVirtualDeleteEvent(item.identity)
+		return nil
+	case err != nil:
+		return err
+	}
+
+	if latest.GetUID() != item.identity.UID {
+		glog.V(5).Infof("UID doesn't match, item %v not found, generating a virtual delete event", item.identity)
+		gc.generateVirtualDeleteEvent(item.identity)
+		return nil
+	}
+
+	// TODO: attemptToOrphanWorker() routine is similar. Consider merging
+	// attemptToOrphanWorker() into attemptToDeleteItem() as well.
+	if item.isDeletingDependents() {
+		return gc.processDeletingDependentsItem(item)
+	}
+
+	// compute if we should delete the item
+	ownerReferences := latest.GetOwnerReferences()
+	if len(ownerReferences) == 0 {
+		glog.V(2).Infof("object %s's doesn't have an owner, continue on next item", item.identity)
+		return nil
+	}
+
+	solid, dangling, waitingForDependentsDeletion, err := gc.classifyReferences(item, ownerReferences)
+	if err != nil {
+		return err
+	}
+	glog.V(5).Infof("classify references of %s.\nsolid: %#v\ndangling: %#v\nwaitingForDependentsDeletion: %#v\n", item.identity, solid, dangling, waitingForDependentsDeletion)
+
+	switch {
+	case len(solid) != 0:
+		glog.V(2).Infof("object %s has at least one existing owner: %#v, will not garbage collect", solid, item.identity)
+		if len(dangling) == 0 && len(waitingForDependentsDeletion) == 0 {
+			return nil
+		}
+		glog.V(2).Infof("remove dangling references %#v and waiting references %#v for object %s", dangling, waitingForDependentsDeletion, item.identity)
+		// waitingForDependentsDeletion needs to be deleted from the
+		// ownerReferences, otherwise the referenced objects will be stuck with
+		// the FinalizerDeletingDependents and never get deleted.
+		patch := deleteOwnerRefPatch(item.identity.UID, append(ownerRefsToUIDs(dangling), ownerRefsToUIDs(waitingForDependentsDeletion)...)...)
+		_, err = gc.patchObject(item.identity, patch)
+		return err
+	case len(waitingForDependentsDeletion) != 0 && item.dependentsLength() != 0:
+		deps := item.getDependents()
+		for _, dep := range deps {
+			if dep.isDeletingDependents() {
+				// this circle detection has false positives, we need to
+				// apply a more rigorous detection if this turns out to be a
+				// problem.
+				// there are multiple workers run attemptToDeleteItem in
+				// parallel, the circle detection can fail in a race condition.
+				glog.V(2).Infof("processing object %s, some of its owners and its dependent [%s] have FinalizerDeletingDependents, to prevent potential cycle, its ownerReferences are going to be modified to be non-blocking, then the object is going to be deleted with Foreground", item.identity, dep.identity)
+				patch, err := item.patchToUnblockOwnerReferences()
+				if err != nil {
+					return err
+				}
+				if _, err := gc.patchObject(item.identity, patch); err != nil {
+					return err
+				}
+				break
+			}
+		}
+		glog.V(2).Infof("at least one owner of object %s has FinalizerDeletingDependents, and the object itself has dependents, so it is going to be deleted in Foreground", item.identity)
+		// the deletion event will be observed by the graphBuilder, so the item
+		// will be processed again in processDeletingDependentsItem. If it
+		// doesn't have dependents, the function will remove the
+		// FinalizerDeletingDependents from the item, resulting in the final
+		// deletion of the item.
+		policy := metav1.DeletePropagationForeground
+		return gc.deleteObject(item.identity, &policy)
+	default:
+		// item doesn't have any solid owner, so it needs to be garbage
+		// collected. Also, none of item's owners is waiting for the deletion of
+		// the dependents, so set propagationPolicy based on existing finalizers.
+		var policy metav1.DeletionPropagation
+		switch {
+		case hasOrphanFinalizer(latest):
+			// if an existing orphan finalizer is already on the object, honor it.
+			policy = metav1.DeletePropagationOrphan
+		case hasDeleteDependentsFinalizer(latest):
+			// if an existing foreground finalizer is already on the object, honor it.
+			policy = metav1.DeletePropagationForeground
+		default:
+			// otherwise, default to background.
+			policy = metav1.DeletePropagationBackground
+		}
+		glog.V(2).Infof("delete object %s with propagation policy %s", item.identity, policy)
+		return gc.deleteObject(item.identity, &policy)
+	}
+}
+
+// process item that's waiting for its dependents to be deleted
+func (gc *GarbageCollector) processDeletingDependentsItem(item *node) error {
+	blockingDependents := item.blockingDependents()
+	if len(blockingDependents) == 0 {
+		glog.V(2).Infof("remove DeleteDependents finalizer for item %s", item.identity)
+		return gc.removeFinalizer(item, metav1.FinalizerDeleteDependents)
+	}
+	for _, dep := range blockingDependents {
+		if !dep.isDeletingDependents() {
+			glog.V(2).Infof("adding %s to attemptToDelete, because its owner %s is deletingDependents", dep.identity, item.identity)
+			gc.attemptToDelete.Add(dep)
+		}
+	}
+	return nil
+}
+
+// dependents are copies of pointers to the owner's dependents, they don't need to be locked.
+func (gc *GarbageCollector) orphanDependents(owner objectReference, dependents []*node) error {
+	errCh := make(chan error, len(dependents))
+	wg := sync.WaitGroup{}
+	wg.Add(len(dependents))
+	for i := range dependents {
+		go func(dependent *node) {
+			defer wg.Done()
+			// the dependent.identity.UID is used as precondition
+			patch := deleteOwnerRefPatch(dependent.identity.UID, owner.UID)
+			_, err := gc.patchObject(dependent.identity, patch)
+			// note that if the target ownerReference doesn't exist in the
+			// dependent, strategic merge patch will NOT return an error.
+			if err != nil && !errors.IsNotFound(err) {
+				errCh <- fmt.Errorf("orphaning %s failed, %v", dependent.identity, err)
+			}
+		}(dependents[i])
+	}
+	wg.Wait()
+	close(errCh)
+
+	var errorsSlice []error
+	for e := range errCh {
+		errorsSlice = append(errorsSlice, e)
+	}
+
+	if len(errorsSlice) != 0 {
+		return fmt.Errorf("failed to orphan dependents of owner %s, got errors: %s", owner, utilerrors.NewAggregate(errorsSlice).Error())
+	}
+	glog.V(5).Infof("successfully updated all dependents of owner %s", owner)
+	return nil
+}
+
+func (gc *GarbageCollector) runAttemptToOrphanWorker() {
+	for gc.attemptToOrphanWorker() {
+	}
+}
+
+// attemptToOrphanWorker dequeues a node from the attemptToOrphan, then finds its
+// dependents based on the graph maintained by the GC, then removes it from the
+// OwnerReferences of its dependents, and finally updates the owner to remove
+// the "Orphan" finalizer. The node is added back into the attemptToOrphan if any of
+// these steps fail.
+func (gc *GarbageCollector) attemptToOrphanWorker() bool {
+	item, quit := gc.attemptToOrphan.Get()
+	gc.workerLock.RLock()
+	defer gc.workerLock.RUnlock()
+	if quit {
+		return false
+	}
+	defer gc.attemptToOrphan.Done(item)
+	owner, ok := item.(*node)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", item))
+		return true
 	}
 	// we don't need to lock each element, because they never get updated
 	owner.dependentsLock.RLock()
@@ -325,398 +557,68 @@ func (gc *GarbageCollector) orphanFinalizer() {
 	}
 	owner.dependentsLock.RUnlock()
 
-	err := gc.orhpanDependents(owner.identity, dependents)
+	err := gc.orphanDependents(owner.identity, dependents)
 	if err != nil {
-		glog.V(6).Infof("orphanDependents for %s failed with %v", owner.identity, err)
-		gc.orphanQueue.Add(owner)
-		return
+		glog.V(5).Infof("orphanDependents for %s failed with %v", owner.identity, err)
+		gc.attemptToOrphan.AddRateLimited(item)
+		return true
 	}
 	// update the owner, remove "orphaningFinalizer" from its finalizers list
-	err = gc.removeOrphanFinalizer(owner)
+	err = gc.removeFinalizer(owner, metav1.FinalizerOrphanDependents)
 	if err != nil {
-		glog.V(6).Infof("removeOrphanFinalizer for %s failed with %v", owner.identity, err)
-		gc.orphanQueue.Add(owner)
+		glog.V(5).Infof("removeOrphanFinalizer for %s failed with %v", owner.identity, err)
+		gc.attemptToOrphan.AddRateLimited(item)
 	}
+	return true
 }
 
-// Dequeueing an event from eventQueue, updating graph, populating dirty_queue.
-func (p *Propagator) processEvent() {
-	key, quit := p.eventQueue.Get()
-	if quit {
-		return
-	}
-	defer p.eventQueue.Done(key)
-	event, ok := key.(event)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("expect an event, got %v", key))
-		return
-	}
-	obj := event.obj
-	accessor, err := meta.Accessor(obj)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
-		return
-	}
-	typeAccessor, err := meta.TypeAccessor(obj)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
-		return
-	}
-	glog.V(6).Infof("Propagator process object: %s/%s, namespace %s, name %s, event type %s", typeAccessor.GetAPIVersion(), typeAccessor.GetKind(), accessor.GetNamespace(), accessor.GetName(), event.eventType)
-	// Check if the node already exsits
-	existingNode, found := p.uidToNode.Read(accessor.GetUID())
-	switch {
-	case (event.eventType == addEvent || event.eventType == updateEvent) && !found:
-		newNode := &node{
-			identity: objectReference{
-				OwnerReference: metatypes.OwnerReference{
-					APIVersion: typeAccessor.GetAPIVersion(),
-					Kind:       typeAccessor.GetKind(),
-					UID:        accessor.GetUID(),
-					Name:       accessor.GetName(),
-				},
-				Namespace: accessor.GetNamespace(),
-			},
-			dependentsLock: &sync.RWMutex{},
-			dependents:     make(map[*node]struct{}),
-			owners:         accessor.GetOwnerReferences(),
-		}
-		p.insertNode(newNode)
-		// the underlying delta_fifo may combine a creation and deletion into one event
-		if shouldOrphanDependents(event, accessor) {
-			glog.V(6).Infof("add %s to the orphanQueue", newNode.identity)
-			p.gc.orphanQueue.Add(newNode)
-		}
-	case (event.eventType == addEvent || event.eventType == updateEvent) && found:
-		// caveat: if GC observes the creation of the dependents later than the
-		// deletion of the owner, then the orphaning finalizer won't be effective.
-		if shouldOrphanDependents(event, accessor) {
-			glog.V(6).Infof("add %s to the orphanQueue", existingNode.identity)
-			p.gc.orphanQueue.Add(existingNode)
-		}
-		// add/remove owner refs
-		added, removed := referencesDiffs(existingNode.owners, accessor.GetOwnerReferences())
-		if len(added) == 0 && len(removed) == 0 {
-			glog.V(6).Infof("The updateEvent %#v doesn't change node references, ignore", event)
-			return
-		}
-		// update the node itself
-		existingNode.owners = accessor.GetOwnerReferences()
-		// Add the node to its new owners' dependent lists.
-		p.addDependentToOwners(existingNode, added)
-		// remove the node from the dependent list of node that are no long in
-		// the node's owners list.
-		p.removeDependentFromOwners(existingNode, removed)
-	case event.eventType == deleteEvent:
-		if !found {
-			glog.V(6).Infof("%v doesn't exist in the graph, this shouldn't happen", accessor.GetUID())
-			return
-		}
-		p.removeNode(existingNode)
-		existingNode.dependentsLock.RLock()
-		defer existingNode.dependentsLock.RUnlock()
-		for dep := range existingNode.dependents {
-			p.gc.dirtyQueue.Add(dep)
-		}
-	}
-}
-
-// GarbageCollector is responsible for carrying out cascading deletion, and
-// removing ownerReferences from the dependents if the owner is deleted with
-// DeleteOptions.OrphanDependents=true.
-type GarbageCollector struct {
-	restMapper  meta.RESTMapper
-	clientPool  dynamic.ClientPool
-	dirtyQueue  *workqueue.Type
-	orphanQueue *workqueue.Type
-	monitors    []monitor
-	propagator  *Propagator
-}
-
-// TODO: make special List and Watch function that removes fields other than
-// ObjectMeta.
-func gcListWatcher(client *dynamic.Client, resource unversioned.GroupVersionResource) *cache.ListWatch {
-	return &cache.ListWatch{
-		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			// APIResource.Kind is not used by the dynamic client, so
-			// leave it empty. We want to list this resource in all
-			// namespaces if it's namespace scoped, so leave
-			// APIResource.Namespaced as false is all right.
-			apiResource := unversioned.APIResource{Name: resource.Resource}
-			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
-				Resource(&apiResource, api.NamespaceAll).
-				List(&options)
-		},
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			// APIResource.Kind is not used by the dynamic client, so
-			// leave it empty. We want to list this resource in all
-			// namespaces if it's namespace scoped, so leave
-			// APIResource.Namespaced as false is all right.
-			apiResource := unversioned.APIResource{Name: resource.Resource}
-			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
-				Resource(&apiResource, api.NamespaceAll).
-				Watch(&options)
-		},
-	}
-}
-
-func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversioned.GroupVersionResource) (monitor, error) {
-	// TODO: consider store in one storage.
-	glog.V(6).Infof("create storage for resource %s", resource)
-	var monitor monitor
-	client, err := clientPool.ClientForGroupVersion(resource.GroupVersion())
-	if err != nil {
-		return monitor, err
-	}
-	monitor.store, monitor.controller = framework.NewInformer(
-		gcListWatcher(client, resource),
-		nil,
-		ResourceResyncTime,
-		framework.ResourceEventHandlerFuncs{
-			// add the event to the propagator's eventQueue.
-			AddFunc: func(obj interface{}) {
-				event := event{
-					eventType: addEvent,
-					obj:       obj,
-				}
-				p.eventQueue.Add(event)
-			},
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				event := event{updateEvent, newObj, oldObj}
-				p.eventQueue.Add(event)
-			},
-			DeleteFunc: func(obj interface{}) {
-				// delta fifo may wrap the object in a cache.DeletedFinalStateUnknown, unwrap it
-				if deletedFinalStateUnknown, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-					obj = deletedFinalStateUnknown.Obj
-				}
-				event := event{
-					eventType: deleteEvent,
-					obj:       obj,
-				}
-				p.eventQueue.Add(event)
-			},
-		},
-	)
-	return monitor, nil
-}
-
-var ignoredResources = map[unversioned.GroupVersionResource]struct{}{
-	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicationcontrollers"}: {},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "bindings"}:                              {},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}:                     {},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "events"}:                                {},
-}
-
-func NewGarbageCollector(clientPool dynamic.ClientPool, resources []unversioned.GroupVersionResource) (*GarbageCollector, error) {
-	gc := &GarbageCollector{
-		clientPool:  clientPool,
-		dirtyQueue:  workqueue.New(),
-		orphanQueue: workqueue.New(),
-		// TODO: should use a dynamic RESTMapper built from the discovery results.
-		restMapper: registered.RESTMapper(),
-	}
-	gc.propagator = &Propagator{
-		eventQueue: workqueue.New(),
-		uidToNode: &concurrentUIDToNode{
-			RWMutex:   &sync.RWMutex{},
-			uidToNode: make(map[types.UID]*node),
-		},
-		gc: gc,
-	}
-	for _, resource := range resources {
-		if _, ok := ignoredResources[resource]; ok {
-			glog.V(6).Infof("ignore resource %#v", resource)
-			continue
-		}
-		monitor, err := monitorFor(gc.propagator, gc.clientPool, resource)
-		if err != nil {
-			return nil, err
-		}
-		gc.monitors = append(gc.monitors, monitor)
-	}
-	return gc, nil
-}
-
-func (gc *GarbageCollector) worker() {
-	key, quit := gc.dirtyQueue.Get()
-	if quit {
-		return
-	}
-	defer gc.dirtyQueue.Done(key)
-	err := gc.processItem(key.(*node))
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Error syncing item %v: %v", key, err))
-	}
-}
-
-// apiResource consults the REST mapper to translate an <apiVersion, kind,
-// namespace> tuple to a unversioned.APIResource struct.
-func (gc *GarbageCollector) apiResource(apiVersion, kind string, namespaced bool) (*unversioned.APIResource, error) {
-	fqKind := unversioned.FromAPIVersionAndKind(apiVersion, kind)
-	mapping, err := gc.restMapper.RESTMapping(fqKind.GroupKind(), apiVersion)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get REST mapping for kind: %s, version: %s", kind, apiVersion)
-	}
-	glog.V(6).Infof("map kind %s, version %s to resource %s", kind, apiVersion, mapping.Resource)
-	resource := unversioned.APIResource{
-		Name:       mapping.Resource,
-		Namespaced: namespaced,
-		Kind:       kind,
-	}
-	return &resource, nil
-}
-
-func (gc *GarbageCollector) deleteObject(item objectReference) error {
-	fqKind := unversioned.FromAPIVersionAndKind(item.APIVersion, item.Kind)
-	client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
-	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
-	if err != nil {
-		return err
-	}
-	uid := item.UID
-	preconditions := v1.Preconditions{UID: &uid}
-	deleteOptions := v1.DeleteOptions{Preconditions: &preconditions}
-	return client.Resource(resource, item.Namespace).Delete(item.Name, &deleteOptions)
-}
-
-func (gc *GarbageCollector) getObject(item objectReference) (*runtime.Unstructured, error) {
-	fqKind := unversioned.FromAPIVersionAndKind(item.APIVersion, item.Kind)
-	client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
-	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
-	if err != nil {
-		return nil, err
-	}
-	return client.Resource(resource, item.Namespace).Get(item.Name)
-}
-
-func (gc *GarbageCollector) updateObject(item objectReference, obj *runtime.Unstructured) (*runtime.Unstructured, error) {
-	fqKind := unversioned.FromAPIVersionAndKind(item.APIVersion, item.Kind)
-	client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
-	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
-	if err != nil {
-		return nil, err
-	}
-	return client.Resource(resource, item.Namespace).Update(obj)
-}
-
-func (gc *GarbageCollector) patchObject(item objectReference, patch []byte) (*runtime.Unstructured, error) {
-	fqKind := unversioned.FromAPIVersionAndKind(item.APIVersion, item.Kind)
-	client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
-	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
-	if err != nil {
-		return nil, err
-	}
-	return client.Resource(resource, item.Namespace).Patch(item.Name, api.StrategicMergePatchType, patch)
-}
-
-func objectReferenceToUnstructured(ref objectReference) *runtime.Unstructured {
-	ret := &runtime.Unstructured{}
-	ret.SetKind(ref.Kind)
-	ret.SetAPIVersion(ref.APIVersion)
-	ret.SetUID(ref.UID)
-	ret.SetNamespace(ref.Namespace)
-	ret.SetName(ref.Name)
-	return ret
-}
-
-func (gc *GarbageCollector) processItem(item *node) error {
-	// Get the latest item from the API server
-	latest, err := gc.getObject(item.identity)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			// the Propagator can add "virtual" node for an owner that doesn't
-			// exist yet, so we need to enqueue a virtual Delete event to remove
-			// the virtual node from Propagator.uidToNode.
-			glog.V(6).Infof("item %v not found, generating a virtual delete event", item.identity)
-			event := event{
-				eventType: deleteEvent,
-				obj:       objectReferenceToUnstructured(item.identity),
-			}
-			gc.propagator.eventQueue.Add(event)
-			return nil
-		}
-		return err
-	}
-	if latest.GetUID() != item.identity.UID {
-		glog.V(6).Infof("UID doesn't match, item %v not found, ignore it", item.identity)
-		return nil
-	}
-	ownerReferences := latest.GetOwnerReferences()
-	if len(ownerReferences) == 0 {
-		glog.V(6).Infof("object %s's doesn't have an owner, continue on next item", item.identity)
-		return nil
-	}
-	// TODO: we need to remove dangling references if the object is not to be
-	// deleted.
-	for _, reference := range ownerReferences {
-		// TODO: we need to verify the reference resource is supported by the
-		// system. If it's not a valid resource, the garbage collector should i)
-		// ignore the reference when decide if the object should be deleted, and
-		// ii) should update the object to remove such references. This is to
-		// prevent objects having references to an old resource from being
-		// deleted during a cluster upgrade.
-		fqKind := unversioned.FromAPIVersionAndKind(reference.APIVersion, reference.Kind)
-		client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
-		if err != nil {
-			return err
-		}
-		resource, err := gc.apiResource(reference.APIVersion, reference.Kind, len(item.identity.Namespace) != 0)
-		if err != nil {
-			return err
-		}
-		owner, err := client.Resource(resource, item.identity.Namespace).Get(reference.Name)
-		if err == nil {
-			if owner.GetUID() != reference.UID {
-				glog.V(6).Infof("object %s's owner %s/%s, %s is not found, UID mismatch", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
-				continue
-			}
-			glog.V(6).Infof("object %s has at least an existing owner, will not garbage collect", item.identity.UID)
-			return nil
-		} else if errors.IsNotFound(err) {
-			glog.V(6).Infof("object %s's owner %s/%s, %s is not found", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
-		} else {
-			return err
-		}
-	}
-	glog.V(2).Infof("none of object %s's owners exist any more, will garbage collect it", item.identity)
-	return gc.deleteObject(item.identity)
-}
-
-func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
-	for _, monitor := range gc.monitors {
-		go monitor.controller.Run(stopCh)
-	}
-
-	// worker
-	go wait.Until(gc.propagator.processEvent, 0, stopCh)
-
-	for i := 0; i < workers; i++ {
-		go wait.Until(gc.worker, 0, stopCh)
-		go wait.Until(gc.orphanFinalizer, 0, stopCh)
-	}
-	<-stopCh
-	glog.Infof("Shutting down garbage collector")
-	gc.dirtyQueue.ShutDown()
-	gc.orphanQueue.ShutDown()
-	gc.propagator.eventQueue.ShutDown()
-}
-
-// QueueDrained returns if the dirtyQueue and eventQueue are drained. It's
-// useful for debugging. Note that it doesn't guarantee the workers are idle.
-func (gc *GarbageCollector) QueuesDrained() bool {
-	return gc.dirtyQueue.Len() == 0 && gc.propagator.eventQueue.Len() == 0 && gc.orphanQueue.Len() == 0
-}
-
-// *FOR TEST USE ONLY* It's not safe to call this function when the GC is still
-// busy.
-// GraphHasUID returns if the Propagator has a particular UID store in its
+// *FOR TEST USE ONLY*
+// GraphHasUID returns if the GraphBuilder has a particular UID store in its
 // uidToNode graph. It's useful for debugging.
+// This method is used by integration tests.
 func (gc *GarbageCollector) GraphHasUID(UIDs []types.UID) bool {
 	for _, u := range UIDs {
-		if _, ok := gc.propagator.uidToNode.Read(u); ok {
+		if _, ok := gc.dependencyGraphBuilder.uidToNode.Read(u); ok {
 			return true
 		}
 	}
 	return false
+}
+
+// GetDeletableResources returns all resources from discoveryClient that the
+// garbage collector should recognize and work with. More specifically, all
+// preferred resources which support the 'delete' verb.
+//
+// All discovery errors are considered temporary. Upon encountering any error,
+// GetDeletableResources will log and return any discovered resources it was
+// able to process (which may be none).
+func GetDeletableResources(discoveryClient discovery.ServerResourcesInterface) map[schema.GroupVersionResource]struct{} {
+	preferredResources, err := discoveryClient.ServerPreferredResources()
+	if err != nil {
+		if discovery.IsGroupDiscoveryFailedError(err) {
+			glog.Warning("failed to discover some groups: %v", err.(*discovery.ErrGroupDiscoveryFailed).Groups)
+		} else {
+			glog.Warning("failed to discover preferred resources: %v", err)
+		}
+	}
+	if preferredResources == nil {
+		return map[schema.GroupVersionResource]struct{}{}
+	}
+
+	// This is extracted from discovery.GroupVersionResources to allow tolerating
+	// failures on a per-resource basis.
+	deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"delete"}}, preferredResources)
+	deletableGroupVersionResources := map[schema.GroupVersionResource]struct{}{}
+	for _, rl := range deletableResources {
+		gv, err := schema.ParseGroupVersion(rl.GroupVersion)
+		if err != nil {
+			glog.Warning("ignoring invalid discovered resource %q: %v", rl.GroupVersion, err)
+			continue
+		}
+		for i := range rl.APIResources {
+			deletableGroupVersionResources[schema.GroupVersionResource{Group: gv.Group, Version: gv.Version, Resource: rl.APIResources[i].Name}] = struct{}{}
+		}
+	}
+
+	return deletableGroupVersionResources
 }

@@ -1,4 +1,4 @@
-// Copyright 2016 CoreOS, Inc.
+// Copyright 2016 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ func (qa *quotaAlarmer) check(ctx context.Context, r interface{}) error {
 		Alarm:    pb.AlarmType_NOSPACE,
 	}
 	qa.a.Alarm(ctx, req)
-	return rpctypes.ErrNoSpace
+	return rpctypes.ErrGRPCNoSpace
 }
 
 func NewQuotaKVServer(s *etcdserver.EtcdServer) pb.KVServer {

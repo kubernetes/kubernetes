@@ -1,4 +1,4 @@
-// +build freebsd openbsd netbsd dragonfly darwin linux
+// +build freebsd openbsd netbsd dragonfly darwin linux solaris
 
 package interrupthandler
 

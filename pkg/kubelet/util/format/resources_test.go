@@ -19,14 +19,14 @@ package format
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func TestResourceList(t *testing.T) {
-	resourceList := api.ResourceList{}
-	resourceList[api.ResourceCPU] = resource.MustParse("100m")
-	resourceList[api.ResourceMemory] = resource.MustParse("5Gi")
+	resourceList := v1.ResourceList{}
+	resourceList[v1.ResourceCPU] = resource.MustParse("100m")
+	resourceList[v1.ResourceMemory] = resource.MustParse("5Gi")
 	actual := ResourceList(resourceList)
 	expected := "cpu=100m,memory=5Gi"
 	if actual != expected {

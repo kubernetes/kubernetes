@@ -14,6 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/rbac
+// +k8s:conversion-gen-external-types=../../../../vendor/k8s.io/api/rbac/v1alpha1
+// +k8s:defaulter-gen=TypeMeta
+// +k8s:defaulter-gen-input=../../../../vendor/k8s.io/api/rbac/v1alpha1
+
 // +groupName=rbac.authorization.k8s.io
-// +genconversion=true
-package v1alpha1
+package v1alpha1 // import "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"

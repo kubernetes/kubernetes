@@ -1,7 +1,27 @@
-assignees:
+reviewers:
+  - cblecker
   - eparis
-  - ihmccreery
+  - fejta
   - ixdy
+  - jbeda
   - lavalamp
   - spxtr
   - zmerlynn
+  - sttts
+  - gmarek
+approvers:
+  - cblecker
+  - deads2k
+  - eparis
+  - fabianofranz
+  - fejta
+  - ixdy
+  - jbeda
+  - lavalamp
+  - madhusudancs
+  - pwittrock
+  - shashidharatd
+  - spxtr
+  - zmerlynn
+  - sttts
+  - gmarek

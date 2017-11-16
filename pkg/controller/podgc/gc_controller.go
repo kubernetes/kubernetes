@@ -21,18 +21,18 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
@@ -42,61 +42,81 @@ const (
 )
 
 type PodGCController struct {
-	kubeClient     clientset.Interface
-	podStore       cache.StoreToPodLister
-	podStoreSyncer *framework.Controller
-	deletePod      func(namespace, name string) error
-	threshold      int
+	kubeClient clientset.Interface
+
+	podLister       corelisters.PodLister
+	podListerSynced cache.InformerSynced
+
+	deletePod              func(namespace, name string) error
+	terminatedPodThreshold int
 }
 
-func New(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, threshold int) *PodGCController {
-	if kubeClient != nil && kubeClient.Core().GetRESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("gc_controller", kubeClient.Core().GetRESTClient().GetRateLimiter())
+func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInformer, terminatedPodThreshold int) *PodGCController {
+	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("gc_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 	gcc := &PodGCController{
-		kubeClient: kubeClient,
-		threshold:  threshold,
+		kubeClient:             kubeClient,
+		terminatedPodThreshold: terminatedPodThreshold,
 		deletePod: func(namespace, name string) error {
-			return kubeClient.Core().Pods(namespace).Delete(name, api.NewDeleteOptions(0))
+			glog.Infof("PodGC is force deleting Pod: %v:%v", namespace, name)
+			return kubeClient.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0))
 		},
 	}
 
-	terminatedSelector := fields.ParseSelectorOrDie("status.phase!=" + string(api.PodPending) + ",status.phase!=" + string(api.PodRunning) + ",status.phase!=" + string(api.PodUnknown))
+	gcc.podLister = podInformer.Lister()
+	gcc.podListerSynced = podInformer.Informer().HasSynced
 
-	gcc.podStore.Indexer, gcc.podStoreSyncer = framework.NewIndexerInformer(
-		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				options.FieldSelector = terminatedSelector
-				return gcc.kubeClient.Core().Pods(api.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				options.FieldSelector = terminatedSelector
-				return gcc.kubeClient.Core().Pods(api.NamespaceAll).Watch(options)
-			},
-		},
-		&api.Pod{},
-		resyncPeriod(),
-		framework.ResourceEventHandlerFuncs{},
-		// We don't need to build a index for podStore here actually, but build one for consistency.
-		// It will ensure that if people start making use of the podStore in more specific ways,
-		// they'll get the benefits they expect. It will also reserve the name for future refactorings.
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-	)
 	return gcc
 }
 
 func (gcc *PodGCController) Run(stop <-chan struct{}) {
-	go gcc.podStoreSyncer.Run(stop)
+	defer utilruntime.HandleCrash()
+
+	glog.Infof("Starting GC controller")
+	defer glog.Infof("Shutting down GC controller")
+
+	if !controller.WaitForCacheSync("GC", stop, gcc.podListerSynced) {
+		return
+	}
+
 	go wait.Until(gcc.gc, gcCheckPeriod, stop)
+
 	<-stop
 }
 
 func (gcc *PodGCController) gc() {
-	terminatedPods, _ := gcc.podStore.List(labels.Everything())
+	pods, err := gcc.podLister.List(labels.Everything())
+	if err != nil {
+		glog.Errorf("Error while listing all Pods: %v", err)
+		return
+	}
+	if gcc.terminatedPodThreshold > 0 {
+		gcc.gcTerminated(pods)
+	}
+	gcc.gcOrphaned(pods)
+	gcc.gcUnscheduledTerminating(pods)
+}
+
+func isPodTerminated(pod *v1.Pod) bool {
+	if phase := pod.Status.Phase; phase != v1.PodPending && phase != v1.PodRunning && phase != v1.PodUnknown {
+		return true
+	}
+	return false
+}
+
+func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
+	terminatedPods := []*v1.Pod{}
+	for _, pod := range pods {
+		if isPodTerminated(pod) {
+			terminatedPods = append(terminatedPods, pod)
+		}
+	}
+
 	terminatedPodCount := len(terminatedPods)
 	sort.Sort(byCreationTimestamp(terminatedPods))
 
-	deleteCount := terminatedPodCount - gcc.threshold
+	deleteCount := terminatedPodCount - gcc.terminatedPodThreshold
 
 	if deleteCount > terminatedPodCount {
 		deleteCount = terminatedPodCount
@@ -119,15 +139,62 @@ func (gcc *PodGCController) gc() {
 	wait.Wait()
 }
 
+// gcOrphaned deletes pods that are bound to nodes that don't exist.
+func (gcc *PodGCController) gcOrphaned(pods []*v1.Pod) {
+	glog.V(4).Infof("GC'ing orphaned")
+	// We want to get list of Nodes from the etcd, to make sure that it's as fresh as possible.
+	nodes, err := gcc.kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return
+	}
+	nodeNames := sets.NewString()
+	for i := range nodes.Items {
+		nodeNames.Insert(nodes.Items[i].Name)
+	}
+
+	for _, pod := range pods {
+		if pod.Spec.NodeName == "" {
+			continue
+		}
+		if nodeNames.Has(pod.Spec.NodeName) {
+			continue
+		}
+		glog.V(2).Infof("Found orphaned Pod %v assigned to the Node %v. Deleting.", pod.Name, pod.Spec.NodeName)
+		if err := gcc.deletePod(pod.Namespace, pod.Name); err != nil {
+			utilruntime.HandleError(err)
+		} else {
+			glog.V(0).Infof("Forced deletion of orphaned Pod %s succeeded", pod.Name)
+		}
+	}
+}
+
+// gcUnscheduledTerminating deletes pods that are terminating and haven't been scheduled to a particular node.
+func (gcc *PodGCController) gcUnscheduledTerminating(pods []*v1.Pod) {
+	glog.V(4).Infof("GC'ing unscheduled pods which are terminating.")
+
+	for _, pod := range pods {
+		if pod.DeletionTimestamp == nil || len(pod.Spec.NodeName) > 0 {
+			continue
+		}
+
+		glog.V(2).Infof("Found unscheduled terminating Pod %v not assigned to any Node. Deleting.", pod.Name)
+		if err := gcc.deletePod(pod.Namespace, pod.Name); err != nil {
+			utilruntime.HandleError(err)
+		} else {
+			glog.V(0).Infof("Forced deletion of unscheduled terminating Pod %s succeeded", pod.Name)
+		}
+	}
+}
+
 // byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.
-type byCreationTimestamp []*api.Pod
+type byCreationTimestamp []*v1.Pod
 
 func (o byCreationTimestamp) Len() int      { return len(o) }
 func (o byCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 
 func (o byCreationTimestamp) Less(i, j int) bool {
-	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
+	if o[i].CreationTimestamp.Equal(&o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
 	}
-	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
+	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
 }

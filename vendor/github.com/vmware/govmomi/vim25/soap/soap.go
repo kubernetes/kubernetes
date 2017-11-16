@@ -22,13 +22,9 @@ import (
 )
 
 type Envelope struct {
-	XMLName xml.Name `xml:"http://schemas.xmlsoap.org/soap/envelope/ Envelope"`
-	Header  *Header  `xml:",omitempty"`
+	XMLName xml.Name    `xml:"http://schemas.xmlsoap.org/soap/envelope/ Envelope"`
+	Header  interface{} `xml:",omitempty"`
 	Body    interface{}
-}
-
-type Header struct {
-	XMLName xml.Name `xml:"http://schemas.xmlsoap.org/soap/envelope/ Header"`
 }
 
 type Fault struct {
@@ -36,7 +32,7 @@ type Fault struct {
 	Code    string   `xml:"faultcode"`
 	String  string   `xml:"faultstring"`
 	Detail  struct {
-		Fault types.AnyType `xml:",any"`
+		Fault types.AnyType `xml:",any,typeattr"`
 	} `xml:"detail"`
 }
 

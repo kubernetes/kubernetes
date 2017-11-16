@@ -26,9 +26,9 @@ import (
 
 	"github.com/golang/glog"
 
-	dockertypes "github.com/docker/engine-api/types"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util/sets"
+	dockertypes "github.com/docker/docker/api/types"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // DockerKeyring tracks a set of docker registry credentials, maintaining a
@@ -306,17 +306,17 @@ func (k *unionDockerKeyring) Lookup(image string) ([]LazyAuthConfiguration, bool
 // MakeDockerKeyring inspects the passedSecrets to see if they contain any DockerConfig secrets.  If they do,
 // then a DockerKeyring is built based on every hit and unioned with the defaultKeyring.
 // If they do not, then the default keyring is returned
-func MakeDockerKeyring(passedSecrets []api.Secret, defaultKeyring DockerKeyring) (DockerKeyring, error) {
+func MakeDockerKeyring(passedSecrets []v1.Secret, defaultKeyring DockerKeyring) (DockerKeyring, error) {
 	passedCredentials := []DockerConfig{}
 	for _, passedSecret := range passedSecrets {
-		if dockerConfigJsonBytes, dockerConfigJsonExists := passedSecret.Data[api.DockerConfigJsonKey]; (passedSecret.Type == api.SecretTypeDockerConfigJson) && dockerConfigJsonExists && (len(dockerConfigJsonBytes) > 0) {
+		if dockerConfigJsonBytes, dockerConfigJsonExists := passedSecret.Data[v1.DockerConfigJsonKey]; (passedSecret.Type == v1.SecretTypeDockerConfigJson) && dockerConfigJsonExists && (len(dockerConfigJsonBytes) > 0) {
 			dockerConfigJson := DockerConfigJson{}
 			if err := json.Unmarshal(dockerConfigJsonBytes, &dockerConfigJson); err != nil {
 				return nil, err
 			}
 
 			passedCredentials = append(passedCredentials, dockerConfigJson.Auths)
-		} else if dockercfgBytes, dockercfgExists := passedSecret.Data[api.DockerConfigKey]; (passedSecret.Type == api.SecretTypeDockercfg) && dockercfgExists && (len(dockercfgBytes) > 0) {
+		} else if dockercfgBytes, dockercfgExists := passedSecret.Data[v1.DockerConfigKey]; (passedSecret.Type == v1.SecretTypeDockercfg) && dockercfgExists && (len(dockercfgBytes) > 0) {
 			dockercfg := DockerConfig{}
 			if err := json.Unmarshal(dockercfgBytes, &dockercfg); err != nil {
 				return nil, err

@@ -18,9 +18,8 @@ FROM BASEIMAGE
 # If we're building normally, for amd64, CROSS_BUILD lines are removed
 CROSS_BUILD_COPY qemu-ARCH-static /usr/bin/
 
-# All apt-get's must be in one run command or the
-# cleanup has no effect.
-RUN DEBIAN_FRONTEND=noninteractive apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y iptables \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y conntrack \
-    && rm -rf /var/lib/apt/lists/*
+RUN clean-install \
+    iptables \
+    ebtables \
+    conntrack \
+    module-init-tools

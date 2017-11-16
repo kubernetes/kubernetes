@@ -45,3 +45,32 @@ func (msg *IfAddrmsg) Serialize() []byte {
 func (msg *IfAddrmsg) Len() int {
 	return syscall.SizeofIfAddrmsg
 }
+
+// struct ifa_cacheinfo {
+// 	__u32	ifa_prefered;
+// 	__u32	ifa_valid;
+// 	__u32	cstamp; /* created timestamp, hundredths of seconds */
+// 	__u32	tstamp; /* updated timestamp, hundredths of seconds */
+// };
+
+const IFA_CACHEINFO = 6
+const SizeofIfaCacheInfo = 0x10
+
+type IfaCacheInfo struct {
+	IfaPrefered uint32
+	IfaValid    uint32
+	Cstamp      uint32
+	Tstamp      uint32
+}
+
+func (msg *IfaCacheInfo) Len() int {
+	return SizeofIfaCacheInfo
+}
+
+func DeserializeIfaCacheInfo(b []byte) *IfaCacheInfo {
+	return (*IfaCacheInfo)(unsafe.Pointer(&b[0:SizeofIfaCacheInfo][0]))
+}
+
+func (msg *IfaCacheInfo) Serialize() []byte {
+	return (*(*[SizeofIfaCacheInfo]byte)(unsafe.Pointer(msg)))[:]
+}

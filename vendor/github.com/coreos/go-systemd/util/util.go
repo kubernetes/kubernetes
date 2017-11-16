@@ -18,96 +18,23 @@
 // than linking against them.
 package util
 
-// #include <stdlib.h>
-// #include <sys/types.h>
-// #include <unistd.h>
-//
-// int
-// my_sd_pid_get_owner_uid(void *f, pid_t pid, uid_t *uid)
-// {
-//   int (*sd_pid_get_owner_uid)(pid_t, uid_t *);
-//
-//   sd_pid_get_owner_uid = (int (*)(pid_t, uid_t *))f;
-//   return sd_pid_get_owner_uid(pid, uid);
-// }
-//
-// int
-// my_sd_pid_get_unit(void *f, pid_t pid, char **unit)
-// {
-//   int (*sd_pid_get_unit)(pid_t, char **);
-//
-//   sd_pid_get_unit = (int (*)(pid_t, char **))f;
-//   return sd_pid_get_unit(pid, unit);
-// }
-//
-// int
-// my_sd_pid_get_slice(void *f, pid_t pid, char **slice)
-// {
-//   int (*sd_pid_get_slice)(pid_t, char **);
-//
-//   sd_pid_get_slice = (int (*)(pid_t, char **))f;
-//   return sd_pid_get_slice(pid, slice);
-// }
-//
-// int
-// am_session_leader()
-// {
-//   return (getsid(0) == getpid());
-// }
-import "C"
 import (
 	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
-	"syscall"
-	"unsafe"
-
-	"github.com/coreos/pkg/dlopen"
 )
 
-var libsystemdNames = []string{
-	// systemd < 209
-	"libsystemd-login.so.0",
-	"libsystemd-login.so",
-
-	// systemd >= 209 merged libsystemd-login into libsystemd proper
-	"libsystemd.so.0",
-	"libsystemd.so",
-}
+var (
+	ErrNoCGO = fmt.Errorf("go-systemd built with CGO disabled")
+)
 
 // GetRunningSlice attempts to retrieve the name of the systemd slice in which
 // the current process is running.
 // This function is a wrapper around the libsystemd C library; if it cannot be
 // opened, an error is returned.
-func GetRunningSlice() (slice string, err error) {
-	var h *dlopen.LibHandle
-	h, err = dlopen.GetHandle(libsystemdNames)
-	if err != nil {
-		return
-	}
-	defer func() {
-		if err1 := h.Close(); err1 != nil {
-			err = err1
-		}
-	}()
-
-	sd_pid_get_slice, err := h.GetSymbolPointer("sd_pid_get_slice")
-	if err != nil {
-		return
-	}
-
-	var s string
-	sl := C.CString(s)
-	defer C.free(unsafe.Pointer(sl))
-
-	ret := C.my_sd_pid_get_slice(sd_pid_get_slice, 0, &sl)
-	if ret < 0 {
-		err = fmt.Errorf("error calling sd_pid_get_slice: %v", syscall.Errno(-ret))
-		return
-	}
-
-	return C.GoString(sl), nil
+func GetRunningSlice() (string, error) {
+	return getRunningSlice()
 }
 
 // RunningFromSystemService tries to detect whether the current process has
@@ -125,81 +52,17 @@ func GetRunningSlice() (slice string, err error) {
 //
 // This function is a wrapper around the libsystemd C library; if this is
 // unable to successfully open a handle to the library for any reason (e.g. it
-// cannot be found), an errr will be returned
-func RunningFromSystemService() (ret bool, err error) {
-	var h *dlopen.LibHandle
-	h, err = dlopen.GetHandle(libsystemdNames)
-	if err != nil {
-		return
-	}
-	defer func() {
-		if err1 := h.Close(); err1 != nil {
-			err = err1
-		}
-	}()
-
-	sd_pid_get_owner_uid, err := h.GetSymbolPointer("sd_pid_get_owner_uid")
-	if err != nil {
-		return
-	}
-
-	var uid C.uid_t
-	errno := C.my_sd_pid_get_owner_uid(sd_pid_get_owner_uid, 0, &uid)
-	serrno := syscall.Errno(-errno)
-	// when we're running from a unit file, sd_pid_get_owner_uid returns
-	// ENOENT (systemd <220) or ENXIO (systemd >=220)
-	switch {
-	case errno >= 0:
-		ret = false
-	case serrno == syscall.ENOENT, serrno == syscall.ENXIO:
-		// Since the implementation of sessions in systemd relies on
-		// the `pam_systemd` module, using the sd_pid_get_owner_uid
-		// heuristic alone can result in false positives if that module
-		// (or PAM itself) is not present or properly configured on the
-		// system. As such, we also check if we're the session leader,
-		// which should be the case if we're invoked from a unit file,
-		// but not if e.g. we're invoked from the command line from a
-		// user's login session
-		ret = C.am_session_leader() == 1
-	default:
-		err = fmt.Errorf("error calling sd_pid_get_owner_uid: %v", syscall.Errno(-errno))
-	}
-	return
+// cannot be found), an error will be returned.
+func RunningFromSystemService() (bool, error) {
+	return runningFromSystemService()
 }
 
 // CurrentUnitName attempts to retrieve the name of the systemd system unit
 // from which the calling process has been invoked. It wraps the systemd
 // `sd_pid_get_unit` call, with the same caveat: for processes not part of a
 // systemd system unit, this function will return an error.
-func CurrentUnitName() (unit string, err error) {
-	var h *dlopen.LibHandle
-	h, err = dlopen.GetHandle(libsystemdNames)
-	if err != nil {
-		return
-	}
-	defer func() {
-		if err1 := h.Close(); err1 != nil {
-			err = err1
-		}
-	}()
-
-	sd_pid_get_unit, err := h.GetSymbolPointer("sd_pid_get_unit")
-	if err != nil {
-		return
-	}
-
-	var s string
-	u := C.CString(s)
-	defer C.free(unsafe.Pointer(u))
-
-	ret := C.my_sd_pid_get_unit(sd_pid_get_unit, 0, &u)
-	if ret < 0 {
-		err = fmt.Errorf("error calling sd_pid_get_unit: %v", syscall.Errno(-ret))
-		return
-	}
-
-	unit = C.GoString(u)
-	return
+func CurrentUnitName() (string, error) {
+	return currentUnitName()
 }
 
 // IsRunningSystemd checks whether the host was booted with systemd as its init

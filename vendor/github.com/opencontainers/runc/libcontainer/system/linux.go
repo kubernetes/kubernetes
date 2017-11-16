@@ -7,9 +7,24 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"syscall"
+	"syscall" // only for exec
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
+
+// If arg2 is nonzero, set the "child subreaper" attribute of the
+// calling process; if arg2 is zero, unset the attribute.  When a
+// process is marked as a child subreaper, all of the children
+// that it creates, and their descendants, will be marked as
+// having a subreaper.  In effect, a subreaper fulfills the role
+// of init(1) for its descendant processes.  Upon termination of
+// a process that is orphaned (i.e., its immediate parent has
+// already terminated) and marked as having a subreaper, the
+// nearest still living ancestor subreaper will receive a SIGCHLD
+// signal and be able to wait(2) on the process to discover its
+// termination status.
+const PR_SET_CHILD_SUBREAPER = 36
 
 type ParentDeathSignal int
 
@@ -40,8 +55,16 @@ func Execv(cmd string, args []string, env []string) error {
 	return syscall.Exec(name, args, env)
 }
 
+func Prlimit(pid, resource int, limit unix.Rlimit) error {
+	_, _, err := unix.RawSyscall6(unix.SYS_PRLIMIT64, uintptr(pid), uintptr(resource), uintptr(unsafe.Pointer(&limit)), uintptr(unsafe.Pointer(&limit)), 0, 0)
+	if err != 0 {
+		return err
+	}
+	return nil
+}
+
 func SetParentDeathSignal(sig uintptr) error {
-	if _, _, err := syscall.RawSyscall(syscall.SYS_PRCTL, syscall.PR_SET_PDEATHSIG, sig, 0); err != 0 {
+	if err := unix.Prctl(unix.PR_SET_PDEATHSIG, sig, 0, 0, 0); err != nil {
 		return err
 	}
 	return nil
@@ -49,15 +72,14 @@ func SetParentDeathSignal(sig uintptr) error {
 
 func GetParentDeathSignal() (ParentDeathSignal, error) {
 	var sig int
-	_, _, err := syscall.RawSyscall(syscall.SYS_PRCTL, syscall.PR_GET_PDEATHSIG, uintptr(unsafe.Pointer(&sig)), 0)
-	if err != 0 {
+	if err := unix.Prctl(unix.PR_GET_PDEATHSIG, uintptr(unsafe.Pointer(&sig)), 0, 0, 0); err != nil {
 		return -1, err
 	}
 	return ParentDeathSignal(sig), nil
 }
 
 func SetKeepCaps() error {
-	if _, _, err := syscall.RawSyscall(syscall.SYS_PRCTL, syscall.PR_SET_KEEPCAPS, 1, 0); err != 0 {
+	if err := unix.Prctl(unix.PR_SET_KEEPCAPS, 1, 0, 0, 0); err != nil {
 		return err
 	}
 
@@ -65,7 +87,7 @@ func SetKeepCaps() error {
 }
 
 func ClearKeepCaps() error {
-	if _, _, err := syscall.RawSyscall(syscall.SYS_PRCTL, syscall.PR_SET_KEEPCAPS, 0, 0); err != 0 {
+	if err := unix.Prctl(unix.PR_SET_KEEPCAPS, 0, 0, 0, 0); err != nil {
 		return err
 	}
 
@@ -73,23 +95,18 @@ func ClearKeepCaps() error {
 }
 
 func Setctty() error {
-	if _, _, err := syscall.RawSyscall(syscall.SYS_IOCTL, 0, uintptr(syscall.TIOCSCTTY), 0); err != 0 {
+	if err := unix.IoctlSetInt(0, unix.TIOCSCTTY, 0); err != nil {
 		return err
 	}
 	return nil
 }
 
-/*
- * Detect whether we are currently running in a user namespace.
- * Copied from github.com/lxc/lxd/shared/util.go
- */
+// RunningInUserNS detects whether we are currently running in a user namespace.
+// Copied from github.com/lxc/lxd/shared/util.go
 func RunningInUserNS() bool {
 	file, err := os.Open("/proc/self/uid_map")
 	if err != nil {
-		/*
-		 * This kernel-provided file only exists if user namespaces are
-		 * supported
-		 */
+		// This kernel-provided file only exists if user namespaces are supported
 		return false
 	}
 	defer file.Close()
@@ -111,4 +128,9 @@ func RunningInUserNS() bool {
 		return false
 	}
 	return true
+}
+
+// SetSubreaper sets the value i as the subreaper setting for the calling process
+func SetSubreaper(i int) error {
+	return unix.Prctl(PR_SET_CHILD_SUBREAPER, uintptr(i), 0, 0, 0)
 }

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 FROM BASEIMAGE
-MAINTAINER Dawn Chen <dawnchen@google.com>
 
 EXPOSE 2379 2380 4001 7001
-COPY etcd etcdctl /usr/local/bin/
+COPY etcd* etcdctl* /usr/local/bin/
+COPY migrate-if-needed.sh attachlease rollback /usr/local/bin/

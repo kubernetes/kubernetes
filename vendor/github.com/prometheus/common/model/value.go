@@ -22,6 +22,22 @@ import (
 	"strings"
 )
 
+var (
+	// ZeroSamplePair is the pseudo zero-value of SamplePair used to signal a
+	// non-existing sample pair. It is a SamplePair with timestamp Earliest and
+	// value 0.0. Note that the natural zero value of SamplePair has a timestamp
+	// of 0, which is possible to appear in a real SamplePair and thus not
+	// suitable to signal a non-existing SamplePair.
+	ZeroSamplePair = SamplePair{Timestamp: Earliest}
+
+	// ZeroSample is the pseudo zero-value of Sample used to signal a
+	// non-existing sample. It is a Sample with timestamp Earliest, value 0.0,
+	// and metric nil. Note that the natural zero value of Sample has a timestamp
+	// of 0, which is possible to appear in a real Sample and thus not suitable
+	// to signal a non-existing Sample.
+	ZeroSample = Sample{Timestamp: Earliest}
+)
+
 // A SampleValue is a representation of a value for a given sample at a given
 // time.
 type SampleValue float64
@@ -113,11 +129,8 @@ func (s *Sample) Equal(o *Sample) bool {
 	if !s.Timestamp.Equal(o.Timestamp) {
 		return false
 	}
-	if s.Value.Equal(o.Value) {
-		return false
-	}
 
-	return true
+	return s.Value.Equal(o.Value)
 }
 
 func (s Sample) String() string {

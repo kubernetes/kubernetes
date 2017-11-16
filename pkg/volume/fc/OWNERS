@@ -1,2 +1,10 @@
-maintainers:
+approvers:
 - rootfs
+- saad-ali
+reviewers:
+- saad-ali
+- jsafrane
+- rootfs
+- jingxu97
+- msau42
+- mtanino 

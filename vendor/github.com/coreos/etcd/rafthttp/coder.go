@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import "github.com/coreos/etcd/raft/raftpb"
 
 type encoder interface {
 	// encode encodes the given message to an output stream.
-	encode(m raftpb.Message) error
+	encode(m *raftpb.Message) error
 }
 
 type decoder interface {

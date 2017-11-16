@@ -1,66 +1,36 @@
-# Cluster add-ons
+# Legacy Cluster add-ons
 
-Cluster add-ons are Services and Replication Controllers (with pods) that are
+For more information on add-ons see [the documentation](https://kubernetes.io/docs/concepts/cluster-administration/addons/).
+
+## Overview
+
+Cluster add-ons are resources like Services and Deployments (with pods) that are
 shipped with the Kubernetes binaries and are considered an inherent part of the
-Kubernetes clusters. The add-ons are visible through the API (they can be listed
-using ```kubectl```), but manipulation of these objects is discouraged because
-the system will bring them back to the original state, in particular:
-* if an add-on is stopped, it will be restarted automatically
-* if an add-on is rolling-updated (for Replication Controllers), the system will stop the new version and
-  start the old one again (or perform rolling update to the old version, in the
-  future).
+Kubernetes clusters.
 
-On the cluster, the add-ons are kept in ```/etc/kubernetes/addons``` on the master node, in yaml files
-(json is not supported at the moment). A system daemon periodically checks if
-the contents of this directory is consistent with the add-on objects on the API
-server. If any difference is spotted, the system updates the API objects
-accordingly. (Limitation: for now, the system compares only the names of objects
-in the directory and on the API server. So changes in parameters may not be
-noticed). So the only persistent way to make changes in add-ons is to update the
-manifests on the master server. But still, users are discouraged to do it
-on their own - they should rather wait for a new release of
-Kubernetes that will also contain new versions of add-ons.
+There are currently two classes of add-ons:
+- Add-ons that will be reconciled.
+- Add-ons that will be created if they don't exist.
 
-Each add-on must specify the following label: ```kubernetes.io/cluster-service: true```.
-Yaml files that do not define this label will be ignored.
+More details could be found in [addon-manager/README.md](addon-manager/README.md).
 
-The naming convention for Replication Controllers is
-```<basename>-<version>```, where ```<basename>``` is the same in consecutive
-versions and ```<version>``` changes when the component is updated
-(```<version>``` must not contain ```-```). For instance,
-```heapster-controller-v1``` and ```heapster-controller-12``` are the
-same controllers with two different versions, while ```heapster-controller-v1```
-and ```heapster-newcontroller-12``` are treated as two different applications.
-When a new version of a Replication Controller add-on is found, the system will
-stop the old (current) replication controller and start the new one
-(in the future, rolling update will be performed).
+## Cooperating Horizontal / Vertical Auto-Scaling with "reconcile class addons"
 
-For services, the naming scheme is just ```<basename>``` (with empty version number)
-because we do not expect the service name to change in consecutive versions (and
-rolling-update of services does not exist).
+"Reconcile" class addons will be periodically reconciled to the original state given
+by the initial config. In order to make Horizontal / Vertical Auto-scaling functional,
+the related fields in config should be left unset. More specifically, leave `replicas`
+in `ReplicationController` / `Deployment` / `ReplicaSet` unset for Horizontal Scaling,
+leave `resources` for container unset for Vertical Scaling. The periodic reconcile
+won't clobbered these fields, hence they could be managed by Horizontal / Vertical
+Auto-scaler.
 
-# Add-on update procedure
+## Add-on naming
 
-To update add-ons, just update the contents of ```/etc/kubernetes/addons```
-directory with the desired definition of add-ons. Then the system will take care
-of:
-
-1. Removing the objects from the API server whose manifest was removed.
-  1. This is done for add-ons in the system that do not have a manifest file with the
-     same basename
-1. Creating objects from new manifests
-  1. This is done for manifests that do not correspond to existing API objects
-     with the same basename
-1. Updating objects whose basename is the same, but whose versions changed.
-  1. The update is currently performed by removing the old object and creating
-     the new one. In the future, rolling update of replication controllers will
-     be implemented to keep the add-on services up and running during update of add-on
-     pods.
-  1. Note that this cannot happen for Services as their version is always empty.
-
-Note that in order to run the updator script, python is required on the machine.
-For OS distros that don't have python installed, a python container will be used.
-
-
+The suggested naming for most of the resources is `<basename>` (with no version number).
+Though resources like `Pod`, `ReplicationController` and `DaemonSet` are exceptional.
+It would be hard to update `Pod` because many fields in `Pod` are immutable. For
+`ReplicationController` and `DaemonSet`, in-place update may not trigger the underlying
+pods to be re-created. You probably need to change their names during update to trigger
+a complete deletion and creation.
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/README.md?pixel)]()

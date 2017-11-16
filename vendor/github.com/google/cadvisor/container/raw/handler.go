@@ -165,35 +165,50 @@ func (self *rawContainerHandler) GetSpec() (info.ContainerSpec, error) {
 	return spec, nil
 }
 
+func fsToFsStats(fs *fs.Fs) info.FsStats {
+	inodes := uint64(0)
+	inodesFree := uint64(0)
+	hasInodes := fs.InodesFree != nil
+	if hasInodes {
+		inodes = *fs.Inodes
+		inodesFree = *fs.InodesFree
+	}
+	return info.FsStats{
+		Device:          fs.Device,
+		Type:            fs.Type.String(),
+		Limit:           fs.Capacity,
+		Usage:           fs.Capacity - fs.Free,
+		HasInodes:       hasInodes,
+		Inodes:          inodes,
+		InodesFree:      inodesFree,
+		Available:       fs.Available,
+		ReadsCompleted:  fs.DiskStats.ReadsCompleted,
+		ReadsMerged:     fs.DiskStats.ReadsMerged,
+		SectorsRead:     fs.DiskStats.SectorsRead,
+		ReadTime:        fs.DiskStats.ReadTime,
+		WritesCompleted: fs.DiskStats.WritesCompleted,
+		WritesMerged:    fs.DiskStats.WritesMerged,
+		SectorsWritten:  fs.DiskStats.SectorsWritten,
+		WriteTime:       fs.DiskStats.WriteTime,
+		IoInProgress:    fs.DiskStats.IoInProgress,
+		IoTime:          fs.DiskStats.IoTime,
+		WeightedIoTime:  fs.DiskStats.WeightedIoTime,
+	}
+}
+
 func (self *rawContainerHandler) getFsStats(stats *info.ContainerStats) error {
+	var allFs []fs.Fs
 	// Get Filesystem information only for the root cgroup.
 	if isRootCgroup(self.name) {
 		filesystems, err := self.fsInfo.GetGlobalFsInfo()
 		if err != nil {
 			return err
 		}
-		for _, fs := range filesystems {
-			stats.Filesystem = append(stats.Filesystem,
-				info.FsStats{
-					Device:          fs.Device,
-					Type:            fs.Type.String(),
-					Limit:           fs.Capacity,
-					Usage:           fs.Capacity - fs.Free,
-					Available:       fs.Available,
-					InodesFree:      fs.InodesFree,
-					ReadsCompleted:  fs.DiskStats.ReadsCompleted,
-					ReadsMerged:     fs.DiskStats.ReadsMerged,
-					SectorsRead:     fs.DiskStats.SectorsRead,
-					ReadTime:        fs.DiskStats.ReadTime,
-					WritesCompleted: fs.DiskStats.WritesCompleted,
-					WritesMerged:    fs.DiskStats.WritesMerged,
-					SectorsWritten:  fs.DiskStats.SectorsWritten,
-					WriteTime:       fs.DiskStats.WriteTime,
-					IoInProgress:    fs.DiskStats.IoInProgress,
-					IoTime:          fs.DiskStats.IoTime,
-					WeightedIoTime:  fs.DiskStats.WeightedIoTime,
-				})
+		for i := range filesystems {
+			fs := filesystems[i]
+			stats.Filesystem = append(stats.Filesystem, fsToFsStats(&fs))
 		}
+		allFs = filesystems
 	} else if len(self.externalMounts) > 0 {
 		var mountSet map[string]struct{}
 		mountSet = make(map[string]struct{})
@@ -204,28 +219,14 @@ func (self *rawContainerHandler) getFsStats(stats *info.ContainerStats) error {
 		if err != nil {
 			return err
 		}
-		for _, fs := range filesystems {
-			stats.Filesystem = append(stats.Filesystem,
-				info.FsStats{
-					Device:          fs.Device,
-					Type:            fs.Type.String(),
-					Limit:           fs.Capacity,
-					Usage:           fs.Capacity - fs.Free,
-					InodesFree:      fs.InodesFree,
-					ReadsCompleted:  fs.DiskStats.ReadsCompleted,
-					ReadsMerged:     fs.DiskStats.ReadsMerged,
-					SectorsRead:     fs.DiskStats.SectorsRead,
-					ReadTime:        fs.DiskStats.ReadTime,
-					WritesCompleted: fs.DiskStats.WritesCompleted,
-					WritesMerged:    fs.DiskStats.WritesMerged,
-					SectorsWritten:  fs.DiskStats.SectorsWritten,
-					WriteTime:       fs.DiskStats.WriteTime,
-					IoInProgress:    fs.DiskStats.IoInProgress,
-					IoTime:          fs.DiskStats.IoTime,
-					WeightedIoTime:  fs.DiskStats.WeightedIoTime,
-				})
+		for i := range filesystems {
+			fs := filesystems[i]
+			stats.Filesystem = append(stats.Filesystem, fsToFsStats(&fs))
 		}
+		allFs = filesystems
 	}
+
+	common.AssignDeviceNamesToDiskStats(&fsNamer{fs: allFs, factory: self.machineInfoFactory}, &stats.DiskIo)
 	return nil
 }
 
@@ -256,6 +257,11 @@ func (self *rawContainerHandler) GetContainerLabels() map[string]string {
 	return map[string]string{}
 }
 
+func (self *rawContainerHandler) GetContainerIPAddress() string {
+	// the IP address for the raw container corresponds to the system ip address.
+	return "127.0.0.1"
+}
+
 func (self *rawContainerHandler) ListContainers(listType container.ListType) ([]info.ContainerReference, error) {
 	return common.ListContainers(self.name, self.cgroupPaths, listType)
 }
@@ -270,4 +276,26 @@ func (self *rawContainerHandler) Exists() bool {
 
 func (self *rawContainerHandler) Type() container.ContainerType {
 	return container.ContainerTypeRaw
+}
+
+type fsNamer struct {
+	fs      []fs.Fs
+	factory info.MachineInfoFactory
+	info    common.DeviceNamer
+}
+
+func (n *fsNamer) DeviceName(major, minor uint64) (string, bool) {
+	for _, info := range n.fs {
+		if uint64(info.Major) == major && uint64(info.Minor) == minor {
+			return info.Device, true
+		}
+	}
+	if n.info == nil {
+		mi, err := n.factory.GetMachineInfo()
+		if err != nil {
+			return "", false
+		}
+		n.info = (*common.MachineInfoNamer)(mi)
+	}
+	return n.info.DeviceName(major, minor)
 }

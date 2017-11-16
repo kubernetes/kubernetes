@@ -17,7 +17,7 @@
 ## Contains configuration values for new image. It is skip when CREATE_IMAGE=false
 
 # Image name which will be displayed in OpenStack
-OPENSTACK_IMAGE_NAME=${OPENSTACK_IMAGE_NAME:-CentOS7}
+OPENSTACK_IMAGE_NAME=${OPENSTACK_IMAGE_NAME:-CentOS-7-x86_64-GenericCloud-1604}
 
 # Downloaded image name for Openstack project
 IMAGE_FILE=${IMAGE_FILE:-CentOS-7-x86_64-GenericCloud-1604.qcow2}

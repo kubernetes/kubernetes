@@ -80,14 +80,18 @@ const (
 	QuantileLabel = "quantile"
 )
 
-// LabelNameRE is a regular expression matching valid label names.
+// LabelNameRE is a regular expression matching valid label names. Note that the
+// IsValid method of LabelName performs the same check but faster than a match
+// with this regular expression.
 var LabelNameRE = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 // A LabelName is a key for a LabelSet or Metric.  It has a value associated
 // therewith.
 type LabelName string
 
-// IsValid is true iff the label name matches the pattern of LabelNameRE.
+// IsValid is true iff the label name matches the pattern of LabelNameRE. This
+// method, however, does not use LabelNameRE for the check but a much faster
+// hardcoded implementation.
 func (ln LabelName) IsValid() bool {
 	if len(ln) == 0 {
 		return false
@@ -106,7 +110,7 @@ func (ln *LabelName) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	if err := unmarshal(&s); err != nil {
 		return err
 	}
-	if !LabelNameRE.MatchString(s) {
+	if !LabelName(s).IsValid() {
 		return fmt.Errorf("%q is not a valid label name", s)
 	}
 	*ln = LabelName(s)
@@ -119,7 +123,7 @@ func (ln *LabelName) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
-	if !LabelNameRE.MatchString(s) {
+	if !LabelName(s).IsValid() {
 		return fmt.Errorf("%q is not a valid label name", s)
 	}
 	*ln = LabelName(s)

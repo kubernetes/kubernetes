@@ -17,79 +17,87 @@ limitations under the License.
 package priorities
 
 import (
-	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	"fmt"
+
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+
+	"github.com/golang/glog"
 )
-
-type NodeAffinity struct {
-	nodeLister algorithm.NodeLister
-}
-
-func NewNodeAffinityPriority(nodeLister algorithm.NodeLister) algorithm.PriorityFunction {
-	nodeAffinity := &NodeAffinity{
-		nodeLister: nodeLister,
-	}
-	return nodeAffinity.CalculateNodeAffinityPriority
-}
 
 // CalculateNodeAffinityPriority prioritizes nodes according to node affinity scheduling preferences
 // indicated in PreferredDuringSchedulingIgnoredDuringExecution. Each time a node match a preferredSchedulingTerm,
 // it will a get an add of preferredSchedulingTerm.Weight. Thus, the more preferredSchedulingTerms
 // the node satisfies and the more the preferredSchedulingTerm that is satisfied weights, the higher
 // score the node gets.
-func (s *NodeAffinity) CalculateNodeAffinityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
-	var maxCount int
-	counts := map[string]int{}
-
-	nodes, err := nodeLister.List()
-	if err != nil {
-		return nil, err
+func CalculateNodeAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+	node := nodeInfo.Node()
+	if node == nil {
+		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
 	}
 
-	affinity, err := api.GetAffinityFromPodAnnotations(pod.Annotations)
-	if err != nil {
-		return nil, err
+	var affinity *v1.Affinity
+	if priorityMeta, ok := meta.(*priorityMetadata); ok {
+		affinity = priorityMeta.affinity
+	} else {
+		// We couldn't parse metadata - fallback to the podspec.
+		affinity = pod.Spec.Affinity
 	}
 
+	var count int32
 	// A nil element of PreferredDuringSchedulingIgnoredDuringExecution matches no objects.
 	// An element of PreferredDuringSchedulingIgnoredDuringExecution that refers to an
 	// empty PreferredSchedulingTerm matches all objects.
-	if affinity.NodeAffinity != nil && affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+	if affinity != nil && affinity.NodeAffinity != nil && affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
 		// Match PreferredDuringSchedulingIgnoredDuringExecution term by term.
-		for _, preferredSchedulingTerm := range affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
+		for i := range affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
+			preferredSchedulingTerm := &affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[i]
 			if preferredSchedulingTerm.Weight == 0 {
 				continue
 			}
 
-			nodeSelector, err := api.NodeSelectorRequirementsAsSelector(preferredSchedulingTerm.Preference.MatchExpressions)
+			// TODO: Avoid computing it for all nodes if this becomes a performance problem.
+			nodeSelector, err := v1helper.NodeSelectorRequirementsAsSelector(preferredSchedulingTerm.Preference.MatchExpressions)
 			if err != nil {
-				return nil, err
+				return schedulerapi.HostPriority{}, err
 			}
-
-			for _, node := range nodes.Items {
-				if nodeSelector.Matches(labels.Set(node.Labels)) {
-					counts[node.Name] += int(preferredSchedulingTerm.Weight)
-				}
-
-				if counts[node.Name] > maxCount {
-					maxCount = counts[node.Name]
-				}
+			if nodeSelector.Matches(labels.Set(node.Labels)) {
+				count += preferredSchedulingTerm.Weight
 			}
 		}
 	}
 
-	result := []schedulerapi.HostPriority{}
-	for _, node := range nodes.Items {
-		fScore := float64(0)
+	return schedulerapi.HostPriority{
+		Host:  node.Name,
+		Score: int(count),
+	}, nil
+}
+
+func CalculateNodeAffinityPriorityReduce(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulercache.NodeInfo, result schedulerapi.HostPriorityList) error {
+	var maxCount int
+	for i := range result {
+		if result[i].Score > maxCount {
+			maxCount = result[i].Score
+		}
+	}
+	maxCountFloat := float64(maxCount)
+
+	var fScore float64
+	for i := range result {
 		if maxCount > 0 {
-			fScore = 10 * (float64(counts[node.Name]) / float64(maxCount))
+			fScore = float64(schedulerapi.MaxPriority) * (float64(result[i].Score) / maxCountFloat)
+		} else {
+			fScore = 0
 		}
-		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: int(fScore)})
-		glog.V(10).Infof("%v -> %v: NodeAffinityPriority, Score: (%d)", pod.Name, node.Name, int(fScore))
+		if glog.V(10) {
+			// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
+			// not logged. There is visible performance gain from it.
+			glog.Infof("%v -> %v: NodeAffinityPriority, Score: (%d)", pod.Name, result[i].Host, int(fScore))
+		}
+		result[i].Score = int(fScore)
 	}
-	return result, nil
+	return nil
 }

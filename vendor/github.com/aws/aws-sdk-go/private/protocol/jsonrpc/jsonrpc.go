@@ -1,9 +1,9 @@
-// Package jsonrpc provides JSON RPC utilities for serialisation of AWS
+// Package jsonrpc provides JSON RPC utilities for serialization of AWS
 // requests and responses.
 package jsonrpc
 
-//go:generate go run ../../../models/protocol_tests/generate.go ../../../models/protocol_tests/input/json.json build_test.go
-//go:generate go run ../../../models/protocol_tests/generate.go ../../../models/protocol_tests/output/json.json unmarshal_test.go
+//go:generate go run -tags codegen ../../../models/protocol_tests/generate.go ../../../models/protocol_tests/input/json.json build_test.go
+//go:generate go run -tags codegen ../../../models/protocol_tests/generate.go ../../../models/protocol_tests/output/json.json unmarshal_test.go
 
 import (
 	"encoding/json"
@@ -17,6 +17,18 @@ import (
 )
 
 var emptyJSON = []byte("{}")
+
+// BuildHandler is a named request handler for building jsonrpc protocol requests
+var BuildHandler = request.NamedHandler{Name: "awssdk.jsonrpc.Build", Fn: Build}
+
+// UnmarshalHandler is a named request handler for unmarshaling jsonrpc protocol requests
+var UnmarshalHandler = request.NamedHandler{Name: "awssdk.jsonrpc.Unmarshal", Fn: Unmarshal}
+
+// UnmarshalMetaHandler is a named request handler for unmarshaling jsonrpc protocol request metadata
+var UnmarshalMetaHandler = request.NamedHandler{Name: "awssdk.jsonrpc.UnmarshalMeta", Fn: UnmarshalMeta}
+
+// UnmarshalErrorHandler is a named request handler for unmarshaling jsonrpc protocol request errors
+var UnmarshalErrorHandler = request.NamedHandler{Name: "awssdk.jsonrpc.UnmarshalError", Fn: UnmarshalError}
 
 // Build builds a JSON payload for a JSON RPC request.
 func Build(req *request.Request) {

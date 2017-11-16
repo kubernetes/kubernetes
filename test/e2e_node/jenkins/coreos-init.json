@@ -1,0 +1,44 @@
+{
+  "ignition":{"version": "2.0.0"},
+  "systemd": {
+    "units": [{
+      "name": "update-engine.service",
+      "mask": true
+    },
+    {
+      "name": "locksmithd.service",
+      "mask": true
+    },
+    {
+      "name": "docker.service",
+      "dropins": [{
+        "name": "10-disable-systemd-cgroup-driver.conf",
+        "contents": "[Service]\nCPUAccounting=yes\nMemoryAccounting=yes\nEnvironment=\"DOCKER_CGROUPS=\""
+      }]
+    }]
+  },
+  "passwd": {
+    "users": [{
+      "name": "jenkins",
+      "create": {
+        "groups": ["docker", "sudo"]
+      }
+    }]
+  },
+  "storage": {
+    "files": [
+      {
+        "filesystem": "root",
+        "path": "/etc/ssh/sshd_config",
+        "contents": {
+          "source": "data:,%23%20Use%20most%20defaults%20for%20sshd%20configuration.%0AUsePrivilegeSeparation%20sandbox%0ASubsystem%20sftp%20internal-sftp%0AClientAliveInterval%20180%0AUseDNS%20no%0AUsePAM%20yes%0APrintLastLog%20no%20%23%20handled%20by%20PAM%0APrintMotd%20no%20%23%20handled%20by%20PAM%0AAuthenticationMethods%20publickey",
+          "verification": {}
+        },
+        "mode": 384,
+        "user": {},
+        "group": {}
+      }
+    ]
+  }
+}
+

@@ -23,9 +23,9 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-"${KUBE_ROOT}/hack/build-go.sh" cmd/hyperkube
+make -C "${KUBE_ROOT}" WHAT=cmd/hyperkube
 
-# add other BADSYMBOLS here.
+# Add other BADSYMBOLS here.
 BADSYMBOLS=(
   "httptest"
   "testify"

@@ -19,23 +19,25 @@ limitations under the License.
 package util
 
 import (
+	"bytes"
 	"fmt"
 	"os/exec"
 	"strings"
-	"syscall"
 
-	"k8s.io/kubernetes/pkg/api/resource"
+	"golang.org/x/sys/unix"
+
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-// FSInfo linux returns (available bytes, byte capacity, byte usage, error) for the filesystem that
-// path resides upon.
-func FsInfo(path string) (int64, int64, int64, error) {
-	statfs := &syscall.Statfs_t{}
-	err := syscall.Statfs(path, statfs)
+// FSInfo linux returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
+// for the filesystem that path resides upon.
+func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
+	statfs := &unix.Statfs_t{}
+	err := unix.Statfs(path, statfs)
 	if err != nil {
-		return 0, 0, 0, err
+		return 0, 0, 0, 0, 0, 0, err
 	}
-	// TODO(vishh): Include inodes space
+
 	// Available is blocks available * fragment size
 	available := int64(statfs.Bavail) * int64(statfs.Bsize)
 
@@ -45,7 +47,11 @@ func FsInfo(path string) (int64, int64, int64, error) {
 	// Usage is block being used * fragment size (aka block size).
 	usage := (int64(statfs.Blocks) - int64(statfs.Bfree)) * int64(statfs.Bsize)
 
-	return available, capacity, usage, nil
+	inodes := int64(statfs.Files)
+	inodesFree := int64(statfs.Ffree)
+	inodesUsed := inodes - inodesFree
+
+	return available, capacity, usage, inodes, inodesFree, inodesUsed, nil
 }
 
 func Du(path string) (*resource.Quantity, error) {
@@ -61,4 +67,31 @@ func Du(path string) (*resource.Quantity, error) {
 	}
 	used.Format = resource.BinarySI
 	return &used, nil
+}
+
+// Find uses the equivalent of the command `find <path> -dev -printf '.' | wc -c` to count files and directories.
+// While this is not an exact measure of inodes used, it is a very good approximation.
+func Find(path string) (int64, error) {
+	if path == "" {
+		return 0, fmt.Errorf("invalid directory")
+	}
+	var counter byteCounter
+	var stderr bytes.Buffer
+	findCmd := exec.Command("find", path, "-xdev", "-printf", ".")
+	findCmd.Stdout, findCmd.Stderr = &counter, &stderr
+	if err := findCmd.Start(); err != nil {
+		return 0, fmt.Errorf("failed to exec cmd %v - %v; stderr: %v", findCmd.Args, err, stderr.String())
+	}
+	if err := findCmd.Wait(); err != nil {
+		return 0, fmt.Errorf("cmd %v failed. stderr: %s; err: %v", findCmd.Args, stderr.String(), err)
+	}
+	return counter.bytesWritten, nil
+}
+
+// Simple io.Writer implementation that counts how many bytes were written.
+type byteCounter struct{ bytesWritten int64 }
+
+func (b *byteCounter) Write(p []byte) (int, error) {
+	b.bytesWritten += int64(len(p))
+	return len(p), nil
 }

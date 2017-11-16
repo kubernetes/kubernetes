@@ -17,12 +17,17 @@ limitations under the License.
 package v0
 
 import (
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/apis/abac"
-	"k8s.io/kubernetes/pkg/conversion"
 )
 
-func init() {
-	api.Scheme.AddConversionFuncs(
+// allAuthenticated matches k8s.io/apiserver/pkg/authentication/user.AllAuthenticated,
+// but we don't want an client library (which must include types), depending on a server library
+const allAuthenticated = "system:authenticated"
+
+func addConversionFuncs(scheme *runtime.Scheme) error {
+	return scheme.AddConversionFuncs(
 		func(in *Policy, out *api.Policy, s conversion.Scope) error {
 			// Begin by copying all fields
 			out.Spec.User = in.User
@@ -31,9 +36,14 @@ func init() {
 			out.Spec.Resource = in.Resource
 			out.Spec.Readonly = in.Readonly
 
-			// In v0, unspecified user and group matches all subjects
+			// In v0, unspecified user and group matches all authenticated subjects
 			if len(in.User) == 0 && len(in.Group) == 0 {
-				out.Spec.User = "*"
+				out.Spec.Group = allAuthenticated
+			}
+			// In v0, user or group of * matches all authenticated subjects
+			if in.User == "*" || in.Group == "*" {
+				out.Spec.Group = allAuthenticated
+				out.Spec.User = ""
 			}
 
 			// In v0, leaving namespace empty matches all namespaces

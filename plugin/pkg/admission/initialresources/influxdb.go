@@ -21,8 +21,8 @@ import (
 	"strings"
 	"time"
 
-	influxdb "github.com/influxdb/influxdb/client"
-	"k8s.io/kubernetes/pkg/api"
+	influxdb "github.com/influxdata/influxdb/client"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 const (
@@ -67,7 +67,7 @@ func (s *influxdbSource) GetUsagePercentile(kind api.ResourceName, perc int64, i
 
 	query := fmt.Sprintf("select percentile(value, %v), count(pod_id) from %v where container_base_image%v%v and time > '%v' and time < '%v'", perc, series, imgPattern, namespaceCond, start.UTC().Format(timeFormat), end.UTC().Format(timeFormat))
 	if _, err := s.query(query); err != nil {
-		return 0, 0, fmt.Errorf("Error while trying to query InfluxDB: %v", err)
+		return 0, 0, fmt.Errorf("error while trying to query InfluxDB: %v", err)
 	}
 	return 0, 0, nil
 }

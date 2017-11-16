@@ -37,7 +37,7 @@ func ResizeInstanceGroup(asg ASG, instanceGroupName string, size int) error {
 		MaxSize:              aws.Int64(int64(size)),
 	}
 	if _, err := asg.UpdateAutoScalingGroup(request); err != nil {
-		return fmt.Errorf("error resizing AWS autoscaling group: %v", err)
+		return fmt.Errorf("error resizing AWS autoscaling group: %q", err)
 	}
 	return nil
 }
@@ -57,7 +57,7 @@ func DescribeInstanceGroup(asg ASG, instanceGroupName string) (InstanceGroupInfo
 	}
 	response, err := asg.DescribeAutoScalingGroups(request)
 	if err != nil {
-		return nil, fmt.Errorf("error listing AWS autoscaling group (%s): %v", instanceGroupName, err)
+		return nil, fmt.Errorf("error listing AWS autoscaling group (%s): %q", instanceGroupName, err)
 	}
 
 	if len(response.AutoScalingGroups) == 0 {

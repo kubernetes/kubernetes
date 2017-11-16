@@ -6,5 +6,9 @@ spec:
   ports:
     - port: 7077
       targetPort: 7077
+      name: spark
+    - port: 8080
+      targetPort: 8080
+      name: http
   selector:
     component: spark-master

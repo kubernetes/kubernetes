@@ -30,6 +30,8 @@ $kube_os = ENV['KUBERNETES_OS'] || "fedora"
 
 # Determine whether vagrant should use nfs to sync folders
 $use_nfs = ENV['KUBERNETES_VAGRANT_USE_NFS'] == 'true'
+# Determine whether vagrant should use rsync to sync folders
+$use_rsync = ENV['KUBERNETES_VAGRANT_USE_RSYNC'] == 'true'
 
 # To override the vagrant provider, use (e.g.):
 #   KUBERNETES_PROVIDER=vagrant VAGRANT_DEFAULT_PROVIDER=... .../cluster/kube-up.sh
@@ -111,7 +113,7 @@ end
 # When doing Salt provisioning, we copy approximately 200MB of content in /tmp before anything else happens.
 # This causes problems if anything else was in /tmp or the other directories that are bound to tmpfs device (i.e /run, etc.)
 $vm_master_mem = (ENV['KUBERNETES_MASTER_MEMORY'] || ENV['KUBERNETES_MEMORY'] || 1280).to_i
-$vm_node_mem = (ENV['KUBERNETES_NODE_MEMORY'] || ENV['KUBERNETES_MEMORY'] || 1024).to_i
+$vm_node_mem = (ENV['KUBERNETES_NODE_MEMORY'] || ENV['KUBERNETES_MEMORY'] || 2048).to_i
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   if Vagrant.has_plugin?("vagrant-proxyconf")
@@ -122,6 +124,12 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     config.proxy.https    = $https_proxy
     config.proxy.no_proxy = $no_proxy
   end
+
+  # this corrects a bug in 1.8.5 where an invalid SSH key is inserted.
+  if Vagrant::VERSION == "1.8.5"
+    config.ssh.insert_key = false
+  end
+
   def setvmboxandurl(config, provider)
     if ENV['KUBERNETES_BOX_NAME'] then
       config.vm.box = ENV['KUBERNETES_BOX_NAME']
@@ -150,6 +158,15 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
     if $use_nfs then
       config.vm.synced_folder ".", "/vagrant", nfs: true
+    elsif $use_rsync then
+      opts = {}
+      if ENV['KUBERNETES_VAGRANT_RSYNC_ARGS'] then
+        opts[:rsync__args] = ENV['KUBERNETES_VAGRANT_RSYNC_ARGS'].split(" ")
+      end
+      if ENV['KUBERNETES_VAGRANT_RSYNC_EXCLUDE'] then
+        opts[:rsync__exclude] = ENV['KUBERNETES_VAGRANT_RSYNC_EXCLUDE'].split(" ")
+      end
+      config.vm.synced_folder ".", "/vagrant", opts
     end
 
     # Try VMWare Fusion first (see
@@ -293,8 +310,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   # Kubernetes node
   $num_node.times do |n|
     node_vm_name = "node-#{n+1}"
-    node_prefix = ENV['INSTANCE_PREFIX'] || 'kubernetes' # must mirror default in cluster/vagrant/config-default.sh
-    node_hostname = "#{node_prefix}-#{node_vm_name}"
 
     config.vm.define node_vm_name do |node|
       customize_vm node, $vm_node_mem

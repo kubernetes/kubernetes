@@ -1,4 +1,4 @@
-// Copyright 2014 The oauth2 Authors. All rights reserved.
+// Copyright 2014 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -46,6 +46,10 @@ type Config struct {
 	//
 	PrivateKey []byte
 
+	// PrivateKeyID contains an optional hint indicating which key is being
+	// used.
+	PrivateKeyID string
+
 	// Subject is the optional user to impersonate.
 	Subject string
 
@@ -54,6 +58,9 @@ type Config struct {
 
 	// TokenURL is the endpoint required to complete the 2-legged JWT flow.
 	TokenURL string
+
+	// Expires optionally specifies how long the token is valid for.
+	Expires time.Duration
 }
 
 // TokenSource returns a JWT TokenSource using the configuration
@@ -95,7 +102,12 @@ func (js jwtSource) Token() (*oauth2.Token, error) {
 		// to be compatible with legacy OAuth 2.0 providers.
 		claimSet.Prn = subject
 	}
-	payload, err := jws.Encode(defaultHeader, claimSet, pk)
+	if t := js.conf.Expires; t > 0 {
+		claimSet.Exp = time.Now().Add(t).Unix()
+	}
+	h := *defaultHeader
+	h.KeyID = js.conf.PrivateKeyID
+	payload, err := jws.Encode(&h, claimSet, pk)
 	if err != nil {
 		return nil, err
 	}

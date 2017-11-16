@@ -41,6 +41,10 @@ var initializers []func()
 // Set this to true to enable it
 var EnablePrefixMatching = false
 
+//EnableCommandSorting controls sorting of the slice of commands, which is turned on by default.
+//To disable sorting, set it to false.
+var EnableCommandSorting = true
+
 //AddTemplateFunc adds a template function that's available to Usage and Help
 //template generation.
 func AddTemplateFunc(name string, tmplFunc interface{}) {

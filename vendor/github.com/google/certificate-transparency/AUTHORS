@@ -1,0 +1,23 @@
+# This is the official list of benchmark authors for copyright purposes.
+# This file is distinct from the CONTRIBUTORS files.
+# See the latter for an explanation.
+#
+# Names should be added to this file as:
+#	Name or Organization <email address>
+# The email address is not required for organizations.
+#
+# Please keep the list sorted.
+
+Comodo CA Limited
+Ed Maste <emaste@freebsd.org>
+Google Inc.
+Jeff Trawick <trawick@gmail.com>
+Katriel Cohn-Gordon <katriel.cohn-gordon@cybersecurity.ox.ac.uk>
+Mark Schloesser <ms@mwcollect.org>
+NORDUnet A/S
+Nicholas Galbreath <nickg@client9.com>
+Oliver Weidner <Oliver.Weidner@gmail.com>
+Ruslan Kovalov <ruslan.kovalyov@gmail.com>
+Venafi, Inc.
+Vladimir Rutsky <vladimir@rutsky.org>
+Ximin Luo <infinity0@gmx.com>

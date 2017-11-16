@@ -21,8 +21,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/runtime"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // TODO these tests don't add much value for testing things that have groups
@@ -67,11 +67,41 @@ func TestResourcePath(t *testing.T) {
 	}
 }
 
-var status = &unversioned.Status{
-	Status:  unversioned.StatusFailure,
+var status = &metav1.Status{
+	Status:  metav1.StatusFailure,
 	Code:    200,
-	Reason:  unversioned.StatusReasonUnknown,
+	Reason:  metav1.StatusReasonUnknown,
 	Message: "",
+}
+
+func TestSelfLink(t *testing.T) {
+	testCases := []struct {
+		resource string
+		name     string
+		expected string
+	}{
+		{"resource", "name", "/api/" + Default.GroupVersion().Version + "/resource/name"},
+		{"resource", "", "/api/" + Default.GroupVersion().Version + "/resource"},
+	}
+	for _, item := range testCases {
+		if actual := Default.SelfLink(item.resource, item.name); actual != item.expected {
+			t.Errorf("Expected: %s, got: %s for resource: %s and name: %s", item.expected, actual, item.resource, item.name)
+		}
+	}
+
+	testGroupCases := []struct {
+		resource string
+		name     string
+		expected string
+	}{
+		{"resource", "name", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/resource/name"},
+		{"resource", "", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/resource"},
+	}
+	for _, item := range testGroupCases {
+		if actual := Admission.SelfLink(item.resource, item.name); actual != item.expected {
+			t.Errorf("Expected: %s, got: %s for resource: %s and name: %s", item.expected, actual, item.resource, item.name)
+		}
+	}
 }
 
 func TestV1EncodeDecodeStatus(t *testing.T) {
@@ -81,7 +111,7 @@ func TestV1EncodeDecodeStatus(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	typeMeta := unversioned.TypeMeta{}
+	typeMeta := metav1.TypeMeta{}
 	if err := json.Unmarshal(encoded, &typeMeta); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -105,7 +135,7 @@ func testEncodeDecodeStatus(t *testing.T, codec runtime.Codec) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	typeMeta := unversioned.TypeMeta{}
+	typeMeta := metav1.TypeMeta{}
 	if err := json.Unmarshal(encoded, &typeMeta); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

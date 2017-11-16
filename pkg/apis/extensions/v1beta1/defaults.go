@@ -17,29 +17,24 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-func addDefaultingFuncs(scheme *runtime.Scheme) {
-	scheme.AddDefaultingFuncs(
-		SetDefaults_DaemonSet,
-		SetDefaults_Deployment,
-		SetDefaults_Job,
-		SetDefaults_HorizontalPodAutoscaler,
-		SetDefaults_ReplicaSet,
-		SetDefaults_NetworkPolicy,
-	)
+func addDefaultingFuncs(scheme *runtime.Scheme) error {
+	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_DaemonSet(obj *DaemonSet) {
+func SetDefaults_DaemonSet(obj *extensionsv1beta1.DaemonSet) {
 	labels := obj.Spec.Template.Labels
 
 	// TODO: support templates defined elsewhere when we support them in the API
 	if labels != nil {
 		if obj.Spec.Selector == nil {
-			obj.Spec.Selector = &LabelSelector{
+			obj.Spec.Selector = &metav1.LabelSelector{
 				MatchLabels: labels,
 			}
 		}
@@ -47,33 +42,61 @@ func SetDefaults_DaemonSet(obj *DaemonSet) {
 			obj.Labels = labels
 		}
 	}
+	updateStrategy := &obj.Spec.UpdateStrategy
+	if updateStrategy.Type == "" {
+		updateStrategy.Type = extensionsv1beta1.OnDeleteDaemonSetStrategyType
+	}
+	if updateStrategy.Type == extensionsv1beta1.RollingUpdateDaemonSetStrategyType {
+		if updateStrategy.RollingUpdate == nil {
+			rollingUpdate := extensionsv1beta1.RollingUpdateDaemonSet{}
+			updateStrategy.RollingUpdate = &rollingUpdate
+		}
+		if updateStrategy.RollingUpdate.MaxUnavailable == nil {
+			// Set default MaxUnavailable as 1 by default.
+			maxUnavailable := intstr.FromInt(1)
+			updateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
+		}
+	}
+	if obj.Spec.RevisionHistoryLimit == nil {
+		obj.Spec.RevisionHistoryLimit = new(int32)
+		*obj.Spec.RevisionHistoryLimit = 10
+	}
 }
 
-func SetDefaults_Deployment(obj *Deployment) {
+func SetDefaults_PodSecurityPolicySpec(obj *extensionsv1beta1.PodSecurityPolicySpec) {
+	// This field was added after PodSecurityPolicy was released.
+	// Policies that do not include this field must remain as permissive as they were prior to the introduction of this field.
+	if obj.AllowPrivilegeEscalation == nil {
+		t := true
+		obj.AllowPrivilegeEscalation = &t
+	}
+}
+
+func SetDefaults_Deployment(obj *extensionsv1beta1.Deployment) {
 	// Default labels and selector to labels from pod template spec.
 	labels := obj.Spec.Template.Labels
 
 	if labels != nil {
 		if obj.Spec.Selector == nil {
-			obj.Spec.Selector = &LabelSelector{MatchLabels: labels}
+			obj.Spec.Selector = &metav1.LabelSelector{MatchLabels: labels}
 		}
 		if len(obj.Labels) == 0 {
 			obj.Labels = labels
 		}
 	}
-	// Set DeploymentSpec.Replicas to 1 if it is not set.
+	// Set extensionsv1beta1.DeploymentSpec.Replicas to 1 if it is not set.
 	if obj.Spec.Replicas == nil {
 		obj.Spec.Replicas = new(int32)
 		*obj.Spec.Replicas = 1
 	}
 	strategy := &obj.Spec.Strategy
-	// Set default DeploymentStrategyType as RollingUpdate.
+	// Set default extensionsv1beta1.DeploymentStrategyType as RollingUpdate.
 	if strategy.Type == "" {
-		strategy.Type = RollingUpdateDeploymentStrategyType
+		strategy.Type = extensionsv1beta1.RollingUpdateDeploymentStrategyType
 	}
-	if strategy.Type == RollingUpdateDeploymentStrategyType {
+	if strategy.Type == extensionsv1beta1.RollingUpdateDeploymentStrategyType || strategy.RollingUpdate != nil {
 		if strategy.RollingUpdate == nil {
-			rollingUpdate := RollingUpdateDeployment{}
+			rollingUpdate := extensionsv1beta1.RollingUpdateDeployment{}
 			strategy.RollingUpdate = &rollingUpdate
 		}
 		if strategy.RollingUpdate.MaxUnavailable == nil {
@@ -89,57 +112,13 @@ func SetDefaults_Deployment(obj *Deployment) {
 	}
 }
 
-func SetDefaults_Job(obj *Job) {
-	labels := obj.Spec.Template.Labels
-	// TODO: support templates defined elsewhere when we support them in the API
-	if labels != nil {
-		// if an autoselector is requested, we'll build the selector later with controller-uid and job-name
-		autoSelector := bool(obj.Spec.AutoSelector != nil && *obj.Spec.AutoSelector)
-
-		// otherwise, we are using a manual selector
-		manualSelector := !autoSelector
-
-		// and default behavior for an unspecified manual selector is to use the pod template labels
-		if manualSelector && obj.Spec.Selector == nil {
-			obj.Spec.Selector = &LabelSelector{
-				MatchLabels: labels,
-			}
-		}
-		if len(obj.Labels) == 0 {
-			obj.Labels = labels
-		}
-	}
-	// For a non-parallel job, you can leave both `.spec.completions` and
-	// `.spec.parallelism` unset.  When both are unset, both are defaulted to 1.
-	if obj.Spec.Completions == nil && obj.Spec.Parallelism == nil {
-		obj.Spec.Completions = new(int32)
-		*obj.Spec.Completions = 1
-		obj.Spec.Parallelism = new(int32)
-		*obj.Spec.Parallelism = 1
-	}
-	if obj.Spec.Parallelism == nil {
-		obj.Spec.Parallelism = new(int32)
-		*obj.Spec.Parallelism = 1
-	}
-}
-
-func SetDefaults_HorizontalPodAutoscaler(obj *HorizontalPodAutoscaler) {
-	if obj.Spec.MinReplicas == nil {
-		minReplicas := int32(1)
-		obj.Spec.MinReplicas = &minReplicas
-	}
-	if obj.Spec.CPUUtilization == nil {
-		obj.Spec.CPUUtilization = &CPUTargetUtilization{TargetPercentage: 80}
-	}
-}
-
-func SetDefaults_ReplicaSet(obj *ReplicaSet) {
+func SetDefaults_ReplicaSet(obj *extensionsv1beta1.ReplicaSet) {
 	labels := obj.Spec.Template.Labels
 
 	// TODO: support templates defined elsewhere when we support them in the API
 	if labels != nil {
 		if obj.Spec.Selector == nil {
-			obj.Spec.Selector = &LabelSelector{
+			obj.Spec.Selector = &metav1.LabelSelector{
 				MatchLabels: labels,
 			}
 		}
@@ -153,15 +132,22 @@ func SetDefaults_ReplicaSet(obj *ReplicaSet) {
 	}
 }
 
-func SetDefaults_NetworkPolicy(obj *NetworkPolicy) {
+func SetDefaults_NetworkPolicy(obj *extensionsv1beta1.NetworkPolicy) {
 	// Default any undefined Protocol fields to TCP.
 	for _, i := range obj.Spec.Ingress {
-		// TODO: Update Ports to be a pointer to slice as soon as auto-generation supports it.
 		for _, p := range i.Ports {
 			if p.Protocol == nil {
 				proto := v1.ProtocolTCP
 				p.Protocol = &proto
 			}
+		}
+	}
+
+	if len(obj.Spec.PolicyTypes) == 0 {
+		// Any policy that does not specify policyTypes implies at least "Ingress".
+		obj.Spec.PolicyTypes = []extensionsv1beta1.PolicyType{extensionsv1beta1.PolicyTypeIngress}
+		if len(obj.Spec.Egress) != 0 {
+			obj.Spec.PolicyTypes = append(obj.Spec.PolicyTypes, extensionsv1beta1.PolicyTypeEgress)
 		}
 	}
 }

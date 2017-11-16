@@ -4,6 +4,8 @@ package codec
 
 import "reflect"
 
+const fastpathEnabled = false
+
 // The generated fast-path code is very large, and adds a few seconds to the build time.
 // This causes test execution, execution of small tools which use codec, etc
 // to take a long time.

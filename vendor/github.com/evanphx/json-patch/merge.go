@@ -4,10 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"strings"
 )
 
-func merge(cur, patch *lazyNode) *lazyNode {
+func merge(cur, patch *lazyNode, mergeMerge bool) *lazyNode {
 	curDoc, err := cur.intoDoc()
 
 	if err != nil {
@@ -21,16 +20,19 @@ func merge(cur, patch *lazyNode) *lazyNode {
 		return patch
 	}
 
-	mergeDocs(curDoc, patchDoc)
+	mergeDocs(curDoc, patchDoc, mergeMerge)
 
 	return cur
 }
 
-func mergeDocs(doc, patch *partialDoc) {
+func mergeDocs(doc, patch *partialDoc, mergeMerge bool) {
 	for k, v := range *patch {
-		k := decodePatchKey(k)
 		if v == nil {
-			delete(*doc, k)
+			if mergeMerge {
+				(*doc)[k] = nil
+			} else {
+				delete(*doc, k)
+			}
 		} else {
 			cur, ok := (*doc)[k]
 
@@ -38,7 +40,7 @@ func mergeDocs(doc, patch *partialDoc) {
 				pruneNulls(v)
 				(*doc)[k] = v
 			} else {
-				(*doc)[k] = merge(cur, v)
+				(*doc)[k] = merge(cur, v, mergeMerge)
 			}
 		}
 	}
@@ -88,8 +90,19 @@ func pruneAryNulls(ary *partialArray) *partialArray {
 var errBadJSONDoc = fmt.Errorf("Invalid JSON Document")
 var errBadJSONPatch = fmt.Errorf("Invalid JSON Patch")
 
+// MergeMergePatches merges two merge patches together, such that
+// applying this resulting merged merge patch to a document yields the same
+// as merging each merge patch to the document in succession.
+func MergeMergePatches(patch1Data, patch2Data []byte) ([]byte, error) {
+	return doMergePatch(patch1Data, patch2Data, true)
+}
+
 // MergePatch merges the patchData into the docData.
 func MergePatch(docData, patchData []byte) ([]byte, error) {
+	return doMergePatch(docData, patchData, false)
+}
+
+func doMergePatch(docData, patchData []byte, mergeMerge bool) ([]byte, error) {
 	doc := &partialDoc{}
 
 	docErr := json.Unmarshal(docData, doc)
@@ -117,7 +130,11 @@ func MergePatch(docData, patchData []byte) ([]byte, error) {
 	if docErr != nil || patchErr != nil {
 		// Not an error, just not a doc, so we turn straight into the patch
 		if patchErr == nil {
-			doc = pruneDocNulls(patch)
+			if mergeMerge {
+				doc = patch
+			} else {
+				doc = pruneDocNulls(patch)
+			}
 		} else {
 			patchAry := &partialArray{}
 			patchErr = json.Unmarshal(patchData, patchAry)
@@ -137,7 +154,7 @@ func MergePatch(docData, patchData []byte) ([]byte, error) {
 			return out, nil
 		}
 	} else {
-		mergeDocs(doc, patch)
+		mergeDocs(doc, patch, mergeMerge)
 	}
 
 	return json.Marshal(doc)
@@ -207,6 +224,9 @@ func matchesValue(av, bv interface{}) bool {
 		if bt == at {
 			return true
 		}
+	case nil:
+		// Both nil, fine.
+		return true
 	case map[string]interface{}:
 		bt := bv.(map[string]interface{})
 		for key := range at {
@@ -231,16 +251,15 @@ func matchesValue(av, bv interface{}) bool {
 func getDiff(a, b map[string]interface{}) (map[string]interface{}, error) {
 	into := map[string]interface{}{}
 	for key, bv := range b {
-		escapedKey := encodePatchKey(key)
 		av, ok := a[key]
 		// value was added
 		if !ok {
-			into[escapedKey] = bv
+			into[key] = bv
 			continue
 		}
 		// If types have changed, replace completely
 		if reflect.TypeOf(av) != reflect.TypeOf(bv) {
-			into[escapedKey] = bv
+			into[key] = bv
 			continue
 		}
 		// Types are the same, compare values
@@ -253,23 +272,23 @@ func getDiff(a, b map[string]interface{}) (map[string]interface{}, error) {
 				return nil, err
 			}
 			if len(dst) > 0 {
-				into[escapedKey] = dst
+				into[key] = dst
 			}
 		case string, float64, bool:
 			if !matchesValue(av, bv) {
-				into[escapedKey] = bv
+				into[key] = bv
 			}
 		case []interface{}:
 			bt := bv.([]interface{})
 			if !matchesArray(at, bt) {
-				into[escapedKey] = bv
+				into[key] = bv
 			}
 		case nil:
 			switch bv.(type) {
 			case nil:
 				// Both nil, fine.
 			default:
-				into[escapedKey] = bv
+				into[key] = bv
 			}
 		default:
 			panic(fmt.Sprintf("Unknown type:%T in key %s", av, key))
@@ -283,24 +302,4 @@ func getDiff(a, b map[string]interface{}) (map[string]interface{}, error) {
 		}
 	}
 	return into, nil
-}
-
-// From http://tools.ietf.org/html/rfc6901#section-4 :
-//
-// Evaluation of each reference token begins by decoding any escaped
-// character sequence.  This is performed by first transforming any
-// occurrence of the sequence '~1' to '/', and then transforming any
-// occurrence of the sequence '~0' to '~'.
-
-var (
-	rfc6901Encoder = strings.NewReplacer("~", "~0", "/", "~1")
-	rfc6901Decoder = strings.NewReplacer("~1", "/", "~0", "~")
-)
-
-func decodePatchKey(k string) string {
-	return rfc6901Decoder.Replace(k)
-}
-
-func encodePatchKey(k string) string {
-	return rfc6901Encoder.Replace(k)
 }

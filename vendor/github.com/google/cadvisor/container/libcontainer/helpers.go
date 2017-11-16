@@ -17,6 +17,7 @@ package libcontainer
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -32,6 +33,11 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 )
 
+/*
+#include <unistd.h>
+*/
+import "C"
+
 type CgroupSubsystems struct {
 	// Cgroup subsystem mounts.
 	// e.g.: "/sys/fs/cgroup/cpu" -> ["cpu", "cpuacct"]
@@ -45,7 +51,7 @@ type CgroupSubsystems struct {
 // Get information about the cgroup subsystems.
 func GetCgroupSubsystems() (CgroupSubsystems, error) {
 	// Get all cgroup mounts.
-	allCgroups, err := cgroups.GetCgroupMounts()
+	allCgroups, err := cgroups.GetCgroupMounts(true)
 	if err != nil {
 		return CgroupSubsystems{}, err
 	}
@@ -78,6 +84,7 @@ var supportedSubsystems map[string]struct{} = map[string]struct{}{
 	"memory":  {},
 	"cpuset":  {},
 	"blkio":   {},
+	"devices": {},
 }
 
 // Get cgroup and networking stats of the specified container
@@ -89,7 +96,7 @@ func GetStats(cgroupManager cgroups.Manager, rootFs string, pid int, ignoreMetri
 	libcontainerStats := &libcontainer.Stats{
 		CgroupStats: cgroupStats,
 	}
-	stats := toContainerStats(libcontainerStats)
+	stats := newContainerStats(libcontainerStats)
 
 	// If we know the pid then get network stats from /proc/<pid>/net/dev
 	if pid == 0 {
@@ -98,7 +105,7 @@ func GetStats(cgroupManager cgroups.Manager, rootFs string, pid int, ignoreMetri
 	if !ignoreMetrics.Has(container.NetworkUsageMetrics) {
 		netStats, err := networkStatsFromProc(rootFs, pid)
 		if err != nil {
-			glog.V(2).Infof("Unable to get network stats from pid %d: %v", pid, err)
+			glog.V(4).Infof("Unable to get network stats from pid %d: %v", pid, err)
 		} else {
 			stats.Network.Interfaces = append(stats.Network.Interfaces, netStats...)
 		}
@@ -106,16 +113,31 @@ func GetStats(cgroupManager cgroups.Manager, rootFs string, pid int, ignoreMetri
 	if !ignoreMetrics.Has(container.NetworkTcpUsageMetrics) {
 		t, err := tcpStatsFromProc(rootFs, pid, "net/tcp")
 		if err != nil {
-			glog.V(2).Infof("Unable to get tcp stats from pid %d: %v", pid, err)
+			glog.V(4).Infof("Unable to get tcp stats from pid %d: %v", pid, err)
 		} else {
 			stats.Network.Tcp = t
 		}
 
 		t6, err := tcpStatsFromProc(rootFs, pid, "net/tcp6")
 		if err != nil {
-			glog.V(2).Infof("Unable to get tcp6 stats from pid %d: %v", pid, err)
+			glog.V(4).Infof("Unable to get tcp6 stats from pid %d: %v", pid, err)
 		} else {
 			stats.Network.Tcp6 = t6
+		}
+	}
+	if !ignoreMetrics.Has(container.NetworkUdpUsageMetrics) {
+		u, err := udpStatsFromProc(rootFs, pid, "net/udp")
+		if err != nil {
+			glog.V(4).Infof("Unable to get udp stats from pid %d: %v", pid, err)
+		} else {
+			stats.Network.Udp = u
+		}
+
+		u6, err := udpStatsFromProc(rootFs, pid, "net/udp6")
+		if err != nil {
+			glog.V(4).Infof("Unable to get udp6 stats from pid %d: %v", pid, err)
+		} else {
+			stats.Network.Udp6 = u6
 		}
 	}
 
@@ -291,6 +313,74 @@ func scanTcpStats(tcpStatsFile string) (info.TcpStat, error) {
 	return stats, nil
 }
 
+func udpStatsFromProc(rootFs string, pid int, file string) (info.UdpStat, error) {
+	var err error
+	var udpStats info.UdpStat
+
+	udpStatsFile := path.Join(rootFs, "proc", strconv.Itoa(pid), file)
+
+	r, err := os.Open(udpStatsFile)
+	if err != nil {
+		return udpStats, fmt.Errorf("failure opening %s: %v", udpStatsFile, err)
+	}
+
+	udpStats, err = scanUdpStats(r)
+	if err != nil {
+		return udpStats, fmt.Errorf("couldn't read udp stats: %v", err)
+	}
+
+	return udpStats, nil
+}
+
+func scanUdpStats(r io.Reader) (info.UdpStat, error) {
+	var stats info.UdpStat
+
+	scanner := bufio.NewScanner(r)
+	scanner.Split(bufio.ScanLines)
+
+	// Discard header line
+	if b := scanner.Scan(); !b {
+		return stats, scanner.Err()
+	}
+
+	listening := uint64(0)
+	dropped := uint64(0)
+	rxQueued := uint64(0)
+	txQueued := uint64(0)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		// Format: sl local_address rem_address st tx_queue rx_queue tr tm->when retrnsmt  uid timeout inode ref pointer drops
+
+		listening++
+
+		fs := strings.Fields(line)
+		if len(fs) != 13 {
+			continue
+		}
+
+		rx, tx := uint64(0), uint64(0)
+		fmt.Sscanf(fs[4], "%X:%X", &rx, &tx)
+		rxQueued += rx
+		txQueued += tx
+
+		d, err := strconv.Atoi(string(fs[12]))
+		if err != nil {
+			continue
+		}
+		dropped += uint64(d)
+	}
+
+	stats = info.UdpStat{
+		Listen:   listening,
+		Dropped:  dropped,
+		RxQueued: rxQueued,
+		TxQueued: txQueued,
+	}
+
+	return stats, nil
+}
+
 func GetProcesses(cgroupManager cgroups.Manager) ([]int, error) {
 	pids, err := cgroupManager.GetPids()
 	if err != nil {
@@ -349,21 +439,72 @@ func DiskStatsCopy(blkio_stats []cgroups.BlkioStatEntry) (stat []info.PerDiskSta
 	return DiskStatsCopy1(disk_stat)
 }
 
+func minUint32(x, y uint32) uint32 {
+	if x < y {
+		return x
+	}
+	return y
+}
+
+// var to allow unit tests to stub it out
+var numCpusFunc = getNumberOnlineCPUs
+
 // Convert libcontainer stats to info.ContainerStats.
-func toContainerStats0(s *cgroups.Stats, ret *info.ContainerStats) {
+func setCpuStats(s *cgroups.Stats, ret *info.ContainerStats) {
 	ret.Cpu.Usage.User = s.CpuStats.CpuUsage.UsageInUsermode
 	ret.Cpu.Usage.System = s.CpuStats.CpuUsage.UsageInKernelmode
-	n := len(s.CpuStats.CpuUsage.PercpuUsage)
-	ret.Cpu.Usage.PerCpu = make([]uint64, n)
-
 	ret.Cpu.Usage.Total = 0
-	for i := 0; i < n; i++ {
+	ret.Cpu.CFS.Periods = s.CpuStats.ThrottlingData.Periods
+	ret.Cpu.CFS.ThrottledPeriods = s.CpuStats.ThrottlingData.ThrottledPeriods
+	ret.Cpu.CFS.ThrottledTime = s.CpuStats.ThrottlingData.ThrottledTime
+
+	if len(s.CpuStats.CpuUsage.PercpuUsage) == 0 {
+		// libcontainer's 'GetStats' can leave 'PercpuUsage' nil if it skipped the
+		// cpuacct subsystem.
+		return
+	}
+
+	numPossible := uint32(len(s.CpuStats.CpuUsage.PercpuUsage))
+	// Note that as of https://patchwork.kernel.org/patch/8607101/ (kernel v4.7),
+	// the percpu usage information includes extra zero values for all additional
+	// possible CPUs. This is to allow statistic collection after CPU-hotplug.
+	// We intentionally ignore these extra zeroes.
+	numActual, err := numCpusFunc()
+	if err != nil {
+		glog.Errorf("unable to determine number of actual cpus; defaulting to maximum possible number: errno %v", err)
+		numActual = numPossible
+	}
+	if numActual > numPossible {
+		// The real number of cores should never be greater than the number of
+		// datapoints reported in cpu usage.
+		glog.Errorf("PercpuUsage had %v cpus, but the actual number is %v; ignoring extra CPUs", numPossible, numActual)
+	}
+	numActual = minUint32(numPossible, numActual)
+	ret.Cpu.Usage.PerCpu = make([]uint64, numActual)
+
+	for i := uint32(0); i < numActual; i++ {
 		ret.Cpu.Usage.PerCpu[i] = s.CpuStats.CpuUsage.PercpuUsage[i]
 		ret.Cpu.Usage.Total += s.CpuStats.CpuUsage.PercpuUsage[i]
 	}
+
 }
 
-func toContainerStats1(s *cgroups.Stats, ret *info.ContainerStats) {
+// Copied from
+// https://github.com/moby/moby/blob/8b1adf55c2af329a4334f21d9444d6a169000c81/daemon/stats/collector_unix.go#L73
+// Apache 2.0, Copyright Docker, Inc.
+func getNumberOnlineCPUs() (uint32, error) {
+	i, err := C.sysconf(C._SC_NPROCESSORS_ONLN)
+	// According to POSIX - errno is undefined after successful
+	// sysconf, and can be non-zero in several cases, so look for
+	// error in returned value not in errno.
+	// (https://sourceware.org/bugzilla/show_bug.cgi?id=21536)
+	if i == -1 {
+		return 0, err
+	}
+	return uint32(i), nil
+}
+
+func setDiskIoStats(s *cgroups.Stats, ret *info.ContainerStats) {
 	ret.DiskIo.IoServiceBytes = DiskStatsCopy(s.BlkioStats.IoServiceBytesRecursive)
 	ret.DiskIo.IoServiced = DiskStatsCopy(s.BlkioStats.IoServicedRecursive)
 	ret.DiskIo.IoQueued = DiskStatsCopy(s.BlkioStats.IoQueuedRecursive)
@@ -374,11 +515,19 @@ func toContainerStats1(s *cgroups.Stats, ret *info.ContainerStats) {
 	ret.DiskIo.IoTime = DiskStatsCopy(s.BlkioStats.IoTimeRecursive)
 }
 
-func toContainerStats2(s *cgroups.Stats, ret *info.ContainerStats) {
+func setMemoryStats(s *cgroups.Stats, ret *info.ContainerStats) {
 	ret.Memory.Usage = s.MemoryStats.Usage.Usage
+	ret.Memory.MaxUsage = s.MemoryStats.Usage.MaxUsage
 	ret.Memory.Failcnt = s.MemoryStats.Usage.Failcnt
 	ret.Memory.Cache = s.MemoryStats.Stats["cache"]
-	ret.Memory.RSS = s.MemoryStats.Stats["rss"]
+
+	if s.MemoryStats.UseHierarchy {
+		ret.Memory.RSS = s.MemoryStats.Stats["total_rss"]
+		ret.Memory.Swap = s.MemoryStats.Stats["total_swap"]
+	} else {
+		ret.Memory.RSS = s.MemoryStats.Stats["rss"]
+		ret.Memory.Swap = s.MemoryStats.Stats["swap"]
+	}
 	if v, ok := s.MemoryStats.Stats["pgfault"]; ok {
 		ret.Memory.ContainerData.Pgfault = v
 		ret.Memory.HierarchicalData.Pgfault = v
@@ -387,26 +536,19 @@ func toContainerStats2(s *cgroups.Stats, ret *info.ContainerStats) {
 		ret.Memory.ContainerData.Pgmajfault = v
 		ret.Memory.HierarchicalData.Pgmajfault = v
 	}
-	if v, ok := s.MemoryStats.Stats["total_inactive_anon"]; ok {
-		workingSet := ret.Memory.Usage
+
+	workingSet := ret.Memory.Usage
+	if v, ok := s.MemoryStats.Stats["total_inactive_file"]; ok {
 		if workingSet < v {
 			workingSet = 0
 		} else {
 			workingSet -= v
 		}
-
-		if v, ok := s.MemoryStats.Stats["total_inactive_file"]; ok {
-			if workingSet < v {
-				workingSet = 0
-			} else {
-				workingSet -= v
-			}
-		}
-		ret.Memory.WorkingSet = workingSet
 	}
+	ret.Memory.WorkingSet = workingSet
 }
 
-func toContainerStats3(libcontainerStats *libcontainer.Stats, ret *info.ContainerStats) {
+func setNetworkStats(libcontainerStats *libcontainer.Stats, ret *info.ContainerStats) {
 	ret.Network.Interfaces = make([]info.InterfaceStats, len(libcontainerStats.Interfaces))
 	for i := range libcontainerStats.Interfaces {
 		ret.Network.Interfaces[i] = info.InterfaceStats{
@@ -428,18 +570,18 @@ func toContainerStats3(libcontainerStats *libcontainer.Stats, ret *info.Containe
 	}
 }
 
-func toContainerStats(libcontainerStats *libcontainer.Stats) *info.ContainerStats {
-	s := libcontainerStats.CgroupStats
-	ret := new(info.ContainerStats)
-	ret.Timestamp = time.Now()
+func newContainerStats(libcontainerStats *libcontainer.Stats) *info.ContainerStats {
+	ret := &info.ContainerStats{
+		Timestamp: time.Now(),
+	}
 
-	if s != nil {
-		toContainerStats0(s, ret)
-		toContainerStats1(s, ret)
-		toContainerStats2(s, ret)
+	if s := libcontainerStats.CgroupStats; s != nil {
+		setCpuStats(s, ret)
+		setDiskIoStats(s, ret)
+		setMemoryStats(s, ret)
 	}
 	if len(libcontainerStats.Interfaces) > 0 {
-		toContainerStats3(libcontainerStats, ret)
+		setNetworkStats(libcontainerStats, ret)
 	}
 	return ret
 }

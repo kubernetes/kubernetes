@@ -10,6 +10,7 @@ import (
 var (
 	ErrKeyMustBePEMEncoded = errors.New("Invalid Key: Key must be PEM encoded PKCS1 or PKCS8 private key")
 	ErrNotRSAPrivateKey    = errors.New("Key is not a valid RSA private key")
+	ErrNotRSAPublicKey     = errors.New("Key is not a valid RSA public key")
 )
 
 // Parse PEM encoded PKCS1 or PKCS8 private key
@@ -61,7 +62,7 @@ func ParseRSAPublicKeyFromPEM(key []byte) (*rsa.PublicKey, error) {
 	var pkey *rsa.PublicKey
 	var ok bool
 	if pkey, ok = parsedKey.(*rsa.PublicKey); !ok {
-		return nil, ErrNotRSAPrivateKey
+		return nil, ErrNotRSAPublicKey
 	}
 
 	return pkey, nil

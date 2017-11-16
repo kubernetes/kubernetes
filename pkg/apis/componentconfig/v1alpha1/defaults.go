@@ -17,98 +17,95 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"net"
+	"strconv"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kruntime "k8s.io/apimachinery/pkg/runtime"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/master/ports"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func addDefaultingFuncs(scheme *runtime.Scheme) {
-	scheme.AddDefaultingFuncs(
-		SetDefaults_KubeProxyConfiguration,
-		SetDefaults_KubeSchedulerConfiguration,
-		SetDefaults_LeaderElectionConfiguration,
-	)
-}
-
-func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
-	if obj.BindAddress == "" {
-		obj.BindAddress = "0.0.0.0"
-	}
-	if obj.HealthzPort == 0 {
-		obj.HealthzPort = 10249
-	}
-	if obj.HealthzBindAddress == "" {
-		obj.HealthzBindAddress = "127.0.0.1"
-	}
-	if obj.OOMScoreAdj == nil {
-		temp := int32(qos.KubeProxyOOMScoreAdj)
-		obj.OOMScoreAdj = &temp
-	}
-	if obj.ResourceContainer == "" {
-		obj.ResourceContainer = "/kube-proxy"
-	}
-	if obj.IPTablesSyncPeriod.Duration == 0 {
-		obj.IPTablesSyncPeriod = unversioned.Duration{Duration: 30 * time.Second}
-	}
-	zero := unversioned.Duration{}
-	if obj.UDPIdleTimeout == zero {
-		obj.UDPIdleTimeout = unversioned.Duration{Duration: 250 * time.Millisecond}
-	}
-	if obj.ConntrackMax == 0 {
-		obj.ConntrackMax = 256 * 1024 // 4x default (64k)
-	}
-	if obj.IPTablesMasqueradeBit == nil {
-		temp := int32(14)
-		obj.IPTablesMasqueradeBit = &temp
-	}
-	if obj.ConntrackTCPEstablishedTimeout == zero {
-		obj.ConntrackTCPEstablishedTimeout = unversioned.Duration{Duration: 24 * time.Hour} // 1 day (1/5 default)
-	}
+func addDefaultingFuncs(scheme *kruntime.Scheme) error {
+	return RegisterDefaults(scheme)
 }
 
 func SetDefaults_KubeSchedulerConfiguration(obj *KubeSchedulerConfiguration) {
-	if obj.Port == 0 {
-		obj.Port = ports.SchedulerPort
-	}
-	if obj.Address == "" {
-		obj.Address = "0.0.0.0"
-	}
-	if obj.AlgorithmProvider == "" {
-		obj.AlgorithmProvider = "DefaultProvider"
-	}
-	if obj.ContentType == "" {
-		obj.ContentType = "application/vnd.kubernetes.protobuf"
-	}
-	if obj.KubeAPIQPS == 0 {
-		obj.KubeAPIQPS = 50.0
-	}
-	if obj.KubeAPIBurst == 0 {
-		obj.KubeAPIBurst = 100
-	}
-	if obj.SchedulerName == "" {
+	if len(obj.SchedulerName) == 0 {
 		obj.SchedulerName = api.DefaultSchedulerName
 	}
+
 	if obj.HardPodAffinitySymmetricWeight == 0 {
 		obj.HardPodAffinitySymmetricWeight = api.DefaultHardPodAffinitySymmetricWeight
 	}
-	if obj.FailureDomains == "" {
-		obj.FailureDomains = api.DefaultFailureDomains
+
+	if obj.AlgorithmSource.Policy == nil &&
+		(obj.AlgorithmSource.Provider == nil || len(*obj.AlgorithmSource.Provider) == 0) {
+		val := SchedulerDefaultProviderName
+		obj.AlgorithmSource.Provider = &val
+	}
+
+	if policy := obj.AlgorithmSource.Policy; policy != nil {
+		if policy.ConfigMap != nil && len(policy.ConfigMap.Namespace) == 0 {
+			obj.AlgorithmSource.Policy.ConfigMap.Namespace = api.NamespaceSystem
+		}
+	}
+
+	if host, port, err := net.SplitHostPort(obj.HealthzBindAddress); err == nil {
+		if len(host) == 0 {
+			host = "0.0.0.0"
+		}
+		obj.HealthzBindAddress = net.JoinHostPort(host, port)
+	} else {
+		obj.HealthzBindAddress = net.JoinHostPort("0.0.0.0", strconv.Itoa(ports.SchedulerPort))
+	}
+
+	if host, port, err := net.SplitHostPort(obj.MetricsBindAddress); err == nil {
+		if len(host) == 0 {
+			host = "0.0.0.0"
+		}
+		obj.MetricsBindAddress = net.JoinHostPort(host, port)
+	} else {
+		obj.MetricsBindAddress = net.JoinHostPort("0.0.0.0", strconv.Itoa(ports.SchedulerPort))
+	}
+
+	if len(obj.ClientConnection.ContentType) == 0 {
+		obj.ClientConnection.ContentType = "application/vnd.kubernetes.protobuf"
+	}
+	if obj.ClientConnection.QPS == 0.0 {
+		obj.ClientConnection.QPS = 50.0
+	}
+	if obj.ClientConnection.Burst == 0 {
+		obj.ClientConnection.Burst = 100
+	}
+
+	if len(obj.LeaderElection.LockObjectNamespace) == 0 {
+		obj.LeaderElection.LockObjectNamespace = SchedulerDefaultLockObjectNamespace
+	}
+	if len(obj.LeaderElection.LockObjectName) == 0 {
+		obj.LeaderElection.LockObjectName = SchedulerDefaultLockObjectName
+	}
+
+	if len(obj.FailureDomains) == 0 {
+		obj.FailureDomains = kubeletapis.DefaultFailureDomains
 	}
 }
 
 func SetDefaults_LeaderElectionConfiguration(obj *LeaderElectionConfiguration) {
-	zero := unversioned.Duration{}
+	zero := metav1.Duration{}
 	if obj.LeaseDuration == zero {
-		obj.LeaseDuration = unversioned.Duration{Duration: 15 * time.Second}
+		obj.LeaseDuration = metav1.Duration{Duration: 15 * time.Second}
 	}
 	if obj.RenewDeadline == zero {
-		obj.RenewDeadline = unversioned.Duration{Duration: 10 * time.Second}
+		obj.RenewDeadline = metav1.Duration{Duration: 10 * time.Second}
 	}
 	if obj.RetryPeriod == zero {
-		obj.RetryPeriod = unversioned.Duration{Duration: 2 * time.Second}
+		obj.RetryPeriod = metav1.Duration{Duration: 2 * time.Second}
+	}
+	if obj.ResourceLock == "" {
+		// obj.ResourceLock = rl.EndpointsResourceLock
+		obj.ResourceLock = "endpoints"
 	}
 }

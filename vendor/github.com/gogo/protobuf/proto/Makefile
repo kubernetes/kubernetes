@@ -39,5 +39,5 @@ test: install generate-test-pbs
 generate-test-pbs:
 	make install
 	make -C testdata
-	protoc-min-version --version="3.0.0" --proto_path=.:../../../../ --gogo_out=. proto3_proto/proto3.proto
+	protoc-min-version --version="3.0.0" --proto_path=.:../../../../:../protobuf --gogo_out=Mtestdata/test.proto=github.com/gogo/protobuf/proto/testdata,Mgoogle/protobuf/any.proto=github.com/gogo/protobuf/types:. proto3_proto/proto3.proto
 	make

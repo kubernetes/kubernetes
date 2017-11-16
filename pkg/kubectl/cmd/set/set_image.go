@@ -20,52 +20,57 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/runtime"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 // ImageOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type ImageOptions struct {
-	Mapper      meta.RESTMapper
-	Typer       runtime.ObjectTyper
-	Infos       []*resource.Info
-	Encoder     runtime.Encoder
-	Selector    string
-	Out         io.Writer
-	Err         io.Writer
-	Filenames   []string
-	Recursive   bool
-	ShortOutput bool
-	All         bool
-	Record      bool
-	ChangeCause string
-	Local       bool
-	Cmd         *cobra.Command
+	resource.FilenameOptions
 
-	PrintObject            func(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
-	UpdatePodSpecForObject func(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error)
+	Mapper       meta.RESTMapper
+	Infos        []*resource.Info
+	Encoder      runtime.Encoder
+	Decoder      runtime.Decoder
+	Selector     string
+	Out          io.Writer
+	Err          io.Writer
+	DryRun       bool
+	ShortOutput  bool
+	All          bool
+	Record       bool
+	Output       string
+	ChangeCause  string
+	Local        bool
+	Cmd          *cobra.Command
+	ResolveImage func(in string) (string, error)
+
+	PrintObject            func(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
+	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
 	Resources              []string
 	ContainerImages        map[string]string
 }
 
 var (
 	image_resources = `
-  pod (po), replicationcontroller (rc), deployment, daemonset (ds), job, replicaset (rs)`
+  	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), replicaset (rs)`
 
-	image_long = dedent.Dedent(`
+	image_long = templates.LongDesc(`
 		Update existing container image(s) of resources.
 
-		Possible resources include (case insensitive):`) + image_resources
+		Possible resources include (case insensitive):
+		` + image_resources)
 
-	image_example = dedent.Dedent(`
+	image_example = templates.Examples(`
 		# Set a deployment's nginx container image to 'nginx:1.9.1', and its busybox container image to 'busybox'.
 		kubectl set image deployment/nginx busybox=busybox nginx=nginx:1.9.1
 
@@ -75,18 +80,19 @@ var (
 		# Update image of all containers of daemonset abc to 'nginx:1.9.1'
 		kubectl set image daemonset abc *=nginx:1.9.1
 
-		# Print result (in yaml format) of updating nginx container image from local file, without hitting the server 
+		# Print result (in yaml format) of updating nginx container image from local file, without hitting the server
 		kubectl set image -f path/to/file.yaml nginx=nginx:1.9.1 --local -o yaml`)
 )
 
-func NewCmdImage(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	options := &ImageOptions{
 		Out: out,
+		Err: err,
 	}
 
 	cmd := &cobra.Command{
 		Use:     "image (-f FILENAME | TYPE NAME) CONTAINER_NAME_1=CONTAINER_IMAGE_1 ... CONTAINER_NAME_N=CONTAINER_IMAGE_N",
-		Short:   "Update image of a pod template",
+		Short:   i18n.T("Update image of a pod template"),
 		Long:    image_long,
 		Example: image_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -97,24 +103,30 @@ func NewCmdImage(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 
 	cmdutil.AddPrinterFlags(cmd)
-	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
-	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
-	cmd.Flags().BoolVar(&options.All, "all", false, "select all resources in the namespace of the specified resource types")
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on")
+	usage := "identifying the resource to get from a server."
+	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
+	cmd.Flags().BoolVar(&options.All, "all", false, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set image will NOT contact api-server but run locally.")
 	cmdutil.AddRecordFlag(cmd)
-	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
+	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
 }
 
-func (o *ImageOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	o.Mapper, o.Typer = f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
+func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	o.Mapper, _ = f.Object()
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
 	o.Encoder = f.JSONEncoder()
+	o.Decoder = f.Decoder(true)
 	o.ShortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
 	o.Record = cmdutil.GetRecordFlag(cmd)
-	o.ChangeCause = f.Command()
+	o.ChangeCause = f.Command(cmd, false)
 	o.PrintObject = f.PrintObject
+	o.Local = cmdutil.GetFlagBool(cmd, "local")
+	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.Output = cmdutil.GetFlagString(cmd, "output")
+	o.ResolveImage = f.ResolveImage
 	o.Cmd = cmd
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -127,17 +139,30 @@ func (o *ImageOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, args []s
 		return err
 	}
 
-	builder := resource.NewBuilder(o.Mapper, o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
+	builder := f.NewBuilder().
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, o.Recursive, o.Filenames...).
+		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		IncludeUninitialized(includeUninitialized).
 		Flatten()
-	if !o.Local {
+
+	if o.Local {
+		// if a --local flag was provided, and a resource was specified in the form
+		// <resource>/<name>, fail immediately as --local cannot query the api server
+		// for the specified resource.
+		if len(o.Resources) > 0 {
+			return resource.LocalResourceError
+		}
+
+		builder = builder.Local(f.ClientForMapping)
+	} else {
 		builder = builder.
-			SelectorParam(o.Selector).
+			LabelSelectorParam(o.Selector).
 			ResourceTypeOrNameArgs(o.All, o.Resources...).
 			Latest()
 	}
+
 	o.Infos, err = builder.Do().Infos()
 	if err != nil {
 		return err
@@ -147,32 +172,50 @@ func (o *ImageOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, args []s
 }
 
 func (o *ImageOptions) Validate() error {
-	if len(o.Resources) < 1 && len(o.Filenames) == 0 {
-		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
+	errors := []error{}
+	if len(o.Resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
+		errors = append(errors, fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>"))
 	}
 	if len(o.ContainerImages) < 1 {
-		return fmt.Errorf("at least one image update is required")
+		errors = append(errors, fmt.Errorf("at least one image update is required"))
 	} else if len(o.ContainerImages) > 1 && hasWildcardKey(o.ContainerImages) {
-		return fmt.Errorf("all containers are already specified by *, but saw more than one container_name=container_image pairs")
+		errors = append(errors, fmt.Errorf("all containers are already specified by *, but saw more than one container_name=container_image pairs"))
 	}
-	return nil
+	return utilerrors.NewAggregate(errors)
 }
 
 func (o *ImageOptions) Run() error {
 	allErrs := []error{}
 
-	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) (bool, error) {
+	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
 		transformed := false
-		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *api.PodSpec) error {
+		_, err := o.UpdatePodSpecForObject(info.VersionedObject, func(spec *v1.PodSpec) error {
 			for name, image := range o.ContainerImages {
-				containerFound := false
+				var (
+					containerFound bool
+					err            error
+					resolved       string
+				)
 				// Find the container to update, and update its image
 				for i, c := range spec.Containers {
 					if c.Name == name || name == "*" {
-						spec.Containers[i].Image = image
 						containerFound = true
-						// Perform updates
-						transformed = true
+						if len(resolved) == 0 {
+							if resolved, err = o.ResolveImage(image); err != nil {
+								allErrs = append(allErrs, fmt.Errorf("error: unable to resolve image %q for container %q: %v", image, name, err))
+								// Do not loop again if the image resolving failed for wildcard case as we
+								// will report the same error again for the next container.
+								if name == "*" {
+									break
+								}
+								continue
+							}
+						}
+						if spec.Containers[i].Image != resolved {
+							spec.Containers[i].Image = resolved
+							// Perform updates
+							transformed = true
+						}
 					}
 				}
 				// Add a new container if not found
@@ -182,7 +225,10 @@ func (o *ImageOptions) Run() error {
 			}
 			return nil
 		})
-		return transformed, err
+		if transformed && err == nil {
+			return runtime.Encode(o.Encoder, info.VersionedObject)
+		}
+		return nil, err
 	})
 
 	for _, patch := range patches {
@@ -197,13 +243,15 @@ func (o *ImageOptions) Run() error {
 			continue
 		}
 
-		if o.Local {
-			fmt.Fprintln(o.Out, "running in local mode...")
-			return o.PrintObject(o.Cmd, o.Mapper, info.Object, o.Out)
+		if o.PrintObject != nil && (o.Local || o.DryRun) {
+			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, patch.Info.VersionedObject, o.Out); err != nil {
+				return err
+			}
+			continue
 		}
 
 		// patch the change
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch.Patch)
+		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch image update to pod template: %v\n", err))
 			continue
@@ -212,15 +260,26 @@ func (o *ImageOptions) Run() error {
 
 		// record this change (for rollout history)
 		if o.Record || cmdutil.ContainsChangeCause(info) {
-			if err := cmdutil.RecordChangeCause(obj, o.ChangeCause); err == nil {
-				if obj, err = resource.NewHelper(info.Client, info.Mapping).Replace(info.Namespace, info.Name, false, obj); err != nil {
-					allErrs = append(allErrs, fmt.Errorf("changes to %s/%s can't be recorded: %v\n", info.Mapping.Resource, info.Name, err))
+			if patch, patchType, err := cmdutil.ChangeResourcePatch(info, o.ChangeCause); err == nil {
+				if obj, err = resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, patchType, patch); err != nil {
+					fmt.Fprintf(o.Err, "WARNING: changes to %s/%s can't be recorded: %v\n", info.Mapping.Resource, info.Name, err)
 				}
 			}
 		}
 
 		info.Refresh(obj, true)
-		cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, "image updated")
+
+		if len(o.Output) > 0 {
+			versionedObject, err := patch.Info.Mapping.ConvertToVersion(obj, patch.Info.Mapping.GroupVersionKind.GroupVersion())
+			if err != nil {
+				return err
+			}
+			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, versionedObject, o.Out); err != nil {
+				return err
+			}
+			continue
+		}
+		cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, o.DryRun, "image updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

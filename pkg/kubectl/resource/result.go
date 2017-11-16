@@ -20,15 +20,13 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/runtime"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // ErrMatchFunc can be used to filter errors that may not be true failures.
@@ -39,13 +37,27 @@ type Result struct {
 	err     error
 	visitor Visitor
 
-	sources  []Visitor
-	singular bool
+	sources            []Visitor
+	singleItemImplied  bool
+	targetsSingleItems bool
 
 	ignoreErrors []utilerrors.Matcher
 
 	// populated by a call to Infos
 	info []*Info
+}
+
+// withError allows a fluent style for internal result code.
+func (r *Result) withError(err error) *Result {
+	r.err = err
+	return r
+}
+
+// TargetsSingleItems returns true if any of the builder arguments pointed
+// to non-list calls (if the user explicitly asked for any object by name).
+// This includes directories, streams, URLs, and resource name tuples.
+func (r *Result) TargetsSingleItems() bool {
+	return r.targetsSingleItems
 }
 
 // IgnoreErrors will filter errors that occur when by visiting the result
@@ -81,10 +93,10 @@ func (r *Result) Visit(fn VisitorFunc) error {
 	return utilerrors.FilterOut(err, r.ignoreErrors...)
 }
 
-// IntoSingular sets the provided boolean pointer to true if the Builder input
-// reflected a single item, or multiple.
-func (r *Result) IntoSingular(b *bool) *Result {
-	*b = r.singular
+// IntoSingleItemImplied sets the provided boolean pointer to true if the Builder input
+// implies a single item, or multiple.
+func (r *Result) IntoSingleItemImplied(b *bool) *Result {
+	*b = r.singleItemImplied
 	return r
 }
 
@@ -117,7 +129,7 @@ func (r *Result) Infos() ([]*Info, error) {
 // found resources.  If the Builder was a singular context (expected to return a
 // single resource by user input) and only a single resource was found, the resource
 // will be returned as is.  Otherwise, the returned resources will be part of an
-// api.List. The ResourceVersion of the api.List will be set only if it is identical
+// v1.List. The ResourceVersion of the v1.List will be set only if it is identical
 // across all infos returned.
 func (r *Result) Object() (runtime.Object, error) {
 	infos, err := r.Infos()
@@ -135,7 +147,7 @@ func (r *Result) Object() (runtime.Object, error) {
 	}
 
 	if len(objects) == 1 {
-		if r.singular {
+		if r.singleItemImplied {
 			return objects[0], nil
 		}
 		// if the item is a list already, don't create another list
@@ -148,12 +160,27 @@ func (r *Result) Object() (runtime.Object, error) {
 	if len(versions) == 1 {
 		version = versions.List()[0]
 	}
-	return &api.List{
-		ListMeta: unversioned.ListMeta{
+
+	return toV1List(objects, version), err
+}
+
+// Compile time check to enforce that list implements the necessary interface
+var _ metav1.ListInterface = &v1.List{}
+var _ metav1.ListMetaAccessor = &v1.List{}
+
+// toV1List takes a slice of Objects + their version, and returns
+// a v1.List Object containing the objects in the Items field
+func toV1List(objects []runtime.Object, version string) runtime.Object {
+	raw := []runtime.RawExtension{}
+	for _, o := range objects {
+		raw = append(raw, runtime.RawExtension{Object: o})
+	}
+	return &v1.List{
+		ListMeta: metav1.ListMeta{
 			ResourceVersion: version,
 		},
-		Items: objects,
-	}, err
+		Items: raw,
+	}
 }
 
 // ResourceMapping returns a single meta.RESTMapping representing the
@@ -205,87 +232,4 @@ func (r *Result) Watch(resourceVersion string) (watch.Interface, error) {
 		return info[0].Watch(resourceVersion)
 	}
 	return w.Watch(resourceVersion)
-}
-
-// AsVersionedObject converts a list of infos into a single object - either a List containing
-// the objects as children, or if only a single Object is present, as that object. The provided
-// version will be preferred as the conversion target, but the Object's mapping version will be
-// used if that version is not present.
-func AsVersionedObject(infos []*Info, forceList bool, version unversioned.GroupVersion, encoder runtime.Encoder) (runtime.Object, error) {
-	objects, err := AsVersionedObjects(infos, version, encoder)
-	if err != nil {
-		return nil, err
-	}
-
-	var object runtime.Object
-	if len(objects) == 1 && !forceList {
-		object = objects[0]
-	} else {
-		object = &api.List{Items: objects}
-		converted, err := tryConvert(api.Scheme, object, version, registered.GroupOrDie(api.GroupName).GroupVersion)
-		if err != nil {
-			return nil, err
-		}
-		object = converted
-	}
-	return object, nil
-}
-
-// AsVersionedObjects converts a list of infos into versioned objects. The provided
-// version will be preferred as the conversion target, but the Object's mapping version will be
-// used if that version is not present.
-func AsVersionedObjects(infos []*Info, version unversioned.GroupVersion, encoder runtime.Encoder) ([]runtime.Object, error) {
-	objects := []runtime.Object{}
-	for _, info := range infos {
-		if info.Object == nil {
-			continue
-		}
-
-		// TODO: use info.VersionedObject as the value?
-		switch obj := info.Object.(type) {
-		case *extensions.ThirdPartyResourceData:
-			objects = append(objects, &runtime.Unknown{Raw: obj.Data})
-			continue
-		}
-
-		// objects that are not part of api.Scheme must be converted to JSON
-		// TODO: convert to map[string]interface{}, attach to runtime.Unknown?
-		if !version.IsEmpty() {
-			if _, _, err := api.Scheme.ObjectKinds(info.Object); runtime.IsNotRegisteredError(err) {
-				// TODO: ideally this would encode to version, but we don't expose multiple codecs here.
-				data, err := runtime.Encode(encoder, info.Object)
-				if err != nil {
-					return nil, err
-				}
-				// TODO: Set ContentEncoding and ContentType.
-				objects = append(objects, &runtime.Unknown{Raw: data})
-				continue
-			}
-		}
-
-		converted, err := tryConvert(info.Mapping.ObjectConvertor, info.Object, version, info.Mapping.GroupVersionKind.GroupVersion())
-		if err != nil {
-			return nil, err
-		}
-		objects = append(objects, converted)
-	}
-	return objects, nil
-}
-
-// tryConvert attempts to convert the given object to the provided versions in order. This function assumes
-// the object is in internal version.
-func tryConvert(convertor runtime.ObjectConvertor, object runtime.Object, versions ...unversioned.GroupVersion) (runtime.Object, error) {
-	var last error
-	for _, version := range versions {
-		if version.IsEmpty() {
-			return object, nil
-		}
-		obj, err := convertor.ConvertToVersion(object, version)
-		if err != nil {
-			last = err
-			continue
-		}
-		return obj, nil
-	}
-	return nil, last
 }

@@ -23,29 +23,31 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
 	appcschema "github.com/appc/spec/schema"
 	appctypes "github.com/appc/spec/schema/types"
+	"github.com/coreos/go-systemd/unit"
 	rktapi "github.com/coreos/rkt/api/v1alpha"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubetypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/errors"
+	utiltesting "k8s.io/client-go/util/testing"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	kubetesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/kubenet"
-	"k8s.io/kubernetes/pkg/kubelet/network/mock_network"
-	"k8s.io/kubernetes/pkg/kubelet/rkt/mock_os"
+	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/kubelet/types"
-	kubetypes "k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/errors"
-	utilexec "k8s.io/kubernetes/pkg/util/exec"
-	utiltesting "k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/utils/exec"
+	fakeexec "k8s.io/utils/exec/testing"
 )
 
 func mustMarshalPodManifest(man *appcschema.PodManifest) []byte {
@@ -178,17 +180,15 @@ func TestCheckVersion(t *testing.T) {
 	}
 	fs.version = "100"
 	tests := []struct {
-		minimumRktBinVersion     string
-		recommendedRktBinVersion string
-		minimumRktApiVersion     string
-		minimumSystemdVersion    string
-		err                      error
-		calledGetInfo            bool
-		calledSystemVersion      bool
+		minimumRktBinVersion  string
+		minimumRktApiVersion  string
+		minimumSystemdVersion string
+		err                   error
+		calledGetInfo         bool
+		calledSystemVersion   bool
 	}{
 		// Good versions.
 		{
-			"1.2.3",
 			"1.2.3",
 			"1.2.5",
 			"99",
@@ -199,7 +199,6 @@ func TestCheckVersion(t *testing.T) {
 		// Good versions.
 		{
 			"1.2.3+git",
-			"1.2.3+git",
 			"1.2.6-alpha",
 			"100",
 			nil,
@@ -208,7 +207,6 @@ func TestCheckVersion(t *testing.T) {
 		},
 		// Requires greater binary version.
 		{
-			"1.2.4",
 			"1.2.4",
 			"1.2.6-alpha",
 			"100",
@@ -219,7 +217,6 @@ func TestCheckVersion(t *testing.T) {
 		// Requires greater API version.
 		{
 			"1.2.3",
-			"1.2.3",
 			"1.2.6",
 			"100",
 			fmt.Errorf("rkt: API version is too old(%v), requires at least %v", fr.info.ApiVersion, "1.2.6"),
@@ -229,7 +226,6 @@ func TestCheckVersion(t *testing.T) {
 		// Requires greater API version.
 		{
 			"1.2.3",
-			"1.2.3",
 			"1.2.7",
 			"100",
 			fmt.Errorf("rkt: API version is too old(%v), requires at least %v", fr.info.ApiVersion, "1.2.7"),
@@ -238,7 +234,6 @@ func TestCheckVersion(t *testing.T) {
 		},
 		// Requires greater systemd version.
 		{
-			"1.2.3",
 			"1.2.3",
 			"1.2.7",
 			"101",
@@ -250,7 +245,7 @@ func TestCheckVersion(t *testing.T) {
 
 	for i, tt := range tests {
 		testCaseHint := fmt.Sprintf("test case #%d", i)
-		err := r.checkVersion(tt.minimumRktBinVersion, tt.recommendedRktBinVersion, tt.minimumRktApiVersion, tt.minimumSystemdVersion)
+		err := r.checkVersion(tt.minimumRktBinVersion, tt.minimumRktApiVersion, tt.minimumSystemdVersion)
 		assert.Equal(t, tt.err, err, testCaseHint)
 
 		if tt.calledGetInfo {
@@ -321,6 +316,33 @@ func TestListImages(t *testing.T) {
 				},
 			},
 		},
+		{
+			[]*rktapi.Image{
+				{
+					Id:      "sha512-a2fb8f390702",
+					Name:    "quay.io_443/coreos/alpine-sh",
+					Version: "latest",
+					Annotations: []*rktapi.KeyValue{
+						{
+							Key:   appcDockerRegistryURL,
+							Value: "quay.io:443",
+						},
+						{
+							Key:   appcDockerRepository,
+							Value: "coreos/alpine-sh",
+						},
+					},
+					Size: 400,
+				},
+			},
+			[]kubecontainer.Image{
+				{
+					ID:       "sha512-a2fb8f390702",
+					RepoTags: []string{"quay.io:443/coreos/alpine-sh:latest"},
+					Size:     400,
+				},
+			},
+		},
 	}
 
 	for i, tt := range tests {
@@ -374,18 +396,20 @@ func TestGetPods(t *testing.T) {
 					Namespace: "default",
 					Containers: []*kubecontainer.Container{
 						{
-							ID:    kubecontainer.BuildContainerID("rkt", "uuid-4002:app-1"),
-							Name:  "app-1",
-							Image: "img-name-1:latest",
-							Hash:  1001,
-							State: "running",
+							ID:      kubecontainer.BuildContainerID("rkt", "uuid-4002:app-1"),
+							Name:    "app-1",
+							Image:   "img-name-1:latest",
+							ImageID: "img-id-1",
+							Hash:    1001,
+							State:   "running",
 						},
 						{
-							ID:    kubecontainer.BuildContainerID("rkt", "uuid-4002:app-2"),
-							Name:  "app-2",
-							Image: "img-name-2:latest",
-							Hash:  1002,
-							State: "exited",
+							ID:      kubecontainer.BuildContainerID("rkt", "uuid-4002:app-2"),
+							Name:    "app-2",
+							Image:   "img-name-2:latest",
+							ImageID: "img-id-2",
+							Hash:    1002,
+							State:   "exited",
 						},
 					},
 				},
@@ -435,18 +459,20 @@ func TestGetPods(t *testing.T) {
 					Namespace: "default",
 					Containers: []*kubecontainer.Container{
 						{
-							ID:    kubecontainer.BuildContainerID("rkt", "uuid-4002:app-1"),
-							Name:  "app-1",
-							Image: "img-name-1:latest",
-							Hash:  1001,
-							State: "running",
+							ID:      kubecontainer.BuildContainerID("rkt", "uuid-4002:app-1"),
+							Name:    "app-1",
+							Image:   "img-name-1:latest",
+							ImageID: "img-id-1",
+							Hash:    1001,
+							State:   "running",
 						},
 						{
-							ID:    kubecontainer.BuildContainerID("rkt", "uuid-4002:app-2"),
-							Name:  "app-2",
-							Image: "img-name-2:latest",
-							Hash:  1002,
-							State: "exited",
+							ID:      kubecontainer.BuildContainerID("rkt", "uuid-4002:app-2"),
+							Name:    "app-2",
+							Image:   "img-name-2:latest",
+							ImageID: "img-id-2",
+							Hash:    1002,
+							State:   "exited",
 						},
 					},
 				},
@@ -456,32 +482,36 @@ func TestGetPods(t *testing.T) {
 					Namespace: "default",
 					Containers: []*kubecontainer.Container{
 						{
-							ID:    kubecontainer.BuildContainerID("rkt", "uuid-4003:app-11"),
-							Name:  "app-11",
-							Image: "img-name-11:latest",
-							Hash:  10011,
-							State: "exited",
+							ID:      kubecontainer.BuildContainerID("rkt", "uuid-4003:app-11"),
+							Name:    "app-11",
+							Image:   "img-name-11:latest",
+							ImageID: "img-id-11",
+							Hash:    10011,
+							State:   "exited",
 						},
 						{
-							ID:    kubecontainer.BuildContainerID("rkt", "uuid-4003:app-22"),
-							Name:  "app-22",
-							Image: "img-name-22:latest",
-							Hash:  10022,
-							State: "exited",
+							ID:      kubecontainer.BuildContainerID("rkt", "uuid-4003:app-22"),
+							Name:    "app-22",
+							Image:   "img-name-22:latest",
+							ImageID: "img-id-22",
+							Hash:    10022,
+							State:   "exited",
 						},
 						{
-							ID:    kubecontainer.BuildContainerID("rkt", "uuid-4004:app-11"),
-							Name:  "app-11",
-							Image: "img-name-11:latest",
-							Hash:  10011,
-							State: "running",
+							ID:      kubecontainer.BuildContainerID("rkt", "uuid-4004:app-11"),
+							Name:    "app-11",
+							Image:   "img-name-11:latest",
+							ImageID: "img-id-11",
+							Hash:    10011,
+							State:   "running",
 						},
 						{
-							ID:    kubecontainer.BuildContainerID("rkt", "uuid-4004:app-22"),
-							Name:  "app-22",
-							Image: "img-name-22:latest",
-							Hash:  10022,
-							State: "running",
+							ID:      kubecontainer.BuildContainerID("rkt", "uuid-4004:app-22"),
+							Name:    "app-22",
+							Image:   "img-name-22:latest",
+							ImageID: "img-id-22",
+							Hash:    10022,
+							State:   "running",
 						},
 					},
 				},
@@ -555,15 +585,17 @@ func TestGetPodStatus(t *testing.T) {
 	defer ctrl.Finish()
 	fr := newFakeRktInterface()
 	fs := newFakeSystemd()
-	fnp := mock_network.NewMockNetworkPlugin(ctrl)
+	fug := newfakeUnitGetter()
+	fnp := nettest.NewMockNetworkPlugin(ctrl)
 	fos := &containertesting.FakeOS{}
-	frh := &fakeRuntimeHelper{}
+	frh := &containertesting.FakeRuntimeHelper{}
 	r := &Runtime{
 		apisvc:        fr,
 		systemd:       fs,
 		runtimeHelper: frh,
 		os:            fos,
-		networkPlugin: fnp,
+		network:       network.NewPluginManager(fnp),
+		unitGetter:    fug,
 	}
 
 	ns := func(seconds int64) int64 {
@@ -780,24 +812,32 @@ func TestGetPodStatus(t *testing.T) {
 			podTimes[podFinishedMarkerPath(r.runtimeHelper.GetPodDir(tt.result.ID), pod.Id)] = tt.result.ContainerStatuses[0].FinishedAt
 		}
 
+		ctrl := gomock.NewController(t)
+
 		r.os.(*containertesting.FakeOS).StatFn = func(name string) (os.FileInfo, error) {
 			podTime, ok := podTimes[name]
 			if !ok {
 				t.Errorf("osStat called with %v, but only knew about %#v", name, podTimes)
 			}
-			mockFI := mock_os.NewMockFileInfo(ctrl)
+			mockFI := containertesting.NewMockFileInfo(ctrl)
 			mockFI.EXPECT().ModTime().Return(podTime)
 			return mockFI, nil
 		}
-		fnp.EXPECT().Name().Return(tt.networkPluginName)
 
-		if tt.networkPluginName == kubenet.KubenetPluginName {
+		if tt.networkPluginName == network.DefaultPluginName {
+			fnp.EXPECT().Name().Return(tt.networkPluginName)
+		}
+
+		if tt.pods != nil && tt.networkPluginName == kubenet.KubenetPluginName {
+			fnp.EXPECT().Name().Return(tt.networkPluginName)
 			if tt.result.IP != "" {
 				fnp.EXPECT().GetPodNetworkStatus("default", "guestbook", kubecontainer.ContainerID{ID: "42"}).
 					Return(&network.PodNetworkStatus{IP: net.ParseIP(tt.result.IP)}, nil)
 			} else {
 				fnp.EXPECT().GetPodNetworkStatus("default", "guestbook", kubecontainer.ContainerID{ID: "42"}).
 					Return(nil, fmt.Errorf("no such network"))
+				// Plugin name only requested again in error case
+				fnp.EXPECT().Name().Return(tt.networkPluginName)
 			}
 		}
 
@@ -808,7 +848,9 @@ func TestGetPodStatus(t *testing.T) {
 
 		assert.Equal(t, tt.result, status, testCaseHint)
 		assert.Equal(t, []string{"ListPods"}, fr.called, testCaseHint)
+		fug.networkNamespace = kubecontainer.ContainerID{}
 		fr.CleanCalls()
+		ctrl.Finish()
 	}
 }
 
@@ -817,7 +859,11 @@ func generateCapRetainIsolator(t *testing.T, caps ...string) appctypes.Isolator 
 	if err != nil {
 		t.Fatalf("Error generating cap retain isolator: %v", err)
 	}
-	return retain.AsIsolator()
+	isolator, err := retain.AsIsolator()
+	if err != nil {
+		t.Fatalf("Error generating cap retain isolator: %v", err)
+	}
+	return *isolator
 }
 
 func generateCapRevokeIsolator(t *testing.T, caps ...string) appctypes.Isolator {
@@ -825,7 +871,11 @@ func generateCapRevokeIsolator(t *testing.T, caps ...string) appctypes.Isolator 
 	if err != nil {
 		t.Fatalf("Error generating cap revoke isolator: %v", err)
 	}
-	return revoke.AsIsolator()
+	isolator, err := revoke.AsIsolator()
+	if err != nil {
+		t.Fatalf("Error generating cap revoke isolator: %v", err)
+	}
+	return *isolator
 }
 
 func generateCPUIsolator(t *testing.T, request, limit string) appctypes.Isolator {
@@ -852,7 +902,7 @@ func baseApp(t *testing.T) *appctypes.App {
 		SupplementaryGIDs: []int{4, 5, 6},
 		WorkingDirectory:  "/foo",
 		Environment: []appctypes.EnvironmentVariable{
-			{"env-foo", "bar"},
+			{Name: "env-foo", Value: "bar"},
 		},
 		MountPoints: []appctypes.MountPoint{
 			{Name: *appctypes.MustACName("mnt-foo"), Path: "/mnt-foo", ReadOnly: false},
@@ -887,6 +937,7 @@ func baseImageManifest(t *testing.T) *appcschema.ImageManifest {
 func baseAppWithRootUserGroup(t *testing.T) *appctypes.App {
 	app := baseApp(t)
 	app.User, app.Group = "0", "0"
+	app.Isolators = append(app.Isolators)
 	return app
 }
 
@@ -940,44 +991,56 @@ func TestSetApp(t *testing.T) {
 	fsgid := int64(3)
 
 	tests := []struct {
-		container *api.Container
-		opts      *kubecontainer.RunContainerOptions
-		ctx       *api.SecurityContext
-		podCtx    *api.PodSecurityContext
-		expect    *appctypes.App
-		err       error
+		container        *v1.Container
+		mountPoints      []appctypes.MountPoint
+		containerPorts   []appctypes.Port
+		envs             []kubecontainer.EnvVar
+		ctx              *v1.SecurityContext
+		podCtx           *v1.PodSecurityContext
+		supplementalGids []int64
+		expect           *appctypes.App
+		err              error
 	}{
 		// Nothing should change, but the "User" and "Group" should be filled.
 		{
-			container: &api.Container{},
-			opts:      &kubecontainer.RunContainerOptions{},
-			ctx:       nil,
-			podCtx:    nil,
-			expect:    baseAppWithRootUserGroup(t),
-			err:       nil,
+			container:        &v1.Container{},
+			mountPoints:      []appctypes.MountPoint{},
+			containerPorts:   []appctypes.Port{},
+			envs:             []kubecontainer.EnvVar{},
+			ctx:              nil,
+			podCtx:           nil,
+			supplementalGids: nil,
+			expect:           baseAppWithRootUserGroup(t),
+			err:              nil,
 		},
 
 		// error verifying non-root.
 		{
-			container: &api.Container{},
-			opts:      &kubecontainer.RunContainerOptions{},
-			ctx: &api.SecurityContext{
+			container:      &v1.Container{},
+			mountPoints:    []appctypes.MountPoint{},
+			containerPorts: []appctypes.Port{},
+			envs:           []kubecontainer.EnvVar{},
+			ctx: &v1.SecurityContext{
 				RunAsNonRoot: &runAsNonRootTrue,
 				RunAsUser:    &rootUser,
 			},
-			podCtx: nil,
-			expect: nil,
-			err:    fmt.Errorf("container has no runAsUser and image will run as root"),
+			podCtx:           nil,
+			supplementalGids: nil,
+			expect:           nil,
+			err:              fmt.Errorf("container has no runAsUser and image will run as root"),
 		},
 
 		// app's args should be changed.
 		{
-			container: &api.Container{
+			container: &v1.Container{
 				Args: []string{"foo"},
 			},
-			opts:   &kubecontainer.RunContainerOptions{},
-			ctx:    nil,
-			podCtx: nil,
+			mountPoints:      []appctypes.MountPoint{},
+			containerPorts:   []appctypes.Port{},
+			envs:             []kubecontainer.EnvVar{},
+			ctx:              nil,
+			podCtx:           nil,
+			supplementalGids: nil,
 			expect: &appctypes.App{
 				Exec:              appctypes.Exec{"/bin/foo", "foo"},
 				User:              "0",
@@ -985,7 +1048,7 @@ func TestSetApp(t *testing.T) {
 				SupplementaryGIDs: []int{4, 5, 6},
 				WorkingDirectory:  "/foo",
 				Environment: []appctypes.EnvironmentVariable{
-					{"env-foo", "bar"},
+					{Name: "env-foo", Value: "bar"},
 				},
 				MountPoints: []appctypes.MountPoint{
 					{Name: *appctypes.MustACName("mnt-foo"), Path: "/mnt-foo", ReadOnly: false},
@@ -1005,46 +1068,48 @@ func TestSetApp(t *testing.T) {
 
 		// app should be changed.
 		{
-			container: &api.Container{
+			container: &v1.Container{
 				Command:    []string{"/bin/bar", "$(env-bar)"},
 				WorkingDir: tmpDir,
-				Resources: api.ResourceRequirements{
-					Limits:   api.ResourceList{"cpu": resource.MustParse("50m"), "memory": resource.MustParse("50M")},
-					Requests: api.ResourceList{"cpu": resource.MustParse("5m"), "memory": resource.MustParse("5M")},
+				Resources: v1.ResourceRequirements{
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m"), v1.ResourceMemory: resource.MustParse("50M")},
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m"), v1.ResourceMemory: resource.MustParse("5M")},
 				},
 			},
-			opts: &kubecontainer.RunContainerOptions{
-				Envs: []kubecontainer.EnvVar{
-					{Name: "env-bar", Value: "foo"},
-				},
-				Mounts: []kubecontainer.Mount{
-					{Name: "mnt-bar", ContainerPath: "/mnt-bar", ReadOnly: true},
-				},
-				PortMappings: []kubecontainer.PortMapping{
-					{Name: "port-bar", Protocol: api.ProtocolTCP, ContainerPort: 1234},
-				},
+			mountPoints: []appctypes.MountPoint{
+				{Name: *appctypes.MustACName("mnt-bar"), Path: "/mnt-bar", ReadOnly: true},
 			},
-			ctx: &api.SecurityContext{
-				Capabilities: &api.Capabilities{
-					Add:  []api.Capability{"CAP_SYS_CHROOT", "CAP_SYS_BOOT"},
-					Drop: []api.Capability{"CAP_SETUID", "CAP_SETGID"},
+			containerPorts: []appctypes.Port{
+				{Name: *appctypes.MustACName("port-bar"), Protocol: "TCP", Port: 1234},
+			},
+			envs: []kubecontainer.EnvVar{
+				{Name: "env-bar", Value: "foo"},
+			},
+			ctx: &v1.SecurityContext{
+				Capabilities: &v1.Capabilities{
+					Add:  []v1.Capability{"CAP_SYS_CHROOT", "CAP_SYS_BOOT"},
+					Drop: []v1.Capability{"CAP_SETUID", "CAP_SETGID"},
 				},
 				RunAsUser:    &nonRootUser,
 				RunAsNonRoot: &runAsNonRootTrue,
 			},
-			podCtx: &api.PodSecurityContext{
-				SupplementalGroups: []int64{1, 2},
-				FSGroup:            &fsgid,
+			podCtx: &v1.PodSecurityContext{
+				SupplementalGroups: []int64{
+					int64(1),
+					int64(2),
+				},
+				FSGroup: &fsgid,
 			},
+			supplementalGids: []int64{4},
 			expect: &appctypes.App{
 				Exec:              appctypes.Exec{"/bin/bar", "foo"},
 				User:              "42",
 				Group:             "0",
-				SupplementaryGIDs: []int{1, 2, 3},
+				SupplementaryGIDs: []int{1, 2, 3, 4},
 				WorkingDirectory:  tmpDir,
 				Environment: []appctypes.EnvironmentVariable{
-					{"env-foo", "bar"},
-					{"env-bar", "foo"},
+					{Name: "env-foo", Value: "bar"},
+					{Name: "env-bar", Value: "foo"},
 				},
 				MountPoints: []appctypes.MountPoint{
 					{Name: *appctypes.MustACName("mnt-foo"), Path: "/mnt-foo", ReadOnly: false},
@@ -1065,52 +1130,54 @@ func TestSetApp(t *testing.T) {
 
 		// app should be changed. (env, mounts, ports, are overrided).
 		{
-			container: &api.Container{
+			container: &v1.Container{
 				Name:       "hello-world",
 				Command:    []string{"/bin/hello", "$(env-foo)"},
 				Args:       []string{"hello", "world", "$(env-bar)"},
 				WorkingDir: tmpDir,
-				Resources: api.ResourceRequirements{
-					Limits:   api.ResourceList{"cpu": resource.MustParse("50m")},
-					Requests: api.ResourceList{"memory": resource.MustParse("5M")},
+				Resources: v1.ResourceRequirements{
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m")},
+					Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("5M")},
 				},
 			},
-			opts: &kubecontainer.RunContainerOptions{
-				Envs: []kubecontainer.EnvVar{
-					{Name: "env-foo", Value: "foo"},
-					{Name: "env-bar", Value: "bar"},
-				},
-				Mounts: []kubecontainer.Mount{
-					{Name: "mnt-foo", ContainerPath: "/mnt-bar", ReadOnly: true},
-				},
-				PortMappings: []kubecontainer.PortMapping{
-					{Name: "port-foo", Protocol: api.ProtocolTCP, ContainerPort: 1234},
-				},
+			mountPoints: []appctypes.MountPoint{
+				{Name: *appctypes.MustACName("mnt-foo"), Path: "/mnt-foo", ReadOnly: true},
 			},
-			ctx: &api.SecurityContext{
-				Capabilities: &api.Capabilities{
-					Add:  []api.Capability{"CAP_SYS_CHROOT", "CAP_SYS_BOOT"},
-					Drop: []api.Capability{"CAP_SETUID", "CAP_SETGID"},
+			containerPorts: []appctypes.Port{
+				{Name: *appctypes.MustACName("port-foo"), Protocol: "TCP", Port: 1234},
+			},
+			envs: []kubecontainer.EnvVar{
+				{Name: "env-foo", Value: "foo"},
+				{Name: "env-bar", Value: "bar"},
+			},
+			ctx: &v1.SecurityContext{
+				Capabilities: &v1.Capabilities{
+					Add:  []v1.Capability{"CAP_SYS_CHROOT", "CAP_SYS_BOOT"},
+					Drop: []v1.Capability{"CAP_SETUID", "CAP_SETGID"},
 				},
 				RunAsUser:    &nonRootUser,
 				RunAsNonRoot: &runAsNonRootTrue,
 			},
-			podCtx: &api.PodSecurityContext{
-				SupplementalGroups: []int64{1, 2},
-				FSGroup:            &fsgid,
+			podCtx: &v1.PodSecurityContext{
+				SupplementalGroups: []int64{
+					int64(1),
+					int64(2),
+				},
+				FSGroup: &fsgid,
 			},
+			supplementalGids: []int64{4},
 			expect: &appctypes.App{
 				Exec:              appctypes.Exec{"/bin/hello", "foo", "hello", "world", "bar"},
 				User:              "42",
 				Group:             "0",
-				SupplementaryGIDs: []int{1, 2, 3},
+				SupplementaryGIDs: []int{1, 2, 3, 4},
 				WorkingDirectory:  tmpDir,
 				Environment: []appctypes.EnvironmentVariable{
-					{"env-foo", "foo"},
-					{"env-bar", "bar"},
+					{Name: "env-foo", Value: "foo"},
+					{Name: "env-bar", Value: "bar"},
 				},
 				MountPoints: []appctypes.MountPoint{
-					{Name: *appctypes.MustACName("mnt-foo"), Path: "/mnt-bar", ReadOnly: true},
+					{Name: *appctypes.MustACName("mnt-foo"), Path: "/mnt-foo", ReadOnly: true},
 				},
 				Ports: []appctypes.Port{
 					{Name: *appctypes.MustACName("port-foo"), Protocol: "TCP", Port: 1234},
@@ -1128,7 +1195,11 @@ func TestSetApp(t *testing.T) {
 	for i, tt := range tests {
 		testCaseHint := fmt.Sprintf("test case #%d", i)
 		img := baseImageManifest(t)
-		err := setApp(img, tt.container, tt.opts, tt.ctx, tt.podCtx)
+
+		err := setApp(img, tt.container,
+			tt.mountPoints, tt.containerPorts, tt.envs,
+			tt.ctx, tt.podCtx, tt.supplementalGids)
+
 		if err == nil && tt.err != nil || err != nil && tt.err == nil {
 			t.Errorf("%s: expect %v, saw %v", testCaseHint, tt.err, err)
 		}
@@ -1142,9 +1213,12 @@ func TestSetApp(t *testing.T) {
 
 func TestGenerateRunCommand(t *testing.T) {
 	hostName := "test-hostname"
+	boolTrue := true
+	boolFalse := false
+
 	tests := []struct {
 		networkPlugin network.NetworkPlugin
-		pod           *api.Pod
+		pod           *v1.Pod
 		uuid          string
 		netnsName     string
 
@@ -1158,11 +1232,13 @@ func TestGenerateRunCommand(t *testing.T) {
 		// Case #0, returns error.
 		{
 			kubenet.NewPlugin("/tmp"),
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
 				},
-				Spec: api.PodSpec{},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "container-foo"}},
+				},
 			},
 			"rkt-uuid-foo",
 			"default",
@@ -1175,9 +1251,12 @@ func TestGenerateRunCommand(t *testing.T) {
 		// Case #1, returns no dns, with private-net.
 		{
 			kubenet.NewPlugin("/tmp"),
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "container-foo"}},
 				},
 			},
 			"rkt-uuid-foo",
@@ -1191,14 +1270,14 @@ func TestGenerateRunCommand(t *testing.T) {
 		// Case #2, returns no dns, with host-net.
 		{
 			kubenet.NewPlugin("/tmp"),
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
 				},
-				Spec: api.PodSpec{
-					SecurityContext: &api.PodSecurityContext{
-						HostNetwork: true,
-					},
+				Spec: v1.PodSpec{
+					HostNetwork: true,
+
+					Containers: []v1.Container{{Name: "container-foo"}},
 				},
 			},
 			"rkt-uuid-foo",
@@ -1212,14 +1291,14 @@ func TestGenerateRunCommand(t *testing.T) {
 		// Case #3, returns dns, dns searches, with private-net.
 		{
 			kubenet.NewPlugin("/tmp"),
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
 				},
-				Spec: api.PodSpec{
-					SecurityContext: &api.PodSecurityContext{
-						HostNetwork: false,
-					},
+				Spec: v1.PodSpec{
+					HostNetwork: false,
+
+					Containers: []v1.Container{{Name: "container-foo"}},
 				},
 			},
 			"rkt-uuid-foo",
@@ -1233,14 +1312,14 @@ func TestGenerateRunCommand(t *testing.T) {
 		// Case #4, returns no dns, dns searches, with host-network.
 		{
 			kubenet.NewPlugin("/tmp"),
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
 				},
-				Spec: api.PodSpec{
-					SecurityContext: &api.PodSecurityContext{
-						HostNetwork: true,
-					},
+				Spec: v1.PodSpec{
+					HostNetwork: true,
+
+					Containers: []v1.Container{{Name: "container-foo"}},
 				},
 			},
 			"rkt-uuid-foo",
@@ -1254,11 +1333,13 @@ func TestGenerateRunCommand(t *testing.T) {
 		// Case #5, with no-op plugin, returns --net=rkt.kubernetes.io, with dns and dns search.
 		{
 			&network.NoopNetworkPlugin{},
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
 				},
-				Spec: api.PodSpec{},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "container-foo"}},
+				},
 			},
 			"rkt-uuid-foo",
 			"default",
@@ -1268,11 +1349,55 @@ func TestGenerateRunCommand(t *testing.T) {
 			nil,
 			"/bin/rkt/rkt --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=rkt.kubernetes.io --dns=127.0.0.1 --dns-search=. --dns-opt=ndots:5 --hostname=pod-hostname-foo rkt-uuid-foo",
 		},
+		// Case #6, if all containers are privileged, the result should have 'insecure-options=all-run'
+		{
+			kubenet.NewPlugin("/tmp"),
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod-name-foo",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container-foo", SecurityContext: &v1.SecurityContext{Privileged: &boolTrue}},
+						{Name: "container-bar", SecurityContext: &v1.SecurityContext{Privileged: &boolTrue}},
+					},
+				},
+			},
+			"rkt-uuid-foo",
+			"default",
+			[]string{},
+			[]string{},
+			"pod-hostname-foo",
+			nil,
+			"/usr/bin/nsenter --net=/var/run/netns/default -- /bin/rkt/rkt --insecure-options=image,ondisk,all-run --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=host --hostname=pod-hostname-foo rkt-uuid-foo",
+		},
+		// Case #7, if not all containers are privileged, the result should not have 'insecure-options=all-run'
+		{
+			kubenet.NewPlugin("/tmp"),
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod-name-foo",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container-foo", SecurityContext: &v1.SecurityContext{Privileged: &boolTrue}},
+						{Name: "container-bar", SecurityContext: &v1.SecurityContext{Privileged: &boolFalse}},
+					},
+				},
+			},
+			"rkt-uuid-foo",
+			"default",
+			[]string{},
+			[]string{},
+			"pod-hostname-foo",
+			nil,
+			"/usr/bin/nsenter --net=/var/run/netns/default -- /bin/rkt/rkt --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=host --hostname=pod-hostname-foo rkt-uuid-foo",
+		},
 	}
 
 	rkt := &Runtime{
 		nsenterPath: "/usr/bin/nsenter",
-		os:          &kubetesting.FakeOS{HostName: hostName},
+		os:          &containertesting.FakeOS{HostName: hostName},
 		config: &Config{
 			Path:            "/bin/rkt/rkt",
 			Stage1Image:     "/bin/rkt/stage1-coreos.aci",
@@ -1284,10 +1409,15 @@ func TestGenerateRunCommand(t *testing.T) {
 
 	for i, tt := range tests {
 		testCaseHint := fmt.Sprintf("test case #%d", i)
-		rkt.networkPlugin = tt.networkPlugin
-		rkt.runtimeHelper = &fakeRuntimeHelper{tt.dnsServers, tt.dnsSearches, tt.hostName, "", tt.err}
-		rkt.execer = &utilexec.FakeExec{CommandScript: []utilexec.FakeCommandAction{func(cmd string, args ...string) utilexec.Cmd {
-			return utilexec.InitFakeCmd(&utilexec.FakeCmd{}, cmd, args...)
+		rkt.network = network.NewPluginManager(tt.networkPlugin)
+		rkt.runtimeHelper = &containertesting.FakeRuntimeHelper{
+			DNSServers:  tt.dnsServers,
+			DNSSearches: tt.dnsSearches,
+			HostName:    tt.hostName,
+			Err:         tt.err,
+		}
+		rkt.execer = &fakeexec.FakeExec{CommandScript: []fakeexec.FakeCommandAction{func(cmd string, args ...string) exec.Cmd {
+			return fakeexec.InitFakeCmd(&fakeexec.FakeCmd{}, cmd, args...)
 		}}}
 
 		// a command should be created of this form, but the returned command shouldn't be called (asserted by having no expectations on it)
@@ -1311,7 +1441,7 @@ func TestLifeCycleHooks(t *testing.T) {
 	}
 
 	tests := []struct {
-		pod           *api.Pod
+		pod           *v1.Pod
 		runtimePod    *kubecontainer.Pod
 		postStartRuns []string
 		preStopRuns   []string
@@ -1319,14 +1449,14 @@ func TestLifeCycleHooks(t *testing.T) {
 	}{
 		{
 			// Case 0, container without any hooks.
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "pod-1",
 					Namespace: "ns-1",
 					UID:       "uid-1",
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{Name: "container-name-1"},
 					},
 				},
@@ -1342,43 +1472,43 @@ func TestLifeCycleHooks(t *testing.T) {
 		},
 		{
 			// Case 1, containers with post-start and pre-stop hooks.
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "pod-1",
 					Namespace: "ns-1",
 					UID:       "uid-1",
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name: "container-name-1",
-							Lifecycle: &api.Lifecycle{
-								PostStart: &api.Handler{
-									Exec: &api.ExecAction{},
+							Lifecycle: &v1.Lifecycle{
+								PostStart: &v1.Handler{
+									Exec: &v1.ExecAction{},
 								},
 							},
 						},
 						{
 							Name: "container-name-2",
-							Lifecycle: &api.Lifecycle{
-								PostStart: &api.Handler{
-									HTTPGet: &api.HTTPGetAction{},
+							Lifecycle: &v1.Lifecycle{
+								PostStart: &v1.Handler{
+									HTTPGet: &v1.HTTPGetAction{},
 								},
 							},
 						},
 						{
 							Name: "container-name-3",
-							Lifecycle: &api.Lifecycle{
-								PreStop: &api.Handler{
-									Exec: &api.ExecAction{},
+							Lifecycle: &v1.Lifecycle{
+								PreStop: &v1.Handler{
+									Exec: &v1.ExecAction{},
 								},
 							},
 						},
 						{
 							Name: "container-name-4",
-							Lifecycle: &api.Lifecycle{
-								PreStop: &api.Handler{
-									HTTPGet: &api.HTTPGetAction{},
+							Lifecycle: &v1.Lifecycle{
+								PreStop: &v1.Handler{
+									HTTPGet: &v1.HTTPGetAction{},
 								},
 							},
 						},
@@ -1417,19 +1547,19 @@ func TestLifeCycleHooks(t *testing.T) {
 		},
 		{
 			// Case 2, one container with invalid hooks.
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "pod-1",
 					Namespace: "ns-1",
 					UID:       "uid-1",
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name: "container-name-1",
-							Lifecycle: &api.Lifecycle{
-								PostStart: &api.Handler{},
-								PreStop:   &api.Handler{},
+							Lifecycle: &v1.Lifecycle{
+								PostStart: &v1.Handler{},
+								PreStop:   &v1.Handler{},
 							},
 						},
 					},
@@ -1445,7 +1575,7 @@ func TestLifeCycleHooks(t *testing.T) {
 			},
 			[]string{},
 			[]string{},
-			errors.NewAggregate([]error{fmt.Errorf("Invalid handler: %v", &api.Handler{})}),
+			errors.NewAggregate([]error{fmt.Errorf("Invalid handler: %v", &v1.Handler{})}),
 		},
 	}
 
@@ -1504,27 +1634,31 @@ func TestGarbageCollect(t *testing.T) {
 	fr := newFakeRktInterface()
 	fs := newFakeSystemd()
 	cli := newFakeRktCli()
-	fakeOS := kubetesting.NewFakeOS()
-	getter := newFakePodGetter()
+	fakeOS := containertesting.NewFakeOS()
+	deletionProvider := newFakePodDeletionProvider()
+	fug := newfakeUnitGetter()
+	frh := &containertesting.FakeRuntimeHelper{}
 
 	rkt := &Runtime{
 		os:                  fakeOS,
 		cli:                 cli,
 		apisvc:              fr,
-		podGetter:           getter,
+		podDeletionProvider: deletionProvider,
 		systemd:             fs,
 		containerRefManager: kubecontainer.NewRefManager(),
+		unitGetter:          fug,
+		runtimeHelper:       frh,
 	}
 
 	fakeApp := &rktapi.App{Name: "app-foo"}
 
 	tests := []struct {
 		gcPolicy             kubecontainer.ContainerGCPolicy
-		apiPods              []*api.Pod
+		apiPods              []*v1.Pod
 		pods                 []*rktapi.Pod
 		serviceFilesOnDisk   []string
 		expectedCommands     []string
-		expectedServiceFiles []string
+		expectedDeletedFiles []string
 	}{
 		// All running pods, should not be gc'd.
 		// Dead, new pods should not be gc'd.
@@ -1536,11 +1670,11 @@ func TestGarbageCollect(t *testing.T) {
 				MinAge:        0,
 				MaxContainers: 0,
 			},
-			[]*api.Pod{
-				{ObjectMeta: api.ObjectMeta{UID: "pod-uid-1"}},
-				{ObjectMeta: api.ObjectMeta{UID: "pod-uid-2"}},
-				{ObjectMeta: api.ObjectMeta{UID: "pod-uid-3"}},
-				{ObjectMeta: api.ObjectMeta{UID: "pod-uid-4"}},
+			[]*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{UID: "pod-uid-1"}},
+				{ObjectMeta: metav1.ObjectMeta{UID: "pod-uid-2"}},
+				{ObjectMeta: metav1.ObjectMeta{UID: "pod-uid-3"}},
+				{ObjectMeta: metav1.ObjectMeta{UID: "pod-uid-4"}},
 			},
 			[]*rktapi.Pod{
 				{
@@ -1611,7 +1745,7 @@ func TestGarbageCollect(t *testing.T) {
 			},
 			[]string{"k8s_dead-old.service", "k8s_deleted-foo.service", "k8s_non-existing-bar.service"},
 			[]string{"rkt rm dead-old", "rkt rm deleted-foo"},
-			[]string{"/run/systemd/system/k8s_dead-old.service", "/run/systemd/system/k8s_deleted-foo.service", "/run/systemd/system/k8s_non-existing-bar.service"},
+			[]string{"/poddir/fake/finished-dead-old", "/poddir/fake/finished-deleted-foo", "/poddir/fake/finished-non-existing-bar", "/run/systemd/system/k8s_dead-old.service", "/run/systemd/system/k8s_deleted-foo.service", "/run/systemd/system/k8s_non-existing-bar.service"},
 		},
 		// gcPolicy.MaxContainers should be enforced.
 		// Oldest ones are removed first.
@@ -1620,10 +1754,10 @@ func TestGarbageCollect(t *testing.T) {
 				MinAge:        0,
 				MaxContainers: 1,
 			},
-			[]*api.Pod{
-				{ObjectMeta: api.ObjectMeta{UID: "pod-uid-0"}},
-				{ObjectMeta: api.ObjectMeta{UID: "pod-uid-1"}},
-				{ObjectMeta: api.ObjectMeta{UID: "pod-uid-2"}},
+			[]*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{UID: "pod-uid-0"}},
+				{ObjectMeta: metav1.ObjectMeta{UID: "pod-uid-1"}},
+				{ObjectMeta: metav1.ObjectMeta{UID: "pod-uid-2"}},
 			},
 			[]*rktapi.Pod{
 				{
@@ -1668,7 +1802,7 @@ func TestGarbageCollect(t *testing.T) {
 			},
 			[]string{"k8s_dead-0.service", "k8s_dead-1.service", "k8s_dead-2.service"},
 			[]string{"rkt rm dead-0", "rkt rm dead-1"},
-			[]string{"/run/systemd/system/k8s_dead-0.service", "/run/systemd/system/k8s_dead-1.service"},
+			[]string{"/poddir/fake/finished-dead-0", "/poddir/fake/finished-dead-1", "/run/systemd/system/k8s_dead-0.service", "/run/systemd/system/k8s_dead-1.service"},
 		},
 	}
 
@@ -1682,7 +1816,11 @@ func TestGarbageCollect(t *testing.T) {
 			var fileInfos []os.FileInfo
 
 			for _, name := range serviceFileNames {
-				mockFI := mock_os.NewMockFileInfo(ctrl)
+				mockFI := containertesting.NewMockFileInfo(ctrl)
+				// we need to specify two calls
+				// first: get all systemd units
+				// second: filter only the files with a k8s_ prefix
+				mockFI.EXPECT().Name().Return(name)
 				mockFI.EXPECT().Name().Return(name)
 				fileInfos = append(fileInfos, mockFI)
 			}
@@ -1691,11 +1829,12 @@ func TestGarbageCollect(t *testing.T) {
 
 		fr.pods = tt.pods
 		for _, p := range tt.apiPods {
-			getter.pods[p.UID] = p
+			deletionProvider.pods[p.UID] = struct{}{}
 		}
 
 		allSourcesReady := true
-		err := rkt.GarbageCollect(tt.gcPolicy, allSourcesReady)
+		evictNonDeletedPods := false
+		err := rkt.GarbageCollect(tt.gcPolicy, allSourcesReady, evictNonDeletedPods)
 		assert.NoError(t, err, testCaseHint)
 
 		sort.Sort(sortedStringList(tt.expectedCommands))
@@ -1703,14 +1842,17 @@ func TestGarbageCollect(t *testing.T) {
 
 		assert.Equal(t, tt.expectedCommands, cli.cmds, testCaseHint)
 
-		sort.Sort(sortedStringList(tt.expectedServiceFiles))
+		sort.Sort(sortedStringList(tt.expectedDeletedFiles))
 		sort.Sort(sortedStringList(fakeOS.Removes))
 		sort.Sort(sortedStringList(fs.resetFailedUnits))
 
-		assert.Equal(t, tt.expectedServiceFiles, fakeOS.Removes, testCaseHint)
+		assert.Equal(t, tt.expectedDeletedFiles, fakeOS.Removes, testCaseHint)
 		var expectedService []string
-		for _, f := range tt.expectedServiceFiles {
-			expectedService = append(expectedService, filepath.Base(f))
+		for _, f := range tt.expectedDeletedFiles {
+			unit := filepath.Base(f)
+			if strings.HasSuffix(unit, ".service") && strings.HasPrefix(unit, kubernetesUnitPrefix) {
+				expectedService = append(expectedService, unit)
+			}
 		}
 		assert.Equal(t, expectedService, fs.resetFailedUnits, testCaseHint)
 
@@ -1719,7 +1861,7 @@ func TestGarbageCollect(t *testing.T) {
 		ctrl.Finish()
 		fakeOS.Removes = []string{}
 		fs.resetFailedUnits = []string{}
-		getter.pods = make(map[kubetypes.UID]*api.Pod)
+		deletionProvider.pods = make(map[kubetypes.UID]struct{})
 	}
 }
 
@@ -1738,13 +1880,13 @@ func TestMakePodManifestAnnotations(t *testing.T) {
 	r := &Runtime{apisvc: fr, systemd: fs}
 
 	testCases := []struct {
-		in     *api.Pod
+		in     *v1.Pod
 		out    *appcschema.PodManifest
 		outerr error
 	}{
 		{
-			in: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			in: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
 					UID:       "uid-1",
 					Name:      "name-1",
 					Namespace: "namespace-1",
@@ -1791,7 +1933,7 @@ func TestMakePodManifestAnnotations(t *testing.T) {
 	for i, testCase := range testCases {
 		hint := fmt.Sprintf("case #%d", i)
 
-		result, err := r.makePodManifest(testCase.in, "", []api.Secret{})
+		result, err := r.makePodManifest(testCase.in, "", []v1.Secret{})
 		assert.Equal(t, testCase.outerr, err, hint)
 		if err == nil {
 			sort.Sort(annotationsByName(result.Annotations))
@@ -1855,5 +1997,133 @@ func TestPreparePodArgs(t *testing.T) {
 		r.config.Stage1Image = testCase.stage1Config
 		cmd := r.preparePodArgs(&testCase.manifest, "file")
 		assert.Equal(t, testCase.cmd, cmd, fmt.Sprintf("Test case #%d", i))
+	}
+}
+
+func TestConstructSyslogIdentifier(t *testing.T) {
+	testCases := []struct {
+		podName         string
+		podGenerateName string
+		identifier      string
+	}{
+		{
+			"prometheus-node-exporter-rv90m",
+			"prometheus-node-exporter-",
+			"prometheus-node-exporter",
+		},
+		{
+			"simplepod",
+			"",
+			"simplepod",
+		},
+		{
+			"p",
+			"",
+			"p",
+		},
+	}
+	for i, testCase := range testCases {
+		identifier := constructSyslogIdentifier(testCase.podGenerateName, testCase.podName)
+		assert.Equal(t, testCase.identifier, identifier, fmt.Sprintf("Test case #%d", i))
+	}
+}
+
+func TestGetPodSystemdServiceFiles(t *testing.T) {
+	fs := containertesting.NewFakeOS()
+	r := &Runtime{os: fs}
+
+	testCases := []struct {
+		serviceFilesOnDisk []string
+		expected           []string
+	}{
+		{
+			[]string{"one.service", "two.service", "k8s_513ce947-8f6e-4d27-8c03-99f97b78d680.service", "k8s_184482df-8630-4d41-b84f-302684871758.service", "k8s_f4a244d8-5ec2-4f59-b7dd-c9e130d6e7a3.service", "k8s_f5aad446-5598-488f-93a4-5a27e03e7fcb.service"},
+			[]string{"k8s_513ce947-8f6e-4d27-8c03-99f97b78d680.service", "k8s_184482df-8630-4d41-b84f-302684871758.service", "k8s_f4a244d8-5ec2-4f59-b7dd-c9e130d6e7a3.service", "k8s_f5aad446-5598-488f-93a4-5a27e03e7fcb.service"},
+		},
+		{
+			[]string{"one.service", "two.service"},
+			[]string{},
+		},
+		{
+			[]string{"one.service", "k8s_513ce947-8f6e-4d27-8c03-99f97b78d680.service"},
+			[]string{"k8s_513ce947-8f6e-4d27-8c03-99f97b78d680.service"},
+		},
+	}
+	for i, tt := range testCases {
+		ctrl := gomock.NewController(t)
+
+		fs.ReadDirFn = func(dirname string) ([]os.FileInfo, error) {
+			serviceFileNames := tt.serviceFilesOnDisk
+			var fileInfos []os.FileInfo
+
+			for _, name := range serviceFileNames {
+				mockFI := containertesting.NewMockFileInfo(ctrl)
+				// we need to specify two calls
+				// first: get all systemd units
+				// second: filter only the files with a k8s_ prefix
+				mockFI.EXPECT().Name().Return(name)
+				mockFI.EXPECT().Name().Return(name)
+				fileInfos = append(fileInfos, mockFI)
+			}
+			return fileInfos, nil
+		}
+		serviceFiles, err := r.getPodSystemdServiceFiles()
+		if err != nil {
+			t.Errorf("%v", err)
+		}
+		for _, f := range serviceFiles {
+			assert.Contains(t, tt.expected, f.Name(), fmt.Sprintf("Test case #%d", i))
+
+		}
+	}
+}
+
+func TestSetupSystemdCustomFields(t *testing.T) {
+	testCases := []struct {
+		unitOpts       []*unit.UnitOption
+		podAnnotations map[string]string
+		expectedValues []string
+		raiseErr       bool
+	}{
+		// without annotation
+		{
+			[]*unit.UnitOption{
+				{Section: "Service", Name: "ExecStart", Value: "/bin/true"},
+			},
+			map[string]string{},
+			[]string{"/bin/true"},
+			false,
+		},
+		// with valid annotation for LimitNOFile
+		{
+			[]*unit.UnitOption{
+				{Section: "Service", Name: "ExecStart", Value: "/bin/true"},
+			},
+			map[string]string{k8sRktLimitNoFileAnno: "1024"},
+			[]string{"/bin/true", "1024"},
+			false,
+		},
+		// with invalid annotation for LimitNOFile
+		{
+			[]*unit.UnitOption{
+				{Section: "Service", Name: "ExecStart", Value: "/bin/true"},
+			},
+			map[string]string{k8sRktLimitNoFileAnno: "-1"},
+			[]string{"/bin/true"},
+			true,
+		},
+	}
+
+	for i, tt := range testCases {
+		raiseErr := false
+		newUnitsOpts, err := setupSystemdCustomFields(tt.podAnnotations, tt.unitOpts)
+		if err != nil {
+			raiseErr = true
+		}
+		assert.Equal(t, tt.raiseErr, raiseErr, fmt.Sprintf("Test case #%d", i))
+		for _, opt := range newUnitsOpts {
+			assert.Equal(t, "Service", opt.Section, fmt.Sprintf("Test case #%d", i))
+			assert.Contains(t, tt.expectedValues, opt.Value, fmt.Sprintf("Test case #%d", i))
+		}
 	}
 }

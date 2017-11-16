@@ -99,7 +99,11 @@ else
     cp -p pki/issued/kubernetes-master.crt "${cert_dir}/server.cert" > /dev/null 2>&1
     cp -p pki/private/kubernetes-master.key "${cert_dir}/server.key" > /dev/null 2>&1
 fi
-./easyrsa build-client-full kubecfg nopass > /dev/null 2>&1
+# Make a superuser client cert with subject "O=system:masters, CN=kubecfg"
+./easyrsa --dn-mode=org \
+  --req-cn=kubecfg --req-org=system:masters \
+  --req-c= --req-st= --req-city= --req-email= --req-ou= \
+  build-client-full kubecfg nopass > /dev/null 2>&1
 cp -p pki/ca.crt "${cert_dir}/ca.crt"
 cp -p pki/issued/kubecfg.crt "${cert_dir}/kubecfg.crt"
 cp -p pki/private/kubecfg.key "${cert_dir}/kubecfg.key"

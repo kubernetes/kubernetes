@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,15 +16,12 @@ package etcdserver
 
 import (
 	"io"
-	"os"
-	"path"
 
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/coreos/etcd/pkg/pbutil"
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/coreos/etcd/raft/raftpb"
 	"github.com/coreos/etcd/snap"
-	"github.com/coreos/etcd/version"
 	"github.com/coreos/etcd/wal"
 	"github.com/coreos/etcd/wal/walpb"
 )
@@ -66,11 +63,7 @@ func (st *storage) SaveSnap(snap raftpb.Snapshot) error {
 	if err != nil {
 		return err
 	}
-	err = st.WAL.ReleaseLockTo(snap.Metadata.Index)
-	if err != nil {
-		return err
-	}
-	return nil
+	return st.WAL.ReleaseLockTo(snap.Metadata.Index)
 }
 
 func readWAL(waldir string, snap walpb.Snapshot) (w *wal.WAL, id, cid types.ID, st raftpb.HardState, ents []raftpb.Entry) {
@@ -105,42 +98,4 @@ func readWAL(waldir string, snap walpb.Snapshot) (w *wal.WAL, id, cid types.ID, 
 	id = types.ID(metadata.NodeID)
 	cid = types.ID(metadata.ClusterID)
 	return
-}
-
-// upgradeDataDir converts an older version of the etcdServer data to the newest version.
-// It must ensure that, after upgrading, the most recent version is present.
-func upgradeDataDir(baseDataDir string, name string, ver version.DataDirVersion) error {
-	switch ver {
-	case version.DataDir2_0:
-		err := makeMemberDir(baseDataDir)
-		if err != nil {
-			return err
-		}
-		fallthrough
-	case version.DataDir2_0_1:
-		fallthrough
-	default:
-	}
-	return nil
-}
-
-func makeMemberDir(dir string) error {
-	membdir := path.Join(dir, "member")
-	_, err := os.Stat(membdir)
-	switch {
-	case err == nil:
-		return nil
-	case !os.IsNotExist(err):
-		return err
-	}
-	if err := os.MkdirAll(membdir, 0700); err != nil {
-		return err
-	}
-	names := []string{"snap", "wal"}
-	for _, name := range names {
-		if err := os.Rename(path.Join(dir, name), path.Join(membdir, name)); err != nil {
-			return err
-		}
-	}
-	return nil
 }

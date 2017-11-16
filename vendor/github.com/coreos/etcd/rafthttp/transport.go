@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -202,11 +202,49 @@ func (t *Transport) Stop() {
 	if tr, ok := t.pipelineRt.(*http.Transport); ok {
 		tr.CloseIdleConnections()
 	}
+	t.peers = nil
+	t.remotes = nil
+}
+
+// CutPeer drops messages to the specified peer.
+func (t *Transport) CutPeer(id types.ID) {
+	t.mu.RLock()
+	p, pok := t.peers[id]
+	g, gok := t.remotes[id]
+	t.mu.RUnlock()
+
+	if pok {
+		p.(Pausable).Pause()
+	}
+	if gok {
+		g.Pause()
+	}
+}
+
+// MendPeer recovers the message dropping behavior of the given peer.
+func (t *Transport) MendPeer(id types.ID) {
+	t.mu.RLock()
+	p, pok := t.peers[id]
+	g, gok := t.remotes[id]
+	t.mu.RUnlock()
+
+	if pok {
+		p.(Pausable).Resume()
+	}
+	if gok {
+		g.Resume()
+	}
 }
 
 func (t *Transport) AddRemote(id types.ID, us []string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if t.remotes == nil {
+		// there's no clean way to shutdown the golang http server
+		// (see: https://github.com/golang/go/issues/4674) before
+		// stopping the transport; ignore any new connections.
+		return
+	}
 	if _, ok := t.peers[id]; ok {
 		return
 	}
@@ -217,12 +255,16 @@ func (t *Transport) AddRemote(id types.ID, us []string) {
 	if err != nil {
 		plog.Panicf("newURLs %+v should never fail: %+v", us, err)
 	}
-	t.remotes[id] = startRemote(t, urls, t.ID, id, t.ClusterID, t.Raft, t.ErrorC)
+	t.remotes[id] = startRemote(t, urls, id)
 }
 
 func (t *Transport) AddPeer(id types.ID, us []string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
+	if t.peers == nil {
+		panic("transport stopped")
+	}
 	if _, ok := t.peers[id]; ok {
 		return
 	}
@@ -231,8 +273,10 @@ func (t *Transport) AddPeer(id types.ID, us []string) {
 		plog.Panicf("newURLs %+v should never fail: %+v", us, err)
 	}
 	fs := t.LeaderStats.Follower(id.String())
-	t.peers[id] = startPeer(t, urls, t.ID, id, t.ClusterID, t.Raft, fs, t.ErrorC)
+	t.peers[id] = startPeer(t, urls, id, fs)
 	addPeerToProber(t.prober, id.String(), us)
+
+	plog.Infof("added peer %s", id)
 }
 
 func (t *Transport) RemovePeer(id types.ID) {
@@ -259,6 +303,7 @@ func (t *Transport) removePeer(id types.ID) {
 	delete(t.peers, id)
 	delete(t.LeaderStats.Followers, id.String())
 	t.prober.Remove(id.String())
+	plog.Infof("removed peer %s", id)
 }
 
 func (t *Transport) UpdatePeer(id types.ID, us []string) {
@@ -276,6 +321,7 @@ func (t *Transport) UpdatePeer(id types.ID, us []string) {
 
 	t.prober.Remove(id.String())
 	addPeerToProber(t.prober, id.String(), us)
+	plog.Infof("updated peer %s", id)
 }
 
 func (t *Transport) ActiveSince(id types.ID) time.Time {

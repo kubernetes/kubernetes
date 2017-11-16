@@ -29,16 +29,4 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 prepare-e2e
 
-if [[ "${FEDERATION:-}" == "true" ]];then
-    source "${KUBE_ROOT}/federation/cluster/common.sh"
-    for zone in ${E2E_ZONES};do
-	# bring up e2e cluster
-	(
-	    set-federation-zone-vars "$zone"
-	    cleanup-federation-api-objects || echo "Couldn't cleanup federation api objects"
-	    test-teardown
-	)
-    done
-else
-    test-teardown
-fi
+test-teardown

@@ -17,46 +17,68 @@ limitations under the License.
 package openstack
 
 import (
+	"fmt"
 	"os"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util/rand"
+	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
+	"k8s.io/api/core/v1"
 
-	"github.com/rackspace/gophercloud"
-	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-const volumeAvailableStatus = "available"
-const volumeInUseStatus = "in-use"
-const volumeCreateTimeoutSeconds = 30
+const (
+	volumeAvailableStatus = "available"
+	volumeInUseStatus     = "in-use"
+	testClusterName       = "testCluster"
 
-func WaitForVolumeStatus(t *testing.T, os *OpenStack, volumeName string, status string, timeoutSeconds int) {
-	timeout := timeoutSeconds
-	start := time.Now().Second()
-	for {
-		time.Sleep(1 * time.Second)
+	volumeStatusTimeoutSeconds = 30
+	// volumeStatus* is configuration of exponential backoff for
+	// waiting for specified volume status. Starting with 1
+	// seconds, multiplying by 1.2 with each step and taking 13 steps at maximum
+	// it will time out after 32s, which roughly corresponds to 30s
+	volumeStatusInitDealy = 1 * time.Second
+	volumeStatusFactor    = 1.2
+	volumeStatusSteps     = 13
+)
 
-		if timeout >= 0 && time.Now().Second()-start >= timeout {
-			t.Logf("Volume (%s) status did not change to %s after %v seconds\n",
-				volumeName,
-				status,
-				timeout)
-			return
-		}
-
+func WaitForVolumeStatus(t *testing.T, os *OpenStack, volumeName string, status string) {
+	backoff := wait.Backoff{
+		Duration: volumeStatusInitDealy,
+		Factor:   volumeStatusFactor,
+		Steps:    volumeStatusSteps,
+	}
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		getVol, err := os.getVolume(volumeName)
 		if err != nil {
-			t.Fatalf("Cannot get existing Cinder volume (%s): %v", volumeName, err)
+			return false, err
 		}
 		if getVol.Status == status {
 			t.Logf("Volume (%s) status changed to %s after %v seconds\n",
 				volumeName,
 				status,
-				timeout)
-			return
+				volumeStatusTimeoutSeconds)
+			return true, nil
+		} else {
+			return false, nil
 		}
+	})
+	if err == wait.ErrWaitTimeout {
+		t.Logf("Volume (%s) status did not change to %s after %v seconds\n",
+			volumeName,
+			status,
+			volumeStatusTimeoutSeconds)
+		return
+	}
+	if err != nil {
+		t.Fatalf("Cannot get existing Cinder volume (%s): %v", volumeName, err)
 	}
 }
 
@@ -75,6 +97,12 @@ func TestReadConfig(t *testing.T) {
  monitor-delay = 1m
  monitor-timeout = 30s
  monitor-max-retries = 3
+ [BlockStorage]
+ bs-version = auto
+ trust-device-path = yes
+ ignore-volume-az = yes
+ [Metadata]
+ search-order = configDrive, metadataService
  `))
 	if err != nil {
 		t.Fatalf("Should succeed when a valid config is provided: %s", err)
@@ -95,6 +123,18 @@ func TestReadConfig(t *testing.T) {
 	if cfg.LoadBalancer.MonitorMaxRetries != 3 {
 		t.Errorf("incorrect lb.monitormaxretries: %d", cfg.LoadBalancer.MonitorMaxRetries)
 	}
+	if cfg.BlockStorage.TrustDevicePath != true {
+		t.Errorf("incorrect bs.trustdevicepath: %v", cfg.BlockStorage.TrustDevicePath)
+	}
+	if cfg.BlockStorage.BSVersion != "auto" {
+		t.Errorf("incorrect bs.bs-version: %v", cfg.BlockStorage.BSVersion)
+	}
+	if cfg.BlockStorage.IgnoreVolumeAZ != true {
+		t.Errorf("incorrect bs.IgnoreVolumeAZ: %v", cfg.BlockStorage.IgnoreVolumeAZ)
+	}
+	if cfg.Metadata.SearchOrder != "configDrive, metadataService" {
+		t.Errorf("incorrect md.search-order: %v", cfg.Metadata.SearchOrder)
+	}
 }
 
 func TestToAuthOptions(t *testing.T) {
@@ -109,6 +149,229 @@ func TestToAuthOptions(t *testing.T) {
 	}
 	if ao.Username != cfg.Global.Username {
 		t.Errorf("Username %s != %s", ao.Username, cfg.Global.Username)
+	}
+}
+
+func TestCheckOpenStackOpts(t *testing.T) {
+	delay := MyDuration{60 * time.Second}
+	timeout := MyDuration{30 * time.Second}
+	tests := []struct {
+		name          string
+		openstackOpts *OpenStack
+		expectedError error
+	}{
+		{
+			name: "test1",
+			openstackOpts: &OpenStack{
+				provider: nil,
+				lbOpts: LoadBalancerOpts{
+					LBVersion:            "v2",
+					SubnetId:             "6261548e-ffde-4bc7-bd22-59c83578c5ef",
+					FloatingNetworkId:    "38b8b5f9-64dc-4424-bf86-679595714786",
+					LBMethod:             "ROUND_ROBIN",
+					LBProvider:           "haproxy",
+					CreateMonitor:        true,
+					MonitorDelay:         delay,
+					MonitorTimeout:       timeout,
+					MonitorMaxRetries:    uint(3),
+					ManageSecurityGroups: true,
+				},
+				metadataOpts: MetadataOpts{
+					SearchOrder: configDriveID,
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name: "test2",
+			openstackOpts: &OpenStack{
+				provider: nil,
+				lbOpts: LoadBalancerOpts{
+					LBVersion:            "v2",
+					FloatingNetworkId:    "38b8b5f9-64dc-4424-bf86-679595714786",
+					LBMethod:             "ROUND_ROBIN",
+					CreateMonitor:        true,
+					MonitorDelay:         delay,
+					MonitorTimeout:       timeout,
+					MonitorMaxRetries:    uint(3),
+					ManageSecurityGroups: true,
+				},
+				metadataOpts: MetadataOpts{
+					SearchOrder: configDriveID,
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name: "test3",
+			openstackOpts: &OpenStack{
+				provider: nil,
+				lbOpts: LoadBalancerOpts{
+					LBVersion:            "v2",
+					SubnetId:             "6261548e-ffde-4bc7-bd22-59c83578c5ef",
+					FloatingNetworkId:    "38b8b5f9-64dc-4424-bf86-679595714786",
+					LBMethod:             "ROUND_ROBIN",
+					CreateMonitor:        true,
+					ManageSecurityGroups: true,
+				},
+				metadataOpts: MetadataOpts{
+					SearchOrder: configDriveID,
+				},
+			},
+			expectedError: fmt.Errorf("monitor-delay not set in cloud provider config"),
+		},
+		{
+			name: "test4",
+			openstackOpts: &OpenStack{
+				provider: nil,
+				metadataOpts: MetadataOpts{
+					SearchOrder: "",
+				},
+			},
+			expectedError: fmt.Errorf("invalid value in section [Metadata] with key `search-order`. Value cannot be empty"),
+		},
+		{
+			name: "test5",
+			openstackOpts: &OpenStack{
+				provider: nil,
+				metadataOpts: MetadataOpts{
+					SearchOrder: "value1,value2,value3",
+				},
+			},
+			expectedError: fmt.Errorf("invalid value in section [Metadata] with key `search-order`. Value cannot contain more than 2 elements"),
+		},
+		{
+			name: "test6",
+			openstackOpts: &OpenStack{
+				provider: nil,
+				metadataOpts: MetadataOpts{
+					SearchOrder: "value1",
+				},
+			},
+			expectedError: fmt.Errorf("invalid element %q found in section [Metadata] with key `search-order`."+
+				"Supported elements include %q and %q", "value1", configDriveID, metadataID),
+		},
+	}
+
+	for _, testcase := range tests {
+		err := checkOpenStackOpts(testcase.openstackOpts)
+
+		if err == nil && testcase.expectedError == nil {
+			continue
+		}
+		if (err != nil && testcase.expectedError == nil) || (err == nil && testcase.expectedError != nil) || err.Error() != testcase.expectedError.Error() {
+			t.Errorf("%s failed: expected err=%q, got %q",
+				testcase.name, testcase.expectedError, err)
+		}
+	}
+}
+
+func TestCaller(t *testing.T) {
+	called := false
+	myFunc := func() { called = true }
+
+	c := NewCaller()
+	c.Call(myFunc)
+
+	if !called {
+		t.Errorf("Caller failed to call function in default case")
+	}
+
+	c.Disarm()
+	called = false
+	c.Call(myFunc)
+
+	if called {
+		t.Error("Caller still called function when disarmed")
+	}
+
+	// Confirm the "usual" deferred Caller pattern works as expected
+
+	called = false
+	success_case := func() {
+		c := NewCaller()
+		defer c.Call(func() { called = true })
+		c.Disarm()
+	}
+	if success_case(); called {
+		t.Error("Deferred success case still invoked unwind")
+	}
+
+	called = false
+	failure_case := func() {
+		c := NewCaller()
+		defer c.Call(func() { called = true })
+	}
+	if failure_case(); !called {
+		t.Error("Deferred failure case failed to invoke unwind")
+	}
+}
+
+// An arbitrary sort.Interface, just for easier comparison
+type AddressSlice []v1.NodeAddress
+
+func (a AddressSlice) Len() int           { return len(a) }
+func (a AddressSlice) Less(i, j int) bool { return a[i].Address < a[j].Address }
+func (a AddressSlice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+
+func TestNodeAddresses(t *testing.T) {
+	srv := servers.Server{
+		Status:     "ACTIVE",
+		HostID:     "29d3c8c896a45aa4c34e52247875d7fefc3d94bbcc9f622b5d204362",
+		AccessIPv4: "50.56.176.99",
+		AccessIPv6: "2001:4800:790e:510:be76:4eff:fe04:82a8",
+		Addresses: map[string]interface{}{
+			"private": []interface{}{
+				map[string]interface{}{
+					"OS-EXT-IPS-MAC:mac_addr": "fa:16:3e:7c:1b:2b",
+					"version":                 float64(4),
+					"addr":                    "10.0.0.32",
+					"OS-EXT-IPS:type":         "fixed",
+				},
+				map[string]interface{}{
+					"version":         float64(4),
+					"addr":            "50.56.176.36",
+					"OS-EXT-IPS:type": "floating",
+				},
+				map[string]interface{}{
+					"version": float64(4),
+					"addr":    "10.0.0.31",
+					// No OS-EXT-IPS:type
+				},
+			},
+			"public": []interface{}{
+				map[string]interface{}{
+					"version": float64(4),
+					"addr":    "50.56.176.35",
+				},
+				map[string]interface{}{
+					"version": float64(6),
+					"addr":    "2001:4800:780e:510:be76:4eff:fe04:84a8",
+				},
+			},
+		},
+	}
+
+	addrs, err := nodeAddresses(&srv)
+	if err != nil {
+		t.Fatalf("nodeAddresses returned error: %v", err)
+	}
+
+	sort.Sort(AddressSlice(addrs))
+	t.Logf("addresses is %v", addrs)
+
+	want := []v1.NodeAddress{
+		{Type: v1.NodeInternalIP, Address: "10.0.0.31"},
+		{Type: v1.NodeInternalIP, Address: "10.0.0.32"},
+		{Type: v1.NodeExternalIP, Address: "2001:4800:780e:510:be76:4eff:fe04:84a8"},
+		{Type: v1.NodeExternalIP, Address: "2001:4800:790e:510:be76:4eff:fe04:82a8"},
+		{Type: v1.NodeExternalIP, Address: "50.56.176.35"},
+		{Type: v1.NodeExternalIP, Address: "50.56.176.36"},
+		{Type: v1.NodeExternalIP, Address: "50.56.176.99"},
+	}
+
+	if !reflect.DeepEqual(want, addrs) {
+		t.Errorf("nodeAddresses returned incorrect value %v", addrs)
 	}
 }
 
@@ -128,16 +391,35 @@ func configFromEnv() (cfg Config, ok bool) {
 
 	cfg.Global.Username = os.Getenv("OS_USERNAME")
 	cfg.Global.Password = os.Getenv("OS_PASSWORD")
-	cfg.Global.ApiKey = os.Getenv("OS_API_KEY")
 	cfg.Global.Region = os.Getenv("OS_REGION_NAME")
+
+	cfg.Global.TenantName = os.Getenv("OS_TENANT_NAME")
+	if cfg.Global.TenantName == "" {
+		cfg.Global.TenantName = os.Getenv("OS_PROJECT_NAME")
+	}
+
+	cfg.Global.TenantId = os.Getenv("OS_TENANT_ID")
+	if cfg.Global.TenantId == "" {
+		cfg.Global.TenantId = os.Getenv("OS_PROJECT_ID")
+	}
+
 	cfg.Global.DomainId = os.Getenv("OS_DOMAIN_ID")
+	if cfg.Global.DomainId == "" {
+		cfg.Global.DomainId = os.Getenv("OS_USER_DOMAIN_ID")
+	}
+
 	cfg.Global.DomainName = os.Getenv("OS_DOMAIN_NAME")
+	if cfg.Global.DomainName == "" {
+		cfg.Global.DomainName = os.Getenv("OS_USER_DOMAIN_NAME")
+	}
 
 	ok = (cfg.Global.AuthUrl != "" &&
 		cfg.Global.Username != "" &&
-		(cfg.Global.Password != "" || cfg.Global.ApiKey != "") &&
+		cfg.Global.Password != "" &&
 		(cfg.Global.TenantId != "" || cfg.Global.TenantName != "" ||
 			cfg.Global.DomainId != "" || cfg.Global.DomainName != ""))
+
+	cfg.Metadata.SearchOrder = fmt.Sprintf("%s,%s", configDriveID, metadataID)
 
 	return
 }
@@ -154,104 +436,42 @@ func TestNewOpenStack(t *testing.T) {
 	}
 }
 
-func TestInstances(t *testing.T) {
-	cfg, ok := configFromEnv()
-	if !ok {
-		t.Skipf("No config found in environment")
-	}
-
-	os, err := newOpenStack(cfg)
-	if err != nil {
-		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
-	}
-
-	i, ok := os.Instances()
-	if !ok {
-		t.Fatalf("Instances() returned false")
-	}
-
-	srvs, err := i.List(".")
-	if err != nil {
-		t.Fatalf("Instances.List() failed: %s", err)
-	}
-	if len(srvs) == 0 {
-		t.Fatalf("Instances.List() returned zero servers")
-	}
-	t.Logf("Found servers (%d): %s\n", len(srvs), srvs)
-
-	srvExternalId, err := i.ExternalID(srvs[0])
-	if err != nil {
-		t.Fatalf("Instances.ExternalId(%s) failed: %s", srvs[0], err)
-	}
-	t.Logf("Found server (%s), with external id: %s\n", srvs[0], srvExternalId)
-
-	srvInstanceId, err := i.InstanceID(srvs[0])
-	if err != nil {
-		t.Fatalf("Instance.InstanceId(%s) failed: %s", srvs[0], err)
-	}
-	t.Logf("Found server (%s), with instance id: %s\n", srvs[0], srvInstanceId)
-
-	addrs, err := i.NodeAddresses(srvs[0])
-	if err != nil {
-		t.Fatalf("Instances.NodeAddresses(%s) failed: %s", srvs[0], err)
-	}
-	t.Logf("Found NodeAddresses(%s) = %s\n", srvs[0], addrs)
-}
-
 func TestLoadBalancer(t *testing.T) {
 	cfg, ok := configFromEnv()
 	if !ok {
 		t.Skipf("No config found in environment")
 	}
 
-	cfg.LoadBalancer.LBVersion = "v2"
+	versions := []string{"v1", "v2", ""}
 
-	os, err := newOpenStack(cfg)
-	if err != nil {
-		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
-	}
+	for _, v := range versions {
+		t.Logf("Trying LBVersion = '%s'\n", v)
+		cfg.LoadBalancer.LBVersion = v
 
-	lb, ok := os.LoadBalancer()
-	if !ok {
-		t.Fatalf("LoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
-	}
+		os, err := newOpenStack(cfg)
+		if err != nil {
+			t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
+		}
 
-	_, exists, err := lb.GetLoadBalancer(&api.Service{ObjectMeta: api.ObjectMeta{Name: "noexist"}})
-	if err != nil {
-		t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
-	}
-	if exists {
-		t.Fatalf("GetLoadBalancer(\"noexist\") returned exists")
-	}
-}
+		lb, ok := os.LoadBalancer()
+		if !ok {
+			t.Fatalf("LoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
+		}
 
-func TestLoadBalancerV2(t *testing.T) {
-	cfg, ok := configFromEnv()
-	if !ok {
-		t.Skipf("No config found in environment")
-	}
-	cfg.LoadBalancer.LBVersion = "v2"
-
-	os, err := newOpenStack(cfg)
-	if err != nil {
-		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
-	}
-
-	lbaas, ok := os.LoadBalancer()
-	if !ok {
-		t.Fatalf("LoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
-	}
-
-	_, exists, err := lbaas.GetLoadBalancer(&api.Service{ObjectMeta: api.ObjectMeta{Name: "noexist"}})
-	if err != nil {
-		t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
-	}
-	if exists {
-		t.Fatalf("GetLoadBalancer(\"noexist\") returned exists")
+		_, exists, err := lb.GetLoadBalancer(testClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "noexist"}})
+		if err != nil {
+			t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
+		}
+		if exists {
+			t.Fatalf("GetLoadBalancer(\"noexist\") returned exists")
+		}
 	}
 }
 
 func TestZones(t *testing.T) {
+	SetMetadataFixture(&FakeMetadata)
+	defer ClearMetadata()
+
 	os := OpenStack{
 		provider: &gophercloud.ProviderClient{
 			IdentityBase: "http://auth.url/",
@@ -272,6 +492,10 @@ func TestZones(t *testing.T) {
 	if zone.Region != "myRegion" {
 		t.Fatalf("GetZone() returned wrong region (%s)", zone.Region)
 	}
+
+	if zone.FailureDomain != "nova" {
+		t.Fatalf("GetZone() returned wrong failure domain (%s)", zone.FailureDomain)
+	}
 }
 
 func TestVolumes(t *testing.T) {
@@ -288,29 +512,40 @@ func TestVolumes(t *testing.T) {
 	tags := map[string]string{
 		"test": "value",
 	}
-	vol, err := os.CreateVolume("kubernetes-test-volume-"+rand.String(10), 1, &tags)
+	vol, _, _, err := os.CreateVolume("kubernetes-test-volume-"+rand.String(10), 1, "", "", &tags)
 	if err != nil {
 		t.Fatalf("Cannot create a new Cinder volume: %v", err)
 	}
 	t.Logf("Volume (%s) created\n", vol)
 
-	WaitForVolumeStatus(t, os, vol, volumeAvailableStatus, volumeCreateTimeoutSeconds)
+	WaitForVolumeStatus(t, os, vol, volumeAvailableStatus)
 
-	diskId, err := os.AttachDisk(os.localInstanceID, vol)
+	id, err := os.InstanceID()
+	if err != nil {
+		t.Fatalf("Cannot find instance id: %v", err)
+	}
+
+	diskId, err := os.AttachDisk(id, vol)
 	if err != nil {
 		t.Fatalf("Cannot AttachDisk Cinder volume %s: %v", vol, err)
 	}
 	t.Logf("Volume (%s) attached, disk ID: %s\n", vol, diskId)
 
-	WaitForVolumeStatus(t, os, vol, volumeInUseStatus, volumeCreateTimeoutSeconds)
+	WaitForVolumeStatus(t, os, vol, volumeInUseStatus)
 
-	err = os.DetachDisk(os.localInstanceID, vol)
+	devicePath := os.GetDevicePath(diskId)
+	if !strings.HasPrefix(devicePath, "/dev/disk/by-id/") {
+		t.Fatalf("GetDevicePath returned and unexpected path for Cinder volume %s, returned %s", vol, devicePath)
+	}
+	t.Logf("Volume (%s) found at path: %s\n", vol, devicePath)
+
+	err = os.DetachDisk(id, vol)
 	if err != nil {
 		t.Fatalf("Cannot DetachDisk Cinder volume %s: %v", vol, err)
 	}
 	t.Logf("Volume (%s) detached\n", vol)
 
-	WaitForVolumeStatus(t, os, vol, volumeAvailableStatus, volumeCreateTimeoutSeconds)
+	WaitForVolumeStatus(t, os, vol, volumeAvailableStatus)
 
 	err = os.DeleteVolume(vol)
 	if err != nil {
@@ -318,4 +553,48 @@ func TestVolumes(t *testing.T) {
 	}
 	t.Logf("Volume (%s) deleted\n", vol)
 
+}
+
+func TestInstanceIDFromProviderID(t *testing.T) {
+	testCases := []struct {
+		providerID string
+		instanceID string
+		fail       bool
+	}{
+		{
+			providerID: ProviderName + "://" + "/" + "7b9cf879-7146-417c-abfd-cb4272f0c935",
+			instanceID: "7b9cf879-7146-417c-abfd-cb4272f0c935",
+			fail:       false,
+		},
+		{
+			providerID: "openstack://7b9cf879-7146-417c-abfd-cb4272f0c935",
+			instanceID: "",
+			fail:       true,
+		},
+		{
+			providerID: "7b9cf879-7146-417c-abfd-cb4272f0c935",
+			instanceID: "",
+			fail:       true,
+		},
+		{
+			providerID: "other-provider:///7b9cf879-7146-417c-abfd-cb4272f0c935",
+			instanceID: "",
+			fail:       true,
+		},
+	}
+
+	for _, test := range testCases {
+		instanceID, err := instanceIDFromProviderID(test.providerID)
+		if (err != nil) != test.fail {
+			t.Errorf("%s yielded `err != nil` as %t. expected %t", test.providerID, (err != nil), test.fail)
+		}
+
+		if test.fail {
+			continue
+		}
+
+		if instanceID != test.instanceID {
+			t.Errorf("%s yielded %s. expected %s", test.providerID, instanceID, test.instanceID)
+		}
+	}
 }

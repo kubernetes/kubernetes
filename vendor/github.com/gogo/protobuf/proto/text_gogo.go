@@ -1,5 +1,7 @@
-// Copyright (c) 2013, Vastech SA (PTY) LTD. All rights reserved.
-// http://github.com/gogo/protobuf/gogoproto
+// Protocol Buffers for Go with Gadgets
+//
+// Copyright (c) 2013, The GoGo Authors. All rights reserved.
+// http://github.com/gogo/protobuf
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -31,10 +33,10 @@ import (
 	"reflect"
 )
 
-func writeEnum(w *textWriter, v reflect.Value, props *Properties) error {
+func (tm *TextMarshaler) writeEnum(w *textWriter, v reflect.Value, props *Properties) error {
 	m, ok := enumStringMaps[props.Enum]
 	if !ok {
-		if err := writeAny(w, v, props); err != nil {
+		if err := tm.writeAny(w, v, props); err != nil {
 			return err
 		}
 	}
@@ -46,7 +48,7 @@ func writeEnum(w *textWriter, v reflect.Value, props *Properties) error {
 	}
 	s, ok := m[key]
 	if !ok {
-		if err := writeAny(w, v, props); err != nil {
+		if err := tm.writeAny(w, v, props); err != nil {
 			return err
 		}
 	}

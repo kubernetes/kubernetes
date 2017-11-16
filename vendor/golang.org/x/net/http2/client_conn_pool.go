@@ -18,6 +18,18 @@ type ClientConnPool interface {
 	MarkDead(*ClientConn)
 }
 
+// clientConnPoolIdleCloser is the interface implemented by ClientConnPool
+// implementations which can close their idle connections.
+type clientConnPoolIdleCloser interface {
+	ClientConnPool
+	closeIdleConnections()
+}
+
+var (
+	_ clientConnPoolIdleCloser = (*clientConnPool)(nil)
+	_ clientConnPoolIdleCloser = noDialClientConnPool{}
+)
+
 // TODO: use singleflight for dialing and addConnCalls?
 type clientConnPool struct {
 	t *Transport
@@ -40,7 +52,16 @@ const (
 	noDialOnMiss = false
 )
 
-func (p *clientConnPool) getClientConn(_ *http.Request, addr string, dialOnMiss bool) (*ClientConn, error) {
+func (p *clientConnPool) getClientConn(req *http.Request, addr string, dialOnMiss bool) (*ClientConn, error) {
+	if isConnectionCloseRequest(req) && dialOnMiss {
+		// It gets its own connection.
+		const singleUse = true
+		cc, err := p.t.dialClientConn(addr, singleUse)
+		if err != nil {
+			return nil, err
+		}
+		return cc, nil
+	}
 	p.mu.Lock()
 	for _, cc := range p.conns[addr] {
 		if cc.CanTakeNewRequest() {
@@ -83,7 +104,8 @@ func (p *clientConnPool) getStartDialLocked(addr string) *dialCall {
 
 // run in its own goroutine.
 func (c *dialCall) dial(addr string) {
-	c.res, c.err = c.p.t.dialClientConn(addr)
+	const singleUse = false // shared conn
+	c.res, c.err = c.p.t.dialClientConn(addr, singleUse)
 	close(c.done)
 
 	c.p.mu.Lock()
@@ -222,4 +244,13 @@ func filterOutClientConn(in []*ClientConn, exclude *ClientConn) []*ClientConn {
 		in[len(in)-1] = nil
 	}
 	return out
+}
+
+// noDialClientConnPool is an implementation of http2.ClientConnPool
+// which never dials. We let the HTTP/1.1 client dial and use its TLS
+// connection instead.
+type noDialClientConnPool struct{ *clientConnPool }
+
+func (p noDialClientConnPool) GetClientConn(req *http.Request, addr string) (*ClientConn, error) {
+	return p.getClientConn(req, addr, noDialOnMiss)
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,12 +18,10 @@ package hostport
 
 import (
 	"fmt"
-	"net"
-	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"github.com/stretchr/testify/assert"
+	"k8s.io/api/core/v1"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -41,192 +39,114 @@ func (f *fakeSocket) Close() error {
 	return nil
 }
 
-func openFakeSocket(hp *hostport) (closeable, error) {
-	return &fakeSocket{hp.port, hp.protocol, false}, nil
+func NewFakeSocketManager() *fakeSocketManager {
+	return &fakeSocketManager{mem: make(map[hostport]*fakeSocket)}
 }
 
-type ruleMatch struct {
-	hostport int
-	chain    string
-	match    string
+type fakeSocketManager struct {
+	mem map[hostport]*fakeSocket
 }
 
-func TestOpenPodHostports(t *testing.T) {
-	fakeIptables := NewFakeIptables()
-
-	h := &handler{
-		hostPortMap: make(map[hostport]closeable),
-		iptables:    fakeIptables,
-		portOpener:  openFakeSocket,
+func (f *fakeSocketManager) openFakeSocket(hp *hostport) (closeable, error) {
+	if socket, ok := f.mem[*hp]; ok && !socket.closed {
+		return nil, fmt.Errorf("hostport is occupied")
 	}
+	fs := &fakeSocket{hp.port, hp.protocol, false}
+	f.mem[*hp] = fs
+	return fs, nil
+}
 
-	tests := []struct {
-		pod     *api.Pod
-		ip      string
-		matches []*ruleMatch
+func TestOpenHostports(t *testing.T) {
+	opener := NewFakeSocketManager()
+	testCases := []struct {
+		podPortMapping *PodPortMapping
+		expectError    bool
 	}{
-		// New pod that we are going to add
 		{
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: api.NamespaceDefault,
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{{
-						Ports: []api.ContainerPort{{
-							HostPort:      4567,
-							ContainerPort: 80,
-							Protocol:      api.ProtocolTCP,
-						}, {
-							HostPort:      5678,
-							ContainerPort: 81,
-							Protocol:      api.ProtocolUDP,
-						}},
-					}},
-				},
+			&PodPortMapping{
+				Namespace: "ns1",
+				Name:      "n0",
 			},
-			"10.1.1.2",
-			[]*ruleMatch{
-				{
-					-1,
-					"KUBE-HOSTPORTS",
-					"-m comment --comment \"test-pod_default hostport 4567\" -m tcp -p tcp --dport 4567",
-				},
-				{
-					4567,
-					"",
-					"-m comment --comment \"test-pod_default hostport 4567\" -s 10.1.1.2/32 -j KUBE-MARK-MASQ",
-				},
-				{
-					4567,
-					"",
-					"-m comment --comment \"test-pod_default hostport 4567\" -m tcp -p tcp -j DNAT --to-destination 10.1.1.2:80",
-				},
-				{
-					-1,
-					"KUBE-HOSTPORTS",
-					"-m comment --comment \"test-pod_default hostport 5678\" -m udp -p udp --dport 5678",
-				},
-				{
-					5678,
-					"",
-					"-m comment --comment \"test-pod_default hostport 5678\" -s 10.1.1.2/32 -j KUBE-MARK-MASQ",
-				},
-				{
-					5678,
-					"",
-					"-m comment --comment \"test-pod_default hostport 5678\" -m udp -p udp -j DNAT --to-destination 10.1.1.2:81",
-				},
-			},
+			false,
 		},
-		// Already running pod
 		{
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "another-test-pod",
-					Namespace: api.NamespaceDefault,
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{{
-						Ports: []api.ContainerPort{{
-							HostPort:      123,
-							ContainerPort: 654,
-							Protocol:      api.ProtocolTCP,
-						}},
-					}},
+			&PodPortMapping{
+				Namespace: "ns1",
+				Name:      "n1",
+				PortMappings: []*PortMapping{
+					{HostPort: 80, Protocol: v1.Protocol("TCP")},
+					{HostPort: 8080, Protocol: v1.Protocol("TCP")},
+					{HostPort: 443, Protocol: v1.Protocol("TCP")},
 				},
 			},
-			"10.1.1.5",
-			[]*ruleMatch{
-				{
-					-1,
-					"KUBE-HOSTPORTS",
-					"-m comment --comment \"another-test-pod_default hostport 123\" -m tcp -p tcp --dport 123",
-				},
-				{
-					123,
-					"",
-					"-m comment --comment \"another-test-pod_default hostport 123\" -s 10.1.1.5/32 -j KUBE-MARK-MASQ",
-				},
-				{
-					123,
-					"",
-					"-m comment --comment \"another-test-pod_default hostport 123\" -m tcp -p tcp -j DNAT --to-destination 10.1.1.5:654",
+			false,
+		},
+		{
+			&PodPortMapping{
+				Namespace: "ns1",
+				Name:      "n2",
+				PortMappings: []*PortMapping{
+					{HostPort: 80, Protocol: v1.Protocol("TCP")},
 				},
 			},
+			true,
+		},
+		{
+			&PodPortMapping{
+				Namespace: "ns1",
+				Name:      "n3",
+				PortMappings: []*PortMapping{
+					{HostPort: 8081, Protocol: v1.Protocol("TCP")},
+					{HostPort: 8080, Protocol: v1.Protocol("TCP")},
+				},
+			},
+			true,
+		},
+		{
+			&PodPortMapping{
+				Namespace: "ns1",
+				Name:      "n3",
+				PortMappings: []*PortMapping{
+					{HostPort: 8081, Protocol: v1.Protocol("TCP")},
+				},
+			},
+			false,
 		},
 	}
 
-	runningPods := make([]*RunningPod, 0)
-
-	// Fill in any match rules missing chain names
-	for _, test := range tests {
-		for _, match := range test.matches {
-			if match.hostport >= 0 {
-				found := false
-				for _, c := range test.pod.Spec.Containers {
-					for _, cp := range c.Ports {
-						if int(cp.HostPort) == match.hostport {
-							match.chain = string(hostportChainName(cp, kubecontainer.GetPodFullName(test.pod)))
-							found = true
-							break
-						}
-					}
-				}
-				if !found {
-					t.Fatalf("Failed to find ContainerPort for match %d/'%s'", match.hostport, match.match)
-				}
-			}
+	for _, tc := range testCases {
+		mapping, err := openHostports(opener.openFakeSocket, tc.podPortMapping)
+		if tc.expectError {
+			assert.Error(t, err)
+			continue
 		}
-		runningPods = append(runningPods, &RunningPod{
-			Pod: test.pod,
-			IP:  net.ParseIP(test.ip),
-		})
-	}
-
-	err := h.OpenPodHostportsAndSync(&RunningPod{Pod: tests[0].pod, IP: net.ParseIP(tests[0].ip)}, "br0", runningPods)
-	if err != nil {
-		t.Fatalf("Failed to OpenPodHostportsAndSync: %v", err)
-	}
-
-	// Generic rules
-	genericRules := []*ruleMatch{
-		{-1, "POSTROUTING", "-m comment --comment \"SNAT for localhost access to hostports\" -o br0 -s 127.0.0.0/8 -j MASQUERADE"},
-		{-1, "PREROUTING", "-m comment --comment \"kube hostport portals\" -m addrtype --dst-type LOCAL -j KUBE-HOSTPORTS"},
-		{-1, "OUTPUT", "-m comment --comment \"kube hostport portals\" -m addrtype --dst-type LOCAL -j KUBE-HOSTPORTS"},
-	}
-
-	for _, rule := range genericRules {
-		_, chain, err := fakeIptables.getChain(utiliptables.TableNAT, utiliptables.Chain(rule.chain))
-		if err != nil {
-			t.Fatalf("Expected NAT chain %s did not exist", rule.chain)
-		}
-		if !matchRule(chain, rule.match) {
-			t.Fatalf("Expected %s chain rule match '%s' not found", rule.chain, rule.match)
-		}
-	}
-
-	// Pod rules
-	for _, test := range tests {
-		for _, match := range test.matches {
-			// Ensure chain exists
-			_, chain, err := fakeIptables.getChain(utiliptables.TableNAT, utiliptables.Chain(match.chain))
-			if err != nil {
-				t.Fatalf("Expected NAT chain %s did not exist", match.chain)
-			}
-			if !matchRule(chain, match.match) {
-				t.Fatalf("Expected NAT chain %s rule containing '%s' not found", match.chain, match.match)
-			}
-		}
+		assert.NoError(t, err)
+		assert.EqualValues(t, len(mapping), len(tc.podPortMapping.PortMappings))
 	}
 }
 
-func matchRule(chain *fakeChain, match string) bool {
-	for _, rule := range chain.rules {
-		if strings.Contains(rule, match) {
-			return true
-		}
+func TestEnsureKubeHostportChains(t *testing.T) {
+	interfaceName := "cbr0"
+	builtinChains := []string{"PREROUTING", "OUTPUT"}
+	jumpRule := "-m comment --comment \"kube hostport portals\" -m addrtype --dst-type LOCAL -j KUBE-HOSTPORTS"
+	masqRule := "-m comment --comment \"SNAT for localhost access to hostports\" -o cbr0 -s 127.0.0.0/8 -j MASQUERADE"
+
+	fakeIPTables := NewFakeIPTables()
+	assert.NoError(t, ensureKubeHostportChains(fakeIPTables, interfaceName))
+
+	_, _, err := fakeIPTables.getChain(utiliptables.TableNAT, utiliptables.Chain("KUBE-HOSTPORTS"))
+	assert.NoError(t, err)
+
+	_, chain, err := fakeIPTables.getChain(utiliptables.TableNAT, utiliptables.ChainPostrouting)
+	assert.NoError(t, err)
+	assert.EqualValues(t, len(chain.rules), 1)
+	assert.Contains(t, chain.rules[0], masqRule)
+
+	for _, chainName := range builtinChains {
+		_, chain, err := fakeIPTables.getChain(utiliptables.TableNAT, utiliptables.Chain(chainName))
+		assert.NoError(t, err)
+		assert.EqualValues(t, len(chain.rules), 1)
+		assert.Contains(t, chain.rules[0], jumpRule)
 	}
-	return false
+
 }

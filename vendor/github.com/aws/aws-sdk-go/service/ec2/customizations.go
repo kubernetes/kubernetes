@@ -5,8 +5,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awsutil"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/private/endpoints"
 )
 
 func init() {
@@ -39,8 +39,20 @@ func fillPresignedURL(r *request.Request) {
 		WithRegion(aws.StringValue(origParams.SourceRegion)))
 
 	clientInfo := r.ClientInfo
-	clientInfo.Endpoint, clientInfo.SigningRegion = endpoints.EndpointForRegion(
-		clientInfo.ServiceName, aws.StringValue(cfg.Region), aws.BoolValue(cfg.DisableSSL))
+	resolved, err := r.Config.EndpointResolver.EndpointFor(
+		clientInfo.ServiceName, aws.StringValue(cfg.Region),
+		func(opt *endpoints.Options) {
+			opt.DisableSSL = aws.BoolValue(cfg.DisableSSL)
+			opt.UseDualStack = aws.BoolValue(cfg.UseDualStack)
+		},
+	)
+	if err != nil {
+		r.Error = err
+		return
+	}
+
+	clientInfo.Endpoint = resolved.URL
+	clientInfo.SigningRegion = resolved.SigningRegion
 
 	// Presign a CopySnapshot request with modified params
 	req := request.New(*cfg, clientInfo, r.Handlers, r.Retryer, r.Operation, newParams, r.Data)

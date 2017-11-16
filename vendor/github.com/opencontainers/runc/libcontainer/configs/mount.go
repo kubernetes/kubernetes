@@ -1,5 +1,11 @@
 package configs
 
+const (
+	// EXT_COPYUP is a directive to copy up the contents of a directory when
+	// a tmpfs is mounted over it.
+	EXT_COPYUP = 1 << iota
+)
+
 type Mount struct {
 	// Source path for the mount.
 	Source string `json:"source"`
@@ -21,6 +27,9 @@ type Mount struct {
 
 	// Relabel source if set, "z" indicates shared, "Z" indicates unshared.
 	Relabel string `json:"relabel"`
+
+	// Extensions are additional flags that are specific to runc.
+	Extensions int `json:"extensions"`
 
 	// Optional Command to be run before Source is mounted.
 	PremountCmds []Command `json:"premount_cmds"`

@@ -17,12 +17,18 @@ limitations under the License.
 package qos
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/api/core/v1"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 )
 
 const (
-	PodInfraOOMAdj        int = -999
+	// PodInfraOOMAdj is very docker specific. For arbitrary runtime, it may not make
+	// sense to set sandbox level oom score, e.g. a sandbox could only be a namespace
+	// without a process.
+	// TODO: Handle infra container oom score adj in a runtime agnostic way.
+	PodInfraOOMAdj        int = -998
 	KubeletOOMScoreAdj    int = -999
+	DockerOOMScoreAdj     int = -999
 	KubeProxyOOMScoreAdj  int = -999
 	guaranteedOOMScoreAdj int = -998
 	besteffortOOMScoreAdj int = 1000
@@ -34,12 +40,12 @@ const (
 // multiplied by 10 (barring exceptional cases) + a configurable quantity which is between -1000
 // and 1000. Containers with higher OOM scores are killed if the system runs out of memory.
 // See https://lwn.net/Articles/391222/ for more information.
-func GetContainerOOMScoreAdjust(pod *api.Pod, container *api.Container, memoryCapacity int64) int {
-	switch GetPodQOS(pod) {
-	case Guaranteed:
+func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapacity int64) int {
+	switch v1qos.GetPodQOS(pod) {
+	case v1.PodQOSGuaranteed:
 		// Guaranteed containers should be the last to get killed.
 		return guaranteedOOMScoreAdj
-	case BestEffort:
+	case v1.PodQOSBestEffort:
 		return besteffortOOMScoreAdj
 	}
 
@@ -53,10 +59,10 @@ func GetContainerOOMScoreAdjust(pod *api.Pod, container *api.Container, memoryCa
 	// Note that this is a heuristic, it won't work if a container has many small processes.
 	memoryRequest := container.Resources.Requests.Memory().Value()
 	oomScoreAdjust := 1000 - (1000*memoryRequest)/memoryCapacity
-	// A guaranteed pod using 100% of memory can have an OOM score of 1. Ensure
+	// A guaranteed pod using 100% of memory can have an OOM score of 10. Ensure
 	// that burstable pods have a higher OOM score adjustment.
-	if oomScoreAdjust < 2 {
-		return 2
+	if int(oomScoreAdjust) < (1000 + guaranteedOOMScoreAdj) {
+		return (1000 + guaranteedOOMScoreAdj)
 	}
 	// Give burstable pods a higher chance of survival over besteffort pods.
 	if int(oomScoreAdjust) == besteffortOOMScoreAdj {

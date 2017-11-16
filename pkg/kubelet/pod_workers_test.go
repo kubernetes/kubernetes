@@ -22,14 +22,15 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/client-go/tools/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 // fakePodWorkers runs sync pod function in serial, so we can have
@@ -64,9 +65,9 @@ type TestingInterface interface {
 	Errorf(format string, args ...interface{})
 }
 
-func newPod(uid, name string) *api.Pod {
-	return &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+func newPod(uid, name string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:  types.UID(uid),
 			Name: name,
 		},
@@ -99,7 +100,7 @@ func createPodWorkers() (*podWorkers, map[types.UID][]syncPodRecord) {
 			return nil
 		},
 		fakeRecorder,
-		queue.NewBasicWorkQueue(&util.RealClock{}),
+		queue.NewBasicWorkQueue(&clock.RealClock{}),
 		time.Second,
 		time.Second,
 		fakeCache,
@@ -239,8 +240,8 @@ func TestForgetNonExistingPodWorkers(t *testing.T) {
 }
 
 type simpleFakeKubelet struct {
-	pod       *api.Pod
-	mirrorPod *api.Pod
+	pod       *v1.Pod
+	mirrorPod *v1.Pod
 	podStatus *kubecontainer.PodStatus
 	wg        sync.WaitGroup
 }
@@ -279,24 +280,24 @@ func TestFakePodWorkers(t *testing.T) {
 	kubeletForRealWorkers := &simpleFakeKubelet{}
 	kubeletForFakeWorkers := &simpleFakeKubelet{}
 
-	realPodWorkers := newPodWorkers(kubeletForRealWorkers.syncPodWithWaitGroup, fakeRecorder, queue.NewBasicWorkQueue(&util.RealClock{}), time.Second, time.Second, fakeCache)
+	realPodWorkers := newPodWorkers(kubeletForRealWorkers.syncPodWithWaitGroup, fakeRecorder, queue.NewBasicWorkQueue(&clock.RealClock{}), time.Second, time.Second, fakeCache)
 	fakePodWorkers := &fakePodWorkers{kubeletForFakeWorkers.syncPod, fakeCache, t}
 
 	tests := []struct {
-		pod       *api.Pod
-		mirrorPod *api.Pod
+		pod       *v1.Pod
+		mirrorPod *v1.Pod
 	}{
 		{
-			&api.Pod{},
-			&api.Pod{},
+			&v1.Pod{},
+			&v1.Pod{},
 		},
 		{
-			podWithUidNameNs("12345678", "foo", "new"),
-			podWithUidNameNs("12345678", "fooMirror", "new"),
+			podWithUIDNameNs("12345678", "foo", "new"),
+			podWithUIDNameNs("12345678", "fooMirror", "new"),
 		},
 		{
-			podWithUidNameNs("98765", "bar", "new"),
-			podWithUidNameNs("98765", "barMirror", "new"),
+			podWithUIDNameNs("98765", "bar", "new"),
+			podWithUIDNameNs("98765", "barMirror", "new"),
 		},
 	}
 
@@ -331,11 +332,12 @@ func TestFakePodWorkers(t *testing.T) {
 
 // TestKillPodNowFunc tests the blocking kill pod function works with pod workers as expected.
 func TestKillPodNowFunc(t *testing.T) {
+	fakeRecorder := &record.FakeRecorder{}
 	podWorkers, processed := createPodWorkers()
-	killPodFunc := killPodNow(podWorkers)
+	killPodFunc := killPodNow(podWorkers, fakeRecorder)
 	pod := newPod("test", "test")
 	gracePeriodOverride := int64(0)
-	err := killPodFunc(pod, api.PodStatus{Phase: api.PodFailed, Reason: "reason", Message: "message"}, &gracePeriodOverride)
+	err := killPodFunc(pod, v1.PodStatus{Phase: v1.PodFailed, Reason: "reason", Message: "message"}, &gracePeriodOverride)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}

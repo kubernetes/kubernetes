@@ -1,4 +1,4 @@
-heat_template_version: 2014-10-16
+heat_template_version: 2016-10-14
 
 description: >
   This is a nested stack that defines a single Kubernetes minion, This stack is
@@ -61,10 +61,14 @@ parameters:
     description: OpenStack Region Name
     default: false
 
-  os_tenant_id:
+  os_tenant_name:
     type: string
-    description: OpenStack Tenant ID
+    description: OpenStack Tenant Name
     default: false
+
+  os_user_domain_name:
+    type: string
+    description: OpenStack User Domain Name (Domain-level authorization scope for keystone v3)
 
   enable_proxy:
     type: string
@@ -96,6 +100,11 @@ parameters:
     description: Comma seperated list of domains/addresses that bypass proxying.
     default: localhost
 
+  assign_floating_ip:
+    type: boolean
+    description: Indicates whether floating IPs will be generated for minions
+    default: true
+
   # The following are all generated in the parent template.
   kube_master_ip:
     type: string
@@ -106,6 +115,9 @@ parameters:
   fixed_subnet:
     type: string
     description: Subnet from which to allocate fixed addresses.
+  cluster_cidr:
+    type: string
+    description: Subnet from which to allocate pod subnets.
   wait_condition_timeout:
     type: number
     description : >
@@ -119,6 +131,9 @@ parameters:
     type: string
   secgroup_node:
     type: string
+
+conditions:
+  assign_floating_ip: {equals : [{get_param: assign_floating_ip}, true]}
 
 resources:
 
@@ -213,8 +228,10 @@ resources:
             "$OS_USERNAME": {get_param: os_username}
             "$OS_PASSWORD": {get_param: os_password}
             "$OS_REGION_NAME": {get_param: os_region_name}
-            "$OS_TENANT_ID": {get_param: os_tenant_id}
+            "$OS_TENANT_NAME": {get_param: os_tenant_name}
+            "$OS_USER_DOMAIN_NAME": {get_param: os_user_domain_name}
             "$role": "kubernetes-pool"
+            "$cluster_cidr": {get_param: cluster_cidr}
 
   run_salt:
     type: OS::Heat::SoftwareConfig
@@ -247,7 +264,11 @@ resources:
   server_name_post_fix:
     type: OS::Heat::RandomString
     properties:
+      character_classes: [{'class': 'lowercase', 'min': 1}]
       length: 8
+      character_classes:
+        - class: lowercase
+        - class: digits
 
   kube_minion:
     type: OS::Nova::Server
@@ -281,10 +302,13 @@ resources:
     properties:
       floating_network: {get_param: external_network}
       port_id: {get_resource: kube_minion_eth0}
+    condition: assign_floating_ip
 
 outputs:
 
   kube_minion_ip:
     value: {get_attr: [kube_minion_eth0, fixed_ips, 0, ip_address]}
+
   kube_minion_external_ip:
     value: {get_attr: [kube_minion_floating, floating_ip_address]}
+    condition: assign_floating_ip

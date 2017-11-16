@@ -18,19 +18,19 @@ package gce_pd
 
 import (
 	"fmt"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/util/exec"
-	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/utils/exec"
 )
 
 const (
@@ -40,9 +40,11 @@ const (
 	diskPartitionSuffix  = "-part"
 	diskSDPath           = "/dev/sd"
 	diskSDPattern        = "/dev/sd*"
+	regionalPDZonesAuto  = "auto" // "replica-zones: auto" means Kubernetes will select zones for RePD
 	maxChecks            = 60
 	maxRetries           = 10
 	checkSleepDuration   = time.Second
+	maxRegionalPDZones   = 2
 )
 
 // These variables are modified only in unit tests and should be constant
@@ -61,6 +63,8 @@ func (util *GCEDiskUtil) DeleteVolume(d *gcePersistentDiskDeleter) error {
 
 	if err = cloud.DeleteDisk(d.pdName); err != nil {
 		glog.V(2).Infof("Error deleting GCE PD volume %s: %v", d.pdName, err)
+		// GCE cloud provider returns volume.deletedVolumeInUseError when
+		// necessary, no handling needed here.
 		return err
 	}
 	glog.V(2).Infof("Successfully deleted GCE PD volume %s", d.pdName)
@@ -68,42 +72,171 @@ func (util *GCEDiskUtil) DeleteVolume(d *gcePersistentDiskDeleter) error {
 }
 
 // CreateVolume creates a GCE PD.
-// Returns: volumeID, volumeSizeGB, labels, error
-func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (string, int, map[string]string, error) {
+// Returns: gcePDName, volumeSizeGB, labels, fsType, error
+func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (string, int, map[string]string, string, error) {
 	cloud, err := getCloudProvider(c.gcePersistentDisk.plugin.host.GetCloudProvider())
 	if err != nil {
-		return "", 0, nil, err
+		return "", 0, nil, "", err
 	}
 
 	name := volume.GenerateVolumeName(c.options.ClusterName, c.options.PVName, 63) // GCE PD name can have up to 63 characters
-	requestBytes := c.options.Capacity.Value()
+	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	requestBytes := capacity.Value()
 	// GCE works with gigabytes, convert to GiB with rounding up
 	requestGB := volume.RoundUpSize(requestBytes, 1024*1024*1024)
 
-	// The disk will be created in the zone in which this code is currently running
-	// TODO: We should support auto-provisioning volumes in multiple/specified zones
-	zones, err := cloud.GetAllZones()
-	if err != nil {
-		glog.V(2).Infof("error getting zone information from GCE: %v", err)
-		return "", 0, nil, err
+	// Apply Parameters (case-insensitive). We leave validation of
+	// the values to the cloud provider.
+	diskType := ""
+	configuredZone := ""
+	configuredZones := ""
+	configuredReplicaZones := ""
+	zonePresent := false
+	zonesPresent := false
+	replicaZonesPresent := false
+	fstype := ""
+	for k, v := range c.options.Parameters {
+		switch strings.ToLower(k) {
+		case "type":
+			diskType = v
+		case "zone":
+			zonePresent = true
+			configuredZone = v
+		case "zones":
+			zonesPresent = true
+			configuredZones = v
+		case "replica-zones":
+			replicaZonesPresent = true
+			configuredReplicaZones = v
+		case volume.VolumeParameterFSType:
+			fstype = v
+		default:
+			return "", 0, nil, "", fmt.Errorf("invalid option %q for volume plugin %s", k, c.plugin.GetPluginName())
+		}
 	}
 
-	zone := volume.ChooseZoneForVolume(zones, c.options.PVCName)
-
-	err = cloud.CreateDisk(name, zone, int64(requestGB), *c.options.CloudTags)
-	if err != nil {
-		glog.V(2).Infof("Error creating GCE PD volume: %v", err)
-		return "", 0, nil, err
+	if ((zonePresent || zonesPresent) && replicaZonesPresent) ||
+		(zonePresent && zonesPresent) {
+		// 011, 101, 111, 110
+		return "", 0, nil, "", fmt.Errorf("a combination of zone, zones, and replica-zones StorageClass parameters must not be used at the same time")
 	}
-	glog.V(2).Infof("Successfully created GCE PD volume %s", name)
 
-	labels, err := cloud.GetAutoLabelsForPD(name, zone)
+	// TODO: implement PVC.Selector parsing
+	if c.options.PVC.Spec.Selector != nil {
+		return "", 0, nil, "", fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on GCE")
+	}
+
+	if !zonePresent && !zonesPresent && replicaZonesPresent {
+		// 001 - "replica-zones" specified
+		replicaZones, err := volumeutil.ZonesToSet(configuredReplicaZones)
+		if err != nil {
+			return "", 0, nil, "", err
+		}
+
+		err = createRegionalPD(
+			name,
+			c.options.PVC.Name,
+			diskType,
+			replicaZones,
+			requestGB,
+			c.options.CloudTags,
+			cloud)
+		if err != nil {
+			glog.V(2).Infof("Error creating regional GCE PD volume: %v", err)
+			return "", 0, nil, "", err
+		}
+
+		glog.V(2).Infof("Successfully created Regional GCE PD volume %s", name)
+	} else {
+		var zones sets.String
+		if !zonePresent && !zonesPresent {
+			// 000 - neither "zone", "zones", or "replica-zones" specified
+			// Pick a zone randomly selected from all active zones where
+			// Kubernetes cluster has a node.
+			zones, err = cloud.GetAllZones()
+			if err != nil {
+				glog.V(2).Infof("error getting zone information from GCE: %v", err)
+				return "", 0, nil, "", err
+			}
+		} else if !zonePresent && zonesPresent {
+			// 010 - "zones" specified
+			// Pick a zone randomly selected from specified set.
+			if zones, err = volumeutil.ZonesToSet(configuredZones); err != nil {
+				return "", 0, nil, "", err
+			}
+		} else if zonePresent && !zonesPresent {
+			// 100 - "zone" specified
+			// Use specified zone
+			if err := volume.ValidateZone(configuredZone); err != nil {
+				return "", 0, nil, "", err
+			}
+			zones = make(sets.String)
+			zones.Insert(configuredZone)
+		}
+		zone := volume.ChooseZoneForVolume(zones, c.options.PVC.Name)
+
+		if err := cloud.CreateDisk(
+			name,
+			diskType,
+			zone,
+			int64(requestGB),
+			*c.options.CloudTags); err != nil {
+			glog.V(2).Infof("Error creating single-zone GCE PD volume: %v", err)
+			return "", 0, nil, "", err
+		}
+
+		glog.V(2).Infof("Successfully created single-zone GCE PD volume %s", name)
+	}
+
+	labels, err := cloud.GetAutoLabelsForPD(name, "" /* zone */)
 	if err != nil {
 		// We don't really want to leak the volume here...
 		glog.Errorf("error getting labels for volume %q: %v", name, err)
 	}
 
-	return name, int(requestGB), labels, nil
+	return name, int(requestGB), labels, fstype, nil
+}
+
+// Creates a Regional PD
+func createRegionalPD(
+	diskName string,
+	pvcName string,
+	diskType string,
+	replicaZones sets.String,
+	requestGB int64,
+	cloudTags *map[string]string,
+	cloud *gcecloud.GCECloud) error {
+
+	autoZoneSelection := false
+	if replicaZones.Len() != maxRegionalPDZones {
+		replicaZonesList := replicaZones.UnsortedList()
+		if replicaZones.Len() == 1 && replicaZonesList[0] == regionalPDZonesAuto {
+			// User requested automatic zone selection.
+			autoZoneSelection = true
+		} else {
+			return fmt.Errorf(
+				"replica-zones specifies %d zones. It must specify %d zones or the keyword \"auto\" to let Kubernetes select zones.",
+				replicaZones.Len(),
+				maxRegionalPDZones)
+		}
+	}
+
+	selectedReplicaZones := replicaZones
+	if autoZoneSelection {
+		selectedReplicaZones = volume.ChooseZonesForVolume(
+			replicaZones, pvcName, maxRegionalPDZones)
+	}
+
+	if err := cloud.CreateRegionalDisk(
+		diskName,
+		diskType,
+		selectedReplicaZones,
+		int64(requestGB),
+		*cloudTags); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Returns the first path that exists, or empty string if none exist.
@@ -114,7 +247,7 @@ func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String) (string, er
 	}
 
 	for _, path := range devicePaths {
-		if pathExists, err := pathExists(path); err != nil {
+		if pathExists, err := volumeutil.PathExists(path); err != nil {
 			return "", fmt.Errorf("Error checking if path exists: %v", err)
 		} else if pathExists {
 			return path, nil
@@ -122,13 +255,6 @@ func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String) (string, er
 	}
 
 	return "", nil
-}
-
-// Unmount the global PD mount, which should be the only one, and delete it.
-func unmountPDAndRemoveGlobalPath(globalMountPath string, mounter mount.Interface) error {
-	err := mounter.Unmount(globalMountPath)
-	os.Remove(globalMountPath)
-	return err
 }
 
 // Returns the first path that exists, or empty string if none exist.
@@ -139,7 +265,7 @@ func verifyAllPathsRemoved(devicePaths []string) (bool, error) {
 			// udevadm errors should not block disk detachment, log and continue
 			glog.Errorf("%v", err)
 		}
-		if exists, err := pathExists(path); err != nil {
+		if exists, err := volumeutil.PathExists(path); err != nil {
 			return false, fmt.Errorf("Error checking if path exists: %v", err)
 		} else {
 			allPathsRemoved = allPathsRemoved && !exists
@@ -163,18 +289,6 @@ func getDiskByIdPaths(pdName string, partition string) []string {
 	}
 
 	return devicePaths
-}
-
-// Checks if the specified path exists
-func pathExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	} else if os.IsNotExist(err) {
-		return false, nil
-	} else {
-		return false, err
-	}
 }
 
 // Return cloud provider
@@ -215,7 +329,7 @@ func udevadmChangeToNewDrives(sdBeforeSet sets.String) error {
 }
 
 // Calls "udevadm trigger --action=change" on the specified drive.
-// drivePath must be the the block device path to trigger on, in the format "/dev/sd*", or a symlink to it.
+// drivePath must be the block device path to trigger on, in the format "/dev/sd*", or a symlink to it.
 // This is workaround for Issue #7972. Once the underlying issue has been resolved, this may be removed.
 func udevadmChangeToDrive(drivePath string) error {
 	glog.V(5).Infof("udevadmChangeToDrive: drive=%q", drivePath)

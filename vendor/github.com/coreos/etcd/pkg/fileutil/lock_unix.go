@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,38 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build !windows,!plan9,!solaris
+// +build !windows,!plan9,!solaris,!linux
 
 package fileutil
 
 import (
 	"os"
-	"syscall"
 )
 
 func TryLockFile(path string, flag int, perm os.FileMode) (*LockedFile, error) {
-	f, err := os.OpenFile(path, flag, perm)
-	if err != nil {
-		return nil, err
-	}
-	if err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		f.Close()
-		if err == syscall.EWOULDBLOCK {
-			err = ErrLocked
-		}
-		return nil, err
-	}
-	return &LockedFile{f}, nil
+	return flockTryLockFile(path, flag, perm)
 }
 
 func LockFile(path string, flag int, perm os.FileMode) (*LockedFile, error) {
-	f, err := os.OpenFile(path, flag, perm)
-	if err != nil {
-		return nil, err
-	}
-	if err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		f.Close()
-		return nil, err
-	}
-	return &LockedFile{f}, err
+	return flockLockFile(path, flag, perm)
 }

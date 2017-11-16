@@ -78,6 +78,15 @@ func PropRemainAfterExit(b bool) Property {
 	}
 }
 
+// PropType sets the Type service property. See
+// http://www.freedesktop.org/software/systemd/man/systemd.service.html#Type=
+func PropType(t string) Property {
+	return Property{
+		Name:  "Type",
+		Value: dbus.MakeVariant(t),
+	}
+}
+
 // PropDescription sets the Description unit property. See
 // http://www.freedesktop.org/software/systemd/man/systemd.unit#Description=
 func PropDescription(desc string) Property {
@@ -214,5 +223,15 @@ func PropSlice(slice string) Property {
 	return Property{
 		Name:  "Slice",
 		Value: dbus.MakeVariant(slice),
+	}
+}
+
+// PropPids sets the PIDs field of scope units used in the initial construction
+// of the scope only and specifies the initial PIDs to add to the scope object.
+// See https://www.freedesktop.org/wiki/Software/systemd/ControlGroupInterface/#properties
+func PropPids(pids ...uint32) Property {
+	return Property{
+		Name:  "PIDs",
+		Value: dbus.MakeVariant(pids),
 	}
 }

@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package gcp_credentials contains  implementations of DockerConfigProvider
 // for Google Cloud Platform.
-package gcp_credentials
+package gcp_credentials // import "k8s.io/kubernetes/pkg/credentialprovider/gcp"

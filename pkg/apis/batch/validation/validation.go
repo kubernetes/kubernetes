@@ -19,13 +19,14 @@ package validation
 import (
 	"github.com/robfig/cron"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	unversionedvalidation "k8s.io/kubernetes/pkg/api/unversioned/validation"
-	apivalidation "k8s.io/kubernetes/pkg/api/validation"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/labels"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/validation/field"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 // TODO: generalize for other controller objects that will follow the same pattern, such as ReplicaSet and DaemonSet, and
@@ -49,14 +50,8 @@ func ValidateGeneratedSelector(obj *batch.Job) field.ErrorList {
 		allErrs = append(allErrs, field.Required(field.NewPath("metadata").Child("uid"), ""))
 	}
 
-	// If somehow uid was unset then we would get "controller-uid=" as the selector
-	// which is bad.
-	if obj.ObjectMeta.UID == "" {
-		allErrs = append(allErrs, field.Required(field.NewPath("metadata").Child("uid"), ""))
-	}
-
 	// If selector generation was requested, then expected labels must be
-	// present on pod template, and much match job's uid and name.  The
+	// present on pod template, and must match job's uid and name.  The
 	// generated (not-manual) selectors/labels ensure no overlap with other
 	// controllers.  The manual mode allows orphaning, adoption,
 	// backward-compatibility, and experimentation with new
@@ -71,7 +66,7 @@ func ValidateGeneratedSelector(obj *batch.Job) field.ErrorList {
 	expectedLabels["controller-uid"] = string(obj.UID)
 	expectedLabels["job-name"] = string(obj.Name)
 	// Whether manually or automatically generated, the selector of the job must match the pods it will produce.
-	if selector, err := unversioned.LabelSelectorAsSelector(obj.Spec.Selector); err == nil {
+	if selector, err := metav1.LabelSelectorAsSelector(obj.Spec.Selector); err == nil {
 		if !selector.Matches(labels.Set(expectedLabels)) {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("selector"), obj.Spec.Selector, "`selector` not auto-generated"))
 		}
@@ -98,7 +93,7 @@ func ValidateJobSpec(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
 	}
 
 	// Whether manually or automatically generated, the selector of the job must match the pods it will produce.
-	if selector, err := unversioned.LabelSelectorAsSelector(spec.Selector); err == nil {
+	if selector, err := metav1.LabelSelectorAsSelector(spec.Selector); err == nil {
 		labels := labels.Set(spec.Template.Labels)
 		if !selector.Matches(labels) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("template", "metadata", "labels"), spec.Template.Labels, "`selector` does not match template `labels`"))
@@ -119,6 +114,9 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
 	if spec.ActiveDeadlineSeconds != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.ActiveDeadlineSeconds), fldPath.Child("activeDeadlineSeconds"))...)
 	}
+	if spec.BackoffLimit != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.BackoffLimit), fldPath.Child("backoffLimit"))...)
+	}
 
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"))...)
 	if spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure &&
@@ -138,13 +136,13 @@ func ValidateJobStatus(status *batch.JobStatus, fldPath *field.Path) field.Error
 }
 
 func ValidateJobUpdate(job, oldJob *batch.Job) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMetaUpdate(&oldJob.ObjectMeta, &job.ObjectMeta, field.NewPath("metadata"))
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateJobSpecUpdate(job.Spec, oldJob.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
 func ValidateJobUpdateStatus(job, oldJob *batch.Job) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMetaUpdate(&oldJob.ObjectMeta, &job.ObjectMeta, field.NewPath("metadata"))
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateJobStatusUpdate(job.Status, oldJob.Status)...)
 	return allErrs
 }
@@ -164,14 +162,29 @@ func ValidateJobStatusUpdate(status, oldStatus batch.JobStatus) field.ErrorList 
 	return allErrs
 }
 
-func ValidateScheduledJob(scheduledJob *batch.ScheduledJob) field.ErrorList {
-	// ScheduledJobs and rcs have the same name validation
+func ValidateCronJob(scheduledJob *batch.CronJob) field.ErrorList {
+	// CronJobs and rcs have the same name validation
 	allErrs := apivalidation.ValidateObjectMeta(&scheduledJob.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateScheduledJobSpec(&scheduledJob.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateCronJobSpec(&scheduledJob.Spec, field.NewPath("spec"))...)
+	if len(scheduledJob.ObjectMeta.Name) > apimachineryvalidation.DNS1035LabelMaxLength-11 {
+		// The cronjob controller appends a 11-character suffix to the cronjob (`-$TIMESTAMP`) when
+		// creating a job. The job name length limit is 63 characters.
+		// Therefore cronjob names must have length <= 63-11=52. If we don't validate this here,
+		// then job creation will fail later.
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata").Child("name"), scheduledJob.ObjectMeta.Name, "must be no more than 52 characters"))
+	}
 	return allErrs
 }
 
-func ValidateScheduledJobSpec(spec *batch.ScheduledJobSpec, fldPath *field.Path) field.ErrorList {
+func ValidateCronJobUpdate(job, oldJob *batch.CronJob) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateCronJobSpec(&job.Spec, field.NewPath("spec"))...)
+	// skip the 52-character name validation limit on update validation
+	// to allow old cronjobs with names > 52 chars to be updated/deleted
+	return allErrs
+}
+
+func ValidateCronJobSpec(spec *batch.CronJobSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(spec.Schedule) == 0 {
@@ -184,6 +197,15 @@ func ValidateScheduledJobSpec(spec *batch.ScheduledJobSpec, fldPath *field.Path)
 	}
 	allErrs = append(allErrs, validateConcurrencyPolicy(&spec.ConcurrencyPolicy, fldPath.Child("concurrencyPolicy"))...)
 	allErrs = append(allErrs, ValidateJobTemplateSpec(&spec.JobTemplate, fldPath.Child("jobTemplate"))...)
+
+	if spec.SuccessfulJobsHistoryLimit != nil {
+		// zero is a valid SuccessfulJobsHistoryLimit
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.SuccessfulJobsHistoryLimit), fldPath.Child("successfulJobsHistoryLimit"))...)
+	}
+	if spec.FailedJobsHistoryLimit != nil {
+		// zero is a valid SuccessfulJobsHistoryLimit
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.FailedJobsHistoryLimit), fldPath.Child("failedJobsHistoryLimit"))...)
+	}
 
 	return allErrs
 }
@@ -205,8 +227,7 @@ func validateConcurrencyPolicy(concurrencyPolicy *batch.ConcurrencyPolicy, fldPa
 
 func validateScheduleFormat(schedule string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	_, err := cron.Parse(schedule)
-	if err != nil {
+	if _, err := cron.ParseStandard(schedule); err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, schedule, err.Error()))
 	}
 

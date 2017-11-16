@@ -18,7 +18,7 @@ package exec
 
 import (
 	"k8s.io/kubernetes/pkg/probe"
-	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/utils/exec"
 
 	"github.com/golang/glog"
 )

@@ -67,6 +67,8 @@ type Channel interface {
 	// boolean, otherwise the return value will be false. Channel
 	// requests are out-of-band messages so they may be sent even
 	// if the data stream is closed or blocked by flow control.
+	// If the channel is closed before a reply is returned, io.EOF
+	// is returned.
 	SendRequest(name string, wantReply bool, payload []byte) (bool, error)
 
 	// Stderr returns an io.ReadWriter that writes to this channel
@@ -217,7 +219,7 @@ func (c *channel) writePacket(packet []byte) error {
 
 func (c *channel) sendMessage(msg interface{}) error {
 	if debugMux {
-		log.Printf("send %d: %#v", c.mux.chanList.offset, msg)
+		log.Printf("send(%d): %#v", c.mux.chanList.offset, msg)
 	}
 
 	p := Marshal(msg)
@@ -371,7 +373,7 @@ func (c *channel) close() {
 	close(c.msg)
 	close(c.incomingRequests)
 	c.writeMu.Lock()
-	// This is not necesary for a normal channel teardown, but if
+	// This is not necessary for a normal channel teardown, but if
 	// there was another error, it is.
 	c.sentClose = true
 	c.writeMu.Unlock()
@@ -459,8 +461,8 @@ func (m *mux) newChannel(chanType string, direction channelDirection, extraData 
 		pending:          newBuffer(),
 		extPending:       newBuffer(),
 		direction:        direction,
-		incomingRequests: make(chan *Request, 16),
-		msg:              make(chan interface{}, 16),
+		incomingRequests: make(chan *Request, chanSize),
+		msg:              make(chan interface{}, chanSize),
 		chanType:         chanType,
 		extraData:        extraData,
 		mux:              m,

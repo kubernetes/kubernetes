@@ -12,6 +12,7 @@ import (
 	"html/template"
 	"log"
 	"math"
+	"sync"
 
 	"golang.org/x/net/internal/timeseries"
 )
@@ -320,15 +321,20 @@ func (h *histogram) newData() *data {
 
 func (h *histogram) html() template.HTML {
 	buf := new(bytes.Buffer)
-	if err := distTmpl.Execute(buf, h.newData()); err != nil {
+	if err := distTmpl().Execute(buf, h.newData()); err != nil {
 		buf.Reset()
 		log.Printf("net/trace: couldn't execute template: %v", err)
 	}
 	return template.HTML(buf.String())
 }
 
-// Input: data
-var distTmpl = template.Must(template.New("distTmpl").Parse(`
+var distTmplCache *template.Template
+var distTmplOnce sync.Once
+
+func distTmpl() *template.Template {
+	distTmplOnce.Do(func() {
+		// Input: data
+		distTmplCache = template.Must(template.New("distTmpl").Parse(`
 <table>
 <tr>
     <td style="padding:0.25em">Count: {{.Count}}</td>
@@ -354,3 +360,6 @@ var distTmpl = template.Must(template.New("distTmpl").Parse(`
 {{end}}
 </table>
 `))
+	})
+	return distTmplCache
+}

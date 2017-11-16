@@ -13,6 +13,7 @@
 // See https://http2.github.io/ for more information on HTTP/2.
 //
 // See https://http2.golang.org/ for a test server running this code.
+//
 package http2
 
 import (
@@ -23,15 +24,19 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
+
+	"golang.org/x/net/lex/httplex"
 )
 
 var (
 	VerboseLogs    bool
 	logFrameWrites bool
 	logFrameReads  bool
+	inTests        bool
 )
 
 func init() {
@@ -73,13 +78,23 @@ var (
 
 type streamState int
 
+// HTTP/2 stream states.
+//
+// See http://tools.ietf.org/html/rfc7540#section-5.1.
+//
+// For simplicity, the server code merges "reserved (local)" into
+// "half-closed (remote)". This is one less state transition to track.
+// The only downside is that we send PUSH_PROMISEs slightly less
+// liberally than allowable. More discussion here:
+// https://lists.w3.org/Archives/Public/ietf-http-wg/2016JulSep/0599.html
+//
+// "reserved (remote)" is omitted since the client code does not
+// support server push.
 const (
 	stateIdle streamState = iota
 	stateOpen
 	stateHalfClosedLocal
 	stateHalfClosedRemote
-	stateResvLocal
-	stateResvRemote
 	stateClosed
 )
 
@@ -88,8 +103,6 @@ var stateName = [...]string{
 	stateOpen:             "Open",
 	stateHalfClosedLocal:  "HalfClosedLocal",
 	stateHalfClosedRemote: "HalfClosedRemote",
-	stateResvLocal:        "ResvLocal",
-	stateResvRemote:       "ResvRemote",
 	stateClosed:           "Closed",
 }
 
@@ -165,57 +178,23 @@ var (
 	errInvalidHeaderFieldValue = errors.New("http2: invalid header field value")
 )
 
-// validHeaderFieldName reports whether v is a valid header field name (key).
-//  RFC 7230 says:
-//   header-field   = field-name ":" OWS field-value OWS
-//   field-name     = token
-//   tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "." /
-//           "^" / "_" / "
+// validWireHeaderFieldName reports whether v is a valid header field
+// name (key). See httplex.ValidHeaderName for the base rules.
+//
 // Further, http2 says:
 //   "Just as in HTTP/1.x, header field names are strings of ASCII
 //   characters that are compared in a case-insensitive
 //   fashion. However, header field names MUST be converted to
 //   lowercase prior to their encoding in HTTP/2. "
-func validHeaderFieldName(v string) bool {
+func validWireHeaderFieldName(v string) bool {
 	if len(v) == 0 {
 		return false
 	}
 	for _, r := range v {
-		if int(r) >= len(isTokenTable) || ('A' <= r && r <= 'Z') {
+		if !httplex.IsTokenRune(r) {
 			return false
 		}
-		if !isTokenTable[byte(r)] {
-			return false
-		}
-	}
-	return true
-}
-
-// validHeaderFieldValue reports whether v is a valid header field value.
-//
-// RFC 7230 says:
-//  field-value    = *( field-content / obs-fold )
-//  obj-fold       =  N/A to http2, and deprecated
-//  field-content  = field-vchar [ 1*( SP / HTAB ) field-vchar ]
-//  field-vchar    = VCHAR / obs-text
-//  obs-text       = %x80-FF
-//  VCHAR          = "any visible [USASCII] character"
-//
-// http2 further says: "Similarly, HTTP/2 allows header field values
-// that are not valid. While most of the values that can be encoded
-// will not alter header field parsing, carriage return (CR, ASCII
-// 0xd), line feed (LF, ASCII 0xa), and the zero character (NUL, ASCII
-// 0x0) might be exploited by an attacker if they are translated
-// verbatim. Any request or response that contains a character not
-// permitted in a header field value MUST be treated as malformed
-// (Section 8.1.2.6). Valid characters are defined by the
-// field-content ABNF rule in Section 3.2 of [RFC7230]."
-//
-// This function does not (yet?) properly handle the rejection of
-// strings that begin or end with SP or HTAB.
-func validHeaderFieldValue(v string) bool {
-	for i := 0; i < len(v); i++ {
-		if b := v[i]; b < ' ' && b != '\t' || b == 0x7f {
+		if 'A' <= r && r <= 'Z' {
 			return false
 		}
 	}
@@ -283,12 +262,25 @@ func newBufferedWriter(w io.Writer) *bufferedWriter {
 	return &bufferedWriter{w: w}
 }
 
+// bufWriterPoolBufferSize is the size of bufio.Writer's
+// buffers created using bufWriterPool.
+//
+// TODO: pick a less arbitrary value? this is a bit under
+// (3 x typical 1500 byte MTU) at least. Other than that,
+// not much thought went into it.
+const bufWriterPoolBufferSize = 4 << 10
+
 var bufWriterPool = sync.Pool{
 	New: func() interface{} {
-		// TODO: pick something better? this is a bit under
-		// (3 x typical 1500 byte MTU) at least.
-		return bufio.NewWriterSize(nil, 4<<10)
+		return bufio.NewWriterSize(nil, bufWriterPoolBufferSize)
 	},
+}
+
+func (w *bufferedWriter) Available() int {
+	if w.bw == nil {
+		return bufWriterPoolBufferSize
+	}
+	return w.bw.Available()
 }
 
 func (w *bufferedWriter) Write(p []byte) (n int, err error) {
@@ -320,7 +312,7 @@ func mustUint31(v int32) uint32 {
 }
 
 // bodyAllowedForStatus reports whether a given response status code
-// permits a body. See RFC2616, section 4.4.
+// permits a body. See RFC 2616, section 4.4.
 func bodyAllowedForStatus(status int) bool {
 	switch {
 	case status >= 100 && status <= 199:
@@ -344,86 +336,56 @@ func (e *httpError) Temporary() bool { return true }
 
 var errTimeout error = &httpError{msg: "http2: timeout awaiting response headers", timeout: true}
 
-var isTokenTable = [127]bool{
-	'!':  true,
-	'#':  true,
-	'$':  true,
-	'%':  true,
-	'&':  true,
-	'\'': true,
-	'*':  true,
-	'+':  true,
-	'-':  true,
-	'.':  true,
-	'0':  true,
-	'1':  true,
-	'2':  true,
-	'3':  true,
-	'4':  true,
-	'5':  true,
-	'6':  true,
-	'7':  true,
-	'8':  true,
-	'9':  true,
-	'A':  true,
-	'B':  true,
-	'C':  true,
-	'D':  true,
-	'E':  true,
-	'F':  true,
-	'G':  true,
-	'H':  true,
-	'I':  true,
-	'J':  true,
-	'K':  true,
-	'L':  true,
-	'M':  true,
-	'N':  true,
-	'O':  true,
-	'P':  true,
-	'Q':  true,
-	'R':  true,
-	'S':  true,
-	'T':  true,
-	'U':  true,
-	'W':  true,
-	'V':  true,
-	'X':  true,
-	'Y':  true,
-	'Z':  true,
-	'^':  true,
-	'_':  true,
-	'`':  true,
-	'a':  true,
-	'b':  true,
-	'c':  true,
-	'd':  true,
-	'e':  true,
-	'f':  true,
-	'g':  true,
-	'h':  true,
-	'i':  true,
-	'j':  true,
-	'k':  true,
-	'l':  true,
-	'm':  true,
-	'n':  true,
-	'o':  true,
-	'p':  true,
-	'q':  true,
-	'r':  true,
-	's':  true,
-	't':  true,
-	'u':  true,
-	'v':  true,
-	'w':  true,
-	'x':  true,
-	'y':  true,
-	'z':  true,
-	'|':  true,
-	'~':  true,
-}
-
 type connectionStater interface {
 	ConnectionState() tls.ConnectionState
+}
+
+var sorterPool = sync.Pool{New: func() interface{} { return new(sorter) }}
+
+type sorter struct {
+	v []string // owned by sorter
+}
+
+func (s *sorter) Len() int           { return len(s.v) }
+func (s *sorter) Swap(i, j int)      { s.v[i], s.v[j] = s.v[j], s.v[i] }
+func (s *sorter) Less(i, j int) bool { return s.v[i] < s.v[j] }
+
+// Keys returns the sorted keys of h.
+//
+// The returned slice is only valid until s used again or returned to
+// its pool.
+func (s *sorter) Keys(h http.Header) []string {
+	keys := s.v[:0]
+	for k := range h {
+		keys = append(keys, k)
+	}
+	s.v = keys
+	sort.Sort(s)
+	return keys
+}
+
+func (s *sorter) SortStrings(ss []string) {
+	// Our sorter works on s.v, which sorter owns, so
+	// stash it away while we sort the user's buffer.
+	save := s.v
+	s.v = ss
+	sort.Sort(s)
+	s.v = save
+}
+
+// validPseudoPath reports whether v is a valid :path pseudo-header
+// value. It must be either:
+//
+//     *) a non-empty string starting with '/'
+//     *) the string '*', for OPTIONS requests.
+//
+// For now this is only used a quick check for deciding when to clean
+// up Opaque URLs before sending requests from the Transport.
+// See golang.org/issue/16847
+//
+// We used to enforce that the path also didn't start with "//", but
+// Google's GFE accepts such paths and Chrome sends them, so ignore
+// that part of the spec. See golang.org/issue/19103.
+func validPseudoPath(v string) bool {
+	return (len(v) > 0 && v[0] == '/') || v == "*"
 }

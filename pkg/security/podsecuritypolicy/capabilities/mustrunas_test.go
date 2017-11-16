@@ -17,20 +17,23 @@ limitations under the License.
 package capabilities
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"reflect"
 	"testing"
+
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 func TestGenerateAdds(t *testing.T) {
 	tests := map[string]struct {
-		defaultAddCaps   []api.Capability
-		requiredDropCaps []api.Capability
-		containerCaps    *api.Capabilities
-		expectedCaps     *api.Capabilities
+		defaultAddCaps []api.Capability
+		containerCaps  *api.Capabilities
+		expectedCaps   *api.Capabilities
 	}{
-		"no required, no container requests": {
-			expectedCaps: nil,
+		"no required, no container requests": {},
+		"no required, no container requests, non-nil": {
+			containerCaps: &api.Capabilities{},
+			expectedCaps:  &api.Capabilities{},
 		},
 		"required, no container requests": {
 			defaultAddCaps: []api.Capability{"foo"},
@@ -65,13 +68,22 @@ func TestGenerateAdds(t *testing.T) {
 				Add: []api.Capability{"bar", "foo"},
 			},
 		},
-		"generation dedupes": {
-			defaultAddCaps: []api.Capability{"foo", "foo", "foo", "foo"},
+		"generation does not mutate unnecessarily": {
+			defaultAddCaps: []api.Capability{"foo", "bar"},
 			containerCaps: &api.Capabilities{
-				Add: []api.Capability{"foo", "foo", "foo"},
+				Add: []api.Capability{"foo", "foo", "bar", "baz"},
 			},
 			expectedCaps: &api.Capabilities{
-				Add: []api.Capability{"foo"},
+				Add: []api.Capability{"foo", "foo", "bar", "baz"},
+			},
+		},
+		"generation dedupes": {
+			defaultAddCaps: []api.Capability{"foo", "bar"},
+			containerCaps: &api.Capabilities{
+				Add: []api.Capability{"foo", "baz"},
+			},
+			expectedCaps: &api.Capabilities{
+				Add: []api.Capability{"bar", "baz", "foo"},
 			},
 		},
 		"generation is case sensitive - will not dedupe": {
@@ -92,7 +104,7 @@ func TestGenerateAdds(t *testing.T) {
 			},
 		}
 
-		strategy, err := NewDefaultCapabilities(v.defaultAddCaps, v.requiredDropCaps, nil)
+		strategy, err := NewDefaultCapabilities(v.defaultAddCaps, nil, nil)
 		if err != nil {
 			t.Errorf("%s failed: %v", k, err)
 			continue
@@ -122,6 +134,10 @@ func TestGenerateDrops(t *testing.T) {
 		"no required, no container requests": {
 			expectedCaps: nil,
 		},
+		"no required, no container requests, non-nil": {
+			containerCaps: &api.Capabilities{},
+			expectedCaps:  &api.Capabilities{},
+		},
 		"required drops are defaulted": {
 			requiredDropCaps: []api.Capability{"foo"},
 			expectedCaps: &api.Capabilities{
@@ -129,12 +145,21 @@ func TestGenerateDrops(t *testing.T) {
 			},
 		},
 		"required drops are defaulted when making container requests": {
-			requiredDropCaps: []api.Capability{"foo"},
+			requiredDropCaps: []api.Capability{"baz"},
 			containerCaps: &api.Capabilities{
 				Drop: []api.Capability{"foo", "bar"},
 			},
 			expectedCaps: &api.Capabilities{
-				Drop: []api.Capability{"bar", "foo"},
+				Drop: []api.Capability{"bar", "baz", "foo"},
+			},
+		},
+		"required drops do not mutate unnecessarily": {
+			requiredDropCaps: []api.Capability{"baz"},
+			containerCaps: &api.Capabilities{
+				Drop: []api.Capability{"foo", "bar", "baz"},
+			},
+			expectedCaps: &api.Capabilities{
+				Drop: []api.Capability{"foo", "bar", "baz"},
 			},
 		},
 		"can drop a required add": {
@@ -168,12 +193,12 @@ func TestGenerateDrops(t *testing.T) {
 			},
 		},
 		"generation dedupes": {
-			requiredDropCaps: []api.Capability{"bar", "bar", "bar", "bar"},
+			requiredDropCaps: []api.Capability{"baz", "foo"},
 			containerCaps: &api.Capabilities{
-				Drop: []api.Capability{"bar", "bar", "bar"},
+				Drop: []api.Capability{"bar", "foo"},
 			},
 			expectedCaps: &api.Capabilities{
-				Drop: []api.Capability{"bar"},
+				Drop: []api.Capability{"bar", "baz", "foo"},
 			},
 		},
 		"generation is case sensitive - will not dedupe": {
@@ -215,23 +240,19 @@ func TestGenerateDrops(t *testing.T) {
 
 func TestValidateAdds(t *testing.T) {
 	tests := map[string]struct {
-		defaultAddCaps   []api.Capability
-		requiredDropCaps []api.Capability
-		allowedCaps      []api.Capability
-		containerCaps    *api.Capabilities
-		shouldPass       bool
+		defaultAddCaps []api.Capability
+		allowedCaps    []api.Capability
+		containerCaps  *api.Capabilities
+		expectedError  string
 	}{
 		// no container requests
-		"no required, no allowed, no container requests": {
-			shouldPass: true,
-		},
+		"no required, no allowed, no container requests": {},
 		"no required, allowed, no container requests": {
 			allowedCaps: []api.Capability{"foo"},
-			shouldPass:  true,
 		},
 		"required, no allowed, no container requests": {
 			defaultAddCaps: []api.Capability{"foo"},
-			shouldPass:     false,
+			expectedError:  `capabilities: Invalid value: "null": required capabilities are not set on the securityContext`,
 		},
 
 		// container requests match required
@@ -240,14 +261,13 @@ func TestValidateAdds(t *testing.T) {
 			containerCaps: &api.Capabilities{
 				Add: []api.Capability{"foo"},
 			},
-			shouldPass: true,
 		},
 		"required, no allowed, container requests invalid": {
 			defaultAddCaps: []api.Capability{"foo"},
 			containerCaps: &api.Capabilities{
 				Add: []api.Capability{"bar"},
 			},
-			shouldPass: false,
+			expectedError: `capabilities.add: Invalid value: "bar": capability may not be added`,
 		},
 
 		// container requests match allowed
@@ -256,14 +276,19 @@ func TestValidateAdds(t *testing.T) {
 			containerCaps: &api.Capabilities{
 				Add: []api.Capability{"foo"},
 			},
-			shouldPass: true,
+		},
+		"no required, all allowed, container requests valid": {
+			allowedCaps: []api.Capability{extensions.AllowAllCapabilities},
+			containerCaps: &api.Capabilities{
+				Add: []api.Capability{"foo"},
+			},
 		},
 		"no required, allowed, container requests invalid": {
 			allowedCaps: []api.Capability{"foo"},
 			containerCaps: &api.Capabilities{
 				Add: []api.Capability{"bar"},
 			},
-			shouldPass: false,
+			expectedError: `capabilities.add: Invalid value: "bar": capability may not be added`,
 		},
 
 		// required and allowed
@@ -273,7 +298,6 @@ func TestValidateAdds(t *testing.T) {
 			containerCaps: &api.Capabilities{
 				Add: []api.Capability{"foo"},
 			},
-			shouldPass: true,
 		},
 		"required, allowed, container requests valid allowed": {
 			defaultAddCaps: []api.Capability{"foo"},
@@ -281,7 +305,6 @@ func TestValidateAdds(t *testing.T) {
 			containerCaps: &api.Capabilities{
 				Add: []api.Capability{"bar"},
 			},
-			shouldPass: true,
 		},
 		"required, allowed, container requests invalid": {
 			defaultAddCaps: []api.Capability{"foo"},
@@ -289,54 +312,53 @@ func TestValidateAdds(t *testing.T) {
 			containerCaps: &api.Capabilities{
 				Add: []api.Capability{"baz"},
 			},
-			shouldPass: false,
+			expectedError: `capabilities.add: Invalid value: "baz": capability may not be added`,
 		},
 		"validation is case sensitive": {
 			defaultAddCaps: []api.Capability{"foo"},
 			containerCaps: &api.Capabilities{
 				Add: []api.Capability{"FOO"},
 			},
-			shouldPass: false,
+			expectedError: `capabilities.add: Invalid value: "FOO": capability may not be added`,
 		},
 	}
 
 	for k, v := range tests {
-		container := &api.Container{
-			SecurityContext: &api.SecurityContext{
-				Capabilities: v.containerCaps,
-			},
-		}
-
-		strategy, err := NewDefaultCapabilities(v.defaultAddCaps, v.requiredDropCaps, v.allowedCaps)
+		strategy, err := NewDefaultCapabilities(v.defaultAddCaps, nil, v.allowedCaps)
 		if err != nil {
 			t.Errorf("%s failed: %v", k, err)
 			continue
 		}
-		errs := strategy.Validate(nil, container)
-		if v.shouldPass && len(errs) > 0 {
+		errs := strategy.Validate(nil, nil, v.containerCaps)
+		if v.expectedError == "" && len(errs) > 0 {
 			t.Errorf("%s should have passed but had errors %v", k, errs)
 			continue
 		}
-		if !v.shouldPass && len(errs) == 0 {
-			t.Errorf("%s should have failed but recieved no errors", k)
+		if v.expectedError != "" && len(errs) == 0 {
+			t.Errorf("%s should have failed but received no errors", k)
+			continue
+		}
+		if len(errs) == 1 && errs[0].Error() != v.expectedError {
+			t.Errorf("%s should have failed with %v but received %v", k, v.expectedError, errs[0])
+			continue
+		}
+		if len(errs) > 1 {
+			t.Errorf("%s should have failed with at most one error, but received %v: %v", k, len(errs), errs)
 		}
 	}
 }
 
 func TestValidateDrops(t *testing.T) {
 	tests := map[string]struct {
-		defaultAddCaps   []api.Capability
 		requiredDropCaps []api.Capability
 		containerCaps    *api.Capabilities
-		shouldPass       bool
+		expectedError    string
 	}{
 		// no container requests
-		"no required, no container requests": {
-			shouldPass: true,
-		},
+		"no required, no container requests": {},
 		"required, no container requests": {
 			requiredDropCaps: []api.Capability{"foo"},
-			shouldPass:       false,
+			expectedError:    `capabilities: Invalid value: "null": required capabilities are not set on the securityContext`,
 		},
 
 		// container requests match required
@@ -345,43 +367,44 @@ func TestValidateDrops(t *testing.T) {
 			containerCaps: &api.Capabilities{
 				Drop: []api.Capability{"foo"},
 			},
-			shouldPass: true,
 		},
 		"required, container requests invalid": {
 			requiredDropCaps: []api.Capability{"foo"},
 			containerCaps: &api.Capabilities{
 				Drop: []api.Capability{"bar"},
 			},
-			shouldPass: false,
+			expectedError: `capabilities.drop: Invalid value: []core.Capability{"bar"}: foo is required to be dropped but was not found`,
 		},
 		"validation is case sensitive": {
 			requiredDropCaps: []api.Capability{"foo"},
 			containerCaps: &api.Capabilities{
 				Drop: []api.Capability{"FOO"},
 			},
-			shouldPass: false,
+			expectedError: `capabilities.drop: Invalid value: []core.Capability{"FOO"}: foo is required to be dropped but was not found`,
 		},
 	}
 
 	for k, v := range tests {
-		container := &api.Container{
-			SecurityContext: &api.SecurityContext{
-				Capabilities: v.containerCaps,
-			},
-		}
-
-		strategy, err := NewDefaultCapabilities(v.defaultAddCaps, v.requiredDropCaps, nil)
+		strategy, err := NewDefaultCapabilities(nil, v.requiredDropCaps, nil)
 		if err != nil {
 			t.Errorf("%s failed: %v", k, err)
 			continue
 		}
-		errs := strategy.Validate(nil, container)
-		if v.shouldPass && len(errs) > 0 {
+		errs := strategy.Validate(nil, nil, v.containerCaps)
+		if v.expectedError == "" && len(errs) > 0 {
 			t.Errorf("%s should have passed but had errors %v", k, errs)
 			continue
 		}
-		if !v.shouldPass && len(errs) == 0 {
-			t.Errorf("%s should have failed but recieved no errors", k)
+		if v.expectedError != "" && len(errs) == 0 {
+			t.Errorf("%s should have failed but received no errors", k)
+			continue
+		}
+		if len(errs) == 1 && errs[0].Error() != v.expectedError {
+			t.Errorf("%s should have failed with %v but received %v", k, v.expectedError, errs[0])
+			continue
+		}
+		if len(errs) > 1 {
+			t.Errorf("%s should have failed with at most one error, but received %v: %v", k, len(errs), errs)
 		}
 	}
 }

@@ -21,8 +21,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/golang/glog"
 )
@@ -36,7 +36,7 @@ type fsResourceAnalyzerInterface interface {
 	GetPodVolumeStats(uid types.UID) (PodVolumeStats, bool)
 }
 
-// diskResourceAnalyzer provider stats about fs resource usage
+// fsResourceAnalyzer provides stats about fs resource usage
 type fsResourceAnalyzer struct {
 	statsProvider     StatsProvider
 	calcPeriod        time.Duration

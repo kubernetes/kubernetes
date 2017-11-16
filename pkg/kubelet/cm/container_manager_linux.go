@@ -19,32 +19,45 @@ limitations under the License.
 package cm
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/blang/semver"
 	"github.com/golang/glog"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
+
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
-	"k8s.io/kubernetes/pkg/util"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/deviceplugin"
+	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
+	"k8s.io/kubernetes/pkg/kubelet/status"
+	utilfile "k8s.io/kubernetes/pkg/util/file"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
-	"k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/procfs"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
-	"k8s.io/kubernetes/pkg/util/wait"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 const (
@@ -63,7 +76,7 @@ const (
 
 var (
 	// The docker version in which containerd was introduced.
-	containerdVersion = semver.MustParse("1.11.0")
+	containerdAPIVersion = utilversion.MustParseGeneric("1.23")
 )
 
 // A non-user container tracked by the Kubelet.
@@ -97,7 +110,27 @@ type containerManagerImpl struct {
 	status Status
 	// External containers being managed.
 	systemContainers []*systemContainer
-	periodicTasks    []func()
+	qosContainers    QOSContainersInfo
+	// Tasks that are run periodically
+	periodicTasks []func()
+	// holds all the mounted cgroup subsystems
+	subsystems *CgroupSubsystems
+	nodeInfo   *v1.Node
+	// Interface for cgroup management
+	cgroupManager CgroupManager
+	// Capacity of this node.
+	capacity v1.ResourceList
+	// Absolute cgroupfs path to a cgroup that Kubelet needs to place all pods under.
+	// This path include a top level container for enforcing Node Allocatable.
+	cgroupRoot string
+	// Event recorder interface.
+	recorder record.EventRecorder
+	// Interface for QoS cgroup management
+	qosContainerManager QOSContainerManager
+	// Interface for exporting and allocating devices reported by device plugins.
+	devicePluginHandler deviceplugin.Handler
+	// Interface for CPU affinity management.
+	cpuManager cpumanager.Manager
 }
 
 type features struct {
@@ -143,11 +176,11 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 
 	// Check if cpu quota is available.
 	// CPU cgroup is required and so it expected to be mounted at this point.
-	periodExists, err := util.FileExists(path.Join(cpuMountPoint, "cpu.cfs_period_us"))
+	periodExists, err := utilfile.FileExists(path.Join(cpuMountPoint, "cpu.cfs_period_us"))
 	if err != nil {
 		glog.Errorf("failed to detect if CPU cgroup cpu.cfs_period_us is available - %v", err)
 	}
-	quotaExists, err := util.FileExists(path.Join(cpuMountPoint, "cpu.cfs_quota_us"))
+	quotaExists, err := utilfile.FileExists(path.Join(cpuMountPoint, "cpu.cfs_quota_us"))
 	if err != nil {
 		glog.Errorf("failed to detect if CPU cgroup cpu.cfs_quota_us is available - %v", err)
 	}
@@ -160,28 +193,149 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig) (ContainerManager, error) {
-	return &containerManagerImpl{
-		cadvisorInterface: cadvisorInterface,
-		mountUtil:         mountUtil,
-		NodeConfig:        nodeConfig,
-	}, nil
+func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, devicePluginEnabled bool, recorder record.EventRecorder) (ContainerManager, error) {
+	subsystems, err := GetCgroupSubsystems()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
+	}
+
+	// Check whether swap is enabled. The Kubelet does not support running with swap enabled.
+	swapData, err := ioutil.ReadFile("/proc/swaps")
+	if err != nil {
+		return nil, err
+	}
+	swapData = bytes.TrimSpace(swapData) // extra trailing \n
+	swapLines := strings.Split(string(swapData), "\n")
+
+	// If there is more than one line (table headers) in /proc/swaps, swap is enabled and we should
+	// error out unless --fail-swap-on is set to false.
+	if failSwapOn && len(swapLines) > 1 {
+		return nil, fmt.Errorf("Running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false. /proc/swaps contained: %v", swapLines)
+	}
+	var capacity = v1.ResourceList{}
+	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
+	// machine info is computed and cached once as part of cAdvisor object creation.
+	// But `RootFsInfo` and `ImagesFsInfo` are not available at this moment so they will be called later during manager starts
+	machineInfo, err := cadvisorInterface.MachineInfo()
+	if err != nil {
+		return nil, err
+	}
+	capacity = cadvisor.CapacityFromMachineInfo(machineInfo)
+
+	cgroupRoot := nodeConfig.CgroupRoot
+	cgroupManager := NewCgroupManager(subsystems, nodeConfig.CgroupDriver)
+	// Check if Cgroup-root actually exists on the node
+	if nodeConfig.CgroupsPerQOS {
+		// this does default to / when enabled, but this tests against regressions.
+		if nodeConfig.CgroupRoot == "" {
+			return nil, fmt.Errorf("invalid configuration: cgroups-per-qos was specified and cgroup-root was not specified. To enable the QoS cgroup hierarchy you need to specify a valid cgroup-root")
+		}
+
+		// we need to check that the cgroup root actually exists for each subsystem
+		// of note, we always use the cgroupfs driver when performing this check since
+		// the input is provided in that format.
+		// this is important because we do not want any name conversion to occur.
+		if !cgroupManager.Exists(CgroupName(cgroupRoot)) {
+			return nil, fmt.Errorf("invalid configuration: cgroup-root %q doesn't exist: %v", cgroupRoot, err)
+		}
+		glog.Infof("container manager verified user specified cgroup-root exists: %v", cgroupRoot)
+		// Include the top level cgroup for enforcing node allocatable into cgroup-root.
+		// This way, all sub modules can avoid having to understand the concept of node allocatable.
+		cgroupRoot = path.Join(cgroupRoot, defaultNodeAllocatableCgroupName)
+	}
+	glog.Infof("Creating Container Manager object based on Node Config: %+v", nodeConfig)
+
+	qosContainerManager, err := NewQOSContainerManager(subsystems, cgroupRoot, nodeConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	cm := &containerManagerImpl{
+		cadvisorInterface:   cadvisorInterface,
+		mountUtil:           mountUtil,
+		NodeConfig:          nodeConfig,
+		subsystems:          subsystems,
+		cgroupManager:       cgroupManager,
+		capacity:            capacity,
+		cgroupRoot:          cgroupRoot,
+		recorder:            recorder,
+		qosContainerManager: qosContainerManager,
+	}
+
+	updateDeviceCapacityFunc := func(updates v1.ResourceList) {
+		cm.Lock()
+		defer cm.Unlock()
+		for k, v := range updates {
+			if v.Value() <= 0 {
+				delete(cm.capacity, k)
+			} else {
+				cm.capacity[k] = v
+			}
+		}
+	}
+
+	glog.Infof("Creating device plugin handler: %t", devicePluginEnabled)
+	if devicePluginEnabled {
+		cm.devicePluginHandler, err = deviceplugin.NewHandlerImpl(updateDeviceCapacityFunc)
+	} else {
+		cm.devicePluginHandler, err = deviceplugin.NewHandlerStub()
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize CPU manager
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
+		cm.cpuManager, err = cpumanager.NewManager(
+			nodeConfig.ExperimentalCPUManagerPolicy,
+			nodeConfig.ExperimentalCPUManagerReconcilePeriod,
+			machineInfo,
+			cm.GetNodeAllocatableReservation(),
+			nodeConfig.KubeletRootDir,
+		)
+		if err != nil {
+			glog.Errorf("failed to initialize cpu manager: %v", err)
+			return nil, err
+		}
+	}
+
+	return cm, nil
+}
+
+// NewPodContainerManager is a factory method returns a PodContainerManager object
+// If qosCgroups are enabled then it returns the general pod container manager
+// otherwise it returns a no-op manager which essentially does nothing
+func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
+	if cm.NodeConfig.CgroupsPerQOS {
+		return &podContainerManagerImpl{
+			qosContainersInfo: cm.GetQOSContainersInfo(),
+			subsystems:        cm.subsystems,
+			cgroupManager:     cm.cgroupManager,
+		}
+	}
+	return &podContainerManagerNoop{
+		cgroupRoot: CgroupName(cm.cgroupRoot),
+	}
+}
+
+func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLifecycle {
+	return &internalContainerLifecycleImpl{cm.cpuManager}
 }
 
 // Create a cgroup container manager.
 func createManager(containerName string) *fs.Manager {
+	allowAllDevices := true
 	return &fs.Manager{
 		Cgroups: &configs.Cgroup{
 			Parent: "/",
 			Name:   containerName,
 			Resources: &configs.Resources{
-				AllowAllDevices: true,
+				AllowAllDevices: &allowAllDevices,
 			},
 		},
 	}
 }
 
-// TODO: plumb this up as a flag to Kubelet in a future PR
 type KernelTunableBehavior string
 
 const (
@@ -198,11 +352,15 @@ func setupKernelTunables(option KernelTunableBehavior) error {
 		utilsysctl.VmPanicOnOOM:       utilsysctl.VmPanicOnOOMInvokeOOMKiller,
 		utilsysctl.KernelPanic:        utilsysctl.KernelPanicRebootTimeout,
 		utilsysctl.KernelPanicOnOops:  utilsysctl.KernelPanicOnOopsAlways,
+		utilsysctl.RootMaxKeys:        utilsysctl.RootMaxKeysSetting,
+		utilsysctl.RootMaxBytes:       utilsysctl.RootMaxBytesSetting,
 	}
+
+	sysctl := utilsysctl.New()
 
 	errList := []error{}
 	for flag, expectedValue := range desiredState {
-		val, err := utilsysctl.GetSysctl(flag)
+		val, err := sysctl.GetSysctl(flag)
 		if err != nil {
 			errList = append(errList, err)
 			continue
@@ -218,7 +376,7 @@ func setupKernelTunables(option KernelTunableBehavior) error {
 			glog.V(2).Infof("Invalid kernel flag: %v, expected value: %v, actual value: %v", flag, expectedValue, val)
 		case KernelTunableModify:
 			glog.V(2).Infof("Updating kernel flag: %v, expected value: %v, actual value: %v", flag, expectedValue, val)
-			err = utilsysctl.SetSysctl(flag, expectedValue)
+			err = sysctl.SetSysctl(flag, expectedValue)
 			if err != nil {
 				errList = append(errList, err)
 			}
@@ -227,7 +385,7 @@ func setupKernelTunables(option KernelTunableBehavior) error {
 	return utilerrors.NewAggregate(errList)
 }
 
-func (cm *containerManagerImpl) setupNode() error {
+func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 	f, err := validateSystemRequirements(cm.mountUtil)
 	if err != nil {
 		return err
@@ -235,58 +393,51 @@ func (cm *containerManagerImpl) setupNode() error {
 	if !f.cpuHardcapping {
 		cm.status.SoftRequirements = fmt.Errorf("CPU hardcapping unsupported")
 	}
-	// TODO: plumb kernel tunable options into container manager, right now, we modify by default
-	if err := setupKernelTunables(KernelTunableModify); err != nil {
+	b := KernelTunableModify
+	if cm.GetNodeConfig().ProtectKernelDefaults {
+		b = KernelTunableError
+	}
+	if err := setupKernelTunables(b); err != nil {
+		return err
+	}
+
+	// Setup top level qos containers only if CgroupsPerQOS flag is specified as true
+	if cm.NodeConfig.CgroupsPerQOS {
+		if err := cm.createNodeAllocatableCgroups(); err != nil {
+			return err
+		}
+		err = cm.qosContainerManager.Start(cm.getNodeAllocatableAbsolute, activePods)
+		if err != nil {
+			return fmt.Errorf("failed to initialize top level QOS containers: %v", err)
+		}
+	}
+
+	// Enforce Node Allocatable (if required)
+	if err := cm.enforceNodeAllocatableCgroups(); err != nil {
 		return err
 	}
 
 	systemContainers := []*systemContainer{}
 	if cm.ContainerRuntime == "docker" {
-		if cm.RuntimeCgroupsName != "" {
-			cont := newSystemCgroups(cm.RuntimeCgroupsName)
-			info, err := cm.cadvisorInterface.MachineInfo()
-			var capacity = api.ResourceList{}
+		// With the docker-CRI integration, dockershim will manage the cgroups
+		// and oom score for the docker processes.
+		// In the future, NodeSpec should mandate the cgroup that the
+		// runtime processes need to be in. For now, we still check the
+		// cgroup for docker periodically, so that kubelet can recognize
+		// the cgroup for docker and serve stats for the runtime.
+		// TODO(#27097): Fix this after NodeSpec is clearly defined.
+		cm.periodicTasks = append(cm.periodicTasks, func() {
+			glog.V(4).Infof("[ContainerManager]: Adding periodic tasks for docker CRI integration")
+			cont, err := getContainerNameForProcess(dockerProcessName, dockerPidFile)
 			if err != nil {
-			} else {
-				capacity = cadvisor.CapacityFromMachineInfo(info)
+				glog.Error(err)
+				return
 			}
-			memoryLimit := (int64(capacity.Memory().Value() * DockerMemoryLimitThresholdPercent / 100))
-			if memoryLimit < MinDockerMemoryLimit {
-				glog.Warningf("Memory limit %d for container %s is too small, reset it to %d", memoryLimit, cm.RuntimeCgroupsName, MinDockerMemoryLimit)
-				memoryLimit = MinDockerMemoryLimit
-			}
-
-			glog.V(2).Infof("Configure resource-only container %s with memory limit: %d", cm.RuntimeCgroupsName, memoryLimit)
-
-			dockerContainer := &fs.Manager{
-				Cgroups: &configs.Cgroup{
-					Parent: "/",
-					Name:   cm.RuntimeCgroupsName,
-					Resources: &configs.Resources{
-						Memory:          memoryLimit,
-						MemorySwap:      -1,
-						AllowAllDevices: true,
-					},
-				},
-			}
-			dockerVersion := getDockerVersion(cm.cadvisorInterface)
-			cont.ensureStateFunc = func(manager *fs.Manager) error {
-				return ensureDockerInContainer(dockerVersion, -900, dockerContainer)
-			}
-			systemContainers = append(systemContainers, cont)
-		} else {
-			cm.periodicTasks = append(cm.periodicTasks, func() {
-				cont, err := getContainerNameForProcess(dockerProcessName, dockerPidFile)
-				if err != nil {
-					glog.Error(err)
-					return
-				}
-				glog.V(2).Infof("Discovered runtime cgroups name: %s", cont)
-				cm.Lock()
-				defer cm.Unlock()
-				cm.RuntimeCgroupsName = cont
-			})
-		}
+			glog.V(2).Infof("[ContainerManager]: Discovered runtime cgroups name: %s", cont)
+			cm.Lock()
+			defer cm.Unlock()
+			cm.RuntimeCgroupsName = cont
+		})
 	}
 
 	if cm.SystemCgroupsName != "" {
@@ -294,35 +445,34 @@ func (cm *containerManagerImpl) setupNode() error {
 			return fmt.Errorf("system container cannot be root (\"/\")")
 		}
 		cont := newSystemCgroups(cm.SystemCgroupsName)
-		rootContainer := &fs.Manager{
-			Cgroups: &configs.Cgroup{
-				Parent: "/",
-				Name:   "/",
-			},
-		}
 		cont.ensureStateFunc = func(manager *fs.Manager) error {
-			return ensureSystemCgroups(rootContainer, manager)
+			return ensureSystemCgroups("/", manager)
 		}
 		systemContainers = append(systemContainers, cont)
 	}
 
 	if cm.KubeletCgroupsName != "" {
 		cont := newSystemCgroups(cm.KubeletCgroupsName)
+		allowAllDevices := true
 		manager := fs.Manager{
 			Cgroups: &configs.Cgroup{
 				Parent: "/",
 				Name:   cm.KubeletCgroupsName,
 				Resources: &configs.Resources{
-					AllowAllDevices: true,
+					AllowAllDevices: &allowAllDevices,
 				},
 			},
 		}
 		cont.ensureStateFunc = func(_ *fs.Manager) error {
-			return manager.Apply(os.Getpid())
+			return ensureProcessInContainerWithOOMScore(os.Getpid(), qos.KubeletOOMScoreAdj, &manager)
 		}
 		systemContainers = append(systemContainers, cont)
 	} else {
 		cm.periodicTasks = append(cm.periodicTasks, func() {
+			if err := ensureProcessInContainerWithOOMScore(os.Getpid(), qos.KubeletOOMScoreAdj, nil); err != nil {
+				glog.Error(err)
+				return
+			}
 			cont, err := getContainer(os.Getpid())
 			if err != nil {
 				glog.Errorf("failed to find cgroups of kubelet - %v", err)
@@ -360,25 +510,57 @@ func (cm *containerManagerImpl) GetNodeConfig() NodeConfig {
 	return cm.NodeConfig
 }
 
+func (cm *containerManagerImpl) GetMountedSubsystems() *CgroupSubsystems {
+	return cm.subsystems
+}
+
+func (cm *containerManagerImpl) GetQOSContainersInfo() QOSContainersInfo {
+	return cm.qosContainerManager.GetQOSContainersInfo()
+}
+
+func (cm *containerManagerImpl) UpdateQOSCgroups() error {
+	return cm.qosContainerManager.UpdateCgroups()
+}
+
 func (cm *containerManagerImpl) Status() Status {
 	cm.RLock()
 	defer cm.RUnlock()
 	return cm.status
 }
 
-func (cm *containerManagerImpl) Start() error {
-	// Setup the node
-	if err := cm.setupNode(); err != nil {
+func (cm *containerManagerImpl) Start(node *v1.Node,
+	activePods ActivePodsFunc,
+	podStatusProvider status.PodStatusProvider,
+	runtimeService internalapi.RuntimeService) error {
+
+	// Initialize CPU manager
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
+		cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), podStatusProvider, runtimeService)
+	}
+
+	// cache the node Info including resource capacity and
+	// allocatable of the node
+	cm.nodeInfo = node
+
+	// Ensure that node allocatable configuration is valid.
+	if err := cm.validateNodeAllocatable(); err != nil {
 		return err
 	}
+
+	// Setup the node
+	if err := cm.setupNode(activePods); err != nil {
+		return err
+	}
+
 	// Don't run a background thread if there are no ensureStateFuncs.
-	numEnsureStateFuncs := 0
+	hasEnsureStateFuncs := false
 	for _, cont := range cm.systemContainers {
 		if cont.ensureStateFunc != nil {
-			numEnsureStateFuncs++
+			hasEnsureStateFuncs = true
+			break
 		}
 	}
-	if numEnsureStateFuncs >= 0 {
+	if hasEnsureStateFuncs {
 		// Run ensure state functions every minute.
 		go wait.Until(func() {
 			for _, cont := range cm.systemContainers {
@@ -402,10 +584,59 @@ func (cm *containerManagerImpl) Start() error {
 		}, 5*time.Minute, wait.NeverStop)
 	}
 
+	// Local storage filesystem information from `RootFsInfo` and `ImagesFsInfo` is available at a later time
+	// depending on the time when cadvisor manager updates container stats. Therefore use a go routine to keep
+	// retrieving the information until it is available.
+	stopChan := make(chan struct{})
+	go wait.Until(func() {
+		if err := cm.setFsCapacity(); err != nil {
+			glog.Errorf("[ContainerManager]: %v", err)
+			return
+		}
+		close(stopChan)
+	}, time.Second, stopChan)
+
+	// Starts device plugin manager.
+	if err := cm.devicePluginHandler.Start(deviceplugin.ActivePodsFunc(activePods)); err != nil {
+		return err
+	}
 	return nil
 }
 
-func (cm *containerManagerImpl) SystemCgroupsLimit() api.ResourceList {
+func (cm *containerManagerImpl) setFsCapacity() error {
+	rootfs, err := cm.cadvisorInterface.RootFsInfo()
+	if err != nil {
+		return fmt.Errorf("Fail to get rootfs information %v", err)
+	}
+
+	cm.Lock()
+	for rName, rCap := range cadvisor.EphemeralStorageCapacityFromFsInfo(rootfs) {
+		cm.capacity[rName] = rCap
+	}
+	cm.Unlock()
+	return nil
+}
+
+// TODO: move the GetResources logic to PodContainerManager.
+func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
+	opts := &kubecontainer.RunContainerOptions{}
+	// Allocate should already be called during predicateAdmitHandler.Admit(),
+	// just try to fetch device runtime information from cached state here
+	devOpts := cm.devicePluginHandler.GetDeviceRunContainerOptions(pod, container)
+	if devOpts == nil {
+		return opts, nil
+	}
+	opts.Devices = append(opts.Devices, devOpts.Devices...)
+	opts.Mounts = append(opts.Mounts, devOpts.Mounts...)
+	opts.Envs = append(opts.Envs, devOpts.Envs...)
+	return opts, nil
+}
+
+func (cm *containerManagerImpl) UpdatePluginResources(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
+	return cm.devicePluginHandler.Allocate(node, attrs)
+}
+
+func (cm *containerManagerImpl) SystemCgroupsLimit() v1.ResourceList {
 	cpuLimit := int64(0)
 
 	// Sum up resources of all external containers.
@@ -413,24 +644,26 @@ func (cm *containerManagerImpl) SystemCgroupsLimit() api.ResourceList {
 		cpuLimit += cont.cpuMillicores
 	}
 
-	return api.ResourceList{
-		api.ResourceCPU: *resource.NewMilliQuantity(
+	return v1.ResourceList{
+		v1.ResourceCPU: *resource.NewMilliQuantity(
 			cpuLimit,
 			resource.DecimalSI),
 	}
 }
 
 func isProcessRunningInHost(pid int) (bool, error) {
-	// Get init mount namespace. Mount namespace is unique for all containers.
-	initMntNs, err := os.Readlink("/proc/1/ns/mnt")
+	// Get init pid namespace.
+	initPidNs, err := os.Readlink("/proc/1/ns/pid")
 	if err != nil {
-		return false, fmt.Errorf("failed to find mount namespace of init process")
+		return false, fmt.Errorf("failed to find pid namespace of init process")
 	}
-	processMntNs, err := os.Readlink(fmt.Sprintf("/proc/%d/ns/mnt", pid))
+	glog.V(10).Infof("init pid ns is %q", initPidNs)
+	processPidNs, err := os.Readlink(fmt.Sprintf("/proc/%d/ns/pid", pid))
 	if err != nil {
-		return false, fmt.Errorf("failed to find mount namespace of process %q", pid)
+		return false, fmt.Errorf("failed to find pid namespace of process %q", pid)
 	}
-	return initMntNs == processMntNs, nil
+	glog.V(10).Infof("Pid %d pid ns is %q", pid, processPidNs)
+	return initPidNs == processPidNs, nil
 }
 
 func getPidFromPidFile(pidFile string) (int, error) {
@@ -454,40 +687,37 @@ func getPidFromPidFile(pidFile string) (int, error) {
 }
 
 func getPidsForProcess(name, pidFile string) ([]int, error) {
-	if len(pidFile) > 0 {
-		if pid, err := getPidFromPidFile(pidFile); err == nil {
-			return []int{pid}, nil
-		} else {
-			// log the error and fall back to pidof
-			runtime.HandleError(err)
-		}
+	if len(pidFile) == 0 {
+		return procfs.PidOf(name)
 	}
 
-	out, err := exec.Command("pidof", name).Output()
-	if err != nil {
-		return []int{}, fmt.Errorf("failed to find pid of %q: %v", name, err)
+	pid, err := getPidFromPidFile(pidFile)
+	if err == nil {
+		return []int{pid}, nil
 	}
 
-	// The output of pidof is a list of pids.
-	pids := []int{}
-	for _, pidStr := range strings.Split(strings.TrimSpace(string(out)), " ") {
-		pid, err := strconv.Atoi(pidStr)
-		if err != nil {
-			continue
-		}
-		pids = append(pids, pid)
+	// Try to lookup pid by process name
+	pids, err2 := procfs.PidOf(name)
+	if err2 == nil {
+		return pids, nil
 	}
-	return pids, nil
+
+	// Return error from getPidFromPidFile since that should have worked
+	// and is the real source of the problem.
+	glog.V(4).Infof("unable to get pid from %s: %v", pidFile, err)
+	return []int{}, err
 }
 
 // Ensures that the Docker daemon is in the desired container.
-func ensureDockerInContainer(dockerVersion semver.Version, oomScoreAdj int, manager *fs.Manager) error {
+// Temporarily export the function to be used by dockershim.
+// TODO(yujuhong): Move this function to dockershim once kubelet migrates to
+// dockershim as the default.
+func EnsureDockerInContainer(dockerAPIVersion *utilversion.Version, oomScoreAdj int, manager *fs.Manager) error {
 	type process struct{ name, file string }
 	dockerProcs := []process{{dockerProcessName, dockerPidFile}}
-	if dockerVersion.GTE(containerdVersion) {
+	if dockerAPIVersion.AtLeast(containerdAPIVersion) {
 		dockerProcs = append(dockerProcs, process{containerdProcessName, containerdPidFile})
 	}
-
 	var errs []error
 	for _, proc := range dockerProcs {
 		pids, err := getPidsForProcess(proc.name, proc.file)
@@ -498,7 +728,7 @@ func ensureDockerInContainer(dockerVersion semver.Version, oomScoreAdj int, mana
 
 		// Move if the pid is not already in the desired container.
 		for _, pid := range pids {
-			if err := ensureProcessInContainer(pid, oomScoreAdj, manager); err != nil {
+			if err := ensureProcessInContainerWithOOMScore(pid, oomScoreAdj, manager); err != nil {
 				errs = append(errs, fmt.Errorf("errors moving %q pid: %v", proc.name, err))
 			}
 		}
@@ -506,32 +736,37 @@ func ensureDockerInContainer(dockerVersion semver.Version, oomScoreAdj int, mana
 	return utilerrors.NewAggregate(errs)
 }
 
-func ensureProcessInContainer(pid int, oomScoreAdj int, manager *fs.Manager) error {
+func ensureProcessInContainerWithOOMScore(pid int, oomScoreAdj int, manager *fs.Manager) error {
 	if runningInHost, err := isProcessRunningInHost(pid); err != nil {
 		// Err on the side of caution. Avoid moving the docker daemon unless we are able to identify its context.
 		return err
 	} else if !runningInHost {
 		// Process is running inside a container. Don't touch that.
+		glog.V(2).Infof("pid %d is not running in the host namespaces", pid)
 		return nil
 	}
 
 	var errs []error
-	cont, err := getContainer(pid)
-	if err != nil {
-		errs = append(errs, fmt.Errorf("failed to find container of PID %d: %v", pid, err))
-	}
-
-	if cont != manager.Cgroups.Name {
-		err = manager.Apply(pid)
+	if manager != nil {
+		cont, err := getContainer(pid)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to move PID %d (in %q) to %q", pid, cont, manager.Cgroups.Name))
+			errs = append(errs, fmt.Errorf("failed to find container of PID %d: %v", pid, err))
+		}
+
+		if cont != manager.Cgroups.Name {
+			err = manager.Apply(pid)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to move PID %d (in %q) to %q: %v", pid, cont, manager.Cgroups.Name, err))
+			}
 		}
 	}
 
 	// Also apply oom-score-adj to processes
 	oomAdjuster := oom.NewOOMAdjuster()
+	glog.V(5).Infof("attempting to apply oom_score_adj of %d to pid %d", oomScoreAdj, pid)
 	if err := oomAdjuster.ApplyOOMScoreAdj(pid, oomScoreAdj); err != nil {
-		errs = append(errs, fmt.Errorf("failed to apply oom score %d to PID %d", oomScoreAdj, pid))
+		glog.V(3).Infof("Failed to apply oom_score_adj %d for pid %d: %v", oomScoreAdj, pid, err)
+		errs = append(errs, fmt.Errorf("failed to apply oom score %d to PID %d: %v", oomScoreAdj, pid, err))
 	}
 	return utilerrors.NewAggregate(errs)
 }
@@ -587,7 +822,7 @@ func getContainer(pid int) (string, error) {
 // The reason of leaving kernel threads at root cgroup is that we don't want to tie the
 // execution of these threads with to-be defined /system quota and create priority inversions.
 //
-func ensureSystemCgroups(rootContainer *fs.Manager, manager *fs.Manager) error {
+func ensureSystemCgroups(rootCgroupPath string, manager *fs.Manager) error {
 	// Move non-kernel PIDs to the system container.
 	attemptsRemaining := 10
 	var errs []error
@@ -596,7 +831,7 @@ func ensureSystemCgroups(rootContainer *fs.Manager, manager *fs.Manager) error {
 		errs = []error{}
 		attemptsRemaining--
 
-		allPids, err := rootContainer.GetPids()
+		allPids, err := cmutil.GetPids(rootCgroupPath)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to list PIDs for root: %v", err))
 			continue
@@ -641,18 +876,23 @@ func isKernelPid(pid int) bool {
 	return err != nil
 }
 
-// Helper for getting the docker version.
-func getDockerVersion(cadvisor cadvisor.Interface) semver.Version {
-	var fallback semver.Version // Fallback to zero-value by default.
+// Helper for getting the docker API version.
+func getDockerAPIVersion(cadvisor cadvisor.Interface) *utilversion.Version {
 	versions, err := cadvisor.VersionInfo()
 	if err != nil {
 		glog.Errorf("Error requesting cAdvisor VersionInfo: %v", err)
-		return fallback
+		return utilversion.MustParseSemantic("0.0")
 	}
-	dockerVersion, err := semver.Parse(versions.DockerVersion)
+	dockerAPIVersion, err := utilversion.ParseGeneric(versions.DockerAPIVersion)
 	if err != nil {
 		glog.Errorf("Error parsing docker version %q: %v", versions.DockerVersion, err)
-		return fallback
+		return utilversion.MustParseSemantic("0.0")
 	}
-	return dockerVersion
+	return dockerAPIVersion
+}
+
+func (cm *containerManagerImpl) GetCapacity() v1.ResourceList {
+	cm.RLock()
+	defer cm.RUnlock()
+	return cm.capacity
 }

@@ -249,9 +249,9 @@ SSH_PID=$(pgrep -f "/usr/bin/ssh.*${tunnel_port}:localhost:8080")
 kube::util::trap_add 'kill $SSH_PID' EXIT
 kube::util::trap_add 'kill $SSH_PID' SIGTERM
 
-requested_profiles=$(echo ${requested_profiles} | xargs -n1 | sort -u | xargs)
-profile_components=$(echo ${profile_components} | xargs -n1 | sort -u | xargs)
-kubelet_addreses=$(echo ${kubelet_addreses} | xargs -n1 | sort -u | xargs)
+requested_profiles=$(echo ${requested_profiles} | xargs -n1 | LC_ALL=C sort -u | xargs)
+profile_components=$(echo ${profile_components} | xargs -n1 | LC_ALL=C sort -u | xargs)
+kubelet_addreses=$(echo ${kubelet_addreses} | xargs -n1 | LC_ALL=C sort -u | xargs)
 echo "requested profiles: ${requested_profiles}"
 echo "flags for heap profile: ${mem_pprof_flags}"
 

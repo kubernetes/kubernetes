@@ -30,7 +30,3 @@ type realMountDetector struct {
 func (m *realMountDetector) GetMountMedium(path string) (storageMedium, bool, error) {
 	return mediumUnknown, false, nil
 }
-
-func selinuxEnabled() bool {
-	return false
-}

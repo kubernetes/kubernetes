@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM busybox
-MAINTAINER Jerzy Szczepkowski <jsz@google.com>
+FROM BASEIMAGE
 ADD controller /controller
 EXPOSE 8080
 ENTRYPOINT ["/controller"]

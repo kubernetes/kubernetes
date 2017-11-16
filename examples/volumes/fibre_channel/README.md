@@ -1,0 +1,1 @@
+This file has moved to [https://github.com/kubernetes/examples/blob/master/staging/volumes/fibre_channel/README.md](https://github.com/kubernetes/examples/blob/master/staging/volumes/fibre_channel/README.md)

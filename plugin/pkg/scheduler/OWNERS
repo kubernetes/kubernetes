@@ -1,2 +1,4 @@
-assignees:
-  - davidopp
+approvers:
+- sig-scheduling-maintainers
+reviewers:
+- sig-scheduling

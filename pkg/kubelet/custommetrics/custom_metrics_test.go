@@ -20,18 +20,18 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/api/core/v1"
 )
 
 func TestGetCAdvisorCustomMetricsDefinitionPath(t *testing.T) {
 
-	regularContainer := &api.Container{
+	regularContainer := &v1.Container{
 		Name: "test_container",
 	}
 
-	cmContainer := &api.Container{
+	cmContainer := &v1.Container{
 		Name: "test_container",
-		VolumeMounts: []api.VolumeMount{
+		VolumeMounts: []v1.VolumeMount{
 			{
 				Name:      "cm",
 				MountPath: CustomMetricsDefinitionDir,

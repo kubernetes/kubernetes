@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package node contains code for syncing cloud instances with
 // node registry
-package node
+package node // import "k8s.io/kubernetes/pkg/controller/node"

@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors.
+# Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,41 +15,42 @@
 # This Dockerfile will build an image that is configured
 # to run Fluentd with an Elasticsearch plug-in and the
 # provided configuration file.
-# TODO(a-robinson): Use a lighter base image, e.g. some form of busybox.
 # The image acts as an executable for the binary /usr/sbin/td-agent.
 # Note that fluentd is run with root permssion to allow access to
 # log files with root only access under /var/log/containers/*
-# Please see http://docs.fluentd.org/articles/install-by-deb for more
-# information about installing fluentd using deb package.
 
-FROM ubuntu:14.04
-MAINTAINER Alex Robinson "arob@google.com"
-MAINTAINER Jimmi Dyson "jimmidyson@gmail.com"
+FROM debian:stretch-slim
 
-# Ensure there are enough file descriptors for running Fluentd.
-RUN ulimit -n 65536
+COPY clean-apt /usr/bin
+COPY clean-install /usr/bin
+COPY Gemfile /Gemfile
 
-# Disable prompts from apt.
-ENV DEBIAN_FRONTEND noninteractive
+# 1. Install & configure dependencies.
+# 2. Install fluentd via ruby.
+# 3. Remove build dependencies.
+# 4. Cleanup leftover caches & files.
+RUN BUILD_DEPS="make gcc g++ libc6-dev ruby-dev" \
+    && clean-install $BUILD_DEPS \
+                     ca-certificates \
+                     libjemalloc1 \
+                     ruby \
+    && echo 'gem: --no-document' >> /etc/gemrc \
+    && gem install --file Gemfile \
+    && apt-get purge -y --auto-remove \
+                     -o APT::AutoRemove::RecommendsImportant=false \
+                     $BUILD_DEPS \
+    && clean-apt \
+    # Ensure fluent has enough file descriptors
+    && ulimit -n 65536
 
-# Install prerequisites.
-RUN apt-get update && \
-    apt-get install -y -q curl make g++ && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+# Copy the Fluentd configuration file for logging Docker container logs.
+COPY fluent.conf /etc/fluent/fluent.conf
+COPY run.sh /run.sh
 
-# Install Fluentd.
-RUN /usr/bin/curl -L https://td-toolbelt.herokuapp.com/sh/install-ubuntu-trusty-td-agent2.sh | sh
+# Expose prometheus metrics.
+EXPOSE 80
 
-# Change the default user and group to root.
-# Needed to allow access to /var/log/docker/... files.
-RUN sed -i -e "s/USER=td-agent/USER=root/" -e "s/GROUP=td-agent/GROUP=root/" /etc/init.d/td-agent
+ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
 
-# Install the Elasticsearch Fluentd plug-in.
-RUN td-agent-gem install fluent-plugin-kubernetes_metadata_filter fluent-plugin-elasticsearch
-
-# Copy the Fluentd configuration file.
-COPY td-agent.conf /etc/td-agent/td-agent.conf
-
-# Run the Fluentd service.
-ENTRYPOINT ["td-agent"]
+# Start Fluentd to pick up our config that watches Docker container logs.
+CMD /run.sh $FLUENTD_ARGS

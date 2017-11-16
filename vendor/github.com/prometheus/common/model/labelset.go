@@ -160,7 +160,7 @@ func (l *LabelSet) UnmarshalJSON(b []byte) error {
 	// LabelName as a string and does not call its UnmarshalJSON method.
 	// Thus, we have to replicate the behavior here.
 	for ln := range m {
-		if !LabelNameRE.MatchString(string(ln)) {
+		if !ln.IsValid() {
 			return fmt.Errorf("%q is not a valid label name", ln)
 		}
 	}

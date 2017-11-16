@@ -60,7 +60,7 @@ mJAYH8WU+UAy9pecUnDZj14LAGNVmYcse8HFX71MoshnvCTFEPVo4rZxIAGwMpeJ
 5jgQ3slYLpqrGlcbLgUXBUgzEO684Wk/UV9DFPlHALVqCfXQ9dpJPg==
 -----END RSA PRIVATE KEY-----`
 
-	jsonKey = fmt.Sprintf(`{"private_key":"%[1]s", "client_email":"%[2]s"}`,
+	jsonKey = fmt.Sprintf(`{"private_key":"%[1]s", "client_email":"%[2]s", "type": "service_account"}`,
 		strings.Replace(dummyPrivateKey, "\n", "\\n", -1), email)
 )
 
@@ -83,8 +83,9 @@ func TestJwtProvider(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating temp file: %v", err)
 	}
-
 	filename := file.Name()
+	defer os.Remove(filename)
+
 	_, err = file.WriteString(jsonKey)
 	if err != nil {
 		t.Fatalf("Error writing temp file: %v", err)

@@ -19,201 +19,187 @@ package antiaffinity
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/admission"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 // ensures the hard PodAntiAffinity is denied if it defines TopologyKey other than kubernetes.io/hostname.
+// TODO: Add test case "invalid topologyKey in requiredDuringSchedulingRequiredDuringExecution then admission fails"
+// after RequiredDuringSchedulingRequiredDuringExecution is implemented.
 func TestInterPodAffinityAdmission(t *testing.T) {
-	handler := NewInterPodAntiAffinity(nil)
+	handler := NewInterPodAntiAffinity()
 	pod := api.Pod{
 		Spec: api.PodSpec{},
 	}
 	tests := []struct {
-		affinity      map[string]string
+		affinity      *api.Affinity
 		errorExpected bool
 	}{
 		// empty affinity its success.
 		{
-			affinity:      map[string]string{},
+			affinity:      &api.Affinity{},
 			errorExpected: false,
 		},
 		// what ever topologyKey in preferredDuringSchedulingIgnoredDuringExecution, the admission should success.
 		{
-			affinity: map[string]string{
-				api.AffinityAnnotationKey: `
-					{"podAntiAffinity": {
-						"preferredDuringSchedulingIgnoredDuringExecution": [{
-							"weight": 5,
-							"podAffinityTerm": {
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "security",
-										"operator": "In",
-										"values":["S2"]
-										}]
+			affinity: &api.Affinity{
+				PodAntiAffinity: &api.PodAntiAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+						{
+							Weight: 5,
+							PodAffinityTerm: api.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "security",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"S2"},
+										},
 									},
-								"namespaces": [],
-								"topologyKey": "az"
-							}
-						}]
-					}}`,
+								},
+								TopologyKey: "az",
+							},
+						},
+					},
+				},
 			},
 			errorExpected: false,
 		},
 		// valid topologyKey in requiredDuringSchedulingIgnoredDuringExecution,
 		// plus any topologyKey in preferredDuringSchedulingIgnoredDuringExecution, then admission success.
 		{
-			affinity: map[string]string{
-				api.AffinityAnnotationKey: `
-					{"podAntiAffinity": {
-						"preferredDuringSchedulingIgnoredDuringExecution": [{
-							"weight": 5,
-							"podAffinityTerm": {
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "security",
-										"operator": "In",
-										"values":["S2"]
-									}]
+			affinity: &api.Affinity{
+				PodAntiAffinity: &api.PodAntiAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+						{
+							Weight: 5,
+							PodAffinityTerm: api.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "security",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"S2"},
+										},
+									},
 								},
-								"namespaces": [],
-								"topologyKey": "az"
-							}
-						}],
-						"requiredDuringSchedulingIgnoredDuringExecution": [{
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "security",
-									"operator": "In",
-									"values":["S2"]
-								}]
+								TopologyKey: "az",
 							},
-							"namespaces": [],
-							"topologyKey": "` + unversioned.LabelHostname + `"
-						}]
-					}}`,
+						},
+					},
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "security",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"S2"},
+									},
+								},
+							},
+							TopologyKey: kubeletapis.LabelHostname,
+						},
+					},
+				},
 			},
 			errorExpected: false,
 		},
 		// valid topologyKey in requiredDuringSchedulingIgnoredDuringExecution then admission success.
 		{
-			affinity: map[string]string{
-				api.AffinityAnnotationKey: `
-					{"podAntiAffinity": {
-						"requiredDuringSchedulingIgnoredDuringExecution": [{
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "security",
-									"operator": "In",
-									"values":["S2"]
-								}]
+			affinity: &api.Affinity{
+				PodAntiAffinity: &api.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "security",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"S2"},
+									},
+								},
 							},
-							"namespaces":[],
-							"topologyKey": "` + unversioned.LabelHostname + `"
-						}]
-					}}`,
+							TopologyKey: kubeletapis.LabelHostname,
+						},
+					},
+				},
 			},
 			errorExpected: false,
 		},
 		// invalid topologyKey in requiredDuringSchedulingIgnoredDuringExecution then admission fails.
 		{
-			affinity: map[string]string{
-				api.AffinityAnnotationKey: `
-					{"podAntiAffinity": {
-						"requiredDuringSchedulingIgnoredDuringExecution": [{
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "security",
-									"operator": "In",
-									"values":["S2"]
-								}]
+			affinity: &api.Affinity{
+				PodAntiAffinity: &api.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "security",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"S2"},
+									},
+								},
 							},
-							"namespaces":[],
-							"topologyKey": " zone "
-						}]
-					}}`,
+							TopologyKey: " zone ",
+						},
+					},
+				},
 			},
 			errorExpected: true,
 		},
-		// invalid topologyKey in requiredDuringSchedulingRequiredDuringExecution then admission fails.
-		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		// {
-		//         affinity: map[string]string{
-		//			api.AffinityAnnotationKey: `
-		//				{"podAntiAffinity": {
-		//					"requiredDuringSchedulingRequiredDuringExecution": [{
-		//						"labelSelector": {
-		//							"matchExpressions": [{
-		//								"key": "security",
-		//								"operator": "In",
-		//								"values":["S2"]
-		//							}]
-		//						},
-		//						"namespaces":[],
-		//						"topologyKey": " zone "
-		//					}]
-		//				}}`,
-		//			},
-		//			errorExpected: true,
-		//  }
 		// list of requiredDuringSchedulingIgnoredDuringExecution middle element topologyKey is not valid.
 		{
-			affinity: map[string]string{
-				api.AffinityAnnotationKey: `
-					{"podAntiAffinity": {
-						"requiredDuringSchedulingIgnoredDuringExecution": [{
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "security",
-									"operator": "In",
-									"values":["S2"]
-								}]
-							},
-							"namespaces":[],
-							"topologyKey": "` + unversioned.LabelHostname + `"
-						},
+			affinity: &api.Affinity{
+				PodAntiAffinity: &api.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
 						{
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "security",
-									"operator": "In",
-									"values":["S2"]
-								}]
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "security",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"S2"},
+									},
+								},
 							},
-							"namespaces":[],
-							"topologyKey": " zone "
+							TopologyKey: kubeletapis.LabelHostname,
+						}, {
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "security",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"S2"},
+									},
+								},
+							},
+							TopologyKey: " zone ",
+						}, {
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "security",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"S2"},
+									},
+								},
+							},
+							TopologyKey: kubeletapis.LabelHostname,
 						},
-						{
-							"labelSelector": {
-								"matchExpressions": [{
-									"key": "security",
-									"operator": "In",
-									"values":["S2"]
-								}]
-							},
-							"namespaces": [],
-							"topologyKey": "` + unversioned.LabelHostname + `"
-						}]
-					}}`,
+					},
+				},
 			},
 			errorExpected: true,
-		},
-		{
-			affinity: map[string]string{
-				api.AffinityAnnotationKey: `
-					{"podAntiAffinity": {
-						"thisIsAInvalidAffinity": [{}
-					}}`,
-			},
-			// however, we should not got error here
-			errorExpected: false,
 		},
 	}
 	for _, test := range tests {
-		pod.ObjectMeta.Annotations = test.affinity
-		err := handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil))
+		pod.Spec.Affinity = test.affinity
+		err := handler.Validate(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil))
 
 		if test.errorExpected && err == nil {
 			t.Errorf("Expected error for Anti Affinity %+v but did not get an error", test.affinity)
@@ -225,7 +211,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 	}
 }
 func TestHandles(t *testing.T) {
-	handler := NewInterPodAntiAffinity(nil)
+	handler := NewInterPodAntiAffinity()
 	tests := map[admission.Operation]bool{
 		admission.Update:  true,
 		admission.Create:  true,
@@ -236,6 +222,63 @@ func TestHandles(t *testing.T) {
 		result := handler.Handles(op)
 		if result != expected {
 			t.Errorf("Unexpected result for operation %s: %v\n", op, result)
+		}
+	}
+}
+
+// TestOtherResources ensures that this admission controller is a no-op for other resources,
+// subresources, and non-pods.
+func TestOtherResources(t *testing.T) {
+	namespace := "testnamespace"
+	name := "testname"
+	pod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+	}
+	tests := []struct {
+		name        string
+		kind        string
+		resource    string
+		subresource string
+		object      runtime.Object
+		expectError bool
+	}{
+		{
+			name:     "non-pod resource",
+			kind:     "Foo",
+			resource: "foos",
+			object:   pod,
+		},
+		{
+			name:        "pod subresource",
+			kind:        "Pod",
+			resource:    "pods",
+			subresource: "eviction",
+			object:      pod,
+		},
+		{
+			name:        "non-pod object",
+			kind:        "Pod",
+			resource:    "pods",
+			object:      &api.Service{},
+			expectError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		handler := &Plugin{}
+
+		err := handler.Validate(admission.NewAttributesRecord(tc.object, nil, api.Kind(tc.kind).WithVersion("version"), namespace, name, api.Resource(tc.resource).WithVersion("version"), tc.subresource, admission.Create, nil))
+
+		if tc.expectError {
+			if err == nil {
+				t.Errorf("%s: unexpected nil error", tc.name)
+			}
+			continue
+		}
+
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", tc.name, err)
+			continue
 		}
 	}
 }

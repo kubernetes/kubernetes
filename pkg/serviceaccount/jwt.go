@@ -18,14 +18,16 @@ package serviceaccount
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rsa"
 	"errors"
 	"fmt"
-	"io/ioutil"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/auth/authenticator"
-	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/api/core/v1"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
+	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/apiserver/pkg/authentication/user"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/golang/glog"
@@ -44,82 +46,81 @@ const (
 
 // ServiceAccountTokenGetter defines functions to retrieve a named service account and secret
 type ServiceAccountTokenGetter interface {
-	GetServiceAccount(namespace, name string) (*api.ServiceAccount, error)
-	GetSecret(namespace, name string) (*api.Secret, error)
+	GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error)
+	GetSecret(namespace, name string) (*v1.Secret, error)
 }
 
 type TokenGenerator interface {
 	// GenerateToken generates a token which will identify the given ServiceAccount.
 	// The returned token will be stored in the given (and yet-unpersisted) Secret.
-	GenerateToken(serviceAccount api.ServiceAccount, secret api.Secret) (string, error)
-}
-
-// ReadPrivateKey is a helper function for reading an rsa.PrivateKey from a PEM-encoded file
-func ReadPrivateKey(file string) (*rsa.PrivateKey, error) {
-	data, err := ioutil.ReadFile(file)
-	if err != nil {
-		return nil, err
-	}
-	return jwt.ParseRSAPrivateKeyFromPEM(data)
-}
-
-// ReadPublicKey is a helper function for reading an rsa.PublicKey from a PEM-encoded file
-// Reads public keys from both public and private key files
-func ReadPublicKey(file string) (*rsa.PublicKey, error) {
-	data, err := ioutil.ReadFile(file)
-	if err != nil {
-		return nil, err
-	}
-
-	if privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(data); err == nil {
-		return &privateKey.PublicKey, nil
-	}
-
-	return jwt.ParseRSAPublicKeyFromPEM(data)
+	GenerateToken(serviceAccount v1.ServiceAccount, secret v1.Secret) (string, error)
 }
 
 // JWTTokenGenerator returns a TokenGenerator that generates signed JWT tokens, using the given privateKey.
 // privateKey is a PEM-encoded byte array of a private RSA key.
 // JWTTokenAuthenticator()
-func JWTTokenGenerator(key *rsa.PrivateKey) TokenGenerator {
-	return &jwtTokenGenerator{key}
+func JWTTokenGenerator(privateKey interface{}) TokenGenerator {
+	return &jwtTokenGenerator{privateKey}
 }
 
 type jwtTokenGenerator struct {
-	key *rsa.PrivateKey
+	privateKey interface{}
 }
 
-func (j *jwtTokenGenerator) GenerateToken(serviceAccount api.ServiceAccount, secret api.Secret) (string, error) {
-	token := jwt.New(jwt.SigningMethodRS256)
+func (j *jwtTokenGenerator) GenerateToken(serviceAccount v1.ServiceAccount, secret v1.Secret) (string, error) {
+	var method jwt.SigningMethod
+	switch privateKey := j.privateKey.(type) {
+	case *rsa.PrivateKey:
+		method = jwt.SigningMethodRS256
+	case *ecdsa.PrivateKey:
+		switch privateKey.Curve {
+		case elliptic.P256():
+			method = jwt.SigningMethodES256
+		case elliptic.P384():
+			method = jwt.SigningMethodES384
+		case elliptic.P521():
+			method = jwt.SigningMethodES512
+		default:
+			return "", fmt.Errorf("unknown private key curve, must be 256, 384, or 521")
+		}
+	default:
+		return "", fmt.Errorf("unknown private key type %T, must be *rsa.PrivateKey or *ecdsa.PrivateKey", j.privateKey)
+	}
+
+	token := jwt.New(method)
+
+	claims, _ := token.Claims.(jwt.MapClaims)
 
 	// Identify the issuer
-	token.Claims[IssuerClaim] = Issuer
+	claims[IssuerClaim] = Issuer
 
 	// Username
-	token.Claims[SubjectClaim] = MakeUsername(serviceAccount.Namespace, serviceAccount.Name)
+	claims[SubjectClaim] = apiserverserviceaccount.MakeUsername(serviceAccount.Namespace, serviceAccount.Name)
 
 	// Persist enough structured info for the authenticator to be able to look up the service account and secret
-	token.Claims[NamespaceClaim] = serviceAccount.Namespace
-	token.Claims[ServiceAccountNameClaim] = serviceAccount.Name
-	token.Claims[ServiceAccountUIDClaim] = serviceAccount.UID
-	token.Claims[SecretNameClaim] = secret.Name
+	claims[NamespaceClaim] = serviceAccount.Namespace
+	claims[ServiceAccountNameClaim] = serviceAccount.Name
+	claims[ServiceAccountUIDClaim] = serviceAccount.UID
+	claims[SecretNameClaim] = secret.Name
 
 	// Sign and get the complete encoded token as a string
-	return token.SignedString(j.key)
+	return token.SignedString(j.privateKey)
 }
 
 // JWTTokenAuthenticator authenticates tokens as JWT tokens produced by JWTTokenGenerator
 // Token signatures are verified using each of the given public keys until one works (allowing key rotation)
 // If lookup is true, the service account and secret referenced as claims inside the token are retrieved and verified with the provided ServiceAccountTokenGetter
-func JWTTokenAuthenticator(keys []*rsa.PublicKey, lookup bool, getter ServiceAccountTokenGetter) authenticator.Token {
+func JWTTokenAuthenticator(keys []interface{}, lookup bool, getter ServiceAccountTokenGetter) authenticator.Token {
 	return &jwtTokenAuthenticator{keys, lookup, getter}
 }
 
 type jwtTokenAuthenticator struct {
-	keys   []*rsa.PublicKey
+	keys   []interface{}
 	lookup bool
 	getter ServiceAccountTokenGetter
 }
+
+var errMismatchedSigningMethod = errors.New("invalid signing method")
 
 func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool, error) {
 	var validationError error
@@ -127,10 +128,20 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 	for i, key := range j.keys {
 		// Attempt to verify with each key until we find one that works
 		parsedToken, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+			switch token.Method.(type) {
+			case *jwt.SigningMethodRSA:
+				if _, ok := key.(*rsa.PublicKey); ok {
+					return key, nil
+				}
+				return nil, errMismatchedSigningMethod
+			case *jwt.SigningMethodECDSA:
+				if _, ok := key.(*ecdsa.PublicKey); ok {
+					return key, nil
+				}
+				return nil, errMismatchedSigningMethod
+			default:
 				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 			}
-			return key, nil
 		})
 
 		if err != nil {
@@ -148,6 +159,15 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 					validationError = err
 					continue
 				}
+
+				// This key doesn't apply to the given signature type
+				// Perhaps one of the other keys will verify the signature
+				// If not, we want to return this error
+				if err.Inner == errMismatchedSigningMethod {
+					glog.V(4).Infof("Mismatched key type (key %d): %v", i, err)
+					validationError = err
+					continue
+				}
 			}
 
 			// Other errors should just return as errors
@@ -156,35 +176,37 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 
 		// If we get here, we have a token with a recognized signature
 
+		claims, _ := parsedToken.Claims.(jwt.MapClaims)
+
 		// Make sure we issued the token
-		iss, _ := parsedToken.Claims[IssuerClaim].(string)
+		iss, _ := claims[IssuerClaim].(string)
 		if iss != Issuer {
 			return nil, false, nil
 		}
 
 		// Make sure the claims we need exist
-		sub, _ := parsedToken.Claims[SubjectClaim].(string)
+		sub, _ := claims[SubjectClaim].(string)
 		if len(sub) == 0 {
 			return nil, false, errors.New("sub claim is missing")
 		}
-		namespace, _ := parsedToken.Claims[NamespaceClaim].(string)
+		namespace, _ := claims[NamespaceClaim].(string)
 		if len(namespace) == 0 {
 			return nil, false, errors.New("namespace claim is missing")
 		}
-		secretName, _ := parsedToken.Claims[SecretNameClaim].(string)
+		secretName, _ := claims[SecretNameClaim].(string)
 		if len(namespace) == 0 {
 			return nil, false, errors.New("secretName claim is missing")
 		}
-		serviceAccountName, _ := parsedToken.Claims[ServiceAccountNameClaim].(string)
+		serviceAccountName, _ := claims[ServiceAccountNameClaim].(string)
 		if len(serviceAccountName) == 0 {
 			return nil, false, errors.New("serviceAccountName claim is missing")
 		}
-		serviceAccountUID, _ := parsedToken.Claims[ServiceAccountUIDClaim].(string)
+		serviceAccountUID, _ := claims[ServiceAccountUIDClaim].(string)
 		if len(serviceAccountUID) == 0 {
 			return nil, false, errors.New("serviceAccountUID claim is missing")
 		}
 
-		subjectNamespace, subjectName, err := SplitUsername(sub)
+		subjectNamespace, subjectName, err := apiserverserviceaccount.SplitUsername(sub)
 		if err != nil || subjectNamespace != namespace || subjectName != serviceAccountName {
 			return nil, false, errors.New("sub claim is invalid")
 		}
@@ -196,7 +218,11 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 				glog.V(4).Infof("Could not retrieve token %s/%s for service account %s/%s: %v", namespace, secretName, namespace, serviceAccountName, err)
 				return nil, false, errors.New("Token has been invalidated")
 			}
-			if bytes.Compare(secret.Data[api.ServiceAccountTokenKey], []byte(token)) != 0 {
+			if secret.DeletionTimestamp != nil {
+				glog.V(4).Infof("Token is deleted and awaiting removal: %s/%s for service account %s/%s", namespace, secretName, namespace, serviceAccountName)
+				return nil, false, errors.New("Token has been invalidated")
+			}
+			if bytes.Compare(secret.Data[v1.ServiceAccountTokenKey], []byte(token)) != 0 {
 				glog.V(4).Infof("Token contents no longer matches %s/%s for service account %s/%s", namespace, secretName, namespace, serviceAccountName)
 				return nil, false, errors.New("Token does not match server's copy")
 			}
@@ -206,6 +232,10 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 			if err != nil {
 				glog.V(4).Infof("Could not retrieve service account %s/%s: %v", namespace, serviceAccountName, err)
 				return nil, false, err
+			}
+			if serviceAccount.DeletionTimestamp != nil {
+				glog.V(4).Infof("Service account has been deleted %s/%s", namespace, serviceAccountName)
+				return nil, false, fmt.Errorf("ServiceAccount %s/%s has been deleted", namespace, serviceAccountName)
 			}
 			if string(serviceAccount.UID) != serviceAccountUID {
 				glog.V(4).Infof("Service account UID no longer matches %s/%s: %q != %q", namespace, serviceAccountName, string(serviceAccount.UID), serviceAccountUID)

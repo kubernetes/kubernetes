@@ -13,18 +13,12 @@ base:
   'roles:kubernetes-pool':
     - match: grain
     - docker
-{% if pillar.get('network_provider', '').lower() == 'flannel' %}
-    - flannel
-{% endif %}
 {% if pillar.get('network_policy_provider', '').lower() == 'calico' %}
     - cni
 {% elif pillar.get('network_provider', '').lower() == 'kubenet' %}
     - cni
 {% elif pillar.get('network_provider', '').lower() == 'cni' %}
     - cni
-{% endif %}
-{% if grains['cloud'] is defined and grains['cloud'] == 'azure-legacy' %}
-    - openvpn-client
 {% endif %}
     - helpers
     - kube-client-tools
@@ -34,13 +28,6 @@ base:
     - opencontrail-networking-minion
 {% else %}
     - kube-proxy
-{% endif %}
-{% if pillar.get('enable_node_logging', '').lower() == 'true' and pillar['logging_destination'] is defined %}
-  {% if pillar['logging_destination'] == 'elasticsearch' %}
-    - fluentd-es
-  {% elif pillar['logging_destination'] == 'gcp' %}
-    - fluentd-gcp
-  {% endif %}
 {% endif %}
 {% if pillar.get('enable_cluster_registry', '').lower() == 'true' %}
     - kube-registry-proxy
@@ -58,10 +45,7 @@ base:
     - match: grain
     - generate-cert
     - etcd
-{% if pillar.get('network_provider', '').lower() == 'flannel' %}
-    - flannel-server
-    - flannel
-{% elif pillar.get('network_provider', '').lower() == 'kubenet' %}
+{% if pillar.get('network_provider', '').lower() == 'kubenet' %}
     - cni
 {% elif pillar.get('network_provider', '').lower() == 'cni' %}
     - cni
@@ -76,22 +60,11 @@ base:
     - kube-client-tools
     - kube-master-addons
     - kube-admission-controls
-{% if pillar.get('enable_node_logging', '').lower() == 'true' and pillar['logging_destination'] is defined %}
-  {% if pillar['logging_destination'] == 'elasticsearch' %}
-    - fluentd-es
-  {% elif pillar['logging_destination'] == 'gcp' %}
-    - fluentd-gcp
-  {% endif %}
-{% endif %}
 {% if grains['cloud'] is defined and grains['cloud'] != 'vagrant' %}
     - logrotate
 {% endif %}
     - kube-addons
-{% if grains['cloud'] is defined and grains['cloud'] == 'azure-legacy' %}
-    - openvpn
-    - nginx
-{% endif %}
-{% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws', 'vsphere', 'photon-controller', 'openstack', 'azure-legacy'] %}
+{% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws', 'photon-controller', 'openstack', 'azure-legacy'] %}
     - docker
     - kubelet
 {% endif %}
@@ -101,6 +74,6 @@ base:
 {% if pillar.get('enable_cluster_autoscaler', '').lower() == 'true' %}
     - cluster-autoscaler
 {% endif %}
-{% if pillar.get('network_policy_provider', '').lower() == 'calico' %}
-    - calico.master
+{% if pillar.get('enable_rescheduler', '').lower() == 'true' %}
+    - rescheduler
 {% endif %}

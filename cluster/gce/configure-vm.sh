@@ -18,15 +18,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Note that this script is also used by AWS; we include it and then override
-# functions with AWS equivalents.  Note `#+AWS_OVERRIDES_HERE` below.
-# TODO(justinsb): Refactor into common script & GCE specific script?
-
 # If we have any arguments at all, this is a push and not just setup.
 is_push=$@
-
-readonly KNOWN_TOKENS_FILE="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
-readonly BASIC_AUTH_FILE="/srv/salt-overlay/salt/kube-apiserver/basic_auth.csv"
 
 function ensure-basic-networking() {
   # Deal with GCE networking bring-up race. (We rely on DNS for a lot,
@@ -53,6 +46,28 @@ ensure-packages() {
   :
 }
 
+function create-node-pki {
+  echo "Creating node pki files"
+
+  local -r pki_dir="/etc/kubernetes/pki"
+  mkdir -p "${pki_dir}"
+
+  if [[ -z "${CA_CERT_BUNDLE:-}" ]]; then
+    CA_CERT_BUNDLE="${CA_CERT}"
+  fi
+
+  CA_CERT_BUNDLE_PATH="${pki_dir}/ca-certificates.crt"
+  echo "${CA_CERT_BUNDLE}" | base64 --decode > "${CA_CERT_BUNDLE_PATH}"
+
+  if [[ ! -z "${KUBELET_CERT:-}" && ! -z "${KUBELET_KEY:-}" ]]; then
+    KUBELET_CERT_PATH="${pki_dir}/kubelet.crt"
+    echo "${KUBELET_CERT}" | base64 --decode > "${KUBELET_CERT_PATH}"
+
+    KUBELET_KEY_PATH="${pki_dir}/kubelet.key"
+    echo "${KUBELET_KEY}" | base64 --decode > "${KUBELET_KEY_PATH}"
+  fi
+}
+
 # A hookpoint for setting up local devices
 ensure-local-disks() {
  for ssd in /dev/disk/by-id/google-local-ssd-*; do
@@ -66,6 +81,17 @@ ensure-local-disks() {
       echo "No local SSD disks found."
     fi
   done
+}
+
+function config-ip-firewall {
+  echo "Configuring IP firewall rules"
+
+  iptables -N KUBE-METADATA-SERVER
+  iptables -I FORWARD -p tcp -d 169.254.169.254 --dport 80 -j KUBE-METADATA-SERVER
+
+  if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]]; then
+    iptables -A KUBE-METADATA-SERVER -j DROP
+  fi
 }
 
 function ensure-install-dir() {
@@ -166,7 +192,7 @@ download-or-bust() {
     for url in "${urls[@]}"; do
       local file="${url##*/}"
       rm -f "${file}"
-      if ! curl -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 80 --retry 6 --retry-delay 10 "${url}"; then
+      if ! curl -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 "${url}"; then
         echo "== Failed to download ${url}. Retrying. =="
       elif [[ -n "${hash}" ]] && ! validate-hash "${file}" "${hash}"; then
         echo "== Hash validation of ${url} failed. Retrying. =="
@@ -368,51 +394,6 @@ find-master-pd() {
   MASTER_PD_DEVICE="/dev/disk/by-id/${relative_path}"
 }
 
-# Mounts a persistent disk (formatting if needed) to store the persistent data
-# on the master -- etcd's data, a few settings, and security certs/keys/tokens.
-#
-# This function can be reused to mount an existing PD because all of its
-# operations modifying the disk are idempotent -- safe_format_and_mount only
-# formats an unformatted disk, and mkdir -p will leave a directory be if it
-# already exists.
-mount-master-pd() {
-  find-master-pd
-  if [[ -z "${MASTER_PD_DEVICE:-}" ]]; then
-    return
-  fi
-
-  # Format and mount the disk, create directories on it for all of the master's
-  # persistent data, and link them to where they're used.
-  echo "Mounting master-pd"
-  mkdir -p /mnt/master-pd
-  /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${MASTER_PD_DEVICE}" /mnt/master-pd &>/var/log/master-pd-mount.log || \
-    { echo "!!! master-pd mount failed, review /var/log/master-pd-mount.log !!!"; return 1; }
-  # Contains all the data stored in etcd
-  mkdir -m 700 -p /mnt/master-pd/var/etcd
-  # Contains the dynamically generated apiserver auth certs and keys
-  mkdir -p /mnt/master-pd/srv/kubernetes
-  # Contains the cluster's initial config parameters and auth tokens
-  mkdir -p /mnt/master-pd/srv/salt-overlay
-  # Directory for kube-apiserver to store SSH key (if necessary)
-  mkdir -p /mnt/master-pd/srv/sshproxy
-
-  ln -s -f /mnt/master-pd/var/etcd /var/etcd
-  ln -s -f /mnt/master-pd/srv/kubernetes /srv/kubernetes
-  ln -s -f /mnt/master-pd/srv/sshproxy /srv/sshproxy
-  ln -s -f /mnt/master-pd/srv/salt-overlay /srv/salt-overlay
-
-  # This is a bit of a hack to get around the fact that salt has to run after the
-  # PD and mounted directory are already set up. We can't give ownership of the
-  # directory to etcd until the etcd user and group exist, but they don't exist
-  # until salt runs if we don't create them here. We could alternatively make the
-  # permissions on the directory more permissive, but this seems less bad.
-  if ! id etcd &>/dev/null; then
-    useradd -s /sbin/nologin -d /var/etcd etcd
-  fi
-  chown -R etcd /mnt/master-pd/var/etcd
-  chgrp -R etcd /mnt/master-pd/var/etcd
-}
-
 # Create the overlay files for the salt tree.  We create these in a separate
 # place so that we can blow away the rest of the salt configs on a kube-push and
 # re-apply these.
@@ -422,6 +403,7 @@ function create-salt-pillar() {
   mkdir -p /srv/salt-overlay/pillar
   cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
 instance_prefix: '$(echo "$INSTANCE_PREFIX" | sed -e "s/'/''/g")'
+node_tags: '$(echo "$NODE_TAGS" | sed -e "s/'/''/g")'
 node_instance_prefix: '$(echo "$NODE_INSTANCE_PREFIX" | sed -e "s/'/''/g")'
 cluster_cidr: '$(echo "$CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
 allocate_node_cidrs: '$(echo "$ALLOCATE_NODE_CIDRS" | sed -e "s/'/''/g")'
@@ -433,17 +415,22 @@ enable_cluster_ui: '$(echo "$ENABLE_CLUSTER_UI" | sed -e "s/'/''/g")'
 enable_node_problem_detector: '$(echo "$ENABLE_NODE_PROBLEM_DETECTOR" | sed -e "s/'/''/g")'
 enable_l7_loadbalancing: '$(echo "$ENABLE_L7_LOADBALANCING" | sed -e "s/'/''/g")'
 enable_node_logging: '$(echo "$ENABLE_NODE_LOGGING" | sed -e "s/'/''/g")'
+enable_metadata_proxy: '$(echo "$ENABLE_METADATA_CONCEALMENT" | sed -e "s/'/''/g")'
+enable_metrics_server: '$(echo "$ENABLE_METRICS_SERVER" | sed -e "s/'/''/g")'
+enable_pod_security_policy: '$(echo "$ENABLE_POD_SECURITY_POLICY" | sed -e "s/'/''/g")'
+enable_rescheduler: '$(echo "$ENABLE_RESCHEDULER" | sed -e "s/'/''/g")'
 logging_destination: '$(echo "$LOGGING_DESTINATION" | sed -e "s/'/''/g")'
 elasticsearch_replicas: '$(echo "$ELASTICSEARCH_LOGGING_REPLICAS" | sed -e "s/'/''/g")'
 enable_cluster_dns: '$(echo "$ENABLE_CLUSTER_DNS" | sed -e "s/'/''/g")'
 enable_cluster_registry: '$(echo "$ENABLE_CLUSTER_REGISTRY" | sed -e "s/'/''/g")'
-dns_replicas: '$(echo "$DNS_REPLICAS" | sed -e "s/'/''/g")'
 dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
 dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
+enable_dns_horizontal_autoscaler: '$(echo "$ENABLE_DNS_HORIZONTAL_AUTOSCALER" | sed -e "s/'/''/g")'
 admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
 network_provider: '$(echo "$NETWORK_PROVIDER" | sed -e "s/'/''/g")'
 prepull_e2e_images: '$(echo "$PREPULL_E2E_IMAGES" | sed -e "s/'/''/g")'
 hairpin_mode: '$(echo "$HAIRPIN_MODE" | sed -e "s/'/''/g")'
+softlockup_panic: '$(echo "$SOFTLOCKUP_PANIC" | sed -e "s/'/''/g")'
 opencontrail_tag: '$(echo "$OPENCONTRAIL_TAG" | sed -e "s/'/''/g")'
 opencontrail_kubernetes_tag: '$(echo "$OPENCONTRAIL_KUBERNETES_TAG")'
 opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET")'
@@ -451,14 +438,69 @@ network_policy_provider: '$(echo "$NETWORK_POLICY_PROVIDER" | sed -e "s/'/''/g")
 enable_manifest_url: '$(echo "${ENABLE_MANIFEST_URL:-}" | sed -e "s/'/''/g")'
 manifest_url: '$(echo "${MANIFEST_URL:-}" | sed -e "s/'/''/g")'
 manifest_url_header: '$(echo "${MANIFEST_URL_HEADER:-}" | sed -e "s/'/''/g")'
-master_name: '$(echo "${MASTER_NAME:-}" | sed -e "s/'/''/g")'
 num_nodes: $(echo "${NUM_NODES:-}" | sed -e "s/'/''/g")
 e2e_storage_test_environment: '$(echo "$E2E_STORAGE_TEST_ENVIRONMENT" | sed -e "s/'/''/g")'
 kube_uid: '$(echo "${KUBE_UID}" | sed -e "s/'/''/g")'
+initial_etcd_cluster: '$(echo "${INITIAL_ETCD_CLUSTER:-}" | sed -e "s/'/''/g")'
+initial_etcd_cluster_state: '$(echo "${INITIAL_ETCD_CLUSTER_STATE:-}" | sed -e "s/'/''/g")'
+ca_cert_bundle_path: '$(echo "${CA_CERT_BUNDLE_PATH:-}" | sed -e "s/'/''/g")'
+hostname: '$(echo "${ETCD_HOSTNAME:-$(hostname -s)}" | sed -e "s/'/''/g")'
+enable_pod_priority: '$(echo "${ENABLE_POD_PRIORITY:-}" | sed -e "s/'/''/g")'
+enable_default_storage_class: '$(echo "$ENABLE_DEFAULT_STORAGE_CLASS" | sed -e "s/'/''/g")'
+kube_proxy_daemonset: '$(echo "$KUBE_PROXY_DAEMONSET" | sed -e "s/'/''/g")'
 EOF
+    if [ -n "${STORAGE_BACKEND:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+storage_backend: '$(echo "$STORAGE_BACKEND" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${STORAGE_MEDIA_TYPE:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+storage_media_type: '$(echo "$STORAGE_MEDIA_TYPE" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT_SEC:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+kube_apiserver_request_timeout_sec: '$(echo "$KUBE_APISERVER_REQUEST_TIMEOUT_SEC" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${ADMISSION_CONTROL:-}" ] && [ ${ADMISSION_CONTROL} == *"ImagePolicyWebhook"* ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+admission-control-config-file: /etc/admission_controller.config
+EOF
+    fi
     if [ -n "${KUBELET_PORT:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 kubelet_port: '$(echo "$KUBELET_PORT" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${ETCD_IMAGE:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+etcd_docker_tag: '$(echo "$ETCD_IMAGE" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${ETCD_DOCKER_REPOSITORY:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+etcd_docker_repository: '$(echo "$ETCD_DOCKER_REPOSITORY" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${ETCD_VERSION:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+etcd_version: '$(echo "$ETCD_VERSION" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [[ -n "${ETCD_CA_KEY:-}" && -n "${ETCD_CA_CERT:-}" && -n "${ETCD_PEER_KEY:-}" && -n "${ETCD_PEER_CERT:-}" ]]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+etcd_over_ssl: 'true'
+EOF
+    else
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+etcd_over_ssl: 'false'
+EOF
+    fi
+    if [ -n "${ETCD_QUORUM_READ:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+etcd_quorum_read: '$(echo "${ETCD_QUORUM_READ}" | sed -e "s/'/''/g")'
 EOF
     fi
     # Configuration changes for test clusters
@@ -540,6 +582,16 @@ EOF
 node_labels: '$(echo "${NODE_LABELS}" | sed -e "s/'/''/g")'
 EOF
     fi
+    if [ -n "${NON_MASTER_NODE_LABELS:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+non_master_node_labels: '$(echo "${NON_MASTER_NODE_LABELS}" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${NODE_TAINTS:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+node_taints: '$(echo "${NODE_TAINTS}" | sed -e "s/'/''/g")'
+EOF
+    fi
     if [ -n "${EVICTION_HARD:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 eviction_hard: '$(echo "${EVICTION_HARD}" | sed -e "s/'/''/g")'
@@ -549,25 +601,17 @@ EOF
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 enable_cluster_autoscaler: '$(echo "${ENABLE_CLUSTER_AUTOSCALER}" | sed -e "s/'/''/g")'
 autoscaler_mig_config: '$(echo "${AUTOSCALER_MIG_CONFIG}" | sed -e "s/'/''/g")'
+autoscaler_expander_config: '$(echo "${AUTOSCALER_EXPANDER_CONFIG}" | sed -e "s/'/''/g")'
 EOF
     fi
-    if [[ "${FEDERATION:-}" == "true" ]]; then
-      local federations_domain_map="${FEDERATIONS_DOMAIN_MAP:-}"
-      if [[ -z "${federations_domain_map}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
-        federations_domain_map="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
-      fi
-      if [[ -n "${federations_domain_map}" ]]; then
-        cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-federations_domain_map: '$(echo "- --federations=${federations_domain_map}" | sed -e "s/'/''/g")'
-EOF
-      else
-        cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-federations_domain_map: ''
-EOF
-      fi
-    else
+    if [ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-federations_domain_map: ''
+scheduling_algorithm_provider: '$(echo "${SCHEDULING_ALGORITHM_PROVIDER}" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${ENABLE_IP_ALIASES:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+enable_ip_aliases: '$(echo "$ENABLE_IP_ALIASES" | sed -e "s/'/''/g")'
 EOF
     fi
 }
@@ -586,63 +630,6 @@ function convert-bytes-gce-kube() {
   echo "${storage_space}" | sed -e 's/^\([0-9]\+\)\([A-Z]\)\?i\?B$/\1\2/g' -e 's/\([A-Z]\)$/\1i/'
 }
 
-# This should only happen on cluster initialization.
-#
-#  - Uses KUBE_PASSWORD and KUBE_USER to generate basic_auth.csv.
-#  - Uses KUBE_BEARER_TOKEN, KUBELET_TOKEN, and KUBE_PROXY_TOKEN to generate
-#    known_tokens.csv (KNOWN_TOKENS_FILE).
-#  - Uses CA_CERT, MASTER_CERT, and MASTER_KEY to populate the SSL credentials
-#    for the apiserver.
-#  - Optionally uses KUBECFG_CERT and KUBECFG_KEY to store a copy of the client
-#    cert credentials.
-#
-# After the first boot and on upgrade, these files exist on the master-pd
-# and should never be touched again (except perhaps an additional service
-# account, see NB below.)
-function create-salt-master-auth() {
-  if [[ ! -e /srv/kubernetes/ca.crt ]]; then
-    if  [[ ! -z "${CA_CERT:-}" ]] && [[ ! -z "${MASTER_CERT:-}" ]] && [[ ! -z "${MASTER_KEY:-}" ]]; then
-      mkdir -p /srv/kubernetes
-      (umask 077;
-        echo "${CA_CERT}" | base64 --decode > /srv/kubernetes/ca.crt;
-        echo "${MASTER_CERT}" | base64 --decode > /srv/kubernetes/server.cert;
-        echo "${MASTER_KEY}" | base64 --decode > /srv/kubernetes/server.key;
-        # Kubecfg cert/key are optional and included for backwards compatibility.
-        # TODO(roberthbailey): Remove these two lines once GKE no longer requires
-        # fetching clients certs from the master VM.
-        echo "${KUBECFG_CERT:-}" | base64 --decode > /srv/kubernetes/kubecfg.crt;
-        echo "${KUBECFG_KEY:-}" | base64 --decode > /srv/kubernetes/kubecfg.key)
-    fi
-  fi
-  if [ ! -e "${BASIC_AUTH_FILE}" ]; then
-    mkdir -p /srv/salt-overlay/salt/kube-apiserver
-    (umask 077;
-      echo "${KUBE_PASSWORD},${KUBE_USER},admin" > "${BASIC_AUTH_FILE}")
-  fi
-  if [ ! -e "${KNOWN_TOKENS_FILE}" ]; then
-    mkdir -p /srv/salt-overlay/salt/kube-apiserver
-    (umask 077;
-      echo "${KUBE_BEARER_TOKEN},admin,admin" > "${KNOWN_TOKENS_FILE}";
-      echo "${KUBELET_TOKEN},kubelet,kubelet" >> "${KNOWN_TOKENS_FILE}";
-      echo "${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy" >> "${KNOWN_TOKENS_FILE}")
-  fi
-}
-
-# This should happen only on cluster initialization. After the first boot
-# and on upgrade, the kubeconfig file exists on the master-pd and should
-# never be touched again.
-#
-#  - Uses KUBELET_CA_CERT (falling back to CA_CERT), KUBELET_CERT, and
-#    KUBELET_KEY to generate a kubeconfig file for the kubelet to securely
-#    connect to the apiserver.
-function create-salt-master-kubelet-auth() {
-  # Only configure the kubelet on the master if the required variables are
-  # set in the environment.
-  if [[ ! -z "${KUBELET_APISERVER:-}" ]] && [[ ! -z "${KUBELET_CERT:-}" ]] && [[ ! -z "${KUBELET_KEY:-}" ]]; then
-    create-salt-kubelet-auth
-  fi
-}
-
 # This should happen both on cluster initialization and node upgrades.
 #
 #  - Uses KUBELET_CA_CERT (falling back to CA_CERT), KUBELET_CERT, and
@@ -650,13 +637,8 @@ function create-salt-master-kubelet-auth() {
 #    connect to the apiserver.
 
 function create-salt-kubelet-auth() {
-  local -r kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/kubeconfig"
+  local -r kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/bootstrap-kubeconfig"
   if [ ! -e "${kubelet_kubeconfig_file}" ]; then
-    # If there isn't a CA certificate set specifically for the kubelet, use
-    # the cluster CA certificate.
-    if [[ -z "${KUBELET_CA_CERT:-}" ]]; then
-      KUBELET_CA_CERT="${CA_CERT}"
-    fi
     mkdir -p /srv/salt-overlay/salt/kubelet
     (umask 077;
       cat > "${kubelet_kubeconfig_file}" <<EOF
@@ -665,13 +647,13 @@ kind: Config
 users:
 - name: kubelet
   user:
-    client-certificate-data: ${KUBELET_CERT}
-    client-key-data: ${KUBELET_KEY}
+    client-certificate: ${KUBELET_CERT_PATH}
+    client-key: ${KUBELET_KEY_PATH}
 clusters:
 - name: local
   cluster:
-    server: https://kubernetes-master
-    certificate-authority-data: ${KUBELET_CA_CERT}
+    server: https://${KUBERNETES_MASTER_NAME}
+    certificate-authority: ${CA_CERT_BUNDLE_PATH}
 contexts:
 - context:
     cluster: local
@@ -685,8 +667,8 @@ EOF
 
 # This should happen both on cluster initialization and node upgrades.
 #
-#  - Uses the CA_CERT and KUBE_PROXY_TOKEN to generate a kubeconfig file for
-#    the kube-proxy to securely connect to the apiserver.
+#  - When run as static pods, use the CA_CERT and KUBE_PROXY_TOKEN to generate a
+#    kubeconfig file for the kube-proxy to securely connect to the apiserver.
 function create-salt-kubeproxy-auth() {
   local -r kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
   if [ ! -e "${kube_proxy_kubeconfig_file}" ]; then
@@ -702,7 +684,7 @@ users:
 clusters:
 - name: local
   cluster:
-    certificate-authority-data: ${CA_CERT}
+    certificate-authority-data: ${CA_CERT_BUNDLE}
 contexts:
 - context:
     cluster: local
@@ -785,129 +767,17 @@ log_level_logfile: debug
 EOF
 }
 
-function salt-master-role() {
-  cat <<EOF >/etc/salt/minion.d/grains.conf
-grains:
-  roles:
-    - kubernetes-master
-  cloud: gce
-EOF
-
-  cat <<EOF >/etc/gce.conf
-[global]
-EOF
-  CLOUD_CONFIG='' # Set to non-empty path if we are using the gce.conf file
-
-  if ! [[ -z "${PROJECT_ID:-}" ]] && ! [[ -z "${TOKEN_URL:-}" ]] && ! [[ -z "${TOKEN_BODY:-}" ]] && ! [[ -z "${NODE_NETWORK:-}" ]] ; then
-    cat <<EOF >>/etc/gce.conf
-token-url = ${TOKEN_URL}
-token-body = ${TOKEN_BODY}
-project-id = ${PROJECT_ID}
-network-name = ${NODE_NETWORK}
-EOF
-    CLOUD_CONFIG=/etc/gce.conf
-    EXTERNAL_IP=$(curl --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
-    cat <<EOF >>/etc/salt/minion.d/grains.conf
-  advertise_address: '${EXTERNAL_IP}'
-  proxy_ssh_user: '${PROXY_SSH_USER}'
-EOF
-  fi
-
-  if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
-    cat <<EOF >>/etc/gce.conf
-node-tags = ${NODE_INSTANCE_PREFIX}
-node-instance-prefix = ${NODE_INSTANCE_PREFIX}
-EOF
-    CLOUD_CONFIG=/etc/gce.conf
-  fi
-
-  if [[ -n "${MULTIZONE:-}" ]]; then
-    cat <<EOF >>/etc/gce.conf
-multizone = ${MULTIZONE}
-EOF
-    CLOUD_CONFIG=/etc/gce.conf
-  fi
-
-  if [[ -n "${CLOUD_CONFIG:-}" ]]; then
-    cat <<EOF >>/etc/salt/minion.d/grains.conf
-  cloud_config: ${CLOUD_CONFIG}
-EOF
-  else
-    rm -f /etc/gce.conf
-  fi
-
-  if [[ -n "${GCP_AUTHN_URL:-}" ]]; then
-    cat <<EOF >>/etc/salt/minion.d/grains.conf
-  webhook_authentication_config: /etc/gcp_authn.config
-EOF
-    cat <<EOF >/etc/gcp_authn.config
-clusters:
-  - name: gcp-authentication-server
-    cluster:
-      server: ${GCP_AUTHN_URL}
-users:
-  - name: kube-apiserver
-    user:
-      auth-provider:
-        name: gcp
-current-context: webhook
-contexts:
-- context:
-    cluster: gcp-authentication-server
-    user: kube-apiserver
-  name: webhook
-EOF
-  fi
-
-  if [[ -n "${GCP_AUTHZ_URL:-}" ]]; then
-    cat <<EOF >>/etc/salt/minion.d/grains.conf
-  webhook_authorization_config: /etc/gcp_authz.config
-EOF
-    cat <<EOF >/etc/gcp_authz.config
-clusters:
-  - name: gcp-authorization-server
-    cluster:
-      server: ${GCP_AUTHZ_URL}
-users:
-  - name: kube-apiserver
-    user:
-      auth-provider:
-        name: gcp
-current-context: webhook
-contexts:
-- context:
-    cluster: gcp-authorization-server
-    user: kube-apiserver
-  name: webhook
-EOF
-  fi
-
-  # If the kubelet on the master is enabled, give it the same CIDR range
-  # as a generic node.
-  if [[ ! -z "${KUBELET_APISERVER:-}" ]] && [[ ! -z "${KUBELET_CERT:-}" ]] && [[ ! -z "${KUBELET_KEY:-}" ]]; then
-    cat <<EOF >>/etc/salt/minion.d/grains.conf
-  kubelet_api_servers: '${KUBELET_APISERVER}'
-  cbr-cidr: 10.123.45.0/30
-EOF
-  else
-    # If the kubelet is running disconnected from a master, give it a fixed
-    # CIDR range.
-    cat <<EOF >>/etc/salt/minion.d/grains.conf
-  cbr-cidr: ${MASTER_IP_RANGE}
-EOF
-  fi
-
-  env-to-grains "runtime_config"
-}
-
 function salt-node-role() {
+  local -r kubelet_bootstrap_kubeconfig="/srv/salt-overlay/salt/kubelet/bootstrap-kubeconfig"
+  local -r kubelet_kubeconfig="/srv/salt-overlay/salt/kubelet/kubeconfig"
   cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
     - kubernetes-pool
-  cbr-cidr: 10.123.45.0/30
   cloud: gce
   api_servers: '${KUBERNETES_MASTER_NAME}'
+  kubelet_bootstrap_kubeconfig: /var/lib/kubelet/bootstrap-kubeconfig
+  kubelet_kubeconfig: /var/lib/kubelet/kubeconfig
 EOF
 }
 
@@ -940,20 +810,14 @@ function salt-grains() {
   env-to-grains "docker_opts"
   env-to-grains "docker_root"
   env-to-grains "kubelet_root"
+  env-to-grains "feature_gates"
 }
 
 function configure-salt() {
   mkdir -p /etc/salt/minion.d
   salt-run-local
-  if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
-    salt-master-role
-    if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}"  ]; then
-        salt-apiserver-timeout-grain $KUBE_APISERVER_REQUEST_TIMEOUT
-    fi
-  else
-    salt-node-role
-    node-docker-opts
-  fi
+  salt-node-role
+  node-docker-opts
   salt-grains
   install-salt
   stop-salt-minion
@@ -961,7 +825,15 @@ function configure-salt() {
 
 function run-salt() {
   echo "== Calling Salt =="
-  salt-call --local state.highstate || true
+  local rc=0
+  for i in {0..6}; do
+    salt-call --retcode-passthrough --local state.highstate && rc=0 || rc=$?
+    if [[ "${rc}" == 0 ]]; then
+      return 0
+    fi
+  done
+  echo "Salt failed to run repeatedly" >&2
+  return "${rc}"
 }
 
 function run-user-script() {
@@ -975,15 +847,15 @@ function run-user-script() {
   fi
 }
 
-# This script is re-used on AWS.  Some of the above functions will be replaced.
-# The AWS kube-up script looks for this marker:
-#+AWS_OVERRIDES_HERE
-
-####################################################################################
+if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
+  echo "Support for debian master has been removed"
+  exit 1
+fi
 
 if [[ -z "${is_push}" ]]; then
   echo "== kube-up node config starting =="
   set-broken-motd
+  config-ip-firewall
   ensure-basic-networking
   fix-apt-sources
   ensure-install-dir
@@ -991,13 +863,10 @@ if [[ -z "${is_push}" ]]; then
   set-kube-env
   auto-upgrade
   ensure-local-disks
-  [[ "${KUBERNETES_MASTER}" == "true" ]] && mount-master-pd
+  create-node-pki
   create-salt-pillar
-  if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
-    create-salt-master-auth
-    create-salt-master-kubelet-auth
-  else
-    create-salt-kubelet-auth
+  create-salt-kubelet-auth
+  if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
     create-salt-kubeproxy-auth
   fi
   download-release

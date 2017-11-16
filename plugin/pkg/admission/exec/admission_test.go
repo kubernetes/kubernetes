@@ -19,13 +19,25 @@ package exec
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/registry/rest"
+	core "k8s.io/client-go/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/runtime"
 )
+
+// newAllowEscalatingExec returns `admission.Interface` that allows execution on
+// "hostIPC", "hostPID" and "privileged".
+func newAllowEscalatingExec() *DenyExec {
+	return &DenyExec{
+		Handler:    admission.NewHandler(admission.Connect),
+		hostIPC:    false,
+		hostPID:    false,
+		privileged: false,
+	}
+}
 
 func TestAdmission(t *testing.T) {
 	privPod := validPod("privileged")
@@ -64,35 +76,22 @@ func TestAdmission(t *testing.T) {
 		},
 	}
 
-	// use the same code as NewDenyEscalatingExec, using the direct object though to allow testAdmission to
-	// inject the client
-	handler := &denyExec{
-		Handler:    admission.NewHandler(admission.Connect),
-		hostIPC:    true,
-		hostPID:    true,
-		privileged: true,
-	}
+	// Get the direct object though to allow testAdmission to inject the client
+	handler := NewDenyEscalatingExec()
 
 	for _, tc := range testCases {
 		testAdmission(t, tc.pod, handler, tc.shouldAccept)
 	}
 
 	// run with a permissive config and all cases should pass
-	handler.privileged = false
-	handler.hostPID = false
-	handler.hostIPC = false
+	handler = newAllowEscalatingExec()
 
 	for _, tc := range testCases {
 		testAdmission(t, tc.pod, handler, true)
 	}
 
 	// run against an init container
-	handler = &denyExec{
-		Handler:    admission.NewHandler(admission.Connect),
-		hostIPC:    true,
-		hostPID:    true,
-		privileged: true,
-	}
+	handler = NewDenyEscalatingExec()
 
 	for _, tc := range testCases {
 		tc.pod.Spec.InitContainers = tc.pod.Spec.Containers
@@ -101,16 +100,14 @@ func TestAdmission(t *testing.T) {
 	}
 
 	// run with a permissive config and all cases should pass
-	handler.privileged = false
-	handler.hostPID = false
-	handler.hostIPC = false
+	handler = newAllowEscalatingExec()
 
 	for _, tc := range testCases {
 		testAdmission(t, tc.pod, handler, true)
 	}
 }
 
-func testAdmission(t *testing.T, pod *api.Pod, handler *denyExec, shouldAccept bool) {
+func testAdmission(t *testing.T, pod *api.Pod, handler *DenyExec, shouldAccept bool) {
 	mockClient := &fake.Clientset{}
 	mockClient.AddReactor("get", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		if action.(core.GetAction).GetName() == pod.Name {
@@ -120,12 +117,13 @@ func testAdmission(t *testing.T, pod *api.Pod, handler *denyExec, shouldAccept b
 		return true, nil, nil
 	})
 
-	handler.client = mockClient
+	handler.SetInternalKubeClientSet(mockClient)
+	admission.ValidateInitialization(handler)
 
 	// pods/exec
 	{
 		req := &rest.ConnectRequest{Name: pod.Name, ResourcePath: "pods/exec"}
-		err := handler.Admit(admission.NewAttributesRecord(req, nil, api.Kind("Pod").WithVersion("version"), "test", "name", api.Resource("pods").WithVersion("version"), "exec", admission.Connect, nil))
+		err := handler.Validate(admission.NewAttributesRecord(req, nil, api.Kind("Pod").WithVersion("version"), "test", "name", api.Resource("pods").WithVersion("version"), "exec", admission.Connect, nil))
 		if shouldAccept && err != nil {
 			t.Errorf("Unexpected error returned from admission handler: %v", err)
 		}
@@ -137,7 +135,7 @@ func testAdmission(t *testing.T, pod *api.Pod, handler *denyExec, shouldAccept b
 	// pods/attach
 	{
 		req := &rest.ConnectRequest{Name: pod.Name, ResourcePath: "pods/attach"}
-		err := handler.Admit(admission.NewAttributesRecord(req, nil, api.Kind("Pod").WithVersion("version"), "test", "name", api.Resource("pods").WithVersion("version"), "attach", admission.Connect, nil))
+		err := handler.Validate(admission.NewAttributesRecord(req, nil, api.Kind("Pod").WithVersion("version"), "test", "name", api.Resource("pods").WithVersion("version"), "attach", admission.Connect, nil))
 		if shouldAccept && err != nil {
 			t.Errorf("Unexpected error returned from admission handler: %v", err)
 		}
@@ -185,14 +183,9 @@ func TestDenyExecOnPrivileged(t *testing.T) {
 		},
 	}
 
-	// use the same code as NewDenyExecOnPrivileged, using the direct object though to allow testAdmission to
-	// inject the client
-	handler := &denyExec{
-		Handler:    admission.NewHandler(admission.Connect),
-		hostIPC:    false,
-		hostPID:    false,
-		privileged: true,
-	}
+	// Get the direct object though to allow testAdmission to inject the client
+	handler := NewDenyExecOnPrivileged()
+
 	for _, tc := range testCases {
 		testAdmission(t, tc.pod, handler, tc.shouldAccept)
 	}
@@ -207,7 +200,7 @@ func TestDenyExecOnPrivileged(t *testing.T) {
 
 func validPod(name string) *api.Pod {
 	return &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: name, Namespace: "test"},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test"},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{Name: "ctr1", Image: "image"},

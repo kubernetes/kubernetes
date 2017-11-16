@@ -2,7 +2,7 @@ clone:
   tags: true
   path: github.com/vmware/govmomi
 build:
-  image: golang:1.6
+  image: golang:1.7
   pull: true
   environment:
     - GOVC_TEST_URL=$$GOVC_TEST_URL

@@ -22,21 +22,59 @@ func (s *CpuGroup) Name() string {
 func (s *CpuGroup) Apply(d *cgroupData) error {
 	// We always want to join the cpu group, to allow fair cpu scheduling
 	// on a container basis
-	_, err := d.join("cpu")
+	path, err := d.path("cpu")
 	if err != nil && !cgroups.IsNotFound(err) {
 		return err
+	}
+	return s.ApplyDir(path, d.config, d.pid)
+}
+
+func (s *CpuGroup) ApplyDir(path string, cgroup *configs.Cgroup, pid int) error {
+	// This might happen if we have no cpu cgroup mounted.
+	// Just do nothing and don't fail.
+	if path == "" {
+		return nil
+	}
+	if err := os.MkdirAll(path, 0755); err != nil {
+		return err
+	}
+	// We should set the real-Time group scheduling settings before moving
+	// in the process because if the process is already in SCHED_RR mode
+	// and no RT bandwidth is set, adding it will fail.
+	if err := s.SetRtSched(path, cgroup); err != nil {
+		return err
+	}
+	// because we are not using d.join we need to place the pid into the procs file
+	// unlike the other subsystems
+	if err := cgroups.WriteCgroupProc(path, pid); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *CpuGroup) SetRtSched(path string, cgroup *configs.Cgroup) error {
+	if cgroup.Resources.CpuRtPeriod != 0 {
+		if err := writeFile(path, "cpu.rt_period_us", strconv.FormatUint(cgroup.Resources.CpuRtPeriod, 10)); err != nil {
+			return err
+		}
+	}
+	if cgroup.Resources.CpuRtRuntime != 0 {
+		if err := writeFile(path, "cpu.rt_runtime_us", strconv.FormatInt(cgroup.Resources.CpuRtRuntime, 10)); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 func (s *CpuGroup) Set(path string, cgroup *configs.Cgroup) error {
 	if cgroup.Resources.CpuShares != 0 {
-		if err := writeFile(path, "cpu.shares", strconv.FormatInt(cgroup.Resources.CpuShares, 10)); err != nil {
+		if err := writeFile(path, "cpu.shares", strconv.FormatUint(cgroup.Resources.CpuShares, 10)); err != nil {
 			return err
 		}
 	}
 	if cgroup.Resources.CpuPeriod != 0 {
-		if err := writeFile(path, "cpu.cfs_period_us", strconv.FormatInt(cgroup.Resources.CpuPeriod, 10)); err != nil {
+		if err := writeFile(path, "cpu.cfs_period_us", strconv.FormatUint(cgroup.Resources.CpuPeriod, 10)); err != nil {
 			return err
 		}
 	}
@@ -45,15 +83,8 @@ func (s *CpuGroup) Set(path string, cgroup *configs.Cgroup) error {
 			return err
 		}
 	}
-	if cgroup.Resources.CpuRtPeriod != 0 {
-		if err := writeFile(path, "cpu.rt_period_us", strconv.FormatInt(cgroup.Resources.CpuRtPeriod, 10)); err != nil {
-			return err
-		}
-	}
-	if cgroup.Resources.CpuRtRuntime != 0 {
-		if err := writeFile(path, "cpu.rt_runtime_us", strconv.FormatInt(cgroup.Resources.CpuRtRuntime, 10)); err != nil {
-			return err
-		}
+	if err := s.SetRtSched(path, cgroup); err != nil {
+		return err
 	}
 
 	return nil

@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ const (
 // Data format of MsgApp:
 // | offset | bytes | description |
 // +--------+-------+-------------+
-// | 0      | 1     | \x01        |
+// | 0      | 1     | \x02        |
 // | 1      | 8     | length of encoded message |
 // | 9      | n     | encoded message |
 type msgAppV2Encoder struct {
@@ -82,7 +82,7 @@ func newMsgAppV2Encoder(w io.Writer, fs *stats.FollowerStats) *msgAppV2Encoder {
 	}
 }
 
-func (enc *msgAppV2Encoder) encode(m raftpb.Message) error {
+func (enc *msgAppV2Encoder) encode(m *raftpb.Message) error {
 	start := time.Now()
 	switch {
 	case isLinkHeartbeatMessage(m):
@@ -135,7 +135,7 @@ func (enc *msgAppV2Encoder) encode(m raftpb.Message) error {
 			return err
 		}
 		// write message
-		if _, err := enc.w.Write(pbutil.MustMarshal(&m)); err != nil {
+		if _, err := enc.w.Write(pbutil.MustMarshal(m)); err != nil {
 			return err
 		}
 

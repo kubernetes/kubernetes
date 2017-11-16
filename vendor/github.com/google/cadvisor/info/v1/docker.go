@@ -17,6 +17,7 @@ package v1
 
 type DockerStatus struct {
 	Version       string            `json:"version"`
+	APIVersion    string            `json:"api_version"`
 	KernelVersion string            `json:"kernel_version"`
 	OS            string            `json:"os"`
 	Hostname      string            `json:"hostname"`

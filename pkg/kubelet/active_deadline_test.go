@@ -20,32 +20,32 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/client-go/tools/record"
 )
 
 // mockPodStatusProvider returns the status on the specified pod
 type mockPodStatusProvider struct {
-	pods []*api.Pod
+	pods []*v1.Pod
 }
 
 // GetPodStatus returns the status on the associated pod with matching uid (if found)
-func (m *mockPodStatusProvider) GetPodStatus(uid types.UID) (api.PodStatus, bool) {
+func (m *mockPodStatusProvider) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
 	for _, pod := range m.pods {
 		if pod.UID == uid {
 			return pod.Status, true
 		}
 	}
-	return api.PodStatus{}, false
+	return v1.PodStatus{}, false
 }
 
 // TestActiveDeadlineHandler verifies the active deadline handler functions as expected.
 func TestActiveDeadlineHandler(t *testing.T) {
 	pods := newTestPods(4)
-	fakeClock := util.NewFakeClock(time.Now())
+	fakeClock := clock.NewFakeClock(time.Now())
 	podStatusProvider := &mockPodStatusProvider{pods: pods}
 	fakeRecorder := &record.FakeRecorder{}
 	handler, err := newActiveDeadlineHandler(podStatusProvider, fakeRecorder, fakeClock)
@@ -53,8 +53,8 @@ func TestActiveDeadlineHandler(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	now := unversioned.Now()
-	startTime := unversioned.NewTime(now.Time.Add(-1 * time.Minute))
+	now := metav1.Now()
+	startTime := metav1.NewTime(now.Time.Add(-1 * time.Minute))
 
 	// this pod has exceeded its active deadline
 	exceededActiveDeadlineSeconds := int64(30)
@@ -71,7 +71,7 @@ func TestActiveDeadlineHandler(t *testing.T) {
 	pods[2].Spec.ActiveDeadlineSeconds = nil
 
 	testCases := []struct {
-		pod      *api.Pod
+		pod      *v1.Pod
 		expected bool
 	}{{pods[0], true}, {pods[1], false}, {pods[2], false}, {pods[3], false}}
 

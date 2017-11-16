@@ -1,0 +1,16 @@
+machine:
+  timezone:
+    America/Los_Angeles
+
+# Output the test output to circle.
+test:
+  pre: 
+    - go get -u github.com/jstemmer/go-junit-report
+  override:
+    - go test -coverprofile=coverage.out -v -race ./... > test.out
+    - cat test.out | go-junit-report > report.xml
+    - go tool cover -func=coverage.out
+  post:
+    - mv test.out $CIRCLE_ARTIFACTS/
+    - mv report.xml $CIRCLE_TEST_REPORTS/
+

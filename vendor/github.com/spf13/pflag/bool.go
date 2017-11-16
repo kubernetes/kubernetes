@@ -1,9 +1,6 @@
 package pflag
 
-import (
-	"fmt"
-	"strconv"
-)
+import "strconv"
 
 // optional interface to indicate boolean flags that can be
 // supplied without "=value" text
@@ -30,7 +27,7 @@ func (b *boolValue) Type() string {
 	return "bool"
 }
 
-func (b *boolValue) String() string { return fmt.Sprintf("%v", *b) }
+func (b *boolValue) String() string { return strconv.FormatBool(bool(*b)) }
 
 func (b *boolValue) IsBoolFlag() bool { return true }
 

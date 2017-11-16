@@ -23,6 +23,8 @@ import (
 
 var xmlSchemaInstance = Name{Space: "http://www.w3.org/2001/XMLSchema-instance", Local: "type"}
 
+var xsiType = Name{Space: "xsi", Local: "type"}
+
 var stringToTypeMap = map[string]reflect.Type{
 	"xsd:boolean":       reflect.TypeOf((*bool)(nil)).Elem(),
 	"xsd:byte":          reflect.TypeOf((*int8)(nil)).Elem(),
@@ -71,7 +73,11 @@ func typeToString(typ reflect.Type) string {
 	case reflect.Float64:
 		return "xsd:double"
 	case reflect.String:
-		return "xsd:string"
+		name := typ.Name()
+		if name == "string" {
+			return "xsd:string"
+		}
+		return name
 	case reflect.Struct:
 		if typ == stringToTypeMap["xsd:dateTime"] {
 			return "xsd:dateTime"

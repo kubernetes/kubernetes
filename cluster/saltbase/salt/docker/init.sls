@@ -18,6 +18,27 @@ bridge-utils:
     - mode: 644
     - makedirs: true
 
+{% if grains.cloud is defined and grains.cloud == 'openstack' %}
+
+cbr0:
+  # workaround https://github.com/saltstack/salt/issues/20570
+  kmod.present:
+    - name: bridge
+
+  network.managed:
+    - enabled: True
+    - type: bridge
+    - proto: none
+    - ports: none
+    - bridge: cbr0
+    - delay: 0
+    - bypassfirewall: True
+    - require_in:
+      - service: docker
+    - require:
+      - kmod: cbr0
+{% endif %}
+
 {% if (grains.os == 'Fedora' and grains.osrelease_info[0] >= 22) or (grains.os == 'CentOS' and grains.osrelease_info[0] >= 7) %}
 
 docker:
@@ -134,7 +155,7 @@ docker:
      - watch:
        - file: {{ environment_file }}
 
-{% elif grains.cloud is defined and grains.cloud in ['vsphere', 'photon-controller'] and grains.os == 'Debian' and grains.osrelease_info[0] >=8 %}
+{% elif grains.cloud is defined and grains.cloud in ['photon-controller'] and grains.os == 'Debian' and grains.osrelease_info[0] >=8 %}
 
 {% if pillar.get('is_systemd') %}
 
@@ -261,6 +282,20 @@ net.ipv4.ip_forward:
   sysctl.present:
     - value: 1
 
+{% if pillar.get('softlockup_panic', '').lower() == 'true' %}
+# TODO(dchen1107) Remove this once kernel.softlockup_panic is built into the CVM image.
+/etc/sysctl.conf:
+  file.append:
+    - text:
+      - "kernel.softlockup_panic = 1"
+      - "kernel.softlockup_all_cpu_backtrace = 1"
+
+'sysctl-reload':
+  cmd.run:
+    - name: 'sysctl --system'
+    - unless: 'sysctl -a | grep "kernel.softlockup_panic = 1"'
+{% endif %}
+ 
 {{ environment_file }}:
   file.managed:
     - source: salt://docker/docker-defaults
@@ -376,11 +411,15 @@ purge-old-docker-package:
     - mode: 644
     - makedirs: true
 
+libltdl7:
+  pkg.installed
+
 docker-upgrade:
   cmd.run:
     - name: /opt/kubernetes/helpers/pkg install-no-start {{ docker_pkg_name }} {{ override_docker_ver }} /var/cache/docker-install/{{ override_deb }}
     - require:
       - file: /var/cache/docker-install/{{ override_deb }}
+      - pkg: libltdl7
 
 {% endif %} # end override_docker_ver != ''
 
@@ -467,7 +506,7 @@ docker:
 # is managing Docker restart we should probably just delete this whole thing
 # but the kubernetes components use salt 'require' to set up a dag, and that
 # complicated and scary to unwind.
-# On AWS, we use a trick now... we don't start the docker service through Salt.
+# On AWS, we use a trick now... We don't start the docker service through Salt.
 # Kubelet or our health checker will start it.  But we use service.enabled,
 # so we still have a `service: docker` node for our DAG.
 {% if grains.cloud is defined and grains.cloud == 'aws' %}
@@ -494,4 +533,3 @@ docker:
       - cmd: fix-service-docker
 {% endif %}
 {% endif %} # end grains.os_family != 'RedHat'
-

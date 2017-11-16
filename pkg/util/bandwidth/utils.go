@@ -19,7 +19,7 @@ package bandwidth
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 var minRsrc = resource.MustParse("1k")
@@ -36,6 +36,9 @@ func validateBandwidthIsReasonable(rsrc *resource.Quantity) error {
 }
 
 func ExtractPodBandwidthResources(podAnnotations map[string]string) (ingress, egress *resource.Quantity, err error) {
+	if podAnnotations == nil {
+		return nil, nil, nil
+	}
 	str, found := podAnnotations["kubernetes.io/ingress-bandwidth"]
 	if found {
 		ingressValue, err := resource.ParseQuantity(str)

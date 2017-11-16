@@ -18,18 +18,52 @@
 
 [ ! -z ${UTIL_SH_DEBUG+x} ] && set -x
 
+command -v kubectl >/dev/null 2>&1 || { echo >&2 "kubectl not found in path. Aborting."; exit 1; }
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 readonly ROOT=$(dirname "${BASH_SOURCE}")
 source "$ROOT/${KUBE_CONFIG_FILE:-"config-default.sh"}"
 source "$KUBE_ROOT/cluster/common.sh"
 
 export LIBVIRT_DEFAULT_URI=qemu:///system
-export SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-false}
-export ADMISSION_CONTROL=${ADMISSION_CONTROL:-NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota}
+export SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-true}
+export ADMISSION_CONTROL=${ADMISSION_CONTROL:-Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota}
 readonly POOL=kubernetes
 readonly POOL_PATH=/var/lib/libvirt/images/kubernetes
 
 [ ! -d "${POOL_PATH}" ] && (echo "$POOL_PATH" does not exist ; exit 1 )
+
+# Creates a kubeconfig file for the kubelet.
+# Args: address (e.g. "http://localhost:8080"), destination file path
+function create-kubelet-kubeconfig() {
+  local apiserver_address="${1}"
+  local destination="${2}"
+  if [[ -z "${apiserver_address}" ]]; then
+    echo "Must provide API server address to create Kubelet kubeconfig file!"
+    exit 1
+  fi
+  if [[ -z "${destination}" ]]; then
+    echo "Must provide destination path to create Kubelet kubeconfig file!"
+    exit 1
+  fi
+  echo "Creating Kubelet kubeconfig file"
+  local dest_dir="$(dirname "${destination}")"
+  mkdir -p "${dest_dir}" &>/dev/null || sudo mkdir -p "${dest_dir}"
+  sudo=$(test -w "${dest_dir}" || echo "sudo -E")
+  cat <<EOF | ${sudo} tee "${destination}" > /dev/null
+apiVersion: v1
+kind: Config
+clusters:
+  - cluster:
+      server: ${apiserver_address}
+    name: local
+contexts:
+  - context:
+      cluster: local
+    name: local
+current-context: local
+EOF
+}
 
 # join <delim> <list...>
 # Concatenates the list elements with the delimiter passed as first parameter
@@ -90,6 +124,12 @@ function generate_certs {
     echo "TLS assets generated..."
 }
 
+#Setup registry proxy
+function setup_registry_proxy {
+  if [[ "$ENABLE_CLUSTER_REGISTRY" == "true" ]]; then
+    cp "./cluster/saltbase/salt/kube-registry-proxy/kube-registry-proxy.yaml" "$POOL_PATH/kubernetes/manifests"
+  fi
+}
 
 # Verify prereqs on host machine
 function verify-prereqs {
@@ -152,7 +192,7 @@ function initialize-pool {
       virsh pool-create-as $POOL dir --target "$POOL_PATH"
   fi
 
-  wget -N -P "$ROOT" http://${COREOS_CHANNEL:-alpha}.release.core-os.net/amd64-usr/current/coreos_production_qemu_image.img.bz2
+  wget -N -P "$ROOT" https://${COREOS_CHANNEL:-alpha}.release.core-os.net/amd64-usr/current/coreos_production_qemu_image.img.bz2
   if [[ "$ROOT/coreos_production_qemu_image.img.bz2" -nt "$POOL_PATH/coreos_base.img" ]]; then
       bunzip2 -f -k "$ROOT/coreos_production_qemu_image.img.bz2"
       virsh vol-delete coreos_base.img --pool $POOL 2> /dev/null || true
@@ -177,8 +217,7 @@ function initialize-pool {
   mkdir -p "$POOL_PATH/kubernetes/addons"
   if [[ "$ENABLE_CLUSTER_DNS" == "true" ]]; then
       render-template "$ROOT/namespace.yaml" > "$POOL_PATH/kubernetes/addons/namespace.yaml"
-      render-template "$ROOT/skydns-svc.yaml" > "$POOL_PATH/kubernetes/addons/skydns-svc.yaml"
-      render-template "$ROOT/skydns-rc.yaml"  > "$POOL_PATH/kubernetes/addons/skydns-rc.yaml"
+      render-template "$ROOT/kube-dns.yaml" > "$POOL_PATH/kubernetes/addons/kube-dns.yaml"
   fi
 
   virsh pool-refresh $POOL
@@ -202,14 +241,13 @@ function render-template {
 
 function wait-cluster-readiness {
   echo "Wait for cluster readiness"
-  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
 
   local timeout=120
   while [[ $timeout -ne 0 ]]; do
-    nb_ready_nodes=$("${kubectl}" get nodes -o go-template="{{range.items}}{{range.status.conditions}}{{.type}}{{end}}:{{end}}" --api-version=v1 2>/dev/null | tr ':' '\n' | grep -c Ready || true)
+    nb_ready_nodes=$(kubectl get nodes -o go-template="{{range.items}}{{range.status.conditions}}{{.type}}{{end}}:{{end}}" 2>/dev/null | tr ':' '\n' | grep -c Ready || true)
     echo "Nb ready nodes: $nb_ready_nodes / $NUM_NODES"
     if [[ "$nb_ready_nodes" -eq "$NUM_NODES" ]]; then
-        return 0
+      return 0
     fi
 
     timeout=$(($timeout-1))
@@ -225,8 +263,8 @@ function kube-up {
   detect-nodes
   initialize-pool keep_base_image
   generate_certs "${NODE_NAMES[@]}"
+  setup_registry_proxy
   initialize-network
-
 
   readonly ssh_keys="$(cat ~/.ssh/*.pub | sed 's/^/  - /')"
   readonly kubernetes_dir="$POOL_PATH/kubernetes"
@@ -270,6 +308,7 @@ function kube-up {
   export KUBE_SERVER="http://192.168.10.1:8080"
   export CONTEXT="libvirt-coreos"
   create-kubeconfig
+  create-kubelet-kubeconfig "http://${MASTER_IP}:8080" "${POOL_PATH}/kubernetes/kubeconfig/kubelet.kubeconfig"
 
   wait-cluster-readiness
 
@@ -277,8 +316,50 @@ function kube-up {
   echo
   echo "  http://${KUBE_MASTER_IP}:8080"
   echo
-  echo "You can control the Kubernetes cluster with: 'cluster/kubectl.sh'"
+  echo "You can control the Kubernetes cluster with: 'kubectl'"
   echo "You can connect on the master with: 'ssh core@${KUBE_MASTER_IP}'"
+
+  wait-registry-readiness
+
+}
+
+function create_registry_rc() {
+  echo " Create registry replication controller"
+  kubectl create -f $ROOT/registry-rc.yaml
+  local timeout=120
+  while [[ $timeout -ne 0 ]]; do
+    phase=$(kubectl get pods -n kube-system -lk8s-app=kube-registry --output='jsonpath={.items..status.phase}')
+    if [ "$phase" = "Running" ]; then
+      return 0
+    fi
+    timeout=$(($timeout-1))
+    sleep .5
+  done
+}
+
+
+function create_registry_svc() {
+  echo " Create registry service"
+  kubectl create -f "${KUBE_ROOT}/cluster/addons/registry/registry-svc.yaml"
+}
+
+function wait-registry-readiness() {
+  if [[ "$ENABLE_CLUSTER_REGISTRY" != "true" ]]; then
+    return 0
+  fi
+  echo "Wait for registry readiness..."
+  local timeout=120
+  while [[ $timeout -ne 0 ]]; do
+    phase=$(kubectl get namespaces --output=jsonpath='{.items[?(@.metadata.name=="kube-system")].status.phase}')
+    if [ "$phase" = "Active" ]; then
+      create_registry_rc
+      create_registry_svc
+      return 0
+    fi
+    echo "waiting for namespace kube-system"
+    timeout=$(($timeout-1))
+    sleep .5
+  done
 }
 
 # Delete a kubernetes cluster
@@ -296,6 +377,7 @@ function upload-server-tars {
   tar -x -C "$POOL_PATH/kubernetes" -f "$SERVER_BINARY_TAR" kubernetes
   rm -rf "$POOL_PATH/kubernetes/bin"
   mv "$POOL_PATH/kubernetes/kubernetes/server/bin" "$POOL_PATH/kubernetes/bin"
+  chmod -R 755 "$POOL_PATH/kubernetes/bin"
   rm -fr "$POOL_PATH/kubernetes/kubernetes"
 }
 

@@ -18,8 +18,8 @@ VERSION=v1
 .PHONY: build push
 
 build:
-	docker build -t "$(IMAGE):$(VERSION)" .
+	docker build --pull -t "$(IMAGE):$(VERSION)" .
 
 push:
-	gcloud docker push "$(IMAGE):$(VERSION)"
+	gcloud docker -- push "$(IMAGE):$(VERSION)"
 

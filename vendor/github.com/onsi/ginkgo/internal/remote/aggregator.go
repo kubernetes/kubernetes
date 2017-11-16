@@ -125,14 +125,12 @@ func (aggregator *Aggregator) registerSuiteBeginning(configAndSuite configAndSui
 
 	aggregator.stenographer.AnnounceSuite(configAndSuite.summary.SuiteDescription, configAndSuite.config.RandomSeed, configAndSuite.config.RandomizeAllSpecs, aggregator.config.Succinct)
 
-	numberOfSpecsToRun := 0
 	totalNumberOfSpecs := 0
-	for _, configAndSuite := range aggregator.aggregatedSuiteBeginnings {
-		numberOfSpecsToRun += configAndSuite.summary.NumberOfSpecsThatWillBeRun
-		totalNumberOfSpecs += configAndSuite.summary.NumberOfTotalSpecs
+	if len(aggregator.aggregatedSuiteBeginnings) > 0 {
+		totalNumberOfSpecs = configAndSuite.summary.NumberOfSpecsBeforeParallelization
 	}
 
-	aggregator.stenographer.AnnounceNumberOfSpecs(numberOfSpecsToRun, totalNumberOfSpecs, aggregator.config.Succinct)
+	aggregator.stenographer.AnnounceTotalNumberOfSpecs(totalNumberOfSpecs, aggregator.config.Succinct)
 	aggregator.stenographer.AnnounceAggregatedParallelRun(aggregator.nodeCount, aggregator.config.Succinct)
 	aggregator.flushCompletedSpecs()
 }
@@ -239,6 +237,7 @@ func (aggregator *Aggregator) registerSuiteEnding(suite *types.SuiteSummary) (fi
 		aggregatedSuiteSummary.NumberOfFailedSpecs += suiteSummary.NumberOfFailedSpecs
 		aggregatedSuiteSummary.NumberOfPendingSpecs += suiteSummary.NumberOfPendingSpecs
 		aggregatedSuiteSummary.NumberOfSkippedSpecs += suiteSummary.NumberOfSkippedSpecs
+		aggregatedSuiteSummary.NumberOfFlakedSpecs += suiteSummary.NumberOfFlakedSpecs
 	}
 
 	aggregatedSuiteSummary.RunTime = time.Since(aggregator.startTime)

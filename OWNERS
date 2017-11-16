@@ -1,0 +1,17 @@
+reviewers:
+  - brendandburns
+  - dchen1107
+  - jbeda
+  - lavalamp
+  - smarterclayton
+  - thockin
+approvers:
+  - bgrant0607
+  - brendandburns
+  - dchen1107
+  - jbeda
+  - monopole # To move code per kubernetes/community#598
+  - lavalamp
+  - smarterclayton
+  - thockin
+  - wojtek-t

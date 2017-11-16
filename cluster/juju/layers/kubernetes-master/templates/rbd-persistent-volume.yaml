@@ -1,0 +1,25 @@
+# JUJU Internal Template used to enlist RBD volumes from the
+# `create-rbd-pv` action. This is a temporary file on disk to enlist resources.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ RBD_NAME }}
+spec:
+  capacity:
+    storage: {{ RBD_SIZE }}M
+  accessModes:
+    - {{ PV_MODE }}
+  storageClassName: "rbd"
+  rbd:
+    monitors:
+      {% for host in monitors %}
+      - {{ host }}
+      {% endfor %}
+    pool: rbd
+    image: {{ RBD_NAME }}
+    user: admin
+    secretRef:
+      name: ceph-secret
+    fsType: {{ RBD_FS }}
+    readOnly: false
+    # persistentVolumeReclaimPolicy: Recycle

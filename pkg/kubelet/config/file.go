@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,34 +23,57 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util/wait"
-
 	"github.com/golang/glog"
+
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/cache"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 type sourceFile struct {
-	path     string
-	nodeName string
-	updates  chan<- interface{}
+	path           string
+	nodeName       types.NodeName
+	store          cache.Store
+	fileKeyMapping map[string]string
+	updates        chan<- interface{}
 }
 
-func NewSourceFile(path string, nodeName string, period time.Duration, updates chan<- interface{}) {
-	config := &sourceFile{
-		path:     path,
-		nodeName: nodeName,
-		updates:  updates,
-	}
+func NewSourceFile(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
+	// "golang.org/x/exp/inotify" requires a path without trailing "/"
+	path = strings.TrimRight(path, string(os.PathSeparator))
+
+	config := new(path, nodeName, period, updates)
 	glog.V(1).Infof("Watching path %q", path)
-	go wait.Until(config.run, period, wait.NeverStop)
+	go wait.Forever(config.run, period)
+}
+
+func new(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) *sourceFile {
+	send := func(objs []interface{}) {
+		var pods []*v1.Pod
+		for _, o := range objs {
+			pods = append(pods, o.(*v1.Pod))
+		}
+		updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.SET, Source: kubetypes.FileSource}
+	}
+	store := cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc)
+	return &sourceFile{
+		path:           path,
+		nodeName:       nodeName,
+		store:          store,
+		fileKeyMapping: map[string]string{},
+		updates:        updates,
+	}
 }
 
 func (s *sourceFile) run() {
-	if err := s.extractFromPath(); err != nil {
-		glog.Errorf("Unable to read config path %q: %v", s.path, err)
+	if err := s.watch(); err != nil {
+		glog.Errorf("Unable to read manifest path %q: %v", s.path, err)
 	}
 }
 
@@ -58,7 +81,7 @@ func (s *sourceFile) applyDefaults(pod *api.Pod, source string) error {
 	return applyDefaults(pod, source, true, s.nodeName)
 }
 
-func (s *sourceFile) extractFromPath() error {
+func (s *sourceFile) resetStoreFromPath() error {
 	path := s.path
 	statInfo, err := os.Stat(path)
 	if err != nil {
@@ -66,7 +89,7 @@ func (s *sourceFile) extractFromPath() error {
 			return err
 		}
 		// Emit an update with an empty PodList to allow FileSource to be marked as seen
-		s.updates <- kubetypes.PodUpdate{Pods: []*api.Pod{}, Op: kubetypes.SET, Source: kubetypes.FileSource}
+		s.updates <- kubetypes.PodUpdate{Pods: []*v1.Pod{}, Op: kubetypes.SET, Source: kubetypes.FileSource}
 		return fmt.Errorf("path does not exist, ignoring")
 	}
 
@@ -76,32 +99,35 @@ func (s *sourceFile) extractFromPath() error {
 		if err != nil {
 			return err
 		}
-		s.updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.SET, Source: kubetypes.FileSource}
+		if len(pods) == 0 {
+			// Emit an update with an empty PodList to allow FileSource to be marked as seen
+			s.updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.SET, Source: kubetypes.FileSource}
+			return nil
+		}
+		return s.replaceStore(pods...)
 
 	case statInfo.Mode().IsRegular():
 		pod, err := s.extractFromFile(path)
 		if err != nil {
 			return err
 		}
-		s.updates <- kubetypes.PodUpdate{Pods: []*api.Pod{pod}, Op: kubetypes.SET, Source: kubetypes.FileSource}
+		return s.replaceStore(pod)
 
 	default:
 		return fmt.Errorf("path is not a directory or file")
 	}
-
-	return nil
 }
 
-// Get as many pod configs as we can from a directory. Return an error if and only if something
+// Get as many pod manifests as we can from a directory. Return an error if and only if something
 // prevented us from reading anything at all. Do not return an error if only some files
 // were problematic.
-func (s *sourceFile) extractFromDir(name string) ([]*api.Pod, error) {
+func (s *sourceFile) extractFromDir(name string) ([]*v1.Pod, error) {
 	dirents, err := filepath.Glob(filepath.Join(name, "[^.]*"))
 	if err != nil {
 		return nil, fmt.Errorf("glob failed: %v", err)
 	}
 
-	pods := make([]*api.Pod, 0)
+	pods := make([]*v1.Pod, 0)
 	if len(dirents) == 0 {
 		return pods, nil
 	}
@@ -110,29 +136,40 @@ func (s *sourceFile) extractFromDir(name string) ([]*api.Pod, error) {
 	for _, path := range dirents {
 		statInfo, err := os.Stat(path)
 		if err != nil {
-			glog.V(1).Infof("Can't get metadata for %q: %v", path, err)
+			glog.Errorf("Can't get metadata for %q: %v", path, err)
 			continue
 		}
 
 		switch {
 		case statInfo.Mode().IsDir():
-			glog.V(1).Infof("Not recursing into config path %q", path)
+			glog.Errorf("Not recursing into manifest path %q", path)
 		case statInfo.Mode().IsRegular():
 			pod, err := s.extractFromFile(path)
 			if err != nil {
-				glog.V(1).Infof("Can't process config file %q: %v", path, err)
+				glog.Errorf("Can't process manifest file %q: %v", path, err)
 			} else {
 				pods = append(pods, pod)
 			}
 		default:
-			glog.V(1).Infof("Config path %q is not a directory or file: %v", path, statInfo.Mode())
+			glog.Errorf("Manifest path %q is not a directory or file: %v", path, statInfo.Mode())
 		}
 	}
 	return pods, nil
 }
 
-func (s *sourceFile) extractFromFile(filename string) (pod *api.Pod, err error) {
-	glog.V(3).Infof("Reading config file %q", filename)
+func (s *sourceFile) extractFromFile(filename string) (pod *v1.Pod, err error) {
+	glog.V(3).Infof("Reading manifest file %q", filename)
+	defer func() {
+		if err == nil && pod != nil {
+			objKey, keyErr := cache.MetaNamespaceKeyFunc(pod)
+			if keyErr != nil {
+				err = keyErr
+				return
+			}
+			s.fileKeyMapping[filename] = objKey
+		}
+	}()
+
 	file, err := os.Open(filename)
 	if err != nil {
 		return pod, err
@@ -156,6 +193,13 @@ func (s *sourceFile) extractFromFile(filename string) (pod *api.Pod, err error) 
 		return pod, nil
 	}
 
-	return pod, fmt.Errorf("%v: read '%v', but couldn't parse as pod(%v).\n",
-		filename, string(data), podErr)
+	return pod, fmt.Errorf("%v: couldn't parse as pod(%v), please check manifest file.\n", filename, podErr)
+}
+
+func (s *sourceFile) replaceStore(pods ...*v1.Pod) (err error) {
+	objs := []interface{}{}
+	for _, pod := range pods {
+		objs = append(objs, pod)
+	}
+	return s.store.Replace(objs, "")
 }

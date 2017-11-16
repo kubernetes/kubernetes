@@ -17,12 +17,12 @@ limitations under the License.
 package session
 
 import (
+	"context"
 	"sync"
 	"time"
 
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/soap"
-	"golang.org/x/net/context"
 )
 
 type keepAlive struct {

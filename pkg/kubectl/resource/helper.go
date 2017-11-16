@@ -19,11 +19,12 @@ package resource
 import (
 	"strconv"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // Helper provides methods for retrieving or mutating a RESTful
@@ -56,48 +57,55 @@ func (m *Helper) Get(namespace, name string, export bool) (runtime.Object, error
 		Resource(m.Resource).
 		Name(name)
 	if export {
+		// TODO: I should be part of GetOptions
 		req.Param("export", strconv.FormatBool(export))
 	}
 	return req.Do().Get()
 }
 
-// TODO: add field selector
-func (m *Helper) List(namespace, apiVersion string, selector labels.Selector, export bool) (runtime.Object, error) {
+func (m *Helper) List(namespace, apiVersion string, export bool, options *metav1.ListOptions) (runtime.Object, error) {
 	req := m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
-		LabelsSelectorParam(selector)
+		VersionedParams(options, metav1.ParameterCodec)
 	if export {
+		// TODO: I should be part of ListOptions
 		req.Param("export", strconv.FormatBool(export))
 	}
 	return req.Do().Get()
 }
 
-func (m *Helper) Watch(namespace, resourceVersion, apiVersion string, labelSelector labels.Selector) (watch.Interface, error) {
+func (m *Helper) Watch(namespace, apiVersion string, options *metav1.ListOptions) (watch.Interface, error) {
+	options.Watch = true
 	return m.RESTClient.Get().
-		Prefix("watch").
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
-		Param("resourceVersion", resourceVersion).
-		LabelsSelectorParam(labelSelector).
+		VersionedParams(options, metav1.ParameterCodec).
 		Watch()
 }
 
 func (m *Helper) WatchSingle(namespace, name, resourceVersion string) (watch.Interface, error) {
 	return m.RESTClient.Get().
-		Prefix("watch").
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
-		Name(name).
-		Param("resourceVersion", resourceVersion).
+		VersionedParams(&metav1.ListOptions{
+			ResourceVersion: resourceVersion,
+			Watch:           true,
+			FieldSelector:   fields.OneTermEqualSelector("metadata.name", name).String(),
+		}, metav1.ParameterCodec).
 		Watch()
 }
 
 func (m *Helper) Delete(namespace, name string) error {
+	return m.DeleteWithOptions(namespace, name, nil)
+}
+
+func (m *Helper) DeleteWithOptions(namespace, name string, options *metav1.DeleteOptions) error {
 	return m.RESTClient.Delete().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		Name(name).
+		Body(options).
 		Do().
 		Error()
 }
@@ -123,7 +131,7 @@ func (m *Helper) Create(namespace string, modify bool, obj runtime.Object) (runt
 func (m *Helper) createResource(c RESTClient, resource, namespace string, obj runtime.Object) (runtime.Object, error) {
 	return c.Post().NamespaceIfScoped(namespace, m.NamespaceScoped).Resource(resource).Body(obj).Do().Get()
 }
-func (m *Helper) Patch(namespace, name string, pt api.PatchType, data []byte) (runtime.Object, error) {
+func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte) (runtime.Object, error) {
 	return m.RESTClient.Patch(pt).
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).

@@ -20,10 +20,13 @@ import (
 	"fmt"
 	"sort"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/tools/cache"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // persistentVolumeOrderedIndex is a cache.Store that keeps persistent volumes
@@ -39,8 +42,8 @@ func newPersistentVolumeOrderedIndex() persistentVolumeOrderedIndex {
 // accessModesIndexFunc is an indexing function that returns a persistent
 // volume's AccessModes as a string
 func accessModesIndexFunc(obj interface{}) ([]string, error) {
-	if pv, ok := obj.(*api.PersistentVolume); ok {
-		modes := api.GetAccessModesAsString(pv.Spec.AccessModes)
+	if pv, ok := obj.(*v1.PersistentVolume); ok {
+		modes := v1helper.GetAccessModesAsString(pv.Spec.AccessModes)
 		return []string{modes}, nil
 	}
 	return []string{""}, fmt.Errorf("object is not a persistent volume: %v", obj)
@@ -48,9 +51,9 @@ func accessModesIndexFunc(obj interface{}) ([]string, error) {
 
 // listByAccessModes returns all volumes with the given set of
 // AccessModeTypes. The list is unsorted!
-func (pvIndex *persistentVolumeOrderedIndex) listByAccessModes(modes []api.PersistentVolumeAccessMode) ([]*api.PersistentVolume, error) {
-	pv := &api.PersistentVolume{
-		Spec: api.PersistentVolumeSpec{
+func (pvIndex *persistentVolumeOrderedIndex) listByAccessModes(modes []v1.PersistentVolumeAccessMode) ([]*v1.PersistentVolume, error) {
+	pv := &v1.PersistentVolume{
+		Spec: v1.PersistentVolumeSpec{
 			AccessModes: modes,
 		},
 	}
@@ -60,19 +63,16 @@ func (pvIndex *persistentVolumeOrderedIndex) listByAccessModes(modes []api.Persi
 		return nil, err
 	}
 
-	volumes := make([]*api.PersistentVolume, len(objs))
+	volumes := make([]*v1.PersistentVolume, len(objs))
 	for i, obj := range objs {
-		volumes[i] = obj.(*api.PersistentVolume)
+		volumes[i] = obj.(*v1.PersistentVolume)
 	}
 
 	return volumes, nil
 }
 
-// matchPredicate is a function that indicates that a persistent volume matches another
-type matchPredicate func(compareThis, toThis *api.PersistentVolume) bool
-
 // find returns the nearest PV from the ordered list or nil if a match is not found
-func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVolumeClaim, matchPredicate matchPredicate) (*api.PersistentVolume, error) {
+func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
 	// PVs are indexed by their access modes to allow easier searching.  Each
 	// index is the string representation of a set of access modes. There is a
 	// finite number of possible sets and PVs will only be indexed in one of
@@ -88,14 +88,14 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 	// example above).
 	allPossibleModes := pvIndex.allPossibleMatchingAccessModes(claim.Spec.AccessModes)
 
-	var smallestVolume *api.PersistentVolume
-	var smallestVolumeSize int64
-	requestedQty := claim.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
-	requestedSize := requestedQty.Value()
+	var smallestVolume *v1.PersistentVolume
+	var smallestVolumeQty resource.Quantity
+	requestedQty := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	requestedClass := v1helper.GetPersistentVolumeClaimClass(claim)
 
 	var selector labels.Selector
 	if claim.Spec.Selector != nil {
-		internalSelector, err := unversioned.LabelSelectorAsSelector(claim.Spec.Selector)
+		internalSelector, err := metav1.LabelSelectorAsSelector(claim.Spec.Selector)
 		if err != nil {
 			// should be unreachable code due to validation
 			return nil, fmt.Errorf("error creating internal label selector for claim: %v: %v", claimToClaimKey(claim), err)
@@ -117,40 +117,36 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 		//   the claim.
 		for _, volume := range volumes {
 			if isVolumeBoundToClaim(volume, claim) {
-				// this claim and volume are bound; return it,
-				// whether the claim is prebound or for volumes
-				// intended for dynamic provisioning v1
+				// this claim and volume are pre-bound; return
+				// the volume if the size request is satisfied,
+				// otherwise continue searching for a match
+				volumeQty := volume.Spec.Capacity[v1.ResourceStorage]
+				if volumeQty.Cmp(requestedQty) < 0 {
+					continue
+				}
 				return volume, nil
 			}
 
 			// filter out:
 			// - volumes bound to another claim
 			// - volumes whose labels don't match the claim's selector, if specified
+			// - volumes in Class that is not requested
 			if volume.Spec.ClaimRef != nil {
 				continue
 			} else if selector != nil && !selector.Matches(labels.Set(volume.Labels)) {
 				continue
 			}
+			if v1helper.GetPersistentVolumeClass(volume) != requestedClass {
+				continue
+			}
 
-			volumeQty := volume.Spec.Capacity[api.ResourceStorage]
-			volumeSize := volumeQty.Value()
-			if volumeSize >= requestedSize {
-				if smallestVolume == nil || smallestVolumeSize > volumeSize {
+			volumeQty := volume.Spec.Capacity[v1.ResourceStorage]
+			if volumeQty.Cmp(requestedQty) >= 0 {
+				if smallestVolume == nil || smallestVolumeQty.Cmp(volumeQty) > 0 {
 					smallestVolume = volume
-					smallestVolumeSize = volumeSize
+					smallestVolumeQty = volumeQty
 				}
 			}
-		}
-
-		// We want to provision volumes if the annotation is set even if there
-		// is matching PV. Therefore, do not look for available PV and let
-		// a new volume to be provisioned.
-		//
-		// When provisioner creates a new PV to this claim, an exact match
-		// pre-bound to the claim will be found by the checks above during
-		// subsequent claim sync.
-		if hasAnnotation(claim.ObjectMeta, annClass) {
-			return nil, nil
 		}
 
 		if smallestVolume != nil {
@@ -162,17 +158,8 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 }
 
 // findBestMatchForClaim is a convenience method that finds a volume by the claim's AccessModes and requests for Storage
-func (pvIndex *persistentVolumeOrderedIndex) findBestMatchForClaim(claim *api.PersistentVolumeClaim) (*api.PersistentVolume, error) {
-	return pvIndex.findByClaim(claim, matchStorageCapacity)
-}
-
-// matchStorageCapacity is a matchPredicate used to sort and find volumes
-func matchStorageCapacity(pvA, pvB *api.PersistentVolume) bool {
-	aQty := pvA.Spec.Capacity[api.ResourceStorage]
-	bQty := pvB.Spec.Capacity[api.ResourceStorage]
-	aSize := aQty.Value()
-	bSize := bQty.Value()
-	return aSize <= bSize
+func (pvIndex *persistentVolumeOrderedIndex) findBestMatchForClaim(claim *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
+	return pvIndex.findByClaim(claim)
 }
 
 // allPossibleMatchingAccessModes returns an array of AccessMode arrays that
@@ -193,32 +180,32 @@ func matchStorageCapacity(pvA, pvB *api.PersistentVolume) bool {
 // A request for RWO could be satisfied by both sets of indexed volumes, so
 // allPossibleMatchingAccessModes returns:
 //
-// [][]api.PersistentVolumeAccessMode {
-//      []api.PersistentVolumeAccessMode {
-//			api.ReadWriteOnce, api.ReadOnlyMany,
+// [][]v1.PersistentVolumeAccessMode {
+//      []v1.PersistentVolumeAccessMode {
+//			v1.ReadWriteOnce, v1.ReadOnlyMany,
 //		},
-//      []api.PersistentVolumeAccessMode {
-//			api.ReadWriteOnce, api.ReadOnlyMany, api.ReadWriteMany,
+//      []v1.PersistentVolumeAccessMode {
+//			v1.ReadWriteOnce, v1.ReadOnlyMany, v1.ReadWriteMany,
 //		},
 // }
 //
 // A request for RWX can be satisfied by only one set of indexed volumes, so
 // the return is:
 //
-// [][]api.PersistentVolumeAccessMode {
-//      []api.PersistentVolumeAccessMode {
-//			api.ReadWriteOnce, api.ReadOnlyMany, api.ReadWriteMany,
+// [][]v1.PersistentVolumeAccessMode {
+//      []v1.PersistentVolumeAccessMode {
+//			v1.ReadWriteOnce, v1.ReadOnlyMany, v1.ReadWriteMany,
 //		},
 // }
 //
 // This func returns modes with ascending levels of modes to give the user
 // what is closest to what they actually asked for.
-func (pvIndex *persistentVolumeOrderedIndex) allPossibleMatchingAccessModes(requestedModes []api.PersistentVolumeAccessMode) [][]api.PersistentVolumeAccessMode {
-	matchedModes := [][]api.PersistentVolumeAccessMode{}
+func (pvIndex *persistentVolumeOrderedIndex) allPossibleMatchingAccessModes(requestedModes []v1.PersistentVolumeAccessMode) [][]v1.PersistentVolumeAccessMode {
+	matchedModes := [][]v1.PersistentVolumeAccessMode{}
 	keys := pvIndex.store.ListIndexFuncValues("accessmodes")
 	for _, key := range keys {
-		indexedModes := api.GetAccessModesFromString(key)
-		if containedInAll(indexedModes, requestedModes) {
+		indexedModes := v1helper.GetAccessModesFromString(key)
+		if volume.AccessModesContainedInAll(indexedModes, requestedModes) {
 			matchedModes = append(matchedModes, indexedModes)
 		}
 	}
@@ -230,27 +217,9 @@ func (pvIndex *persistentVolumeOrderedIndex) allPossibleMatchingAccessModes(requ
 	return matchedModes
 }
 
-func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeAccessMode) bool {
-	for _, m := range modes {
-		if m == mode {
-			return true
-		}
-	}
-	return false
-}
-
-func containedInAll(indexedModes []api.PersistentVolumeAccessMode, requestedModes []api.PersistentVolumeAccessMode) bool {
-	for _, mode := range requestedModes {
-		if !contains(indexedModes, mode) {
-			return false
-		}
-	}
-	return true
-}
-
 // byAccessModes is used to order access modes by size, with the fewest modes first
 type byAccessModes struct {
-	modes [][]api.PersistentVolumeAccessMode
+	modes [][]v1.PersistentVolumeAccessMode
 }
 
 func (c byAccessModes) Less(i, j int) bool {
@@ -265,10 +234,10 @@ func (c byAccessModes) Len() int {
 	return len(c.modes)
 }
 
-func claimToClaimKey(claim *api.PersistentVolumeClaim) string {
+func claimToClaimKey(claim *v1.PersistentVolumeClaim) string {
 	return fmt.Sprintf("%s/%s", claim.Namespace, claim.Name)
 }
 
-func claimrefToClaimKey(claimref *api.ObjectReference) string {
+func claimrefToClaimKey(claimref *v1.ObjectReference) string {
 	return fmt.Sprintf("%s/%s", claimref.Namespace, claimref.Name)
 }

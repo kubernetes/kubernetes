@@ -5,6 +5,7 @@
 package gensupport
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,14 +13,9 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
-	"golang.org/x/net/context/ctxhttp"
 )
 
 const (
-	// statusResumeIncomplete is the code returned by the Google uploader
-	// when the transfer is not yet complete.
-	statusResumeIncomplete = 308
-
 	// statusTooManyRequests is returned by the storage API if the
 	// per-project limits have been temporarily exceeded. The request
 	// should be retried.
@@ -80,8 +76,23 @@ func (rx *ResumableUpload) doUploadRequest(ctx context.Context, data io.Reader, 
 	req.Header.Set("Content-Range", contentRange)
 	req.Header.Set("Content-Type", rx.MediaType)
 	req.Header.Set("User-Agent", rx.UserAgent)
-	return ctxhttp.Do(ctx, rx.Client, req)
 
+	// Google's upload endpoint uses status code 308 for a
+	// different purpose than the "308 Permanent Redirect"
+	// since-standardized in RFC 7238. Because of the conflict in
+	// semantics, Google added this new request header which
+	// causes it to not use "308" and instead reply with 200 OK
+	// and sets the upload-specific "X-HTTP-Status-Code-Override:
+	// 308" response header.
+	req.Header.Set("X-GUploader-No-308", "yes")
+
+	return SendRequest(ctx, rx.Client, req)
+}
+
+func statusResumeIncomplete(resp *http.Response) bool {
+	// This is how the server signals "status resume incomplete"
+	// when X-GUploader-No-308 is set to "yes":
+	return resp != nil && resp.Header.Get("X-Http-Status-Code-Override") == "308"
 }
 
 // reportProgress calls a user-supplied callback to report upload progress.
@@ -112,11 +123,17 @@ func (rx *ResumableUpload) transferChunk(ctx context.Context) (*http.Response, e
 		return res, err
 	}
 
-	if res.StatusCode == statusResumeIncomplete || res.StatusCode == http.StatusOK {
+	// We sent "X-GUploader-No-308: yes" (see comment elsewhere in
+	// this file), so we don't expect to get a 308.
+	if res.StatusCode == 308 {
+		return nil, errors.New("unexpected 308 response status code")
+	}
+
+	if res.StatusCode == http.StatusOK {
 		rx.reportProgress(off, off+int64(size))
 	}
 
-	if res.StatusCode == statusResumeIncomplete {
+	if statusResumeIncomplete(res) {
 		rx.Media.Next()
 	}
 	return res, nil
@@ -135,6 +152,8 @@ func contextDone(ctx context.Context) bool {
 // It retries using the provided back off strategy until cancelled or the
 // strategy indicates to stop retrying.
 // It is called from the auto-generated API code and is not visible to the user.
+// Before sending an HTTP request, Upload calls any registered hook functions,
+// and calls the returned functions after the request returns (see send.go).
 // rx is private to the auto-generated API code.
 // Exactly one of resp or err will be nil.  If resp is non-nil, the caller must call resp.Body.Close.
 func (rx *ResumableUpload) Upload(ctx context.Context) (resp *http.Response, err error) {
@@ -176,7 +195,7 @@ func (rx *ResumableUpload) Upload(ctx context.Context) (resp *http.Response, err
 
 		// If the chunk was uploaded successfully, but there's still
 		// more to go, upload the next chunk without any delay.
-		if status == statusResumeIncomplete {
+		if statusResumeIncomplete(resp) {
 			pause = 0
 			backoff.Reset()
 			resp.Body.Close()

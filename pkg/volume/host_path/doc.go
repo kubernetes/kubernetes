@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package host_path contains the internal representation of hostPath
 // volumes.
-package host_path
+package host_path // import "k8s.io/kubernetes/pkg/volume/host_path"

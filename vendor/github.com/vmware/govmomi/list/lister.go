@@ -17,6 +17,7 @@ limitations under the License.
 package list
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"reflect"
@@ -25,12 +26,15 @@ import (
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
 
 type Element struct {
 	Path   string
 	Object mo.Reference
+}
+
+func (e Element) String() string {
+	return fmt.Sprintf("%s @ %s", e.Object.Reference(), e.Path)
 }
 
 func ToElement(r mo.Reference, prefix string) Element {
@@ -79,6 +83,8 @@ func ToElement(r mo.Reference, prefix string) Element {
 	// Network entity folders on an ESXi host can contain only Network objects.
 	case mo.Network:
 		name = m.Name
+	case mo.OpaqueNetwork:
+		name = m.Name
 	case mo.DistributedVirtualSwitch:
 		name = m.Name
 	case mo.DistributedVirtualPortgroup:
@@ -108,23 +114,6 @@ type Lister struct {
 	Reference types.ManagedObjectReference
 	Prefix    string
 	All       bool
-}
-
-func traversable(ref types.ManagedObjectReference) bool {
-	switch ref.Type {
-	case "Folder":
-	case "Datacenter":
-	case "ComputeResource", "ClusterComputeResource":
-		// Treat ComputeResource and ClusterComputeResource as one and the same.
-		// It doesn't matter from the perspective of the lister.
-	case "HostSystem":
-	case "VirtualApp":
-	case "StoragePod":
-	default:
-		return false
-	}
-
-	return true
 }
 
 func (l Lister) retrieveProperties(ctx context.Context, req types.RetrieveProperties, dst *[]interface{}) error {
@@ -223,6 +212,8 @@ func (l Lister) ListFolder(ctx context.Context) ([]Element, error) {
 
 			// Additional basic properties.
 			switch t {
+			case "Folder":
+				pspec.PathSet = append(pspec.PathSet, "childType")
 			case "ComputeResource", "ClusterComputeResource":
 				// The ComputeResource and ClusterComputeResource are dereferenced in
 				// the ResourcePoolFlag. Make sure they always have their resourcePool
@@ -284,7 +275,7 @@ func (l Lister) ListDatacenter(ctx context.Context) ([]Element, error) {
 	if l.All {
 		pspec.All = types.NewBool(true)
 	} else {
-		pspec.PathSet = []string{"name"}
+		pspec.PathSet = []string{"name", "childType"}
 	}
 
 	req := types.RetrieveProperties{

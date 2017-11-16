@@ -73,7 +73,6 @@ for a protocol buffer variable v:
 When the .proto file specifies `syntax="proto3"`, there are some differences:
 
   - Non-repeated fields of non-message type are values instead of pointers.
-  - Getters are only generated for message and oneof fields.
   - Enum types do not get an Enum method.
 
 The simplest way to describe this is to see an example.
@@ -308,7 +307,7 @@ func GetStats() Stats { return stats }
 // temporary Buffer and are fine for most applications.
 type Buffer struct {
 	buf   []byte // encode/decode byte stream
-	index int    // write point
+	index int    // read point
 
 	// pools of basic types to amortize allocation.
 	bools   []bool
@@ -888,6 +887,10 @@ func isProto3Zero(v reflect.Value) bool {
 	}
 	return false
 }
+
+// ProtoPackageIsVersion2 is referenced from generated protocol buffer files
+// to assert that that code is compatible with this version of the proto package.
+const ProtoPackageIsVersion2 = true
 
 // ProtoPackageIsVersion1 is referenced from generated protocol buffer files
 // to assert that that code is compatible with this version of the proto package.

@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM haproxy:1.5
-MAINTAINER Muhammed Uluyol <uluyol@google.com>
+FROM nginx:1.11
 
-RUN apt-get update && apt-get install -y dnsutils
+RUN apt-get update \
+	&& apt-get install -y \
+		curl \
+		--no-install-recommends \
+	&& apt-get clean \
+	&& rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/man /usr/share/doc
 
-ADD proxy.conf.insecure.in /proxy.conf.in
-ADD run_proxy.sh /usr/bin/run_proxy
+COPY rootfs /
 
-RUN chown root:users /usr/bin/run_proxy
-RUN chmod 755 /usr/bin/run_proxy
-
-CMD ["/usr/bin/run_proxy"]
+CMD ["/bin/boot"]
