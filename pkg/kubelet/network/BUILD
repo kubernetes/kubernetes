@@ -41,6 +41,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/kubelet/network/cni:all-srcs",
+        "//pkg/kubelet/network/dns:all-srcs",
         "//pkg/kubelet/network/hairpin:all-srcs",
         "//pkg/kubelet/network/hostport:all-srcs",
         "//pkg/kubelet/network/kubenet:all-srcs",

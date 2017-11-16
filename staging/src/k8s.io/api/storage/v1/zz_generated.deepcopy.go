@@ -60,6 +60,15 @@ func (in *StorageClass) DeepCopyInto(out *StorageClass) {
 			**out = **in
 		}
 	}
+	if in.VolumeBindingMode != nil {
+		in, out := &in.VolumeBindingMode, &out.VolumeBindingMode
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(VolumeBindingMode)
+			**out = **in
+		}
+	}
 	return
 }
 

@@ -23,6 +23,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 	example "k8s.io/code-generator/_examples/apiserver/apis/example"
+	example2 "k8s.io/code-generator/_examples/apiserver/apis/example2"
 )
 
 // GenericInformer is type of SharedIndexInformer which will locate and delegate to other
@@ -54,6 +55,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	// Group=example.apiserver.code-generator.k8s.io, Version=internalVersion
 	case example.SchemeGroupVersion.WithResource("testtypes"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Example().InternalVersion().TestTypes().Informer()}, nil
+
+		// Group=example.test.apiserver.code-generator.k8s.io, Version=internalVersion
+	case example2.SchemeGroupVersion.WithResource("testtypes"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.SecondExample().InternalVersion().TestTypes().Informer()}, nil
 
 	}
 

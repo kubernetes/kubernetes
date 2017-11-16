@@ -32,9 +32,9 @@ type FakeTestTypes struct {
 	ns   string
 }
 
-var testtypesResource = schema.GroupVersionResource{Group: "example.test2.crd.code-generator.k8s.io", Version: "v1", Resource: "testtypes"}
+var testtypesResource = schema.GroupVersionResource{Group: "example.test.crd.code-generator.k8s.io", Version: "v1", Resource: "testtypes"}
 
-var testtypesKind = schema.GroupVersionKind{Group: "example.test2.crd.code-generator.k8s.io", Version: "v1", Kind: "TestType"}
+var testtypesKind = schema.GroupVersionKind{Group: "example.test.crd.code-generator.k8s.io", Version: "v1", Kind: "TestType"}
 
 // Get takes name of the testType, and returns the corresponding testType object, and an error if there is any.
 func (c *FakeTestTypes) Get(name string, options v1.GetOptions) (result *example2_v1.TestType, err error) {

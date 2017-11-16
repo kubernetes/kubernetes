@@ -481,14 +481,10 @@ var _ = SIGDescribe("Services", func() {
 		}
 	})
 
-	It("should be able to change the type and ports of a service [Slow]", func() {
+	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #52495 is fixed.
+	It("should be able to change the type and ports of a service [Slow] [DisabledForLargeClusters]", func() {
 		// requires cloud load-balancer support
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
-		if framework.ProviderIs("gke", "gce") {
-			// Skipping this test for too large clusters due to issue #52495.
-			// TODO(MrHohn): Get rid of this when gce-side load-balancer improvements are done.
-			framework.SkipUnlessNodeCountIsAtMost(framework.GCPMaxInstancesInInstanceGroup)
-		}
 
 		loadBalancerSupportsUDP := !framework.ProviderIs("aws")
 
@@ -1403,11 +1399,9 @@ var _ = SIGDescribe("Services", func() {
 		framework.CheckReachabilityFromPod(true, normalReachabilityTimeout, namespace, dropPodName, svcIP)
 	})
 
-	It("should be able to create an internal type load balancer [Slow]", func() {
+	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #52495 is fixed.
+	It("should be able to create an internal type load balancer [Slow] [DisabledForLargeClusters]", func() {
 		framework.SkipUnlessProviderIs("azure", "gke", "gce")
-		if framework.ProviderIs("gke", "gce") {
-			framework.SkipUnlessNodeCountIsAtMost(framework.GCPMaxInstancesInInstanceGroup)
-		}
 
 		createTimeout := framework.LoadBalancerCreateTimeoutDefault
 		if nodes := framework.GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > framework.LargeClusterMinNodesNumber {
@@ -1491,7 +1485,8 @@ var _ = SIGDescribe("Services", func() {
 	})
 })
 
-var _ = SIGDescribe("ESIPP [Slow]", func() {
+// TODO: Get rid of [DisabledForLargeClusters] tag when issue #52495 is fixed.
+var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 	f := framework.NewDefaultFramework("esipp")
 	loadBalancerCreateTimeout := framework.LoadBalancerCreateTimeoutDefault
 
@@ -1501,10 +1496,6 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 	BeforeEach(func() {
 		// requires cloud load-balancer support - this feature currently supported only on GCE/GKE
 		framework.SkipUnlessProviderIs("gce", "gke")
-
-		// Skipping this test for too large clusters due to issue #52495.
-		// TODO(MrHohn): Get rid of this when gce-side load-balancer improvements are done.
-		framework.SkipUnlessNodeCountIsAtMost(framework.GCPMaxInstancesInInstanceGroup)
 
 		cs = f.ClientSet
 		if nodes := framework.GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > framework.LargeClusterMinNodesNumber {

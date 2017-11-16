@@ -97,13 +97,13 @@ func (m *ManagerImpl) removeContents(dir string) error {
 }
 
 const (
-	// defaultCheckpoint is the file name of device plugin checkpoint
-	defaultCheckpoint = "kubelet_internal_checkpoint"
+	// kubeletDevicePluginCheckpoint is the file name of device plugin checkpoint
+	kubeletDevicePluginCheckpoint = "kubelet_internal_checkpoint"
 )
 
 // CheckpointFile returns device plugin checkpoint file path.
 func (m *ManagerImpl) CheckpointFile() string {
-	return filepath.Join(m.socketdir, defaultCheckpoint)
+	return filepath.Join(m.socketdir, kubeletDevicePluginCheckpoint)
 }
 
 // Start starts the Device Plugin Manager
@@ -205,34 +205,46 @@ func (m *ManagerImpl) Stop() error {
 }
 
 func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
+	existingDevs := make(map[string]pluginapi.Device)
+	m.mutex.Lock()
+	old, ok := m.endpoints[r.ResourceName]
+	if ok && old != nil {
+		// Pass devices of previous endpoint into re-registered one,
+		// to avoid potential orphaned devices upon re-registration
+		existingDevs = old.devices
+	}
+	m.mutex.Unlock()
+
 	socketPath := filepath.Join(m.socketdir, r.Endpoint)
-	e, err := newEndpoint(socketPath, r.ResourceName, m.callback)
+	e, err := newEndpoint(socketPath, r.ResourceName, existingDevs, m.callback)
 	if err != nil {
 		glog.Errorf("Failed to dial device plugin with request %v: %v", r, err)
 		return
 	}
 
-	stream, err := e.list()
-	if err != nil {
-		glog.Errorf("Failed to List devices for plugin %v: %v", r.ResourceName, err)
+	m.mutex.Lock()
+	// Check for potential re-registration during the initialization of new endpoint,
+	// and skip updating if re-registration happens.
+	// TODO: simplify the part once we have a better way to handle registered devices
+	ext := m.endpoints[r.ResourceName]
+	if ext != old {
+		glog.Warningf("Some other endpoint %v is added while endpoint %v is initialized", ext, e)
+		m.mutex.Unlock()
 		e.stop()
 		return
 	}
-
 	// Associates the newly created endpoint with the corresponding resource name.
 	// Stops existing endpoint if there is any.
-	m.mutex.Lock()
-	old, ok := m.endpoints[r.ResourceName]
 	m.endpoints[r.ResourceName] = e
 	glog.V(2).Infof("Registered endpoint %v", e)
 	m.mutex.Unlock()
 
-	if ok && old != nil {
+	if old != nil {
 		old.stop()
 	}
 
 	go func() {
-		e.listAndWatch(stream)
+		e.run()
 		e.stop()
 
 		m.mutex.Lock()

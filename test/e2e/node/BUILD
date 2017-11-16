@@ -8,6 +8,7 @@ go_library(
         "framework.go",
         "kubelet.go",
         "kubelet_perf.go",
+        "mount_propagation.go",
         "pod_gc.go",
         "pods.go",
         "pre_stop.go",

@@ -943,6 +943,7 @@ func TestDescribeDeployment(t *testing.T) {
 
 func TestDescribeStorageClass(t *testing.T) {
 	reclaimPolicy := api.PersistentVolumeReclaimRetain
+	bindingMode := storage.VolumeBindingMode("bindingmode")
 	f := fake.NewSimpleClientset(&storage.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -956,14 +957,22 @@ func TestDescribeStorageClass(t *testing.T) {
 			"param1": "value1",
 			"param2": "value2",
 		},
-		ReclaimPolicy: &reclaimPolicy,
+		ReclaimPolicy:     &reclaimPolicy,
+		VolumeBindingMode: &bindingMode,
 	})
 	s := StorageClassDescriber{f}
 	out, err := s.Describe("", "foo", printers.DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "foo") {
+	if !strings.Contains(out, "foo") ||
+		!strings.Contains(out, "my-provisioner") ||
+		!strings.Contains(out, "param1") ||
+		!strings.Contains(out, "param2") ||
+		!strings.Contains(out, "value1") ||
+		!strings.Contains(out, "value2") ||
+		!strings.Contains(out, "Retain") ||
+		!strings.Contains(out, "bindingmode") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }

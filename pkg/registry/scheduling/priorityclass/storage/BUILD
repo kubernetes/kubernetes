@@ -12,6 +12,7 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/registry/scheduling/priorityclass/storage",
     library = ":go_default_library",
     deps = [
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/scheduling:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -19,6 +20,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/registry/generic/testing:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/etcd/testing:go_default_library",
     ],
 )

@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"path"
 )
 
 // ActivePodsFunc is a function that returns a list of pods to reconcile.
@@ -43,6 +44,9 @@ type runtimeService interface {
 }
 
 type policyName string
+
+// CPUManagerStateFileName is the name file name where cpu manager stores it's state
+const CPUManagerStateFileName = "cpu_manager_state"
 
 // Manager interface provides methods for Kubelet to manage pod cpus.
 type Manager interface {
@@ -99,13 +103,16 @@ func NewManager(
 	reconcilePeriod time.Duration,
 	machineInfo *cadvisorapi.MachineInfo,
 	nodeAllocatableReservation v1.ResourceList,
+	stateFileDirecory string,
 ) (Manager, error) {
 	var policy Policy
+	var stateHandle state.State
 
 	switch policyName(cpuPolicyName) {
 
 	case PolicyNone:
 		policy = NewNonePolicy()
+		stateHandle = state.NewMemoryState()
 
 	case PolicyStatic:
 		topo, err := topology.Discover(machineInfo)
@@ -134,16 +141,18 @@ func NewManager(
 		reservedCPUsFloat := float64(reservedCPUs.MilliValue()) / 1000
 		numReservedCPUs := int(math.Ceil(reservedCPUsFloat))
 		policy = NewStaticPolicy(topo, numReservedCPUs)
+		stateHandle = state.NewFileState(path.Join(stateFileDirecory, CPUManagerStateFileName), policy.Name())
 
 	default:
 		glog.Errorf("[cpumanager] Unknown policy \"%s\", falling back to default policy \"%s\"", cpuPolicyName, PolicyNone)
 		policy = NewNonePolicy()
+		stateHandle = state.NewMemoryState()
 	}
 
 	manager := &manager{
 		policy:                     policy,
 		reconcilePeriod:            reconcilePeriod,
-		state:                      state.NewMemoryState(),
+		state:                      stateHandle,
 		machineInfo:                machineInfo,
 		nodeAllocatableReservation: nodeAllocatableReservation,
 	}

@@ -43,7 +43,6 @@ const (
 	the Marker for the current call.
 */
 type ListOpts struct {
-
 	// ChangesSince, if provided, instructs List to return only those things which
 	// have changed since the timestamp provided.
 	ChangesSince string `q:"changes-since"`
@@ -152,6 +151,15 @@ func Get(client *gophercloud.ServiceClient, id string) (r GetResult) {
 func Delete(client *gophercloud.ServiceClient, id string) (r DeleteResult) {
 	_, r.Err = client.Delete(deleteURL(client, id), nil)
 	return
+}
+
+// ListAccesses retrieves the tenants which have access to a flavor.
+func ListAccesses(client *gophercloud.ServiceClient, id string) pagination.Pager {
+	url := accessURL(client, id)
+
+	return pagination.NewPager(client, url, func(r pagination.PageResult) pagination.Page {
+		return AccessPage{pagination.SinglePageBase(r)}
+	})
 }
 
 // IDFromName is a convienience function that returns a flavor's ID given its

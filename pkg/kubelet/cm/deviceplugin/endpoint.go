@@ -46,7 +46,7 @@ type endpoint struct {
 }
 
 // newEndpoint creates a new endpoint for the given resourceName.
-func newEndpoint(socketPath, resourceName string, callback MonitorCallback) (*endpoint, error) {
+func newEndpoint(socketPath, resourceName string, devices map[string]pluginapi.Device, callback MonitorCallback) (*endpoint, error) {
 	client, c, err := dial(socketPath)
 	if err != nil {
 		glog.Errorf("Can't create new endpoint with path %s err %v", socketPath, err)
@@ -60,7 +60,7 @@ func newEndpoint(socketPath, resourceName string, callback MonitorCallback) (*en
 		socketPath:   socketPath,
 		resourceName: resourceName,
 
-		devices:  nil,
+		devices:  devices,
 		callback: callback,
 	}, nil
 }
@@ -77,44 +77,21 @@ func (e *endpoint) getDevices() []pluginapi.Device {
 	return devs
 }
 
-// list initializes ListAndWatch gRPC call for the device plugin and gets the
-// initial list of the devices. Returns ListAndWatch gRPC stream on success.
-func (e *endpoint) list() (pluginapi.DevicePlugin_ListAndWatchClient, error) {
-	stream, err := e.client.ListAndWatch(context.Background(), &pluginapi.Empty{})
-	if err != nil {
-		glog.Errorf(errListAndWatch, e.resourceName, err)
-		return nil, err
-	}
-
-	devs, err := stream.Recv()
-	if err != nil {
-		glog.Errorf(errListAndWatch, e.resourceName, err)
-		return nil, err
-	}
-
-	devices := make(map[string]pluginapi.Device)
-	var added, updated, deleted []pluginapi.Device
-	for _, d := range devs.Devices {
-		devices[d.ID] = *d
-		added = append(added, *d)
-	}
-
-	e.mutex.Lock()
-	e.devices = devices
-	e.mutex.Unlock()
-
-	e.callback(e.resourceName, added, updated, deleted)
-
-	return stream, nil
-}
-
-// listAndWatch blocks on receiving ListAndWatch gRPC stream updates. Each ListAndWatch
+// run initializes ListAndWatch gRPC call for the device plugin and
+// blocks on receiving ListAndWatch gRPC stream updates. Each ListAndWatch
 // stream update contains a new list of device states. listAndWatch compares the new
 // device states with its cached states to get list of new, updated, and deleted devices.
 // It then issues a callback to pass this information to the device_plugin_handler which
 // will adjust the resource available information accordingly.
-func (e *endpoint) listAndWatch(stream pluginapi.DevicePlugin_ListAndWatchClient) {
+func (e *endpoint) run() {
 	glog.V(3).Infof("Starting ListAndWatch")
+
+	stream, err := e.client.ListAndWatch(context.Background(), &pluginapi.Empty{})
+	if err != nil {
+		glog.Errorf(errListAndWatch, e.resourceName, err)
+
+		return
+	}
 
 	devices := make(map[string]pluginapi.Device)
 

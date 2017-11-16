@@ -58,8 +58,6 @@ func TestDefaulting(t *testing.T) {
 		{Group: "", Version: "v1", Kind: "PersistentVolumeList"}:                                  {},
 		{Group: "", Version: "v1", Kind: "PersistentVolumeClaim"}:                                 {},
 		{Group: "", Version: "v1", Kind: "PersistentVolumeClaimList"}:                             {},
-		{Group: "", Version: "v1", Kind: "PodAttachOptions"}:                                      {},
-		{Group: "", Version: "v1", Kind: "PodExecOptions"}:                                        {},
 		{Group: "", Version: "v1", Kind: "Pod"}:                                                   {},
 		{Group: "", Version: "v1", Kind: "PodList"}:                                               {},
 		{Group: "", Version: "v1", Kind: "PodTemplate"}:                                           {},

@@ -206,7 +206,7 @@ func (f *Framework) BeforeEach() {
 			InKubemark:                  ProviderIs("kubemark"),
 			MasterOnly:                  TestContext.GatherKubeSystemResourceUsageData == "master",
 			ResourceDataGatheringPeriod: 60 * time.Second,
-			ProbeDuration:               5 * time.Second,
+			ProbeDuration:               15 * time.Second,
 		}, nil)
 		if err != nil {
 			Logf("Error while creating NewResourceUsageGatherer: %v", err)

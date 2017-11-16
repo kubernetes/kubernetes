@@ -188,6 +188,7 @@ func (s *ServiceController) Run(stopCh <-chan struct{}, workers int) {
 	defer glog.Info("Shutting down service controller")
 
 	if !controller.WaitForCacheSync("service", stopCh, s.serviceListerSynced, s.nodeListerSynced) {
+		return
 	}
 
 	for i := 0; i < workers; i++ {
@@ -219,12 +220,12 @@ func (s *ServiceController) worker() {
 
 func (s *ServiceController) init() error {
 	if s.cloud == nil {
-		return fmt.Errorf("WARNING: no cloud provider provided, services of type LoadBalancer will fail.")
+		return fmt.Errorf("WARNING: no cloud provider provided, services of type LoadBalancer will fail")
 	}
 
 	balancer, ok := s.cloud.LoadBalancer()
 	if !ok {
-		return fmt.Errorf("the cloud provider does not support external load balancers.")
+		return fmt.Errorf("the cloud provider does not support external load balancers")
 	}
 	s.balancer = balancer
 
@@ -284,7 +285,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 	if !wantsLoadBalancer(service) {
 		_, exists, err := s.balancer.GetLoadBalancer(s.clusterName, service)
 		if err != nil {
-			return fmt.Errorf("Error getting LB for service %s: %v", key, err), retryable
+			return fmt.Errorf("error getting LB for service %s: %v", key, err), retryable
 		}
 		if exists {
 			glog.Infof("Deleting existing load balancer for service %s that no longer needs a load balancer.", key)
@@ -304,7 +305,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 		s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuringLoadBalancer", "Ensuring load balancer")
 		newState, err = s.ensureLoadBalancer(service)
 		if err != nil {
-			return fmt.Errorf("Failed to ensure load balancer for service %s: %v", key, err), retryable
+			return fmt.Errorf("failed to ensure load balancer for service %s: %v", key, err), retryable
 		}
 		s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuredLoadBalancer", "Ensured load balancer")
 	}
@@ -319,7 +320,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 		service.Status.LoadBalancer = *newState
 
 		if err := s.persistUpdate(service); err != nil {
-			return fmt.Errorf("Failed to persist updated status to apiserver, even after retries. Giving up: %v", err), notRetryable
+			return fmt.Errorf("failed to persist updated status to apiserver, even after retries. Giving up: %v", err), notRetryable
 		}
 	} else {
 		glog.V(2).Infof("Not persisting unchanged LoadBalancerStatus for service %s to registry.", key)
@@ -346,7 +347,7 @@ func (s *ServiceController) persistUpdate(service *v1.Service) error {
 		// TODO: Try to resolve the conflict if the change was unrelated to load
 		// balancer status. For now, just pass it up the stack.
 		if errors.IsConflict(err) {
-			return fmt.Errorf("Not persisting update to service '%s/%s' that has been changed since we received it: %v",
+			return fmt.Errorf("not persisting update to service '%s/%s' that has been changed since we received it: %v",
 				service.Namespace, service.Name, err)
 		}
 		glog.Warningf("Failed to persist updated LoadBalancerStatus to service '%s/%s' after creating its load balancer: %v",
@@ -511,7 +512,7 @@ func getPortsForLB(service *v1.Service) ([]*v1.ServicePort, error) {
 			protocol = sp.Protocol
 		} else if protocol != sp.Protocol && wantsLoadBalancer(service) {
 			// TODO:  Convert error messages to use event recorder
-			return nil, fmt.Errorf("mixed protocol external load balancers are not supported.")
+			return nil, fmt.Errorf("mixed protocol external load balancers are not supported")
 		}
 	}
 	return ports, nil
@@ -597,10 +598,6 @@ func stringSlicesEqual(x, y []string) bool {
 		}
 	}
 	return true
-}
-
-func includeNodeFromNodeList(node *v1.Node) bool {
-	return !node.Spec.Unschedulable
 }
 
 func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
@@ -784,7 +781,7 @@ func (s *ServiceController) syncService(key string) error {
 			s.workingQueue.AddAfter(obj, delay)
 		}(key, retryDelay)
 	} else if err != nil {
-		runtime.HandleError(fmt.Errorf("Failed to process service %v. Not retrying: %v", key, err))
+		runtime.HandleError(fmt.Errorf("failed to process service %v. Not retrying: %v", key, err))
 	}
 	return nil
 }
@@ -795,7 +792,7 @@ func (s *ServiceController) syncService(key string) error {
 func (s *ServiceController) processServiceDeletion(key string) (error, time.Duration) {
 	cachedService, ok := s.cache.get(key)
 	if !ok {
-		return fmt.Errorf("Service %s not in cache even though the watcher thought it was. Ignoring the deletion.", key), doNotRetry
+		return fmt.Errorf("service %s not in cache even though the watcher thought it was. Ignoring the deletion", key), doNotRetry
 	}
 	return s.processLoadBalancerDelete(cachedService, key)
 }

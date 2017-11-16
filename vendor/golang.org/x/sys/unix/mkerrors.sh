@@ -17,8 +17,8 @@ if test -z "$GOARCH" -o -z "$GOOS"; then
 fi
 
 # Check that we are using the new build system if we should
-if [[ "$GOOS" -eq "linux" ]] && [[ "$GOARCH" != "sparc64" ]]; then
-	if [[ "$GOLANG_SYS_BUILD" -ne "docker" ]]; then
+if [[ "$GOOS" = "linux" ]] && [[ "$GOARCH" != "sparc64" ]]; then
+	if [[ "$GOLANG_SYS_BUILD" != "docker" ]]; then
 		echo 1>&2 "In the new build system, mkerrors should not be called directly."
 		echo 1>&2 "See README.md"
 		exit 1
@@ -27,7 +27,7 @@ fi
 
 CC=${CC:-cc}
 
-if [[ "$GOOS" -eq "solaris" ]]; then
+if [[ "$GOOS" = "solaris" ]]; then
 	# Assumes GNU versions of utilities in PATH.
 	export PATH=/usr/gnu/bin:$PATH
 fi
@@ -84,6 +84,7 @@ includes_FreeBSD='
 #include <sys/sockio.h>
 #include <sys/sysctl.h>
 #include <sys/mman.h>
+#include <sys/mount.h>
 #include <sys/wait.h>
 #include <sys/ioctl.h>
 #include <net/bpf.h>
@@ -183,6 +184,7 @@ struct ltchars {
 #include <linux/vm_sockets.h>
 #include <linux/taskstats.h>
 #include <linux/genetlink.h>
+#include <linux/watchdog.h>
 #include <net/route.h>
 #include <asm/termbits.h>
 
@@ -283,6 +285,7 @@ includes_SunOS='
 #include <sys/mman.h>
 #include <sys/wait.h>
 #include <sys/ioctl.h>
+#include <sys/mkdev.h>
 #include <net/bpf.h>
 #include <net/if.h>
 #include <net/if_arp.h>
@@ -347,6 +350,7 @@ ccflags="$@"
 		$2 !~ /^EXPR_/ &&
 		$2 ~ /^E[A-Z0-9_]+$/ ||
 		$2 ~ /^B[0-9_]+$/ ||
+		$2 ~ /^(OLD|NEW)DEV$/ ||
 		$2 == "BOTHER" ||
 		$2 ~ /^CI?BAUD(EX)?$/ ||
 		$2 == "IBSHIFT" ||
@@ -417,7 +421,9 @@ ccflags="$@"
 		$2 ~ /^(VM|VMADDR)_/ ||
 		$2 ~ /^(TASKSTATS|TS)_/ ||
 		$2 ~ /^GENL_/ ||
+		$2 ~ /^UTIME_/ ||
 		$2 ~ /^XATTR_(CREATE|REPLACE)/ ||
+		$2 ~ /^WDIOC_/ ||
 		$2 !~ "WMESGLEN" &&
 		$2 ~ /^W[A-Z0-9]+$/ ||
 		$2 ~ /^BLK[A-Z]*(GET$|SET$|BUF$|PART$|SIZE)/ {printf("\t%s = C.%s\n", $2, $2)}

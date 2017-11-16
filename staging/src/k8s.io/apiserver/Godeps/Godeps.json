@@ -408,31 +408,31 @@
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud",
-			"Rev": "443743e88335413103dcf1997e46d401b264fbcd"
+			"Rev": "0b6b13c4dd9e07a89f83cbe4617c13ad646d6362"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack",
-			"Rev": "443743e88335413103dcf1997e46d401b264fbcd"
+			"Rev": "0b6b13c4dd9e07a89f83cbe4617c13ad646d6362"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v2/tenants",
-			"Rev": "443743e88335413103dcf1997e46d401b264fbcd"
+			"Rev": "0b6b13c4dd9e07a89f83cbe4617c13ad646d6362"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v2/tokens",
-			"Rev": "443743e88335413103dcf1997e46d401b264fbcd"
+			"Rev": "0b6b13c4dd9e07a89f83cbe4617c13ad646d6362"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens",
-			"Rev": "443743e88335413103dcf1997e46d401b264fbcd"
+			"Rev": "0b6b13c4dd9e07a89f83cbe4617c13ad646d6362"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/utils",
-			"Rev": "443743e88335413103dcf1997e46d401b264fbcd"
+			"Rev": "0b6b13c4dd9e07a89f83cbe4617c13ad646d6362"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/pagination",
-			"Rev": "443743e88335413103dcf1997e46d401b264fbcd"
+			"Rev": "0b6b13c4dd9e07a89f83cbe4617c13ad646d6362"
 		},
 		{
 			"ImportPath": "github.com/gregjones/httpcache",
@@ -640,11 +640,11 @@
 		},
 		{
 			"ImportPath": "golang.org/x/sys/unix",
-			"Rev": "7ddbeae9ae08c6a06a59597f0c9edbc5ff2444ce"
+			"Rev": "95c6576299259db960f6c5b9b69ea52422860fce"
 		},
 		{
 			"ImportPath": "golang.org/x/sys/windows",
-			"Rev": "7ddbeae9ae08c6a06a59597f0c9edbc5ff2444ce"
+			"Rev": "95c6576299259db960f6c5b9b69ea52422860fce"
 		},
 		{
 			"ImportPath": "golang.org/x/text/cases",

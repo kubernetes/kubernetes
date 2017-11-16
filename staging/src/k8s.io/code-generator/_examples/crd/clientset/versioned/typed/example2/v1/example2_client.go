@@ -28,7 +28,7 @@ type SecondExampleV1Interface interface {
 	TestTypesGetter
 }
 
-// SecondExampleV1Client is used to interact with features provided by the example.test2.crd.code-generator.k8s.io group.
+// SecondExampleV1Client is used to interact with features provided by the example.test.crd.code-generator.k8s.io group.
 type SecondExampleV1Client struct {
 	restClient rest.Interface
 }

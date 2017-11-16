@@ -25,7 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -72,7 +74,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).ClusterScope()
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme).ClusterScope()
 	volumeAttachment := validNewVolumeAttachment("foo")
 	volumeAttachment.ObjectMeta = metav1.ObjectMeta{GenerateName: "foo"}
 	pvName := "foo"
@@ -102,7 +104,7 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).ClusterScope()
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme).ClusterScope()
 	test.TestUpdate(
 		// valid
 		validNewVolumeAttachment("foo"),
@@ -130,7 +132,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).ClusterScope().ReturnDeletedObject()
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme).ClusterScope().ReturnDeletedObject()
 	test.TestDelete(validNewVolumeAttachment("foo"))
 }
 
@@ -143,7 +145,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).ClusterScope()
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme).ClusterScope()
 	test.TestGet(validNewVolumeAttachment("foo"))
 }
 
@@ -156,7 +158,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).ClusterScope()
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme).ClusterScope()
 	test.TestList(validNewVolumeAttachment("foo"))
 }
 
@@ -169,7 +171,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).ClusterScope()
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme).ClusterScope()
 	test.TestWatch(
 		validNewVolumeAttachment("foo"),
 		// matching labels

@@ -346,3 +346,11 @@ func NewImageServiceV2(client *gophercloud.ProviderClient, eo gophercloud.Endpoi
 	sc.ResourceBase = sc.Endpoint + "v2/"
 	return sc, err
 }
+
+// NewLoadBalancerV2 creates a ServiceClient that may be used to access the v2
+// load balancer service.
+func NewLoadBalancerV2(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	sc, err := initClientOpts(client, eo, "load-balancer")
+	sc.ResourceBase = sc.Endpoint + "v2.0/"
+	return sc, err
+}

@@ -17,17 +17,13 @@ limitations under the License.
 package phases
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
-	clientset "k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	versionutil "k8s.io/kubernetes/pkg/util/version"
 )
 
 // NewCmdBootstrapToken returns the Cobra command for running the mark-master phase
@@ -100,10 +96,7 @@ func NewSubCmdNodeBootstrapTokenPostCSRs(kubeConfigFile *string) *cobra.Command 
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
-			clusterVersion, err := getClusterVersion(client)
-			kubeadmutil.CheckErr(err)
-
-			err = node.AllowBootstrapTokensToPostCSRs(client, clusterVersion)
+			err = node.AllowBootstrapTokensToPostCSRs(client)
 			kubeadmutil.CheckErr(err)
 		},
 	}
@@ -119,25 +112,9 @@ func NewSubCmdNodeBootstrapTokenAutoApprove(kubeConfigFile *string) *cobra.Comma
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
-			clusterVersion, err := getClusterVersion(client)
-			kubeadmutil.CheckErr(err)
-
-			err = node.AutoApproveNodeBootstrapTokens(client, clusterVersion)
+			err = node.AutoApproveNodeBootstrapTokens(client)
 			kubeadmutil.CheckErr(err)
 		},
 	}
 	return cmd
-}
-
-// getClusterVersion fetches the API server version and parses it
-func getClusterVersion(client clientset.Interface) (*versionutil.Version, error) {
-	clusterVersionInfo, err := client.Discovery().ServerVersion()
-	if err != nil {
-		return nil, fmt.Errorf("failed to check server version: %v", err)
-	}
-	clusterVersion, err := versionutil.ParseSemantic(clusterVersionInfo.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse server version: %v", err)
-	}
-	return clusterVersion, nil
 }

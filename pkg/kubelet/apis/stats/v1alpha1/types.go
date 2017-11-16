@@ -109,6 +109,8 @@ type ContainerStats struct {
 	// Stats pertaining to memory (RAM) resources.
 	// +optional
 	Memory *MemoryStats `json:"memory,omitempty"`
+	// Metrics for Accelerators. Each Accelerator corresponds to one element in the array.
+	Accelerators []AcceleratorStats `json:"accelerators,omitempty"`
 	// Stats pertaining to container rootfs usage of filesystem resources.
 	// Rootfs.UsedBytes is the number of bytes used for the container write layer.
 	// +optional
@@ -186,6 +188,30 @@ type MemoryStats struct {
 	// Cumulative number of major page faults.
 	// +optional
 	MajorPageFaults *uint64 `json:"majorPageFaults,omitempty"`
+}
+
+// AcceleratorStats contains stats for accelerators attached to the container.
+type AcceleratorStats struct {
+	// Make of the accelerator (nvidia, amd, google etc.)
+	Make string `json:"make"`
+
+	// Model of the accelerator (tesla-p100, tesla-k80 etc.)
+	Model string `json:"model"`
+
+	// ID of the accelerator.
+	ID string `json:"id"`
+
+	// Total accelerator memory.
+	// unit: bytes
+	MemoryTotal uint64 `json:"memory_total"`
+
+	// Total accelerator memory allocated.
+	// unit: bytes
+	MemoryUsed uint64 `json:"memory_used"`
+
+	// Percent of time over the past sample period (10s) during which
+	// the accelerator was actively processing.
+	DutyCycle uint64 `json:"duty_cycle"`
 }
 
 // VolumeStats contains data about Volume filesystem usage.

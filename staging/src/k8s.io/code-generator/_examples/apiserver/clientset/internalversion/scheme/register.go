@@ -24,6 +24,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	example "k8s.io/code-generator/_examples/apiserver/apis/example/install"
+	secondexample "k8s.io/code-generator/_examples/apiserver/apis/example2/install"
 	os "os"
 )
 
@@ -42,5 +43,6 @@ func init() {
 // Install registers the API group and adds types to a scheme
 func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
 	example.Install(groupFactoryRegistry, registry, scheme)
+	secondexample.Install(groupFactoryRegistry, registry, scheme)
 
 }

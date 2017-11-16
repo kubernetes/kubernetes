@@ -22,7 +22,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/flag"
-	clientgoclientset "k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -103,7 +102,7 @@ func main() {
 		glog.Fatalf("Failed to create a ClientConfig: %v. Exiting.", err)
 	}
 
-	clientset, err := clientset.NewForConfig(clientConfig)
+	client, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
 		glog.Fatalf("Failed to create a ClientSet: %v. Exiting.", err)
 	}
@@ -126,7 +125,7 @@ func main() {
 
 		hollowKubelet := kubemark.NewHollowKubelet(
 			config.NodeName,
-			clientset,
+			client,
 			cadvisorInterface,
 			fakeDockerClientConfig,
 			config.KubeletPort,
@@ -139,7 +138,7 @@ func main() {
 	}
 
 	if config.Morph == "proxy" {
-		client, err := clientgoclientset.NewForConfig(clientConfig)
+		client, err := clientset.NewForConfig(clientConfig)
 		if err != nil {
 			glog.Fatalf("Failed to create API Server client: %v", err)
 		}

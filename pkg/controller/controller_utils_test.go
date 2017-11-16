@@ -439,10 +439,6 @@ func TestActiveReplicaSetsFiltering(t *testing.T) {
 		"expected %v, got %v", expectedNames.List(), gotNames.List())
 }
 
-func int64P(num int64) *int64 {
-	return &num
-}
-
 func TestComputeHash(t *testing.T) {
 	collisionCount := int32(1)
 	otherCollisionCount := int32(2)

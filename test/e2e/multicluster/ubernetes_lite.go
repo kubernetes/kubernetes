@@ -58,7 +58,7 @@ var _ = SIGDescribe("Multi-AZ Clusters", func() {
 		SpreadRCOrFail(f, int32((2*zoneCount)+1), image)
 	})
 
-	It("should schedule pods in the same zones as statically provisioned PVs", func() {
+	It("should schedule pods in the same zones as statically provisioned PVs [sig-storage]", func() {
 		PodsUseStaticPVsOrFail(f, (2*zoneCount)+1, image)
 	})
 })

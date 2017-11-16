@@ -23,7 +23,6 @@ package rbd
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -174,19 +173,26 @@ func (util *RBDUtil) rbdLock(b rbdMounter, lock bool) error {
 				return nil
 			}
 			// clean up orphaned lock if no watcher on the image
-			used, statusErr := util.rbdStatus(&b)
-			if statusErr == nil && !used {
-				re := regexp.MustCompile("client.* " + kubeLockMagic + ".*")
-				locks := re.FindAllStringSubmatch(output, -1)
-				for _, v := range locks {
-					if len(v) > 0 {
-						lockInfo := strings.Split(v[0], " ")
-						if len(lockInfo) > 2 {
-							args := []string{"lock", "remove", b.Image, lockInfo[1], lockInfo[0], "--pool", b.Pool, "--id", b.Id, "-m", mon}
-							args = append(args, secret_opt...)
-							cmd, err = b.exec.Run("rbd", args...)
-							glog.Infof("remove orphaned locker %s from client %s: err %v, output: %s", lockInfo[1], lockInfo[0], err, string(cmd))
-						}
+			used, rbdOutput, statusErr := util.rbdStatus(&b)
+			if statusErr != nil {
+				return fmt.Errorf("rbdStatus failed error %v, rbd output: %v", statusErr, rbdOutput)
+			}
+			if used {
+				// this image is already used by a node other than this node
+				return fmt.Errorf("rbd image: %s/%s is already used by a node other than this node, rbd output: %v", b.Image, b.Pool, output)
+			}
+
+			// best effort clean up orphaned locked if not used
+			re := regexp.MustCompile("client.* " + kubeLockMagic + ".*")
+			locks := re.FindAllStringSubmatch(output, -1)
+			for _, v := range locks {
+				if len(v) > 0 {
+					lockInfo := strings.Split(v[0], " ")
+					if len(lockInfo) > 2 {
+						args := []string{"lock", "remove", b.Image, lockInfo[1], lockInfo[0], "--pool", b.Pool, "--id", b.Id, "-m", mon}
+						args = append(args, secret_opt...)
+						cmd, err = b.exec.Run("rbd", args...)
+						glog.Infof("remove orphaned locker %s from client %s: err %v, rbd output: %s", lockInfo[1], lockInfo[0], err, string(cmd))
 					}
 				}
 			}
@@ -250,13 +256,13 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
 
 		// Currently, we don't acquire advisory lock on image, but for backward
 		// compatibility, we need to check if the image is being used by nodes running old kubelet.
-		found, err := util.rbdStatus(&b)
+		found, rbdOutput, err := util.rbdStatus(&b)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("error: %v, rbd output: %v", err, rbdOutput)
 		}
 		if found {
-			glog.Info("rbd is still being used ", b.Image)
-			return "", fmt.Errorf("rbd %s is still being used", b.Image)
+			glog.Infof("rbd image %s/%s is still being used ", b.Pool, b.Image)
+			return "", fmt.Errorf("rbd image %s/%s is still being used. rbd output: %s", b.Pool, b.Image, rbdOutput)
 		}
 
 		// rbd map
@@ -277,33 +283,34 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
 			if err == nil {
 				break
 			}
-			glog.V(1).Infof("rbd: map error %v %s", err, string(output))
+			glog.V(1).Infof("rbd: map error %v, rbd output: %s", err, string(output))
 		}
 		if err != nil {
-			return "", fmt.Errorf("rbd: map failed %v %s", err, string(output))
+			return "", fmt.Errorf("rbd: map failed %v, rbd output: %s", err, string(output))
 		}
 		devicePath, found = waitForPath(b.Pool, b.Image, 10)
 		if !found {
-			return "", errors.New("Could not map image: Timeout after 10s")
+			return "", fmt.Errorf("Could not map image %s/%s, Timeout after 10s", b.Pool, b.Image)
 		}
 	}
-	return devicePath, err
+	return devicePath, nil
 }
 
 // DetachDisk detaches the disk from the node.
 // It detaches device from the node if device is provided, and removes the lock
 // if there is persisted RBD info under deviceMountPath.
 func (util *RBDUtil) DetachDisk(plugin *rbdPlugin, deviceMountPath string, device string) error {
-	var err error
-	if len(device) > 0 {
-		// rbd unmap
-		exec := plugin.host.GetExec(plugin.GetPluginName())
-		_, err = exec.Run("rbd", "unmap", device)
-		if err != nil {
-			return rbdErrors(err, fmt.Errorf("rbd: failed to unmap device %s:Error: %v", device, err))
-		}
-		glog.V(3).Infof("rbd: successfully unmap device %s", device)
+	if len(device) == 0 {
+		return fmt.Errorf("DetachDisk failed , device is empty")
 	}
+	// rbd unmap
+	exec := plugin.host.GetExec(plugin.GetPluginName())
+	output, err := exec.Run("rbd", "unmap", device)
+	if err != nil {
+		return rbdErrors(err, fmt.Errorf("rbd: failed to unmap device %s, error %v, rbd output: %v", device, err, output))
+	}
+	glog.V(3).Infof("rbd: successfully unmap device %s", device)
+
 	// Currently, we don't persist rbd info on the disk, but for backward
 	// compatbility, we need to clean it if found.
 	rbdFile := path.Join(deviceMountPath, "rbd.json")
@@ -402,13 +409,13 @@ func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDPersistentVo
 
 func (util *RBDUtil) DeleteImage(p *rbdVolumeDeleter) error {
 	var output []byte
-	found, err := util.rbdStatus(p.rbdMounter)
+	found, rbdOutput, err := util.rbdStatus(p.rbdMounter)
 	if err != nil {
-		return err
+		return fmt.Errorf("error %v, rbd output: %v", err, rbdOutput)
 	}
 	if found {
 		glog.Info("rbd is still being used ", p.rbdMounter.Image)
-		return fmt.Errorf("rbd %s is still being used", p.rbdMounter.Image)
+		return fmt.Errorf("rbd image %s/%s is still being used, rbd output: %v", p.rbdMounter.Pool, p.rbdMounter.Image, rbdOutput)
 	}
 	// rbd rm
 	l := len(p.rbdMounter.Mon)
@@ -426,11 +433,11 @@ func (util *RBDUtil) DeleteImage(p *rbdVolumeDeleter) error {
 			glog.Errorf("failed to delete rbd image: %v, command output: %s", err, string(output))
 		}
 	}
-	return err
+	return fmt.Errorf("error %v, rbd output: %v", err, string(output))
 }
 
 // rbdStatus runs `rbd status` command to check if there is watcher on the image.
-func (util *RBDUtil) rbdStatus(b *rbdMounter) (bool, error) {
+func (util *RBDUtil) rbdStatus(b *rbdMounter) (bool, string, error) {
 	var err error
 	var output string
 	var cmd []byte
@@ -475,20 +482,20 @@ func (util *RBDUtil) rbdStatus(b *rbdMounter) (bool, error) {
 		if err.Error() == rbdCmdErr {
 			glog.Errorf("rbd cmd not found")
 			// fail fast if command not found
-			return false, err
+			return false, output, err
 		}
 	}
 
 	// If command never succeed, returns its last error.
 	if err != nil {
-		return false, err
+		return false, output, err
 	}
 
 	if strings.Contains(output, imageWatcherStr) {
 		glog.V(4).Infof("rbd: watchers on %s: %s", b.Image, output)
-		return true, nil
+		return true, output, nil
 	} else {
 		glog.Warningf("rbd: no watchers on %s", b.Image)
-		return false, nil
+		return false, output, nil
 	}
 }
