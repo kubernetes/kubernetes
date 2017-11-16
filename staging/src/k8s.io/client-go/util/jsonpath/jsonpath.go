@@ -34,9 +34,12 @@ type JSONPath struct {
 	beginRange int
 	inRange    int
 	endRange   int
+	functions  map[string]JSONPathFunction
 
 	allowMissingKeys bool
 }
+
+type JSONPathFunction func([]reflect.Value) []reflect.Value
 
 // New creates a new JSONPath with the given name.
 func New(name string) *JSONPath {
@@ -52,6 +55,11 @@ func New(name string) *JSONPath {
 // cannot be located, or simply an empty result. The receiver is returned for chaining.
 func (j *JSONPath) AllowMissingKeys(allow bool) *JSONPath {
 	j.allowMissingKeys = allow
+	return j
+}
+
+func (j *JSONPath) RegisterJSONPathFunctions(functions map[string]JSONPathFunction) *JSONPath {
+	j.functions = functions
 	return j
 }
 
@@ -162,6 +170,8 @@ func (j *JSONPath) walk(value []reflect.Value, node Node) ([]reflect.Value, erro
 		return j.evalUnion(value, node)
 	case *IdentifierNode:
 		return j.evalIdentifier(value, node)
+	case *FunctionNode:
+		return j.evalFunction(value, node)
 	default:
 		return value, fmt.Errorf("unexpected Node %v", node)
 	}
@@ -502,6 +512,24 @@ func (j *JSONPath) evalFilter(input []reflect.Value, node *FilterNode) ([]reflec
 			}
 		}
 	}
+	return results, nil
+}
+
+// evalFunction evaluates a JSONPath function.
+func (j *JSONPath) evalFunction(input []reflect.Value, node *FunctionNode) ([]reflect.Value, error) {
+	results := []reflect.Value{}
+	// If there's no input, there's no output
+	if len(input) == 0 {
+		return results, nil
+	}
+	function, ok := j.functions[node.Name]
+	if !ok {
+		return results, fmt.Errorf("unrecognized function %s", node.Name)
+	}
+
+	returnedValue := function(input)
+	results = append(results, returnedValue...)
+
 	return results, nil
 }
 

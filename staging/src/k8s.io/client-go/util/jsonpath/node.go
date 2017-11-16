@@ -43,6 +43,7 @@ const (
 	NodeRecursive
 	NodeUnion
 	NodeBool
+	NodeFunction
 )
 
 var NodeTypeName = map[NodeType]string{
@@ -58,6 +59,7 @@ var NodeTypeName = map[NodeType]string{
 	NodeRecursive:  "NodeRecursive",
 	NodeUnion:      "NodeUnion",
 	NodeBool:       "NodeBool",
+	NodeFunction:   "NodeFunction",
 }
 
 type Node interface {
@@ -252,4 +254,18 @@ func newBool(value bool) *BoolNode {
 
 func (b *BoolNode) String() string {
 	return fmt.Sprintf("%s: %t", b.Type(), b.Value)
+}
+
+// FunctionNode holds a JSONpath function
+type FunctionNode struct {
+	NodeType
+	Name string
+}
+
+func newFunction(name string) *FunctionNode {
+	return &FunctionNode{NodeType: NodeFunction, Name: name}
+}
+
+func (f *FunctionNode) String() string {
+	return fmt.Sprintf("%s: %s", f.Type(), f.Name)
 }

@@ -169,7 +169,7 @@ func (p *Parser) parseInsideAction(cur *ListNode) error {
 	case r == '"' || r == '\'':
 		return p.parseQuote(cur, r)
 	case r == '.':
-		return p.parseField(cur)
+		return p.parseFieldOrFunction(cur)
 	case r == '+' || r == '-' || unicode.IsDigit(r):
 		p.backup()
 		return p.parseNumber(cur)
@@ -222,7 +222,7 @@ func (p *Parser) parseRecursive(cur *ListNode) error {
 	p.consumeText()
 	cur.append(newRecursive())
 	if r := p.peek(); isAlphaNumeric(r) {
-		return p.parseField(cur)
+		return p.parseFieldOrFunction(cur)
 	}
 	return p.parseInsideAction(cur)
 }
@@ -418,14 +418,16 @@ Loop:
 	return p.parseInsideAction(cur)
 }
 
-// parseField scans a field until a terminator
-func (p *Parser) parseField(cur *ListNode) error {
+// parseFieldOrFunction scans a field until a terminator
+func (p *Parser) parseFieldOrFunction(cur *ListNode) error {
 	p.consumeText()
 	for p.advance() {
 	}
 	value := p.consumeText()
 	if value == "*" {
 		cur.append(newWildcard())
+	} else if strings.HasSuffix(value, "()") {
+		cur.append(newFunction(value[:len(value)-2]))
 	} else {
 		cur.append(newField(strings.Replace(value, "\\", "", -1)))
 	}
