@@ -145,9 +145,9 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	pod, err := client.CoreV1().Pods(namespace).Create(podSpec)
 	Expect(err).NotTo(HaveOccurred())
 
-	vsp, err := vsphere.GetVSphere()
+	vsp, err := getVSphere(client)
 	Expect(err).NotTo(HaveOccurred())
-	verifyVSphereDiskAttached(vsp, pv.Spec.VsphereVolume.VolumePath, k8stype.NodeName(nodeName))
+	verifyVSphereDiskAttached(client, vsp, pv.Spec.VsphereVolume.VolumePath, k8stype.NodeName(nodeName))
 
 	By("Waiting for pod to be running")
 	Expect(framework.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(Succeed())

@@ -295,16 +295,16 @@ func invokeValidPolicyTest(f *framework.Framework, client clientset.Interface, n
 	pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, "")
 	Expect(err).NotTo(HaveOccurred())
 
-	vsp, err := vsphere.GetVSphere()
+	vsp, err := getVSphere(client)
 	Expect(err).NotTo(HaveOccurred())
 	By("Verify the volume is accessible and available in the pod")
-	verifyVSphereVolumesAccessible(pod, persistentvolumes, vsp)
+	verifyVSphereVolumesAccessible(client, pod, persistentvolumes, vsp)
 
 	By("Deleting pod")
 	framework.DeletePodWithWait(f, client, pod)
 
 	By("Waiting for volumes to be detached from the node")
-	waitForVSphereDiskToDetach(vsp, persistentvolumes[0].Spec.VsphereVolume.VolumePath, k8stype.NodeName(pod.Spec.NodeName))
+	waitForVSphereDiskToDetach(client, vsp, persistentvolumes[0].Spec.VsphereVolume.VolumePath, k8stype.NodeName(pod.Spec.NodeName))
 }
 
 func invokeInvalidPolicyTestNeg(client clientset.Interface, namespace string, scParameters map[string]string) error {

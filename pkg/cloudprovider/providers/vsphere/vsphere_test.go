@@ -39,7 +39,7 @@ func configFromEnv() (cfg VSphereConfig, ok bool) {
 	cfg.Global.Password = os.Getenv("VSPHERE_PASSWORD")
 	cfg.Global.Datacenter = os.Getenv("VSPHERE_DATACENTER")
 	cfg.Network.PublicNetwork = os.Getenv("VSPHERE_PUBLIC_NETWORK")
-	cfg.Global.Datastore = os.Getenv("VSPHERE_DATASTORE")
+	cfg.Global.DefaultDatastore = os.Getenv("VSPHERE_DATASTORE")
 	cfg.Disk.SCSIControllerType = os.Getenv("VSPHERE_SCSICONTROLLER_TYPE")
 	cfg.Global.WorkingDir = os.Getenv("VSPHERE_WORKING_DIR")
 	cfg.Global.VMName = os.Getenv("VSPHERE_VM_NAME")
@@ -103,7 +103,7 @@ func TestNewVSphere(t *testing.T) {
 		t.Skipf("No config found in environment")
 	}
 
-	_, err := newVSphere(cfg)
+	_, err := newControllerNode(cfg)
 	if err != nil {
 		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
 	}
@@ -116,7 +116,7 @@ func TestVSphereLogin(t *testing.T) {
 	}
 
 	// Create vSphere configuration object
-	vs, err := newVSphere(cfg)
+	vs, err := newControllerNode(cfg)
 	if err != nil {
 		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
 	}
@@ -126,11 +126,16 @@ func TestVSphereLogin(t *testing.T) {
 	defer cancel()
 
 	// Create vSphere client
-	err = vs.conn.Connect(ctx)
+	var vcInstance *VSphereInstance
+	if vcInstance, ok = vs.vsphereInstanceMap[cfg.Global.VCenterIP]; !ok {
+		t.Fatalf("Couldn't get vSphere instance: %s", cfg.Global.VCenterIP)
+	}
+
+	err = vcInstance.conn.Connect(ctx)
 	if err != nil {
 		t.Errorf("Failed to connect to vSphere: %s", err)
 	}
-	defer vs.conn.GoVmomiClient.Logout(ctx)
+	defer vcInstance.conn.GoVmomiClient.Logout(ctx)
 }
 
 func TestZones(t *testing.T) {
@@ -154,7 +159,7 @@ func TestInstances(t *testing.T) {
 		t.Skipf("No config found in environment")
 	}
 
-	vs, err := newVSphere(cfg)
+	vs, err := newControllerNode(cfg)
 	if err != nil {
 		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
 	}
@@ -213,7 +218,7 @@ func TestVolumes(t *testing.T) {
 		t.Skipf("No config found in environment")
 	}
 
-	vs, err := newVSphere(cfg)
+	vs, err := newControllerNode(cfg)
 	if err != nil {
 		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
 	}
