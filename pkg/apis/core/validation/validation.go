@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/security/apparmor"
+	"k8s.io/kubernetes/pkg/util/annotations"
 )
 
 // TODO: delete this global variable when we enable the validation of common
@@ -1799,10 +1800,17 @@ func validateObjectFieldSelector(fs *core.ObjectFieldSelector, expressions *sets
 		allErrs = append(allErrs, field.Required(fldPath.Child("fieldPath"), ""))
 	} else {
 		internalFieldPath, _, err := legacyscheme.Scheme.ConvertFieldLabel(fs.APIVersion, "Pod", fs.FieldPath, "")
+		isAnnotationFieldPathValid, key := annotations.ValidateAndParse(internalFieldPath)
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldPath"), fs.FieldPath, fmt.Sprintf("error converting fieldPath: %v", err)))
-		} else if !expressions.Has(internalFieldPath) {
+		} else if !expressions.Has(internalFieldPath) && !isAnnotationFieldPathValid {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("fieldPath"), internalFieldPath, expressions.List()))
+		}
+
+		if isAnnotationFieldPathValid {
+			for _, msg := range validation.IsQualifiedName(key) {
+				allErrs = append(allErrs, field.Invalid(fldPath, key, msg))
+			}
 		}
 	}
 

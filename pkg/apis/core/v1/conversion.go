@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/util/annotations"
 )
 
 // This is a "fast-path" that avoids reflection for common types. It focuses on the objects that are
@@ -156,6 +157,10 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add field conversion funcs.
 	err = scheme.AddFieldLabelConversionFunc("v1", "Pod",
 		func(label, value string) (string, string, error) {
+			if ok, _ := annotations.ValidateAndParse(label); ok {
+				return label, value, nil
+			}
+
 			switch label {
 			case "metadata.annotations",
 				"metadata.labels",

@@ -15,6 +15,7 @@ go_library(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/util/annotations:go_default_library",
         "//pkg/util/parsers:go_default_library",
         "//pkg/util/pointer:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

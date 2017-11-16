@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/util/annotations"
 )
 
 // FormatMap formats map[string]string to a string.
@@ -40,6 +41,11 @@ func ExtractFieldPathAsString(obj interface{}, fieldPath string) (string, error)
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return "", nil
+	}
+
+	isAnnotationFieldPathValid, key := annotations.ValidateAndParse(fieldPath)
+	if isAnnotationFieldPathValid {
+		return accessor.GetAnnotations()[key], nil
 	}
 
 	switch fieldPath {
