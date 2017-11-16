@@ -115,6 +115,9 @@ const (
 	// system:nodes group subject is removed if present.
 	NodesClusterRoleBinding = "system:node"
 
+	// KubeletBaseConfigMapRoleName defines the base kubelet configuration ConfigMap.
+	KubeletBaseConfigMapRoleName = "kubeadm:kubelet-base-configmap"
+
 	// APICallRetryInterval defines how long kubeadm should wait before retrying a failed API operation
 	APICallRetryInterval = 500 * time.Millisecond
 	// DiscoveryRetryInterval specifies how long kubeadm should wait before retrying to connect to the master when doing discovery

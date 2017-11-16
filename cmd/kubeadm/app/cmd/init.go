@@ -30,15 +30,11 @@ import (
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
-	"k8s.io/api/core/v1"
-	rbac "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
-	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -51,6 +47,7 @@ import (
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
+	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
 	selfhostingphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
 	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
@@ -62,15 +59,7 @@ import (
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
-	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
-	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 	utilsexec "k8s.io/utils/exec"
-)
-
-const (
-	// KubeletBaseConfigMapRoleName sets the name for the ClusterRole that allows access to ConfigMaps in the kube-system ns
-	KubeletBaseConfigMapRoleName = "kubeadm:kubelet-base-configmap"
 )
 
 var (
@@ -349,34 +338,6 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
-		_, kubeletCodecs, err := kubeletconfigscheme.NewSchemeAndCodecs()
-		if err != nil {
-			return err
-		}
-		kubeletBytes, err := kubeadmutil.MarshalToYamlForCodecs(i.cfg.KubeletConfiguration.BaseConfig, kubeletconfigv1alpha1.SchemeGroupVersion, *kubeletCodecs)
-		if err != nil {
-			return err
-		}
-
-		if err = apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      kubeadmconstants.KubeletBaseConfigurationConfigMap,
-				Namespace: metav1.NamespaceSystem,
-			},
-			Data: map[string]string{
-				kubeadmconstants.KubeletBaseConfigurationConfigMapKey: string(kubeletBytes),
-			},
-		}); err != nil {
-			return err
-		}
-
-		if err := CreateKubeletBaseConfigMapRBACRules(client, i.cfg.NodeName); err != nil {
-			return fmt.Errorf("error creating kubelet base configmap RBAC rules: %v", err)
-		}
-	}
-
 	// waiter holds the apiclient.Waiter implementation of choice, responsible for querying the API server in various ways and waiting for conditions to be fulfilled
 	waiter := getWaiter(i.dryRun, client)
 
@@ -393,10 +354,11 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("couldn't initialize a Kubernetes cluster")
 	}
 
+	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
 	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
-		err = cmdutil.UpdateNodeWithConfigMap(client, i.cfg.NodeName)
-		if err != nil {
-			return nil
+		// Create base kubelet configuration for dynamic kubelet configuration feature.
+		if err := kubeletphase.CreateBaseKubeletConfiguration(i.cfg, client); err != nil {
+			return fmt.Errorf("error uploading configuration: %v", err)
 		}
 	}
 
@@ -580,38 +542,4 @@ func waitForAPIAndKubelet(waiter apiclient.Waiter) error {
 
 	// This call is blocking until one of the goroutines sends to errorChan
 	return <-errorChan
-}
-
-// CreateKubeletBaseConfigMapRBACRules creates the RBAC rules for exposing the kubelet base ConfigMap in the kube-system namespace to unauthenticated users
-func CreateKubeletBaseConfigMapRBACRules(client clientset.Interface, nodeName string) error {
-	err := apiclient.CreateOrUpdateRole(client, &rbac.Role{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      KubeletBaseConfigMapRoleName,
-			Namespace: metav1.NamespaceSystem,
-		},
-		Rules: []rbac.PolicyRule{
-			rbachelper.NewRule("get").Groups("").Resources("configmaps").Names(kubeadmconstants.KubeletBaseConfigurationConfigMap).RuleOrDie(),
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	return apiclient.CreateOrUpdateRoleBinding(client, &rbac.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      KubeletBaseConfigMapRoleName,
-			Namespace: metav1.NamespaceSystem,
-		},
-		RoleRef: rbac.RoleRef{
-			APIGroup: rbac.GroupName,
-			Kind:     "Role",
-			Name:     KubeletBaseConfigMapRoleName,
-		},
-		Subjects: []rbac.Subject{
-			{
-				Kind: "Group",
-				Name: kubeadmconstants.NodesGroup,
-			},
-		},
-	})
 }
