@@ -106,13 +106,11 @@ func NewManager(
 	stateFileDirecory string,
 ) (Manager, error) {
 	var policy Policy
-	var stateHandle state.State
 
 	switch policyName(cpuPolicyName) {
 
 	case PolicyNone:
 		policy = NewNonePolicy()
-		stateHandle = state.NewMemoryState()
 
 	case PolicyStatic:
 		topo, err := topology.Discover(machineInfo)
@@ -141,18 +139,20 @@ func NewManager(
 		reservedCPUsFloat := float64(reservedCPUs.MilliValue()) / 1000
 		numReservedCPUs := int(math.Ceil(reservedCPUsFloat))
 		policy = NewStaticPolicy(topo, numReservedCPUs)
-		stateHandle = state.NewFileState(path.Join(stateFileDirecory, CPUManagerStateFileName), policy.Name())
 
 	default:
 		glog.Errorf("[cpumanager] Unknown policy \"%s\", falling back to default policy \"%s\"", cpuPolicyName, PolicyNone)
 		policy = NewNonePolicy()
-		stateHandle = state.NewMemoryState()
 	}
+
+	stateImpl := state.NewFileState(
+		path.Join(stateFileDirecory, CPUManagerStateFileName),
+		policy.Name())
 
 	manager := &manager{
 		policy:                     policy,
 		reconcilePeriod:            reconcilePeriod,
-		state:                      stateHandle,
+		state:                      stateImpl,
 		machineInfo:                machineInfo,
 		nodeAllocatableReservation: nodeAllocatableReservation,
 	}
