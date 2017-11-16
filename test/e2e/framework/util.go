@@ -4573,7 +4573,7 @@ func CoreDump(dir string) {
 		Logf("Dumping logs locally to: %s", dir)
 		cmd = exec.Command(path.Join(TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir)
 	}
-	cmd.Env = append(os.Environ(), fmt.Sprintf("SYSTEMD_SERVICES=%s", parseSystemdServices(TestContext.SystemdServices)))
+	cmd.Env = append(os.Environ(), fmt.Sprintf("LOG_DUMP_SYSTEMD_SERVICES=%s", parseSystemdServices(TestContext.SystemdServices)))
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
