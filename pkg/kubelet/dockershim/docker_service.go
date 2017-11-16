@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network/kubenet"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
+	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/metrics"
@@ -365,6 +366,9 @@ func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.Po
 	checkpoint, err := ds.checkpointHandler.GetCheckpoint(podSandboxID)
 	// Return empty portMappings if checkpoint is not found
 	if err != nil {
+		if err == utilstore.ErrKeyNotFound {
+			return nil, nil
+		}
 		return nil, err
 	}
 
