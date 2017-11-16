@@ -46,8 +46,6 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	})
 	scheme.AddTypeDefaultingFunc(&v1.PersistentVolumeList{}, func(obj interface{}) { SetObjectDefaults_PersistentVolumeList(obj.(*v1.PersistentVolumeList)) })
 	scheme.AddTypeDefaultingFunc(&v1.Pod{}, func(obj interface{}) { SetObjectDefaults_Pod(obj.(*v1.Pod)) })
-	scheme.AddTypeDefaultingFunc(&v1.PodAttachOptions{}, func(obj interface{}) { SetObjectDefaults_PodAttachOptions(obj.(*v1.PodAttachOptions)) })
-	scheme.AddTypeDefaultingFunc(&v1.PodExecOptions{}, func(obj interface{}) { SetObjectDefaults_PodExecOptions(obj.(*v1.PodExecOptions)) })
 	scheme.AddTypeDefaultingFunc(&v1.PodList{}, func(obj interface{}) { SetObjectDefaults_PodList(obj.(*v1.PodList)) })
 	scheme.AddTypeDefaultingFunc(&v1.PodTemplate{}, func(obj interface{}) { SetObjectDefaults_PodTemplate(obj.(*v1.PodTemplate)) })
 	scheme.AddTypeDefaultingFunc(&v1.PodTemplateList{}, func(obj interface{}) { SetObjectDefaults_PodTemplateList(obj.(*v1.PodTemplateList)) })
@@ -306,14 +304,6 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 			}
 		}
 	}
-}
-
-func SetObjectDefaults_PodAttachOptions(in *v1.PodAttachOptions) {
-	SetDefaults_PodAttachOptions(in)
-}
-
-func SetObjectDefaults_PodExecOptions(in *v1.PodExecOptions) {
-	SetDefaults_PodExecOptions(in)
 }
 
 func SetObjectDefaults_PodList(in *v1.PodList) {
