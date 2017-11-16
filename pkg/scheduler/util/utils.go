@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
 	"sort"
 
 	"k8s.io/api/core/v1"
@@ -28,33 +27,126 @@ import (
 
 const DefaultBindAllHostIP = "0.0.0.0"
 
-// GetUsedPorts returns the used host ports of Pods: if 'port' was used, a 'port:true' pair
+// ProtocolPort represents a protocol port pair, e.g. tcp:80.
+type ProtocolPort struct {
+	Protocol string
+	Port     int32
+}
+
+// NewProtocolPort creates a ProtocolPort instance.
+func NewProtocolPort(protocol string, port int32) *ProtocolPort {
+	pp := &ProtocolPort{
+		Protocol: protocol,
+		Port:     port,
+	}
+
+	if len(pp.Protocol) == 0 {
+		pp.Protocol = string(v1.ProtocolTCP)
+	}
+
+	return pp
+}
+
+// HostPortInfo stores mapping from ip to a set of ProtocolPort
+type HostPortInfo map[string]map[ProtocolPort]struct{}
+
+// Add adds (ip, protocol, port) to HostPortInfo
+func (h HostPortInfo) Add(ip, protocol string, port int32) {
+	if port <= 0 {
+		return
+	}
+
+	h.sanitize(&ip, &protocol)
+
+	pp := NewProtocolPort(protocol, port)
+	if _, ok := h[ip]; !ok {
+		h[ip] = map[ProtocolPort]struct{}{
+			*pp: {},
+		}
+		return
+	}
+
+	h[ip][*pp] = struct{}{}
+}
+
+// Remove removes (ip, protocol, port) from HostPortInfo
+func (h HostPortInfo) Remove(ip, protocol string, port int32) {
+	if port <= 0 {
+		return
+	}
+
+	h.sanitize(&ip, &protocol)
+
+	pp := NewProtocolPort(protocol, port)
+	if m, ok := h[ip]; ok {
+		delete(m, *pp)
+		if len(h[ip]) == 0 {
+			delete(h, ip)
+		}
+	}
+}
+
+// Len returns the total number of (ip, protocol, port) tuple in HostPortInfo
+func (h HostPortInfo) Len() int {
+	length := 0
+	for _, m := range h {
+		length += len(m)
+	}
+	return length
+}
+
+// CheckConflict checks if the input (ip, protocol, port) conflicts with the existing
+// ones in HostPortInfo.
+func (h HostPortInfo) CheckConflict(ip, protocol string, port int32) bool {
+	if port <= 0 {
+		return false
+	}
+
+	h.sanitize(&ip, &protocol)
+
+	pp := NewProtocolPort(protocol, port)
+
+	// If ip is 0.0.0.0 check all IP's (protocol, port) pair
+	if ip == DefaultBindAllHostIP {
+		for _, m := range h {
+			if _, ok := m[*pp]; ok {
+				return true
+			}
+		}
+		return false
+	}
+
+	// If ip isn't 0.0.0.0, only check IP and 0.0.0.0's (protocol, port) pair
+	for _, key := range []string{DefaultBindAllHostIP, ip} {
+		if m, ok := h[key]; ok {
+			if _, ok2 := m[*pp]; ok2 {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// sanitize the parameters
+func (h HostPortInfo) sanitize(ip, protocol *string) {
+	if len(*ip) == 0 {
+		*ip = DefaultBindAllHostIP
+	}
+	if len(*protocol) == 0 {
+		*protocol = string(v1.ProtocolTCP)
+	}
+}
+
+// GetContainerPorts returns the used host ports of Pods: if 'port' was used, a 'port:true' pair
 // will be in the result; but it does not resolve port conflict.
-func GetUsedPorts(pods ...*v1.Pod) map[string]bool {
-	ports := make(map[string]bool)
+func GetContainerPorts(pods ...*v1.Pod) []*v1.ContainerPort {
+	var ports []*v1.ContainerPort
 	for _, pod := range pods {
 		for j := range pod.Spec.Containers {
 			container := &pod.Spec.Containers[j]
 			for k := range container.Ports {
-				podPort := &container.Ports[k]
-				// "0" is explicitly ignored in PodFitsHostPorts,
-				// which is the only function that uses this value.
-				if podPort.HostPort != 0 {
-					// user does not explicitly set protocol, default is tcp
-					portProtocol := podPort.Protocol
-					if podPort.Protocol == "" {
-						portProtocol = v1.ProtocolTCP
-					}
-
-					// user does not explicitly set hostIP, default is 0.0.0.0
-					portHostIP := podPort.HostIP
-					if podPort.HostIP == "" {
-						portHostIP = "0.0.0.0"
-					}
-
-					str := fmt.Sprintf("%s/%s/%d", portProtocol, portHostIP, podPort.HostPort)
-					ports[str] = true
-				}
+				ports = append(ports, &container.Ports[k])
 			}
 		}
 	}

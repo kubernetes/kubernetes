@@ -38,7 +38,7 @@ type NodeInfo struct {
 
 	pods             []*v1.Pod
 	podsWithAffinity []*v1.Pod
-	usedPorts        map[string]bool
+	usedPorts        util.HostPortInfo
 
 	// Total requested resource of all pods on this node.
 	// It includes assumed pods which scheduler sends binding to apiserver but
@@ -164,7 +164,7 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		nonzeroRequest:      &Resource{},
 		allocatableResource: &Resource{},
 		generation:          0,
-		usedPorts:           make(map[string]bool),
+		usedPorts:           make(util.HostPortInfo),
 	}
 	for _, pod := range pods {
 		ni.AddPod(pod)
@@ -188,7 +188,7 @@ func (n *NodeInfo) Pods() []*v1.Pod {
 	return n.pods
 }
 
-func (n *NodeInfo) UsedPorts() map[string]bool {
+func (n *NodeInfo) UsedPorts() util.HostPortInfo {
 	if n == nil {
 		return nil
 	}
@@ -269,7 +269,7 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		taintsErr:               n.taintsErr,
 		memoryPressureCondition: n.memoryPressureCondition,
 		diskPressureCondition:   n.diskPressureCondition,
-		usedPorts:               make(map[string]bool),
+		usedPorts:               make(util.HostPortInfo),
 		generation:              n.generation,
 	}
 	if len(n.pods) > 0 {
@@ -400,34 +400,15 @@ func calculateResource(pod *v1.Pod) (res Resource, non0_cpu int64, non0_mem int6
 	return
 }
 
-func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, used bool) {
+func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
 	for j := range pod.Spec.Containers {
 		container := &pod.Spec.Containers[j]
 		for k := range container.Ports {
 			podPort := &container.Ports[k]
-			// "0" is explicitly ignored in PodFitsHostPorts,
-			// which is the only function that uses this value.
-			if podPort.HostPort != 0 {
-				// user does not explicitly set protocol, default is tcp
-				portProtocol := podPort.Protocol
-				if podPort.Protocol == "" {
-					portProtocol = v1.ProtocolTCP
-				}
-
-				// user does not explicitly set hostIP, default is 0.0.0.0
-				portHostIP := podPort.HostIP
-				if podPort.HostIP == "" {
-					portHostIP = util.DefaultBindAllHostIP
-				}
-
-				str := fmt.Sprintf("%s/%s/%d", portProtocol, portHostIP, podPort.HostPort)
-
-				if used {
-					n.usedPorts[str] = used
-				} else {
-					delete(n.usedPorts, str)
-				}
-
+			if add {
+				n.usedPorts.Add(podPort.HostIP, string(podPort.Protocol), podPort.HostPort)
+			} else {
+				n.usedPorts.Remove(podPort.HostIP, string(podPort.Protocol), podPort.HostPort)
 			}
 		}
 	}

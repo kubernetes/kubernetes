@@ -966,12 +966,12 @@ func (s *ServiceAffinity) checkServiceAffinity(pod *v1.Pod, meta algorithm.Predi
 
 // PodFitsHostPorts checks if a node has free ports for the requested pod ports.
 func PodFitsHostPorts(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
-	var wantPorts map[string]bool
+	var wantPorts []*v1.ContainerPort
 	if predicateMeta, ok := meta.(*predicateMetadata); ok {
 		wantPorts = predicateMeta.podPorts
 	} else {
 		// We couldn't parse metadata - fallback to computing it.
-		wantPorts = schedutil.GetUsedPorts(pod)
+		wantPorts = schedutil.GetContainerPorts(pod)
 	}
 	if len(wantPorts) == 0 {
 		return true, nil, nil
