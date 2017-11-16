@@ -1,17 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["httplog_test.go"],
-    importpath = "k8s.io/apiserver/pkg/server/httplog",
-    library = ":go_default_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -20,7 +7,15 @@ go_library(
         "httplog.go",
     ],
     importpath = "k8s.io/apiserver/pkg/server/httplog",
+    visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/golang/glog:go_default_library"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["httplog_test.go"],
+    importpath = "k8s.io/apiserver/pkg/server/httplog",
+    library = ":go_default_library",
 )
 
 filegroup(
@@ -34,4 +29,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

@@ -1,14 +1,10 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = ["codec.go"],
     importpath = "k8s.io/apimachinery/pkg/api/testing",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
@@ -32,4 +28,5 @@ filegroup(
         "//staging/src/k8s.io/apimachinery/pkg/api/testing/roundtrip:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

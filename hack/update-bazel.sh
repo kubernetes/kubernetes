@@ -35,6 +35,7 @@ kube::util::go_install_from_commit \
     c72631a220406c4fae276861ee286aaec82c5af2
 
 touch "${KUBE_ROOT}/vendor/BUILD"
+find "${KUBE_ROOT}/staging/src/k8s.io/" -name BUILD -delete
 
 gazelle fix \
     -build_file_name=BUILD,BUILD.bazel \

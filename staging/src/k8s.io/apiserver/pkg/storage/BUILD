@@ -1,9 +1,41 @@
-package(default_visibility = ["//visibility:public"])
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "cacher.go",
+        "doc.go",
+        "errors.go",
+        "interfaces.go",
+        "selection_predicate.go",
+        "time_budget.go",
+        "util.go",
+        "watch_cache.go",
+    ],
+    importpath = "k8s.io/apiserver/pkg/storage",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/golang.org/x/net/context:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/validation/path:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/features:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/trace:go_default_library",
+        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
+    ],
 )
 
 go_test(
@@ -35,43 +67,6 @@ go_test(
     ],
 )
 
-go_library(
-    name = "go_default_library",
-    srcs = [
-        "cacher.go",
-        "doc.go",
-        "errors.go",
-        "interfaces.go",
-        "selection_predicate.go",
-        "time_budget.go",
-        "util.go",
-        "watch_cache.go",
-    ],
-    importpath = "k8s.io/apiserver/pkg/storage",
-    deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/validation/path:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/features:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/trace:go_default_library",
-        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
-    ],
-)
-
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
@@ -93,4 +88,5 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/storage/value:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

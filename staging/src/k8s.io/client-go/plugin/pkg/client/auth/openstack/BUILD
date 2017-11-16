@@ -1,9 +1,16 @@
-package(default_visibility = ["//visibility:public"])
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
+go_library(
+    name = "go_default_library",
+    srcs = ["openstack.go"],
+    importpath = "k8s.io/client-go/plugin/pkg/client/auth/openstack",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/gophercloud/gophercloud/openstack:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        "//vendor/k8s.io/client-go/rest:go_default_library",
+    ],
 )
 
 go_test(
@@ -11,18 +18,6 @@ go_test(
     srcs = ["openstack_test.go"],
     importpath = "k8s.io/client-go/plugin/pkg/client/auth/openstack",
     library = ":go_default_library",
-)
-
-go_library(
-    name = "go_default_library",
-    srcs = ["openstack.go"],
-    importpath = "k8s.io/client-go/plugin/pkg/client/auth/openstack",
-    deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/github.com/gophercloud/gophercloud/openstack:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
-    ],
 )
 
 filegroup(
@@ -36,4 +31,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

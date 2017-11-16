@@ -1,14 +1,10 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = ["provider.go"],
     importpath = "k8s.io/client-go/plugin/pkg/auth/authenticator/token/oidc/testing",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/go-oidc/jose:go_default_library",
         "//vendor/github.com/coreos/go-oidc/key:go_default_library",
@@ -27,4 +23,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

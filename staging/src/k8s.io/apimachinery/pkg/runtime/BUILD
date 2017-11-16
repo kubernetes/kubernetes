@@ -1,16 +1,9 @@
-package(default_visibility = ["//visibility:public"])
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["swagger_doc_generator_test.go"],
-    importpath = "k8s.io/apimachinery/pkg/runtime",
-    library = ":go_default_library",
+filegroup(
+    name = "go_default_library_protos",
+    srcs = ["generated.proto"],
+    visibility = ["//visibility:public"],
 )
 
 go_library(
@@ -35,6 +28,7 @@ go_library(
         "zz_generated.deepcopy.go",
     ],
     importpath = "k8s.io/apimachinery/pkg/runtime",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
@@ -42,6 +36,13 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
     ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["swagger_doc_generator_test.go"],
+    importpath = "k8s.io/apimachinery/pkg/runtime",
+    library = ":go_default_library",
 )
 
 go_test(
@@ -82,10 +83,5 @@ filegroup(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/testing:all-srcs",
     ],
     tags = ["automanaged"],
-)
-
-filegroup(
-    name = "go_default_library_protos",
-    srcs = ["generated.proto"],
     visibility = ["//visibility:public"],
 )

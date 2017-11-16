@@ -1,9 +1,29 @@
-package(default_visibility = ["//visibility:public"])
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "client.go",
+        "client_pool.go",
+        "dynamic_util.go",
+    ],
+    importpath = "k8s.io/client-go/dynamic",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/conversion/queryparams:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
+        "//vendor/k8s.io/client-go/rest:go_default_library",
+        "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
+    ],
 )
 
 go_test(
@@ -27,31 +47,6 @@ go_test(
     ],
 )
 
-go_library(
-    name = "go_default_library",
-    srcs = [
-        "client.go",
-        "client_pool.go",
-        "dynamic_util.go",
-    ],
-    importpath = "k8s.io/client-go/dynamic",
-    deps = [
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/conversion/queryparams:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
-    ],
-)
-
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
@@ -66,4 +61,5 @@ filegroup(
         "//staging/src/k8s.io/client-go/dynamic/fake:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

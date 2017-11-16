@@ -1,14 +1,10 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = ["registry.go"],
     importpath = "k8s.io/sample-apiserver/pkg/registry",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",
@@ -30,4 +26,5 @@ filegroup(
         "//staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

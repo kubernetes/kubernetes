@@ -1,5 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+filegroup(
+    name = "go_default_library_protos",
+    srcs = ["generated.proto"],
+    visibility = ["//visibility:public"],
+)
+
 go_library(
     name = "go_default_library",
     srcs = [
@@ -20,12 +26,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
     ],
-)
-
-filegroup(
-    name = "go_default_library_protos",
-    srcs = ["generated.proto"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(
