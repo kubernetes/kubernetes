@@ -220,6 +220,7 @@ func autoConvert_v1beta1_CustomResourceDefinitionSpec_To_apiextensions_CustomRes
 		out.Validation = nil
 	}
 	out.Subresources = (*apiextensions.CustomResourceSubresources)(unsafe.Pointer(in.Subresources))
+	out.Prune = in.Prune
 	return nil
 }
 
@@ -245,6 +246,7 @@ func autoConvert_apiextensions_CustomResourceDefinitionSpec_To_v1beta1_CustomRes
 		out.Validation = nil
 	}
 	out.Subresources = (*CustomResourceSubresources)(unsafe.Pointer(in.Subresources))
+	out.Prune = in.Prune
 	return nil
 }
 
