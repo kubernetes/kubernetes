@@ -28,13 +28,14 @@ import (
 type MasterConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	API                API        `json:"api"`
-	Etcd               Etcd       `json:"etcd"`
-	Networking         Networking `json:"networking"`
-	KubernetesVersion  string     `json:"kubernetesVersion"`
-	CloudProvider      string     `json:"cloudProvider"`
-	NodeName           string     `json:"nodeName"`
-	AuthorizationModes []string   `json:"authorizationModes,omitempty"`
+	API                  API                  `json:"api"`
+	Etcd                 Etcd                 `json:"etcd"`
+	KubeletConfiguration KubeletConfiguration `json:"kubeletConfiguration"`
+	Networking           Networking           `json:"networking"`
+	KubernetesVersion    string               `json:"kubernetesVersion"`
+	CloudProvider        string               `json:"cloudProvider"`
+	NodeName             string               `json:"nodeName"`
+	AuthorizationModes   []string             `json:"authorizationModes,omitempty"`
 
 	Token    string           `json:"token"`
 	TokenTTL *metav1.Duration `json:"tokenTTL,omitempty"`

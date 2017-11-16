@@ -104,6 +104,7 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 	}
 
 	SetDefaultsEtcdSelfHosted(obj)
+	SetDefaults_KubeletConfiguration(obj)
 }
 
 // SetDefaults_NodeConfiguration assigns default values to a regular node
@@ -150,26 +151,29 @@ func SetDefaultsEtcdSelfHosted(obj *MasterConfiguration) {
 }
 
 // SetDefaults_KubeletConfiguration assigns default values to kubelet
-func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
-	if obj.BaseConfig.PodManifestPath == "" {
-		obj.BaseConfig.PodManifestPath = DefaultManifestsDir
+func SetDefaults_KubeletConfiguration(obj *MasterConfiguration) {
+	if obj.KubeletConfiguration.BaseConfig == nil {
+		obj.KubeletConfiguration.BaseConfig = &kubeletconfigv1alpha1.KubeletConfiguration{}
 	}
-	if obj.BaseConfig.AllowPrivileged == nil {
-		obj.BaseConfig.AllowPrivileged = utilpointer.BoolPtr(true)
+	if obj.KubeletConfiguration.BaseConfig.PodManifestPath == "" {
+		obj.KubeletConfiguration.BaseConfig.PodManifestPath = DefaultManifestsDir
 	}
-	if obj.BaseConfig.ClusterDNS == nil {
-		obj.BaseConfig.ClusterDNS = []string{DefaultClusterDNSIP}
+	if obj.KubeletConfiguration.BaseConfig.AllowPrivileged == nil {
+		obj.KubeletConfiguration.BaseConfig.AllowPrivileged = utilpointer.BoolPtr(true)
 	}
-	if obj.BaseConfig.ClusterDomain == "" {
-		obj.BaseConfig.ClusterDomain = DefaultServiceDNSDomain
+	if obj.KubeletConfiguration.BaseConfig.ClusterDNS == nil {
+		obj.KubeletConfiguration.BaseConfig.ClusterDNS = []string{DefaultClusterDNSIP}
 	}
-	if obj.BaseConfig.Authorization.Mode == "" {
-		obj.BaseConfig.Authorization.Mode = kubeletconfigv1alpha1.KubeletAuthorizationModeWebhook
+	if obj.KubeletConfiguration.BaseConfig.ClusterDomain == "" {
+		obj.KubeletConfiguration.BaseConfig.ClusterDomain = DefaultServiceDNSDomain
 	}
-	if obj.BaseConfig.Authentication.X509.ClientCAFile == "" {
-		obj.BaseConfig.Authentication.X509.ClientCAFile = DefaultCACertPath
+	if obj.KubeletConfiguration.BaseConfig.Authorization.Mode == "" {
+		obj.KubeletConfiguration.BaseConfig.Authorization.Mode = kubeletconfigv1alpha1.KubeletAuthorizationModeWebhook
 	}
-	if obj.BaseConfig.CAdvisorPort == nil {
-		obj.BaseConfig.CAdvisorPort = utilpointer.Int32Ptr(0)
+	if obj.KubeletConfiguration.BaseConfig.Authentication.X509.ClientCAFile == "" {
+		obj.KubeletConfiguration.BaseConfig.Authentication.X509.ClientCAFile = DefaultCACertPath
+	}
+	if obj.KubeletConfiguration.BaseConfig.CAdvisorPort == nil {
+		obj.KubeletConfiguration.BaseConfig.CAdvisorPort = utilpointer.Int32Ptr(0)
 	}
 }

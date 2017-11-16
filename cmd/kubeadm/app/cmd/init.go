@@ -355,8 +355,7 @@ func (i *Init) Run(out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		kubeletConfig := &kubeadmapiext.KubeletConfiguration{}
-		kubeletBytes, err := kubeadmutil.MarshalToYamlForCodecs(kubeletConfig.BaseConfig, kubeletconfigv1alpha1.SchemeGroupVersion, *kubeletCodecs)
+		kubeletBytes, err := kubeadmutil.MarshalToYamlForCodecs(i.cfg.KubeletConfiguration.BaseConfig, kubeletconfigv1alpha1.SchemeGroupVersion, *kubeletCodecs)
 		if err != nil {
 			return err
 		}

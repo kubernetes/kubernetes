@@ -28,13 +28,14 @@ import (
 type MasterConfiguration struct {
 	metav1.TypeMeta
 
-	API                API
-	Etcd               Etcd
-	Networking         Networking
-	KubernetesVersion  string
-	CloudProvider      string
-	NodeName           string
-	AuthorizationModes []string
+	API                  API
+	Etcd                 Etcd
+	KubeletConfiguration KubeletConfiguration
+	Networking           Networking
+	KubernetesVersion    string
+	CloudProvider        string
+	NodeName             string
+	AuthorizationModes   []string
 
 	Token    string
 	TokenTTL *metav1.Duration
