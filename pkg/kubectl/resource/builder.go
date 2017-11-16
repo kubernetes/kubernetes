@@ -419,11 +419,7 @@ func (b *Builder) ReplaceAliases(input string) string {
 		if resources, ok := b.categoryExpander.Expand(arg); ok {
 			asStrings := []string{}
 			for _, resource := range resources {
-				if len(resource.Group) == 0 {
-					asStrings = append(asStrings, resource.Resource)
-					continue
-				}
-				asStrings = append(asStrings, resource.Resource+"."+resource.Group)
+				asStrings = append(asStrings, resource.String())
 			}
 			arg = strings.Join(asStrings, ",")
 		}
