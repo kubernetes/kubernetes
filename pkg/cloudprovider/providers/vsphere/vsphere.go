@@ -541,17 +541,22 @@ func (vs *VSphere) ExternalID(nodeName k8stypes.NodeName) (string, error) {
 func (vs *VSphere) InstanceExistsByProviderID(providerID string) (bool, error) {
 	vmName := path.Base(providerID)
 	nodeName := convertToK8sType(vmName)
+
 	// Create context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	// Ensure client is logged in and session is valid
-	err := vs.conn.Connect(ctx)
+	vsi, err := vs.getVSphereInstance(nodeName)
 	if err != nil {
 		return false, err
 	}
-	vm, err := vs.getVMByName(ctx, nodeName)
+	// Ensure client is logged in and session is valid
+	err = vsi.conn.Connect(ctx)
 	if err != nil {
-		if vclib.IsNotFound(err) {
+		return false, err
+	}
+	vm, err := vs.getVMFromNodeName(ctx, nodeName)
+	if err != nil {
+		if err == vclib.ErrNoVMFound {
 			return false, nil
 		}
 		glog.Errorf("Failed to get VM object for node: %q. err: +%v", convertToString(nodeName), err)
