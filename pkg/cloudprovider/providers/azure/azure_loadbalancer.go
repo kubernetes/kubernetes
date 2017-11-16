@@ -798,7 +798,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		// Get lbIP since we make up NSG rules based on ingress IP
 		lbIP := &lbStatus.Ingress[0].IP
 		if lbIP == nil {
-			return &sg, fmt.Errorf("No load balancer IP for setting up security rules for service %s", service.Name)
+			return nil, fmt.Errorf("No load balancer IP for setting up security rules for service %s", service.Name)
 		}
 		destinationIPAddress = *lbIP
 	}
