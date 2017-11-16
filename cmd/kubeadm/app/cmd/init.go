@@ -38,6 +38,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	platformutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/platform"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -68,13 +69,7 @@ import (
 var (
 	initDoneTempl = template.Must(template.New("init").Parse(dedent.Dedent(`
 		Your Kubernetes master has initialized successfully!
-
-		To start using your cluster, you need to run the following as a regular user:
-
-		  mkdir -p $HOME/.kube
-		  sudo cp -i {{.KubeConfigPath}} $HOME/.kube/config
-		  sudo chown $(id -u):$(id -g) $HOME/.kube/config
-
+		{{.KubeConfigInfo}}
 		You should now deploy a pod network to the cluster.
 		Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
 		  https://kubernetes.io/docs/concepts/cluster-administration/addons/
@@ -117,6 +112,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	var dryRun bool
 	var featureGatesString string
 	var ignorePreflightErrors []string
+	var copyCredentialsForUser string
 
 	cmd := &cobra.Command{
 		Use:   "init",
@@ -134,7 +130,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
 			kubeadmutil.CheckErr(err)
 
-			i, err := NewInit(cfgPath, internalcfg, ignorePreflightErrorsSet, skipTokenPrint, dryRun)
+			i, err := NewInit(cfgPath, internalcfg, ignorePreflightErrorsSet, skipTokenPrint, dryRun, copyCredentialsForUser)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(i.Validate(cmd))
 			kubeadmutil.CheckErr(i.Run(out))
@@ -142,7 +138,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	}
 
 	AddInitConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
-	AddInitOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &skipTokenPrint, &dryRun, &ignorePreflightErrors)
+	AddInitOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &skipTokenPrint, &dryRun, &ignorePreflightErrors, &copyCredentialsForUser)
 
 	return cmd
 }
@@ -203,7 +199,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfigur
 }
 
 // AddInitOtherFlags adds init flags that are not bound to a configuration file to the given flagset
-func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, skipTokenPrint, dryRun *bool, ignorePreflightErrors *[]string) {
+func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, skipTokenPrint, dryRun *bool, ignorePreflightErrors *[]string, copyCredentialsForUser *string) {
 	flagSet.StringVar(
 		cfgPath, "config", *cfgPath,
 		"Path to kubeadm config file. WARNING: Usage of a configuration file is experimental.",
@@ -231,7 +227,7 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, sk
 }
 
 // NewInit validates given arguments and instantiates Init struct with provided information.
-func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, ignorePreflightErrors sets.String, skipTokenPrint, dryRun bool) (*Init, error) {
+func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, ignorePreflightErrors sets.String, skipTokenPrint, dryRun bool, copyCredentialsForUser string) (*Init, error) {
 
 	if cfgPath != "" {
 		glog.V(1).Infof("[init] reading config file from: " + cfgPath)
@@ -275,14 +271,15 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, ignorePrefligh
 	glog.V(1).Infof("Starting kubelet")
 	preflight.TryStartKubelet(ignorePreflightErrors)
 
-	return &Init{cfg: cfg, skipTokenPrint: skipTokenPrint, dryRun: dryRun}, nil
+	return &Init{cfg: cfg, skipTokenPrint: skipTokenPrint, dryRun: dryRun, copyCredentialsForUser: copyCredentialsForUser}, nil
 }
 
 // Init defines struct used by "kubeadm init" command
 type Init struct {
-	cfg            *kubeadmapi.MasterConfiguration
-	skipTokenPrint bool
-	dryRun         bool
+	cfg                    *kubeadmapi.MasterConfiguration
+	skipTokenPrint         bool
+	dryRun                 bool
+	copyCredentialsForUser string
 }
 
 // Validate validates configuration passed to "kubeadm init"
@@ -498,6 +495,24 @@ func (i *Init) Run(out io.Writer) error {
 	ctx := map[string]string{
 		"KubeConfigPath": adminKubeConfigPath,
 		"joinCommand":    joinCommand,
+	}
+
+	kubeConfigInfo := fmt.Sprintf(`
+To start using your cluster, you need to run the following as a regular user:
+
+	  mkdir -p $HOME/.kube
+	  sudo cp -i %s $HOME/.kube/config
+	  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+`, adminKubeConfigPath)
+
+	ctx["KubeConfigInfo"] = kubeConfigInfo
+	if i.copyCredentialsForUser != "" {
+		if err := platformutil.InitCopyCredentialsForUser(i.copyCredentialsForUser, adminKubeConfigPath); err == nil {
+			ctx["KubeConfigInfo"] = ""
+		} else {
+			fmt.Printf("[init] WARNING: Could not copy the administrator credentials for user %q: %v\n", i.copyCredentialsForUser, err)
+		}
 	}
 
 	return initDoneTempl.Execute(out, ctx)
