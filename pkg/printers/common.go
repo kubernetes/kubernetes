@@ -18,8 +18,18 @@ package printers
 
 import (
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"time"
 )
+
+// ElapsedTime returns the elapsed time since timestamp in
+// human-readable approximation.
+func ElapsedTime(timestamp metav1.Time) string {
+	if timestamp.IsZero() {
+		return "<unknown>"
+	}
+	return ShortHumanDuration(time.Now().Sub(timestamp.Time))
+}
 
 func ShortHumanDuration(d time.Duration) string {
 	// Allow deviation no more than 2 seconds(excluded) to tolerate machine time

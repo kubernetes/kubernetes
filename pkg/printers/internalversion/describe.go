@@ -2948,9 +2948,9 @@ func DescribeEvents(el *api.EventList, w PrefixWriter) {
 	for _, e := range el.Items {
 		var interval string
 		if e.Count > 1 {
-			interval = fmt.Sprintf("%s (x%d over %s)", translateTimestamp(e.LastTimestamp), e.Count, translateTimestamp(e.FirstTimestamp))
+			interval = fmt.Sprintf("%s (x%d over %s)", printers.ElapsedTime(e.LastTimestamp), e.Count, printers.ElapsedTime(e.FirstTimestamp))
 		} else {
-			interval = translateTimestamp(e.FirstTimestamp)
+			interval = printers.ElapsedTime(e.FirstTimestamp)
 		}
 		w.Write(LEVEL_1, "%v\t%v\t%s\t%v\t%v\n",
 			e.Type,
