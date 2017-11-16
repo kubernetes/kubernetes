@@ -16,6 +16,8 @@ limitations under the License.
 
 package modes
 
+import "k8s.io/apimachinery/pkg/util/sets"
+
 const (
 	ModeAlwaysAllow string = "AlwaysAllow"
 	ModeAlwaysDeny  string = "AlwaysDeny"
@@ -29,10 +31,5 @@ var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABA
 
 // IsValidAuthorizationMode returns true if the given authorization mode is a valid one for the apiserver
 func IsValidAuthorizationMode(authzMode string) bool {
-	for _, validMode := range AuthorizationModeChoices {
-		if authzMode == validMode {
-			return true
-		}
-	}
-	return false
+	return sets.NewString(AuthorizationModeChoices...).Has(authzMode)
 }
