@@ -127,12 +127,12 @@ func testLoadBalancerServiceDefaultModeSelection(t *testing.T, isInternal bool) 
 
 		ruleCount := len(*lb.LoadBalancingRules)
 		if ruleCount != index {
-			t.Errorf("lb rule could should be equal to nuber of services deployed, expected (%d) Found (%d)", index, ruleCount)
+			t.Errorf("lb rule count should be equal to nuber of services deployed, expected (%d) Found (%d)", index, ruleCount)
 		}
 	}
 }
 
-// Validate even distribution of external services across load balances
+// Validate even distribution of external services across load balancers
 // based on number of availability sets
 func testLoadBalancerServiceAutoModeSelection(t *testing.T, isInternal bool) {
 	az := getTestCloud()
@@ -173,8 +173,7 @@ func testLoadBalancerServiceAutoModeSelection(t *testing.T, isInternal bool) {
 
 		maxRules := 0
 		minRules := serviceCount
-		for x := range *result.Value {
-			lb := (*result.Value)[x]
+		for _, lb := range *result.Value {
 			ruleCount := len(*lb.LoadBalancingRules)
 			if ruleCount < minRules {
 				minRules = ruleCount
@@ -737,7 +736,7 @@ func TestReconcilePublicIPWithNewService(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
-	validatePublicIP(t, pip, &svc, true)
+	validatePublicIP(t, pip2, &svc, true)
 	if pip.Name != pip2.Name ||
 		pip.PublicIPAddressPropertiesFormat.IPAddress != pip2.PublicIPAddressPropertiesFormat.IPAddress {
 		t.Errorf("We should get the exact same public ip resource after a second reconcile")
@@ -814,7 +813,7 @@ func getTestCloud() (az *Cloud) {
 			SubnetName:                   "subnet",
 			SecurityGroupName:            "nsg",
 			RouteTableName:               "rt",
-			PrimaryAvailabilitySetName:   "asName",
+			PrimaryAvailabilitySetName:   "as",
 			MaximumLoadBalancerRuleCount: 250,
 		},
 	}
@@ -832,8 +831,8 @@ func getTestCloud() (az *Cloud) {
 const networkInterfacesIDTemplate = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/networkInterfaces/%s"
 const primaryIPConfigIDTemplate = "%s/ipConfigurations/ipconfig"
 
-// returns the full identifier of a publicIPAddress.
-func getNetworkInterfacesID(subscriptionID string, resourceGroupName, nicName string) string {
+// returns the full identifier of Network Interface.
+func getNetworkInterfaceID(subscriptionID string, resourceGroupName, nicName string) string {
 	return fmt.Sprintf(
 		networkInterfacesIDTemplate,
 		subscriptionID,
@@ -892,7 +891,7 @@ func getClusterResources(az *Cloud, vmCount int, availabilitySetCount int) (clus
 		clusterResources.availabilitySetNames = append(clusterResources.availabilitySetNames, asName)
 
 		nicName := getNICName(vmIndex)
-		nicID := getNetworkInterfacesID(az.Config.SubscriptionID, az.Config.ResourceGroup, nicName)
+		nicID := getNetworkInterfaceID(az.Config.SubscriptionID, az.Config.ResourceGroup, nicName)
 		primaryIPConfigID := getPrimaryIPConfigID(nicID)
 		isPrimary := true
 		newNIC := network.Interface{

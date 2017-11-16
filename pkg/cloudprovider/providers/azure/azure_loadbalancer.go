@@ -79,8 +79,8 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 	// Here we'll firstly ensure service do not lie in the opposite LB.
 	serviceName := getServiceName(service)
 	glog.V(5).Infof("ensureloadbalancer(%s): START clusterName=%q", serviceName, clusterName)
-	flipedService := flipServiceInternalAnnotation(service)
-	if _, err := az.reconcileLoadBalancer(clusterName, flipedService, nil, false /* wantLb */); err != nil {
+	flippedService := flipServiceInternalAnnotation(service)
+	if _, err := az.reconcileLoadBalancer(clusterName, flippedService, nil, false /* wantLb */); err != nil {
 		return nil, err
 	}
 
@@ -136,7 +136,7 @@ func (az *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servi
 	return nil
 }
 
-// getServiceLoadBalancer gets the loadbalancer for the service if it already exits
+// getServiceLoadBalancer gets the loadbalancer for the service if it already exists
 // If wantLb is TRUE then -it selects a new load balancer
 // In case the selected load balancer does not exists it returns network.LoadBalancer struct
 // with added metadata (such as name, location) and existsLB set to FALSE
@@ -258,9 +258,11 @@ func (az *Cloud) determinePublicIPName(clusterName string, service *v1.Service) 
 
 func flipServiceInternalAnnotation(service *v1.Service) *v1.Service {
 	copyService := service.DeepCopy()
-	if _, ok := copyService.Annotations[ServiceAnnotationLoadBalancerInternal]; ok {
+	if v, ok := copyService.Annotations[ServiceAnnotationLoadBalancerInternal]; ok && v == "true" {
+		// If it is internal now, we make it external by remove the annotation
 		delete(copyService.Annotations, ServiceAnnotationLoadBalancerInternal)
 	} else {
+		// If it is external now, we make it internal
 		copyService.Annotations[ServiceAnnotationLoadBalancerInternal] = "true"
 	}
 	return copyService
@@ -628,8 +630,8 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 	// If it is not exist, and no change to that, we don't CreateOrUpdate LB
 	if dirtyLb {
 		if lb.FrontendIPConfigurations == nil || len(*lb.FrontendIPConfigurations) == 0 {
-			// When FrontendIPConfigurations is empty, we need to delete the Azure LoadBalancer resource itself
-			// Because delete all FrontendIPConfigurations in LB is not supported, we have to delete the LB itself
+			// When FrontendIPConfigurations is empty, we need to delete the Azure load balancer resource itself,
+			// because an Azure load balancer cannot have an empty FrontendIPConfigurations collection
 			glog.V(3).Infof("delete(%s): lb(%s) - deleting; no remaining frontendipconfigs", serviceName, lbName)
 
 			az.operationPollRateLimiter.Accept()
@@ -713,14 +715,6 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 	az.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("SecurityGroupsClient.Get(%q): start", az.SecurityGroupName)
 	sg, err := az.SecurityGroupsClient.Get(az.ResourceGroup, az.SecurityGroupName, "")
-	glog.V(10).Infof("SecurityGroupsClient.Get(%q): end", az.SecurityGroupName)
-	if err != nil {
-		return nil, err
-	}
-
-	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("SecurityGroupsClient.Get(%q): start", az.SecurityGroupName)
-	sg, err = az.SecurityGroupsClient.Get(az.ResourceGroup, az.SecurityGroupName, "")
 	glog.V(10).Infof("SecurityGroupsClient.Get(%q): end", az.SecurityGroupName)
 	if err != nil {
 		return nil, err
@@ -846,7 +840,6 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 }
 
 // This reconciles the PublicIP resources similar to how the LB is reconciled.
-// This entails adding required, missing SecurityRules and removing stale rules.
 func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, wantLb bool) (*network.PublicIPAddress, error) {
 	isInternal := requiresInternalLoadBalancer(service)
 	serviceName := getServiceName(service)
@@ -869,9 +862,7 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, want
 			if wantLb && !isInternal && pipName == desiredPipName {
 				// This is the only case we should preserve the
 				// Public ip resource with match service tag
-				// We could do nothing here, we will ensure that out of the loop
 			} else {
-				// We use tag to decide which IP should be removed
 				glog.V(2).Infof("ensure(%s): pip(%s) - deleting", serviceName, pipName)
 				az.operationPollRateLimiter.Accept()
 				glog.V(10).Infof("PublicIPAddressesClient.Delete(%q): start", pipName)
@@ -899,12 +890,12 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, want
 
 	if !isInternal && wantLb {
 		// Confirm desired public ip resource exists
-		var rpip *network.PublicIPAddress
+		var pip *network.PublicIPAddress
 		domainNameLabel := getPublicIPLabel(service)
-		if rpip, err = az.ensurePublicIPExists(serviceName, desiredPipName, domainNameLabel); err != nil {
+		if pip, err = az.ensurePublicIPExists(serviceName, desiredPipName, domainNameLabel); err != nil {
 			return nil, err
 		}
-		return rpip, nil
+		return pip, nil
 	}
 	return nil, nil
 }
@@ -972,7 +963,7 @@ func (az *Cloud) ensureHostInPool(serviceName string, nodeName types.NodeName, b
 		expectedAvailabilitySetName := az.getAvailabilitySetID(availabilitySetName)
 		if machine.AvailabilitySet == nil || !strings.EqualFold(*machine.AvailabilitySet.ID, expectedAvailabilitySetName) {
 			glog.V(3).Infof(
-				"nicupdate(%s): skipping nic (%s) since it is not in the availabilitSet(%s)",
+				"nicupdate(%s): skipping nic (%s) since it is not in the availabilitySet(%s)",
 				serviceName, nicName, availabilitySetName)
 			return nil
 		}

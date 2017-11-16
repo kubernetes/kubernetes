@@ -37,7 +37,7 @@ Service Annotation for Auto and specific load balancer mode
     - ensure Public IP with desiredPipName exists
 
 - getServiceLoadBalancer(service *v1.Service, clusterName string, nodes []*v1.Node, wantLb bool) (lb, status, exists, error)
-  - gets the loadbalancer for the service if it already exits
+  - gets the loadbalancer for the service if it already exists
   - If wantLb is TRUE then -it selects a new load balancer, the selction helps distribute the services across load balancers
   - In case the selected load balancer does not exists it returns network.LoadBalancer struct with added metadata (such as name, location) and existsLB set to FALSE 
   - By default - cluster default LB is returned
@@ -52,7 +52,7 @@ Service Annotation for Auto and specific load balancer mode
 
 ### EnsureLoadBalancer
 
-- Reconcile LB for the fliped service
+- Reconcile LB for the flipped service
   - Call reconcileLoadBalancer(clusterName, flipedService, nil, false/* wantLb */)
 - Reconcile Public IP
   - Call reconcilePublicIP(cluster, service, true)
