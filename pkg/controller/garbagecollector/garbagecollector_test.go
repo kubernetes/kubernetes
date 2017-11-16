@@ -688,7 +688,7 @@ func TestGetDeletableResources(t *testing.T) {
 					// Valid GroupVersion
 					GroupVersion: "apps/v1",
 					APIResources: []metav1.APIResource{
-						{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: metav1.Verbs{"delete"}},
+						{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: metav1.Verbs{"delete", "list", "watch"}},
 						{Name: "services", Namespaced: true, Kind: "Service"},
 					},
 				},
@@ -696,7 +696,14 @@ func TestGetDeletableResources(t *testing.T) {
 					// Invalid GroupVersion, should be ignored
 					GroupVersion: "foo//whatever",
 					APIResources: []metav1.APIResource{
-						{Name: "bars", Namespaced: true, Kind: "Bar", Verbs: metav1.Verbs{"delete"}},
+						{Name: "bars", Namespaced: true, Kind: "Bar", Verbs: metav1.Verbs{"delete", "list", "watch"}},
+					},
+				},
+				{
+					// Valid GroupVersion, missing required verbs, should be ignored
+					GroupVersion: "acme/v1",
+					APIResources: []metav1.APIResource{
+						{Name: "widgets", Namespaced: true, Kind: "Widget", Verbs: metav1.Verbs{"delete"}},
 					},
 				},
 			},
@@ -710,7 +717,7 @@ func TestGetDeletableResources(t *testing.T) {
 				{
 					GroupVersion: "apps/v1",
 					APIResources: []metav1.APIResource{
-						{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: metav1.Verbs{"delete"}},
+						{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: metav1.Verbs{"delete", "list", "watch"}},
 						{Name: "services", Namespaced: true, Kind: "Service"},
 					},
 				},
@@ -725,7 +732,7 @@ func TestGetDeletableResources(t *testing.T) {
 				{
 					GroupVersion: "apps/v1",
 					APIResources: []metav1.APIResource{
-						{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: metav1.Verbs{"delete"}},
+						{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: metav1.Verbs{"delete", "list", "watch"}},
 						{Name: "services", Namespaced: true, Kind: "Service"},
 					},
 				},
