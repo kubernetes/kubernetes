@@ -75,12 +75,11 @@ func (s HorizontalPodAutoscalerGeneratorV1) validate() error {
 	if len(s.Name) == 0 {
 		return fmt.Errorf("name must be specified")
 	}
-	if s.MaxReplicas <= 0 {
-		return fmt.Errorf("'max' is a required parameter and must be greater than zero")
+	if s.MaxReplicas < 1 {
+		return fmt.Errorf("'max' is a required parameter and must be at least 1")
 	}
 	if s.MinReplicas > s.MaxReplicas {
 		return fmt.Errorf("'max' must be greater than or equal to 'min'")
 	}
 	return nil
 }
-

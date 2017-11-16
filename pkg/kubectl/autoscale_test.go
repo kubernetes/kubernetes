@@ -89,7 +89,7 @@ func TestHPAGenerate(t *testing.T) {
 			expectErr:          true,
 		},
 		{
-			name:               "'max' must be greater than zero",
+			name:               "'max' must be at least 1",
 			HPAName:            "foo",
 			minReplicas:        1,
 			maxReplicas:        -10,
