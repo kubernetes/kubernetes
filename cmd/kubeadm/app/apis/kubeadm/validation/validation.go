@@ -119,13 +119,6 @@ func ValidateDiscovery(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.
 	allErrs = append(allErrs, ValidateArgSelection(c, fldPath)...)
 	allErrs = append(allErrs, ValidateToken(c.TLSBootstrapToken, fldPath)...)
 	allErrs = append(allErrs, ValidateJoinDiscoveryTokenAPIServer(c, fldPath)...)
-
-	if len(c.DiscoveryToken) != 0 {
-		allErrs = append(allErrs, ValidateToken(c.DiscoveryToken, fldPath)...)
-	}
-	if len(c.DiscoveryFile) != 0 {
-		allErrs = append(allErrs, ValidateDiscoveryFile(c.DiscoveryFile, fldPath)...)
-	}
 	return allErrs
 }
 
