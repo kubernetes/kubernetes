@@ -153,7 +153,7 @@ func CreateTestClient() *fake.Clientset {
 						},
 					},
 				},
-				Spec: v1.NodeSpec{ExternalID: string(nodeName)},
+				Spec: v1.NodeSpec{ExternalID: nodeName},
 			}
 			obj.Items = append(obj.Items, node)
 		}

@@ -257,7 +257,7 @@ func (cnc *CloudNodeController) MonitorNode() {
 				ref := &v1.ObjectReference{
 					Kind:      "Node",
 					Name:      node.Name,
-					UID:       types.UID(node.UID),
+					UID:       node.UID,
 					Namespace: "",
 				}
 				glog.V(2).Infof("Recording %s event message for node %s", "DeletingNode", node.Name)

@@ -81,7 +81,7 @@ func (c *resourceMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 		}
 
 		if !missing {
-			res[m.Name] = int64(podSum)
+			res[m.Name] = podSum
 		}
 	}
 
