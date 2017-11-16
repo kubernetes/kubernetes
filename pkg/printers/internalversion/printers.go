@@ -223,6 +223,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "OS-Image", Type: "string", Priority: 1, Description: apiv1.NodeSystemInfo{}.SwaggerDoc()["osImage"]},
 		{Name: "Kernel-Version", Type: "string", Priority: 1, Description: apiv1.NodeSystemInfo{}.SwaggerDoc()["kernelVersion"]},
 		{Name: "Container-Runtime", Type: "string", Priority: 1, Description: apiv1.NodeSystemInfo{}.SwaggerDoc()["containerRuntimeVersion"]},
+		{Name: "Taints", Type: "string", Priority: 1, Description: "the specific info of node taints"},
 	}
 
 	h.TableHandler(nodeColumnDefinitions, printNode)
@@ -1125,6 +1126,11 @@ func printNode(obj *api.Node, options printers.PrintOptions) ([]metav1alpha1.Tab
 	row.Cells = append(row.Cells, obj.Name, strings.Join(status, ","), roles, translateTimestamp(obj.CreationTimestamp), obj.Status.NodeInfo.KubeletVersion)
 	if options.Wide {
 		osImage, kernelVersion, crVersion := obj.Status.NodeInfo.OSImage, obj.Status.NodeInfo.KernelVersion, obj.Status.NodeInfo.ContainerRuntimeVersion
+		taintKeys := []string{}
+		for _, taint := range obj.Spec.Taints {
+			taintKeys = append(taintKeys, string(taint.Effect))
+		}
+		taints := strings.Join(taintKeys, ",")
 		if osImage == "" {
 			osImage = "<unknown>"
 		}
@@ -1134,7 +1140,10 @@ func printNode(obj *api.Node, options printers.PrintOptions) ([]metav1alpha1.Tab
 		if crVersion == "" {
 			crVersion = "<unknown>"
 		}
-		row.Cells = append(row.Cells, getNodeExternalIP(obj), osImage, kernelVersion, crVersion)
+		if taints == "" {
+			taints = "<none>"
+		}
+		row.Cells = append(row.Cells, getNodeExternalIP(obj), osImage, kernelVersion, crVersion, taints)
 	}
 
 	return []metav1alpha1.TableRow{row}, nil

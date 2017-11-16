@@ -976,6 +976,85 @@ func TestPrintNodeKernelVersion(t *testing.T) {
 	}
 }
 
+func TestPrintNodeTaints(t *testing.T) {
+	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+		ColumnLabels: []string{},
+		Wide:         true,
+	})
+	AddHandlers(printer)
+
+	table := []struct {
+		node   api.Node
+		taints string
+	}{
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+				Spec: api.NodeSpec{
+					Taints: []api.Taint{},
+				},
+			},
+			taints: "<none>",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo2"},
+				Spec: api.NodeSpec{
+					Taints: []api.Taint{
+						{Effect: api.TaintEffectNoExecute},
+					},
+				},
+			},
+			taints: "NoExecute",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo3"},
+				Spec: api.NodeSpec{
+					Taints: []api.Taint{
+						{Effect: api.TaintEffectNoSchedule},
+					},
+				},
+			},
+			taints: "NoSchedule",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo4"},
+				Spec: api.NodeSpec{
+					Taints: []api.Taint{
+						{Effect: api.TaintEffectPreferNoSchedule},
+					},
+				},
+			},
+			taints: "PreferNoSchedule",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo5"},
+				Spec: api.NodeSpec{
+					Taints: []api.Taint{
+						{Effect: api.TaintEffectNoSchedule},
+						{Effect: api.TaintEffectNoExecute},
+					},
+				},
+			},
+			taints: "NoSchedule,NoExecute",
+		},
+	}
+
+	for _, test := range table {
+		buffer := &bytes.Buffer{}
+		err := printer.PrintObj(&test.node, buffer)
+		if err != nil {
+			t.Fatalf("An error occurred printing Node: %#v", err)
+		}
+		if !contains(strings.Fields(buffer.String()), test.taints) {
+			t.Fatalf("Expect printing node %s with kernel version %#v, got: %#v", test.node.Name, test.taints, buffer.String())
+		}
+	}
+}
+
 func TestPrintNodeContainerRuntimeVersion(t *testing.T) {
 	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
 		ColumnLabels: []string{},
