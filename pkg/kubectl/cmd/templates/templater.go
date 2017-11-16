@@ -58,6 +58,16 @@ func UseOptionsTemplates(cmd *cobra.Command) {
 	cmd.SetHelpFunc(templater.HelpFunc())
 }
 
+func UseMainUsageTemplatesWithoutFlags(cmd *cobra.Command) {
+	templater := &templater{
+		RootCmd:       cmd,
+		UsageTemplate: MainUsageTemplateWithoutFlags(),
+		HelpTemplate:  MainHelpTemplateWithoutFlags(),
+	}
+	cmd.SetUsageFunc(templater.UsageFunc())
+	cmd.SetHelpFunc(templater.HelpFunc())
+}
+
 type templater struct {
 	UsageTemplate string
 	HelpTemplate  string
