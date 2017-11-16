@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"math"
 	"reflect"
 	"strings"
@@ -5148,7 +5149,18 @@ func TestValidateRestartPolicy(t *testing.T) {
 }
 
 func TestValidateDNSPolicy(t *testing.T) {
-	successCases := []core.DNSPolicy{core.DNSClusterFirst, core.DNSDefault, core.DNSPolicy(core.DNSClusterFirst)}
+	customDNSEnabled := utilfeature.DefaultFeatureGate.Enabled("CustomPodDNS")
+	defer func() {
+		// Restoring the old value.
+		if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("CustomPodDNS=%v", customDNSEnabled)); err != nil {
+			t.Errorf("Failed to restore CustomPodDNS feature gate: %v", err)
+		}
+	}()
+	if err := utilfeature.DefaultFeatureGate.Set("CustomPodDNS=true"); err != nil {
+		t.Errorf("Failed to enable CustomPodDNS feature gate: %v", err)
+	}
+
+	successCases := []core.DNSPolicy{core.DNSClusterFirst, core.DNSDefault, core.DNSPolicy(core.DNSClusterFirst), core.DNSNone}
 	for _, policy := range successCases {
 		if errs := validateDNSPolicy(&policy, field.NewPath("field")); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
@@ -5159,6 +5171,177 @@ func TestValidateDNSPolicy(t *testing.T) {
 	for _, policy := range errorCases {
 		if errs := validateDNSPolicy(&policy, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %v", policy)
+		}
+	}
+}
+
+func TestValidatePodDNSConfig(t *testing.T) {
+	customDNSEnabled := utilfeature.DefaultFeatureGate.Enabled("CustomPodDNS")
+	defer func() {
+		// Restoring the old value.
+		if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("CustomPodDNS=%v", customDNSEnabled)); err != nil {
+			t.Errorf("Failed to restore CustomPodDNS feature gate: %v", err)
+		}
+	}()
+	if err := utilfeature.DefaultFeatureGate.Set("CustomPodDNS=true"); err != nil {
+		t.Errorf("Failed to enable CustomPodDNS feature gate: %v", err)
+	}
+
+	generateTestSearchPathFunc := func(numChars int) string {
+		res := ""
+		for i := 0; i < numChars; i++ {
+			res = res + "a"
+		}
+		return res
+	}
+	testOptionValue := "2"
+	testDNSNone := core.DNSNone
+	testDNSClusterFirst := core.DNSClusterFirst
+
+	testCases := []struct {
+		desc          string
+		dnsConfig     *core.PodDNSConfig
+		dnsPolicy     *core.DNSPolicy
+		expectedError bool
+	}{
+		{
+			desc:          "valid: empty DNSConfig",
+			dnsConfig:     &core.PodDNSConfig{},
+			expectedError: false,
+		},
+		{
+			desc: "valid: 1 option",
+			dnsConfig: &core.PodDNSConfig{
+				Options: []core.PodDNSConfigOption{
+					{Name: "ndots", Value: &testOptionValue},
+				},
+			},
+			expectedError: false,
+		},
+		{
+			desc: "valid: 1 nameserver",
+			dnsConfig: &core.PodDNSConfig{
+				Nameservers: []string{"127.0.0.1"},
+			},
+			expectedError: false,
+		},
+		{
+			desc: "valid: DNSNone with 1 nameserver",
+			dnsConfig: &core.PodDNSConfig{
+				Nameservers: []string{"127.0.0.1"},
+			},
+			dnsPolicy:     &testDNSNone,
+			expectedError: false,
+		},
+		{
+			desc: "valid: 1 search path",
+			dnsConfig: &core.PodDNSConfig{
+				Searches: []string{"custom"},
+			},
+			expectedError: false,
+		},
+		{
+			desc: "valid: 3 nameservers and 6 search paths",
+			dnsConfig: &core.PodDNSConfig{
+				Nameservers: []string{"127.0.0.1", "10.0.0.10", "8.8.8.8"},
+				Searches:    []string{"custom", "mydomain.com", "local", "cluster.local", "svc.cluster.local", "default.svc.cluster.local"},
+			},
+			expectedError: false,
+		},
+		{
+			desc: "valid: 256 characters in search path list",
+			dnsConfig: &core.PodDNSConfig{
+				// We can have 256 - (6 - 1) = 251 characters in total for 6 search paths.
+				Searches: []string{
+					generateTestSearchPathFunc(1),
+					generateTestSearchPathFunc(50),
+					generateTestSearchPathFunc(50),
+					generateTestSearchPathFunc(50),
+					generateTestSearchPathFunc(50),
+					generateTestSearchPathFunc(50),
+				},
+			},
+			expectedError: false,
+		},
+		{
+			desc: "valid: ipv6 nameserver",
+			dnsConfig: &core.PodDNSConfig{
+				Nameservers: []string{"FE80::0202:B3FF:FE1E:8329"},
+			},
+			expectedError: false,
+		},
+		{
+			desc: "invalid: 4 nameservers",
+			dnsConfig: &core.PodDNSConfig{
+				Nameservers: []string{"127.0.0.1", "10.0.0.10", "8.8.8.8", "1.2.3.4"},
+			},
+			expectedError: true,
+		},
+		{
+			desc: "invalid: 7 search paths",
+			dnsConfig: &core.PodDNSConfig{
+				Searches: []string{"custom", "mydomain.com", "local", "cluster.local", "svc.cluster.local", "default.svc.cluster.local", "exceeded"},
+			},
+			expectedError: true,
+		},
+		{
+			desc: "invalid: 257 characters in search path list",
+			dnsConfig: &core.PodDNSConfig{
+				// We can have 256 - (6 - 1) = 251 characters in total for 6 search paths.
+				Searches: []string{
+					generateTestSearchPathFunc(2),
+					generateTestSearchPathFunc(50),
+					generateTestSearchPathFunc(50),
+					generateTestSearchPathFunc(50),
+					generateTestSearchPathFunc(50),
+					generateTestSearchPathFunc(50),
+				},
+			},
+			expectedError: true,
+		},
+		{
+			desc: "invalid search path",
+			dnsConfig: &core.PodDNSConfig{
+				Searches: []string{"custom?"},
+			},
+			expectedError: true,
+		},
+		{
+			desc: "invalid nameserver",
+			dnsConfig: &core.PodDNSConfig{
+				Nameservers: []string{"invalid"},
+			},
+			expectedError: true,
+		},
+		{
+			desc: "invalid empty option name",
+			dnsConfig: &core.PodDNSConfig{
+				Options: []core.PodDNSConfigOption{
+					{Value: &testOptionValue},
+				},
+			},
+			expectedError: true,
+		},
+		{
+			desc: "invalid: DNSNone with 0 nameserver",
+			dnsConfig: &core.PodDNSConfig{
+				Searches: []string{"custom"},
+			},
+			dnsPolicy:     &testDNSNone,
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		if tc.dnsPolicy == nil {
+			tc.dnsPolicy = &testDNSClusterFirst
+		}
+
+		errs := validatePodDNSConfig(tc.dnsConfig, tc.dnsPolicy, field.NewPath("dnsConfig"))
+		if len(errs) != 0 && !tc.expectedError {
+			t.Errorf("%v: validatePodDNSConfig(%v) = %v, want nil", tc.desc, tc.dnsConfig, errs)
+		} else if len(errs) == 0 && tc.expectedError {
+			t.Errorf("%v: validatePodDNSConfig(%v) = nil, want error", tc.desc, tc.dnsConfig)
 		}
 	}
 }
