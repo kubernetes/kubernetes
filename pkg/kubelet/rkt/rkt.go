@@ -1812,6 +1812,10 @@ func (r *Runtime) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecontainer.
 		}
 	}()
 	// TODO: (random-liu) Stop using running pod in SyncPod()
+	if podStatus == nil {
+		glog.Error("podStatus is nil")
+		return
+	}
 	runningPod := kubecontainer.ConvertPodStatusToRunningPod(r.Type(), podStatus)
 	// Add references to all containers.
 	unidentifiedContainers := make(map[kubecontainer.ContainerID]*kubecontainer.Container)

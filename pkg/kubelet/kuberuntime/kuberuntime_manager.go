@@ -589,6 +589,10 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 			glog.V(4).Infof("Stopping PodSandbox for %q, will start new one", format.Pod(pod))
 		}
 
+		if podStatus == nil {
+			glog.Error("podStatus is nil")
+			return
+		}
 		killResult := m.killPodWithSyncResult(pod, kubecontainer.ConvertPodStatusToRunningPod(m.runtimeName, podStatus), nil)
 		result.AddPodSyncResult(killResult)
 		if killResult.Error() != nil {
