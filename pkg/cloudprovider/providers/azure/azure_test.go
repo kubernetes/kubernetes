@@ -19,6 +19,7 @@ package azure
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -161,10 +162,8 @@ func testLoadBalancerServiceAutoModeSelection(t *testing.T, isInternal bool) {
 			t.Errorf("Unexpected error: %s", svcName)
 		}
 
-		expectedNumOfLB := index % availabilitySetCount
-		if index >= availabilitySetCount {
-			expectedNumOfLB = availabilitySetCount
-		}
+		// expected is MIN(index, availabilitySetCount)
+		expectedNumOfLB := int(math.Min(float64(index), float64(availabilitySetCount)))
 		result, _ := az.LoadBalancerClient.List(az.Config.ResourceGroup)
 		lbCount := len(*result.Value)
 		if lbCount != expectedNumOfLB {
@@ -192,6 +191,9 @@ func testLoadBalancerServiceAutoModeSelection(t *testing.T, isInternal bool) {
 
 // Validate availability set selection of services across load balancers
 // based on provided availability sets through service annotation
+// The scenario is that there are 4 availability sets in the agent pool but the
+// services will be assigned load balancers that are part of the provided availability sets
+// specified in service annotation
 func testLoadBalancerServicesSpecifiedSelection(t *testing.T, isInternal bool) {
 	az := getTestCloud()
 	const vmCount = 8
@@ -201,8 +203,8 @@ func testLoadBalancerServicesSpecifiedSelection(t *testing.T, isInternal bool) {
 	clusterResources := getClusterResources(az, vmCount, availabilitySetCount)
 	getTestSecurityGroup(az)
 
-	selectedAvailabilitySetName1 := getASName(az, 1, availabilitySetCount)
-	selectedAvailabilitySetName2 := getASName(az, 2, availabilitySetCount)
+	selectedAvailabilitySetName1 := getAvailabilitySetName(az, 1, availabilitySetCount)
+	selectedAvailabilitySetName2 := getAvailabilitySetName(az, 2, availabilitySetCount)
 	for index := 1; index <= serviceCount; index++ {
 		svcName := fmt.Sprintf("service-%d", index)
 		var svc v1.Service
@@ -223,10 +225,8 @@ func testLoadBalancerServicesSpecifiedSelection(t *testing.T, isInternal bool) {
 			t.Errorf("Unexpected error: %s", svcName)
 		}
 
-		expectedNumOfLB := index % 2
-		if index >= 2 {
-			expectedNumOfLB = 2
-		}
+		// expected is MIN(index, 2)
+		expectedNumOfLB := int(math.Min(float64(index), float64(2)))
 		result, _ := az.LoadBalancerClient.List(az.Config.ResourceGroup)
 		lbCount := len(*result.Value)
 		if lbCount != expectedNumOfLB {
@@ -263,14 +263,12 @@ func testLoadBalancerMaxRulesServices(t *testing.T, isInternal bool) {
 			t.Errorf("Unexpected error: %s", svcName)
 		}
 
-		expectedNumOfLB := index % az.Config.MaximumLoadBalancerRuleCount
-		if index >= az.Config.MaximumLoadBalancerRuleCount {
-			expectedNumOfLB = az.Config.MaximumLoadBalancerRuleCount
-		}
+		// expected is MIN(index, az.Config.MaximumLoadBalancerRuleCount)
+		expectedNumOfLBRules := int(math.Min(float64(index), float64(az.Config.MaximumLoadBalancerRuleCount)))
 		result, _ := az.LoadBalancerClient.List(az.Config.ResourceGroup)
 		lbCount := len(*result.Value)
-		if lbCount != expectedNumOfLB {
-			t.Errorf("Unexpected number of LB's: Expected (%d) Found (%d)", expectedNumOfLB, lbCount)
+		if lbCount != expectedNumOfLBRules {
+			t.Errorf("Unexpected number of LB's: Expected (%d) Found (%d)", expectedNumOfLBRules, lbCount)
 		}
 	}
 
@@ -286,11 +284,15 @@ func testLoadBalancerMaxRulesServices(t *testing.T, isInternal bool) {
 	_, err := az.EnsureLoadBalancer(testClusterName, &svc, clusterResources.nodes)
 	if err == nil {
 		t.Errorf("Expect any new service to fail as max limit in lb has reached")
+	} else {
+		expectedErrMessageSubString := "all available load balancers have exceeded maximum rule limit"
+		if !strings.Contains(err.Error(), expectedErrMessageSubString) {
+			t.Errorf("Error message returned is not expected, expected sub string=%s, actual error message=%v", expectedErrMessageSubString, err)
+		}
 	}
 }
 
-// Validate even distribution of external services across load balances
-// based on number of availability sets
+// Validate service deletion in lb auto selection mode
 func testLoadBalancerServiceAutoModeDeleteSelection(t *testing.T, isInternal bool) {
 	az := getTestCloud()
 	const vmCount = 8
@@ -331,10 +333,8 @@ func testLoadBalancerServiceAutoModeDeleteSelection(t *testing.T, isInternal boo
 
 		setLoadBalancerAutoModeAnnotation(&svc)
 
-		expectedNumOfLB := index % availabilitySetCount
-		if index >= availabilitySetCount {
-			expectedNumOfLB = availabilitySetCount
-		}
+		// expected is MIN(index, availabilitySetCount)
+		expectedNumOfLB := int(math.Min(float64(index), float64(availabilitySetCount)))
 		result, _ := az.LoadBalancerClient.List(az.Config.ResourceGroup)
 		lbCount := len(*result.Value)
 		if lbCount != expectedNumOfLB {
@@ -859,7 +859,7 @@ func getVMName(vmIndex int) string {
 	return getTestResourceName(TestVMResourceBaseName, vmIndex)
 }
 
-func getASName(az *Cloud, vmIndex int, numAS int) string {
+func getAvailabilitySetName(az *Cloud, vmIndex int, numAS int) string {
 	asIndex := vmIndex % numAS
 	if asIndex == 0 {
 		return az.Config.PrimaryAvailabilitySetName
@@ -868,8 +868,10 @@ func getASName(az *Cloud, vmIndex int, numAS int) string {
 	return getTestResourceName(TestASResourceBaseName, asIndex)
 }
 
+// test supporting on 1 nic per vm
+// we really dont care about the name of the nic
+// just using the vm name for testing purposes
 func getNICName(vmIndex int) string {
-	// test supporting on 1 nic per vm
 	return getVMName(vmIndex)
 }
 
@@ -887,7 +889,7 @@ func getClusterResources(az *Cloud, vmCount int, availabilitySetCount int) (clus
 	clusterResources.availabilitySetNames = []string{}
 	for vmIndex := 0; vmIndex < vmCount; vmIndex++ {
 		vmName := getVMName(vmIndex)
-		asName := getASName(az, vmIndex, availabilitySetCount)
+		asName := getAvailabilitySetName(az, vmIndex, availabilitySetCount)
 		clusterResources.availabilitySetNames = append(clusterResources.availabilitySetNames, asName)
 
 		nicName := getNICName(vmIndex)

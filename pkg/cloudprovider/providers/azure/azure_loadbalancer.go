@@ -18,11 +18,13 @@ package azure
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
 	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
@@ -41,6 +43,13 @@ const ServiceAnnotationLoadBalancerInternalSubnet = "service.beta.kubernetes.io/
 
 // ServiceAnnotationLoadBalancerMode is the annotation used on the service to specify the
 // Azure load balancer selection based on availability sets
+// There are currently three possible load balancer selection modes :
+// 1. Default mode - service has no annotation ("service.beta.kubernetes.io/azure-load-balancer-mode")
+//	  In this case the Loadbalancer of the primary Availability set is selected
+// 2. "__auto__" mode - service is annotated with __auto__ value, this when loadbalancer from any availability set
+//    is selected which has the miinimum rules associated with it.
+// 3. "as1,as2" mode - this is when the laod balancer from the specified availability sets is selected that has the
+//    miinimum rules associated with it.
 const ServiceAnnotationLoadBalancerMode = "service.beta.kubernetes.io/azure-load-balancer-mode"
 
 // ServiceAnnotationLoadBalancerAutoModeValue the annotation used on the service to specify the
@@ -146,20 +155,21 @@ func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string,
 	var defaultLB *network.LoadBalancer
 	defaultLBName := az.getLoadBalancerName(clusterName, az.Config.PrimaryAvailabilitySetName, isInternal)
 
-	lbs, err := az.ListLBWithRetry()
+	existingLBs, err := az.ListLBWithRetry()
 	if err != nil {
 		return nil, nil, false, err
 	}
-	if lbs != nil {
-		for lbx := range lbs {
-			lb := &(lbs[lbx])
-			if strings.EqualFold(*lb.Name, defaultLBName) {
-				defaultLB = lb
+
+	// check if the service already has a load balancer
+	if existingLBs != nil {
+		for _, existingLB := range existingLBs {
+			if strings.EqualFold(*existingLB.Name, defaultLBName) {
+				defaultLB = &existingLB
 			}
-			if isInternalLoadBalancer(lb) != isInternal {
+			if isInternalLoadBalancer(&existingLB) != isInternal {
 				continue
 			}
-			status, err = az.getServiceLoadBalancerStatus(service, lb)
+			status, err = az.getServiceLoadBalancerStatus(service, &existingLB)
 			if err != nil {
 				return nil, nil, false, err
 			}
@@ -168,19 +178,22 @@ func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string,
 				continue
 			}
 
-			return lb, status, true, nil
+			return &existingLB, status, true, nil
 		}
 	}
+
 	// service does not have a load balancer, select one
 	if wantLb {
 		// select new load balancer for service
-		lb, exists, err = az.selectLoadBalancer(clusterName, service, &lbs, nodes)
+		selectedLB, exists, err := az.selectLoadBalancer(clusterName, service, &existingLBs, nodes)
 		if err != nil {
 			return nil, nil, false, err
 		}
 
-		return lb, nil, exists, err
+		return selectedLB, nil, exists, err
 	}
+
+	// create a default LB with meta data if not present
 	if defaultLB == nil {
 		defaultLB = &network.LoadBalancer{
 			Name:                         &defaultLBName,
@@ -190,6 +203,66 @@ func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string,
 	}
 
 	return defaultLB, nil, false, nil
+}
+
+// select load balancer for the service in the cluster
+// the selection algorithm selectes the the load balancer with currently has
+// the minimum lb rules, there there are multiple LB's with same number of rules
+// it selects the first one (sorted based on name)
+func (az *Cloud) selectLoadBalancer(clusterName string, service *v1.Service, existingLBs *[]network.LoadBalancer, nodes []*v1.Node) (selectedLB *network.LoadBalancer, existsLb bool, err error) {
+	isInternal := requiresInternalLoadBalancer(service)
+	serviceName := getServiceName(service)
+	glog.V(3).Infof("selectLoadBalancer(%s): isInternal(%s) - start", serviceName, isInternal)
+	availabilitySetNames, err := az.getLoadBalancerAvailabilitySetNames(service, nodes)
+	if err != nil {
+		glog.Errorf("az.selectLoadBalancer: cluster(%s) service(%s) isInternal(%t) - az.getLoadBalancerAvailabilitySetNames failed, err=(%v)", clusterName, serviceName, isInternal, err)
+		return nil, false, err
+	}
+	glog.Infof("selectLoadBalancer: cluster(%s) service(%s) isInternal(%t) - availabilitysetsnames %v", clusterName, serviceName, isInternal, *availabilitySetNames)
+	mapExistingLBs := map[string]network.LoadBalancer{}
+	for _, lb := range *existingLBs {
+		mapExistingLBs[*lb.Name] = lb
+	}
+	selectedLBRuleCount := math.MaxInt32
+	for _, currASName := range *availabilitySetNames {
+		currLBName := az.getLoadBalancerName(clusterName, currASName, isInternal)
+		lb, exists := mapExistingLBs[currLBName]
+		if !exists {
+			// select this LB as this is a new LB and will have minimum rules
+			// create tmp lb struct to hold metadata for the new load-balancer
+			selectedLB = &network.LoadBalancer{
+				Name:                         &currLBName,
+				Location:                     &az.Location,
+				LoadBalancerPropertiesFormat: &network.LoadBalancerPropertiesFormat{},
+			}
+
+			return selectedLB, false, nil
+		}
+
+		lbRules := *lb.LoadBalancingRules
+		currLBRuleCount := 0
+		if lbRules != nil {
+			currLBRuleCount = len(lbRules)
+		}
+		if currLBRuleCount < selectedLBRuleCount {
+			selectedLBRuleCount = currLBRuleCount
+			selectedLB = &lb
+		}
+	}
+
+	if selectedLB == nil {
+		err = fmt.Errorf("selectLoadBalancer: cluster(%s) service(%s) isInternal(%t) - unable to find load balancer for selected availability sets %v", clusterName, serviceName, isInternal, *availabilitySetNames)
+		glog.Error(err)
+		return nil, false, err
+	}
+	// validate if the selected LB has not exceeded the MaximumLoadBalancerRuleCount
+	if az.Config.MaximumLoadBalancerRuleCount != 0 && selectedLBRuleCount >= az.Config.MaximumLoadBalancerRuleCount {
+		err = fmt.Errorf("selectLoadBalancer: cluster(%s) service(%s) isInternal(%t) -  all available load balancers have exceeded maximum rule limit %d, availabilitysetnames (%v)", clusterName, serviceName, isInternal, selectedLBRuleCount, *availabilitySetNames)
+		glog.Error(err)
+		return selectedLB, existsLb, err
+	}
+
+	return selectedLB, existsLb, nil
 }
 
 func (az *Cloud) getServiceLoadBalancerStatus(service *v1.Service, lb *network.LoadBalancer) (status *v1.LoadBalancerStatus, err error) {
@@ -1043,15 +1116,26 @@ func subnet(service *v1.Service) *string {
 	return nil
 }
 
-func getServiceLoadBalancerMode(service *v1.Service) (hasMode bool, isAuto bool, asl []string) {
+// getServiceLoadBalancerMode parses the mode value
+// if the value is __auto__ it returns isAuto = TRUE
+// if anything else it returns the unique availability set names after triming spaces
+func getServiceLoadBalancerMode(service *v1.Service) (hasMode bool, isAuto bool, availabilitySetNames []string) {
 	mode, hasMode := service.Annotations[ServiceAnnotationLoadBalancerMode]
+	mode = strings.TrimSpace(mode)
 	isAuto = strings.EqualFold(mode, ServiceAnnotationLoadBalancerAutoModeValue)
 	if !isAuto {
-		asTagList := strings.TrimSpace(mode)
-
 		// Break up list of "AS1,AS2"
-		asl = strings.Split(asTagList, ",")
+		availabilitySetParsedList := strings.Split(mode, ",")
+
+		// Trim the availability set names and remove duplicates
+		//  e.g. {"AS1"," AS2", "AS3", "AS3"} => {"AS1", "AS2", "AS3"}
+		availabilitySetNameSet := sets.NewString()
+		for _, v := range availabilitySetParsedList {
+			availabilitySetNameSet.Insert(strings.TrimSpace(v))
+		}
+
+		availabilitySetNames = availabilitySetNameSet.List()
 	}
 
-	return hasMode, isAuto, asl
+	return hasMode, isAuto, availabilitySetNames
 }
