@@ -66,6 +66,7 @@ go_library(
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/mountpod:go_default_library",
         "//pkg/kubelet/network:go_default_library",
+        "//pkg/kubelet/network/dns:go_default_library",
         "//pkg/kubelet/pleg:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
         "//pkg/kubelet/preemption:go_default_library",
