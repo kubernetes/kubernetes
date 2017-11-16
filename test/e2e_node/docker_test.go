@@ -101,7 +101,7 @@ var _ = framework.KubeDescribe("Docker features [Feature:Docker]", func() {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{
 						Name:  containerName,
-						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Image: imageutils.GetE2EImage(imageutils.NginxSlim),
 					}},
 				},
 			})
