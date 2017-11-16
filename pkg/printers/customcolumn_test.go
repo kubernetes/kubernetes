@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
+	"time"
 )
 
 func TestMassageJSONPath(t *testing.T) {
@@ -40,6 +41,7 @@ func TestMassageJSONPath(t *testing.T) {
 		{input: "{foo.bar}", expectedOutput: "{.foo.bar}"},
 		{input: ".foo.bar", expectedOutput: "{.foo.bar}"},
 		{input: "{.foo.bar}", expectedOutput: "{.foo.bar}"},
+		{input: ".field.function()", expectedOutput: "{.field.function()}"},
 		{input: "", expectedOutput: ""},
 		{input: "{foo.bar", expectErr: true},
 		{input: "foo.bar}", expectErr: true},
@@ -305,6 +307,22 @@ foo       baz
 			obj: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, TypeMeta: metav1.TypeMeta{APIVersion: "baz"}},
 			expectedOutput: `NAME      API_VERSION   NOT_FOUND
 foo       baz           <none>
+`,
+		},
+		{
+			columns: []printers.Column{
+				{
+					Header:    "NAME",
+					FieldSpec: "{.metadata.name}",
+				},
+				{
+					Header:    "AGE",
+					FieldSpec: "{.metadata.creationTimestamp.elapsedTime()}",
+				},
+			},
+			obj: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", CreationTimestamp: metav1.NewTime(time.Now().Add(-120 * time.Minute))}},
+			expectedOutput: `NAME      AGE
+foo       2h
 `,
 		},
 	}

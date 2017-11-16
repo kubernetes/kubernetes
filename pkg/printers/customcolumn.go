@@ -27,8 +27,10 @@ import (
 	"text/tabwriter"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/jsonpath"
+	"time"
 )
 
 const (
@@ -39,7 +41,33 @@ const (
 	flags             = 0
 )
 
-var jsonRegexp = regexp.MustCompile("^\\{\\.?([^{}]+)\\}$|^\\.?([^{}]+)$")
+var jsonRegexp = regexp.MustCompile("^{\\.?([^{}]+)}$|^\\.?([^{}]+)$")
+
+var jsonPathFunctions = map[string]jsonpath.JSONPathFunction{
+	"elapsedTime": elapsedTimeJSONPathFunc,
+}
+
+func elapsedTimeJSONPathFunc(input []reflect.Value) []reflect.Value {
+	results := []reflect.Value{}
+	for _, value := range input {
+		var v string
+		switch val := value.Interface().(type) {
+		case string:
+			parsedTime, err := time.Parse(time.RFC3339, val)
+			if err == nil {
+				v = ElapsedTime(metav1.NewTime(parsedTime))
+			} else {
+				v = "<err:" + val + ">"
+			}
+		case metav1.Time:
+			v = ElapsedTime(val)
+		default:
+			v = "<err>"
+		}
+		results = append(results, reflect.ValueOf(v))
+	}
+	return results
+}
 
 // RelaxedJSONPathExpression attempts to be flexible with JSONPath expressions, it accepts:
 //   * metadata.name (no leading '.' or curly brances '{...}'
@@ -176,7 +204,7 @@ func (s *CustomColumnsPrinter) PrintObj(obj runtime.Object, out io.Writer) error
 	}
 	parsers := make([]*jsonpath.JSONPath, len(s.Columns))
 	for ix := range s.Columns {
-		parsers[ix] = jsonpath.New(fmt.Sprintf("column%d", ix)).AllowMissingKeys(true)
+		parsers[ix] = jsonpath.New(fmt.Sprintf("column%d", ix)).AllowMissingKeys(true).RegisterJSONPathFunctions(jsonPathFunctions)
 		if err := parsers[ix].Parse(s.Columns[ix].FieldSpec); err != nil {
 			return err
 		}
