@@ -68,15 +68,15 @@ func TestForbidden(t *testing.T) {
 		reason      string
 		contentType string
 	}{
-		{`{"metadata":{},"status":"Failure","message":"forbidden: User \"NAME\" cannot GET path \"/whatever\"","reason":"Forbidden","details":{},"code":403}
+		{`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"forbidden: User \"NAME\" cannot GET path \"/whatever\"","reason":"Forbidden","details":{},"code":403}
 `, authorizer.AttributesRecord{User: u, Verb: "GET", Path: "/whatever"}, "", "application/json"},
-		{`{"metadata":{},"status":"Failure","message":"forbidden: User \"NAME\" cannot GET path \"/\u0026lt;script\u0026gt;\"","reason":"Forbidden","details":{},"code":403}
+		{`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"forbidden: User \"NAME\" cannot GET path \"/\u0026lt;script\u0026gt;\"","reason":"Forbidden","details":{},"code":403}
 `, authorizer.AttributesRecord{User: u, Verb: "GET", Path: "/<script>"}, "", "application/json"},
-		{`{"metadata":{},"status":"Failure","message":"pod is forbidden: User \"NAME\" cannot GET pod at the cluster scope","reason":"Forbidden","details":{"kind":"pod"},"code":403}
+		{`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"pod is forbidden: User \"NAME\" cannot GET pod at the cluster scope","reason":"Forbidden","details":{"kind":"pod"},"code":403}
 `, authorizer.AttributesRecord{User: u, Verb: "GET", Resource: "pod", ResourceRequest: true}, "", "application/json"},
-		{`{"metadata":{},"status":"Failure","message":"pod \"mypod\" is forbidden: User \"NAME\" cannot GET pod at the cluster scope","reason":"Forbidden","details":{"name":"mypod","kind":"pod"},"code":403}
+		{`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"pod \"mypod\" is forbidden: User \"NAME\" cannot GET pod at the cluster scope","reason":"Forbidden","details":{"name":"mypod","kind":"pod"},"code":403}
 `, authorizer.AttributesRecord{User: u, Verb: "GET", Resource: "pod", ResourceRequest: true, Name: "mypod"}, "", "application/json"},
-		{`{"metadata":{},"status":"Failure","message":"pod.v2 is forbidden: User \"NAME\" cannot GET pod.v2/quota in the namespace \"test\"","reason":"Forbidden","details":{"group":"v2","kind":"pod"},"code":403}
+		{`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"pod.v2 is forbidden: User \"NAME\" cannot GET pod.v2/quota in the namespace \"test\"","reason":"Forbidden","details":{"group":"v2","kind":"pod"},"code":403}
 `, authorizer.AttributesRecord{User: u, Verb: "GET", Namespace: "test", APIGroup: "v2", Resource: "pod", Subresource: "quota", ResourceRequest: true}, "", "application/json"},
 	}
 	for _, test := range cases {
