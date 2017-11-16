@@ -47,11 +47,14 @@ func TestNewManagerImplStart(t *testing.T) {
 
 // Tests that the device plugin manager correctly handles registration and re-registration by
 // making sure that after registration, devices are correctly updated and if a re-registration
-// happens, we will NOT delete devices.
+// happens, we will NOT delete devices; and no orphaned devices left.
 func TestDevicePluginReRegistration(t *testing.T) {
 	devs := []*pluginapi.Device{
 		{ID: "Dev1", Health: pluginapi.Healthy},
 		{ID: "Dev2", Health: pluginapi.Healthy},
+	}
+	devsForRegistration := []*pluginapi.Device{
+		{ID: "Dev3", Health: pluginapi.Healthy},
 	}
 
 	callbackCount := 0
@@ -59,8 +62,8 @@ func TestDevicePluginReRegistration(t *testing.T) {
 	var stopping int32
 	stopping = 0
 	callback := func(n string, a, u, r []pluginapi.Device) {
-		// Should be called twice, one for each plugin registration, till we are stopping.
-		if callbackCount > 1 && atomic.LoadInt32(&stopping) <= 0 {
+		// Should be called three times, one for each plugin registration, till we are stopping.
+		if callbackCount > 2 && atomic.LoadInt32(&stopping) <= 0 {
 			t.FailNow()
 		}
 		callbackCount++
@@ -89,12 +92,25 @@ func TestDevicePluginReRegistration(t *testing.T) {
 
 	devices2 := m.Devices()
 	require.Equal(t, 2, len(devices2[testResourceName]), "Devices shouldn't change.")
+
+	// Test the scenario that a plugin re-registers with different devices.
+	p3 := NewDevicePluginStub(devsForRegistration, pluginSocketName+".third")
+	err = p3.Start()
+	require.NoError(t, err)
+	p3.Register(socketName, testResourceName)
+	// Wait for the second callback to be issued.
+	<-callbackChan
+
+	devices3 := m.Devices()
+	require.Equal(t, 1, len(devices3[testResourceName]), "Devices of plugin previously registered should be removed.")
 	// Wait long enough to catch unexpected callbacks.
 	time.Sleep(5 * time.Second)
 
 	atomic.StoreInt32(&stopping, 1)
-	cleanup(t, m, p1)
 	p2.Stop()
+	p3.Stop()
+	cleanup(t, m, p1)
+
 }
 
 func setup(t *testing.T, devs []*pluginapi.Device, callback MonitorCallback) (Manager, *Stub) {
