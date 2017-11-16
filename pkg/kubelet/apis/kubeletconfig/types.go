@@ -121,6 +121,8 @@ type KubeletConfiguration struct {
 	EnableDebuggingHandlers bool
 	// enableContentionProfiling enables lock contention profiling, if enableDebuggingHandlers is true.
 	EnableContentionProfiling bool
+	// cAdvisorAllowDynamicHousekeeping allows housekeeping intervals to be dynamic.
+	CAdvisorAllowDynamicHousekeeping bool
 	// cAdvisorPort is the port of the localhost cAdvisor endpoint (set to 0 to disable)
 	CAdvisorPort int32
 	// healthzPort is the port of the localhost healthz endpoint (set to 0 to disable)

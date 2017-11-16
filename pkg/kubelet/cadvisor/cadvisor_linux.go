@@ -55,7 +55,6 @@ var _ Interface = new(cadvisorClient)
 const statsCacheDuration = 2 * time.Minute
 const maxHousekeepingInterval = 15 * time.Second
 const defaultHousekeepingInterval = 10 * time.Second
-const allowDynamicHousekeeping = true
 
 func init() {
 	// Override cAdvisor flag defaults.
@@ -105,7 +104,7 @@ func containerLabels(c *cadvisorapi.ContainerInfo) map[string]string {
 }
 
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(address string, port uint, imageFsInfoProvider ImageFsInfoProvider, rootPath string, usingLegacyStats bool) (Interface, error) {
+func New(address string, port uint, imageFsInfoProvider ImageFsInfoProvider, rootPath string, usingLegacyStats bool, allowDynamicHousekeeping bool) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
 
 	ignoreMetrics := cadvisormetrics.MetricSet{cadvisormetrics.NetworkTcpUsageMetrics: struct{}{}, cadvisormetrics.NetworkUdpUsageMetrics: struct{}{}}

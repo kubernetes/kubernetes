@@ -145,6 +145,7 @@ var (
 		"Authorization.Mode",
 		"Authorization.Webhook.CacheAuthorizedTTL.Duration",
 		"Authorization.Webhook.CacheUnauthorizedTTL.Duration",
+		"CAdvisorAllowDynamicHousekeeping",
 		"CAdvisorPort",
 		"CPUCFSQuota",
 		"CPUManagerPolicy",

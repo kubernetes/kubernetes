@@ -181,6 +181,9 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 		return err
 	}
 	out.EnableContentionProfiling = in.EnableContentionProfiling
+	if err := v1.Convert_Pointer_bool_To_bool(&in.CAdvisorAllowDynamicHousekeeping, &out.CAdvisorAllowDynamicHousekeeping, s); err != nil {
+		return err
+	}
 	if err := v1.Convert_Pointer_int32_To_int32(&in.CAdvisorPort, &out.CAdvisorPort, s); err != nil {
 		return err
 	}
@@ -306,6 +309,9 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 		return err
 	}
 	out.EnableContentionProfiling = in.EnableContentionProfiling
+	if err := v1.Convert_bool_To_Pointer_bool(&in.CAdvisorAllowDynamicHousekeeping, &out.CAdvisorAllowDynamicHousekeeping, s); err != nil {
+		return err
+	}
 	if err := v1.Convert_int32_To_Pointer_int32(&in.CAdvisorPort, &out.CAdvisorPort, s); err != nil {
 		return err
 	}
