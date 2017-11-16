@@ -9,26 +9,23 @@ items:
     foo: changed-value
     new-data: new-value
     new-data2: new-value
-    new-data3: newivalue
   kind: ConfigMap
   metadata:
     annotations: {}
     name: cm1
     namespace: myproject
 - kind: Service
-  apiVersion: v1
   metadata:
     annotations: {}
     labels:
       app: svc1
       new-label: foo
-      new-label2: foo2
     name: svc1
     namespace: myproject
   spec:
     ports:
     - name: "80"
-      port: 82
+      port: 81
       protocol: TCP
       targetPort: 81
     sessionAffinity: None
