@@ -40,7 +40,7 @@ func NewKubeadmCommand(_ io.Reader, out, err io.Writer) *cobra.Command {
 			kubeadm: easily bootstrap a secure Kubernetes cluster.
 
 			    ┌──────────────────────────────────────────────────────────┐
-			    │ KUBEADM IS BETA, DO NOT USE IT FOR PRODUCTION CLUSTERS!  │
+			    │ KUBEADM IS CURRENTLY IN BETA                             │
 			    │                                                          │
 			    │ But please, try it out and give us feedback at:          │
 			    │ https://github.com/kubernetes/kubeadm/issues             │
