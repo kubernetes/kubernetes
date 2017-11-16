@@ -19,8 +19,12 @@ package cpumanager
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
+	"time"
 
+	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"io/ioutil"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,6 +33,7 @@ import (
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"os"
 )
 
 type mockState struct {
@@ -220,6 +225,127 @@ func TestCPUManagerAdd(t *testing.T) {
 			t.Errorf("CPU Manager AddContainer() error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expErr, err)
 		}
+	}
+}
+
+func TestCPUManagerGenerate(t *testing.T) {
+	testCases := []struct {
+		description                string
+		cpuPolicyName              string
+		nodeAllocatableReservation v1.ResourceList
+		isTopologyBroken           bool
+		panicMsg                   string
+		expectedPolicy             string
+		expectedError              error
+		skipIfPermissionsError     bool
+	}{
+		{
+			description:                "set none policy",
+			cpuPolicyName:              "none",
+			nodeAllocatableReservation: nil,
+			expectedPolicy:             "none",
+		},
+		{
+			description:                "invalid policy name",
+			cpuPolicyName:              "invalid",
+			nodeAllocatableReservation: nil,
+			expectedPolicy:             "none",
+		},
+		{
+			description:                "static policy",
+			cpuPolicyName:              "static",
+			nodeAllocatableReservation: v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(3, resource.DecimalSI)},
+			expectedPolicy:             "static",
+			skipIfPermissionsError:     true,
+		},
+		{
+			description:                "static policy - broken topology",
+			cpuPolicyName:              "static",
+			nodeAllocatableReservation: v1.ResourceList{},
+			isTopologyBroken:           true,
+			expectedError:              fmt.Errorf("could not detect number of cpus"),
+			skipIfPermissionsError:     true,
+		},
+		{
+			description:                "static policy - broken reservation",
+			cpuPolicyName:              "static",
+			nodeAllocatableReservation: v1.ResourceList{},
+			panicMsg:                   "unable to determine reserved CPU resources for static policy",
+			skipIfPermissionsError:     true,
+		},
+		{
+			description:                "static policy - no CPU resources",
+			cpuPolicyName:              "static",
+			nodeAllocatableReservation: v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(0, resource.DecimalSI)},
+			panicMsg:                   "the static policy requires systemreserved.cpu + kubereserved.cpu to be greater than zero",
+			skipIfPermissionsError:     true,
+		},
+	}
+
+	mockedMachineInfo := cadvisorapi.MachineInfo{
+		NumCores: 4,
+		Topology: []cadvisorapi.Node{
+			{
+				Cores: []cadvisorapi.Core{
+					{
+						Id:      0,
+						Threads: []int{0},
+					},
+					{
+						Id:      1,
+						Threads: []int{1},
+					},
+					{
+						Id:      2,
+						Threads: []int{2},
+					},
+					{
+						Id:      3,
+						Threads: []int{3},
+					},
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			machineInfo := &mockedMachineInfo
+			if testCase.isTopologyBroken {
+				machineInfo = &cadvisorapi.MachineInfo{}
+			}
+			sDir, err := ioutil.TempDir("/tmp/", "cpu_manager_test")
+			if err != nil {
+				t.Errorf("cannot create state file: %s", err.Error())
+			}
+			defer os.RemoveAll(sDir)
+			defer func() {
+				if err := recover(); err != nil {
+					if testCase.panicMsg != "" {
+						if !strings.Contains(err.(string), testCase.panicMsg) {
+							t.Errorf("Unexpected panic message. Have: %q wants %q", err, testCase.panicMsg)
+						}
+					} else {
+						t.Errorf("Unexpected panic: %q", err)
+					}
+				} else if testCase.panicMsg != "" {
+					t.Error("Expected panic hasn't been raised")
+				}
+			}()
+
+			mgr, err := NewManager(testCase.cpuPolicyName, 5*time.Second, machineInfo, testCase.nodeAllocatableReservation, sDir)
+			if testCase.expectedError != nil {
+				if !strings.Contains(err.Error(), testCase.expectedError.Error()) {
+					t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), testCase.expectedError.Error())
+				}
+			} else {
+				rawMgr := mgr.(*manager)
+				if rawMgr.policy.Name() != testCase.expectedPolicy {
+					t.Errorf("Unexpected policy name. Have: %q wants %q", rawMgr.policy.Name(), testCase.expectedPolicy)
+				}
+			}
+		})
+
 	}
 }
 

@@ -38,6 +38,7 @@ type staticPolicyTest struct {
 	expErr          error
 	expCPUAlloc     bool
 	expCSet         cpuset.CPUSet
+	expPanic        bool
 }
 
 func TestStaticPolicyName(t *testing.T) {
@@ -51,18 +52,73 @@ func TestStaticPolicyName(t *testing.T) {
 }
 
 func TestStaticPolicyStart(t *testing.T) {
-	policy := NewStaticPolicy(topoSingleSocketHT, 1).(*staticPolicy)
-
-	st := &mockState{
-		assignments:   state.ContainerCPUAssignments{},
-		defaultCPUSet: cpuset.NewCPUSet(),
+	testCases := []staticPolicyTest{
+		{
+			description: "non-corrupted state",
+			topo:        topoDualSocketHT,
+			stAssignments: state.ContainerCPUAssignments{
+				"0": cpuset.NewCPUSet(0),
+			},
+			stDefaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			expCSet:         cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+		},
+		{
+			description:     "empty cpuset",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 1,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(),
+			expCSet:         cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+		},
+		{
+			description:     "reserved cores 0 & 6 are not present in available cpuset",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 2,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1),
+			expPanic:        true,
+		},
+		{
+			description: "assigned core 2 is still present in available cpuset",
+			topo:        topoDualSocketHT,
+			stAssignments: state.ContainerCPUAssignments{
+				"0": cpuset.NewCPUSet(0, 1, 2),
+			},
+			stDefaultCPUSet: cpuset.NewCPUSet(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			expPanic:        true,
+		},
 	}
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			defer func() {
+				if err := recover(); err != nil {
+					if !testCase.expPanic {
+						t.Errorf("unexpected panic occured: %q", err)
+					}
+				} else if testCase.expPanic {
+					t.Error("expected panic doesn't occured")
+				}
+			}()
+			policy := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs).(*staticPolicy)
+			st := &mockState{
+				assignments:   testCase.stAssignments,
+				defaultCPUSet: testCase.stDefaultCPUSet,
+			}
+			policy.Start(st)
 
-	policy.Start(st)
-	for cpuid := 1; cpuid < policy.topology.NumCPUs; cpuid++ {
-		if !st.defaultCPUSet.Contains(cpuid) {
-			t.Errorf("StaticPolicy Start() error. expected cpuid %d to be present in defaultCPUSet", cpuid)
-		}
+			if !testCase.stDefaultCPUSet.IsEmpty() {
+				for cpuid := 1; cpuid < policy.topology.NumCPUs; cpuid++ {
+					if !st.defaultCPUSet.Contains(cpuid) {
+						t.Errorf("StaticPolicy Start() error. expected cpuid %d to be present in defaultCPUSet", cpuid)
+					}
+				}
+			}
+			if !st.GetDefaultCPUSet().Equals(testCase.expCSet) {
+				t.Errorf("State CPUSet is different than expected. Have %q wants: %q", st.GetDefaultCPUSet(),
+					testCase.expCSet)
+			}
+
+		})
 	}
 }
 
