@@ -71,9 +71,9 @@ func (fLBC fakeAzureLBClient) Delete(resourceGroupName string, loadBalancerName 
 		close(respChan)
 		close(errChan)
 	}()
-	if _, ok := fLBC.FakeStore[resourceGroupName]; ok {
-		if _, ok := fLBC.FakeStore[resourceGroupName][loadBalancerName]; ok {
-			delete(fLBC.FakeStore[resourceGroupName], loadBalancerName)
+	if rgLBs, ok := fLBC.FakeStore[resourceGroupName]; ok {
+		if _, ok := rgLBs[loadBalancerName]; ok {
+			delete(rgLBs, loadBalancerName)
 			resp.Response = &http.Response{
 				StatusCode: http.StatusAccepted,
 			}
@@ -207,9 +207,9 @@ func (fAPC fakeAzurePIPClient) Delete(resourceGroupName string, publicIPAddressN
 		close(respChan)
 		close(errChan)
 	}()
-	if _, ok := fAPC.FakeStore[resourceGroupName]; ok {
-		if _, ok := fAPC.FakeStore[resourceGroupName][publicIPAddressName]; ok {
-			delete(fAPC.FakeStore[resourceGroupName], publicIPAddressName)
+	if rgPIPs, ok := fAPC.FakeStore[resourceGroupName]; ok {
+		if _, ok := rgPIPs[publicIPAddressName]; ok {
+			delete(rgPIPs, publicIPAddressName)
 			resp.Response = &http.Response{
 				StatusCode: http.StatusAccepted,
 			}
@@ -434,9 +434,9 @@ func (fASC fakeAzureSubnetsClient) Delete(resourceGroupName string, virtualNetwo
 	}()
 
 	rgVnet := strings.Join([]string{resourceGroupName, virtualNetworkName}, "AND")
-	if _, ok := fASC.FakeStore[rgVnet]; ok {
-		if _, ok := fASC.FakeStore[rgVnet][subnetName]; ok {
-			delete(fASC.FakeStore[rgVnet], subnetName)
+	if rgSubnets, ok := fASC.FakeStore[rgVnet]; ok {
+		if _, ok := rgSubnets[subnetName]; ok {
+			delete(rgSubnets, subnetName)
 			resp.Response = &http.Response{
 				StatusCode: http.StatusAccepted,
 			}
@@ -532,9 +532,9 @@ func (fNSG fakeAzureNSGClient) Delete(resourceGroupName string, networkSecurityG
 		close(respChan)
 		close(errChan)
 	}()
-	if _, ok := fNSG.FakeStore[resourceGroupName]; ok {
-		if _, ok := fNSG.FakeStore[resourceGroupName][networkSecurityGroupName]; ok {
-			delete(fNSG.FakeStore[resourceGroupName], networkSecurityGroupName)
+	if rgSGs, ok := fNSG.FakeStore[resourceGroupName]; ok {
+		if _, ok := rgSGs[networkSecurityGroupName]; ok {
+			delete(rgSGs, networkSecurityGroupName)
 			resp.Response = &http.Response{
 				StatusCode: http.StatusAccepted,
 			}
