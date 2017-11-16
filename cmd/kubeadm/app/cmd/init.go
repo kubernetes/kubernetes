@@ -267,6 +267,9 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight,
 		if err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, criSocket); err != nil {
 			return nil, err
 		}
+
+		// Try to start the kubelet service in case it's inactive
+		preflight.TryStartKubelet()
 	} else {
 		fmt.Println("[preflight] Skipping pre-flight checks.")
 	}
@@ -348,19 +351,19 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
-		// TODO: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+		// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
 		kubeletCfg := &kubeadmapi.KubeletConfiguration{
 			BaseConfig: &kubeletconfigv1alpha1.KubeletConfiguration{
-				PodManifestPath: "/etc/kubernetes/manifests",
+				PodManifestPath: kubeadmapiext.DefaultManifestsDir,
 				AllowPrivileged: utilpointer.BoolPtr(true),
-				ClusterDNS:      []string{"10.96.0.10"},
-				ClusterDomain:   "cluster.local",
+				ClusterDNS:      []string{kubeadmapiext.DefaultClusterDNSIP},
+				ClusterDomain:   kubeadmapiext.DefaultServiceDNSDomain,
 				Authorization: kubeletconfigv1alpha1.KubeletAuthorization{
-					Mode: "Webhook",
+					Mode: kubeletconfigv1alpha1.KubeletAuthorizationModeWebhook,
 				},
 				Authentication: kubeletconfigv1alpha1.KubeletAuthentication{
 					X509: kubeletconfigv1alpha1.KubeletX509Authentication{
-						ClientCAFile: "/etc/kubernetes/pki/ca.crt",
+						ClientCAFile: kubeadmapiext.DefaultCACertPath,
 					},
 				},
 				CAdvisorPort: utilpointer.Int32Ptr(0),
@@ -392,11 +395,7 @@ func (i *Init) Run(out io.Writer) error {
 		if err := CreateKubeletBaseConfigMapRBACRules(client, i.cfg.NodeName); err != nil {
 			return fmt.Errorf("error creating kubelet base configmap RBAC rules: %v", err)
 		}
-
 	}
-
-	// Try to start the kubelet service in case it's inactive
-	preflight.TryStartKubelet()
 
 	// waiter holds the apiclient.Waiter implementation of choice, responsible for querying the API server in various ways and waiting for conditions to be fulfilled
 	waiter := getWaiter(i.dryRun, client)

@@ -212,6 +212,9 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 		if err := preflight.RunJoinNodeChecks(utilsexec.New(), cfg, criSocket); err != nil {
 			return nil, err
 		}
+
+		// Try to start the kubelet service in case it's inactive
+		preflight.TryStartKubelet()
 	} else {
 		fmt.Println("[preflight] Skipping pre-flight checks.")
 	}
@@ -234,19 +237,15 @@ func (j *Join) Run(out io.Writer) error {
 		return err
 	}
 
-	// Try to start the kubelet service in case it's inactive
-	preflight.TryStartKubelet()
-
 	if features.Enabled(j.cfg.FeatureGates, features.DynamicKubeletConfig) {
-		// TODO: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+		// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
 		client, err := kubeconfigutil.ClientSetFromFile(kubeadmconstants.GetAdminKubeConfigPath())
 		if err != nil {
 			return err
 		}
 
-		err = cmdutil.UpdateNodeWithConfigMap(client, j.cfg.NodeName)
-		if err != nil {
-			return nil
+		if err = cmdutil.UpdateNodeWithConfigMap(client, j.cfg.NodeName); err != nil {
+			return err
 		}
 	}
 

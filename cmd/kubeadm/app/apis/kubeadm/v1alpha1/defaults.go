@@ -30,6 +30,8 @@ const (
 	DefaultServiceDNSDomain = "cluster.local"
 	// DefaultServicesSubnet defines default service subnet range
 	DefaultServicesSubnet = "10.96.0.0/12"
+	// DefaultClusterDNSIP defines default DNS IP
+	DefaultClusterDNSIP = "10.96.0.10"
 	// DefaultKubernetesVersion defines default kubernetes version
 	DefaultKubernetesVersion = "stable-1.8"
 	// DefaultAPIBindPort defines default API port
@@ -40,6 +42,8 @@ const (
 	DefaultCertificatesDir = "/etc/kubernetes/pki"
 	// DefaultImageRepository defines default image registry
 	DefaultImageRepository = "gcr.io/google_containers"
+	// DefaultManifestsDir defines default manifests directory
+	DefaultManifestsDir = "/etc/kubernetes/manifests"
 
 	// DefaultEtcdDataDir defines default location of etcd where static pods will save data to
 	DefaultEtcdDataDir = "/var/lib/etcd"

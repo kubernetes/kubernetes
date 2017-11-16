@@ -140,10 +140,12 @@ const (
 	// MasterConfigurationConfigMapKey specifies in what ConfigMap key the master configuration should be stored
 	MasterConfigurationConfigMapKey = "MasterConfiguration"
 
-	// KubeletBaseConfigurationConfigMap specifies in what ConfigMap in the kube-system namespace the init kubelet configuration should be stored
+	// KubeletBaseConfigurationConfigMap specifies in what ConfigMap in the kube-system namespace the initial remote configuration should be stored
 	KubeletBaseConfigurationConfigMap = "kubelet-base-config-1.9"
 
-	// KubeletBaseConfigurationConfigMapKey specifies in what ConfigMap key the init kubelet configuration should be stored
+	// KubeletBaseConfigurationConfigMapKey specifies in what ConfigMap key the initial remote configuration should be stored
+	// TODO: Use the constant ("kubelet.config.k8s.io") defined in pkg/kubelet/kubeletconfig/util/keys/keys.go
+	// after https://github.com/kubernetes/kubernetes/pull/53833 being merged.
 	KubeletBaseConfigurationConfigMapKey = "kubelet"
 
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
