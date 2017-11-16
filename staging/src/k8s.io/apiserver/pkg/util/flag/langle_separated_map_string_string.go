@@ -38,10 +38,6 @@ func NewLangleSeparatedMapStringString(m *map[string]string) *LangleSeparatedMap
 
 // String implements github.com/spf13/pflag.Value
 func (m *LangleSeparatedMapStringString) String() string {
-	if *m.Map == nil {
-		return "nil"
-	}
-
 	pairs := []string{}
 	for k, v := range *m.Map {
 		pairs = append(pairs, fmt.Sprintf("%s<%s", k, v))
@@ -54,12 +50,6 @@ func (m *LangleSeparatedMapStringString) String() string {
 func (m *LangleSeparatedMapStringString) Set(value string) error {
 	if m.Map == nil {
 		return fmt.Errorf("no target (nil pointer to map[string]string)")
-	}
-	// allow explicit nil map
-	if value == "nil" {
-		*m.Map = nil
-		m.initialized = true
-		return nil
 	}
 	if !m.initialized || *m.Map == nil {
 		// clear default values, or allocate if no existing map
@@ -84,4 +74,9 @@ func (m *LangleSeparatedMapStringString) Set(value string) error {
 // Type implements github.com/spf13/pflag.Value
 func (*LangleSeparatedMapStringString) Type() string {
 	return "mapStringString"
+}
+
+// Empty implements OmitEmpty
+func (m *LangleSeparatedMapStringString) Empty() bool {
+	return len(*m.Map) == 0
 }

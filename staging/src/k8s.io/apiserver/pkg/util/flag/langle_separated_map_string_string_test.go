@@ -28,7 +28,7 @@ func TestStringLangleSeparatedMapStringString(t *testing.T) {
 		m      *LangleSeparatedMapStringString
 		expect string
 	}{
-		{"nil", NewLangleSeparatedMapStringString(&nilMap), "nil"},
+		{"nil", NewLangleSeparatedMapStringString(&nilMap), ""},
 		{"empty", NewLangleSeparatedMapStringString(&map[string]string{}), ""},
 		{"one key", NewLangleSeparatedMapStringString(&map[string]string{"one": "foo"}), "one<foo"},
 		{"two keys", NewLangleSeparatedMapStringString(&map[string]string{"one": "foo", "two": "bar"}), "one<foo,two<bar"},
@@ -58,12 +58,6 @@ func TestSetLangleSeparatedMapStringString(t *testing.T) {
 			&LangleSeparatedMapStringString{
 				initialized: true,
 				Map:         &map[string]string{},
-			}, ""},
-		{"explicitly nil", []string{"nil"},
-			NewLangleSeparatedMapStringString(&map[string]string{"default": ""}),
-			&LangleSeparatedMapStringString{
-				initialized: true,
-				Map:         &nilMap,
 			}, ""},
 		// make sure we still allocate for "initialized" maps where Map was initially set to a nil map
 		{"allocates map if currently nil", []string{""},
@@ -138,6 +132,27 @@ func TestSetLangleSeparatedMapStringString(t *testing.T) {
 			}
 			if !reflect.DeepEqual(c.expect, c.start) {
 				t.Fatalf("expect %#v but got %#v", c.expect, c.start)
+			}
+		})
+	}
+}
+
+func TestEmptyLangleSeparatedMapStringString(t *testing.T) {
+	var nilMap map[string]string
+	cases := []struct {
+		desc   string
+		val    *LangleSeparatedMapStringString
+		expect bool
+	}{
+		{"nil", NewLangleSeparatedMapStringString(&nilMap), true},
+		{"empty", NewLangleSeparatedMapStringString(&map[string]string{}), true},
+		{"populated", NewLangleSeparatedMapStringString(&map[string]string{"foo": ""}), false},
+	}
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			result := c.val.Empty()
+			if result != c.expect {
+				t.Fatalf("expect %t but got %t", c.expect, result)
 			}
 		})
 	}

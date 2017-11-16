@@ -38,10 +38,6 @@ func NewMapStringString(m *map[string]string) *MapStringString {
 
 // String implements github.com/spf13/pflag.Value
 func (m *MapStringString) String() string {
-	if *m.Map == nil {
-		return "nil"
-	}
-
 	pairs := []string{}
 	for k, v := range *m.Map {
 		pairs = append(pairs, fmt.Sprintf("%s=%s", k, v))
@@ -54,12 +50,6 @@ func (m *MapStringString) String() string {
 func (m *MapStringString) Set(value string) error {
 	if m.Map == nil {
 		return fmt.Errorf("no target (nil pointer to map[string]string)")
-	}
-	// allow explicit nil map
-	if value == "nil" {
-		*m.Map = nil
-		m.initialized = true
-		return nil
 	}
 	if !m.initialized || *m.Map == nil {
 		// clear default values, or allocate if no existing map
@@ -84,4 +74,9 @@ func (m *MapStringString) Set(value string) error {
 // Type implements github.com/spf13/pflag.Value
 func (*MapStringString) Type() string {
 	return "mapStringString"
+}
+
+// Empty implements OmitEmpty
+func (m *MapStringString) Empty() bool {
+	return len(*m.Map) == 0
 }

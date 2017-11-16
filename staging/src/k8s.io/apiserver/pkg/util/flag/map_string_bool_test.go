@@ -28,7 +28,7 @@ func TestStringMapStringBool(t *testing.T) {
 		m      *MapStringBool
 		expect string
 	}{
-		{"nil", NewMapStringBool(&nilMap), "nil"},
+		{"nil", NewMapStringBool(&nilMap), ""},
 		{"empty", NewMapStringBool(&map[string]bool{}), ""},
 		{"one key", NewMapStringBool(&map[string]bool{"one": true}), "one=true"},
 		{"two keys", NewMapStringBool(&map[string]bool{"one": true, "two": false}), "one=true,two=false"},
@@ -58,12 +58,6 @@ func TestSetMapStringBool(t *testing.T) {
 			&MapStringBool{
 				initialized: true,
 				Map:         &map[string]bool{},
-			}, ""},
-		{"explicitly nil", []string{"nil"},
-			NewMapStringBool(&map[string]bool{"default": true}),
-			&MapStringBool{
-				initialized: true,
-				Map:         &nilMap,
 			}, ""},
 		// make sure we still allocate for "initialized" maps where Map was initially set to a nil map
 		{"allocates map if currently nil", []string{""},
@@ -142,6 +136,27 @@ func TestSetMapStringBool(t *testing.T) {
 			}
 			if !reflect.DeepEqual(c.expect, c.start) {
 				t.Fatalf("expect %#v but got %#v", c.expect, c.start)
+			}
+		})
+	}
+}
+
+func TestEmptyMapStringBool(t *testing.T) {
+	var nilMap map[string]bool
+	cases := []struct {
+		desc   string
+		val    *MapStringBool
+		expect bool
+	}{
+		{"nil", NewMapStringBool(&nilMap), true},
+		{"empty", NewMapStringBool(&map[string]bool{}), true},
+		{"populated", NewMapStringBool(&map[string]bool{"foo": true}), false},
+	}
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			result := c.val.Empty()
+			if result != c.expect {
+				t.Fatalf("expect %t but got %t", c.expect, result)
 			}
 		})
 	}

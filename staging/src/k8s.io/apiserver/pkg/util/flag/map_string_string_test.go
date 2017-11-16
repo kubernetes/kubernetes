@@ -28,7 +28,7 @@ func TestStringMapStringString(t *testing.T) {
 		m      *MapStringString
 		expect string
 	}{
-		{"nil", NewMapStringString(&nilMap), "nil"},
+		{"nil", NewMapStringString(&nilMap), ""},
 		{"empty", NewMapStringString(&map[string]string{}), ""},
 		{"one key", NewMapStringString(&map[string]string{"one": "foo"}), "one=foo"},
 		{"two keys", NewMapStringString(&map[string]string{"one": "foo", "two": "bar"}), "one=foo,two=bar"},
@@ -58,12 +58,6 @@ func TestSetMapStringString(t *testing.T) {
 			&MapStringString{
 				initialized: true,
 				Map:         &map[string]string{},
-			}, ""},
-		{"explicitly nil", []string{"nil"},
-			NewMapStringString(&map[string]string{"default": ""}),
-			&MapStringString{
-				initialized: true,
-				Map:         &nilMap,
 			}, ""},
 		// make sure we still allocate for "initialized" maps where Map was initially set to a nil map
 		{"allocates map if currently nil", []string{""},
@@ -138,6 +132,27 @@ func TestSetMapStringString(t *testing.T) {
 			}
 			if !reflect.DeepEqual(c.expect, c.start) {
 				t.Fatalf("expect %#v but got %#v", c.expect, c.start)
+			}
+		})
+	}
+}
+
+func TestEmptyMapStringString(t *testing.T) {
+	var nilMap map[string]string
+	cases := []struct {
+		desc   string
+		val    *MapStringString
+		expect bool
+	}{
+		{"nil", NewMapStringString(&nilMap), true},
+		{"empty", NewMapStringString(&map[string]string{}), true},
+		{"populated", NewMapStringString(&map[string]string{"foo": ""}), false},
+	}
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			result := c.val.Empty()
+			if result != c.expect {
+				t.Fatalf("expect %t but got %t", c.expect, result)
 			}
 		})
 	}

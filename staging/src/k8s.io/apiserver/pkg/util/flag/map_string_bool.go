@@ -39,10 +39,6 @@ func NewMapStringBool(m *map[string]bool) *MapStringBool {
 
 // String implements github.com/spf13/pflag.Value
 func (m *MapStringBool) String() string {
-	if *m.Map == nil {
-		return "nil"
-	}
-
 	pairs := []string{}
 	for k, v := range *m.Map {
 		pairs = append(pairs, fmt.Sprintf("%s=%t", k, v))
@@ -55,12 +51,6 @@ func (m *MapStringBool) String() string {
 func (m *MapStringBool) Set(value string) error {
 	if m.Map == nil {
 		return fmt.Errorf("no target (nil pointer to map[string]bool)")
-	}
-	// allow explicit nil map
-	if value == "nil" {
-		*m.Map = nil
-		m.initialized = true
-		return nil
 	}
 	if !m.initialized || *m.Map == nil {
 		// clear default values, or allocate if no existing map
@@ -89,4 +79,9 @@ func (m *MapStringBool) Set(value string) error {
 // Type implements github.com/spf13/pflag.Value
 func (*MapStringBool) Type() string {
 	return "mapStringBool"
+}
+
+// Empty implements OmitEmpty
+func (m *MapStringBool) Empty() bool {
+	return len(*m.Map) == 0
 }
