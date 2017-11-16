@@ -363,22 +363,13 @@ func (az *Cloud) ensurePublicIPExists(serviceName, pipName, domainNameLabel stri
 	pip.Tags = &map[string]*string{"service": &serviceName}
 	glog.V(3).Infof("ensure(%s): pip(%s) - creating", serviceName, *pip.Name)
 	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("PublicIPAddressesClient.CreateOrUpdate(%q): start", *pip.Name)
-	respChan, errChan := az.PublicIPAddressesClient.CreateOrUpdate(az.ResourceGroup, *pip.Name, pip, nil)
-	resp := <-respChan
-	err = <-errChan
-	glog.V(10).Infof("PublicIPAddressesClient.CreateOrUpdate(%q): end", *pip.Name)
-	if az.CloudProviderBackoff && shouldRetryAPIRequest(resp.Response, err) {
-		glog.V(2).Infof("ensure(%s) backing off: pip(%s) - creating", serviceName, *pip.Name)
-		retryErr := az.CreateOrUpdatePIPWithRetry(pip)
-		if retryErr != nil {
-			glog.V(2).Infof("ensure(%s) abort backoff: pip(%s) - creating", serviceName, *pip.Name)
-			err = retryErr
-		}
-	}
+	glog.V(10).Infof("CreateOrUpdatePIPWithRetry(%q): start", *pip.Name)
+	err = az.CreateOrUpdatePIPWithRetry(pip)
 	if err != nil {
+		glog.V(2).Infof("ensure(%s) abort backoff: pip(%s) - creating", serviceName, *pip.Name)
 		return nil, err
 	}
+	glog.V(10).Infof("CreateOrUpdatePIPWithRetry(%q): end", *pip.Name)
 
 	az.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("PublicIPAddressesClient.Get(%q): start", *pip.Name)
@@ -709,39 +700,17 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 
 			az.operationPollRateLimiter.Accept()
 			glog.V(10).Infof("LoadBalancerClient.Delete(%q): start", lbName)
-			respChan, errChan := az.LoadBalancerClient.Delete(az.ResourceGroup, lbName, nil)
-			resp := <-respChan
-			err := <-errChan
-			glog.V(10).Infof("LoadBalancerClient.Delete(%q): end", lbName)
-			if az.CloudProviderBackoff && shouldRetryAPIRequest(resp, err) {
-				glog.V(2).Infof("delete(%s) backing off: lb(%s) - deleting; no remaining frontendipconfigs", serviceName, lbName)
-				retryErr := az.DeleteLBWithRetry(lbName)
-				if retryErr != nil {
-					err = retryErr
-					glog.V(2).Infof("delete(%s) abort backoff: lb(%s) - deleting; no remaining frontendipconfigs", serviceName, lbName)
-				}
-			}
+			err := az.DeleteLBWithRetry(lbName)
 			if err != nil {
+				glog.V(2).Infof("delete(%s) abort backoff: lb(%s) - deleting; no remaining frontendipconfigs", serviceName, lbName)
 				return nil, err
 			}
-
+			glog.V(10).Infof("LoadBalancerClient.Delete(%q): end", lbName)
 		} else {
 			glog.V(3).Infof("ensure(%s): lb(%s) - updating", serviceName, lbName)
-			az.operationPollRateLimiter.Accept()
-			glog.V(10).Infof("LoadBalancerClient.CreateOrUpdate(%q): start", lbName)
-			respChan, errChan := az.LoadBalancerClient.CreateOrUpdate(az.ResourceGroup, lbName, *lb, nil)
-			resp := <-respChan
-			err := <-errChan
-			glog.V(10).Infof("LoadBalancerClient.CreateOrUpdate(%q): end", lbName)
-			if az.CloudProviderBackoff && shouldRetryAPIRequest(resp.Response, err) {
-				glog.V(2).Infof("ensure(%s) backing off: lb(%s) - updating", serviceName, lbName)
-				retryErr := az.CreateOrUpdateLBWithRetry(*lb)
-				if retryErr != nil {
-					glog.V(2).Infof("ensure(%s) abort backoff: lb(%s) - updating", serviceName, lbName)
-					return nil, retryErr
-				}
-			}
+			err := az.CreateOrUpdateLBWithRetry(*lb)
 			if err != nil {
+				glog.V(2).Infof("ensure(%s) abort backoff: lb(%s) - updating", serviceName, lbName)
 				return nil, err
 			}
 		}
@@ -892,22 +861,13 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		sg.SecurityRules = &updatedRules
 		glog.V(3).Infof("ensure(%s): sg(%s) - updating", serviceName, *sg.Name)
 		az.operationPollRateLimiter.Accept()
-		glog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%q): start", *sg.Name)
-		respChan, errChan := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *sg.Name, sg, nil)
-		resp := <-respChan
-		err := <-errChan
-		glog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%q): end", *sg.Name)
-		if az.CloudProviderBackoff && shouldRetryAPIRequest(resp.Response, err) {
-			glog.V(2).Infof("ensure(%s) backing off: sg(%s) - updating", serviceName, *sg.Name)
-			retryErr := az.CreateOrUpdateSGWithRetry(sg)
-			if retryErr != nil {
-				glog.V(2).Infof("ensure(%s) abort backoff: sg(%s) - updating", serviceName, *sg.Name)
-				return nil, retryErr
-			}
-		}
+		glog.V(10).Infof("CreateOrUpdateSGWithRetry(%q): start", *sg.Name)
+		err := az.CreateOrUpdateSGWithRetry(sg)
 		if err != nil {
+			glog.V(2).Infof("ensure(%s) abort backoff: sg(%s) - updating", serviceName, *sg.Name)
 			return nil, err
 		}
+		glog.V(10).Infof("CreateOrUpdateSGWithRetry(%q): end", *sg.Name)
 	}
 	return &sg, nil
 }
@@ -938,22 +898,18 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, want
 			} else {
 				glog.V(2).Infof("ensure(%s): pip(%s) - deleting", serviceName, pipName)
 				az.operationPollRateLimiter.Accept()
-				glog.V(10).Infof("PublicIPAddressesClient.Delete(%q): start", pipName)
-				resp, deleteErrChan := az.PublicIPAddressesClient.Delete(az.ResourceGroup, pipName, nil)
-				deleteErr := <-deleteErrChan
-				glog.V(10).Infof("PublicIPAddressesClient.Delete(%q): end", pipName) // response not read yet...
-				if az.CloudProviderBackoff && shouldRetryAPIRequest(<-resp, deleteErr) {
-					glog.V(2).Infof("ensure(%s) backing off: pip(%s) - deleting", serviceName, pipName)
-					retryErr := az.DeletePublicIPWithRetry(pipName)
-					if retryErr != nil {
-						glog.V(2).Infof("ensure(%s) abort backoff: pip(%s) - deleting", serviceName, pipName)
-						return nil, retryErr
-					}
+				glog.V(10).Infof("DeletePublicIPWithRetry(%q): start", pipName)
+				err = az.DeletePublicIPWithRetry(pipName)
+				if err != nil {
+					glog.V(2).Infof("ensure(%s) abort backoff: pip(%s) - deleting", serviceName, pipName)
+					// We let err to pass through
+					// It may be ignorable
 				}
+				glog.V(10).Infof("DeletePublicIPWithRetry(%q): end", pipName) // response not read yet...
 
-				deleteErr = ignoreStatusNotFoundFromError(deleteErr)
-				if deleteErr != nil {
-					return nil, deleteErr
+				err = ignoreStatusNotFoundFromError(err)
+				if err != nil {
+					return nil, err
 				}
 				glog.V(2).Infof("ensure(%s): pip(%s) - finished", serviceName, pipName)
 			}
@@ -1007,20 +963,12 @@ func (az *Cloud) ensureHostInPool(serviceName string, nodeName types.NodeName, b
 	vmName := mapNodeNameToVMName(nodeName)
 	az.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("VirtualMachinesClient.Get(%q): start", vmName)
-	machine, err := az.VirtualMachinesClient.Get(az.ResourceGroup, vmName, "")
-	glog.V(10).Infof("VirtualMachinesClient.Get(%q): end", vmName)
+	machine, err := az.VirtualMachineClientGetWithRetry(az.ResourceGroup, vmName, "")
 	if err != nil {
-		if az.CloudProviderBackoff {
-			glog.V(2).Infof("ensureHostInPool(%s, %s, %s) backing off", serviceName, nodeName, backendPoolID)
-			machine, err = az.VirtualMachineClientGetWithRetry(az.ResourceGroup, vmName, "")
-			if err != nil {
-				glog.V(2).Infof("ensureHostInPool(%s, %s, %s) abort backoff", serviceName, nodeName, backendPoolID)
-				return err
-			}
-		} else {
-			return err
-		}
+		glog.V(2).Infof("ensureHostInPool(%s, %s, %s) abort backoff", serviceName, nodeName, backendPoolID)
+		return err
 	}
+	glog.V(10).Infof("VirtualMachinesClient.Get(%q): end", vmName)
 
 	primaryNicID, err := getPrimaryInterfaceID(machine)
 	if err != nil {

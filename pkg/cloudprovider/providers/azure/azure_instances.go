@@ -48,19 +48,10 @@ func (az *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 		}
 		return addresses, nil
 	}
-	ip, err := az.getIPForMachine(name)
+	ip, err := az.GetIPForMachineWithRetry(name)
 	if err != nil {
-		if az.CloudProviderBackoff {
-			glog.V(2).Infof("NodeAddresses(%s) backing off", name)
-			ip, err = az.GetIPForMachineWithRetry(name)
-			if err != nil {
-				glog.V(2).Infof("NodeAddresses(%s) abort backoff", name)
-				return nil, err
-			}
-		} else {
-			glog.Errorf("error: az.NodeAddresses, az.getIPForMachine(%s), err=%v", name, err)
-			return nil, err
-		}
+		glog.V(2).Infof("NodeAddresses(%s) abort backoff", name)
+		return nil, err
 	}
 
 	return []v1.NodeAddress{

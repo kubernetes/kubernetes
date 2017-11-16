@@ -70,6 +70,9 @@ func (fLBC fakeAzureLBClient) CreateOrUpdate(resourceGroupName string, loadBalan
 	}
 	fLBC.FakeStore[resourceGroupName][loadBalancerName] = parameters
 	result = fLBC.FakeStore[resourceGroupName][loadBalancerName]
+	result.Response.Response = &http.Response{
+		StatusCode: http.StatusOK,
+	}
 	err = nil
 	return resultChan, errChan
 }
@@ -206,6 +209,9 @@ func (fAPC fakeAzurePIPClient) CreateOrUpdate(resourceGroupName string, publicIP
 
 	fAPC.FakeStore[resourceGroupName][publicIPAddressName] = parameters
 	result = fAPC.FakeStore[resourceGroupName][publicIPAddressName]
+	result.Response.Response = &http.Response{
+		StatusCode: http.StatusOK,
+	}
 	err = nil
 	return resultChan, errChan
 }
@@ -311,6 +317,9 @@ func (fIC fakeAzureInterfacesClient) CreateOrUpdate(resourceGroupName string, ne
 	}
 	fIC.FakeStore[resourceGroupName][networkInterfaceName] = parameters
 	result = fIC.FakeStore[resourceGroupName][networkInterfaceName]
+	result.Response.Response = &http.Response{
+		StatusCode: http.StatusOK,
+	}
 	err = nil
 
 	return resultChan, errChan
@@ -360,6 +369,9 @@ func (fVMC fakeAzureVirtualMachinesClient) CreateOrUpdate(resourceGroupName stri
 	}
 	fVMC.FakeStore[resourceGroupName][VMName] = parameters
 	result = fVMC.FakeStore[resourceGroupName][VMName]
+	result.Response.Response = &http.Response{
+		StatusCode: http.StatusOK,
+	}
 	err = nil
 	return resultChan, errChan
 }
@@ -431,6 +443,9 @@ func (fASC fakeAzureSubnetsClient) CreateOrUpdate(resourceGroupName string, virt
 	}
 	fASC.FakeStore[rgVnet][subnetName] = subnetParameters
 	result = fASC.FakeStore[rgVnet][subnetName]
+	result.Response.Response = &http.Response{
+		StatusCode: http.StatusOK,
+	}
 	err = nil
 	return resultChan, errChan
 }
@@ -531,6 +546,9 @@ func (fNSG fakeAzureNSGClient) CreateOrUpdate(resourceGroupName string, networkS
 	}
 	fNSG.FakeStore[resourceGroupName][networkSecurityGroupName] = parameters
 	result = fNSG.FakeStore[resourceGroupName][networkSecurityGroupName]
+	result.Response.Response = &http.Response{
+		StatusCode: http.StatusOK,
+	}
 	err = nil
 	return resultChan, errChan
 }
