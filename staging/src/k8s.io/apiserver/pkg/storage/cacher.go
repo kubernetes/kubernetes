@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/golang/glog"
@@ -186,7 +187,11 @@ type Cacher struct {
 	stopped  bool
 	stopCh   chan struct{}
 	stopWg   sync.WaitGroup
+
+	num int64
 }
+
+var activeCachers int64
 
 // Create a new Cacher responsible for servicing WATCH and LIST requests from
 // its internal cache and updating its cache in the background based on the
@@ -242,6 +247,10 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 			}, time.Second, stopCh,
 		)
 	}()
+
+	cacher.num = atomic.AddInt64(&activeCachers, 1)
+	fmt.Printf("################### CACHER STARTED: %d\n", cacher.num)
+
 	return cacher
 }
 
@@ -658,10 +667,27 @@ func (c *Cacher) Stop() {
 		// avoid that it was locked meanwhile as isStopped only read-locks
 		return
 	}
+
+	fmt.Printf("################### STOPPING CACHER %d / %d\n", c.num, atomic.LoadInt64(&activeCachers))
+
 	c.stopped = true
 	c.stopLock.Unlock()
 	close(c.stopCh)
-	c.stopWg.Wait()
+
+	waited := make(chan struct{})
+	go func() {
+		defer close(waited)
+		c.stopWg.Wait()
+	}()
+
+	select {
+	case <-waited:
+	case <-time.After(10 * time.Second):
+		panic("Cache did not terminate")
+	}
+
+	atomic.AddInt64(&activeCachers, -1)
+	fmt.Printf("################### STOPPED CACHER %d / %d\n", c.num, atomic.LoadInt64(&activeCachers))
 }
 
 func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported bool) func(bool) {
