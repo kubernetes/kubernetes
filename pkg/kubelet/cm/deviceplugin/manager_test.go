@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"reflect"
+	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -56,72 +57,85 @@ func TestNewManagerImplStart(t *testing.T) {
 // making sure that after registration, devices are correctly updated and if a re-registration
 // happens, we will NOT delete devices; and no orphaned devices left.
 func TestDevicePluginReRegistration(t *testing.T) {
-	devs := []*pluginapi.Device{
-		{ID: "Dev1", Health: pluginapi.Healthy},
-		{ID: "Dev2", Health: pluginapi.Healthy},
-	}
-	devsForRegistration := []*pluginapi.Device{
-		{ID: "Dev3", Health: pluginapi.Healthy},
+	devs := sets.NewString("Dev1", "Dev2")
+	devsForRegistration := sets.NewString("Dev3")
+
+	// A stub to simulate devices maintained in handler.
+	maintainedDevices := make(map[string]sets.String)
+	registeredPlugins := []*Stub{}
+	testCases := []struct {
+		description string
+		devs        sets.String
+	}{
+		{
+			description: "Successful registration",
+			devs:        devs,
+		},
+		{
+			description: "Devices shouldn't change",
+			devs:        devs,
+		},
+		{
+			description: "Devices of plugin previously registered should be removed",
+			devs:        devsForRegistration,
+		},
 	}
 
 	callbackCount := 0
 	callbackChan := make(chan int)
 	var stopping int32
 	stopping = 0
-	callback := func(n string, a, u, r []pluginapi.Device) {
+	callback := func(resourceName string, added, updated, deleted []pluginapi.Device) {
+		// Simulate behavior of devices stored in handler
+		if _, ok := maintainedDevices[resourceName]; !ok {
+			maintainedDevices[resourceName] = sets.NewString()
+		}
+		kept := append(updated, added...)
+		for _, dev := range kept {
+			maintainedDevices[resourceName].Insert(dev.ID)
+		}
+		for _, dev := range deleted {
+			maintainedDevices[resourceName].Delete(dev.ID)
+		}
+
 		// Should be called three times, one for each plugin registration, till we are stopping.
-		if callbackCount > 2 && atomic.LoadInt32(&stopping) <= 0 {
+		if callbackCount >= len(testCases) && atomic.LoadInt32(&stopping) <= 0 {
 			t.FailNow()
 		}
 		callbackCount++
 		callbackChan <- callbackCount
 	}
-	m, p1 := setup(t, devs, callback)
-	p1.Register(socketName, testResourceName)
-	// Wait for the first callback to be issued.
+	m := setupManagerImpl(t, callback)
 
-	<-callbackChan
-	// Wait till the endpoint is added to the manager.
-	for i := 0; i < 20; i++ {
-		if len(m.Devices()) > 0 {
-			break
-		}
-		time.Sleep(1)
+	for index, testCase := range testCases {
+		p := setupDevicePluginStub(t, generateDeviceList(testCase.devs), pluginSocketName+strconv.Itoa(index))
+		registeredPlugins = append(registeredPlugins, p)
+		p.Register(socketName, testResourceName)
+
+		<-callbackChan
+		require.Truef(t, maintainedDevices[testResourceName].Equal(testCase.devs), "Expected devs [%v], actual devs [%v]", testCase.devs.UnsortedList(), maintainedDevices[testResourceName].UnsortedList())
 	}
-	devices := m.Devices()
-	require.Equal(t, 2, len(devices[testResourceName]), "Devices are not updated.")
 
-	p2 := NewDevicePluginStub(devs, pluginSocketName+".new")
-	err := p2.Start()
-	require.NoError(t, err)
-	p2.Register(socketName, testResourceName)
-	// Wait for the second callback to be issued.
-	<-callbackChan
-
-	devices2 := m.Devices()
-	require.Equal(t, 2, len(devices2[testResourceName]), "Devices shouldn't change.")
-
-	// Test the scenario that a plugin re-registers with different devices.
-	p3 := NewDevicePluginStub(devsForRegistration, pluginSocketName+".third")
-	err = p3.Start()
-	require.NoError(t, err)
-	p3.Register(socketName, testResourceName)
-	// Wait for the second callback to be issued.
-	<-callbackChan
-
-	devices3 := m.Devices()
-	require.Equal(t, 1, len(devices3[testResourceName]), "Devices of plugin previously registered should be removed.")
 	// Wait long enough to catch unexpected callbacks.
 	time.Sleep(5 * time.Second)
 
 	atomic.StoreInt32(&stopping, 1)
-	p2.Stop()
-	p3.Stop()
-	cleanup(t, m, p1)
-
+	for _, p := range registeredPlugins {
+		p.Stop()
+	}
+	m.Stop()
 }
 
-func setup(t *testing.T, devs []*pluginapi.Device, callback monitorCallback) (Manager, *Stub) {
+func generateDeviceList(devSet sets.String) []*pluginapi.Device {
+	devList := []*pluginapi.Device{}
+	for dev := range devSet {
+		devList = append(devList, &pluginapi.Device{ID: dev, Health: pluginapi.Healthy})
+	}
+
+	return devList
+}
+
+func setupManagerImpl(t *testing.T, callback monitorCallback) Manager {
 	m, err := newManagerImpl(socketName)
 	require.NoError(t, err)
 
@@ -133,9 +147,20 @@ func setup(t *testing.T, devs []*pluginapi.Device, callback monitorCallback) (Ma
 	err = m.Start(activePods, &sourcesReadyStub{})
 	require.NoError(t, err)
 
-	p := NewDevicePluginStub(devs, pluginSocketName)
-	err = p.Start()
+	return m
+}
+
+func setupDevicePluginStub(t *testing.T, devs []*pluginapi.Device, socket string) *Stub {
+	p := NewDevicePluginStub(devs, socket)
+	err := p.Start()
 	require.NoError(t, err)
+
+	return p
+}
+
+func setup(t *testing.T, devs []*pluginapi.Device, callback monitorCallback) (Manager, *Stub) {
+	m := setupManagerImpl(t, callback)
+	p := setupDevicePluginStub(t, devs, pluginSocketName)
 
 	return m, p
 }
