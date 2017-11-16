@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -606,6 +607,26 @@ func TestMultipleResourceByTheSameName(t *testing.T) {
 
 	if _, err := b.Do().ResourceMapping(); err == nil {
 		t.Errorf("unexpected non-error")
+	}
+}
+
+func TestRequestModifier(t *testing.T) {
+	var got *rest.Request
+	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClientWith("test", t, nil), corev1Codec).
+		NamespaceParam("foo").
+		TransformRequests(func(req *rest.Request) {
+			got = req
+		}).
+		ResourceNames("", "services/baz").
+		RequireObject(false)
+
+	i, err := b.Do().Infos()
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := i[0].Client.Get()
+	if got != req {
+		t.Fatalf("request was not received by modifier: %#v", req)
 	}
 }
 
