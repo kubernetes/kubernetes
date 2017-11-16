@@ -38,7 +38,7 @@ type CloudControllerManagerServer struct {
 	Master     string
 	Kubeconfig string
 
-	// NodeStatusUpdateFrequency is the freuency at which the controller updates nodes' status
+	// NodeStatusUpdateFrequency is the frequency at which the controller updates nodes' status
 	NodeStatusUpdateFrequency metav1.Duration
 }
 
