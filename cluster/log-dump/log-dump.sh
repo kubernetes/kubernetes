@@ -219,7 +219,7 @@ function dump_masters() {
 }
 
 function dump_nodes() {
-  local node_names
+  local node_names=()
   if [[ -n "${1:-}" ]]; then
     echo "Dumping logs for nodes provided as args to dump_nodes() function"
     node_names=( "$@" )
@@ -232,7 +232,9 @@ function dump_nodes() {
   else
     echo "Detecting nodes in the cluster"
     detect-node-names &> /dev/null
-    node_names=( "${NODE_NAMES[@]}" )
+    if [[ -n "${NODE_NAMES:-}" ]]; then
+      node_names=( "${NODE_NAMES[@]}" )
+    fi
   fi
 
   if [[ "${#node_names[@]}" == 0 ]]; then
@@ -283,7 +285,7 @@ function dump_nodes_with_logexporter() {
   echo "Detecting nodes in the cluster"
   detect-node-names &> /dev/null
 
-  if [[ "${#NODE_NAMES[@]}" == 0 ]]; then
+  if [[ -z "${NODE_NAMES:-}" ]]; then
     echo "No nodes found!"
     return
   fi
