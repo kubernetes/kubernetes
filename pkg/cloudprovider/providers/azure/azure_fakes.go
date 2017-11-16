@@ -36,7 +36,7 @@ type fakeAzureLBClient struct {
 	FakeStore map[string]map[string]network.LoadBalancer
 }
 
-func NewFakeAzureLBClient() fakeAzureLBClient {
+func newFakeAzureLBClient() fakeAzureLBClient {
 	fLBC := fakeAzureLBClient{}
 	fLBC.FakeStore = make(map[string]map[string]network.LoadBalancer)
 	fLBC.mutex = &sync.Mutex{}
@@ -166,7 +166,7 @@ func getpublicIPAddressID(subscriptionID string, resourceGroupName, pipName stri
 		pipName)
 }
 
-func NewFakeAzurePIPClient(subscriptionID string) fakeAzurePIPClient {
+func newFakeAzurePIPClient(subscriptionID string) fakeAzurePIPClient {
 	fAPC := fakeAzurePIPClient{}
 	fAPC.FakeStore = make(map[string]map[string]network.PublicIPAddress)
 	fAPC.SubscriptionID = subscriptionID
@@ -285,7 +285,7 @@ type fakeAzureInterfacesClient struct {
 	FakeStore map[string]map[string]network.Interface
 }
 
-func NewFakeAzureInterfacesClient() fakeAzureInterfacesClient {
+func newFakeAzureInterfacesClient() fakeAzureInterfacesClient {
 	fIC := fakeAzureInterfacesClient{}
 	fIC.FakeStore = make(map[string]map[string]network.Interface)
 	fIC.mutex = &sync.Mutex{}
@@ -335,7 +335,7 @@ type fakeAzureVirtualMachinesClient struct {
 	FakeStore map[string]map[string]compute.VirtualMachine
 }
 
-func NewFakeAzureVirtualMachinesClient() fakeAzureVirtualMachinesClient {
+func newFakeAzureVirtualMachinesClient() fakeAzureVirtualMachinesClient {
 	fVMC := fakeAzureVirtualMachinesClient{}
 	fVMC.FakeStore = make(map[string]map[string]compute.VirtualMachine)
 	fVMC.mutex = &sync.Mutex{}
@@ -405,7 +405,7 @@ type fakeAzureSubnetsClient struct {
 	FakeStore map[string]map[string]network.Subnet
 }
 
-func NewFakeAzureSubnetsClient() fakeAzureSubnetsClient {
+func newFakeAzureSubnetsClient() fakeAzureSubnetsClient {
 	fASC := fakeAzureSubnetsClient{}
 	fASC.FakeStore = make(map[string]map[string]network.Subnet)
 	fASC.mutex = &sync.Mutex{}
@@ -506,7 +506,7 @@ type fakeAzureNSGClient struct {
 	FakeStore map[string]map[string]network.SecurityGroup
 }
 
-func NewFakeAzureNSGClient() fakeAzureNSGClient {
+func newFakeAzureNSGClient() fakeAzureNSGClient {
 	fNSG := fakeAzureNSGClient{}
 	fNSG.FakeStore = make(map[string]map[string]network.SecurityGroup)
 	fNSG.mutex = &sync.Mutex{}

@@ -818,12 +818,12 @@ func getTestCloud() (az *Cloud) {
 		},
 	}
 	az.operationPollRateLimiter = flowcontrol.NewTokenBucketRateLimiter(100, 100)
-	az.LoadBalancerClient = NewFakeAzureLBClient()
-	az.PublicIPAddressesClient = NewFakeAzurePIPClient(az.Config.SubscriptionID)
-	az.SubnetsClient = NewFakeAzureSubnetsClient()
-	az.SecurityGroupsClient = NewFakeAzureNSGClient()
-	az.VirtualMachinesClient = NewFakeAzureVirtualMachinesClient()
-	az.InterfacesClient = NewFakeAzureInterfacesClient()
+	az.LoadBalancerClient = newFakeAzureLBClient()
+	az.PublicIPAddressesClient = newFakeAzurePIPClient(az.Config.SubscriptionID)
+	az.SubnetsClient = newFakeAzureSubnetsClient()
+	az.SecurityGroupsClient = newFakeAzureNSGClient()
+	az.VirtualMachinesClient = newFakeAzureVirtualMachinesClient()
+	az.InterfacesClient = newFakeAzureInterfacesClient()
 
 	return az
 }
