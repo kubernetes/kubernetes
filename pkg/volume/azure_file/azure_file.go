@@ -222,7 +222,7 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
 	} else {
 		os.MkdirAll(dir, 0700)
 		// parameters suggested by https://azure.microsoft.com/en-us/documentation/articles/storage-how-to-use-files-linux/
-		options := []string{fmt.Sprintf("vers=3.0,username=%s,password=%s", accountName, accountKey)}
+		options := []string{fmt.Sprintf("username=%s,password=%s", accountName, accountKey)}
 		if b.readOnly {
 			options = append(options, "ro")
 		}
