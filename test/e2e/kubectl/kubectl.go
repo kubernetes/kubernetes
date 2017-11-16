@@ -303,12 +303,12 @@ var _ = SIGDescribe("Kubectl client", func() {
 		forEachGBFile := func(run func(s string)) {
 			guestbookRoot := "test/e2e/testing-manifests/guestbook"
 			for _, gbAppFile := range []string{
-				"frontend-deployment.yaml.in",
-				"frontend-service.yaml",
-				"redis-master-deployment.yaml.in",
-				"redis-master-service.yaml",
-				"redis-slave-deployment.yaml.in",
 				"redis-slave-service.yaml",
+				"redis-master-service.yaml",
+				"frontend-service.yaml",
+				"frontend-deployment.yaml.in",
+				"redis-master-deployment.yaml.in",
+				"redis-slave-deployment.yaml.in",
 			} {
 				contents := substituteImageName(string(generated.ReadOrDie(filepath.Join(guestbookRoot, gbAppFile))))
 				run(contents)
