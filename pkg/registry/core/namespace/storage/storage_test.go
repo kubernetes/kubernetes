@@ -24,8 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
@@ -49,7 +51,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.store.DestroyFunc()
-	test := registrytest.New(t, storage.store).ClusterScope()
+	test := genericregistrytest.New(t, storage.store, legacyscheme.Scheme).ClusterScope()
 	namespace := validNewNamespace()
 	namespace.ObjectMeta = metav1.ObjectMeta{GenerateName: "foo"}
 	test.TestCreate(
@@ -93,7 +95,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.store.DestroyFunc()
-	test := registrytest.New(t, storage.store).ClusterScope().ReturnDeletedObject()
+	test := genericregistrytest.New(t, storage.store, legacyscheme.Scheme).ClusterScope().ReturnDeletedObject()
 	test.TestDelete(validNewNamespace())
 }
 
@@ -101,7 +103,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.store.DestroyFunc()
-	test := registrytest.New(t, storage.store).ClusterScope()
+	test := genericregistrytest.New(t, storage.store, legacyscheme.Scheme).ClusterScope()
 	test.TestGet(validNewNamespace())
 }
 
@@ -109,7 +111,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.store.DestroyFunc()
-	test := registrytest.New(t, storage.store).ClusterScope()
+	test := genericregistrytest.New(t, storage.store, legacyscheme.Scheme).ClusterScope()
 	test.TestList(validNewNamespace())
 }
 
@@ -117,7 +119,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.store.DestroyFunc()
-	test := registrytest.New(t, storage.store).ClusterScope()
+	test := genericregistrytest.New(t, storage.store, legacyscheme.Scheme).ClusterScope()
 	test.TestWatch(
 		validNewNamespace(),
 		// matching labels

@@ -25,7 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -122,7 +124,7 @@ func TestCreate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	ingress := validIngress()
 	noDefaultBackendAndRules := validIngress()
 	noDefaultBackendAndRules.Spec.Backend = &extensions.IngressBackend{}
@@ -142,7 +144,7 @@ func TestUpdate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestUpdate(
 		// valid
 		validIngress(),
@@ -178,7 +180,7 @@ func TestDelete(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestDelete(validIngress())
 }
 
@@ -186,7 +188,7 @@ func TestGet(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestGet(validIngress())
 }
 
@@ -194,7 +196,7 @@ func TestList(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestList(validIngress())
 }
 
@@ -202,7 +204,7 @@ func TestWatch(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
 	test.TestWatch(
 		validIngress(),
 		// matching labels
