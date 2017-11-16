@@ -21,11 +21,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	core_v1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	core "k8s.io/kubernetes/pkg/apis/core"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	unsafe "unsafe"
 )
@@ -194,9 +192,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 	if err := v1.Convert_Pointer_int32_To_int32(&in.OOMScoreAdj, &out.OOMScoreAdj, s); err != nil {
 		return err
 	}
-	if err := v1.Convert_Pointer_bool_To_bool(&in.RegisterNode, &out.RegisterNode, s); err != nil {
-		return err
-	}
 	out.ClusterDomain = in.ClusterDomain
 	out.ClusterDNS = *(*[]string)(unsafe.Pointer(&in.ClusterDNS))
 	out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
@@ -209,7 +204,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 		return err
 	}
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
-	out.VolumePluginDir = in.VolumePluginDir
 	out.KubeletCgroups = in.KubeletCgroups
 	out.SystemCgroups = in.SystemCgroups
 	out.CgroupRoot = in.CgroupRoot
@@ -220,10 +214,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 	out.CPUManagerPolicy = in.CPUManagerPolicy
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
-	if err := v1.Convert_Pointer_string_To_string(&in.LockFilePath, &out.LockFilePath, s); err != nil {
-		return err
-	}
-	out.ExitOnLockContention = in.ExitOnLockContention
 	out.HairpinMode = in.HairpinMode
 	out.MaxPods = in.MaxPods
 	out.PodCIDR = in.PodCIDR
@@ -232,7 +222,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 		return err
 	}
 	out.MaxOpenFiles = in.MaxOpenFiles
-	out.RegisterWithTaints = *(*[]core.Taint)(unsafe.Pointer(&in.RegisterWithTaints))
 	out.ContentType = in.ContentType
 	if err := v1.Convert_Pointer_int32_To_int32(&in.KubeAPIQPS, &out.KubeAPIQPS, s); err != nil {
 		return err
@@ -241,7 +230,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 	if err := v1.Convert_Pointer_bool_To_bool(&in.SerializeImagePulls, &out.SerializeImagePulls, s); err != nil {
 		return err
 	}
-	out.NodeLabels = *(*map[string]string)(unsafe.Pointer(&in.NodeLabels))
 	if err := v1.Convert_Pointer_string_To_string(&in.EvictionHard, &out.EvictionHard, s); err != nil {
 		return err
 	}
@@ -332,9 +320,6 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 	if err := v1.Convert_int32_To_Pointer_int32(&in.OOMScoreAdj, &out.OOMScoreAdj, s); err != nil {
 		return err
 	}
-	if err := v1.Convert_bool_To_Pointer_bool(&in.RegisterNode, &out.RegisterNode, s); err != nil {
-		return err
-	}
 	out.ClusterDomain = in.ClusterDomain
 	out.ClusterDNS = *(*[]string)(unsafe.Pointer(&in.ClusterDNS))
 	out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
@@ -347,7 +332,6 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 		return err
 	}
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
-	out.VolumePluginDir = in.VolumePluginDir
 	out.KubeletCgroups = in.KubeletCgroups
 	if err := v1.Convert_bool_To_Pointer_bool(&in.CgroupsPerQOS, &out.CgroupsPerQOS, s); err != nil {
 		return err
@@ -358,10 +342,6 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 	out.CPUManagerPolicy = in.CPUManagerPolicy
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
-	if err := v1.Convert_string_To_Pointer_string(&in.LockFilePath, &out.LockFilePath, s); err != nil {
-		return err
-	}
-	out.ExitOnLockContention = in.ExitOnLockContention
 	out.HairpinMode = in.HairpinMode
 	out.MaxPods = in.MaxPods
 	out.PodCIDR = in.PodCIDR
@@ -370,7 +350,6 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 		return err
 	}
 	out.MaxOpenFiles = in.MaxOpenFiles
-	out.RegisterWithTaints = *(*[]core_v1.Taint)(unsafe.Pointer(&in.RegisterWithTaints))
 	out.ContentType = in.ContentType
 	if err := v1.Convert_int32_To_Pointer_int32(&in.KubeAPIQPS, &out.KubeAPIQPS, s); err != nil {
 		return err
@@ -379,7 +358,6 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 	if err := v1.Convert_bool_To_Pointer_bool(&in.SerializeImagePulls, &out.SerializeImagePulls, s); err != nil {
 		return err
 	}
-	out.NodeLabels = *(*map[string]string)(unsafe.Pointer(&in.NodeLabels))
 	if err := v1.Convert_string_To_Pointer_string(&in.EvictionHard, &out.EvictionHard, s); err != nil {
 		return err
 	}
