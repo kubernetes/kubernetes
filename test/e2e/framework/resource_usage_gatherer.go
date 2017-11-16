@@ -215,10 +215,12 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 	if options.InKubemark {
 		g.workerWg.Add(1)
 		g.workers = append(g.workers, resourceGatherWorker{
-			inKubemark: true,
-			stopCh:     g.stopCh,
-			wg:         &g.workerWg,
-			finished:   false,
+			inKubemark:                  true,
+			stopCh:                      g.stopCh,
+			wg:                          &g.workerWg,
+			finished:                    false,
+			resourceDataGatheringPeriod: options.ResourceDataGatheringPeriod,
+			probeDuration:               options.ProbeDuration,
 		})
 	} else {
 		// Tracks kube-system pods if no valid PodList is passed in.
