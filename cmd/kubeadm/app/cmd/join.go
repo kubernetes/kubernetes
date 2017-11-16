@@ -237,8 +237,8 @@ func (j *Join) Run(out io.Writer) error {
 		return err
 	}
 
+	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
 	if features.Enabled(j.cfg.FeatureGates, features.DynamicKubeletConfig) {
-		// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
 		client, err := kubeconfigutil.ClientSetFromFile(kubeadmconstants.GetAdminKubeConfigPath())
 		if err != nil {
 			return err

@@ -26,7 +26,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/ghodss/yaml"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
@@ -64,8 +63,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
+	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 	utilsexec "k8s.io/utils/exec"
 )
 
@@ -350,45 +349,27 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
+	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
 	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
-		// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-		kubeletCfg := &kubeadmapi.KubeletConfiguration{
-			BaseConfig: &kubeletconfigv1alpha1.KubeletConfiguration{
-				PodManifestPath: kubeadmapiext.DefaultManifestsDir,
-				AllowPrivileged: utilpointer.BoolPtr(true),
-				ClusterDNS:      []string{kubeadmapiext.DefaultClusterDNSIP},
-				ClusterDomain:   kubeadmapiext.DefaultServiceDNSDomain,
-				Authorization: kubeletconfigv1alpha1.KubeletAuthorization{
-					Mode: kubeletconfigv1alpha1.KubeletAuthorizationModeWebhook,
-				},
-				Authentication: kubeletconfigv1alpha1.KubeletAuthentication{
-					X509: kubeletconfigv1alpha1.KubeletX509Authentication{
-						ClientCAFile: kubeadmapiext.DefaultCACertPath,
-					},
-				},
-				CAdvisorPort: utilpointer.Int32Ptr(0),
-			},
+		_, kubeletCodecs, err := kubeletconfigscheme.NewSchemeAndCodecs()
+		if err != nil {
+			return err
 		}
-
-		// Convert cfg to the external version as that's the only version of the API that can be deserialized later
-		externalKubeletCfg := &kubeadmapiext.KubeletConfiguration{}
-		legacyscheme.Scheme.Convert(kubeletCfg, externalKubeletCfg, nil)
-
-		kubeletCfgYaml, err := yaml.Marshal(*externalKubeletCfg)
+		kubeletConfig := &kubeadmapiext.KubeletConfiguration{}
+		kubeletBytes, err := kubeadmutil.MarshalToYamlForCodecs(kubeletConfig.BaseConfig, kubeletconfigv1alpha1.SchemeGroupVersion, *kubeletCodecs)
 		if err != nil {
 			return err
 		}
 
-		err = apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
+		if err = apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      kubeadmconstants.KubeletBaseConfigurationConfigMap,
 				Namespace: metav1.NamespaceSystem,
 			},
 			Data: map[string]string{
-				kubeadmconstants.KubeletBaseConfigurationConfigMapKey: string(kubeletCfgYaml),
+				kubeadmconstants.KubeletBaseConfigurationConfigMapKey: string(kubeletBytes),
 			},
-		})
-		if err != nil {
+		}); err != nil {
 			return err
 		}
 

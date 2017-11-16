@@ -23,6 +23,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 const (
@@ -144,5 +146,30 @@ func SetDefaultsEtcdSelfHosted(obj *MasterConfiguration) {
 
 	if obj.Etcd.SelfHosted.CertificatesDir == "" {
 		obj.Etcd.SelfHosted.CertificatesDir = DefaultEtcdCertDir
+	}
+}
+
+// SetDefaults_KubeletConfiguration assigns default values to kubelet
+func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
+	if obj.BaseConfig.PodManifestPath == "" {
+		obj.BaseConfig.PodManifestPath = DefaultManifestsDir
+	}
+	if obj.BaseConfig.AllowPrivileged == nil {
+		obj.BaseConfig.AllowPrivileged = utilpointer.BoolPtr(true)
+	}
+	if obj.BaseConfig.ClusterDNS == nil {
+		obj.BaseConfig.ClusterDNS = []string{DefaultClusterDNSIP}
+	}
+	if obj.BaseConfig.ClusterDomain == "" {
+		obj.BaseConfig.ClusterDomain = DefaultServiceDNSDomain
+	}
+	if obj.BaseConfig.Authorization.Mode == "" {
+		obj.BaseConfig.Authorization.Mode = kubeletconfigv1alpha1.KubeletAuthorizationModeWebhook
+	}
+	if obj.BaseConfig.Authentication.X509.ClientCAFile == "" {
+		obj.BaseConfig.Authentication.X509.ClientCAFile = DefaultCACertPath
+	}
+	if obj.BaseConfig.CAdvisorPort == nil {
+		obj.BaseConfig.CAdvisorPort = utilpointer.Int32Ptr(0)
 	}
 }

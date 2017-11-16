@@ -142,8 +142,9 @@ type NodeConfiguration struct {
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
 }
 
+// KubeletConfiguration contains elements describing initial remote configuration of kubelet
 type KubeletConfiguration struct {
-	BaseConfig *kubeletconfigv1alpha1.KubeletConfiguration
+	BaseConfig *kubeletconfigv1alpha1.KubeletConfiguration `json:"baseConfig"`
 }
 
 // HostPathMount contains elements describing volumes that are mounted from the

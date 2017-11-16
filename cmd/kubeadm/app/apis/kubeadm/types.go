@@ -148,6 +148,7 @@ type NodeConfiguration struct {
 	FeatureGates map[string]bool
 }
 
+// KubeletConfiguration contains elements describing initial remote configuration of kubelet
 type KubeletConfiguration struct {
 	BaseConfig *kubeletconfigv1alpha1.KubeletConfiguration
 }
