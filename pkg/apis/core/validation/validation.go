@@ -1965,13 +1965,6 @@ func ValidateVolumeMounts(mounts []core.VolumeMount, volumes sets.String, contai
 		if mountpoints.Has(mnt.MountPath) {
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("mountPath"), mnt.MountPath, "must be unique"))
 		}
-		if !path.IsAbs(mnt.MountPath) {
-			// also allow windows absolute path
-			p := mnt.MountPath
-			if len(p) < 2 || ((p[0] < 'A' || p[0] > 'Z') && (p[0] < 'a' || p[0] > 'z')) || p[1] != ':' {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("mountPath"), mnt.MountPath, "must be an absolute path"))
-			}
-		}
 		mountpoints.Insert(mnt.MountPath)
 		if len(mnt.SubPath) > 0 {
 			allErrs = append(allErrs, validateLocalDescendingPath(mnt.SubPath, fldPath.Child("subPath"))...)
