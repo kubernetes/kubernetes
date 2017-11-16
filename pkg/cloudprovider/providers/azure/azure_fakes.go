@@ -264,20 +264,20 @@ func (fAPC fakeAzurePIPClient) List(resourceGroupName string) (result network.Pu
 	return result, nil
 }
 
-type fakeInterfacesClient struct {
+type fakeAzureInterfacesClient struct {
 	mutex     *sync.Mutex
 	FakeStore map[string]map[string]network.Interface
 }
 
-func NewFakeInterfacesClient() fakeInterfacesClient {
-	fIC := fakeInterfacesClient{}
+func NewFakeAzureInterfacesClient() fakeAzureInterfacesClient {
+	fIC := fakeAzureInterfacesClient{}
 	fIC.FakeStore = make(map[string]map[string]network.Interface)
 	fIC.mutex = &sync.Mutex{}
 
 	return fIC
 }
 
-func (fIC fakeInterfacesClient) CreateOrUpdate(resourceGroupName string, networkInterfaceName string, parameters network.Interface, cancel <-chan struct{}) (<-chan network.Interface, <-chan error) {
+func (fIC fakeAzureInterfacesClient) CreateOrUpdate(resourceGroupName string, networkInterfaceName string, parameters network.Interface, cancel <-chan struct{}) (<-chan network.Interface, <-chan error) {
 	fIC.mutex.Lock()
 	defer fIC.mutex.Unlock()
 	resultChan := make(chan network.Interface, 1)
@@ -300,7 +300,7 @@ func (fIC fakeInterfacesClient) CreateOrUpdate(resourceGroupName string, network
 	return resultChan, errChan
 }
 
-func (fIC fakeInterfacesClient) Get(resourceGroupName string, networkInterfaceName string, expand string) (result network.Interface, err error) {
+func (fIC fakeAzureInterfacesClient) Get(resourceGroupName string, networkInterfaceName string, expand string) (result network.Interface, err error) {
 	fIC.mutex.Lock()
 	defer fIC.mutex.Unlock()
 	if _, ok := fIC.FakeStore[resourceGroupName]; ok {
@@ -314,19 +314,19 @@ func (fIC fakeInterfacesClient) Get(resourceGroupName string, networkInterfaceNa
 	}
 }
 
-type fakeVirtualMachinesClient struct {
+type fakeAzureVirtualMachinesClient struct {
 	mutex     *sync.Mutex
 	FakeStore map[string]map[string]compute.VirtualMachine
 }
 
-func NewFakeVirtualMachinesClient() fakeVirtualMachinesClient {
-	fVMC := fakeVirtualMachinesClient{}
+func NewFakeAzureVirtualMachinesClient() fakeAzureVirtualMachinesClient {
+	fVMC := fakeAzureVirtualMachinesClient{}
 	fVMC.FakeStore = make(map[string]map[string]compute.VirtualMachine)
 	fVMC.mutex = &sync.Mutex{}
 	return fVMC
 }
 
-func (fVMC fakeVirtualMachinesClient) CreateOrUpdate(resourceGroupName string, VMName string, parameters compute.VirtualMachine, cancel <-chan struct{}) (<-chan compute.VirtualMachine, <-chan error) {
+func (fVMC fakeAzureVirtualMachinesClient) CreateOrUpdate(resourceGroupName string, VMName string, parameters compute.VirtualMachine, cancel <-chan struct{}) (<-chan compute.VirtualMachine, <-chan error) {
 	fVMC.mutex.Lock()
 	defer fVMC.mutex.Unlock()
 	resultChan := make(chan compute.VirtualMachine, 1)
@@ -348,7 +348,7 @@ func (fVMC fakeVirtualMachinesClient) CreateOrUpdate(resourceGroupName string, V
 	return resultChan, errChan
 }
 
-func (fVMC fakeVirtualMachinesClient) Get(resourceGroupName string, VMName string, expand compute.InstanceViewTypes) (result compute.VirtualMachine, err error) {
+func (fVMC fakeAzureVirtualMachinesClient) Get(resourceGroupName string, VMName string, expand compute.InstanceViewTypes) (result compute.VirtualMachine, err error) {
 	fVMC.mutex.Lock()
 	defer fVMC.mutex.Unlock()
 	if _, ok := fVMC.FakeStore[resourceGroupName]; ok {
@@ -362,7 +362,7 @@ func (fVMC fakeVirtualMachinesClient) Get(resourceGroupName string, VMName strin
 	}
 }
 
-func (fVMC fakeVirtualMachinesClient) List(resourceGroupName string) (result compute.VirtualMachineListResult, err error) {
+func (fVMC fakeAzureVirtualMachinesClient) List(resourceGroupName string) (result compute.VirtualMachineListResult, err error) {
 	fVMC.mutex.Lock()
 	defer fVMC.mutex.Unlock()
 	var value []compute.VirtualMachine
@@ -378,7 +378,7 @@ func (fVMC fakeVirtualMachinesClient) List(resourceGroupName string) (result com
 	result.Value = &value
 	return result, nil
 }
-func (fVMC fakeVirtualMachinesClient) ListNextResults(lastResults compute.VirtualMachineListResult) (result compute.VirtualMachineListResult, err error) {
+func (fVMC fakeAzureVirtualMachinesClient) ListNextResults(lastResults compute.VirtualMachineListResult) (result compute.VirtualMachineListResult, err error) {
 	fVMC.mutex.Lock()
 	defer fVMC.mutex.Unlock()
 	return compute.VirtualMachineListResult{}, nil
