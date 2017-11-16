@@ -123,7 +123,7 @@ func KnownFeatures(f *FeatureList) []string {
 	return known
 }
 
-// NewFeatureGate parse a string of the form "key1=value1,key2=value2,..." into a
+// NewFeatureGate parses a string of the form "key1=value1,key2=value2,..." into a
 // map[string]bool of known keys or returns an error.
 func NewFeatureGate(f *FeatureList, value string) (map[string]bool, error) {
 	featureGate := map[string]bool{}
