@@ -267,8 +267,8 @@ func TestForgivenessAdmission(t *testing.T) {
 			t.Errorf("[%s]: unexpected error %v for pod %+v", test.description, err, test.requestedPod)
 		}
 
-		if !helper.Semantic.DeepEqual(test.expectedPod.Annotations, test.requestedPod.Annotations) {
-			t.Errorf("[%s]: expected %#v got %#v", test.description, test.expectedPod.Annotations, test.requestedPod.Annotations)
+		if !helper.Semantic.DeepEqual(test.expectedPod.Spec.Tolerations, test.requestedPod.Spec.Tolerations) {
+			t.Errorf("[%s]: expected %#v got %#v", test.description, test.expectedPod.Spec.Tolerations, test.requestedPod.Spec.Tolerations)
 		}
 	}
 }
