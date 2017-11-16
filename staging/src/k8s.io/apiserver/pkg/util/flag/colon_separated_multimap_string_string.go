@@ -48,12 +48,6 @@ func (m *ColonSeparatedMultimapStringString) Set(value string) error {
 	if m.Multimap == nil {
 		return fmt.Errorf("no target (nil pointer to map[string][]string)")
 	}
-	// allow explicit nil multimap
-	if value == "nil" {
-		*m.Multimap = nil
-		m.initialized = true
-		return nil
-	}
 	if !m.initialized || *m.Multimap == nil {
 		// clear default values, or allocate if no existing map
 		*m.Multimap = make(map[string][]string)
@@ -76,10 +70,6 @@ func (m *ColonSeparatedMultimapStringString) Set(value string) error {
 
 // String implements github.com/spf13/pflag.Value
 func (m *ColonSeparatedMultimapStringString) String() string {
-	if *m.Multimap == nil {
-		return "nil"
-	}
-
 	type kv struct {
 		k string
 		v string
@@ -104,4 +94,9 @@ func (m *ColonSeparatedMultimapStringString) String() string {
 // Type implements github.com/spf13/pflag.Value
 func (m *ColonSeparatedMultimapStringString) Type() string {
 	return "colonSeparatedMultimapStringString"
+}
+
+// Empty implements OmitEmpty
+func (m *ColonSeparatedMultimapStringString) Empty() bool {
+	return len(*m.Multimap) == 0
 }

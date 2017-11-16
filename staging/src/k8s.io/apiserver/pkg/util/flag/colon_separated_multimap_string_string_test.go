@@ -28,7 +28,7 @@ func TestStringColonSeparatedMultimapStringString(t *testing.T) {
 		m      *ColonSeparatedMultimapStringString
 		expect string
 	}{
-		{"nil", NewColonSeparatedMultimapStringString(&nilMap), "nil"},
+		{"nil", NewColonSeparatedMultimapStringString(&nilMap), ""},
 		{"empty", NewColonSeparatedMultimapStringString(&map[string][]string{}), ""},
 		{"empty key", NewColonSeparatedMultimapStringString(
 			&map[string][]string{
@@ -85,12 +85,6 @@ func TestSetColonSeparatedMultimapStringString(t *testing.T) {
 			&ColonSeparatedMultimapStringString{
 				initialized: true,
 				Multimap:    &map[string][]string{}}, ""},
-		{"explicitly nil", []string{"nil"},
-			NewColonSeparatedMultimapStringString(&map[string][]string{"default": {}}),
-			&ColonSeparatedMultimapStringString{
-				initialized: true,
-				Multimap:    &nilMap,
-			}, ""},
 		// make sure we still allocate for "initialized" multimaps where Multimap was initially set to a nil map
 		{"allocates map if currently nil", []string{""},
 			&ColonSeparatedMultimapStringString{initialized: true, Multimap: &nilMap},
@@ -221,6 +215,27 @@ func TestRoundTripColonSeparatedMultimapStringString(t *testing.T) {
 			str := m.String()
 			if c.expect != str {
 				t.Fatalf("expect %q but got %q", c.expect, str)
+			}
+		})
+	}
+}
+
+func TestEmptyColonSeparatedMultimapStringString(t *testing.T) {
+	var nilMap map[string][]string
+	cases := []struct {
+		desc   string
+		val    *ColonSeparatedMultimapStringString
+		expect bool
+	}{
+		{"nil", NewColonSeparatedMultimapStringString(&nilMap), true},
+		{"empty", NewColonSeparatedMultimapStringString(&map[string][]string{}), true},
+		{"populated", NewColonSeparatedMultimapStringString(&map[string][]string{"foo": {}}), false},
+	}
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			result := c.val.Empty()
+			if result != c.expect {
+				t.Fatalf("expect %t but got %t", c.expect, result)
 			}
 		})
 	}
