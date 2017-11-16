@@ -46,9 +46,8 @@ type PluginFactoryArgs struct {
 	HardPodAffinitySymmetricWeight int32
 }
 
-// MetadataProducerFactory produces MetadataProducer from the given args.
-// TODO: Rename this to PriorityMetadataProducerFactory.
-type MetadataProducerFactory func(PluginFactoryArgs) algorithm.MetadataProducer
+// PriorityMetadataProducerFactory produces PriorityMetadataProducer from the given args.
+type PriorityMetadataProducerFactory func(PluginFactoryArgs) algorithm.MetadataProducer
 
 // PredicateMetadataProducerFactory produces PredicateMetadataProducer from the given args.
 type PredicateMetadataProducerFactory func(PluginFactoryArgs) algorithm.PredicateMetadataProducer
@@ -83,7 +82,7 @@ var (
 	algorithmProviderMap   = make(map[string]AlgorithmProviderConfig)
 
 	// Registered metadata producers
-	priorityMetadataProducer  MetadataProducerFactory
+	priorityMetadataProducer  PriorityMetadataProducerFactory
 	predicateMetadataProducer PredicateMetadataProducerFactory
 
 	// get equivalence pod function
@@ -239,7 +238,7 @@ func IsFitPredicateRegistered(name string) bool {
 	return ok
 }
 
-func RegisterPriorityMetadataProducerFactory(factory MetadataProducerFactory) {
+func RegisterPriorityMetadataProducerFactory(factory PriorityMetadataProducerFactory) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 	priorityMetadataProducer = factory
