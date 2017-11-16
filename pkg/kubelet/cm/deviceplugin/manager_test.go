@@ -83,7 +83,12 @@ func TestDevicePluginReRegistration(t *testing.T) {
 	devices := m.Devices()
 	require.Equal(t, 2, len(devices[testResourceName]), "Devices are not updated.")
 
-	p2 := NewDevicePluginStub(devs, pluginSocketName+".new")
+	devs2 := []*pluginapi.Device{
+		{ID: "Dev3", Health: pluginapi.Healthy},
+		{ID: "Dev4", Health: pluginapi.Healthy},
+	}
+
+	p2 := NewDevicePluginStub(devs2, pluginSocketName+".new")
 	err := p2.Start()
 	require.NoError(t, err)
 	p2.Register(socketName, testResourceName)
@@ -91,14 +96,14 @@ func TestDevicePluginReRegistration(t *testing.T) {
 	<-callbackChan
 
 	devices2 := m.Devices()
-	require.Equal(t, 2, len(devices2[testResourceName]), "Devices shouldn't change.")
+	require.Equal(t, 2, len(devices2[testResourceName]), "Devices' capacity shouldn't change.")
 
 	// Test the scenario that a plugin re-registers with different devices.
 	p3 := NewDevicePluginStub(devsForRegistration, pluginSocketName+".third")
 	err = p3.Start()
 	require.NoError(t, err)
 	p3.Register(socketName, testResourceName)
-	// Wait for the second callback to be issued.
+	// Wait for the third callback to be issued.
 	<-callbackChan
 
 	devices3 := m.Devices()
