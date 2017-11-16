@@ -144,3 +144,33 @@ func TestCompileManifests(t *testing.T) {
 		}
 	}
 }
+
+func TestGetDNSIP(t *testing.T) {
+	var tests = []struct {
+		svcSubnet, expectedDNSIP string
+	}{
+		{
+			svcSubnet:     "10.96.0.0/12",
+			expectedDNSIP: "10.96.0.10",
+		},
+		{
+			svcSubnet:     "10.87.116.64/26",
+			expectedDNSIP: "10.87.116.74",
+		},
+	}
+	for _, rt := range tests {
+		dnsIP, err := GetDNSIP(rt.svcSubnet)
+		if err != nil {
+			t.Fatalf("couldn't get dnsIP : %v", err)
+		}
+
+		actualDNSIP := dnsIP.String()
+		if actualDNSIP != rt.expectedDNSIP {
+			t.Errorf(
+				"failed GetDNSIP\n\texpected: %s\n\t  actual: %s",
+				rt.expectedDNSIP,
+				actualDNSIP,
+			)
+		}
+	}
+}

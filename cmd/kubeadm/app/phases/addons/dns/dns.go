@@ -34,6 +34,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -59,7 +60,7 @@ func kubeDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interfac
 		return err
 	}
 
-	dnsip, err := getDNSIP(client)
+	dnsip, err := GetDNSIP(cfg.Networking.ServiceSubnet)
 	if err != nil {
 		return err
 	}
@@ -148,7 +149,7 @@ func coreDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interfac
 		return fmt.Errorf("error when parsing CoreDNS configMap template: %v", err)
 	}
 
-	dnsip, err := getDNSIP(client)
+	dnsip, err := GetDNSIP(cfg.Networking.ServiceSubnet)
 	if err != nil {
 		return err
 	}
@@ -244,21 +245,20 @@ func createDNSService(dnsService *v1.Service, serviceBytes []byte, client client
 	return nil
 }
 
-// getDNSIP fetches the kubernetes service's ClusterIP and appends a "0" to it in order to get the DNS IP
-func getDNSIP(client clientset.Interface) (net.IP, error) {
-	k8ssvc, err := client.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
+// GetDNSIP returns a dnsIP, which is 10th IP in svcSubnet CIDR range
+func GetDNSIP(svcSubnet string) (net.IP, error) {
+
+	// Get the service subnet CIDR
+	_, svcSubnetCIDR, err := net.ParseCIDR(svcSubnet)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't fetch information about the kubernetes service: %v", err)
+		return nil, fmt.Errorf("couldn't parse service subnet CIDR %q: %v", svcSubnet, err)
 	}
 
-	if len(k8ssvc.Spec.ClusterIP) == 0 {
-		return nil, fmt.Errorf("couldn't fetch a valid clusterIP from the kubernetes service")
+	// Selects the 10th IP in service subnet CIDR range as dnsIP
+	dnsIP, err := ipallocator.GetIndexedIP(svcSubnetCIDR, 10)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get tenth IP address from service subnet CIDR %s: %v", svcSubnetCIDR.String(), err)
 	}
 
-	// Build an IP by taking the kubernetes service's clusterIP and appending a "0" and checking that it's valid
-	dnsIP := net.ParseIP(fmt.Sprintf("%s0", k8ssvc.Spec.ClusterIP))
-	if dnsIP == nil {
-		return nil, fmt.Errorf("could not parse dns ip %q: %v", dnsIP, err)
-	}
 	return dnsIP, nil
 }

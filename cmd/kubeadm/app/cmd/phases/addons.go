@@ -116,6 +116,7 @@ func getAddonsSubCommands() []*cobra.Command {
 
 		if properties.use == "all" || properties.use == "kube-dns" {
 			cmd.Flags().StringVar(&cfg.Networking.DNSDomain, "service-dns-domain", cfg.Networking.DNSDomain, `Use alternative domain for services, e.g. "myorg.internal.`)
+			cmd.Flags().StringVar(&cfg.Networking.ServiceSubnet, "service-cidr", cfg.Networking.ServiceSubnet, `Use alternative range of IP address for service VIPs`)
 		}
 		subCmds = append(subCmds, cmd)
 	}
