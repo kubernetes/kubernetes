@@ -14,18 +14,20 @@ go_library(
         "docker_checkpoint.go",
         "docker_container.go",
         "docker_image.go",
-        "docker_image_unsupported.go",
         "docker_sandbox.go",
         "docker_service.go",
-        "docker_stats_unsupported.go",
         "docker_streaming.go",
         "exec.go",
         "helpers.go",
-        "helpers_unsupported.go",
         "naming.go",
         "security_context.go",
         "selinux_util.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "docker_image_unsupported.go",
+            "docker_stats_unsupported.go",
+            "helpers_unsupported.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "docker_image_linux.go",
             "docker_stats_linux.go",
@@ -104,8 +106,8 @@ go_test(
         "fixtures/seccomp/sub/subtest",
         "fixtures/seccomp/test",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim",
-    library = ":go_default_library",
     deps = [
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/container:go_default_library",

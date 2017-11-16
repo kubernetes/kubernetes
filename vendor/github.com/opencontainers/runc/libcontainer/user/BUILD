@@ -4,7 +4,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "lookup.go",
-        "lookup_unsupported.go",
         "user.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:darwin_amd64": [
@@ -12,6 +11,9 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "lookup_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "lookup_unsupported.go",
         ],
         "//conditions:default": [],
     }),

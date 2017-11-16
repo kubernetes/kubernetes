@@ -33,8 +33,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["gc_controller_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/controller/podgc",
-    library = ":go_default_library",
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/controller/testutil:go_default_library",

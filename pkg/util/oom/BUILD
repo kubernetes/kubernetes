@@ -12,10 +12,15 @@ go_library(
         "doc.go",
         "oom.go",
         "oom_fake.go",
-        "oom_unsupported.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "oom_unsupported.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "oom_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "oom_unsupported.go",
         ],
         "//conditions:default": [],
     }),
@@ -37,8 +42,8 @@ go_test(
         ],
         "//conditions:default": [],
     }),
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/util/oom",
-    library = ":go_default_library",
     deps = select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "//vendor/github.com/stretchr/testify/assert:go_default_library",

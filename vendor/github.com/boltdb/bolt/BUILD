@@ -3,8 +3,6 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "bolt_unix.go",
-        "boltsync_unix.go",
         "bucket.go",
         "cursor.go",
         "db.go",
@@ -17,10 +15,13 @@ go_library(
     ] + select({
         "@io_bazel_rules_go//go/platform:darwin_amd64": [
             "bolt_amd64.go",
+            "bolt_unix.go",
+            "boltsync_unix.go",
         ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "bolt_amd64.go",
             "bolt_linux.go",
+            "bolt_unix.go",
         ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "bolt_amd64.go",

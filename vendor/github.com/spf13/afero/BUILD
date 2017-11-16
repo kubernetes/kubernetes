@@ -6,7 +6,6 @@ go_library(
         "afero.go",
         "basepath.go",
         "cacheOnReadFs.go",
-        "const_win_unix.go",
         "copyOnWriteFs.go",
         "httpFs.go",
         "ioutil.go",
@@ -22,6 +21,12 @@ go_library(
     ] + select({
         "@io_bazel_rules_go//go/platform:darwin_amd64": [
             "const_bsds.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "const_win_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "const_win_unix.go",
         ],
         "//conditions:default": [],
     }),

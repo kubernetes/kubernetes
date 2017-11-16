@@ -19,8 +19,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["conversion_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook/versioned",
-    library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",

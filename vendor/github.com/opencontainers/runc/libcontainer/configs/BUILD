@@ -4,17 +4,19 @@ go_library(
     name = "go_default_library",
     srcs = [
         "blkio_device.go",
-        "cgroup_unsupported.go",
         "config.go",
         "device.go",
         "hugepage_limit.go",
         "interface_priority_map.go",
         "mount.go",
         "namespaces.go",
-        "namespaces_syscall_unsupported.go",
-        "namespaces_unsupported.go",
         "network.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "cgroup_unsupported.go",
+            "namespaces_syscall_unsupported.go",
+            "namespaces_unsupported.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "cgroup_linux.go",
             "config_linux.go",
@@ -24,6 +26,7 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "cgroup_windows.go",
+            "namespaces_unsupported.go",
         ],
         "//conditions:default": [],
     }),

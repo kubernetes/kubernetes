@@ -3,9 +3,14 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "colorable_others.go",
         "noncolorable.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "colorable_others.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "colorable_others.go",
+        ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "colorable_windows.go",
         ],

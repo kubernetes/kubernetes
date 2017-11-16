@@ -115,8 +115,8 @@ go_test(
         "master_openapi_test.go",
         "master_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/master",
-    library = ":go_default_library",
     race = "off",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",

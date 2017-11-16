@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["util_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/util",
-    library = ":go_default_library",
     deps = ["//vendor/github.com/stretchr/testify/assert:go_default_library"],
 )
 
@@ -19,7 +19,6 @@ go_library(
     srcs = [
         "doc.go",
         "util.go",
-        "util_unsupported.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:darwin_amd64": [
             "util_unix.go",

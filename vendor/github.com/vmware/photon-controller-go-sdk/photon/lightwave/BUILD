@@ -5,8 +5,13 @@ go_library(
     srcs = [
         "jwttoken.go",
         "oidcclient.go",
-        "oidcclient_sspi_unsupported.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "oidcclient_sspi_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "oidcclient_sspi_unsupported.go",
+        ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "oidcclient_sspi.go",
         ],

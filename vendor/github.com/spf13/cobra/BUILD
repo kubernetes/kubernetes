@@ -6,8 +6,13 @@ go_library(
         "bash_completions.go",
         "cobra.go",
         "command.go",
-        "command_notwin.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "command_notwin.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "command_notwin.go",
+        ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "command_win.go",
         ],

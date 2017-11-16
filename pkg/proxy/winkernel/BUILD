@@ -44,8 +44,8 @@ go_test(
         ],
         "//conditions:default": [],
     }),
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/proxy/winkernel",
-    library = ":go_default_library",
     deps = select({
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "//pkg/apis/core:go_default_library",

@@ -4,8 +4,10 @@ go_library(
     name = "go_default_library",
     srcs = [
         "proc.go",
-        "unsupported.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "unsupported.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "linux.go",
             "syscall_linux_64.go",
@@ -14,6 +16,7 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "sysconfig_notcgo.go",
+            "unsupported.go",
         ],
         "//conditions:default": [],
     }),

@@ -7,14 +7,15 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "flock_other.go",
-    ] + select({
+    srcs = select({
         "@io_bazel_rules_go//go/platform:darwin_amd64": [
             "flock_unix.go",
         ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "flock_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "flock_other.go",
         ],
         "//conditions:default": [],
     }),

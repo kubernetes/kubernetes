@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["nodecontroller_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/controller/node",
-    library = ":go_default_library",
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/fake:go_default_library",

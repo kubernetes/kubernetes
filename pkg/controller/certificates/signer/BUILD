@@ -14,8 +14,8 @@ go_test(
         "testdata/ca.key",
         "testdata/kubelet.csr",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/controller/certificates/signer",
-    library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/api/certificates/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/util/cert:go_default_library",

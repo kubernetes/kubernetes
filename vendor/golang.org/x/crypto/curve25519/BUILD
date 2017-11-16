@@ -3,7 +3,6 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "curve25519.go",
         "doc.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:darwin_amd64": [

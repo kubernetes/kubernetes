@@ -4,7 +4,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "client.go",
-        "client_unix.go",
         "controller.go",
         "event.go",
         "namespace.go",
@@ -16,6 +15,12 @@ go_library(
         "validation.go",
         "volume.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "client_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "client_unix.go",
+        ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "client_windows.go",
         ],

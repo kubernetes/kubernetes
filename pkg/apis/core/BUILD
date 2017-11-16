@@ -33,8 +33,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["taint_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/apis/core",
-    library = ":go_default_library",
 )
 
 filegroup(
