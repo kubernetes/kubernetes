@@ -62,11 +62,17 @@ func NewCSV(path string) (*TokenAuthenticator, error) {
 		if len(record) < 3 {
 			return nil, fmt.Errorf("token file '%s' must have at least 3 columns (token, user name, user uid), found %d", path, len(record))
 		}
+
+		recordNum++
+		if record[0] == "" {
+			glog.Warningf("empty token has been found in token file '%s', record number '%d'", path, recordNum)
+			continue
+		}
+
 		obj := &user.DefaultInfo{
 			Name: record[1],
 			UID:  record[2],
 		}
-		recordNum++
 		if _, exist := tokens[record[0]]; exist {
 			glog.Warningf("duplicate token has been found in token file '%s', record number '%d'", path, recordNum)
 		}
