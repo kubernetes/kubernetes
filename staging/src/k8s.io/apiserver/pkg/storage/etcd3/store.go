@@ -79,11 +79,12 @@ type elemForDecode struct {
 }
 
 type objState struct {
-	obj   runtime.Object
-	meta  *storage.ResponseMeta
-	rev   int64
-	data  []byte
-	stale bool
+	obj     runtime.Object
+	meta    *storage.ResponseMeta
+	rev     int64
+	leaseID int64
+	data    []byte
+	stale   bool
 }
 
 // New returns an etcd3 implementation of storage.Interface.
@@ -302,7 +303,7 @@ func (s *store) GuaranteedUpdate(
 			return err
 		}
 
-		ret, ttl, err := s.updateState(origState, tryUpdate)
+		ret, ttlPtr, err := s.updateState(origState, tryUpdate)
 		if err != nil {
 			// It's possible we were working with stale data
 			if mustCheckData && apierrors.IsConflict(err) {
@@ -346,10 +347,16 @@ func (s *store) GuaranteedUpdate(
 			return storage.NewInternalError(err.Error())
 		}
 
-		opts, err := s.ttlOpts(ctx, int64(ttl))
-		if err != nil {
-			return err
+		var opts []clientv3.OpOption
+		if ttlPtr != nil {
+			opts, err = s.ttlOpts(ctx, int64(*ttlPtr))
+			if err != nil {
+				return err
+			}
+		} else {
+			opts = []clientv3.OpOption{clientv3.WithLease(clientv3.LeaseID(origState.leaseID))}
 		}
+
 		trace.Step("Transaction prepared")
 
 		txnResp, err := s.client.KV.Txn(ctx).If(
@@ -691,6 +698,7 @@ func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Va
 			return nil, storage.NewInternalError(err.Error())
 		}
 		state.rev = getResp.Kvs[0].ModRevision
+		state.leaseID = getResp.Kvs[0].Lease
 		state.meta.ResourceVersion = uint64(state.rev)
 		state.data = data
 		state.stale = stale
@@ -727,20 +735,16 @@ func (s *store) getStateFromObject(obj runtime.Object) (*objState, error) {
 	return state, nil
 }
 
-func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc) (runtime.Object, uint64, error) {
+func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc) (runtime.Object, *uint64, error) {
 	ret, ttlPtr, err := userUpdate(st.obj, *st.meta)
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, err
 	}
 
 	if err := s.versioner.PrepareObjectForStorage(ret); err != nil {
-		return nil, 0, fmt.Errorf("PrepareObjectForStorage failed: %v", err)
+		return nil, ttlPtr, fmt.Errorf("PrepareObjectForStorage failed: %v", err)
 	}
-	var ttl uint64
-	if ttlPtr != nil {
-		ttl = *ttlPtr
-	}
-	return ret, ttl, nil
+	return ret, ttlPtr, nil
 }
 
 // ttlOpts returns client options based on given ttl.

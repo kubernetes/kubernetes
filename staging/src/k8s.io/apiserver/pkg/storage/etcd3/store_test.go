@@ -507,6 +507,39 @@ func TestGuaranteedUpdateWithTTL(t *testing.T) {
 	testCheckEventType(t, watch.Deleted, w)
 }
 
+func TestGuaranteedUpdateWithNilTTL(t *testing.T) {
+	ctx, store, cluster := testSetup(t)
+	defer cluster.Terminate(t)
+
+	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	key := "/somekey"
+
+	out := &example.Pod{}
+	err := store.GuaranteedUpdate(ctx, key, out, true, nil,
+		func(_ runtime.Object, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
+			ttl := uint64(1)
+			return input, &ttl, nil
+		})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	err = store.GuaranteedUpdate(ctx, key, out, true, nil,
+		func(_ runtime.Object, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
+			input.Namespace = "update"
+			return input, nil, nil
+		})
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+
+	w, err := store.Watch(ctx, key, out.ResourceVersion, storage.Everything)
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+	testCheckEventType(t, watch.Deleted, w)
+}
+
 func TestGuaranteedUpdateChecksStoredData(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
