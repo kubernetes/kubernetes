@@ -1,0 +1,16 @@
+cmd/snappytool/snappytool
+testdata/bench
+
+# These explicitly listed benchmark data files are for an obsolete version of
+# snappy_test.go.
+testdata/alice29.txt
+testdata/asyoulik.txt
+testdata/fireworks.jpeg
+testdata/geo.protodata
+testdata/html
+testdata/html_x_4
+testdata/kppkn.gtb
+testdata/lcet10.txt
+testdata/paper-100k.pdf
+testdata/plrabn12.txt
+testdata/urls.10K

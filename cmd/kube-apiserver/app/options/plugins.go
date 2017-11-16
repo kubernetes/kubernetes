@@ -25,6 +25,7 @@ import (
 
 	// Admission policies
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages"
 	"k8s.io/kubernetes/plugin/pkg/admission/antiaffinity"
@@ -50,6 +51,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/plugin/pkg/admission/storageclass/setdefault"
+	"k8s.io/kubernetes/plugin/pkg/kmsproviders/vault"
 )
 
 // RegisterAllAdmissionPlugins registers all admission plugins
@@ -79,4 +81,9 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	serviceaccount.Register(plugins)
 	setdefault.Register(plugins)
 	resize.Register(plugins)
+}
+
+//RegisterAllKMSPlugins registers all KMS providers plugins
+func RegisterAllKMSPlugins(pluginRegistry *encryptionconfig.KMSPlugins) {
+	vault.Register(pluginRegistry)
 }
