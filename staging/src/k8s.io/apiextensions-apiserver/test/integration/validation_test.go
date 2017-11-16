@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/test/integration/testserver"
@@ -176,12 +175,6 @@ func TestCustomResourceValidation(t *testing.T) {
 	}
 	defer close(stopCh)
 
-	// enable alpha feature CustomResourceValidation
-	err = utilfeature.DefaultFeatureGate.Set("CustomResourceValidation=true")
-	if err != nil {
-		t.Errorf("failed to enable feature gate for CustomResourceValidation: %v", err)
-	}
-
 	noxuDefinition := newNoxuValidationCRD(apiextensionsv1beta1.NamespaceScoped)
 	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
 	if err != nil {
@@ -202,12 +195,6 @@ func TestCustomResourceUpdateValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer close(stopCh)
-
-	// enable alpha feature CustomResourceValidation
-	err = utilfeature.DefaultFeatureGate.Set("CustomResourceValidation=true")
-	if err != nil {
-		t.Errorf("failed to enable feature gate for CustomResourceValidation: %v", err)
-	}
 
 	noxuDefinition := newNoxuValidationCRD(apiextensionsv1beta1.NamespaceScoped)
 	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
@@ -251,12 +238,6 @@ func TestCustomResourceValidationErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer close(stopCh)
-
-	// enable alpha feature CustomResourceValidation
-	err = utilfeature.DefaultFeatureGate.Set("CustomResourceValidation=true")
-	if err != nil {
-		t.Errorf("failed to enable feature gate for CustomResourceValidation: %v", err)
-	}
 
 	noxuDefinition := newNoxuValidationCRD(apiextensionsv1beta1.NamespaceScoped)
 	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
@@ -349,12 +330,6 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 	}
 	defer close(stopCh)
 
-	// enable alpha feature CustomResourceValidation
-	err = utilfeature.DefaultFeatureGate.Set("CustomResourceValidation=true")
-	if err != nil {
-		t.Errorf("failed to enable feature gate for CustomResourceValidation: %v", err)
-	}
-
 	noxuDefinition := newNoxuValidationCRD(apiextensionsv1beta1.NamespaceScoped)
 
 	// set stricter schema
@@ -408,12 +383,6 @@ func TestForbiddenFieldsInSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer close(stopCh)
-
-	// enable alpha feature CustomResourceValidation
-	err = utilfeature.DefaultFeatureGate.Set("CustomResourceValidation=true")
-	if err != nil {
-		t.Errorf("failed to enable feature gate for CustomResourceValidation: %v", err)
-	}
 
 	noxuDefinition := newNoxuValidationCRD(apiextensionsv1beta1.NamespaceScoped)
 	noxuDefinition.Spec.Validation.OpenAPIV3Schema.AdditionalProperties.Allows = false

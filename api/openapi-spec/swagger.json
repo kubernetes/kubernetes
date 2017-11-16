@@ -81289,7 +81289,7 @@
       "type": "string"
      },
      "validation": {
-      "description": "Validation describes the validation methods for CustomResources This field is alpha-level and should only be sent to servers that enable the CustomResourceValidation feature.",
+      "description": "Validation describes the validation methods for CustomResources",
       "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceValidation"
      },
      "version": {
