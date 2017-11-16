@@ -19,3 +19,7 @@ func createURL(client *gophercloud.ServiceClient) string {
 func deleteURL(client *gophercloud.ServiceClient, id string) string {
 	return client.ServiceURL("flavors", id)
 }
+
+func accessURL(client *gophercloud.ServiceClient, id string) string {
+	return client.ServiceURL("flavors", id, "os-flavor-access")
+}
