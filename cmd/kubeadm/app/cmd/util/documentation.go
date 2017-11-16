@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,24 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package app
+package util
 
 import (
-	"os"
-
-	"github.com/spf13/pflag"
-
-	_ "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/install"
-	"k8s.io/kubernetes/cmd/kubeadm/app/cmd"
+	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
-// Run creates and executes new kubeadm command
-func Run() error {
-	// We do not want these flags to show up in --help
-	pflag.CommandLine.MarkHidden("version")
-	pflag.CommandLine.MarkHidden("google-json-key")
-	pflag.CommandLine.MarkHidden("log-flush-frequency")
+var (
+	// AlphaDisclaimer to be places at the end of description of commands in alpha release
+	AlphaDisclaimer = `
+		Alpha Disclaimer: this command is currently alpha but, please try it out and give us feedback!
+	`
 
-	cmd := cmd.NewKubeadmCommand(os.Stdin, os.Stdout, os.Stderr)
-	return cmd.Execute()
-}
+	// MacroCommandLongDescription provide a standard description for "macro" commands
+	MacroCommandLongDescription = normalizer.LongDesc(`
+		This command is not meant to be run on its own. See list of available subcommands.
+	`)
+)
