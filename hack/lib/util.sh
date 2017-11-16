@@ -737,12 +737,12 @@ function kube::util::ensure-cfssl {
     kernel=$(uname -s)
     case "${kernel}" in
       Linux)
-        curl -s -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
-        curl -s -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
+        curl --retry 10 -s -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
+        curl --retry 10 -s -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
         ;;
       Darwin)
-        curl -s -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_darwin-amd64
-        curl -s -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_darwin-amd64
+        curl --retry 10 -s -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_darwin-amd64
+        curl --retry 10 -s -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_darwin-amd64
         ;;
       *)
         echo "Unknown, unsupported platform: ${kernel}." >&2
