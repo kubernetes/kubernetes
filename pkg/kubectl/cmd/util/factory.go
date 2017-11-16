@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/categories"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -192,7 +193,7 @@ type ObjectMappingFactory interface {
 	// runtime.Unstructured. This performs API calls to discover types.
 	UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error)
 	// Returns interface for expanding categories like `all`.
-	CategoryExpander() resource.CategoryExpander
+	CategoryExpander() categories.CategoryExpander
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
 	// for working with arbitrary resources and is not guaranteed to point to a Kubernetes APIServer.
 	ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)
