@@ -11,6 +11,7 @@ go_library(
     deps = [
         "//vendor/github.com/docker/go-units:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/google/cadvisor/accelerators:go_default_library",
         "//vendor/github.com/google/cadvisor/cache/memory:go_default_library",
         "//vendor/github.com/google/cadvisor/collector:go_default_library",
         "//vendor/github.com/google/cadvisor/container:go_default_library",

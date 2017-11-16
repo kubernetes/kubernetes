@@ -1,4 +1,4 @@
-// Copyright 2009 The Go Authors.  All rights reserved.
+// Copyright 2009 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -71,12 +71,17 @@ func UTF16PtrFromString(s string) (*uint16, error) {
 
 func Getpagesize() int { return 4096 }
 
-// Converts a Go function to a function pointer conforming
-// to the stdcall or cdecl calling convention.  This is useful when
-// interoperating with Windows code requiring callbacks.
-// Implemented in runtime/syscall_windows.goc
-func NewCallback(fn interface{}) uintptr
-func NewCallbackCDecl(fn interface{}) uintptr
+// NewCallback converts a Go function to a function pointer conforming to the stdcall calling convention.
+// This is useful when interoperating with Windows code requiring callbacks.
+func NewCallback(fn interface{}) uintptr {
+	return syscall.NewCallback(fn)
+}
+
+// NewCallbackCDecl converts a Go function to a function pointer conforming to the cdecl calling convention.
+// This is useful when interoperating with Windows code requiring callbacks.
+func NewCallbackCDecl(fn interface{}) uintptr {
+	return syscall.NewCallbackCDecl(fn)
+}
 
 // windows api calls
 
@@ -196,6 +201,21 @@ func NewCallbackCDecl(fn interface{}) uintptr
 //sys	PulseEvent(event Handle) (err error) = kernel32.PulseEvent
 
 // syscall interface implementation for other packages
+
+// GetProcAddressByOrdinal retrieves the address of the exported
+// function from module by ordinal.
+func GetProcAddressByOrdinal(module Handle, ordinal uintptr) (proc uintptr, err error) {
+	r0, _, e1 := syscall.Syscall(procGetProcAddress.Addr(), 2, uintptr(module), ordinal, 0)
+	proc = uintptr(r0)
+	if proc == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
 
 func Exit(code int) { ExitProcess(uint32(code)) }
 

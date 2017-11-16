@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
@@ -31,6 +30,8 @@ import (
 	"github.com/google/cadvisor/utils/sysinfo"
 
 	"github.com/golang/glog"
+
+	"golang.org/x/sys/unix"
 )
 
 const hugepagesDirectory = "/sys/kernel/mm/hugepages/"
@@ -189,19 +190,11 @@ func ContainerOsVersion() string {
 }
 
 func KernelVersion() string {
-	uname := &syscall.Utsname{}
+	uname := &unix.Utsname{}
 
-	if err := syscall.Uname(uname); err != nil {
+	if err := unix.Uname(uname); err != nil {
 		return "Unknown"
 	}
 
-	release := make([]byte, len(uname.Release))
-	i := 0
-	for _, c := range uname.Release {
-		release[i] = byte(c)
-		i++
-	}
-	release = release[:bytes.IndexByte(release, 0)]
-
-	return string(release)
+	return string(uname.Release[:bytes.IndexByte(uname.Release[:], 0)])
 }
