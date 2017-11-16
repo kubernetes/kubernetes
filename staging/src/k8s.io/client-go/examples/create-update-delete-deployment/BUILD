@@ -8,8 +8,8 @@ load(
 
 go_binary(
     name = "create-update-delete-deployment",
+    embed = [":go_default_library"],
     importpath = "k8s.io/client-go/examples/create-update-delete-deployment",
-    library = ":go_default_library",
 )
 
 go_library(

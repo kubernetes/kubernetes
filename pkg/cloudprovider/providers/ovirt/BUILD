@@ -22,8 +22,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["ovirt_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/ovirt",
-    library = ":go_default_library",
     deps = ["//pkg/cloudprovider:go_default_library"],
 )
 

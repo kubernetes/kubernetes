@@ -11,19 +11,23 @@ go_library(
     srcs = [
         "doc.go",
         "exec.go",
-        "exec_mount_unsupported.go",
         "fake.go",
         "mount.go",
-        "mount_unsupported.go",
-        "nsenter_mount_unsupported.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "exec_mount_unsupported.go",
+            "mount_unsupported.go",
+            "nsenter_mount_unsupported.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "exec_mount.go",
             "mount_linux.go",
             "nsenter_mount.go",
         ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "exec_mount_unsupported.go",
             "mount_windows.go",
+            "nsenter_mount_unsupported.go",
         ],
         "//conditions:default": [],
     }),
@@ -57,8 +61,8 @@ go_test(
         ],
         "//conditions:default": [],
     }),
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/util/mount",
-    library = ":go_default_library",
     deps = ["//vendor/k8s.io/utils/exec/testing:go_default_library"],
 )
 

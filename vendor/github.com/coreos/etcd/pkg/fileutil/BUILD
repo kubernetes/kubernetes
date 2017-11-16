@@ -3,21 +3,21 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "dir_unix.go",
         "fileutil.go",
         "lock.go",
-        "lock_flock.go",
-        "lock_unix.go",
         "preallocate.go",
-        "preallocate_unsupported.go",
         "purge.go",
-        "sync.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "dir_unix.go",
+            "lock_flock.go",
+            "lock_unix.go",
             "preallocate_darwin.go",
             "sync_darwin.go",
         ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "dir_unix.go",
+            "lock_flock.go",
             "lock_linux.go",
             "preallocate_unix.go",
             "sync_linux.go",
@@ -25,6 +25,8 @@ go_library(
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "dir_windows.go",
             "lock_windows.go",
+            "preallocate_unsupported.go",
+            "sync.go",
         ],
         "//conditions:default": [],
     }),

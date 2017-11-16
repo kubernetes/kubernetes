@@ -13,8 +13,8 @@ go_test(
         "extender_test.go",
         "generic_scheduler_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/core",
-    library = ":go_default_library",
     deps = [
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",

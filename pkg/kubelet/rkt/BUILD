@@ -66,8 +66,8 @@ go_test(
         "fake_rkt_interface_test.go",
         "rkt_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/rkt",
-    library = ":go_default_library",
     deps = [
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",

@@ -2,9 +2,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "fs_unsupported.go",
-    ] + select({
+    srcs = select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "fs_unsupported.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "apply_raw.go",
             "blkio.go",
@@ -21,6 +22,9 @@ go_library(
             "perf_event.go",
             "pids.go",
             "utils.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "fs_unsupported.go",
         ],
         "//conditions:default": [],
     }),

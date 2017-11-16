@@ -11,11 +11,13 @@ go_library(
     srcs = [
         "attacher.go",
         "azure_common.go",
-        "azure_common_unsupported.go",
         "azure_dd.go",
         "azure_mounter.go",
         "azure_provision.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "azure_common_unsupported.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "azure_common_linux.go",
         ],
@@ -66,8 +68,8 @@ go_test(
         "azure_common_test.go",
         "azure_dd_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/volume/azure_dd",
-    library = ":go_default_library",
     deps = [
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",

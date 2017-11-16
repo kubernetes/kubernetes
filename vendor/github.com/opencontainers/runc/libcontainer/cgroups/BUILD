@@ -2,13 +2,17 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "cgroups_unsupported.go",
-    ] + select({
+    srcs = select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "cgroups_unsupported.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "cgroups.go",
             "stats.go",
             "utils.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "cgroups_unsupported.go",
         ],
         "//conditions:default": [],
     }),

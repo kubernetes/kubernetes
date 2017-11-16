@@ -39,8 +39,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["proxier_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/proxy/iptables",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/proxy:go_default_library",

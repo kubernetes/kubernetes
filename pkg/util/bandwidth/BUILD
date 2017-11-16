@@ -12,11 +12,16 @@ go_library(
         "doc.go",
         "fake_shaper.go",
         "interfaces.go",
-        "unsupported.go",
         "utils.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "unsupported.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "unsupported.go",
         ],
         "//conditions:default": [],
     }),
@@ -43,8 +48,8 @@ go_test(
         ],
         "//conditions:default": [],
     }),
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/util/bandwidth",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",

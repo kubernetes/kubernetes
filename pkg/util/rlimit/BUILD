@@ -7,11 +7,15 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "rlimit_unsupported.go",
-    ] + select({
+    srcs = select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "rlimit_unsupported.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "rlimit_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "rlimit_unsupported.go",
         ],
         "//conditions:default": [],
     }),

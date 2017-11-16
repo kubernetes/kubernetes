@@ -10,9 +10,14 @@ go_library(
     name = "go_default_library",
     srcs = [
         "checks.go",
-        "checks_unix.go",
         "utils.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "checks_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "checks_unix.go",
+        ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "checks_windows.go",
         ],
@@ -46,8 +51,8 @@ go_test(
         "checks_test.go",
         "utils_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/preflight",
-    library = ":go_default_library",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//vendor/github.com/renstrom/dedent:go_default_library",

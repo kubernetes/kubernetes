@@ -15,13 +15,18 @@ go_library(
         "defaults.go",
         "doc.go",
         "file.go",
-        "file_unsupported.go",
         "flags.go",
         "http.go",
         "sources.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "file_unsupported.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "file_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "file_unsupported.go",
         ],
         "//conditions:default": [],
     }),
@@ -73,8 +78,8 @@ go_test(
         ],
         "//conditions:default": [],
     }),
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/config",
-    library = ":go_default_library",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",

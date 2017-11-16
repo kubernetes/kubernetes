@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["cidr_set_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/controller/node/ipam/cidrset",
-    library = ":go_default_library",
     deps = ["//vendor/github.com/golang/glog:go_default_library"],
 )
 

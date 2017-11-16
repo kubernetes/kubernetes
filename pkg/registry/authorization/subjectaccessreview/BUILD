@@ -38,8 +38,8 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["rest_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/registry/authorization/subjectaccessreview",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/authorization:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",

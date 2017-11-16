@@ -10,8 +10,13 @@ go_library(
     name = "go_default_library",
     srcs = [
         "cni.go",
-        "cni_others.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "cni_others.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "cni_others.go",
+        ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "cni_windows.go",
         ],
@@ -42,8 +47,8 @@ go_test(
         ],
         "//conditions:default": [],
     }),
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/network/cni",
-    library = ":go_default_library",
     deps = select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "//pkg/kubelet/apis/kubeletconfig:go_default_library",

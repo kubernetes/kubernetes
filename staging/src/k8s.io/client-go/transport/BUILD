@@ -13,8 +13,8 @@ go_test(
         "round_trippers_test.go",
         "transport_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/client-go/transport",
-    library = ":go_default_library",
 )
 
 go_library(

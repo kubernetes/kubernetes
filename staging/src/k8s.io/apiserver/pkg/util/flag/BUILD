@@ -13,8 +13,8 @@ go_test(
         "map_string_bool_test.go",
         "namedcertkey_flag_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apiserver/pkg/util/flag",
-    library = ":go_default_library",
     deps = [
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

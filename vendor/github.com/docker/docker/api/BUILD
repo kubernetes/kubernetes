@@ -4,9 +4,14 @@ go_library(
     name = "go_default_library",
     srcs = [
         "common.go",
-        "common_unix.go",
         "names.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "common_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "common_unix.go",
+        ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "common_windows.go",
         ],

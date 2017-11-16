@@ -13,8 +13,8 @@ go_test(
         "etcd_helper_test.go",
         "etcd_watcher_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apiserver/pkg/storage/etcd",
-    library = ":go_default_library",
     deps = [
         "//vendor/github.com/coreos/etcd/client:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",

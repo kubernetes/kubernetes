@@ -10,10 +10,15 @@ go_library(
     name = "go_default_library",
     srcs = [
         "resize.go",
-        "resizeevents.go",
         "term.go",
         "term_writer.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "resizeevents.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "resizeevents.go",
+        ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "resizeevents_windows.go",
         ],
@@ -24,17 +29,24 @@ go_library(
         "//pkg/util/interrupt:go_default_library",
         "//vendor/github.com/docker/docker/pkg/term:go_default_library",
         "//vendor/github.com/mitchellh/go-wordwrap:go_default_library",
-        "//vendor/golang.org/x/sys/unix:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["term_writer_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubectl/util/term",
-    library = ":go_default_library",
 )
 
 filegroup(

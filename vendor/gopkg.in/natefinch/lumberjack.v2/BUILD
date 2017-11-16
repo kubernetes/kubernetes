@@ -3,11 +3,16 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "chown.go",
         "lumberjack.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "chown.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "chown_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "chown.go",
         ],
         "//conditions:default": [],
     }),

@@ -5,8 +5,13 @@ go_library(
     srcs = [
         "config.go",
         "host_config.go",
-        "hostconfig_unix.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "hostconfig_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "hostconfig_unix.go",
+        ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "hostconfig_windows.go",
         ],

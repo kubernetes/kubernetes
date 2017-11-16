@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["server_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/cmd/kubelet/app",
-    library = ":go_default_library",
     deps = ["//pkg/kubelet/apis/kubeletconfig:go_default_library"],
 )
 
@@ -20,10 +20,15 @@ go_library(
         "auth.go",
         "plugins.go",
         "server.go",
-        "server_unsupported.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "server_unsupported.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "server_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "server_unsupported.go",
         ],
         "//conditions:default": [],
     }),
