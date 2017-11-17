@@ -2488,6 +2488,15 @@ type PodAffinityTerm struct {
 	// selected pods is running.
 	// Empty topologyKey is not allowed.
 	TopologyKey string `json:"topologyKey" protobuf:"bytes,3,opt,name=topologyKey"`
+	// NumOfMatchingPods specifies the minimal number of pod that matching the selector; the term is considered to
+	// be matched if and only if the matching number is larger than NumOfMatchingPods. Only support anti-affinity:
+	// a node N is eligible only if the number of pods matching the LabelSelector that are running on nodes with the
+	// same value for key TopologyKey as N has is less than NumOfMatchingPods. For example, if NumOfMatchingPods is
+	// 1 (the default), then after this pod is scheduled to node M, there will not be more than one pod from the set
+	// selected by the LabelSelector running on nodes with M's value for key TopologyKey.
+	// The default value is 1.
+	// +optional
+	NumOfMatchingPods uint32 `json:"numOfMatchingPods,omitempty" protobuf:"varint,4,opt,name=numOfMatchingPods"`
 }
 
 // Node affinity is a group of node affinity scheduling rules.

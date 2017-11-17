@@ -171,6 +171,9 @@ func SetObjectDefaults_CronJob(in *v2alpha1.CronJob) {
 			}
 		}
 	}
+	if in.Spec.JobTemplate.Spec.Template.Spec.Affinity != nil {
+		v1.SetDefaults_Affinity(in.Spec.JobTemplate.Spec.Template.Spec.Affinity)
+	}
 }
 
 func SetObjectDefaults_CronJobList(in *v2alpha1.CronJobList) {
@@ -313,5 +316,8 @@ func SetObjectDefaults_JobTemplate(in *v2alpha1.JobTemplate) {
 				}
 			}
 		}
+	}
+	if in.Template.Spec.Template.Spec.Affinity != nil {
+		v1.SetDefaults_Affinity(in.Template.Spec.Template.Spec.Affinity)
 	}
 }

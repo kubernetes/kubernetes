@@ -172,6 +172,9 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 			}
 		}
 	}
+	if in.Spec.Template.Spec.Affinity != nil {
+		v1.SetDefaults_Affinity(in.Spec.Template.Spec.Affinity)
+	}
 }
 
 func SetObjectDefaults_DeploymentList(in *v1beta1.DeploymentList) {
@@ -315,6 +318,9 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 				}
 			}
 		}
+	}
+	if in.Spec.Template.Spec.Affinity != nil {
+		v1.SetDefaults_Affinity(in.Spec.Template.Spec.Affinity)
 	}
 	for i := range in.Spec.VolumeClaimTemplates {
 		a := &in.Spec.VolumeClaimTemplates[i]
