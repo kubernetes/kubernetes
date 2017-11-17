@@ -1509,6 +1509,18 @@ func (proxier *Proxier) syncProxyRules() {
 			)
 			writeLine(proxier.natRules, args...)
 		} else {
+			// First write session affinity rules only over local endpoints, if applicable.
+			if svcInfo.sessionAffinityType == api.ServiceAffinityClientIP {
+				for _, endpointChain := range localEndpointChains {
+					writeLine(proxier.natRules,
+						"-A", string(svcXlbChain),
+						"-m", "comment", "--comment", svcNameString,
+						"-m", "recent", "--name", string(endpointChain),
+						"--rcheck", "--seconds", strconv.Itoa(svcInfo.stickyMaxAgeSeconds), "--reap",
+						"-j", string(endpointChain))
+				}
+			}
+
 			// Setup probability filter rules only over local endpoints
 			for i, endpointChain := range localEndpointChains {
 				// Balancing rules in the per-service chain.
