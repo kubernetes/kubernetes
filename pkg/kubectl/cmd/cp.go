@@ -88,18 +88,11 @@ var (
 	errFileCannotBeEmpty         = errors.New("Filepath can not be empty")
 	errTar126					 = errors.New("Tar command invoked but could not execute. Might be a permission problem or command is not an executable")
 	errTar127 					 = errors.New("Tar command not found, please install tar before using kubectl cp")
-	errTar2 					 = errors.New("Could be a permission problem or missing command arguments and keywords")
-	//errTarGeneric 				 = errors.New("The cp command failed")
 )
 
 const (
-	// errTar126					 = "Tar command invoked but could not execute. Might be a permission problem or command is not an executable"
-	// errTar127 					 = "Tar command not found, please install tar before using kubectl cp"
-	// errTar2 					 = "Could be a permission problem or missing command arguments and keywords"
-	// errTarGeneric				 = "The cp command failed"
 	exitCode126 				 = "command terminated with exit code 126"
 	exitCode127 				 = "command terminated with exit code 127"
-	exitCode2 					 = "command terminated with exit code 2"
 )
 
 func extractFileSpec(arg string) (fileSpec, error) {
@@ -221,22 +214,16 @@ func copyToPod(f cmdutil.Factory, cmd *cobra.Command, stdout, stderr io.Writer, 
 			return errTar126
 		} else if err.Error() == exitCode127 {
 			return errTar127 
-		} else if err.Error() == exitCode2 {
-			return errTar2
 		} else {
 			return err
 		}
 	}
-
-	// fmt.Println("Error before go func")
 
 	go func() {
 		defer writer.Close()
 		err := makeTar(src.File, dest.File, writer)
 		cmdutil.CheckErr(err)
 	}()
-
-	// fmt.Println("Error after go func")
 
 	cmdArr := []string{"tar", "xf", "-"}
 	destDir := path.Dir(dest.File)
@@ -258,9 +245,6 @@ func copyToPod(f cmdutil.Factory, cmd *cobra.Command, stdout, stderr io.Writer, 
 		Command:  cmdArr,
 		Executor: &DefaultRemoteExecutor{},
 	}
-
-	// fmt.Println("Should not get here")
-
 	return execute(f, cmd, options)
 }
 
@@ -276,8 +260,6 @@ func copyFromPod(f cmdutil.Factory, cmd *cobra.Command, cmderr io.Writer, src, d
 			return errTar126
 		} else if err.Error() == exitCode127 {
 			return errTar127 
-		} else if err.Error() == exitCode2 {
-			return errTar2
 		} else {
 			return err
 		}
