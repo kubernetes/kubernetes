@@ -17,6 +17,16 @@ git remote add $USER git@github.com:$USER/govmomi.git
 git fetch $USER
 ```
 
+## Installing from source
+
+Compile the govmomi libraries and install govc using:
+
+``` shell
+go install -v github.com/vmware/govmomi/govc
+```
+
+Note that **govc/build.sh** is only used for building release binaries.
+
 ## Contribution flow
 
 This is a rough outline of what a contributor's workflow looks like:

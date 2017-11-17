@@ -65,3 +65,15 @@ func (s DistributedVirtualSwitch) AddPortgroup(ctx context.Context, spec []types
 
 	return NewTask(s.Client(), res.Returnval), nil
 }
+
+func (s DistributedVirtualSwitch) FetchDVPorts(ctx context.Context) ([]types.DistributedVirtualPort, error) {
+	req := &types.FetchDVPorts{
+		This: s.Reference(),
+	}
+
+	res, err := methods.FetchDVPorts(ctx, s.Client(), req)
+	if err != nil {
+		return nil, err
+	}
+	return res.Returnval, nil
+}

@@ -97,6 +97,25 @@ func (m *DatastoreFileManager) DeleteVirtualDisk(ctx context.Context, name strin
 	return task.Wait(ctx)
 }
 
+// Move dispatches to the appropriate Move method based on file name extension
+func (m *DatastoreFileManager) Move(ctx context.Context, src string, dst string) error {
+	srcp := m.Path(src)
+	dstp := m.Path(dst)
+
+	f := m.FileManager.MoveDatastoreFile
+
+	if srcp.IsVMDK() {
+		f = m.VirtualDiskManager.MoveVirtualDisk
+	}
+
+	task, err := f(ctx, srcp.String(), m.Datacenter, dstp.String(), m.Datacenter, m.Force)
+	if err != nil {
+		return err
+	}
+
+	return task.Wait(ctx)
+}
+
 // Path converts path name to a DatastorePath
 func (m *DatastoreFileManager) Path(name string) *DatastorePath {
 	var p DatastorePath
