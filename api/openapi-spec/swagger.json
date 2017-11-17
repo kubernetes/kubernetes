@@ -71480,6 +71480,10 @@
      "verbs"
     ],
     "properties": {
+     "denies": {
+      "description": "Denies indicates if a rule allows or denies requests that match the rule's resource and action.",
+      "type": "boolean"
+     },
      "nonResourceURLs": {
       "description": "NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path.  \"*\" means all.",
       "type": "array",
@@ -71541,6 +71545,10 @@
       "items": {
        "type": "string"
       }
+     },
+     "denies": {
+      "description": "Denies indicates if a rule allows or denies requests that match the rule's resource and action.",
+      "type": "boolean"
      },
      "resourceNames": {
       "description": "ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.  \"*\" means all.",
@@ -71613,7 +71621,7 @@
     }
    },
    "io.k8s.api.authorization.v1.SelfSubjectRulesReview": {
-    "description": "SelfSubjectRulesReview enumerates the set of actions the current user can perform within a namespace. The returned list of actions may be incomplete depending on the server's authorization mode, and any errors experienced during the evaluation. SelfSubjectRulesReview should be used by UIs to show/hide actions, or to quickly let an end user reason about their permissions. It should NOT Be used by external systems to drive authorization decisions as this raises confused deputy, cache lifetime/revocation, and correctness concerns. SubjectAccessReview, and LocalAccessReview are the correct way to defer authorization decisions to the API server.",
+    "description": "SelfSubjectRulesReview enumerates the set of actions the current user is allowed or explicitly disallowed from performing within a namespace. Rules review should be used by UIs to show/hide actions, or to quickly let an end user reason about their permissions.\n\nRules review APIs MUST NOT be used by external systems to drive authorization decisions as this raises confused deputy, cache lifetime/revocation, and correctness concerns. Additionally, the returned list may be incomplete depending on the server's authorization mode or errors encountered during evaluation",
     "required": [
      "spec"
     ],
@@ -71721,7 +71729,7 @@
       "type": "string"
      },
      "user": {
-      "description": "User is the user you're testing for. If you specify \"User\" but not \"Groups\", then is it interpreted as \"What if User were not a member of any groups",
+      "description": "User is the user you're testing for. If you specify \"User\" but not \"Groups\", then is it interpreted as \"What if User were not a member of any groups\"",
       "type": "string"
      }
     }
@@ -71751,7 +71759,7 @@
     }
    },
    "io.k8s.api.authorization.v1.SubjectRulesReviewStatus": {
-    "description": "SubjectRulesReviewStatus contains the result of a rules check. This check can be incomplete depending on the set of authorizers the server is configured with and any errors experienced during evaluation. Because authorization rules are additive, if a rule appears in a list it's safe to assume the subject has that permission, even if that list is incomplete.",
+    "description": "SubjectRulesReviewStatus contains the result of a rules check. This check can be incomplete depending on the set of authorizers the server is configured with and any errors experienced during evaluation.",
     "required": [
      "resourceRules",
      "nonResourceRules",
@@ -71767,14 +71775,14 @@
       "type": "boolean"
      },
      "nonResourceRules": {
-      "description": "NonResourceRules is the list of actions the subject is allowed to perform on non-resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
+      "description": "NonResourceRules is the list of actions the subject is allowed or disallowed to perform on non-resource URLs.\n\nOrder matters when evaluating rules. The first rule that matches a request either allows or denies it. If no rule matches a request, the action is implicily denied.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.authorization.v1.NonResourceRule"
       }
      },
      "resourceRules": {
-      "description": "ResourceRules is the list of actions the subject is allowed to perform on resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
+      "description": "ResourceRules is the list of actions the subject is allowed or disallowed to perform on resources.\n\nOrder matters when evaluating rules. The first rule that matches a request either allows or denies it. If no rule matches a request, the action is implicily denied.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.authorization.v1.ResourceRule"
@@ -71835,6 +71843,10 @@
      "verbs"
     ],
     "properties": {
+     "denies": {
+      "description": "Denies indicates if a rule allows or denies requests that match the rule's resource and action.",
+      "type": "boolean"
+     },
      "nonResourceURLs": {
       "description": "NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path.  \"*\" means all.",
       "type": "array",
@@ -71896,6 +71908,10 @@
       "items": {
        "type": "string"
       }
+     },
+     "denies": {
+      "description": "Denies indicates if a rule allows or denies requests that match the rule's resource and action.",
+      "type": "boolean"
      },
      "resourceNames": {
       "description": "ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.  \"*\" means all.",
@@ -71968,7 +71984,7 @@
     }
    },
    "io.k8s.api.authorization.v1beta1.SelfSubjectRulesReview": {
-    "description": "SelfSubjectRulesReview enumerates the set of actions the current user can perform within a namespace. The returned list of actions may be incomplete depending on the server's authorization mode, and any errors experienced during the evaluation. SelfSubjectRulesReview should be used by UIs to show/hide actions, or to quickly let an end user reason about their permissions. It should NOT Be used by external systems to drive authorization decisions as this raises confused deputy, cache lifetime/revocation, and correctness concerns. SubjectAccessReview, and LocalAccessReview are the correct way to defer authorization decisions to the API server.",
+    "description": "SelfSubjectRulesReview enumerates the set of actions the current user is allowed or explicitly disallowed from performing within a namespace. Rules review should be used by UIs to show/hide actions, or to quickly let an end user reason about their permissions.\n\nRules review APIs MUST NOT be used by external systems to drive authorization decisions as this raises confused deputy, cache lifetime/revocation, and correctness concerns. Additionally, the returned list may be incomplete depending on the server's authorization mode or errors encountered during evaluation",
     "required": [
      "spec"
     ],
@@ -72076,7 +72092,7 @@
       "type": "string"
      },
      "user": {
-      "description": "User is the user you're testing for. If you specify \"User\" but not \"Group\", then is it interpreted as \"What if User were not a member of any groups",
+      "description": "User is the user you're testing for. If you specify \"User\" but not \"Group\", then is it interpreted as \"What if User were not a member of any groups\"",
       "type": "string"
      }
     }
@@ -72106,7 +72122,7 @@
     }
    },
    "io.k8s.api.authorization.v1beta1.SubjectRulesReviewStatus": {
-    "description": "SubjectRulesReviewStatus contains the result of a rules check. This check can be incomplete depending on the set of authorizers the server is configured with and any errors experienced during evaluation. Because authorization rules are additive, if a rule appears in a list it's safe to assume the subject has that permission, even if that list is incomplete.",
+    "description": "SubjectRulesReviewStatus contains the result of a rules check. This check can be incomplete depending on the set of authorizers the server is configured with and any errors experienced during evaluation.",
     "required": [
      "resourceRules",
      "nonResourceRules",
@@ -72122,14 +72138,14 @@
       "type": "boolean"
      },
      "nonResourceRules": {
-      "description": "NonResourceRules is the list of actions the subject is allowed to perform on non-resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
+      "description": "NonResourceRules is the list of actions the subject is allowed or disallowed to perform on non-resource URLs.\n\nOrder matters when evaluating rules. The first rule that matches a request either allows or denies it. If no rule matches a request, the action is implicily denied.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.authorization.v1beta1.NonResourceRule"
       }
      },
      "resourceRules": {
-      "description": "ResourceRules is the list of actions the subject is allowed to perform on resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
+      "description": "ResourceRules is the list of actions the subject is allowed or disallowed to perform on resources.\n\nOrder matters when evaluating rules. The first rule that matches a request either allows or denies it. If no rule matches a request, the action is implicily denied.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.authorization.v1beta1.ResourceRule"
