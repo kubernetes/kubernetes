@@ -56,13 +56,6 @@ spec:
             - /heapster
             - --source=kubernetes.summary_api:''
             - --sink=stackdriver:?cluster_name={{ cluster_name }}&min_interval_sec=100&batch_export_timeout_sec=110
-          volumeMounts:
-            - name: ssl-certs
-              mountPath: /etc/ssl/certs
-              readOnly: true
-            - name: usr-ca-certs
-              mountPath: /usr/share/ca-certificates
-              readOnly: true
         # BEGIN_PROMETHEUS_TO_SD
         - name: prom-to-sd
           image: gcr.io/google-containers/prometheus-to-sd:v0.2.2
@@ -112,13 +105,6 @@ spec:
             - --container=heapster
             - --poll-period=300000
             - --estimator=exponential
-      volumes:
-        - name: ssl-certs
-          hostPath:
-            path: "/etc/ssl/certs"
-        - name: usr-ca-certs
-          hostPath:
-            path: "/usr/share/ca-certificates"
       serviceAccountName: heapster
       tolerations:
         - key: "CriticalAddonsOnly"
