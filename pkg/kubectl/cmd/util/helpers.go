@@ -133,8 +133,10 @@ func checkErr(err error, handleErr func(string, int)) {
 
 	switch {
 	case err == ErrExit:
+		fmt.Println("Case 1")
 		handleErr("", DefaultErrorExitCode)
 	case kerrors.IsInvalid(err):
+		fmt.Println("Case 2")
 		details := err.(*kerrors.StatusError).Status().Details
 		s := fmt.Sprintf("The %s %q is invalid", details.Kind, details.Name)
 		if len(details.Causes) > 0 {
@@ -144,25 +146,33 @@ func checkErr(err error, handleErr func(string, int)) {
 			handleErr(s, DefaultErrorExitCode)
 		}
 	case clientcmd.IsConfigurationInvalid(err):
+		fmt.Println("Case 3")
 		handleErr(MultilineError("Error in configuration: ", err), DefaultErrorExitCode)
 	default:
 		switch err := err.(type) {
 		case *meta.NoResourceMatchError:
 			switch {
 			case len(err.PartialResource.Group) > 0 && len(err.PartialResource.Version) > 0:
+				fmt.Println("Case 4")
 				handleErr(fmt.Sprintf("the server doesn't have a resource type %q in group %q and version %q", err.PartialResource.Resource, err.PartialResource.Group, err.PartialResource.Version), DefaultErrorExitCode)
 			case len(err.PartialResource.Group) > 0:
+				fmt.Println("Case 5")
 				handleErr(fmt.Sprintf("the server doesn't have a resource type %q in group %q", err.PartialResource.Resource, err.PartialResource.Group), DefaultErrorExitCode)
 			case len(err.PartialResource.Version) > 0:
+				fmt.Println("Case 6")
 				handleErr(fmt.Sprintf("the server doesn't have a resource type %q in version %q", err.PartialResource.Resource, err.PartialResource.Version), DefaultErrorExitCode)
 			default:
+				fmt.Println("Case 7")
 				handleErr(fmt.Sprintf("the server doesn't have a resource type %q", err.PartialResource.Resource), DefaultErrorExitCode)
 			}
 		case utilerrors.Aggregate:
+			fmt.Println("Case 8")
 			handleErr(MultipleErrors(``, err.Errors()), DefaultErrorExitCode)
 		case utilexec.ExitError:
+			fmt.Println("Case 9")
 			handleErr(err.Error(), err.ExitStatus())
 		default: // for any other error type
+			fmt.Println("Case 10")
 			msg, ok := StandardErrorMessage(err)
 			if !ok {
 				msg = err.Error()

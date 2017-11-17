@@ -93,6 +93,10 @@ var (
 )
 
 const (
+	// errTar126					 = "Tar command invoked but could not execute. Might be a permission problem or command is not an executable"
+	// errTar127 					 = "Tar command not found, please install tar before using kubectl cp"
+	// errTar2 					 = "Could be a permission problem or missing command arguments and keywords"
+	// errTarGeneric				 = "The cp command failed"
 	exitCode126 				 = "command terminated with exit code 126"
 	exitCode127 				 = "command terminated with exit code 127"
 	exitCode2 					 = "command terminated with exit code 2"
@@ -172,27 +176,21 @@ func checkDestinationIsDir(dest fileSpec, f cmdutil.Factory, cmd *cobra.Command)
 
 
 // testTar receives information about the destination container 
-// and determines if the command tar is present in the containe.
+// and determines if the command tar is present in the container.
 // If the command does not exist or permission was denied, an 
 // error will be returned along with the exit code received 
 func testTar(f cmdutil.Factory, cmd *cobra.Command, dest fileSpec) error {
-	
-	cmdArr := []string{"tar"}
-
-	reader, _ := io.Pipe()
 
 	options := &ExecOptions{
 		StreamOptions: StreamOptions{
-			In:    reader,
 			Out:   bytes.NewBuffer([]byte{}),
 			Err:   bytes.NewBuffer([]byte{}),
-			Stdin: true,
 
 			Namespace: dest.PodNamespace,
 			PodName:   dest.PodName,
 		},
 
-		Command:  cmdArr,
+		Command:  []string{"tar"},
 		Executor: &DefaultRemoteExecutor{},
 	}
 	
@@ -217,12 +215,6 @@ func copyToPod(f cmdutil.Factory, cmd *cobra.Command, stdout, stderr io.Writer, 
 		dest.File = dest.File + "/" + path.Base(src.File)
 	}
 
-	go func() {
-		defer writer.Close()
-		err := makeTar(src.File, dest.File, writer)
-		cmdutil.CheckErr(err)
-	}()
-
 	if err := testTar(f, cmd, dest); err != nil {
 
 		if err.Error() == exitCode126 {
@@ -235,6 +227,16 @@ func copyToPod(f cmdutil.Factory, cmd *cobra.Command, stdout, stderr io.Writer, 
 			return errTarGeneric
 		}
 	}
+
+	fmt.Println("Error before go func")
+
+	go func() {
+		defer writer.Close()
+		err := makeTar(src.File, dest.File, writer)
+		cmdutil.CheckErr(err)
+	}()
+
+	fmt.Println("Error after go func")
 
 	cmdArr := []string{"tar", "xf", "-"}
 	destDir := path.Dir(dest.File)
@@ -256,6 +258,9 @@ func copyToPod(f cmdutil.Factory, cmd *cobra.Command, stdout, stderr io.Writer, 
 		Command:  cmdArr,
 		Executor: &DefaultRemoteExecutor{},
 	}
+
+	fmt.Println("Should not get here")
+	
 	return execute(f, cmd, options)
 }
 
@@ -264,19 +269,19 @@ func copyFromPod(f cmdutil.Factory, cmd *cobra.Command, cmderr io.Writer, src, d
 		return errFileCannotBeEmpty
 	}
 
-	// check if tar command exists in the container
-	if err := testTar(f, cmd, dest); err != nil {
+	// // check if tar command exists in the container
+	// if err := testTar(f, cmd, dest); err != nil {
 
-		if err.Error() == exitCode126 {
-			return errTar126
-		} else if err.Error() == exitCode127 {
-			return errTar127 
-		} else if err.Error() == exitCode2 {
-			return errTar2
-		} else {
-			return errTarGeneric
-		}
-	}
+	// 	if err.Error() == exitCode126 {
+	// 		return errTar126
+	// 	} else if err.Error() == exitCode127 {
+	// 		return errTar127 
+	// 	} else if err.Error() == exitCode2 {
+	// 		return errTar2
+	// 	} else {
+	// 		return errTarGeneric
+	// 	}
+	// }
 
 	reader, outStream := io.Pipe()
 	options := &ExecOptions{
