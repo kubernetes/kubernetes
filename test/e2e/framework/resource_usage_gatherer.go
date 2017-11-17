@@ -137,6 +137,7 @@ type resourceGatherWorker struct {
 	inKubemark                  bool
 	resourceDataGatheringPeriod time.Duration
 	probeDuration               time.Duration
+	printVerboseLogs            bool
 }
 
 func (w *resourceGatherWorker) singleProbe() {
@@ -161,7 +162,9 @@ func (w *resourceGatherWorker) singleProbe() {
 		}
 		for k, v := range nodeUsage {
 			data[k] = v
-			Logf("Get container %v usage on node %v. CPUUsageInCores: %v, MemoryUsageInBytes: %v, MemoryWorkingSetInBytes: %v", k, w.nodeName, v.CPUUsageInCores, v.MemoryUsageInBytes, v.MemoryWorkingSetInBytes)
+			if w.printVerboseLogs {
+				Logf("Get container %v usage on node %v. CPUUsageInCores: %v, MemoryUsageInBytes: %v, MemoryWorkingSetInBytes: %v", k, w.nodeName, v.CPUUsageInCores, v.MemoryUsageInBytes, v.MemoryWorkingSetInBytes)
+			}
 		}
 	}
 	w.dataSeries = append(w.dataSeries, data)
@@ -202,6 +205,7 @@ type ResourceGathererOptions struct {
 	MasterOnly                  bool
 	ResourceDataGatheringPeriod time.Duration
 	ProbeDuration               time.Duration
+	PrintVerboseLogs            bool
 }
 
 func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOptions, pods *v1.PodList) (*containerResourceGatherer, error) {
@@ -221,6 +225,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 			finished:                    false,
 			resourceDataGatheringPeriod: options.ResourceDataGatheringPeriod,
 			probeDuration:               options.ProbeDuration,
+			printVerboseLogs:            options.PrintVerboseLogs,
 		})
 	} else {
 		// Tracks kube-system pods if no valid PodList is passed in.
@@ -259,6 +264,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 					inKubemark:                  false,
 					resourceDataGatheringPeriod: options.ResourceDataGatheringPeriod,
 					probeDuration:               options.ProbeDuration,
+					printVerboseLogs:            options.PrintVerboseLogs,
 				})
 				if options.MasterOnly {
 					break
