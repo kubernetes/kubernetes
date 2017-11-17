@@ -231,9 +231,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.EnforceNodeAllocatable == nil {
 		obj.EnforceNodeAllocatable = defaultNodeAllocatableEnforcement
 	}
-	if obj.ManifestURLHeader == nil {
-		obj.ManifestURLHeader = make(map[string][]string)
-	}
 }
 
 func boolVar(b bool) *bool {
