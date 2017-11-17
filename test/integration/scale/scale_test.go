@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 	apitesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
 type subresourceTest struct {
@@ -209,7 +210,7 @@ var (
 )
 
 func setup(t *testing.T) (client kubernetes.Interface, tearDown func()) {
-	masterConfig, tearDownMaster := apitesting.StartTestServerOrDie(t)
+	masterConfig, _, tearDownMaster := apitesting.StartTestServerOrDie(t, nil, framework.SharedEtcd())
 
 	// TODO: Disable logging here until we resolve teardown issues which result in
 	// massive log spam. Another path forward would be to refactor
