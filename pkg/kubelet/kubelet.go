@@ -163,6 +163,10 @@ const (
 
 	// Minimum number of dead containers to keep in a pod
 	minDeadContainerInPod = 1
+
+	// Bit range of the fwmark space
+	maxIptablesBit = 31
+	minIptablesBit = 0
 )
 
 // SyncHandler is an interface implemented by Kubelet, for testability
@@ -353,11 +357,11 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 
 	if kubeCfg.MakeIPTablesUtilChains {
-		if kubeCfg.IPTablesMasqueradeBit > 31 || kubeCfg.IPTablesMasqueradeBit < 0 {
-			return nil, fmt.Errorf("iptables-masquerade-bit is not valid. Must be within [0, 31]")
+		if kubeCfg.IPTablesMasqueradeBit > maxIptablesBit || kubeCfg.IPTablesMasqueradeBit < minIptablesBit {
+			return nil, fmt.Errorf("iptables-masquerade-bit is not valid. Must be within [%d, %d]", minIptablesBit, maxIptablesBit)
 		}
-		if kubeCfg.IPTablesDropBit > 31 || kubeCfg.IPTablesDropBit < 0 {
-			return nil, fmt.Errorf("iptables-drop-bit is not valid. Must be within [0, 31]")
+		if kubeCfg.IPTablesDropBit > maxIptablesBit || kubeCfg.IPTablesDropBit < minIptablesBit {
+			return nil, fmt.Errorf("iptables-drop-bit is not valid. Must be within [%d, %d]", minIptablesBit, maxIptablesBit)
 		}
 		if kubeCfg.IPTablesDropBit == kubeCfg.IPTablesMasqueradeBit {
 			return nil, fmt.Errorf("iptables-masquerade-bit and iptables-drop-bit must be different")
