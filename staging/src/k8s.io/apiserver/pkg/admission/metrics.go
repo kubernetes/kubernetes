@@ -41,7 +41,7 @@ var (
 
 // NamedHandler requires each admission.Interface be named, primarly for metrics tracking purposes.
 type NamedHandler interface {
-	Interface() Interface
+	Interface
 	Name() string
 }
 
