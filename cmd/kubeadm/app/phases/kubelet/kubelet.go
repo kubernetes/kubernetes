@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -68,41 +69,45 @@ func CreateBaseKubeletConfiguration(cfg *kubeadmapi.MasterConfiguration, client 
 
 // UpdateNodeWithConfigMap updates node ConfigSource with KubeletBaseConfigurationConfigMap
 func UpdateNodeWithConfigMap(client clientset.Interface, nodeName string) error {
-	node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	oldData, err := json.Marshal(node)
-	if err != nil {
-		return err
-	}
-
-	kubeletCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeletBaseConfigurationConfigMap, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	node.Spec.ConfigSource.ConfigMapRef.UID = kubeletCfg.UID
-
-	newData, err := json.Marshal(node)
-	if err != nil {
-		return err
-	}
-
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
-	if err != nil {
-		return err
-	}
-
-	if _, err := client.CoreV1().Nodes().Patch(node.Name, types.StrategicMergePatchType, patchBytes); err != nil {
-		if apierrs.IsConflict(err) {
-			fmt.Println("Temporarily unable to update node metadata due to conflict (will retry)")
+	// Loop on every falsy return. Return with an error if raised. Exit successfully if true is returned.
+	return wait.Poll(kubeadmconstants.APICallRetryInterval, kubeadmconstants.UpdateNodeTimeout, func() (bool, error) {
+		node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
 		}
-		return err
-	}
 
-	return nil
+		oldData, err := json.Marshal(node)
+		if err != nil {
+			return false, err
+		}
+
+		kubeletCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeletBaseConfigurationConfigMap, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+
+		node.Spec.ConfigSource.ConfigMapRef.UID = kubeletCfg.UID
+
+		newData, err := json.Marshal(node)
+		if err != nil {
+			return false, err
+		}
+
+		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
+		if err != nil {
+			return false, err
+		}
+
+		if _, err := client.CoreV1().Nodes().Patch(node.Name, types.StrategicMergePatchType, patchBytes); err != nil {
+			if apierrs.IsConflict(err) {
+				fmt.Println("Temporarily unable to update node metadata due to conflict (will retry)")
+				return false, nil
+			}
+			return false, err
+		}
+
+		return true, nil
+	})
 }
 
 // createKubeletBaseConfigMapRBACRules creates the RBAC rules for exposing the base kubelet ConfigMap in the kube-system namespace to unauthenticated users
