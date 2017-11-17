@@ -1,14 +1,10 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = ["kube_features.go"],
     importpath = "k8s.io/apiserver/pkg/features",
+    visibility = ["//visibility:public"],
     deps = ["//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library"],
 )
 
@@ -23,4 +19,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

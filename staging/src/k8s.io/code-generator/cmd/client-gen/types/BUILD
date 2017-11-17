@@ -1,10 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -13,6 +7,7 @@ go_library(
         "types.go",
     ],
     importpath = "k8s.io/code-generator/cmd/client-gen/types",
+    visibility = ["//visibility:public"],
     deps = ["//vendor/k8s.io/gengo/namer:go_default_library"],
 )
 
@@ -34,4 +29,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

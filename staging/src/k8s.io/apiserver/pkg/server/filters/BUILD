@@ -1,9 +1,31 @@
-package(default_visibility = ["//visibility:public"])
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "compression.go",
+        "cors.go",
+        "doc.go",
+        "longrunning.go",
+        "maxinflight.go",
+        "timeout.go",
+        "waitgroup.go",
+        "wrap.go",
+    ],
+    importpath = "k8s.io/apiserver/pkg/server/filters",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/emicklei/go-restful:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/waitgroup:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/metrics:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/httplog:go_default_library",
+    ],
 )
 
 go_test(
@@ -28,33 +50,6 @@ go_test(
     ],
 )
 
-go_library(
-    name = "go_default_library",
-    srcs = [
-        "compression.go",
-        "cors.go",
-        "doc.go",
-        "longrunning.go",
-        "maxinflight.go",
-        "timeout.go",
-        "waitgroup.go",
-        "wrap.go",
-    ],
-    importpath = "k8s.io/apiserver/pkg/server/filters",
-    deps = [
-        "//vendor/github.com/emicklei/go-restful:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/waitgroup:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/endpoints/metrics:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/server/httplog:go_default_library",
-    ],
-)
-
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
@@ -66,4 +61,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

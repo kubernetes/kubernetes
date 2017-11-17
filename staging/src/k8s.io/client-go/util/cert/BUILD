@@ -1,9 +1,15 @@
-package(default_visibility = ["//visibility:public"])
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "cert.go",
+        "csr.go",
+        "io.go",
+        "pem.go",
+    ],
+    importpath = "k8s.io/client-go/util/cert",
+    visibility = ["//visibility:public"],
 )
 
 go_test(
@@ -15,20 +21,6 @@ go_test(
     data = glob(["testdata/**"]),
     importpath = "k8s.io/client-go/util/cert",
     library = ":go_default_library",
-)
-
-go_library(
-    name = "go_default_library",
-    srcs = [
-        "cert.go",
-        "csr.go",
-        "io.go",
-        "pem.go",
-    ],
-    data = [
-        "testdata/dontUseThisKey.pem",
-    ],
-    importpath = "k8s.io/client-go/util/cert",
 )
 
 filegroup(
@@ -45,4 +37,5 @@ filegroup(
         "//staging/src/k8s.io/client-go/util/cert/triple:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

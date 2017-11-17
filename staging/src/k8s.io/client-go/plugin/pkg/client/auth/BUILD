@@ -1,14 +1,10 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = ["plugins.go"],
     importpath = "k8s.io/client-go/plugin/pkg/client/auth",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/k8s.io/client-go/plugin/pkg/client/auth/azure:go_default_library",
         "//vendor/k8s.io/client-go/plugin/pkg/client/auth/gcp:go_default_library",
@@ -34,4 +30,5 @@ filegroup(
         "//staging/src/k8s.io/client-go/plugin/pkg/client/auth/openstack:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

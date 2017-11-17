@@ -1,14 +1,10 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = ["interface.go"],
     importpath = "k8s.io/client-go/informers/rbac",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/k8s.io/client-go/informers/internalinterfaces:go_default_library",
         "//vendor/k8s.io/client-go/informers/rbac/v1:go_default_library",
@@ -33,4 +29,5 @@ filegroup(
         "//staging/src/k8s.io/client-go/informers/rbac/v1beta1:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
