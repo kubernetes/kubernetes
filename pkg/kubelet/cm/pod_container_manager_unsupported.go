@@ -21,6 +21,8 @@ package cm
 import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 type unsupportedPodContainerManager struct {
@@ -50,4 +52,8 @@ func (m *unsupportedPodContainerManager) GetAllPodsFromCgroups() (map[types.UID]
 
 func (m *unsupportedPodContainerManager) Destroy(name CgroupName) error {
 	return nil
+}
+
+func (cm *unsupportedPodContainerManager) GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
+	return &kubecontainer.RunContainerOptions{}, nil
 }

@@ -47,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/deviceplugin"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -308,9 +307,10 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 	if cm.NodeConfig.CgroupsPerQOS {
 		return &podContainerManagerImpl{
-			qosContainersInfo: cm.GetQOSContainersInfo(),
-			subsystems:        cm.subsystems,
-			cgroupManager:     cm.cgroupManager,
+			qosContainersInfo:   cm.GetQOSContainersInfo(),
+			subsystems:          cm.subsystems,
+			cgroupManager:       cm.cgroupManager,
+			devicePluginHandler: cm.devicePluginHandler,
 		}
 	}
 	return &podContainerManagerNoop{
@@ -615,21 +615,6 @@ func (cm *containerManagerImpl) setFsCapacity() error {
 	}
 	cm.Unlock()
 	return nil
-}
-
-// TODO: move the GetResources logic to PodContainerManager.
-func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
-	opts := &kubecontainer.RunContainerOptions{}
-	// Allocate should already be called during predicateAdmitHandler.Admit(),
-	// just try to fetch device runtime information from cached state here
-	devOpts := cm.devicePluginHandler.GetDeviceRunContainerOptions(pod, container)
-	if devOpts == nil {
-		return opts, nil
-	}
-	opts.Devices = append(opts.Devices, devOpts.Devices...)
-	opts.Mounts = append(opts.Mounts, devOpts.Mounts...)
-	opts.Envs = append(opts.Envs, devOpts.Envs...)
-	return opts, nil
 }
 
 func (cm *containerManagerImpl) UpdatePluginResources(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
