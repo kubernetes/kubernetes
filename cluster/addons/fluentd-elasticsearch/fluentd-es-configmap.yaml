@@ -114,7 +114,7 @@ data:
         time_format %Y-%m-%dT%H:%M:%S.%NZ
       </pattern>
       <pattern>
-        format /^(?<time>.+) (?<stream>stdout|stderr) (?<log>.*)$/
+        format /^(?<time>.+) (?<stream>stdout|stderr) (?<tag>.*) (?<log>.*)$/
         time_format %Y-%m-%dT%H:%M:%S.%N%:z
       </pattern>
     </source>
