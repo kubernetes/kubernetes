@@ -29,26 +29,13 @@ import (
 
 	"bytes"
 
-	"k8s.io/apimachinery/pkg/apimachinery/announced"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/apis/apiserver"
-	"k8s.io/apiserver/pkg/apis/apiserver/install"
 	apiserverv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
 )
-
-var (
-	groupFactoryRegistry = make(announced.APIGroupFactoryRegistry)
-	registry             = registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
-	scheme               = runtime.NewScheme()
-	codecs               = serializer.NewCodecFactory(scheme)
-)
-
-func init() {
-	install.Install(groupFactoryRegistry, registry, scheme)
-}
 
 func makeAbs(path, base string) (string, error) {
 	if filepath.IsAbs(path) {
@@ -70,7 +57,7 @@ func makeAbs(path, base string) (string, error) {
 // set of pluginNames whose config location references the specified configFilePath.
 // It does this to preserve backward compatibility when admission control files were opaque.
 // It returns an error if the file did not exist.
-func ReadAdmissionConfiguration(pluginNames []string, configFilePath string) (ConfigProvider, error) {
+func ReadAdmissionConfiguration(pluginNames []string, configFilePath string, configScheme *runtime.Scheme) (ConfigProvider, error) {
 	if configFilePath == "" {
 		return configProvider{config: &apiserver.AdmissionConfiguration{}}, nil
 	}
@@ -79,6 +66,7 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string) (Co
 	if err != nil {
 		return nil, fmt.Errorf("unable to read admission control configuration from %q [%v]", configFilePath, err)
 	}
+	codecs := serializer.NewCodecFactory(configScheme)
 	decoder := codecs.UniversalDecoder()
 	decodedObj, err := runtime.Decode(decoder, data)
 	// we were able to decode the file successfully
@@ -99,7 +87,10 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string) (Co
 			}
 			decodedConfig.Plugins[i].Path = absPath
 		}
-		return configProvider{config: decodedConfig}, nil
+		return configProvider{
+			config: decodedConfig,
+			scheme: configScheme,
+		}, nil
 	}
 	// we got an error where the decode wasn't related to a missing type
 	if !(runtime.IsMissingVersion(err) || runtime.IsMissingKind(err) || runtime.IsNotRegisteredError(err)) {
@@ -119,25 +110,29 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string) (Co
 					Path: configFilePath})
 		}
 	}
-	scheme.Default(externalConfig)
+	configScheme.Default(externalConfig)
 	internalConfig := &apiserver.AdmissionConfiguration{}
-	if err := scheme.Convert(externalConfig, internalConfig, nil); err != nil {
+	if err := configScheme.Convert(externalConfig, internalConfig, nil); err != nil {
 		return nil, err
 	}
-	return configProvider{config: internalConfig}, nil
+	return configProvider{
+		config: internalConfig,
+		scheme: configScheme,
+	}, nil
 }
 
 type configProvider struct {
 	config *apiserver.AdmissionConfiguration
+	scheme *runtime.Scheme
 }
 
 // GetAdmissionPluginConfigurationFor returns a reader that holds the admission plugin configuration.
-func GetAdmissionPluginConfigurationFor(pluginCfg apiserver.AdmissionPluginConfiguration) (io.Reader, error) {
+func GetAdmissionPluginConfigurationFor(pluginCfg apiserver.AdmissionPluginConfiguration, scheme *runtime.Scheme) (io.Reader, error) {
 	// if there is nothing nested in the object, we return the named location
 	obj := pluginCfg.Configuration
 	if obj != nil {
 		// serialize the configuration and build a reader for it
-		content, err := writeYAML(obj)
+		content, err := writeYAML(obj, scheme)
 		if err != nil {
 			return nil, err
 		}
@@ -168,7 +163,7 @@ func (p configProvider) ConfigFor(pluginName string) (io.Reader, error) {
 		if pluginName != pluginCfg.Name {
 			continue
 		}
-		pluginConfig, err := GetAdmissionPluginConfigurationFor(pluginCfg)
+		pluginConfig, err := GetAdmissionPluginConfigurationFor(pluginCfg, p.scheme)
 		if err != nil {
 			return nil, err
 		}
@@ -179,8 +174,17 @@ func (p configProvider) ConfigFor(pluginName string) (io.Reader, error) {
 }
 
 // writeYAML writes the specified object to a byte array as yaml.
-func writeYAML(obj runtime.Object) ([]byte, error) {
-	json, err := runtime.Encode(codecs.LegacyCodec(), obj)
+func writeYAML(obj runtime.Object, scheme *runtime.Scheme) ([]byte, error) {
+	gvks, _, err := scheme.ObjectKinds(obj)
+	if err != nil {
+		return nil, err
+	}
+	gvs := []schema.GroupVersion{}
+	for _, gvk := range gvks {
+		gvs = append(gvs, gvk.GroupVersion())
+	}
+	codecs := serializer.NewCodecFactory(scheme)
+	json, err := runtime.Encode(codecs.LegacyCodec(gvs...), obj)
 	if err != nil {
 		return nil, err
 	}

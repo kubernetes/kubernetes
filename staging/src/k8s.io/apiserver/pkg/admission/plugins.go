@@ -25,6 +25,8 @@ import (
 	"sort"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/golang/glog"
 )
 
@@ -37,6 +39,16 @@ type Factory func(config io.Reader) (Interface, error)
 type Plugins struct {
 	lock     sync.Mutex
 	registry map[string]Factory
+
+	// ConfigScheme is used to parse the admission plugin config file.
+	// It is exposed to act as a hook for extending server providing their own config.
+	ConfigScheme *runtime.Scheme
+}
+
+func NewPlugins() *Plugins {
+	return &Plugins{
+		ConfigScheme: runtime.NewScheme(),
+	}
 }
 
 // All registered admission options.
