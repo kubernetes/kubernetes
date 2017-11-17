@@ -44,6 +44,10 @@ var ResourcesShortcutStatic = []ResourceShortcuts{
 		LongForm:  schema.GroupResource{Resource: "configmaps"},
 	},
 	{
+		ShortForm: schema.GroupResource{Resource: "crd"},
+		LongForm:  schema.GroupResource{Resource: "customresourcedefinition"},
+	},
+	{
 		ShortForm: schema.GroupResource{Resource: "cs"},
 		LongForm:  schema.GroupResource{Resource: "componentstatuses"},
 	},
