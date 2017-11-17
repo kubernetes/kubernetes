@@ -4,7 +4,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "poly1305.go",
-        "sum_ref.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:darwin_amd64": [
             "sum_amd64.go",

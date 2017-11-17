@@ -12,8 +12,8 @@ go_test(
         "eviction_manager_test.go",
         "helpers_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/eviction",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
@@ -39,11 +39,16 @@ go_library(
         "doc.go",
         "eviction_manager.go",
         "helpers.go",
-        "threshold_notifier_unsupported.go",
         "types.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "threshold_notifier_unsupported.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "threshold_notifier_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "threshold_notifier_unsupported.go",
         ],
         "//conditions:default": [],
     }),

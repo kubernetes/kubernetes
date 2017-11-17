@@ -11,10 +11,15 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
-        "endpoint.go",
         "fake_image_service.go",
         "fake_runtime.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "endpoint.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "endpoint.go",
+        ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "endpoint_windows.go",
         ],

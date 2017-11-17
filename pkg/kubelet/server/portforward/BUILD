@@ -33,8 +33,8 @@ go_test(
         "httpstream_test.go",
         "websocket_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/server/portforward",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/httpstream:go_default_library",

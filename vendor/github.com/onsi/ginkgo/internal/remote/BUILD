@@ -7,13 +7,14 @@ go_library(
         "forwarding_reporter.go",
         "output_interceptor.go",
         "server.go",
-        "syscall_dup_unix.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:darwin_amd64": [
             "output_interceptor_unix.go",
+            "syscall_dup_unix.go",
         ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "output_interceptor_unix.go",
+            "syscall_dup_unix.go",
         ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "output_interceptor_win.go",

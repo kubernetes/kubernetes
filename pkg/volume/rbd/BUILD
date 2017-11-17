@@ -38,8 +38,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["rbd_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/volume/rbd",
-    library = ":go_default_library",
     deps = [
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",

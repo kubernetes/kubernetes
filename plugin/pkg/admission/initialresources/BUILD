@@ -43,8 +43,8 @@ go_test(
         "hawkular_test.go",
         "influxdb_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/initialresources",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",

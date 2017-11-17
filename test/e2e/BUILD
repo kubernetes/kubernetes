@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["e2e_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/test/e2e",
-    library = ":go_default_library",
     tags = ["e2e"],
     deps = [
         "//test/e2e/apimachinery:go_default_library",

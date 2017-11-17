@@ -17,9 +17,14 @@ go_library(
         "package_validator.go",
         "report.go",
         "types.go",
-        "types_unix.go",
         "validators.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "types_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "types_unix.go",
+        ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "types_windows.go",
         ],
@@ -45,8 +50,8 @@ go_test(
         "os_validator_test.go",
         "package_validator_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/test/e2e_node/system",
-    library = ":go_default_library",
     tags = ["e2e"],
     deps = [
         "//vendor/github.com/docker/docker/api/types:go_default_library",

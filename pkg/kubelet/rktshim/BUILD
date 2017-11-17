@@ -26,8 +26,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["imagestore_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/rktshim",
-    library = ":go_default_library",
     deps = ["//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library"],
 )
 

@@ -4,8 +4,13 @@ go_library(
     name = "go_default_library",
     srcs = [
         "fs.go",
-        "fs_unix.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "fs_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "fs_unix.go",
+        ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "fs_windows.go",
         ],

@@ -32,17 +32,21 @@ go_library(
         "tlsa.go",
         "tsig.go",
         "types.go",
-        "udp.go",
-        "udp_other.go",
         "update.go",
         "xfr.go",
         "zmsg.go",
         "ztypes.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "udp.go",
+            "udp_other.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "udp.go",
             "udp_linux.go",
         ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "udp_other.go",
             "udp_windows.go",
         ],
         "//conditions:default": [],

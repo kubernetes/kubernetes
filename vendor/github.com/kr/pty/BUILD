@@ -5,7 +5,6 @@ go_library(
     srcs = [
         "doc.go",
         "ioctl.go",
-        "pty_unsupported.go",
         "run.go",
         "util.go",
     ] + select({
@@ -19,6 +18,7 @@ go_library(
             "ztypes_amd64.go",
         ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "pty_unsupported.go",
             "ztypes_amd64.go",
         ],
         "//conditions:default": [],

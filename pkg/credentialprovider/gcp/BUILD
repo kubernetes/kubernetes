@@ -31,8 +31,8 @@ go_test(
         "jwt_test.go",
         "metadata_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/credentialprovider/gcp",
-    library = ":go_default_library",
     deps = [
         "//pkg/credentialprovider:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",

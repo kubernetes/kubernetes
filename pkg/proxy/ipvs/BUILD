@@ -11,8 +11,8 @@ go_test(
     srcs = [
         "proxier_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/proxy/ipvs",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/proxy:go_default_library",
@@ -36,11 +36,16 @@ go_library(
     name = "go_default_library",
     srcs = [
         "netlink.go",
-        "netlink_unsupported.go",
         "proxier.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "netlink_unsupported.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "netlink_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "netlink_unsupported.go",
         ],
         "//conditions:default": [],
     }),

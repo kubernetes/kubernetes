@@ -11,20 +11,23 @@ go_library(
     srcs = [
         "atomic_writer.go",
         "device_util.go",
-        "device_util_unsupported.go",
         "doc.go",
         "error.go",
-        "fs_unsupported.go",
         "io_util.go",
         "metrics.go",
         "util.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "device_util_unsupported.go",
             "fs.go",
         ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "device_util_linux.go",
             "fs.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "device_util_unsupported.go",
+            "fs_unsupported.go",
         ],
         "//conditions:default": [],
     }),
@@ -38,7 +41,6 @@ go_library(
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/storage/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -48,9 +50,14 @@ go_library(
     ] + select({
         "@io_bazel_rules_go//go/platform:darwin_amd64": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
         "//conditions:default": [],
     }),
@@ -67,8 +74,8 @@ go_test(
         ],
         "//conditions:default": [],
     }),
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/volume/util",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/core/install:go_default_library",
         "//pkg/apis/core/v1/helper:go_default_library",

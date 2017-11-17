@@ -6,10 +6,16 @@ go_library(
         "inmem_socket.go",
         "proxy.go",
         "sockets.go",
-        "sockets_unix.go",
         "tcp_socket.go",
-        "unix_socket.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "sockets_unix.go",
+            "unix_socket.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "sockets_unix.go",
+            "unix_socket.go",
+        ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "sockets_windows.go",
         ],

@@ -9,7 +9,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "defaults.go",
-        "defaults_unix.go",
         "doc.go",
         "register.go",
         "types.go",
@@ -17,6 +16,12 @@ go_library(
         "zz_generated.deepcopy.go",
         "zz_generated.defaults.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "defaults_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "defaults_unix.go",
+        ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "defaults_windows.go",
         ],

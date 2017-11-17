@@ -8,7 +8,6 @@ go_library(
         "auth_sha1.go",
         "call.go",
         "conn.go",
-        "conn_other.go",
         "dbus.go",
         "decoder.go",
         "doc.go",
@@ -20,7 +19,6 @@ go_library(
         "object.go",
         "sig.go",
         "transport_generic.go",
-        "transport_unix.go",
         "variant.go",
         "variant_lexer.go",
         "variant_parser.go",
@@ -28,9 +26,15 @@ go_library(
         "@io_bazel_rules_go//go/platform:darwin_amd64": [
             "conn_darwin.go",
             "transport_darwin.go",
+            "transport_unix.go",
         ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "conn_other.go",
+            "transport_unix.go",
             "transport_unixcred_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "conn_other.go",
         ],
         "//conditions:default": [],
     }),

@@ -38,8 +38,8 @@ go_test(
         "admission_test.go",
         "certs_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook/validating",
-    library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/api/admission/v1alpha1:go_default_library",
         "//vendor/k8s.io/api/admissionregistration/v1alpha1:go_default_library",

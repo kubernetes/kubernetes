@@ -8,8 +8,8 @@ load(
 
 go_binary(
     name = "kubemark",
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/cmd/kubemark",
-    library = ":go_default_library",
 )
 
 go_library(

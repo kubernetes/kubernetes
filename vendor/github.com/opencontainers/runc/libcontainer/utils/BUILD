@@ -4,10 +4,13 @@ go_library(
     name = "go_default_library",
     srcs = [
         "utils.go",
-        "utils_unix.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "utils_unix.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "cmsg.go",
+            "utils_unix.go",
         ],
         "//conditions:default": [],
     }),

@@ -4,12 +4,14 @@ go_library(
     name = "go_default_library",
     srcs = [
         "flags.go",
-        "flags_unsupported.go",
         "mount.go",
-        "mounter_unsupported.go",
         "mountinfo.go",
-        "mountinfo_unsupported.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "flags_unsupported.go",
+            "mounter_unsupported.go",
+            "mountinfo_unsupported.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "flags_linux.go",
             "mounter_linux.go",
@@ -17,6 +19,8 @@ go_library(
             "sharedsubtree_linux.go",
         ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "flags_unsupported.go",
+            "mounter_unsupported.go",
             "mountinfo_windows.go",
         ],
         "//conditions:default": [],

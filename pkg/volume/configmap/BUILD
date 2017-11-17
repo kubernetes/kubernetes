@@ -30,8 +30,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["configmap_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/volume/configmap",
-    library = ":go_default_library",
     deps = [
         "//pkg/volume:go_default_library",
         "//pkg/volume/empty_dir:go_default_library",

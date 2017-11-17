@@ -44,8 +44,8 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["ttl_controller_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/controller/ttl",
-    library = ":go_default_library",
     deps = [
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

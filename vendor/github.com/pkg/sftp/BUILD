@@ -9,7 +9,6 @@ go_library(
         "packet.go",
         "release.go",
         "server.go",
-        "server_statvfs_stubs.go",
         "sftp.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:darwin_amd64": [
@@ -26,6 +25,7 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "attrs_stubs.go",
+            "server_statvfs_stubs.go",
             "server_stubs.go",
         ],
         "//conditions:default": [],

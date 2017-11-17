@@ -5,25 +5,27 @@ go_library(
     srcs = [
         "addr.go",
         "class.go",
-        "conntrack_unspecified.go",
         "filter.go",
-        "genetlink_unspecified.go",
-        "handle_unspecified.go",
         "link.go",
         "neigh.go",
         "netlink.go",
-        "netlink_unspecified.go",
         "order.go",
         "protinfo.go",
         "qdisc.go",
         "route.go",
-        "route_unspecified.go",
         "rule.go",
         "socket.go",
         "xfrm.go",
         "xfrm_policy.go",
         "xfrm_state.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "conntrack_unspecified.go",
+            "genetlink_unspecified.go",
+            "handle_unspecified.go",
+            "netlink_unspecified.go",
+            "route_unspecified.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "addr_linux.go",
             "bpf_linux.go",
@@ -47,6 +49,13 @@ go_library(
             "xfrm_policy_linux.go",
             "xfrm_state_linux.go",
         ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "conntrack_unspecified.go",
+            "genetlink_unspecified.go",
+            "handle_unspecified.go",
+            "netlink_unspecified.go",
+            "route_unspecified.go",
+        ],
         "//conditions:default": [],
     }),
     cgo = True,
@@ -54,8 +63,18 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/vishvananda/netlink/nl:go_default_library",
-        "//vendor/github.com/vishvananda/netns:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "//vendor/github.com/vishvananda/netns:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/github.com/vishvananda/netns:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "//vendor/github.com/vishvananda/netns:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(
