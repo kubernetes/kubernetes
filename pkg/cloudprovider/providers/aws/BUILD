@@ -32,6 +32,7 @@ go_library(
         "//pkg/controller:go_default_library",
         "//pkg/credentialprovider/aws:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
+        "//pkg/util/tags:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",

@@ -53,6 +53,7 @@ filegroup(
         "//pkg/util/strings:all-srcs",
         "//pkg/util/sysctl:all-srcs",
         "//pkg/util/system:all-srcs",
+        "//pkg/util/tags:all-srcs",
         "//pkg/util/tail:all-srcs",
         "//pkg/util/taints:all-srcs",
         "//pkg/util/template:all-srcs",
