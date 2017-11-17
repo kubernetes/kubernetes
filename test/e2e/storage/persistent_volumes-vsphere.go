@@ -131,7 +131,8 @@ var _ = SIGDescribe("PersistentVolumes:vsphere", func() {
 		3. Delete Volume (vmdk)
 	*/
 	framework.AddCleanupAction(func() {
-		if len(volumePath) > 0 {
+		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
+		if len(ns) > 0 && len(volumePath) > 0 {
 			framework.ExpectNoError(waitForVSphereDiskToDetach(vsp, volumePath, node))
 			vsp.DeleteVolume(volumePath)
 		}

@@ -71,12 +71,20 @@ var serverWebhookVersion = utilversion.MustParseSemantic("v1.8.0")
 
 var _ = SIGDescribe("AdmissionWebhook", func() {
 	var context *certContext
+	var ns string
+	var c clientset.Interface
 	f := framework.NewDefaultFramework("webhook")
 	framework.AddCleanupAction(func() {
-		cleanWebhookTest(f)
+		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
+		if len(ns) > 0 {
+			cleanWebhookTest(c, ns)
+		}
 	})
 
 	BeforeEach(func() {
+		c = f.ClientSet
+		ns = f.Namespace.Name
+
 		// Make sure the relevant provider supports admission webhook
 		framework.SkipUnlessServerVersionGTE(serverWebhookVersion, f.ClientSet.Discovery())
 		framework.SkipUnlessProviderIs("gce", "gke", "local")
@@ -563,11 +571,8 @@ func updateConfigMap(c clientset.Interface, ns, name string, update updateConfig
 	return cm, pollErr
 }
 
-func cleanWebhookTest(f *framework.Framework) {
-	client := f.ClientSet
+func cleanWebhookTest(client clientset.Interface, namespaceName string) {
 	_ = client.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations().Delete(webhookConfigName, nil)
-	_ = client.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations().Delete(crdWebhookConfigName, nil)
-	namespaceName := f.Namespace.Name
 	_ = client.CoreV1().Services(namespaceName).Delete(serviceName, nil)
 	_ = client.ExtensionsV1beta1().Deployments(namespaceName).Delete(deploymentName, nil)
 	_ = client.CoreV1().Secrets(namespaceName).Delete(secretName, nil)
