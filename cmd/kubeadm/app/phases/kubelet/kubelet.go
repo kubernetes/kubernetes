@@ -31,7 +31,6 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
@@ -64,54 +63,11 @@ func CreateBaseKubeletConfiguration(cfg *kubeadmapi.MasterConfiguration, client 
 		return fmt.Errorf("error creating base kubelet configmap RBAC rules: %v", err)
 	}
 
-	return updateNodeWithConfigMap(client, cfg.NodeName)
+	return UpdateNodeWithConfigMap(client, cfg.NodeName)
 }
 
-// UpdateNodeWithBaseKubeletConfiguration updates node with remote base kubelet configuration
-func UpdateNodeWithBaseKubeletConfiguration(cfg *kubeadmapi.NodeConfiguration) error {
-	client, err := kubeconfigutil.ClientSetFromFile(kubeadmconstants.GetAdminKubeConfigPath())
-	if err != nil {
-		return err
-	}
-
-	return updateNodeWithConfigMap(client, cfg.NodeName)
-}
-
-// createKubeletBaseConfigMapRBACRules creates the RBAC rules for exposing the base kubelet ConfigMap in the kube-system namespace to unauthenticated users
-func createKubeletBaseConfigMapRBACRules(client clientset.Interface) error {
-	if err := apiclient.CreateOrUpdateRole(client, &rbac.Role{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      kubeadmconstants.KubeletBaseConfigMapRoleName,
-			Namespace: metav1.NamespaceSystem,
-		},
-		Rules: []rbac.PolicyRule{
-			rbachelper.NewRule("get").Groups("").Resources("configmaps").Names(kubeadmconstants.KubeletBaseConfigurationConfigMap).RuleOrDie(),
-		},
-	}); err != nil {
-		return err
-	}
-
-	return apiclient.CreateOrUpdateRoleBinding(client, &rbac.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      kubeadmconstants.KubeletBaseConfigMapRoleName,
-			Namespace: metav1.NamespaceSystem,
-		},
-		RoleRef: rbac.RoleRef{
-			APIGroup: rbac.GroupName,
-			Kind:     "Role",
-			Name:     kubeadmconstants.KubeletBaseConfigMapRoleName,
-		},
-		Subjects: []rbac.Subject{
-			{
-				Kind: "Group",
-				Name: kubeadmconstants.NodesGroup,
-			},
-		},
-	})
-}
-
-// updateNodeWithConfigMap updates node ConfigSource with KubeletBaseConfigurationConfigMap
-func updateNodeWithConfigMap(client clientset.Interface, nodeName string) error {
+// UpdateNodeWithConfigMap updates node ConfigSource with KubeletBaseConfigurationConfigMap
+func UpdateNodeWithConfigMap(client clientset.Interface, nodeName string) error {
 	node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -147,4 +103,37 @@ func updateNodeWithConfigMap(client clientset.Interface, nodeName string) error 
 	}
 
 	return nil
+}
+
+// createKubeletBaseConfigMapRBACRules creates the RBAC rules for exposing the base kubelet ConfigMap in the kube-system namespace to unauthenticated users
+func createKubeletBaseConfigMapRBACRules(client clientset.Interface) error {
+	if err := apiclient.CreateOrUpdateRole(client, &rbac.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      kubeadmconstants.KubeletBaseConfigMapRoleName,
+			Namespace: metav1.NamespaceSystem,
+		},
+		Rules: []rbac.PolicyRule{
+			rbachelper.NewRule("get").Groups("").Resources("configmaps").Names(kubeadmconstants.KubeletBaseConfigurationConfigMap).RuleOrDie(),
+		},
+	}); err != nil {
+		return err
+	}
+
+	return apiclient.CreateOrUpdateRoleBinding(client, &rbac.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      kubeadmconstants.KubeletBaseConfigMapRoleName,
+			Namespace: metav1.NamespaceSystem,
+		},
+		RoleRef: rbac.RoleRef{
+			APIGroup: rbac.GroupName,
+			Kind:     "Role",
+			Name:     kubeadmconstants.KubeletBaseConfigMapRoleName,
+		},
+		Subjects: []rbac.Subject{
+			{
+				Kind: "Group",
+				Name: kubeadmconstants.NodesGroup,
+			},
+		},
+	})
 }

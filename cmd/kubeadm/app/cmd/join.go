@@ -239,8 +239,13 @@ func (j *Join) Run(out io.Writer) error {
 
 	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
 	if features.Enabled(j.cfg.FeatureGates, features.DynamicKubeletConfig) {
+		client, err := kubeconfigutil.ClientSetFromFile(kubeadmconstants.GetAdminKubeConfigPath())
+		if err != nil {
+			return err
+		}
+
 		// Update the node with remote base kubelet configuration
-		if err := kubeletphase.UpdateNodeWithBaseKubeletConfiguration(j.cfg); err != nil {
+		if err := kubeletphase.UpdateNodeWithConfigMap(client, j.cfg.NodeName); err != nil {
 			return err
 		}
 	}
