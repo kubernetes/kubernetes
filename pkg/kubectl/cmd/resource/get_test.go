@@ -980,6 +980,37 @@ func TestGetByFormatForcesFlag(t *testing.T) {
 	}
 }
 
+func TestLabelsColumnWithOutputFlag(t *testing.T) {
+	options := &GetOptions{}
+	testCases := []struct {
+		flags       map[string]string
+		expectedErr string
+	}{
+		{flags: map[string]string{"show-labels": "true"}},
+		{flags: map[string]string{"show-labels": "true", "output": "wide"}},
+		{flags: map[string]string{"show-labels": "true", "output": "yaml"}, expectedErr: "--show-labels option cannot be used with yaml printer"},
+	}
+
+	for _, test := range testCases {
+		f, _, _, _ := cmdtesting.NewAPIFactory()
+
+		buf := bytes.NewBuffer([]byte{})
+		errBuf := bytes.NewBuffer([]byte{})
+
+		cmd := NewCmdGet(f, buf, errBuf)
+		for k, v := range test.flags {
+			cmd.Flags().Lookup(k).Value.Set(v)
+		}
+		errString := ""
+		if options.Validate(cmd) != nil {
+			errString = options.Validate(cmd).Error()
+		}
+		if errString != test.expectedErr {
+			t.Fatalf("expected: %v, but: %v", test.expectedErr, errString)
+		}
+	}
+}
+
 func watchTestData() ([]api.Pod, []watch.Event) {
 	pods := []api.Pod{
 		{
