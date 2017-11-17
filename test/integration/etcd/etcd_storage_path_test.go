@@ -431,6 +431,7 @@ var ephemeralWhiteList = createEphemeralWhiteList(
 
 	// SRR objects that are not stored in etcd
 	gvr("authorization.k8s.io", "v1beta1", "selfsubjectrulesreviews"),
+	gvr("authorization.k8s.io", "v1beta1", "subjectrulesreviews"),
 	// SAR objects that are not stored in etcd
 	gvr("authorization.k8s.io", "v1beta1", "selfsubjectaccessreviews"),
 	gvr("authorization.k8s.io", "v1beta1", "localsubjectaccessreviews"),
@@ -441,6 +442,7 @@ var ephemeralWhiteList = createEphemeralWhiteList(
 
 	// SRR objects that are not stored in etcd
 	gvr("authorization.k8s.io", "v1", "selfsubjectrulesreviews"),
+	gvr("authorization.k8s.io", "v1", "subjectrulesreviews"),
 	// SAR objects that are not stored in etcd
 	gvr("authorization.k8s.io", "v1", "selfsubjectaccessreviews"),
 	gvr("authorization.k8s.io", "v1", "localsubjectaccessreviews"),
