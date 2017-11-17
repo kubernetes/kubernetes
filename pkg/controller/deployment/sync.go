@@ -159,7 +159,7 @@ func (dc *DeploymentController) rsAndPodsWithHashKeySynced(d *extensions.Deploym
 // 3. Add hash label to the rs's label and selector
 func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet, podList *v1.PodList, collisionCount *int32) (*extensions.ReplicaSet, error) {
 	// If the rs already has the new hash label in its selector, it's done syncing
-	if labelsutil.SelectorHasLabel(rs.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
+	if metav1.SelectorHasLabel(rs.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
 		return rs, nil
 	}
 	hash, err := deploymentutil.GetReplicaSetHash(rs, collisionCount)
@@ -213,7 +213,7 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet,
 			return utilerrors.ErrPreconditionViolated
 		}
 		updated.Labels = labelsutil.AddLabel(updated.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
-		updated.Spec.Selector = labelsutil.AddLabelToSelector(updated.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey, hash)
+		updated.Spec.Selector = metav1.AddLabelToSelector(updated.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey, hash)
 		return nil
 	})
 	// If the RS isn't actually updated, that's okay, we'll retry in the
@@ -285,7 +285,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 	podTemplateSpecHash := fmt.Sprintf("%d", controller.ComputeHash(&newRSTemplate, d.Status.CollisionCount))
 	newRSTemplate.Labels = labelsutil.CloneAndAddLabel(d.Spec.Template.Labels, extensions.DefaultDeploymentUniqueLabelKey, podTemplateSpecHash)
 	// Add podTemplateHash label to selector.
-	newRSSelector := labelsutil.CloneSelectorAndAddLabel(d.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey, podTemplateSpecHash)
+	newRSSelector := metav1.CloneSelectorAndAddLabel(d.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey, podTemplateSpecHash)
 
 	// Create new ReplicaSet
 	newRS := extensions.ReplicaSet{

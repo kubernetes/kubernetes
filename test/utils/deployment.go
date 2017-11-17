@@ -29,7 +29,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
 type LogfFn func(format string, args ...interface{})
@@ -128,7 +127,7 @@ func checkRollingUpdateStatus(c clientset.Interface, deployment *extensions.Depl
 	allRSs := append(oldRSs, newRS)
 	// The old/new ReplicaSets need to contain the pod-template-hash label
 	for i := range allRSs {
-		if !labelsutil.SelectorHasLabel(allRSs[i].Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
+		if !metav1.SelectorHasLabel(allRSs[i].Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
 			reason = "all replica sets need to contain the pod-template-hash label"
 			return reason, nil
 		}
@@ -223,7 +222,7 @@ func checkRevisionAndImage(deployment *extensions.Deployment, newRS *extensions.
 	if newRS == nil {
 		return fmt.Errorf("new replicaset for deployment %q is yet to be created", deployment.Name)
 	}
-	if !labelsutil.SelectorHasLabel(newRS.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
+	if !metav1.SelectorHasLabel(newRS.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
 		return fmt.Errorf("new replica set %q doesn't have %q label selector", newRS.Name, extensions.DefaultDeploymentUniqueLabelKey)
 	}
 	// Check revision of this deployment, and of the new replica set of this deployment
