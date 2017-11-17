@@ -22,8 +22,10 @@ Service Annotation for Auto and specific load balancer mode
     - Call az cloud to CreateOrUpdate on this lb, or Delete if nothing left
   - return lb, err
 
-- reconcileSecurityGroup(clusterName string, service *v1.Service, lbStatus *v1.LoadBalancerStatus, wantLb bool) (*network.SecurityGroup, error)
+- reconcileSecurityGroup(clusterName string, service *v1.Service, lbIP *string, wantLb bool) (*network.SecurityGroup, error)
   - Go though NSG' properties, update based on wantLb
+    - Use destinationIPAddress as target address if possible
+    - Consolidate NSG rules if possible
   - If any change on the NSG, (the NSG should always exists)
     - Call az cloud to CreateOrUpdate on this NSG
   - return sg, err
