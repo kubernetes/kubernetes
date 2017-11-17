@@ -19,6 +19,7 @@ package testing
 import (
 	"k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -26,6 +27,7 @@ import (
 type FakeRuntimeHelper struct {
 	DNSServers      []string
 	DNSSearches     []string
+	DNSOptions      []string
 	HostName        string
 	HostDomain      string
 	PodContainerDir string
@@ -44,8 +46,11 @@ func (f *FakeRuntimeHelper) GetPodCgroupParent(pod *v1.Pod) string {
 	return ""
 }
 
-func (f *FakeRuntimeHelper) GetClusterDNS(pod *v1.Pod) ([]string, []string, []string, bool, error) {
-	return f.DNSServers, f.DNSSearches, nil, false, f.Err
+func (f *FakeRuntimeHelper) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
+	return &runtimeapi.DNSConfig{
+		Servers:  f.DNSServers,
+		Searches: f.DNSSearches,
+		Options:  f.DNSOptions}, f.Err
 }
 
 // This is not used by docker runtime.
