@@ -14,92 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package admission
+package metrics
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
 	ptype "github.com/prometheus/client_model/go"
 )
-
-// FakeHandler provide a mock implement both MutationInterface and ValidationInterface that tracks which
-// methods have been called and always returns an error if admit is false.
-type FakeHandler struct {
-	*Handler
-	name           string
-	admit          bool
-	admitCalled    bool
-	validateCalled bool
-}
-
-func (h *FakeHandler) Name() string {
-	return h.name
-}
-
-func (h *FakeHandler) Admit(a Attributes) (err error) {
-	h.admitCalled = true
-	if h.admit {
-		return nil
-	}
-	return fmt.Errorf("Don't admit")
-}
-
-func (h *FakeHandler) Validate(a Attributes) (err error) {
-	h.validateCalled = true
-	if h.admit {
-		return nil
-	}
-	return fmt.Errorf("Don't admit")
-}
-
-func makeHandler(admit bool, ops ...Operation) *FakeHandler {
-	return &FakeHandler{
-		admit:   admit,
-		Handler: NewHandler(ops...),
-	}
-}
-
-func makeNamedHandler(name string, admit bool, ops ...Operation) NamedHandler {
-	return &FakeHandler{
-		name:    name,
-		admit:   admit,
-		Handler: NewHandler(ops...),
-	}
-}
-
-// FakeValidatingHandler provide a mock of ValidationInterface that tracks which
-// methods have been called and always returns an error if validate is false.
-type FakeValidatingHandler struct {
-	*Handler
-	validate, validateCalled bool
-}
-
-func (h *FakeValidatingHandler) Validate(a Attributes) (err error) {
-	h.validateCalled = true
-	if h.validate {
-		return nil
-	}
-	return fmt.Errorf("Don't validate")
-}
-
-func makeValidatingHandler(validate bool, ops ...Operation) *FakeValidatingHandler {
-	return &FakeValidatingHandler{
-		validate: validate,
-		Handler:  NewHandler(ops...),
-	}
-}
-
-func makeValidatingNamedHandler(name string, validate bool, ops ...Operation) NamedHandler {
-	return &pluginHandler{
-		Interface: &FakeValidatingHandler{
-			validate: validate,
-			Handler:  NewHandler(ops...),
-		},
-		name: name,
-	}
-}
 
 func labelsMatch(metric *ptype.Metric, labelFilter map[string]string) bool {
 	for _, lp := range metric.GetLabel() {

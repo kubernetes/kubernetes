@@ -136,7 +136,7 @@ func TestIgnoreAdmission(t *testing.T) {
 		t.Errorf("unexpected error initializing handler: %v", err)
 	}
 	informerFactory.Start(wait.NeverStop)
-	chainHandler := admission.NewChainHandler(admission.NewNamedHandler("ns", handler))
+	chainHandler := admission.NewChainHandler(handler)
 
 	pod := newPod(namespace)
 	err = chainHandler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
