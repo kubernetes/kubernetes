@@ -19,6 +19,8 @@ package cephfs
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"path"
 	"strings"
 
 	"github.com/golang/glog"
@@ -56,7 +58,7 @@ func (plugin *cephfsPlugin) GetPluginName() string {
 }
 
 func (plugin *cephfsPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	mon, _, _, _, _, err := getVolumeSource(spec)
+	mon, _, _, _, _, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
 	}
@@ -114,7 +116,7 @@ func (plugin *cephfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.
 }
 
 func (plugin *cephfsPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, mounter mount.Interface, secret string) (volume.Mounter, error) {
-	mon, path, id, secretFile, readOnly, err := getVolumeSource(spec)
+	mon, path, id, secretFile, readOnly, fuse, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
 	}
@@ -146,6 +148,7 @@ func (plugin *cephfsPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 			mounter:      mounter,
 			plugin:       plugin,
 			mountOptions: volume.MountOptionFromSpec(spec),
+			fuse:         fuse,
 		},
 	}, nil
 }
@@ -191,6 +194,7 @@ type cephfs struct {
 	plugin      *cephfsPlugin
 	volume.MetricsNil
 	mountOptions []string
+	fuse         bool
 }
 
 type cephfsMounter struct {
@@ -231,6 +235,26 @@ func (cephfsVolume *cephfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 	os.MkdirAll(dir, 0750)
 
+	if cephfsVolume.fuse {
+		glog.V(4).Infof("CephFS mount using fuse.")
+
+		err = cephfsVolume.execFuseMount(dir)
+		if err == nil {
+			return nil
+		}
+
+		// cleanup upon failure
+		keyringPath := cephfsVolume.GetKeyringPath()
+		_, StatErr := os.Stat(keyringPath)
+		if !os.IsNotExist(StatErr) {
+			os.RemoveAll(keyringPath)
+		}
+		util.UnmountPath(dir, cephfsVolume.mounter)
+
+		return err
+	}
+
+	glog.V(4).Infof("CephFS mount using kernel.")
 	err = cephfsVolume.execMount(dir)
 	if err == nil {
 		return nil
@@ -255,6 +279,11 @@ func (cephfsVolume *cephfsUnmounter) TearDown() error {
 
 // TearDownAt unmounts the bind mount
 func (cephfsVolume *cephfsUnmounter) TearDownAt(dir string) error {
+	glog.V(4).Infof("TearDownAt: dir: %q ", dir)
+	if strings.Contains(dir, "~keyring") {
+		return os.RemoveAll(dir)
+	}
+
 	return util.UnmountPath(dir, cephfsVolume.mounter)
 }
 
@@ -262,6 +291,14 @@ func (cephfsVolume *cephfsUnmounter) TearDownAt(dir string) error {
 func (cephfsVolume *cephfs) GetPath() string {
 	name := cephfsPluginName
 	return cephfsVolume.plugin.host.GetPodVolumeDir(cephfsVolume.podUID, utilstrings.EscapeQualifiedNameForDisk(name), cephfsVolume.volName)
+}
+
+// GateKeyringPath creates cephfuse keyring path
+func (cephfsVolume *cephfs) GetKeyringPath() string {
+	name := cephfsPluginName
+	volumeDir := cephfsVolume.plugin.host.GetPodVolumeDir(cephfsVolume.podUID, utilstrings.EscapeQualifiedNameForDisk(name), cephfsVolume.volName)
+	volumeKeyringDir := volumeDir + "~keyring"
+	return volumeKeyringDir
 }
 
 func (cephfsVolume *cephfs) execMount(mountpoint string) error {
@@ -299,14 +336,85 @@ func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 	return nil
 }
 
-func getVolumeSource(spec *volume.Spec) ([]string, string, string, string, bool, error) {
+func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
+	// cephfs keyring file
+	keyring_file := ""
+	// override secretfile if secret is provided
+	if cephfsVolume.secret != "" {
+		glog.V(4).Infof("cephfs mount begin using fuse.")
+
+		keyringPath := cephfsVolume.GetKeyringPath()
+		os.MkdirAll(keyringPath, 0750)
+
+		payload := make(map[string]util.FileProjection, 1)
+		var fileProjection util.FileProjection
+
+		keyring := fmt.Sprintf("[client.%s]\n", cephfsVolume.id) + "key = " + cephfsVolume.secret
+
+		fileProjection.Data = []byte(keyring)
+		fileProjection.Mode = int32(0644)
+		fileName := cephfsVolume.id + ".keyring"
+
+		payload[fileName] = fileProjection
+
+		writerContext := fmt.Sprintf("cephfuse:%v.keyring", cephfsVolume.id)
+		writer, err := util.NewAtomicWriter(keyringPath, writerContext)
+		if err != nil {
+			glog.Errorf("failed to create atomic writer: %v", err)
+			return err
+		}
+
+		err = writer.Write(payload)
+		if err != nil {
+			glog.Errorf("failed to write payload to dir: %v", err)
+			return err
+		}
+
+		keyring_file = path.Join(keyringPath, fileName)
+
+	} else {
+		keyring_file = cephfsVolume.secret_file
+	}
+
+	// build src like mon1:6789,mon2:6789,mon3:6789:/
+	hosts := cephfsVolume.mon
+	l := len(hosts)
+	// pass all monitors and let ceph randomize and fail over
+	i := 0
+	src := ""
+	for i = 0; i < l-1; i++ {
+		src += hosts[i] + ","
+	}
+	src += hosts[i]
+
+	mountArgs := []string{}
+	mountArgs = append(mountArgs, "-k")
+	mountArgs = append(mountArgs, keyring_file)
+	mountArgs = append(mountArgs, "-m")
+	mountArgs = append(mountArgs, src)
+	mountArgs = append(mountArgs, mountpoint)
+	mountArgs = append(mountArgs, "-r")
+	mountArgs = append(mountArgs, cephfsVolume.path)
+
+	glog.V(4).Infof("Mounting cmd ceph-fuse with arguments (%s)", mountArgs)
+	command := exec.Command("ceph-fuse", mountArgs...)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Ceph-fuse failed: %v\narguments: %s\nOutput: %s\n", err, mountArgs, string(output))
+	}
+
+	return nil
+}
+
+func getVolumeSource(spec *volume.Spec) ([]string, string, string, string, bool, bool, error) {
 	if spec.Volume != nil && spec.Volume.CephFS != nil {
 		mon := spec.Volume.CephFS.Monitors
 		path := spec.Volume.CephFS.Path
 		user := spec.Volume.CephFS.User
 		secretFile := spec.Volume.CephFS.SecretFile
 		readOnly := spec.Volume.CephFS.ReadOnly
-		return mon, path, user, secretFile, readOnly, nil
+		fuse := spec.Volume.CephFS.Fuse
+		return mon, path, user, secretFile, readOnly, fuse, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.CephFS != nil {
 		mon := spec.PersistentVolume.Spec.CephFS.Monitors
@@ -314,10 +422,11 @@ func getVolumeSource(spec *volume.Spec) ([]string, string, string, string, bool,
 		user := spec.PersistentVolume.Spec.CephFS.User
 		secretFile := spec.PersistentVolume.Spec.CephFS.SecretFile
 		readOnly := spec.PersistentVolume.Spec.CephFS.ReadOnly
-		return mon, path, user, secretFile, readOnly, nil
+		fuse := spec.Volume.CephFS.Fuse
+		return mon, path, user, secretFile, readOnly, fuse, nil
 	}
 
-	return nil, "", "", "", false, fmt.Errorf("Spec does not reference a CephFS volume type")
+	return nil, "", "", "", false, false, fmt.Errorf("Spec does not reference a CephFS volume type")
 }
 
 func getSecretNameAndNamespace(spec *volume.Spec, defaultNamespace string) (string, string, error) {

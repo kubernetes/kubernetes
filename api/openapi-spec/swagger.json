@@ -73524,6 +73524,10 @@
      "monitors"
     ],
     "properties": {
+     "fuse": {
+      "description": "Optional: Defaults to false. Fuse here will force to mount cephfs using fuse. More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+      "type": "boolean"
+     },
      "monitors": {
       "description": "Required: Monitors is a collection of Ceph monitors More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
       "type": "array",
