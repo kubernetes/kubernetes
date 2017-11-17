@@ -40,6 +40,30 @@ import (
 
 var testClusterName = "testCluster"
 
+// Test flipServiceInternalAnnotation
+func TestFlipServiceInternalAnnotation(t *testing.T) {
+	svc := getTestService("servicea", v1.ProtocolTCP, 80)
+	svcUpdated := flipServiceInternalAnnotation(&svc)
+	if !requiresInternalLoadBalancer(svcUpdated) {
+		t.Errorf("Expected svc to be an internal service")
+	}
+	svcUpdated = flipServiceInternalAnnotation(svcUpdated)
+	if requiresInternalLoadBalancer(svcUpdated) {
+		t.Errorf("Expected svc to be an external service")
+	}
+
+	svc2 := getInternalTestService("serviceb", 8081)
+	svc2Updated := flipServiceInternalAnnotation(&svc2)
+	if requiresInternalLoadBalancer(svc2Updated) {
+		t.Errorf("Expected svc to be an external service")
+	}
+
+	svc2Updated = flipServiceInternalAnnotation(svc2Updated)
+	if !requiresInternalLoadBalancer(svc2Updated) {
+		t.Errorf("Expected svc to be an internal service")
+	}
+}
+
 // Test additional of a new service/port.
 func TestAddPort(t *testing.T) {
 	az := getTestCloud()
