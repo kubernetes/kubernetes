@@ -352,6 +352,14 @@ func (elb *FakeELB) SetLoadBalancerPoliciesForBackendServer(*elb.SetLoadBalancer
 	panic("Not implemented")
 }
 
+func (elb *FakeELB) SetLoadBalancerPoliciesOfListener(input *elb.SetLoadBalancerPoliciesOfListenerInput) (*elb.SetLoadBalancerPoliciesOfListenerOutput, error) {
+	panic("Not implemented")
+}
+
+func (elb *FakeELB) DescribeLoadBalancerPolicies(input *elb.DescribeLoadBalancerPoliciesInput) (*elb.DescribeLoadBalancerPoliciesOutput, error) {
+	panic("Not implemented")
+}
+
 func (elb *FakeELB) DescribeLoadBalancerAttributes(*elb.DescribeLoadBalancerAttributesInput) (*elb.DescribeLoadBalancerAttributesOutput, error) {
 	panic("Not implemented")
 }

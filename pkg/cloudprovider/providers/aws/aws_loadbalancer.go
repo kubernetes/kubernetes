@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/golang/glog"
@@ -32,6 +33,8 @@ import (
 )
 
 const ProxyProtocolPolicyName = "k8s-proxyprotocol-enabled"
+
+const SSLNegotiationPolicyNameFormat = "k8s-SSLNegotiationPolicy-%s"
 
 // getLoadBalancerAdditionalTags converts the comma separated list of key-value
 // pairs in the ServiceAnnotationLoadBalancerAdditionalTags annotation and returns
@@ -468,6 +471,78 @@ func (c *Cloud) ensureLoadBalancerInstances(loadBalancerName string, lbInstances
 		glog.V(1).Infof("Instances removed from load-balancer %s", loadBalancerName)
 	}
 
+	return nil
+}
+
+func (c *Cloud) getLoadBalancerTLSPorts(loadBalancer *elb.LoadBalancerDescription) []int64 {
+	ports := []int64{}
+
+	for _, listenerDescription := range loadBalancer.ListenerDescriptions {
+		protocol := aws.StringValue(listenerDescription.Listener.Protocol)
+		if protocol == "SSL" || protocol == "HTTPS" {
+			ports = append(ports, aws.Int64Value(listenerDescription.Listener.LoadBalancerPort))
+		}
+	}
+	return ports
+}
+
+func (c *Cloud) ensureSSLNegotiationPolicy(loadBalancer *elb.LoadBalancerDescription, policyName string) error {
+	glog.V(2).Info("Describing load balancer policies on load balancer")
+	result, err := c.elb.DescribeLoadBalancerPolicies(&elb.DescribeLoadBalancerPoliciesInput{
+		LoadBalancerName: loadBalancer.LoadBalancerName,
+		PolicyNames: []*string{
+			aws.String(fmt.Sprintf(SSLNegotiationPolicyNameFormat, policyName)),
+		},
+	})
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case "PolicyNotFound":
+				// TODO change from string to `elb.ErrCodePolicyNotFoundException` once the AWS SDK is updated
+			default:
+				return fmt.Errorf("error describing security policies on load balancer: %q", err)
+			}
+		}
+	}
+
+	if len(result.PolicyDescriptions) > 0 {
+		return nil
+	}
+
+	glog.V(2).Infof("Creating SSL negotiation policy '%s' on load balancer", fmt.Sprintf(SSLNegotiationPolicyNameFormat, policyName))
+	// there is an upper limit of 98 policies on an ELB, we're pretty safe from
+	// running into it
+	_, err = c.elb.CreateLoadBalancerPolicy(&elb.CreateLoadBalancerPolicyInput{
+		LoadBalancerName: loadBalancer.LoadBalancerName,
+		PolicyName:       aws.String(fmt.Sprintf(SSLNegotiationPolicyNameFormat, policyName)),
+		PolicyTypeName:   aws.String("SSLNegotiationPolicyType"),
+		PolicyAttributes: []*elb.PolicyAttribute{
+			{
+				AttributeName:  aws.String("Reference-Security-Policy"),
+				AttributeValue: aws.String(policyName),
+			},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("error creating security policy on load balancer: %q", err)
+	}
+	return nil
+}
+
+func (c *Cloud) setSSLNegotiationPolicy(loadBalancerName, sslPolicyName string, port int64) error {
+	policyName := fmt.Sprintf(SSLNegotiationPolicyNameFormat, sslPolicyName)
+	request := &elb.SetLoadBalancerPoliciesOfListenerInput{
+		LoadBalancerName: aws.String(loadBalancerName),
+		LoadBalancerPort: aws.Int64(port),
+		PolicyNames: []*string{
+			aws.String(policyName),
+		},
+	}
+	glog.V(2).Infof("Setting SSL negotiation policy '%s' on load balancer", policyName)
+	_, err := c.elb.SetLoadBalancerPoliciesOfListener(request)
+	if err != nil {
+		return fmt.Errorf("error setting SSL negotiation policy '%s' on load balancer: %q", policyName, err)
+	}
 	return nil
 }
 

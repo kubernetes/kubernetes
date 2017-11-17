@@ -129,6 +129,11 @@ const ServiceAnnotationLoadBalancerCertificate = "service.beta.kubernetes.io/aws
 // listeners. Defaults to '*' (all).
 const ServiceAnnotationLoadBalancerSSLPorts = "service.beta.kubernetes.io/aws-load-balancer-ssl-ports"
 
+// ServiceAnnotationLoadBalancerSSLNegotiationPolicy is the annotation used on
+// the service to specify a SSL negotiation settings for the HTTPS/SSL listeners
+// of your load balancer. Defaults to AWS's default
+const ServiceAnnotationLoadBalancerSSLNegotiationPolicy = "service.beta.kubernetes.io/aws-load-balancer-ssl-negotiation-policy"
+
 // ServiceAnnotationLoadBalancerBEProtocol is the annotation used on the service
 // to specify the protocol spoken by the backend (pod) behind a listener.
 // If `http` (default) or `https`, an HTTPS listener that terminates the
@@ -259,6 +264,8 @@ type ELB interface {
 	DeregisterInstancesFromLoadBalancer(*elb.DeregisterInstancesFromLoadBalancerInput) (*elb.DeregisterInstancesFromLoadBalancerOutput, error)
 	CreateLoadBalancerPolicy(*elb.CreateLoadBalancerPolicyInput) (*elb.CreateLoadBalancerPolicyOutput, error)
 	SetLoadBalancerPoliciesForBackendServer(*elb.SetLoadBalancerPoliciesForBackendServerInput) (*elb.SetLoadBalancerPoliciesForBackendServerOutput, error)
+	SetLoadBalancerPoliciesOfListener(input *elb.SetLoadBalancerPoliciesOfListenerInput) (*elb.SetLoadBalancerPoliciesOfListenerOutput, error)
+	DescribeLoadBalancerPolicies(input *elb.DescribeLoadBalancerPoliciesInput) (*elb.DescribeLoadBalancerPoliciesOutput, error)
 
 	DetachLoadBalancerFromSubnets(*elb.DetachLoadBalancerFromSubnetsInput) (*elb.DetachLoadBalancerFromSubnetsOutput, error)
 	AttachLoadBalancerToSubnets(*elb.AttachLoadBalancerToSubnetsInput) (*elb.AttachLoadBalancerToSubnetsOutput, error)
@@ -3101,6 +3108,20 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 		return nil, err
 	}
 
+	if sslPolicyName, ok := annotations[ServiceAnnotationLoadBalancerSSLNegotiationPolicy]; ok {
+		err := c.ensureSSLNegotiationPolicy(loadBalancer, sslPolicyName)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, port := range c.getLoadBalancerTLSPorts(loadBalancer) {
+			err := c.setSSLNegotiationPolicy(loadBalancerName, sslPolicyName, port)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	if path, healthCheckNodePort := service.GetServiceHealthCheckPathPort(apiService); path != "" {
 		glog.V(4).Infof("service %v (%v) needs health checks on :%d%s)", apiService.Name, loadBalancerName, healthCheckNodePort, path)
 		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "HTTP", healthCheckNodePort, path)
@@ -3490,6 +3511,19 @@ func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, node
 
 	if lb == nil {
 		return fmt.Errorf("Load balancer not found")
+	}
+
+	if sslPolicyName, ok := service.Annotations[ServiceAnnotationLoadBalancerSSLNegotiationPolicy]; ok {
+		err := c.ensureSSLNegotiationPolicy(lb, sslPolicyName)
+		if err != nil {
+			return err
+		}
+		for _, port := range c.getLoadBalancerTLSPorts(lb) {
+			err := c.setSSLNegotiationPolicy(loadBalancerName, sslPolicyName, port)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	err = c.ensureLoadBalancerInstances(aws.StringValue(lb.LoadBalancerName), lb.Instances, instances)
