@@ -44,7 +44,7 @@ var _ volume.Attacher = &cinderDiskAttacher{}
 var _ volume.AttachableVolumePlugin = &cinderPlugin{}
 
 const (
-	checkSleepDuration       = 1 * time.Second
+	checkSleepDuration       = 5 * time.Second
 	operationFinishInitDealy = 1 * time.Second
 	operationFinishFactor    = 1.1
 	operationFinishSteps     = 10
