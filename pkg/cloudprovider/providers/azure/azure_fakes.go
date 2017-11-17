@@ -64,7 +64,9 @@ func (fLBC fakeAzureLBClient) CreateOrUpdate(resourceGroupName string, loadBalan
 	if parameters.FrontendIPConfigurations != nil {
 		for idx, config := range *parameters.FrontendIPConfigurations {
 			if config.PrivateIPAllocationMethod == network.Dynamic {
-				(*parameters.FrontendIPConfigurations)[idx].PrivateIPAddress = to.StringPtr("10.0.0.19")
+				// Here we randomly assign an ip as private ip
+				// It dosen't smart enough to know whether it is in the subnet's range
+				(*parameters.FrontendIPConfigurations)[idx].PrivateIPAddress = getRandomIPPtr()
 			}
 		}
 	}
@@ -202,9 +204,7 @@ func (fAPC fakeAzurePIPClient) CreateOrUpdate(resourceGroupName string, publicIP
 	if parameters.PublicIPAddressPropertiesFormat != nil &&
 		parameters.PublicIPAddressPropertiesFormat.PublicIPAllocationMethod == network.Static {
 		// assign ip
-		rand.Seed(time.Now().UnixNano())
-		randomIP := fmt.Sprintf("%d.%d.%d.%d", rand.Intn(256), rand.Intn(256), rand.Intn(256), rand.Intn(256))
-		parameters.IPAddress = &randomIP
+		parameters.IPAddress = getRandomIPPtr()
 	}
 
 	fAPC.FakeStore[resourceGroupName][publicIPAddressName] = parameters
@@ -615,4 +615,9 @@ func (fNSG fakeAzureNSGClient) List(resourceGroupName string) (result network.Se
 	result.NextLink = nil
 	result.Value = &value
 	return result, nil
+}
+
+func getRandomIPPtr() *string {
+	rand.Seed(time.Now().UnixNano())
+	return to.StringPtr(fmt.Sprintf("%d.%d.%d.%d", rand.Intn(256), rand.Intn(256), rand.Intn(256), rand.Intn(256)))
 }
