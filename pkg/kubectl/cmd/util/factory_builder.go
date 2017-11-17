@@ -47,7 +47,7 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 	return f
 }
 
-func (f *ring2Factory) PrinterForOptions(options printers.PrintOptions) (printers.ResourcePrinter, error) {
+func (f *ring2Factory) PrinterForOptions(options *printers.PrintOptions) (printers.ResourcePrinter, error) {
 	var mapper meta.RESTMapper
 	var typer runtime.ObjectTyper
 
@@ -59,7 +59,7 @@ func (f *ring2Factory) PrinterForOptions(options printers.PrintOptions) (printer
 	return PrinterForOptions(mapper, typer, encoder, decoders, options)
 }
 
-func (f *ring2Factory) PrinterForMapping(options printers.PrintOptions, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
+func (f *ring2Factory) PrinterForMapping(options *printers.PrintOptions, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
 	printer, err := f.PrinterForOptions(options)
 	if err != nil {
 		return nil, err
@@ -124,7 +124,7 @@ func (f *ring2Factory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta
 		return err
 	}
 
-	printer, err := f.PrinterForMapping(printers.PrintOptions{}, mapping)
+	printer, err := f.PrinterForMapping(ExtractCmdPrintOptions(cmd, false), mapping)
 	if err != nil {
 		return err
 	}
@@ -132,12 +132,13 @@ func (f *ring2Factory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta
 }
 
 func (f *ring2Factory) PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, out io.Writer) error {
-	printer, err := f.PrinterForOptions(printers.PrintOptions{})
+	printOpts := ExtractCmdPrintOptions(cmd, false)
+	printer, err := f.PrinterForOptions(printOpts)
 	if err != nil {
 		return err
 	}
 	if !printer.IsGeneric() {
-		printer, err = f.PrinterForMapping(printers.PrintOptions{}, nil)
+		printer, err = f.PrinterForMapping(printOpts, nil)
 		if err != nil {
 			return err
 		}

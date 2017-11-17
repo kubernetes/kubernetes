@@ -230,12 +230,12 @@ type BuilderFactory interface {
 	// PrinterForCommand returns the default printer for the command. It requires that certain options
 	// are declared on the command (see AddPrinterFlags). Returns a printer, or an error if a printer
 	// could not be found.
-	PrinterForOptions(options printers.PrintOptions) (printers.ResourcePrinter, error)
+	PrinterForOptions(options *printers.PrintOptions) (printers.ResourcePrinter, error)
 	// PrinterForMapping returns a printer suitable for displaying the provided resource type.
 	// Requires that printer flags have been added to cmd (see AddPrinterFlags).
 	// Returns a printer, true if the printer is generic (is not internal), or
 	// an error if a printer could not be found.
-	PrinterForMapping(options printers.PrintOptions, mapping *meta.RESTMapping) (printers.ResourcePrinter, error)
+	PrinterForMapping(options *printers.PrintOptions, mapping *meta.RESTMapping) (printers.ResourcePrinter, error)
 	// PrintObject prints an api object given command line flags to modify the output format
 	PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 	// PrintResourceInfoForCommand receives a *cobra.Command and a *resource.Info and

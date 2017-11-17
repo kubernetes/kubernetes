@@ -255,7 +255,7 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 	}
 
 	printOpts := cmdutil.ExtractCmdPrintOptions(cmd, options.AllNamespaces)
-	printer, err := f.PrinterForOptions(*printOpts)
+	printer, err := f.PrinterForOptions(printOpts)
 	if err != nil {
 		return err
 	}
@@ -331,11 +331,11 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 				printWithNamespace = false
 			}
 
-			printOpts := *cmdutil.ExtractCmdPrintOptions(cmd, printWithNamespace)
+			printOpts := cmdutil.ExtractCmdPrintOptions(cmd, printWithNamespace)
 			// if cmd does not specify output format and useOpenAPIPrintColumnFlagLabel flag is true,
 			// then get the default output options for this mapping from OpenAPI schema.
 			if !cmdSpecifiesOutputFmt(cmd) && useOpenAPIPrintColumns {
-				outputOptsForMappingFromOpenAPI(f, mapping, &printOpts)
+				updatePrintOptionsForOpenAPI(f, mapping, printOpts)
 			}
 
 			printer, err = f.PrinterForMapping(printOpts, mapping)
@@ -480,7 +480,7 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 	info := infos[0]
 	mapping := info.ResourceMapping()
 	printOpts := cmdutil.ExtractCmdPrintOptions(cmd, options.AllNamespaces)
-	printer, err := f.PrinterForMapping(*printOpts, mapping)
+	printer, err := f.PrinterForMapping(printOpts, mapping)
 	if err != nil {
 		return err
 	}
@@ -663,8 +663,8 @@ func cmdSpecifiesOutputFmt(cmd *cobra.Command) bool {
 }
 
 // outputOptsForMappingFromOpenAPI looks for the output format metatadata in the
-// openapi schema and returns the output options for the mapping if found.
-func outputOptsForMappingFromOpenAPI(f cmdutil.Factory, mapping *meta.RESTMapping, printOpts *printers.PrintOptions) bool {
+// openapi schema and modifies the passed print options for the mapping if found.
+func updatePrintOptionsForOpenAPI(f cmdutil.Factory, mapping *meta.RESTMapping, printOpts *printers.PrintOptions) bool {
 
 	// user has not specified any output format, check if OpenAPI has
 	// default specification to print this resource type

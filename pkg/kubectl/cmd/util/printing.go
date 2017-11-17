@@ -81,11 +81,11 @@ func ValidateOutputArgs(cmd *cobra.Command) error {
 	return nil
 }
 
-// printerForOptions returns the printer for the outputOptions (if given) or
+// PrinterForOptions returns the printer for the outputOptions (if given) or
 // returns the default printer for the command. Requires that printer flags have
 // been added to cmd (see AddPrinterFlags).
-func PrinterForOptions(mapper meta.RESTMapper, typer runtime.ObjectTyper, encoder runtime.Encoder, decoders []runtime.Decoder, options printers.PrintOptions) (printers.ResourcePrinter, error) {
-	printer, err := printers.GetStandardPrinter(mapper, typer, encoder, decoders, options)
+func PrinterForOptions(mapper meta.RESTMapper, typer runtime.ObjectTyper, encoder runtime.Encoder, decoders []runtime.Decoder, options *printers.PrintOptions) (printers.ResourcePrinter, error) {
+	printer, err := printers.GetStandardPrinter(mapper, typer, encoder, decoders, *options)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func PrinterForOptions(mapper meta.RESTMapper, typer runtime.ObjectTyper, encode
 		printersinternal.AddHandlers(humanReadablePrinter)
 	}
 
-	return maybeWrapSortingPrinter(printer, options), nil
+	return maybeWrapSortingPrinter(printer, *options), nil
 }
 
 // ExtractCmdPrintOptions parses printer specific commandline args and
