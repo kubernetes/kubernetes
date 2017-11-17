@@ -168,9 +168,6 @@ func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 				}
 			}
 		} else {
-			if err = diskController.InitStorageAccount(); err != nil {
-				return nil, err
-			}
 			diskURI, err = diskController.CreateBlobDisk(name, skuName, requestGB, forceStandAlone)
 			if err != nil {
 				return nil, err
