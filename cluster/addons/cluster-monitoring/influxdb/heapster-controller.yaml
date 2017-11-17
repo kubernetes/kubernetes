@@ -20,6 +20,32 @@ metadata:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: heapster-config
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: EnsureExists
+data:
+  NannyConfiguration: |-
+    apiVersion: nannyconfig/v1alpha1
+    kind: NannyConfiguration
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eventer-config
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: EnsureExists
+data:
+  NannyConfiguration: |-
+    apiVersion: nannyconfig/v1alpha1
+    kind: NannyConfiguration
+---
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
@@ -64,7 +90,7 @@ spec:
             - /eventer
             - --source=kubernetes:''
             - --sink=influxdb:http://monitoring-influxdb:8086
-        - image: gcr.io/google_containers/addon-resizer:1.7
+        - image: gcr.io/google_containers/addon-resizer:1.8.1
           name: heapster-nanny
           resources:
             limits:
@@ -82,8 +108,12 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+          volumeMounts:
+          - name: heapster-config-volume
+            mountPath: /etc/config
           command:
             - /pod_nanny
+            - --config-dir=/etc/config
             - --cpu={{ base_metrics_cpu }}
             - --extra-cpu={{ metrics_cpu_per_node }}m
             - --memory={{ base_metrics_memory }}
@@ -93,7 +123,7 @@ spec:
             - --container=heapster
             - --poll-period=300000
             - --estimator=exponential
-        - image: gcr.io/google_containers/addon-resizer:1.7
+        - image: gcr.io/google_containers/addon-resizer:1.8.1
           name: eventer-nanny
           resources:
             limits:
@@ -111,8 +141,12 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+          volumeMounts:
+          - name: eventer-config-volume
+            mountPath: /etc/config
           command:
             - /pod_nanny
+            - --config-dir=/etc/config
             - --cpu=100m
             - --extra-cpu=0m
             - --memory={{ base_eventer_memory }}
@@ -122,6 +156,13 @@ spec:
             - --container=eventer
             - --poll-period=300000
             - --estimator=exponential
+      volumes:
+        - name: heapster-config-volume
+          configMap:
+            name: heapster-config
+        - name: eventer-config-volume
+          configMap:
+            name: eventer-config
       serviceAccountName: heapster
       tolerations:
         - key: "CriticalAddonsOnly"
