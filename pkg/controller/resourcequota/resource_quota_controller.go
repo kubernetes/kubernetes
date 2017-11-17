@@ -274,11 +274,11 @@ func (rq *ResourceQuotaController) Run(workers int, stopCh <-chan struct{}) {
 	glog.Infof("Starting resource quota controller")
 	defer glog.Infof("Shutting down resource quota controller")
 
-	go rq.quotaMonitor.Run(stopCh)
-
 	if !controller.WaitForCacheSync("resource quota", stopCh, rq.informerSyncedFuncs...) {
 		return
 	}
+
+	go rq.quotaMonitor.Run(stopCh)
 
 	// the workers that chug through the quota calculation backlog
 	for i := 0; i < workers; i++ {
