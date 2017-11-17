@@ -256,7 +256,12 @@ func TestStream(t *testing.T) {
 			conf := &restclient.Config{
 				Host: server.URL,
 			}
-			e, err := remoteclient.NewSPDYExecutorForProtocols(conf, "POST", req.URL(), testCase.ClientProtocols...)
+			transport, upgradeTransport, err := spdy.RoundTripperFor(conf)
+			if err != nil {
+				t.Errorf("%s: unexpected error: %v", name, err)
+				continue
+			}
+			e, err := remoteclient.NewSPDYExecutorForProtocols(transport, upgradeTransport, "POST", req.URL(), testCase.ClientProtocols...)
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", name, err)
 				continue
