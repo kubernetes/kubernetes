@@ -30,6 +30,7 @@ import (
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -47,7 +48,7 @@ type upgradeVariables struct {
 }
 
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
-func enforceRequirements(kubeConfigPath, cfgPath string, printConfig, dryRun bool) (*upgradeVariables, error) {
+func enforceRequirements(featureGatesString, kubeConfigPath, cfgPath string, printConfig, dryRun bool) (*upgradeVariables, error) {
 	client, err := getClient(kubeConfigPath, dryRun)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create a Kubernetes client from file %q: %v", kubeConfigPath, err)
@@ -67,6 +68,14 @@ func enforceRequirements(kubeConfigPath, cfgPath string, printConfig, dryRun boo
 	// If the user told us to print this information out; do it!
 	if printConfig {
 		printConfiguration(cfg, os.Stdout)
+	}
+
+	cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString)
+	if err != nil {
+		return nil, fmt.Errorf("[upgrade/config] FATAL: %v", err)
+	}
+	if err := features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {
+		return nil, err
 	}
 
 	return &upgradeVariables{

@@ -119,7 +119,7 @@ func NewCmdApply(parentFlags *cmdUpgradeFlags) *cobra.Command {
 func RunApply(flags *applyFlags) error {
 
 	// Start with the basics, verify that the cluster is healthy and get the configuration from the cluster (using the ConfigMap)
-	upgradeVars, err := enforceRequirements(flags.parent.kubeConfigPath, flags.parent.cfgPath, flags.parent.printConfig, flags.dryRun)
+	upgradeVars, err := enforceRequirements(flags.parent.featureGatesString, flags.parent.kubeConfigPath, flags.parent.cfgPath, flags.parent.printConfig, flags.dryRun)
 	if err != nil {
 		return err
 	}
