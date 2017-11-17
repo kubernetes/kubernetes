@@ -175,6 +175,20 @@ var _ = framework.KubeDescribe("Summary API", func() {
 					"TxBytes":  bounded(10, 10*framework.Mb),
 					"TxErrors": bounded(0, 1000),
 				}),
+				"CPU": ptrMatchAllFields(gstruct.Fields{
+					"Time":                 recent(maxStatsAge),
+					"UsageNanoCores":       bounded(100000, 1E9),
+					"UsageCoreNanoSeconds": bounded(10000000, 1E11),
+				}),
+				"Memory": ptrMatchAllFields(gstruct.Fields{
+					"Time":            recent(maxStatsAge),
+					"AvailableBytes":  bounded(1*framework.Kb, 10*framework.Mb),
+					"UsageBytes":      bounded(10*framework.Kb, 20*framework.Mb),
+					"WorkingSetBytes": bounded(10*framework.Kb, 20*framework.Mb),
+					"RSSBytes":        bounded(1*framework.Kb, framework.Mb),
+					"PageFaults":      bounded(0, 1000000),
+					"MajorPageFaults": bounded(0, 10),
+				}),
 				"VolumeStats": gstruct.MatchAllElements(summaryObjectID, gstruct.Elements{
 					"test-empty-dir": gstruct.MatchAllFields(gstruct.Fields{
 						"Name":   Equal("test-empty-dir"),
