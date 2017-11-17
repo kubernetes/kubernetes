@@ -233,10 +233,10 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		},
 	}
 	nodeTaints := make([]v1.Taint, 0)
-	if len(kl.kubeletConfiguration.RegisterWithTaints) > 0 {
-		taints := make([]v1.Taint, len(kl.kubeletConfiguration.RegisterWithTaints))
-		for i := range kl.kubeletConfiguration.RegisterWithTaints {
-			if err := k8s_api_v1.Convert_core_Taint_To_v1_Taint(&kl.kubeletConfiguration.RegisterWithTaints[i], &taints[i], nil); err != nil {
+	if len(kl.registerWithTaints) > 0 {
+		taints := make([]v1.Taint, len(kl.registerWithTaints))
+		for i := range kl.registerWithTaints {
+			if err := k8s_api_v1.Convert_core_Taint_To_v1_Taint(&kl.registerWithTaints[i], &taints[i], nil); err != nil {
 				return nil, err
 			}
 		}

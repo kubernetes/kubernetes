@@ -115,6 +115,7 @@ func GetHollowKubeletConfig(
 	f.MinimumGCAge = metav1.Duration{Duration: 1 * time.Minute}
 	f.MaxContainerCount = 100
 	f.MaxPerPodContainerCount = 2
+	f.RegisterNode = true
 	f.RegisterSchedulable = true
 
 	// Config struct
@@ -150,7 +151,6 @@ func GetHollowKubeletConfig(
 	// set promiscuous mode on docker0.
 	c.HairpinMode = kubeletconfig.HairpinVeth
 	c.MaxOpenFiles = 1024
-	c.RegisterNode = true
 	c.RegistryBurst = 10
 	c.RegistryPullQPS = 5.0
 	c.ResolverConfig = kubetypes.ResolvConfDefault

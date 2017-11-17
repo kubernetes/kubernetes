@@ -145,9 +145,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.MaxPods == 0 {
 		obj.MaxPods = 110
 	}
-	if obj.VolumePluginDir == "" {
-		obj.VolumePluginDir = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
-	}
 	if obj.NodeStatusUpdateFrequency == zeroDuration {
 		obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 10 * time.Second}
 	}
@@ -166,9 +163,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	}
 	if obj.ReadOnlyPort == nil {
 		obj.ReadOnlyPort = utilpointer.Int32Ptr(ports.KubeletReadOnlyPort)
-	}
-	if obj.RegisterNode == nil {
-		obj.RegisterNode = boolVar(true)
 	}
 	if obj.RegistryBurst == 0 {
 		obj.RegistryBurst = 10

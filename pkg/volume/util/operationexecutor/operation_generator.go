@@ -267,6 +267,18 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 			volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
 
 		if attachErr != nil {
+			if derr, ok := attachErr.(*util.DanglingAttachError); ok {
+				addErr := actualStateOfWorld.MarkVolumeAsAttached(
+					v1.UniqueVolumeName(""),
+					volumeToAttach.VolumeSpec,
+					derr.CurrentNode,
+					derr.DevicePath)
+
+				if addErr != nil {
+					glog.Errorf("AttachVolume.MarkVolumeAsAttached failed to fix dangling volume error for volume %q with %s", volumeToAttach.VolumeName, addErr)
+				}
+
+			}
 			// On failure, return error. Caller will log and retry.
 			eventErr, detailedErr := volumeToAttach.GenerateError("AttachVolume.Attach failed", attachErr)
 			for _, pod := range volumeToAttach.ScheduledPods {

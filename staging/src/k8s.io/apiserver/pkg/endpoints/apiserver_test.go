@@ -1922,6 +1922,15 @@ func TestGetTable(t *testing.T) {
 			if resp.StatusCode != test.statusCode {
 				t.Errorf("%d: unexpected response: %#v", i, resp)
 			}
+			obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
+			if err != nil {
+				t.Errorf("%d: unexpected body read error: %v", err)
+				continue
+			}
+			gvk := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
+			if obj.GetObjectKind().GroupVersionKind() != gvk {
+				t.Errorf("%d: unexpected error body: %#v", obj)
+			}
 			continue
 		}
 		if resp.StatusCode != http.StatusOK {
@@ -2037,6 +2046,15 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 		if test.statusCode != 0 {
 			if resp.StatusCode != test.statusCode {
 				t.Errorf("%d: unexpected response: %#v", i, resp)
+			}
+			obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
+			if err != nil {
+				t.Errorf("%d: unexpected body read error: %v", err)
+				continue
+			}
+			gvk := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
+			if obj.GetObjectKind().GroupVersionKind() != gvk {
+				t.Errorf("%d: unexpected error body: %#v", obj)
 			}
 			continue
 		}

@@ -58,7 +58,6 @@ pkg/apis/imagepolicy
 pkg/apis/imagepolicy/v1alpha1
 pkg/apis/networking
 pkg/apis/policy
-pkg/apis/policy/v1alpha1
 pkg/apis/policy/v1beta1
 pkg/apis/policy/validation
 pkg/apis/rbac/v1
@@ -354,6 +353,7 @@ pkg/util/labels
 pkg/util/mount
 pkg/util/netsh/testing
 pkg/util/node
+pkg/util/normalizer
 pkg/util/oom
 pkg/util/parsers
 pkg/util/procfs

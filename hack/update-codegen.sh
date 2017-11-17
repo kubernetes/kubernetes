@@ -87,8 +87,7 @@ ${listergen} --input-dirs "${listergen_internal_apis_csv}" "$@"
 listergen_external_apis=(
 $(
   cd ${KUBE_ROOT}/staging/src
-  # because client-gen doesn't do policy/v1alpha1, we have to skip it too
-  find k8s.io/api -name types.go | xargs -n1 dirname | sort | grep -v pkg.apis.policy.v1alpha1
+  find k8s.io/api -name types.go | xargs -n1 dirname | sort
 )
 )
 listergen_external_apis_csv=$(IFS=,; echo "${listergen_external_apis[*]}")

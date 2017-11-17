@@ -218,7 +218,7 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, sk
 // NewInit validates given arguments and instantiates Init struct with provided information.
 func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight, skipTokenPrint, dryRun bool, criSocket string) (*Init, error) {
 
-	fmt.Println("[kubeadm] WARNING: kubeadm is in beta. Please do not use it for production clusters!")
+	fmt.Println("[kubeadm] WARNING: kubeadm is currently in beta")
 
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
