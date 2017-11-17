@@ -270,7 +270,7 @@ func TestGetNodeAddresses(t *testing.T) {
 
 	// Fail case (no addresses associated with nodes)
 	nodes, _ := fakeNodeClient.List(metav1.ListOptions{})
-	addrs, err := addressProvider.externalAddresses()
+	addrs, err := addressProvider.preferredAddresses([]string{string(api.NodeExternalIP)})
 
 	assert.Error(err, "addresses should have caused an error as there are no addresses.")
 	assert.Equal([]string(nil), addrs)
@@ -281,7 +281,7 @@ func TestGetNodeAddresses(t *testing.T) {
 		nodes.Items[index].Status.Addresses = []apiv1.NodeAddress{{Type: apiv1.NodeExternalIP, Address: "127.0.0.1"}}
 		fakeNodeClient.Update(&nodes.Items[index])
 	}
-	addrs, err = addressProvider.externalAddresses()
+	addrs, err = addressProvider.preferredAddresses([]string{string(api.NodeExternalIP)})
 	assert.NoError(err, "addresses should not have returned an error.")
 	assert.Equal([]string{"127.0.0.1", "127.0.0.1"}, addrs)
 }

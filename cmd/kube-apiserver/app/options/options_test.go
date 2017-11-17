@@ -91,10 +91,11 @@ func TestAddFlags(t *testing.T) {
 
 	// This is a snapshot of expected options parsed by args.
 	expected := &ServerRunOptions{
-		ServiceNodePortRange:   kubeoptions.DefaultServiceNodePortRange,
-		MasterCount:            5,
-		EndpointReconcilerType: string(reconcilers.MasterCountReconcilerType),
-		AllowPrivileged:        false,
+		SSHPreferredAddressTypes: []string{string(kapi.NodeExternalIP)},
+		ServiceNodePortRange:     kubeoptions.DefaultServiceNodePortRange,
+		MasterCount:              5,
+		EndpointReconcilerType:   string(reconcilers.MasterCountReconcilerType),
+		AllowPrivileged:          false,
 		GenericServerRunOptions: &apiserveroptions.ServerRunOptions{
 			AdvertiseAddress:            net.ParseIP("192.168.10.10"),
 			CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},

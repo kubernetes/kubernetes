@@ -232,6 +232,9 @@ func CreateNodeDialer(s *options.ServerRunOptions) (tunneler.Tunneler, *http.Tra
 		if s.KubeletConfig.ReadOnlyPort == 0 {
 			return nil, nil, fmt.Errorf("must enable kubelet readonly port if proxy ssh-tunneling is specified")
 		}
+		if len(s.SSHPreferredAddressTypes) == 0 {
+			return nil, nil, fmt.Errorf("a ssh-preferred-address-types must be specified if proxy ssh-tunneling is specified")
+		}
 		// Set up the nodeTunneler
 		// TODO(cjcullen): If we want this to handle per-kubelet ports or other
 		// kubelet listen-addresses, we need to plumb through options.
@@ -240,7 +243,7 @@ func CreateNodeDialer(s *options.ServerRunOptions) (tunneler.Tunneler, *http.Tra
 			Host:   net.JoinHostPort("127.0.0.1", strconv.FormatUint(uint64(s.KubeletConfig.ReadOnlyPort), 10)),
 			Path:   "healthz",
 		}
-		nodeTunneler = tunneler.New(s.SSHUser, s.SSHKeyfile, healthCheckPath, installSSHKey)
+		nodeTunneler = tunneler.New(s.SSHUser, s.SSHKeyfile, healthCheckPath, installSSHKey, s.SSHPreferredAddressTypes)
 
 		// Use the nodeTunneler's dialer when proxying to pods, services, and nodes
 		proxyDialerFn = nodeTunneler.Dial

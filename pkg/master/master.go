@@ -382,7 +382,7 @@ func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.
 }
 
 func (m *Master) installTunneler(nodeTunneler tunneler.Tunneler, nodeClient corev1client.NodeInterface) {
-	nodeTunneler.Run(nodeAddressProvider{nodeClient}.externalAddresses)
+	nodeTunneler.Run(nodeAddressProvider{nodeClient}.preferredAddresses)
 	m.GenericAPIServer.AddHealthzChecks(healthz.NamedCheck("SSH Tunnel Check", tunneler.TunnelSyncHealthChecker(nodeTunneler)))
 	prometheus.NewGaugeFunc(prometheus.GaugeOpts{
 		Name: "apiserver_proxy_tunnel_sync_latency_secs",
@@ -435,10 +435,12 @@ type nodeAddressProvider struct {
 	nodeClient corev1client.NodeInterface
 }
 
-func (n nodeAddressProvider) externalAddresses() ([]string, error) {
-	preferredAddressTypes := []apiv1.NodeAddressType{
-		apiv1.NodeExternalIP,
+func (n nodeAddressProvider) preferredAddresses(preferredAddressTypes []string) ([]string, error) {
+	nodeAddressTypes := []apiv1.NodeAddressType{}
+	for _, v := range preferredAddressTypes {
+		nodeAddressTypes = append(nodeAddressTypes, apiv1.NodeAddressType(v))
 	}
+
 	nodes, err := n.nodeClient.List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
@@ -446,7 +448,7 @@ func (n nodeAddressProvider) externalAddresses() ([]string, error) {
 	addrs := []string{}
 	for ix := range nodes.Items {
 		node := &nodes.Items[ix]
-		addr, err := nodeutil.GetPreferredNodeAddress(node, preferredAddressTypes)
+		addr, err := nodeutil.GetPreferredNodeAddress(node, nodeAddressTypes)
 		if err != nil {
 			return nil, err
 		}
