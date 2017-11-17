@@ -23,7 +23,7 @@ go_library(
         "//pkg/api/testapi:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/core:go_default_library",
-        "//pkg/apis/policy/v1alpha1:go_default_library",
+        "//pkg/apis/policy/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/replication:go_default_library",
