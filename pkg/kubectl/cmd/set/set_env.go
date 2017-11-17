@@ -39,7 +39,8 @@ import (
 )
 
 var (
-	envResources = `
+	validEnvNameRegexp = regexp.MustCompile("[^a-zA-Z0-9_]")
+	envResources       = `
   	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), job, replicaset (rs)`
 
 	envLong = templates.LongDesc(`
@@ -172,7 +173,6 @@ func validateNoOverwrites(existing []v1.EnvVar, env []v1.EnvVar) error {
 }
 
 func keyToEnvName(key string) string {
-	validEnvNameRegexp := regexp.MustCompile("[^a-zA-Z0-9_]")
 	return strings.ToUpper(validEnvNameRegexp.ReplaceAllString(key, "_"))
 }
 
