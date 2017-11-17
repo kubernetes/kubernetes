@@ -93,7 +93,7 @@ func TestAdmitAndValidate(t *testing.T) {
 			t.Errorf("unexpected result of admit call: %v", accepted)
 		}
 		for _, h := range test.chain {
-			fake := h.Interface().(*FakeHandler)
+			fake := h.(*FakeHandler)
 			_, shouldBeCalled := test.calls[h.Name()]
 			if shouldBeCalled != fake.admitCalled {
 				t.Errorf("admit handler %s not called as expected: %v", h.Name(), fake.admitCalled)
@@ -120,7 +120,7 @@ func TestAdmitAndValidate(t *testing.T) {
 			t.Errorf("unexpected result of validate call: %v\n", accepted)
 		}
 		for _, h := range test.chain {
-			fake := h.Interface().(*FakeHandler)
+			fake := h.(*FakeHandler)
 
 			_, shouldBeCalled := test.calls[h.Name()]
 			if shouldBeCalled != fake.validateCalled {

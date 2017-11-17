@@ -29,8 +29,8 @@ func NewChainHandler(handlers ...NamedHandler) chainAdmissionHandler {
 
 func NewNamedHandler(name string, i Interface) NamedHandler {
 	return &pluginHandler{
-		i:    i,
-		name: name,
+		Interface: i,
+		name:      name,
 	}
 }
 
@@ -49,10 +49,10 @@ func (admissionHandler chainAdmissionHandler) Admit(a Attributes) error {
 
 func (admissionHandler chainAdmissionHandler) admit(a Attributes) error {
 	for _, handler := range admissionHandler {
-		if !handler.Interface().Handles(a.GetOperation()) {
+		if !handler.Handles(a.GetOperation()) {
 			continue
 		}
-		if mutator, ok := handler.Interface().(MutationInterface); ok {
+		if mutator, ok := handler.(MutationInterface); ok {
 			t := time.Now()
 			err := mutator.Admit(a)
 			Metrics.ObserveAdmissionController(time.Since(t), err != nil, handler, a, stepAdmit)
@@ -74,10 +74,10 @@ func (admissionHandler chainAdmissionHandler) Validate(a Attributes) error {
 
 func (admissionHandler chainAdmissionHandler) validate(a Attributes) (err error) {
 	for _, handler := range admissionHandler {
-		if !handler.Interface().Handles(a.GetOperation()) {
+		if !handler.Handles(a.GetOperation()) {
 			continue
 		}
-		if validator, ok := handler.Interface().(ValidationInterface); ok {
+		if validator, ok := handler.(ValidationInterface); ok {
 			t := time.Now()
 			err := validator.Validate(a)
 			Metrics.ObserveAdmissionController(time.Since(t), err != nil, handler, a, stepValidate)
@@ -92,7 +92,7 @@ func (admissionHandler chainAdmissionHandler) validate(a Attributes) (err error)
 // Handles will return true if any of the handlers handles the given operation
 func (admissionHandler chainAdmissionHandler) Handles(operation Operation) bool {
 	for _, handler := range admissionHandler {
-		if handler.Interface().Handles(operation) {
+		if handler.Handles(operation) {
 			return true
 		}
 	}
