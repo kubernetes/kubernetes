@@ -396,6 +396,9 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 	} else if currentReplicas > hpa.Spec.MaxReplicas {
 		rescaleReason = "Current number of replicas above Spec.MaxReplicas"
 		desiredReplicas = hpa.Spec.MaxReplicas
+	} else if currentReplicas == hpa.Spec.MaxReplicas {
+		rescale = false
+		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "ScalingNoNeed", "no need to scale since the replica count equals maximum limit")
 	} else if hpa.Spec.MinReplicas != nil && currentReplicas < *hpa.Spec.MinReplicas {
 		rescaleReason = "Current number of replicas below Spec.MinReplicas"
 		desiredReplicas = *hpa.Spec.MinReplicas
