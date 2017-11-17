@@ -660,7 +660,7 @@ func TestReconcileSecurityGroupNewServiceAddsPort(t *testing.T) {
 	lb, _ := az.reconcileLoadBalancer(testClusterName, &svc1, clusterResources.nodes, true)
 	lbStatus, _ := az.getServiceLoadBalancerStatus(&svc1, lb)
 
-	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, lbStatus, true /* wantLb */)
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, &lbStatus.Ingress[0].IP, true /* wantLb */)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -677,7 +677,7 @@ func TestReconcileSecurityGroupNewInternalServiceAddsPort(t *testing.T) {
 
 	lb, _ := az.reconcileLoadBalancer(testClusterName, &svc1, clusterResources.nodes, true)
 	lbStatus, _ := az.getServiceLoadBalancerStatus(&svc1, lb)
-	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, lbStatus, true /* wantLb */)
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, &lbStatus.Ingress[0].IP, true /* wantLb */)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -699,7 +699,7 @@ func TestReconcileSecurityGroupRemoveService(t *testing.T) {
 	sg := getTestSecurityGroup(az, service1, service2)
 	validateSecurityGroup(t, sg, service1, service2)
 
-	sg, err := az.reconcileSecurityGroup(testClusterName, &service1, lbStatus, false /* wantLb */)
+	sg, err := az.reconcileSecurityGroup(testClusterName, &service1, &lbStatus.Ingress[0].IP, false /* wantLb */)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -717,7 +717,7 @@ func TestReconcileSecurityGroupRemoveServiceRemovesPort(t *testing.T) {
 	lb, _ := az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, true)
 	lbStatus, _ := az.getServiceLoadBalancerStatus(&svc, lb)
 
-	sg, err := az.reconcileSecurityGroup(testClusterName, &svcUpdated, lbStatus, true /* wantLb */)
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svcUpdated, &lbStatus.Ingress[0].IP, true /* wantLb */)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -738,7 +738,7 @@ func TestReconcileSecurityWithSourceRanges(t *testing.T) {
 	lb, _ := az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, true)
 	lbStatus, _ := az.getServiceLoadBalancerStatus(&svc, lb)
 
-	sg, err := az.reconcileSecurityGroup(testClusterName, &svc, lbStatus, true /* wantLb */)
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc, &lbStatus.Ingress[0].IP, true /* wantLb */)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -1266,19 +1266,73 @@ func validatePublicIP(t *testing.T, publicIP *network.PublicIPAddress, service *
 	// Becuase service properties are updated outside of cloudprovider code
 }
 
+func contains(ruleValues []string, targetValue string) bool {
+	for _, ruleValue := range ruleValues {
+		if strings.EqualFold(ruleValue, targetValue) {
+			return true
+		}
+	}
+	return false
+}
+
+func securityRuleMatches(serviceSourceRange string, servicePort v1.ServicePort, serviceIP string, securityRule network.SecurityRule) error {
+	ruleSource := securityRule.SourceAddressPrefixes
+	if ruleSource == nil || len(*ruleSource) == 0 {
+		if securityRule.SourceAddressPrefix == nil {
+			ruleSource = &[]string{}
+		} else {
+			ruleSource = &[]string{*securityRule.SourceAddressPrefix}
+		}
+	}
+
+	rulePorts := securityRule.DestinationPortRanges
+	if rulePorts == nil || len(*rulePorts) == 0 {
+		if securityRule.DestinationPortRange == nil {
+			rulePorts = &[]string{}
+		} else {
+			rulePorts = &[]string{*securityRule.DestinationPortRange}
+		}
+	}
+
+	ruleDestination := securityRule.DestinationAddressPrefixes
+	if ruleDestination == nil || len(*ruleDestination) == 0 {
+		if securityRule.DestinationAddressPrefix == nil {
+			ruleDestination = &[]string{}
+		} else {
+			ruleDestination = &[]string{*securityRule.DestinationAddressPrefix}
+		}
+	}
+
+	if !contains(*ruleSource, serviceSourceRange) {
+		return fmt.Errorf("Rule does not contain source %s", serviceSourceRange)
+	}
+
+	if !contains(*rulePorts, fmt.Sprintf("%d", servicePort.Port)) {
+		return fmt.Errorf("Rule does not contain port %d", servicePort.Port)
+	}
+
+	if serviceIP != "" && !contains(*ruleDestination, serviceIP) {
+		return fmt.Errorf("Rule does not contain destination %s", serviceIP)
+	}
+
+	return nil
+}
+
 func validateSecurityGroup(t *testing.T, securityGroup *network.SecurityGroup, services ...v1.Service) {
-	expectedRuleCount := 0
+	seenRules := make(map[string]string)
 	for _, svc := range services {
 		for _, wantedRule := range svc.Spec.Ports {
 			sources := getServiceSourceRanges(&svc)
 			for _, source := range sources {
 				wantedRuleName := getSecurityRuleName(&svc, wantedRule, source)
-				expectedRuleCount++
+				seenRules[wantedRuleName] = wantedRuleName
 				foundRule := false
 				for _, actualRule := range *securityGroup.SecurityRules {
-					if strings.EqualFold(*actualRule.Name, wantedRuleName) &&
-						*actualRule.SourceAddressPrefix == source &&
-						*actualRule.DestinationPortRange == fmt.Sprintf("%d", wantedRule.Port) {
+					if strings.EqualFold(*actualRule.Name, wantedRuleName) {
+						err := securityRuleMatches(source, wantedRule, svc.Spec.LoadBalancerIP, actualRule)
+						if err != nil {
+							t.Errorf("Found matching security rule %q but properties were incorrect: %v", wantedRuleName, err)
+						}
 						foundRule = true
 						break
 					}
@@ -1291,6 +1345,7 @@ func validateSecurityGroup(t *testing.T, securityGroup *network.SecurityGroup, s
 	}
 
 	lenRules := len(*securityGroup.SecurityRules)
+	expectedRuleCount := len(seenRules)
 	if lenRules != expectedRuleCount {
 		t.Errorf("Expected the loadbalancer to have %d rules. Found %d.\n", expectedRuleCount, lenRules)
 	}
@@ -1698,3 +1753,831 @@ func addTestSubnet(t *testing.T, az *Cloud, svc *v1.Service) {
 	}
 	svc.Annotations[ServiceAnnotationLoadBalancerInternalSubnet] = subName
 }
+
+func TestIfServiceSpecifiesSharedRuleAndRuleDoesNotExistItIsCreated(t *testing.T) {
+	az := getTestCloud()
+	svc := getTestService("servicesr", v1.ProtocolTCP, 80)
+	svc.Spec.LoadBalancerIP = "192.168.77.88"
+	svc.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	sg := getTestSecurityGroup(az)
+
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc, to.StringPtr(svc.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error: %q", err)
+	}
+
+	validateSecurityGroup(t, sg, svc)
+
+	expectedRuleName := "shared-TCP-80-Internet"
+	_, securityRule, ruleFound := findSecurityRuleByName(*sg.SecurityRules, expectedRuleName)
+	if !ruleFound {
+		t.Fatalf("Expected security rule %q but it was not present", expectedRuleName)
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 80}, "192.168.77.88", securityRule)
+	if err != nil {
+		t.Errorf("Shared rule was not updated with new service IP: %v", err)
+	}
+
+	if securityRule.Priority == nil {
+		t.Errorf("Shared rule %s had no priority", expectedRuleName)
+	}
+
+	if securityRule.Access != network.SecurityRuleAccessAllow {
+		t.Errorf("Shared rule %s did not have Allow access", expectedRuleName)
+	}
+
+	if securityRule.Direction != network.SecurityRuleDirectionInbound {
+		t.Errorf("Shared rule %s did not have Inbound direction", expectedRuleName)
+	}
+}
+
+func TestIfServiceSpecifiesSharedRuleAndRuleExistsThenTheServicesPortAndAddressAreAdded(t *testing.T) {
+	az := getTestCloud()
+	svc := getTestService("servicesr", v1.ProtocolTCP, 80)
+	svc.Spec.LoadBalancerIP = "192.168.77.88"
+	svc.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	expectedRuleName := "shared-TCP-80-Internet"
+
+	sg := getTestSecurityGroup(az)
+	sg.SecurityRules = &[]network.SecurityRule{
+		{
+			Name: &expectedRuleName,
+			SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
+				Protocol:                 network.SecurityRuleProtocolTCP,
+				SourcePortRange:          to.StringPtr("*"),
+				SourceAddressPrefix:      to.StringPtr("Internet"),
+				DestinationPortRange:     to.StringPtr("80"),
+				DestinationAddressPrefix: to.StringPtr("192.168.33.44"),
+				Access:    network.SecurityRuleAccessAllow,
+				Direction: network.SecurityRuleDirectionInbound,
+			},
+		},
+	}
+
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc, to.StringPtr(svc.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error: %q", err)
+	}
+
+	validateSecurityGroup(t, sg, svc)
+
+	_, securityRule, ruleFound := findSecurityRuleByName(*sg.SecurityRules, expectedRuleName)
+	if !ruleFound {
+		t.Fatalf("Expected security rule %q but it was not present", expectedRuleName)
+	}
+
+	expectedDestinationIPCount := 2
+	if len(*securityRule.DestinationAddressPrefixes) != expectedDestinationIPCount {
+		t.Errorf("Shared rule should have had %d destination IP addresses but had %d", expectedDestinationIPCount, len(*securityRule.DestinationAddressPrefixes))
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 80}, "192.168.33.44", securityRule)
+	if err != nil {
+		t.Errorf("Shared rule no longer matched other service IP: %v", err)
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 80}, "192.168.77.88", securityRule)
+	if err != nil {
+		t.Errorf("Shared rule was not updated with new service IP: %v", err)
+	}
+}
+
+func TestIfServicesSpecifySharedRuleButDifferentPortsThenSeparateRulesAreCreated(t *testing.T) {
+	az := getTestCloud()
+
+	svc1 := getTestService("servicesr1", v1.ProtocolTCP, 4444)
+	svc1.Spec.LoadBalancerIP = "192.168.77.88"
+	svc1.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	svc2 := getTestService("servicesr2", v1.ProtocolTCP, 8888)
+	svc2.Spec.LoadBalancerIP = "192.168.33.44"
+	svc2.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	expectedRuleName1 := "shared-TCP-4444-Internet"
+	expectedRuleName2 := "shared-TCP-8888-Internet"
+
+	sg := getTestSecurityGroup(az)
+
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc1: %q", err)
+	}
+
+	sg, err = az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc2: %q", err)
+	}
+
+	validateSecurityGroup(t, sg, svc1, svc2)
+
+	_, securityRule1, rule1Found := findSecurityRuleByName(*sg.SecurityRules, expectedRuleName1)
+	if !rule1Found {
+		t.Fatalf("Expected security rule %q but it was not present", expectedRuleName1)
+	}
+
+	_, securityRule2, rule2Found := findSecurityRuleByName(*sg.SecurityRules, expectedRuleName2)
+	if !rule2Found {
+		t.Fatalf("Expected security rule %q but it was not present", expectedRuleName2)
+	}
+
+	expectedDestinationIPCount1 := 1
+	if len(*securityRule1.DestinationAddressPrefixes) != expectedDestinationIPCount1 {
+		t.Errorf("Shared rule %s should have had %d destination IP addresses but had %d", expectedRuleName1, expectedDestinationIPCount1, len(*securityRule1.DestinationAddressPrefixes))
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 4444}, "192.168.77.88", securityRule1)
+	if err != nil {
+		t.Errorf("Shared rule %s did not match service IP: %v", expectedRuleName1, err)
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 8888}, "192.168.33.44", securityRule1)
+	if err == nil {
+		t.Errorf("Shared rule %s matched wrong service's port and IP", expectedRuleName1)
+	}
+
+	expectedDestinationIPCount2 := 1
+	if len(*securityRule2.DestinationAddressPrefixes) != expectedDestinationIPCount2 {
+		t.Errorf("Shared rule %s should have had %d destination IP addresses but had %d", expectedRuleName2, expectedDestinationIPCount2, len(*securityRule2.DestinationAddressPrefixes))
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 8888}, "192.168.33.44", securityRule2)
+	if err != nil {
+		t.Errorf("Shared rule %s did not match service IP: %v", expectedRuleName2, err)
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 4444}, "192.168.77.88", securityRule2)
+	if err == nil {
+		t.Errorf("Shared rule %s matched wrong service's port and IP", expectedRuleName2)
+	}
+}
+
+func TestIfServicesSpecifySharedRuleButDifferentProtocolsThenSeparateRulesAreCreated(t *testing.T) {
+	az := getTestCloud()
+
+	svc1 := getTestService("servicesr1", v1.ProtocolTCP, 4444)
+	svc1.Spec.LoadBalancerIP = "192.168.77.88"
+	svc1.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	svc2 := getTestService("servicesr2", v1.ProtocolUDP, 4444)
+	svc2.Spec.LoadBalancerIP = "192.168.77.88"
+	svc2.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	expectedRuleName1 := "shared-TCP-4444-Internet"
+	expectedRuleName2 := "shared-UDP-4444-Internet"
+
+	sg := getTestSecurityGroup(az)
+
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc1: %q", err)
+	}
+
+	sg, err = az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc2: %q", err)
+	}
+
+	validateSecurityGroup(t, sg, svc1, svc2)
+
+	_, securityRule1, rule1Found := findSecurityRuleByName(*sg.SecurityRules, expectedRuleName1)
+	if !rule1Found {
+		t.Fatalf("Expected security rule %q but it was not present", expectedRuleName1)
+	}
+
+	_, securityRule2, rule2Found := findSecurityRuleByName(*sg.SecurityRules, expectedRuleName2)
+	if !rule2Found {
+		t.Fatalf("Expected security rule %q but it was not present", expectedRuleName2)
+	}
+
+	expectedDestinationIPCount1 := 1
+	if len(*securityRule1.DestinationAddressPrefixes) != expectedDestinationIPCount1 {
+		t.Errorf("Shared rule %s should have had %d destination IP addresses but had %d", expectedRuleName1, expectedDestinationIPCount1, len(*securityRule1.DestinationAddressPrefixes))
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 4444}, "192.168.77.88", securityRule1)
+	if err != nil {
+		t.Errorf("Shared rule %s did not match service IP: %v", expectedRuleName1, err)
+	}
+
+	if securityRule1.Protocol != network.SecurityRuleProtocolTCP {
+		t.Errorf("Shared rule %s should have been %s but was %s", expectedRuleName1, network.SecurityRuleProtocolTCP, securityRule1.Protocol)
+	}
+
+	expectedDestinationIPCount2 := 1
+	if len(*securityRule2.DestinationAddressPrefixes) != expectedDestinationIPCount2 {
+		t.Errorf("Shared rule %s should have had %d destination IP addresses but had %d", expectedRuleName2, expectedDestinationIPCount2, len(*securityRule2.DestinationAddressPrefixes))
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 4444}, "192.168.77.88", securityRule2)
+	if err != nil {
+		t.Errorf("Shared rule %s did not match service IP: %v", expectedRuleName2, err)
+	}
+
+	if securityRule2.Protocol != network.SecurityRuleProtocolUDP {
+		t.Errorf("Shared rule %s should have been %s but was %s", expectedRuleName2, network.SecurityRuleProtocolUDP, securityRule2.Protocol)
+	}
+}
+
+func TestIfServicesSpecifySharedRuleButDifferentSourceAddressesThenSeparateRulesAreCreated(t *testing.T) {
+	az := getTestCloud()
+
+	svc1 := getTestService("servicesr1", v1.ProtocolTCP, 80)
+	svc1.Spec.LoadBalancerIP = "192.168.77.88"
+	svc1.Spec.LoadBalancerSourceRanges = []string{"192.168.12.0/24"}
+	svc1.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	svc2 := getTestService("servicesr2", v1.ProtocolTCP, 80)
+	svc2.Spec.LoadBalancerIP = "192.168.33.44"
+	svc2.Spec.LoadBalancerSourceRanges = []string{"192.168.34.0/24"}
+	svc2.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	expectedRuleName1 := "shared-TCP-80-192.168.12.0_24"
+	expectedRuleName2 := "shared-TCP-80-192.168.34.0_24"
+
+	sg := getTestSecurityGroup(az)
+
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc1: %q", err)
+	}
+
+	sg, err = az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc2: %q", err)
+	}
+
+	validateSecurityGroup(t, sg, svc1, svc2)
+
+	_, securityRule1, rule1Found := findSecurityRuleByName(*sg.SecurityRules, expectedRuleName1)
+	if !rule1Found {
+		t.Fatalf("Expected security rule %q but it was not present", expectedRuleName1)
+	}
+
+	_, securityRule2, rule2Found := findSecurityRuleByName(*sg.SecurityRules, expectedRuleName2)
+	if !rule2Found {
+		t.Fatalf("Expected security rule %q but it was not present", expectedRuleName2)
+	}
+
+	expectedDestinationIPCount1 := 1
+	if len(*securityRule1.DestinationAddressPrefixes) != expectedDestinationIPCount1 {
+		t.Errorf("Shared rule %s should have had %d destination IP addresses but had %d", expectedRuleName1, expectedDestinationIPCount1, len(*securityRule1.DestinationAddressPrefixes))
+	}
+
+	err = securityRuleMatches(svc1.Spec.LoadBalancerSourceRanges[0], v1.ServicePort{Port: 80}, "192.168.77.88", securityRule1)
+	if err != nil {
+		t.Errorf("Shared rule %s did not match service IP: %v", expectedRuleName1, err)
+	}
+
+	err = securityRuleMatches(svc2.Spec.LoadBalancerSourceRanges[0], v1.ServicePort{Port: 80}, "192.168.33.44", securityRule1)
+	if err == nil {
+		t.Errorf("Shared rule %s matched wrong service's port and IP", expectedRuleName1)
+	}
+
+	expectedDestinationIPCount2 := 1
+	if len(*securityRule2.DestinationAddressPrefixes) != expectedDestinationIPCount2 {
+		t.Errorf("Shared rule %s should have had %d destination IP addresses but had %d", expectedRuleName2, expectedDestinationIPCount2, len(*securityRule2.DestinationAddressPrefixes))
+	}
+
+	err = securityRuleMatches(svc2.Spec.LoadBalancerSourceRanges[0], v1.ServicePort{Port: 80}, "192.168.33.44", securityRule2)
+	if err != nil {
+		t.Errorf("Shared rule %s did not match service IP: %v", expectedRuleName2, err)
+	}
+
+	err = securityRuleMatches(svc1.Spec.LoadBalancerSourceRanges[0], v1.ServicePort{Port: 80}, "192.168.77.88", securityRule2)
+	if err == nil {
+		t.Errorf("Shared rule %s matched wrong service's port and IP", expectedRuleName2)
+	}
+}
+
+func TestIfServicesSpecifySharedRuleButSomeAreOnDifferentPortsThenRulesAreSeparatedOrConsoliatedByPort(t *testing.T) {
+	az := getTestCloud()
+
+	svc1 := getTestService("servicesr1", v1.ProtocolTCP, 4444)
+	svc1.Spec.LoadBalancerIP = "192.168.77.88"
+	svc1.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	svc2 := getTestService("servicesr2", v1.ProtocolTCP, 8888)
+	svc2.Spec.LoadBalancerIP = "192.168.33.44"
+	svc2.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	svc3 := getTestService("servicesr3", v1.ProtocolTCP, 4444)
+	svc3.Spec.LoadBalancerIP = "192.168.99.11"
+	svc3.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	expectedRuleName13 := "shared-TCP-4444-Internet"
+	expectedRuleName2 := "shared-TCP-8888-Internet"
+
+	sg := getTestSecurityGroup(az)
+
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc1: %q", err)
+	}
+
+	sg, err = az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc2: %q", err)
+	}
+
+	sg, err = az.reconcileSecurityGroup(testClusterName, &svc3, to.StringPtr(svc3.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc3: %q", err)
+	}
+
+	validateSecurityGroup(t, sg, svc1, svc2, svc3)
+
+	_, securityRule13, rule13Found := findSecurityRuleByName(*sg.SecurityRules, expectedRuleName13)
+	if !rule13Found {
+		t.Fatalf("Expected security rule %q but it was not present", expectedRuleName13)
+	}
+
+	_, securityRule2, rule2Found := findSecurityRuleByName(*sg.SecurityRules, expectedRuleName2)
+	if !rule2Found {
+		t.Fatalf("Expected security rule %q but it was not present", expectedRuleName2)
+	}
+
+	expectedDestinationIPCount13 := 2
+	if len(*securityRule13.DestinationAddressPrefixes) != expectedDestinationIPCount13 {
+		t.Errorf("Shared rule %s should have had %d destination IP addresses but had %d", expectedRuleName13, expectedDestinationIPCount13, len(*securityRule13.DestinationAddressPrefixes))
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 4444}, "192.168.77.88", securityRule13)
+	if err != nil {
+		t.Errorf("Shared rule %s did not match service IP: %v", expectedRuleName13, err)
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 4444}, "192.168.99.11", securityRule13)
+	if err != nil {
+		t.Errorf("Shared rule %s did not match service IP: %v", expectedRuleName13, err)
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 8888}, "192.168.33.44", securityRule13)
+	if err == nil {
+		t.Errorf("Shared rule %s matched wrong service's port and IP", expectedRuleName13)
+	}
+
+	if securityRule13.Priority == nil {
+		t.Errorf("Shared rule %s had no priority", expectedRuleName13)
+	}
+
+	if securityRule13.Access != network.SecurityRuleAccessAllow {
+		t.Errorf("Shared rule %s did not have Allow access", expectedRuleName13)
+	}
+
+	if securityRule13.Direction != network.SecurityRuleDirectionInbound {
+		t.Errorf("Shared rule %s did not have Inbound direction", expectedRuleName13)
+	}
+
+	expectedDestinationIPCount2 := 1
+	if len(*securityRule2.DestinationAddressPrefixes) != expectedDestinationIPCount2 {
+		t.Errorf("Shared rule %s should have had %d destination IP addresses but had %d", expectedRuleName2, expectedDestinationIPCount2, len(*securityRule2.DestinationAddressPrefixes))
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 8888}, "192.168.33.44", securityRule2)
+	if err != nil {
+		t.Errorf("Shared rule %s did not match service IP: %v", expectedRuleName2, err)
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 4444}, "192.168.77.88", securityRule2)
+	if err == nil {
+		t.Errorf("Shared rule %s matched wrong service's port and IP", expectedRuleName2)
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 4444}, "192.168.99.11", securityRule2)
+	if err == nil {
+		t.Errorf("Shared rule %s matched wrong service's port and IP", expectedRuleName2)
+	}
+}
+
+func TestIfServiceSpecifiesSharedRuleAndServiceIsDeletedThenTheServicesPortAndAddressAreRemoved(t *testing.T) {
+	az := getTestCloud()
+
+	svc1 := getTestService("servicesr1", v1.ProtocolTCP, 80)
+	svc1.Spec.LoadBalancerIP = "192.168.77.88"
+	svc1.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	svc2 := getTestService("servicesr2", v1.ProtocolTCP, 80)
+	svc2.Spec.LoadBalancerIP = "192.168.33.44"
+	svc2.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	expectedRuleName := "shared-TCP-80-Internet"
+
+	sg := getTestSecurityGroup(az)
+
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc1: %q", err)
+	}
+
+	sg, err = az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc2: %q", err)
+	}
+
+	validateSecurityGroup(t, sg, svc1, svc2)
+
+	sg, err = az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), false)
+	if err != nil {
+		t.Errorf("Unexpected error removing svc1: %q", err)
+	}
+
+	validateSecurityGroup(t, sg, svc2)
+
+	_, securityRule, ruleFound := findSecurityRuleByName(*sg.SecurityRules, expectedRuleName)
+	if !ruleFound {
+		t.Fatalf("Expected security rule %q but it was not present", expectedRuleName)
+	}
+
+	expectedDestinationIPCount := 1
+	if len(*securityRule.DestinationAddressPrefixes) != expectedDestinationIPCount {
+		t.Errorf("Shared rule should have had %d destination IP addresses but had %d", expectedDestinationIPCount, len(*securityRule.DestinationAddressPrefixes))
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 80}, "192.168.33.44", securityRule)
+	if err != nil {
+		t.Errorf("Shared rule no longer matched other service IP: %v", err)
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 80}, "192.168.77.88", securityRule)
+	if err == nil {
+		t.Error("Shared rule was not updated to remove deleted service IP")
+	}
+}
+
+func TestIfSomeServicesShareARuleAndOneIsDeletedItIsRemovedFromTheRightRule(t *testing.T) {
+	az := getTestCloud()
+
+	svc1 := getTestService("servicesr1", v1.ProtocolTCP, 4444)
+	svc1.Spec.LoadBalancerIP = "192.168.77.88"
+	svc1.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	svc2 := getTestService("servicesr2", v1.ProtocolTCP, 8888)
+	svc2.Spec.LoadBalancerIP = "192.168.33.44"
+	svc2.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	svc3 := getTestService("servicesr3", v1.ProtocolTCP, 4444)
+	svc3.Spec.LoadBalancerIP = "192.168.99.11"
+	svc3.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	expectedRuleName13 := "shared-TCP-4444-Internet"
+	expectedRuleName2 := "shared-TCP-8888-Internet"
+
+	sg := getTestSecurityGroup(az)
+
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc1: %q", err)
+	}
+
+	sg, err = az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc2: %q", err)
+	}
+
+	sg, err = az.reconcileSecurityGroup(testClusterName, &svc3, to.StringPtr(svc3.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc3: %q", err)
+	}
+
+	validateSecurityGroup(t, sg, svc1, svc2, svc3)
+
+	sg, err = az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), false)
+	if err != nil {
+		t.Errorf("Unexpected error removing svc1: %q", err)
+	}
+
+	validateSecurityGroup(t, sg, svc2, svc3)
+
+	_, securityRule13, rule13Found := findSecurityRuleByName(*sg.SecurityRules, expectedRuleName13)
+	if !rule13Found {
+		t.Fatalf("Expected security rule %q but it was not present", expectedRuleName13)
+	}
+
+	_, securityRule2, rule2Found := findSecurityRuleByName(*sg.SecurityRules, expectedRuleName2)
+	if !rule2Found {
+		t.Fatalf("Expected security rule %q but it was not present", expectedRuleName2)
+	}
+
+	expectedDestinationIPCount13 := 1
+	if len(*securityRule13.DestinationAddressPrefixes) != expectedDestinationIPCount13 {
+		t.Errorf("Shared rule %s should have had %d destination IP addresses but had %d", expectedRuleName13, expectedDestinationIPCount13, len(*securityRule13.DestinationAddressPrefixes))
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 4444}, "192.168.77.88", securityRule13)
+	if err == nil {
+		t.Errorf("Shared rule %s should have had svc1 removed but did not", expectedRuleName13)
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 4444}, "192.168.99.11", securityRule13)
+	if err != nil {
+		t.Errorf("Shared rule %s did not match service IP: %v", expectedRuleName13, err)
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 8888}, "192.168.33.44", securityRule13)
+	if err == nil {
+		t.Errorf("Shared rule %s matched wrong service's port and IP", expectedRuleName13)
+	}
+
+	if securityRule13.Priority == nil {
+		t.Errorf("Shared rule %s had no priority", expectedRuleName13)
+	}
+
+	if securityRule13.Access != network.SecurityRuleAccessAllow {
+		t.Errorf("Shared rule %s did not have Allow access", expectedRuleName13)
+	}
+
+	if securityRule13.Direction != network.SecurityRuleDirectionInbound {
+		t.Errorf("Shared rule %s did not have Inbound direction", expectedRuleName13)
+	}
+
+	expectedDestinationIPCount2 := 1
+	if len(*securityRule2.DestinationAddressPrefixes) != expectedDestinationIPCount2 {
+		t.Errorf("Shared rule %s should have had %d destination IP addresses but had %d", expectedRuleName2, expectedDestinationIPCount2, len(*securityRule2.DestinationAddressPrefixes))
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 8888}, "192.168.33.44", securityRule2)
+	if err != nil {
+		t.Errorf("Shared rule %s did not match service IP: %v", expectedRuleName2, err)
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 4444}, "192.168.77.88", securityRule2)
+	if err == nil {
+		t.Errorf("Shared rule %s matched wrong service's port and IP", expectedRuleName2)
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 4444}, "192.168.99.11", securityRule2)
+	if err == nil {
+		t.Errorf("Shared rule %s matched wrong service's port and IP", expectedRuleName2)
+	}
+}
+
+func TestIfServiceSpecifiesSharedRuleAndLastServiceIsDeletedThenRuleIsDeleted(t *testing.T) {
+	az := getTestCloud()
+
+	svc1 := getTestService("servicesr1", v1.ProtocolTCP, 4444)
+	svc1.Spec.LoadBalancerIP = "192.168.77.88"
+	svc1.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	svc2 := getTestService("servicesr2", v1.ProtocolTCP, 8888)
+	svc2.Spec.LoadBalancerIP = "192.168.33.44"
+	svc2.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	svc3 := getTestService("servicesr3", v1.ProtocolTCP, 4444)
+	svc3.Spec.LoadBalancerIP = "192.168.99.11"
+	svc3.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	expectedRuleName13 := "shared-TCP-4444-Internet"
+	expectedRuleName2 := "shared-TCP-8888-Internet"
+
+	sg := getTestSecurityGroup(az)
+
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc1: %q", err)
+	}
+
+	sg, err = az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc2: %q", err)
+	}
+
+	sg, err = az.reconcileSecurityGroup(testClusterName, &svc3, to.StringPtr(svc3.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc3: %q", err)
+	}
+
+	validateSecurityGroup(t, sg, svc1, svc2, svc3)
+
+	sg, err = az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), false)
+	if err != nil {
+		t.Errorf("Unexpected error removing svc1: %q", err)
+	}
+
+	sg, err = az.reconcileSecurityGroup(testClusterName, &svc3, to.StringPtr(svc3.Spec.LoadBalancerIP), false)
+	if err != nil {
+		t.Errorf("Unexpected error removing svc3: %q", err)
+	}
+
+	validateSecurityGroup(t, sg, svc2)
+
+	_, _, rule13Found := findSecurityRuleByName(*sg.SecurityRules, expectedRuleName13)
+	if rule13Found {
+		t.Fatalf("Expected security rule %q to have been deleted but it was still present", expectedRuleName13)
+	}
+
+	_, securityRule2, rule2Found := findSecurityRuleByName(*sg.SecurityRules, expectedRuleName2)
+	if !rule2Found {
+		t.Fatalf("Expected security rule %q but it was not present", expectedRuleName2)
+	}
+
+	expectedDestinationIPCount2 := 1
+	if len(*securityRule2.DestinationAddressPrefixes) != expectedDestinationIPCount2 {
+		t.Errorf("Shared rule %s should have had %d destination IP addresses but had %d", expectedRuleName2, expectedDestinationIPCount2, len(*securityRule2.DestinationAddressPrefixes))
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 8888}, "192.168.33.44", securityRule2)
+	if err != nil {
+		t.Errorf("Shared rule %s did not match service IP: %v", expectedRuleName2, err)
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 4444}, "192.168.77.88", securityRule2)
+	if err == nil {
+		t.Errorf("Shared rule %s matched wrong service's port and IP", expectedRuleName2)
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 4444}, "192.168.99.11", securityRule2)
+	if err == nil {
+		t.Errorf("Shared rule %s matched wrong service's port and IP", expectedRuleName2)
+	}
+}
+
+func TestCanCombineSharedAndPrivateRulesInSameGroup(t *testing.T) {
+	az := getTestCloud()
+
+	svc1 := getTestService("servicesr1", v1.ProtocolTCP, 4444)
+	svc1.Spec.LoadBalancerIP = "192.168.77.88"
+	svc1.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	svc2 := getTestService("servicesr2", v1.ProtocolTCP, 8888)
+	svc2.Spec.LoadBalancerIP = "192.168.33.44"
+	svc2.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	svc3 := getTestService("servicesr3", v1.ProtocolTCP, 4444)
+	svc3.Spec.LoadBalancerIP = "192.168.99.11"
+	svc3.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
+
+	svc4 := getTestService("servicesr4", v1.ProtocolTCP, 4444)
+	svc4.Spec.LoadBalancerIP = "192.168.22.33"
+	svc4.Annotations[ServiceAnnotationSharedSecurityRule] = "false"
+
+	svc5 := getTestService("servicesr5", v1.ProtocolTCP, 8888)
+	svc5.Spec.LoadBalancerIP = "192.168.22.33"
+	svc5.Annotations[ServiceAnnotationSharedSecurityRule] = "false"
+
+	expectedRuleName13 := "shared-TCP-4444-Internet"
+	expectedRuleName2 := "shared-TCP-8888-Internet"
+	expectedRuleName4 := getSecurityRuleName(&svc4, v1.ServicePort{Port: 4444, Protocol: v1.ProtocolTCP}, "Internet")
+	expectedRuleName5 := getSecurityRuleName(&svc5, v1.ServicePort{Port: 8888, Protocol: v1.ProtocolTCP}, "Internet")
+
+	sg := getTestSecurityGroup(az)
+
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc1: %q", err)
+	}
+
+	sg, err = az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc2: %q", err)
+	}
+
+	sg, err = az.reconcileSecurityGroup(testClusterName, &svc3, to.StringPtr(svc3.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc3: %q", err)
+	}
+
+	sg, err = az.reconcileSecurityGroup(testClusterName, &svc4, to.StringPtr(svc4.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc4: %q", err)
+	}
+
+	sg, err = az.reconcileSecurityGroup(testClusterName, &svc5, to.StringPtr(svc5.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error adding svc4: %q", err)
+	}
+
+	validateSecurityGroup(t, sg, svc1, svc2, svc3, svc4, svc5)
+
+	expectedRuleCount := 4
+	if len(*sg.SecurityRules) != expectedRuleCount {
+		t.Errorf("Expected security group to have %d rules but it had %d", expectedRuleCount, len(*sg.SecurityRules))
+	}
+
+	_, securityRule13, rule13Found := findSecurityRuleByName(*sg.SecurityRules, expectedRuleName13)
+	if !rule13Found {
+		t.Fatalf("Expected security rule %q but it was not present", expectedRuleName13)
+	}
+
+	_, securityRule2, rule2Found := findSecurityRuleByName(*sg.SecurityRules, expectedRuleName2)
+	if !rule2Found {
+		t.Fatalf("Expected security rule %q but it was not present", expectedRuleName2)
+	}
+
+	_, securityRule4, rule4Found := findSecurityRuleByName(*sg.SecurityRules, expectedRuleName4)
+	if !rule4Found {
+		t.Fatalf("Expected security rule %q but it was not present", expectedRuleName4)
+	}
+
+	_, securityRule5, rule5Found := findSecurityRuleByName(*sg.SecurityRules, expectedRuleName5)
+	if !rule5Found {
+		t.Fatalf("Expected security rule %q but it was not present", expectedRuleName5)
+	}
+
+	expectedDestinationIPCount13 := 2
+	if len(*securityRule13.DestinationAddressPrefixes) != expectedDestinationIPCount13 {
+		t.Errorf("Shared rule %s should have had %d destination IP addresses but had %d", expectedRuleName13, expectedDestinationIPCount13, len(*securityRule13.DestinationAddressPrefixes))
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 4444}, "192.168.77.88", securityRule13)
+	if err != nil {
+		t.Errorf("Shared rule %s did not match service IP: %v", expectedRuleName13, err)
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 4444}, "192.168.99.11", securityRule13)
+	if err != nil {
+		t.Errorf("Shared rule %s did not match service IP: %v", expectedRuleName13, err)
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 4444}, "192.168.22.33", securityRule13)
+	if err == nil {
+		t.Errorf("Shared rule %s matched wrong (unshared) service's port and IP", expectedRuleName13)
+	}
+
+	expectedDestinationIPCount2 := 1
+	if len(*securityRule2.DestinationAddressPrefixes) != expectedDestinationIPCount2 {
+		t.Errorf("Shared rule %s should have had %d destination IP addresses but had %d", expectedRuleName2, expectedDestinationIPCount2, len(*securityRule2.DestinationAddressPrefixes))
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 8888}, "192.168.33.44", securityRule2)
+	if err != nil {
+		t.Errorf("Shared rule %s did not match service IP: %v", expectedRuleName2, err)
+	}
+
+	err = securityRuleMatches("Internet", v1.ServicePort{Port: 8888}, "192.168.22.33", securityRule2)
+	if err == nil {
+		t.Errorf("Shared rule %s matched wrong (unshared) service's port and IP", expectedRuleName2)
+	}
+
+	if securityRule4.DestinationAddressPrefixes != nil {
+		t.Errorf("Expected unshared rule %s to use single destination IP address but used collection", expectedRuleName4)
+	}
+
+	if securityRule4.DestinationAddressPrefix == nil {
+		t.Errorf("Expected unshared rule %s to have a destination IP address", expectedRuleName4)
+	} else {
+		if !strings.EqualFold(*securityRule4.DestinationAddressPrefix, svc4.Spec.LoadBalancerIP) {
+			t.Errorf("Expected unshared rule %s to have a destination %s but had %s", expectedRuleName4, svc4.Spec.LoadBalancerIP, *securityRule4.DestinationAddressPrefix)
+		}
+	}
+
+	if securityRule5.DestinationAddressPrefixes != nil {
+		t.Errorf("Expected unshared rule %s to use single destination IP address but used collection", expectedRuleName5)
+	}
+
+	if securityRule5.DestinationAddressPrefix == nil {
+		t.Errorf("Expected unshared rule %s to have a destination IP address", expectedRuleName5)
+	} else {
+		if !strings.EqualFold(*securityRule5.DestinationAddressPrefix, svc5.Spec.LoadBalancerIP) {
+			t.Errorf("Expected unshared rule %s to have a destination %s but had %s", expectedRuleName5, svc5.Spec.LoadBalancerIP, *securityRule5.DestinationAddressPrefix)
+		}
+	}
+
+	sg, err = az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), false)
+	if err != nil {
+		t.Errorf("Unexpected error removing svc1: %q", err)
+	}
+
+	sg, err = az.reconcileSecurityGroup(testClusterName, &svc5, to.StringPtr(svc5.Spec.LoadBalancerIP), false)
+	if err != nil {
+		t.Errorf("Unexpected error removing svc5: %q", err)
+	}
+
+	_, securityRule13, rule13Found = findSecurityRuleByName(*sg.SecurityRules, expectedRuleName13)
+	if !rule13Found {
+		t.Fatalf("Expected security rule %q but it was not present", expectedRuleName13)
+	}
+
+	_, securityRule2, rule2Found = findSecurityRuleByName(*sg.SecurityRules, expectedRuleName2)
+	if !rule2Found {
+		t.Fatalf("Expected security rule %q but it was not present", expectedRuleName2)
+	}
+
+	_, securityRule4, rule4Found = findSecurityRuleByName(*sg.SecurityRules, expectedRuleName4)
+	if !rule4Found {
+		t.Fatalf("Expected security rule %q but it was not present", expectedRuleName4)
+	}
+
+	_, _, rule5Found = findSecurityRuleByName(*sg.SecurityRules, expectedRuleName5)
+	if rule5Found {
+		t.Fatalf("Expected security rule %q to have been removed but it was not present", expectedRuleName5)
+	}
+
+	expectedDestinationIPCount13 = 1
+	if len(*securityRule13.DestinationAddressPrefixes) != expectedDestinationIPCount13 {
+		t.Errorf("Shared rule %s should have had %d destination IP addresses but had %d", expectedRuleName13, expectedDestinationIPCount13, len(*securityRule13.DestinationAddressPrefixes))
+	}
+}
+
+// TODO: sanity check if the same IP address incorrectly gets put in twice?
+// (shouldn't happen but...)
+
+// func TestIfServiceIsEditedFromOwnRuleToSharedRuleThenOwnRuleIsDeletedAndSharedRuleIsCreated(t *testing.T) {
+// 	t.Error()
+// }
+
+// func TestIfServiceIsEditedFromSharedRuleToOwnRuleThenItIsRemovedFromSharedRuleAndOwnRuleIsCreated(t *testing.T) {
+// 	t.Error()
+// }
