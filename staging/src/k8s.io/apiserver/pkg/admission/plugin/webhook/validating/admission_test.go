@@ -38,7 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/testdata"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/rest"
 )
@@ -97,7 +97,7 @@ func ccfgSVC(urlPath string) registrationv1alpha1.WebhookClientConfig {
 			Namespace: "default",
 			Path:      &urlPath,
 		},
-		CABundle: testdata.CACert,
+		CABundle: testcerts.CACert,
 	}
 }
 
@@ -112,7 +112,7 @@ func (c urlConfigGenerator) ccfgURL(urlPath string) registrationv1alpha1.Webhook
 	urlString := u2.String()
 	return registrationv1alpha1.WebhookClientConfig{
 		URL:      &urlString,
-		CABundle: testdata.CACert,
+		CABundle: testcerts.CACert,
 	}
 }
 
@@ -579,12 +579,12 @@ func TestAdmitCachedClient(t *testing.T) {
 
 func newTestServer(t *testing.T) *httptest.Server {
 	// Create the test webhook server
-	sCert, err := tls.X509KeyPair(testdata.ServerCert, testdata.ServerKey)
+	sCert, err := tls.X509KeyPair(testcerts.ServerCert, testcerts.ServerKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 	rootCAs := x509.NewCertPool()
-	rootCAs.AppendCertsFromPEM(testdata.CACert)
+	rootCAs.AppendCertsFromPEM(testcerts.CACert)
 	testServer := httptest.NewUnstartedServer(http.HandlerFunc(webhookHandler))
 	testServer.TLS = &tls.Config{
 		Certificates: []tls.Certificate{sCert},
@@ -643,9 +643,9 @@ func newFakeAuthenticationInfoResolver(count *int32) *fakeAuthenticationInfoReso
 	return &fakeAuthenticationInfoResolver{
 		restConfig: &rest.Config{
 			TLSClientConfig: rest.TLSClientConfig{
-				CAData:   testdata.CACert,
-				CertData: testdata.ClientCert,
-				KeyData:  testdata.ClientKey,
+				CAData:   testcerts.CACert,
+				CertData: testcerts.ClientCert,
+				KeyData:  testcerts.ClientKey,
 			},
 		},
 		cachedCount: count,

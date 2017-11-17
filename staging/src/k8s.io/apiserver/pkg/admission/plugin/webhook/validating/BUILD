@@ -47,7 +47,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/config:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/testdata:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
     ],

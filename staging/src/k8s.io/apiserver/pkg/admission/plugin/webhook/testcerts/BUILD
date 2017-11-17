@@ -6,7 +6,7 @@ go_library(
         "certs.go",
         "doc.go",
     ],
-    importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook/testdata",
+    importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts",
     visibility = ["//visibility:public"],
 )
 

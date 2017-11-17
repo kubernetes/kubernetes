@@ -84,7 +84,7 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/namespace:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/request:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/rules:all-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/testdata:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/validating:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/versioned:all-srcs",
     ],
