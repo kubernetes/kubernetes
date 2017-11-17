@@ -19,6 +19,7 @@ package webhook
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -44,8 +45,15 @@ const retryBackoff = 500 * time.Millisecond
 // Ensure Webhook implements the authorizer.Authorizer interface.
 var _ authorizer.Authorizer = (*WebhookAuthorizer)(nil)
 
+// Since SubjectRulesReview isn't an API served by the API server it doesn't have a client
+// inteface like SubjectAccessReview. Defined a similar interface here instead.
+type subjectRulesReviewInterface interface {
+	Create(*authorization.SubjectRulesReview) (*authorization.SubjectRulesReview, error)
+}
+
 type WebhookAuthorizer struct {
 	subjectAccessReview authorizationclient.SubjectAccessReviewInterface
+	subjectRulesReview  subjectRulesReviewInterface
 	responseCache       *cache.LRUExpireCache
 	authorizedTTL       time.Duration
 	unauthorizedTTL     time.Duration
@@ -55,7 +63,7 @@ type WebhookAuthorizer struct {
 
 // NewFromInterface creates a WebhookAuthorizer using the given subjectAccessReview client
 func NewFromInterface(subjectAccessReview authorizationclient.SubjectAccessReviewInterface, authorizedTTL, unauthorizedTTL time.Duration) (*WebhookAuthorizer, error) {
-	return newWithBackoff(subjectAccessReview, authorizedTTL, unauthorizedTTL, retryBackoff)
+	return newWithBackoff(subjectAccessReview, nil, authorizedTTL, unauthorizedTTL, retryBackoff)
 }
 
 // New creates a new WebhookAuthorizer from the provided kubeconfig file.
@@ -78,18 +86,29 @@ func NewFromInterface(subjectAccessReview authorizationclient.SubjectAccessRevie
 //
 // For additional HTTP configuration, refer to the kubeconfig documentation
 // https://kubernetes.io/docs/user-guide/kubeconfig-file/.
-func New(kubeConfigFile string, authorizedTTL, unauthorizedTTL time.Duration) (*WebhookAuthorizer, error) {
+func New(kubeConfigFile, rulesReviewKubeConfig string, authorizedTTL, unauthorizedTTL time.Duration) (*WebhookAuthorizer, error) {
 	subjectAccessReview, err := subjectAccessReviewInterfaceFromKubeconfig(kubeConfigFile)
 	if err != nil {
 		return nil, err
 	}
-	return newWithBackoff(subjectAccessReview, authorizedTTL, unauthorizedTTL, retryBackoff)
+
+	var rulesReview subjectRulesReviewInterface
+	if rulesReviewKubeConfig != "" {
+		r, err := subjectRulesReviewInterfaceFromKubeconfig(rulesReviewKubeConfig)
+		if err != nil {
+			return nil, err
+		}
+		rulesReview = r
+	}
+
+	return newWithBackoff(subjectAccessReview, rulesReview, authorizedTTL, unauthorizedTTL, retryBackoff)
 }
 
 // newWithBackoff allows tests to skip the sleep.
-func newWithBackoff(subjectAccessReview authorizationclient.SubjectAccessReviewInterface, authorizedTTL, unauthorizedTTL, initialBackoff time.Duration) (*WebhookAuthorizer, error) {
+func newWithBackoff(subjectAccessReview authorizationclient.SubjectAccessReviewInterface, subjectRulesReview subjectRulesReviewInterface, authorizedTTL, unauthorizedTTL, initialBackoff time.Duration) (*WebhookAuthorizer, error) {
 	return &WebhookAuthorizer{
 		subjectAccessReview: subjectAccessReview,
+		subjectRulesReview:  subjectRulesReview,
 		responseCache:       cache.NewLRUExpireCache(1024),
 		authorizedTTL:       authorizedTTL,
 		unauthorizedTTL:     unauthorizedTTL,
@@ -214,12 +233,57 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (decision auth
 
 //TODO: need to finish the method to get the rules when using webhook mode
 func (w *WebhookAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+	if w.subjectRulesReview == nil {
+		incomplete := true
+		return nil, nil, incomplete, fmt.Errorf("webhook authorizer does not support user rule resolution")
+	}
+
+	r := &authorization.SubjectRulesReview{
+		Spec: authorization.SubjectRulesReviewSpec{
+			Namespace: namespace,
+			User:      user.GetName(),
+			UID:       user.GetUID(),
+			Groups:    user.GetGroups(),
+			Extra:     convertToSARExtra(user.GetExtra()),
+		},
+	}
+
 	var (
-		resourceRules    []authorizer.ResourceRuleInfo
-		nonResourceRules []authorizer.NonResourceRuleInfo
+		result *authorization.SubjectRulesReview
+		err    error
 	)
-	incomplete := true
-	return resourceRules, nonResourceRules, incomplete, fmt.Errorf("webhook authorizer does not support user rule resolution")
+	webhook.WithExponentialBackoff(w.initialBackoff, func() error {
+		result, err = w.subjectRulesReview.Create(r)
+		return err
+	})
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	resourceRules := make([]authorizer.ResourceRuleInfo, len(result.Status.ResourceRules))
+	nonResourceRules := make([]authorizer.NonResourceRuleInfo, len(result.Status.NonResourceRules))
+
+	for i, rule := range result.Status.ResourceRules {
+		resourceRules[i] = &authorizer.DefaultResourceRuleInfo{
+			Verbs:         rule.Verbs,
+			APIGroups:     rule.APIGroups,
+			Resources:     rule.Resources,
+			ResourceNames: rule.ResourceNames,
+			Denies:        rule.Denies,
+		}
+	}
+	for i, rule := range result.Status.NonResourceRules {
+		nonResourceRules[i] = &authorizer.DefaultNonResourceRuleInfo{
+			Verbs:           rule.Verbs,
+			NonResourceURLs: rule.NonResourceURLs,
+			Denies:          rule.Denies,
+		}
+	}
+
+	if len(result.Status.EvaluationError) != 0 {
+		err = errors.New(r.Status.EvaluationError)
+	}
+	return resourceRules, nonResourceRules, result.Status.Incomplete, err
 }
 
 func convertToSARExtra(extra map[string][]string) map[string]authorization.ExtraValue {
@@ -265,5 +329,23 @@ type subjectAccessReviewClient struct {
 func (t *subjectAccessReviewClient) Create(subjectAccessReview *authorization.SubjectAccessReview) (*authorization.SubjectAccessReview, error) {
 	result := &authorization.SubjectAccessReview{}
 	err := t.w.RestClient.Post().Body(subjectAccessReview).Do().Into(result)
+	return result, err
+}
+
+func subjectRulesReviewInterfaceFromKubeconfig(kubeConfigFile string) (subjectRulesReviewInterface, error) {
+	gw, err := webhook.NewGenericWebhook(registry, scheme.Codecs, kubeConfigFile, groupVersions, 0)
+	if err != nil {
+		return nil, err
+	}
+	return &subjectRulesReviewClient{gw}, nil
+}
+
+type subjectRulesReviewClient struct {
+	w *webhook.GenericWebhook
+}
+
+func (t *subjectRulesReviewClient) Create(subjectRulesReview *authorization.SubjectRulesReview) (*authorization.SubjectRulesReview, error) {
+	result := &authorization.SubjectRulesReview{}
+	err := t.w.RestClient.Post().Body(subjectRulesReview).Do().Into(result)
 	return result, err
 }

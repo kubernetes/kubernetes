@@ -51,6 +51,11 @@ type AuthorizationConfig struct {
 	// TTL for caching of unauthorized responses from the webhook server.
 	WebhookCacheUnauthorizedTTL time.Duration
 
+	// Kubeconfig file for the Webhook authorization plugin rules review support.
+	// If this value isn't provided, SelfSubjectRulesReview requests may return
+	// incomplete results if the webhook authorizer is enabled.
+	WebhookRulesReviewConfigFile string
+
 	InformerFactory informers.SharedInformerFactory
 }
 
@@ -106,6 +111,7 @@ func (config AuthorizationConfig) New() (authorizer.Authorizer, authorizer.RuleR
 				return nil, nil, errors.New("Webhook's configuration file not passed")
 			}
 			webhookAuthorizer, err := webhook.New(config.WebhookConfigFile,
+				config.WebhookRulesReviewConfigFile,
 				config.WebhookCacheAuthorizedTTL,
 				config.WebhookCacheUnauthorizedTTL)
 			if err != nil {
@@ -133,6 +139,9 @@ func (config AuthorizationConfig) New() (authorizer.Authorizer, authorizer.RuleR
 	}
 	if !authorizerMap[modes.ModeWebhook] && config.WebhookConfigFile != "" {
 		return nil, nil, errors.New("Cannot specify --authorization-webhook-config-file without mode Webhook")
+	}
+	if !authorizerMap[modes.ModeWebhook] && config.WebhookRulesReviewConfigFile != "" {
+		return nil, nil, errors.New("Cannot specify --authorization-webhook-rules-review-config-file without mode Webhook")
 	}
 
 	return union.New(authorizers...), union.NewRuleResolvers(ruleResolvers...), nil
