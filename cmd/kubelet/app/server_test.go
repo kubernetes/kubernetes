@@ -18,46 +18,38 @@ package app
 
 import (
 	"testing"
-
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 )
 
 func TestValueOfAllocatableResources(t *testing.T) {
 	testCases := []struct {
-		kubeReserved   string
-		systemReserved string
+		kubeReserved   map[string]string
+		systemReserved map[string]string
 		errorExpected  bool
 		name           string
 	}{
 		{
-			kubeReserved:   "cpu=200m,memory=-150G,ephemeral-storage=10Gi",
-			systemReserved: "cpu=200m,memory=15Ki",
+			kubeReserved:   map[string]string{"cpu": "200m", "memory": "-150G", "ephemeral-storage": "10Gi"},
+			systemReserved: map[string]string{"cpu": "200m", "memory": "15Ki"},
 			errorExpected:  true,
 			name:           "negative quantity value",
 		},
 		{
-			kubeReserved:   "cpu=200m,memory=150Gi,ephemeral-storage=10Gi",
-			systemReserved: "cpu=200m,memory=15Ky",
+			kubeReserved:   map[string]string{"cpu": "200m", "memory": "150Gi", "ephemeral-storage": "10Gi"},
+			systemReserved: map[string]string{"cpu": "200m", "memory": "15Ky"},
 			errorExpected:  true,
 			name:           "invalid quantity unit",
 		},
 		{
-			kubeReserved:   "cpu=200m,memory=15G,ephemeral-storage=10Gi",
-			systemReserved: "cpu=200m,memory=15Ki",
+			kubeReserved:   map[string]string{"cpu": "200m", "memory": "15G", "ephemeral-storage": "10Gi"},
+			systemReserved: map[string]string{"cpu": "200m", "memory": "15Ki"},
 			errorExpected:  false,
 			name:           "Valid resource quantity",
 		},
 	}
 
 	for _, test := range testCases {
-		kubeReservedCM := make(kubeletconfig.ConfigurationMap)
-		systemReservedCM := make(kubeletconfig.ConfigurationMap)
-
-		kubeReservedCM.Set(test.kubeReserved)
-		systemReservedCM.Set(test.systemReserved)
-
-		_, err1 := parseResourceList(kubeReservedCM)
-		_, err2 := parseResourceList(systemReservedCM)
+		_, err1 := parseResourceList(test.kubeReserved)
+		_, err2 := parseResourceList(test.systemReserved)
 		if test.errorExpected {
 			if err1 == nil && err2 == nil {
 				t.Errorf("%s: error expected", test.name)

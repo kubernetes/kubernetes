@@ -26,7 +26,6 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
@@ -101,7 +100,7 @@ func validSignal(signal evictionapi.Signal) bool {
 }
 
 // ParseThresholdConfig parses the flags for thresholds.
-func ParseThresholdConfig(allocatableConfig []string, evictionHard, evictionSoft, evictionSoftGracePeriod, evictionMinimumReclaim string) ([]evictionapi.Threshold, error) {
+func ParseThresholdConfig(allocatableConfig []string, evictionHard, evictionSoft, evictionSoftGracePeriod, evictionMinimumReclaim map[string]string) ([]evictionapi.Threshold, error) {
 	results := []evictionapi.Threshold{}
 	allocatableThresholds := getAllocatableThreshold(allocatableConfig)
 	results = append(results, allocatableThresholds...)
@@ -145,60 +144,34 @@ func ParseThresholdConfig(allocatableConfig []string, evictionHard, evictionSoft
 }
 
 // parseThresholdStatements parses the input statements into a list of Threshold objects.
-func parseThresholdStatements(expr string) ([]evictionapi.Threshold, error) {
-	if len(expr) == 0 {
+func parseThresholdStatements(statements map[string]string) ([]evictionapi.Threshold, error) {
+	if len(statements) == 0 {
 		return nil, nil
 	}
 	results := []evictionapi.Threshold{}
-	statements := strings.Split(expr, ",")
-	signalsFound := sets.NewString()
-	for _, statement := range statements {
-		result, err := parseThresholdStatement(statement)
+	for signal, val := range statements {
+		result, err := parseThresholdStatement(evictionapi.Signal(signal), val)
 		if err != nil {
 			return nil, err
 		}
-		if signalsFound.Has(string(result.Signal)) {
-			return nil, fmt.Errorf("found duplicate eviction threshold for signal %v", result.Signal)
-		}
-		signalsFound.Insert(string(result.Signal))
 		results = append(results, result)
 	}
 	return results, nil
 }
 
 // parseThresholdStatement parses a threshold statement.
-func parseThresholdStatement(statement string) (evictionapi.Threshold, error) {
-	tokens2Operator := map[string]evictionapi.ThresholdOperator{
-		"<": evictionapi.OpLessThan,
-	}
-	var (
-		operator evictionapi.ThresholdOperator
-		parts    []string
-	)
-	for token := range tokens2Operator {
-		parts = strings.Split(statement, token)
-		// if we got a token, we know this was the operator...
-		if len(parts) > 1 {
-			operator = tokens2Operator[token]
-			break
-		}
-	}
-	if len(operator) == 0 || len(parts) != 2 {
-		return evictionapi.Threshold{}, fmt.Errorf("invalid eviction threshold syntax %v, expected <signal><operator><value>", statement)
-	}
-	signal := evictionapi.Signal(parts[0])
+func parseThresholdStatement(signal evictionapi.Signal, val string) (evictionapi.Threshold, error) {
 	if !validSignal(signal) {
 		return evictionapi.Threshold{}, fmt.Errorf(unsupportedEvictionSignal, signal)
 	}
-
-	quantityValue := parts[1]
-	if strings.HasSuffix(quantityValue, "%") {
-		percentage, err := parsePercentage(quantityValue)
+	operator := evictionapi.OpForSignal[signal]
+	if strings.HasSuffix(val, "%") {
+		percentage, err := parsePercentage(val)
 		if err != nil {
 			return evictionapi.Threshold{}, err
 		}
 		if percentage <= 0 {
-			return evictionapi.Threshold{}, fmt.Errorf("eviction percentage threshold %v must be positive: %s", signal, quantityValue)
+			return evictionapi.Threshold{}, fmt.Errorf("eviction percentage threshold %v must be positive: %s", signal, val)
 		}
 		return evictionapi.Threshold{
 			Signal:   signal,
@@ -208,7 +181,7 @@ func parseThresholdStatement(statement string) (evictionapi.Threshold, error) {
 			},
 		}, nil
 	}
-	quantity, err := resource.ParseQuantity(quantityValue)
+	quantity, err := resource.ParseQuantity(val)
 	if err != nil {
 		return evictionapi.Threshold{}, err
 	}
@@ -265,33 +238,22 @@ func parsePercentage(input string) (float32, error) {
 }
 
 // parseGracePeriods parses the grace period statements
-func parseGracePeriods(expr string) (map[evictionapi.Signal]time.Duration, error) {
-	if len(expr) == 0 {
+func parseGracePeriods(statements map[string]string) (map[evictionapi.Signal]time.Duration, error) {
+	if len(statements) == 0 {
 		return nil, nil
 	}
 	results := map[evictionapi.Signal]time.Duration{}
-	statements := strings.Split(expr, ",")
-	for _, statement := range statements {
-		parts := strings.Split(statement, "=")
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid eviction grace period syntax %v, expected <signal>=<duration>", statement)
-		}
-		signal := evictionapi.Signal(parts[0])
+	for signal, val := range statements {
+		signal := evictionapi.Signal(signal)
 		if !validSignal(signal) {
 			return nil, fmt.Errorf(unsupportedEvictionSignal, signal)
 		}
-
-		gracePeriod, err := time.ParseDuration(parts[1])
+		gracePeriod, err := time.ParseDuration(val)
 		if err != nil {
 			return nil, err
 		}
 		if gracePeriod < 0 {
-			return nil, fmt.Errorf("invalid eviction grace period specified: %v, must be a positive value", parts[1])
-		}
-
-		// check against duplicate statements
-		if _, found := results[signal]; found {
-			return nil, fmt.Errorf("duplicate eviction grace period specified for %v", signal)
+			return nil, fmt.Errorf("invalid eviction grace period specified: %v, must be a positive value", val)
 		}
 		results[signal] = gracePeriod
 	}
@@ -299,50 +261,35 @@ func parseGracePeriods(expr string) (map[evictionapi.Signal]time.Duration, error
 }
 
 // parseMinimumReclaims parses the minimum reclaim statements
-func parseMinimumReclaims(expr string) (map[evictionapi.Signal]evictionapi.ThresholdValue, error) {
-	if len(expr) == 0 {
+func parseMinimumReclaims(statements map[string]string) (map[evictionapi.Signal]evictionapi.ThresholdValue, error) {
+	if len(statements) == 0 {
 		return nil, nil
 	}
 	results := map[evictionapi.Signal]evictionapi.ThresholdValue{}
-	statements := strings.Split(expr, ",")
-	for _, statement := range statements {
-		parts := strings.Split(statement, "=")
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid eviction minimum reclaim syntax: %v, expected <signal>=<value>", statement)
-		}
-		signal := evictionapi.Signal(parts[0])
+	for signal, val := range statements {
+		signal := evictionapi.Signal(signal)
 		if !validSignal(signal) {
 			return nil, fmt.Errorf(unsupportedEvictionSignal, signal)
 		}
-
-		quantityValue := parts[1]
-		if strings.HasSuffix(quantityValue, "%") {
-			percentage, err := parsePercentage(quantityValue)
+		if strings.HasSuffix(val, "%") {
+			percentage, err := parsePercentage(val)
 			if err != nil {
 				return nil, err
 			}
 			if percentage <= 0 {
-				return nil, fmt.Errorf("eviction percentage minimum reclaim %v must be positive: %s", signal, quantityValue)
-			}
-			// check against duplicate statements
-			if _, found := results[signal]; found {
-				return nil, fmt.Errorf("duplicate eviction minimum reclaim specified for %v", signal)
+				return nil, fmt.Errorf("eviction percentage minimum reclaim %v must be positive: %s", signal, val)
 			}
 			results[signal] = evictionapi.ThresholdValue{
 				Percentage: percentage,
 			}
 			continue
 		}
-		// check against duplicate statements
-		if _, found := results[signal]; found {
-			return nil, fmt.Errorf("duplicate eviction minimum reclaim specified for %v", signal)
-		}
-		quantity, err := resource.ParseQuantity(parts[1])
-		if quantity.Sign() < 0 {
-			return nil, fmt.Errorf("negative eviction minimum reclaim specified for %v", signal)
-		}
+		quantity, err := resource.ParseQuantity(val)
 		if err != nil {
 			return nil, err
+		}
+		if quantity.Sign() < 0 {
+			return nil, fmt.Errorf("negative eviction minimum reclaim specified for %v", signal)
 		}
 		results[signal] = evictionapi.ThresholdValue{
 			Quantity: &quantity,

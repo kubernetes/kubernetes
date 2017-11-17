@@ -219,18 +219,24 @@ type KubeletConfiguration struct {
 	// run docker daemon with version  < 1.9 or an Aufs storage backend.
 	// Issue #10959 has more details.
 	SerializeImagePulls *bool `json:"serializeImagePulls"`
-	// Comma-delimited list of hard eviction expressions.  For example, 'memory.available<300Mi'.
-	EvictionHard *string `json:"evictionHard"`
-	// Comma-delimited list of soft eviction expressions.  For example, 'memory.available<300Mi'.
-	EvictionSoft string `json:"evictionSoft"`
-	// Comma-delimeted list of grace periods for each soft eviction signal.  For example, 'memory.available=30s'.
-	EvictionSoftGracePeriod string `json:"evictionSoftGracePeriod"`
+	// Map of signal names to quantities that defines hard eviction thresholds. For example: {"memory.available": "300Mi"}.
+	// +optional
+	EvictionHard map[string]string `json:"evictionHard"`
+	// Map of signal names to quantities that defines soft eviction thresholds.  For example: {"memory.available": "300Mi"}.
+	// +optional
+	EvictionSoft map[string]string `json:"evictionSoft"`
+	// Map of signal names to quantities that defines grace periods for each soft eviction signal. For example: {"memory.available": "30s"}.
+	// +optional
+	EvictionSoftGracePeriod map[string]string `json:"evictionSoftGracePeriod"`
 	// Duration for which the kubelet has to wait before transitioning out of an eviction pressure condition.
 	EvictionPressureTransitionPeriod metav1.Duration `json:"evictionPressureTransitionPeriod"`
 	// Maximum allowed grace period (in seconds) to use when terminating pods in response to a soft eviction threshold being met.
 	EvictionMaxPodGracePeriod int32 `json:"evictionMaxPodGracePeriod"`
-	// Comma-delimited list of minimum reclaims (e.g. imagefs.available=2Gi) that describes the minimum amount of resource the kubelet will reclaim when performing a pod eviction if that resource is under pressure.
-	EvictionMinimumReclaim string `json:"evictionMinimumReclaim"`
+	// Map of signal names to quantities that defines minimum reclaims, which describe the minimum
+	// amount of a given resource the kubelet will reclaim when performing a pod eviction while
+	// that resource is under pressure. For example: {"imagefs.available": "2Gi"}
+	// +optional
+	EvictionMinimumReclaim map[string]string `json:"evictionMinimumReclaim"`
 	// Maximum number of pods per core. Cannot exceed MaxPods
 	PodsPerCore int32 `json:"podsPerCore"`
 	// enableControllerAttachDetach enables the Attach/Detach controller to

@@ -200,17 +200,15 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.HairpinMode = PromiscuousBridge
 	}
 	if obj.EvictionHard == nil {
-		temp := "memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%,imagefs.available<15%"
-		obj.EvictionHard = &temp
+		obj.EvictionHard = map[string]string{
+			"memory.available":  "100Mi",
+			"nodefs.available":  "10%",
+			"nodefs.inodesFree": "5%",
+			"imagefs.available": "15%",
+		}
 	}
 	if obj.EvictionPressureTransitionPeriod == zeroDuration {
 		obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}
-	}
-	if obj.SystemReserved == nil {
-		obj.SystemReserved = make(map[string]string)
-	}
-	if obj.KubeReserved == nil {
-		obj.KubeReserved = make(map[string]string)
 	}
 	if obj.MakeIPTablesUtilChains == nil {
 		obj.MakeIPTablesUtilChains = boolVar(true)
@@ -232,9 +230,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	}
 	if obj.EnforceNodeAllocatable == nil {
 		obj.EnforceNodeAllocatable = defaultNodeAllocatableEnforcement
-	}
-	if obj.FeatureGates == nil {
-		obj.FeatureGates = make(map[string]bool)
 	}
 	if obj.ManifestURLHeader == nil {
 		obj.ManifestURLHeader = make(map[string][]string)

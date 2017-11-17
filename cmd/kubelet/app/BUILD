@@ -11,7 +11,6 @@ go_test(
     srcs = ["server_test.go"],
     importpath = "k8s.io/kubernetes/cmd/kubelet/app",
     library = ":go_default_library",
-    deps = ["//pkg/kubelet/apis/kubeletconfig:go_default_library"],
 )
 
 go_library(
