@@ -89,7 +89,7 @@ var (
 	errTar126					 = errors.New("Tar command invoked but could not execute. Might be a permission problem or command is not an executable")
 	errTar127 					 = errors.New("Tar command not found, please install tar before using kubectl cp")
 	errTar2 					 = errors.New("Could be a permission problem or missing command arguments and keywords")
-	errTarGeneric 				 = errors.New("The cp command failed")
+	//errTarGeneric 				 = errors.New("The cp command failed")
 )
 
 const (
@@ -224,11 +224,11 @@ func copyToPod(f cmdutil.Factory, cmd *cobra.Command, stdout, stderr io.Writer, 
 		} else if err.Error() == exitCode2 {
 			return errTar2
 		} else {
-			return errTarGeneric
+			return err
 		}
 	}
 
-	fmt.Println("Error before go func")
+	// fmt.Println("Error before go func")
 
 	go func() {
 		defer writer.Close()
@@ -236,7 +236,7 @@ func copyToPod(f cmdutil.Factory, cmd *cobra.Command, stdout, stderr io.Writer, 
 		cmdutil.CheckErr(err)
 	}()
 
-	fmt.Println("Error after go func")
+	// fmt.Println("Error after go func")
 
 	cmdArr := []string{"tar", "xf", "-"}
 	destDir := path.Dir(dest.File)
@@ -259,8 +259,8 @@ func copyToPod(f cmdutil.Factory, cmd *cobra.Command, stdout, stderr io.Writer, 
 		Executor: &DefaultRemoteExecutor{},
 	}
 
-	fmt.Println("Should not get here")
-	
+	// fmt.Println("Should not get here")
+
 	return execute(f, cmd, options)
 }
 
@@ -269,19 +269,19 @@ func copyFromPod(f cmdutil.Factory, cmd *cobra.Command, cmderr io.Writer, src, d
 		return errFileCannotBeEmpty
 	}
 
-	// // check if tar command exists in the container
-	// if err := testTar(f, cmd, dest); err != nil {
+	// check if tar command exists in the container
+	if err := testTar(f, cmd, dest); err != nil {
 
-	// 	if err.Error() == exitCode126 {
-	// 		return errTar126
-	// 	} else if err.Error() == exitCode127 {
-	// 		return errTar127 
-	// 	} else if err.Error() == exitCode2 {
-	// 		return errTar2
-	// 	} else {
-	// 		return errTarGeneric
-	// 	}
-	// }
+		if err.Error() == exitCode126 {
+			return errTar126
+		} else if err.Error() == exitCode127 {
+			return errTar127 
+		} else if err.Error() == exitCode2 {
+			return errTar2
+		} else {
+			return err
+		}
+	}
 
 	reader, outStream := io.Pipe()
 	options := &ExecOptions{
@@ -404,7 +404,7 @@ func untarAll(reader io.Reader, destFile, prefix string) error {
 			if err := os.MkdirAll(outFileName, 0755); err != nil {
 				return err
 			}
-			continue
+			break
 		}
 
 		// handle coping remote file into local directory
