@@ -18,10 +18,15 @@ go_library(
         "plugins.go",
         "util.go",
         "volume.go",
-        "volume_unsupported.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "volume_unsupported.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "volume_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "volume_unsupported.go",
         ],
         "//conditions:default": [],
     }),
@@ -53,8 +58,8 @@ go_test(
         "plugins_test.go",
         "util_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/volume",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/util/slice:go_default_library",

@@ -47,8 +47,8 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["options_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/cmd/kubelet/app/options",
-    library = ":go_default_library",
     deps = [
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",

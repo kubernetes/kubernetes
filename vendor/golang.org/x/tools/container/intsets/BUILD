@@ -3,7 +3,6 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "popcnt_generic.go",
         "sparse.go",
         "util.go",
     ] + select({

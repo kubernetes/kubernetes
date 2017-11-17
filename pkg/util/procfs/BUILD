@@ -12,10 +12,15 @@ go_library(
         "doc.go",
         "procfs.go",
         "procfs_fake.go",
-        "procfs_unsupported.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "procfs_unsupported.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "procfs_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "procfs_unsupported.go",
         ],
         "//conditions:default": [],
     }),
@@ -40,8 +45,8 @@ go_test(
     data = [
         "example_proc_cgroup",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/util/procfs",
-    library = ":go_default_library",
     deps = select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "//vendor/github.com/stretchr/testify/assert:go_default_library",

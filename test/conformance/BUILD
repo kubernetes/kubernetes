@@ -9,8 +9,8 @@ go_library(
 
 go_binary(
     name = "conformance",
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/test/conformance",
-    library = ":go_default_library",
     visibility = ["//visibility:public"],
 )
 

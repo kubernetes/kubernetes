@@ -8,7 +8,6 @@ go_library(
         "container_reference_manager.go",
         "helpers.go",
         "os.go",
-        "pty_unsupported.go",
         "ref.go",
         "resize.go",
         "runtime.go",
@@ -16,8 +15,14 @@ go_library(
         "runtime_cache_fake.go",
         "sync_result.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "pty_unsupported.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "pty_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "pty_unsupported.go",
         ],
         "//conditions:default": [],
     }),
@@ -58,8 +63,8 @@ go_test(
         "ref_test.go",
         "sync_result_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/container",
-    library = ":go_default_library",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core/install:go_default_library",

@@ -17,8 +17,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["expand_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/third_party/forked/golang/expansion",
-    library = ":go_default_library",
     deps = ["//pkg/apis/core:go_default_library"],
 )
 

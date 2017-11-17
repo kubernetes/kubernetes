@@ -35,8 +35,8 @@ go_test(
         "client_test.go",
         "roundtrip_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/client-go/scale",
-    library = ":go_default_library",
     deps = [
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta1:go_default_library",

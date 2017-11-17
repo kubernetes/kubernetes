@@ -16,8 +16,8 @@ go_test(
         "preallocate_test.go",
         "purge_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/third_party/forked/etcd237/pkg/fileutil",
-    library = ":go_default_library",
 )
 
 go_library(
@@ -25,17 +25,22 @@ go_library(
     srcs = [
         "fileutil.go",
         "lock.go",
-        "lock_unix.go",
-        "perallocate_unsupported.go",
         "purge.go",
-        "sync.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "lock_unix.go",
+            "perallocate_unsupported.go",
+            "sync.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "lock_unix.go",
             "preallocate.go",
             "sync_linux.go",
         ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "lock_windows.go",
+            "perallocate_unsupported.go",
+            "sync.go",
         ],
         "//conditions:default": [],
     }),

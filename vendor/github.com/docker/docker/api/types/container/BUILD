@@ -10,9 +10,14 @@ go_library(
         "container_update.go",
         "container_wait.go",
         "host_config.go",
-        "hostconfig_unix.go",
         "waitcondition.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "hostconfig_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "hostconfig_unix.go",
+        ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "hostconfig_windows.go",
         ],

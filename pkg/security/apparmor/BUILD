@@ -11,8 +11,15 @@ go_library(
     srcs = [
         "helpers.go",
         "validate.go",
-        "validate_disabled.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "validate_disabled.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "validate_disabled.go",
+        ],
+        "//conditions:default": [],
+    }),
     importpath = "k8s.io/kubernetes/pkg/security/apparmor",
     deps = [
         "//pkg/features:go_default_library",
@@ -29,8 +36,8 @@ go_test(
     data = [
         "testdata/profiles",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/security/apparmor",
-    library = ":go_default_library",
     deps = [
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

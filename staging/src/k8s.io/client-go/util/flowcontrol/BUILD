@@ -12,8 +12,8 @@ go_test(
         "backoff_test.go",
         "throttle_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/client-go/util/flowcontrol",
-    library = ":go_default_library",
     deps = ["//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library"],
 )
 

@@ -24,8 +24,8 @@ go_library(
 
 go_binary(
     name = "webhook",
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/test/images/webhook",
-    library = ":go_default_library",
     visibility = ["//visibility:public"],
 )
 

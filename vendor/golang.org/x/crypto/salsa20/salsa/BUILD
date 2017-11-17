@@ -5,7 +5,6 @@ go_library(
     srcs = [
         "hsalsa20.go",
         "salsa208.go",
-        "salsa20_ref.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:darwin_amd64": [
             "salsa2020_amd64.s",

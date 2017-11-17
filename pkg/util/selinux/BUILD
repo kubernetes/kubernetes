@@ -10,10 +10,15 @@ go_library(
     srcs = [
         "doc.go",
         "selinux.go",
-        "selinux_unsupported.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "selinux_unsupported.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "selinux_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "selinux_unsupported.go",
         ],
         "//conditions:default": [],
     }),

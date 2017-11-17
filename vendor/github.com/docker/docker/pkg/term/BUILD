@@ -5,15 +5,18 @@ go_library(
     srcs = [
         "ascii.go",
         "proxy.go",
-        "tc.go",
-        "term.go",
-        "winsize.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "tc.go",
+            "term.go",
             "termios_bsd.go",
+            "winsize.go",
         ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "tc.go",
+            "term.go",
             "termios_linux.go",
+            "winsize.go",
         ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "term_windows.go",
@@ -23,9 +26,13 @@ go_library(
     cgo = True,
     importpath = "github.com/docker/docker/pkg/term",
     visibility = ["//visibility:public"],
-    deps = [
-        "//vendor/golang.org/x/sys/unix:go_default_library",
-    ] + select({
+    deps = select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "//vendor/github.com/Azure/go-ansiterm/winterm:go_default_library",
             "//vendor/github.com/docker/docker/pkg/term/windows:go_default_library",

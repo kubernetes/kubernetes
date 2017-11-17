@@ -4,13 +4,18 @@ go_library(
     name = "go_default_library",
     srcs = [
         "capability.go",
-        "capability_noop.go",
         "enum.go",
         "enum_gen.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "capability_noop.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "capability_linux.go",
             "syscall_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "capability_noop.go",
         ],
         "//conditions:default": [],
     }),

@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["node_authorizer_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/plugin/pkg/auth/authorizer/node",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/auth/nodeidentifier:go_default_library",

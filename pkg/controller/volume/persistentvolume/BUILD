@@ -62,8 +62,8 @@ go_test(
         "pv_controller_test.go",
         "recycle_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/controller/volume/persistentvolume",
-    library = ":go_default_library",
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/apis/core:go_default_library",

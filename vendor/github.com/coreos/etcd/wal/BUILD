@@ -11,8 +11,13 @@ go_library(
         "repair.go",
         "util.go",
         "wal.go",
-        "wal_unix.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "wal_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "wal_unix.go",
+        ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "wal_windows.go",
         ],

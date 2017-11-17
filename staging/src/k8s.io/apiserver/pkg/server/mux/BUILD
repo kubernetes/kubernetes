@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["pathrecorder_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apiserver/pkg/server/mux",
-    library = ":go_default_library",
     deps = ["//vendor/github.com/stretchr/testify/assert:go_default_library"],
 )
 

@@ -8,8 +8,8 @@ load(
 
 go_binary(
     name = "guestbook-go",
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/examples/guestbook-go",
-    library = ":go_default_library",
 )
 
 go_library(

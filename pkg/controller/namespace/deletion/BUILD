@@ -29,8 +29,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["namespaced_resources_deleter_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/controller/namespace/deletion",
-    library = ":go_default_library",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",

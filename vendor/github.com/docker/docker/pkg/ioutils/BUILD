@@ -7,10 +7,15 @@ go_library(
         "bytespipe.go",
         "fswriters.go",
         "readers.go",
-        "temp_unix.go",
         "writeflusher.go",
         "writers.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "temp_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "temp_unix.go",
+        ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "temp_windows.go",
         ],

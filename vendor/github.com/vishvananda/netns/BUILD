@@ -4,10 +4,15 @@ go_library(
     name = "go_default_library",
     srcs = [
         "netns.go",
-        "netns_unspecified.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "netns_unspecified.go",
+        ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "netns_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "netns_unspecified.go",
         ],
         "//conditions:default": [],
     }),
