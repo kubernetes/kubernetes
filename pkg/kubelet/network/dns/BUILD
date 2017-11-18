@@ -6,6 +6,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/network/dns",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

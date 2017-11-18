@@ -41,11 +41,6 @@ const (
 	minQuotaPeriod = 1000
 )
 
-var (
-	// The default dns opt strings
-	defaultDNSOptions = []string{"ndots:5"}
-)
-
 type podsByID []*kubecontainer.Pod
 
 func (b podsByID) Len() int           { return len(b) }

@@ -152,7 +152,7 @@ func TestComposeDNSSearch(t *testing.T) {
 	}
 }
 
-func TestGetClusterDNS(t *testing.T) {
+func TestGetPodDNS(t *testing.T) {
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
@@ -179,10 +179,11 @@ func TestGetClusterDNS(t *testing.T) {
 	}, 4)
 	for i, pod := range pods {
 		var err error
-		options[i].DNS, options[i].DNSSearch, _, _, err = configurer.GetClusterDNS(pod)
+		dnsConfig, err := configurer.GetPodDNS(pod)
 		if err != nil {
 			t.Fatalf("failed to generate container options: %v", err)
 		}
+		options[i].DNS, options[i].DNSSearch = dnsConfig.Servers, dnsConfig.Searches
 	}
 	if len(options[0].DNS) != 1 || options[0].DNS[0] != clusterNS {
 		t.Errorf("expected nameserver %s, got %+v", clusterNS, options[0].DNS)
@@ -213,10 +214,11 @@ func TestGetClusterDNS(t *testing.T) {
 	configurer = NewConfigurer(recorder, nodeRef, nil, testClusterDNS, testClusterDNSDomain, testResolverConfig)
 	for i, pod := range pods {
 		var err error
-		options[i].DNS, options[i].DNSSearch, _, _, err = configurer.GetClusterDNS(pod)
+		dnsConfig, err := configurer.GetPodDNS(pod)
 		if err != nil {
 			t.Fatalf("failed to generate container options: %v", err)
 		}
+		options[i].DNS, options[i].DNSSearch = dnsConfig.Servers, dnsConfig.Searches
 	}
 	t.Logf("nameservers %+v", options[1].DNS)
 	if len(options[0].DNS) != 1 {

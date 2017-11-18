@@ -47,7 +47,7 @@ type HandlerRunner interface {
 // able to get necessary informations like the RunContainerOptions, DNS settings, Host IP.
 type RuntimeHelper interface {
 	GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (contOpts *RunContainerOptions, err error)
-	GetClusterDNS(pod *v1.Pod) (dnsServers []string, dnsSearches []string, dnsOptions []string, useClusterFirstPolicy bool, err error)
+	GetPodDNS(pod *v1.Pod) (dnsConfig *runtimeapi.DNSConfig, err error)
 	// GetPodCgroupParent returns the CgroupName identifer, and its literal cgroupfs form on the host
 	// of a pod.
 	GetPodCgroupParent(pod *v1.Pod) string
