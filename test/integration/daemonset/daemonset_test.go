@@ -44,6 +44,14 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
+const (
+	pollInterval = 100 * time.Millisecond
+	pollTimeout  = 60 * time.Second
+
+	fakeContainerName = "fake-name"
+	fakeImage         = "fakeimage"
+)
+
 func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *daemon.DaemonSetsController, informers.SharedInformerFactory, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	_, server, closeFn := framework.RunAMaster(masterConfig)
@@ -96,7 +104,7 @@ func newDaemonSet(name, namespace string) *v1beta1.DaemonSet {
 					Labels: testLabels(),
 				},
 				Spec: v1.PodSpec{
-					Containers: []v1.Container{{Name: "foo", Image: "bar"}},
+					Containers: []v1.Container{{Name: fakeContainerName, Image: fakeImage}},
 				},
 			},
 		},
@@ -134,8 +142,8 @@ func resourcePodSpec(nodeName, memory, cpu string) v1.PodSpec {
 		NodeName: nodeName,
 		Containers: []v1.Container{
 			{
-				Name:  "foo",
-				Image: "bar",
+				Name:  fakeContainerName,
+				Image: fakeImage,
 				Resources: v1.ResourceRequirements{
 					Requests: v1.ResourceList{
 						v1.ResourceMemory: resource.MustParse(memory),
@@ -179,7 +187,7 @@ func validateDaemonSetPodsAndMarkReady(
 	podInformer cache.SharedIndexInformer,
 	numberPods int,
 	t *testing.T) {
-	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		objects := podInformer.GetIndexer().List()
 		if len(objects) != numberPods {
 			return false, nil
@@ -228,7 +236,7 @@ func validateDaemonSetStatus(
 	dsNamespace string,
 	expectedNumberReady int32,
 	t *testing.T) {
-	if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		ds, err := dsClient.Get(dsName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -240,7 +248,7 @@ func validateDaemonSetStatus(
 }
 
 func validateFailedPlacementEvent(eventClient corev1typed.EventInterface, t *testing.T) {
-	if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		eventList, err := eventClient.List(metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -440,9 +448,24 @@ func updatePodStatus(t *testing.T, podClient typedv1.PodInterface, podName strin
 	return pod
 }
 
+// waitForAllPodsPending waits for all pods to be in pending phase
+func waitForAllPodsPending(podClient corev1typed.PodInterface, t *testing.T) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
+		pods := getPods(t, podClient, testLabels())
+		for _, pod := range pods.Items {
+			if pod.Status.Phase != v1.PodPending {
+				return false, nil
+			}
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatalf("failed waiting for all pods to be in pending phase: %v", err)
+	}
+}
+
 // checkAtLeastOnePodWithNewImage checks if there is at least one pod with specific image
 func checkAtLeastOnePodWithImage(podClient corev1typed.PodInterface, image string, t *testing.T) {
-	if err := wait.Poll(2*time.Second, 20*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		pods := getPods(t, podClient, testLabels())
 		for _, pod := range pods.Items {
 			if pod.Spec.Containers[0].Image == image {
@@ -486,7 +509,7 @@ func schedulableNodes(c clientset.Interface, ds *v1beta1.DaemonSet, t *testing.T
 // checkPodsImageAndAvailability checks whether pods have desired image and
 // maxUnavailable requirement is met after a rolling update operation completes
 func checkPodsImageAndAvailability(c clientset.Interface, ds *v1beta1.DaemonSet, image string, maxUnavailable int, podClient corev1typed.PodInterface, t *testing.T) {
-	if err := wait.Poll(2*time.Second, 30*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		pods := getPods(t, podClient, testLabels())
 		unavailablePods := 0
 		nodesToUpdatedPodCount := make(map[string]int)
@@ -557,20 +580,12 @@ func TestRetryCreatingFailedPod(t *testing.T) {
 
 		// Set the pod's phase to "Failed"
 		pods := getPods(t, podClient, testLabels())
-		pod := updatePodStatus(t, podClient, pods.Items[0].Name, func(pod *v1.Pod) {
+		updatePodStatus(t, podClient, pods.Items[0].Name, func(pod *v1.Pod) {
 			pod.Status.Phase = v1.PodFailed
 		})
 
-		// Validate everything works correctly again
-		validateDaemonSetPodsAndMarkReady(podClient, podInformer, 1, t)
-		validateDaemonSetStatus(dsClient, ds.Name, ds.Namespace, 1, t)
-
-		// Validate the failed pod is re-created
-		pods = getPods(t, podClient, testLabels())
-		pod = &pods.Items[0]
-		if pod.Status.Phase != v1.PodRunning {
-			t.Fatalf("failed to retry create failed pod %q", pod.Name)
-		}
+		// Wait for the failed pod to be created again and in pending phase
+		waitForAllPodsPending(podClient, t)
 	}
 }
 
