@@ -445,7 +445,7 @@ func DeepCopyJSONValue(x interface{}) interface{} {
 			clone[i] = DeepCopyJSONValue(v)
 		}
 		return clone
-	case string, int64, bool, float64, nil, encodingjson.Number:
+	case string, uint64, int64, bool, float64, nil, encodingjson.Number:
 		return x
 	default:
 		panic(fmt.Errorf("cannot deep copy %T", x))
@@ -739,6 +739,9 @@ func structToUnstructured(sv, dv reflect.Value) error {
 		if fieldInfo.omitempty && isZero(fv) {
 			// omitempty fields should be ignored.
 			continue
+		}
+		if fv.Type().Kind() == reflect.Ptr {
+			fv = fv.Elem()
 		}
 		if len(fieldInfo.name) == 0 {
 			// This field is inlined.
