@@ -276,7 +276,8 @@
 		},
 		{
 			"ImportPath": "github.com/pkg/errors",
-			"Rev": "a22138067af1c4942683050411a841ade67fe1eb"
+			"Comment": "v0.8.0-5-gc605e28",
+			"Rev": "c605e284fe17294bda444b34710735b29d1a9d90"
 		},
 		{
 			"ImportPath": "github.com/pmezard/go-difflib/difflib",
