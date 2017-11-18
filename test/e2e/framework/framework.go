@@ -207,6 +207,7 @@ func (f *Framework) BeforeEach() {
 			MasterOnly:                  TestContext.GatherKubeSystemResourceUsageData == "master",
 			ResourceDataGatheringPeriod: 60 * time.Second,
 			ProbeDuration:               15 * time.Second,
+			PrintVerboseLogs:            false,
 		}, nil)
 		if err != nil {
 			Logf("Error while creating NewResourceUsageGatherer: %v", err)
