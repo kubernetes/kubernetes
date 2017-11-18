@@ -28,6 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	pvcutil "k8s.io/kubernetes/pkg/api/persistentvolumeclaim"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 )
@@ -48,8 +49,10 @@ func (persistentvolumeclaimStrategy) NamespaceScoped() bool {
 
 // PrepareForCreate clears the Status field which is not allowed to be set by end users on creation.
 func (persistentvolumeclaimStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
-	pv := obj.(*api.PersistentVolumeClaim)
-	pv.Status = api.PersistentVolumeClaimStatus{}
+	pvc := obj.(*api.PersistentVolumeClaim)
+	pvc.Status = api.PersistentVolumeClaimStatus{}
+
+	pvcutil.DropDisabledAlphaFields(&pvc.Spec)
 }
 
 func (persistentvolumeclaimStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
@@ -70,6 +73,9 @@ func (persistentvolumeclaimStrategy) PrepareForUpdate(ctx genericapirequest.Cont
 	newPvc := obj.(*api.PersistentVolumeClaim)
 	oldPvc := old.(*api.PersistentVolumeClaim)
 	newPvc.Status = oldPvc.Status
+
+	pvcutil.DropDisabledAlphaFields(&newPvc.Spec)
+	pvcutil.DropDisabledAlphaFields(&oldPvc.Spec)
 }
 
 func (persistentvolumeclaimStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
