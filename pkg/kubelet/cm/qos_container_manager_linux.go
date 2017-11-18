@@ -56,21 +56,21 @@ type qosContainerManagerImpl struct {
 	cgroupManager      CgroupManager
 	activePods         ActivePodsFunc
 	getNodeAllocatable func() v1.ResourceList
-	cgroupRoot         string
+	cgroupRoot         CgroupName
 	qosReserved        map[v1.ResourceName]int64
 }
 
-func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot string, nodeConfig NodeConfig) (QOSContainerManager, error) {
+func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot string, nodeConfig NodeConfig, cgroupManager CgroupManager) (QOSContainerManager, error) {
 	if !nodeConfig.CgroupsPerQOS {
 		return &qosContainerManagerNoop{
-			cgroupRoot: CgroupName(nodeConfig.CgroupRoot),
+			cgroupRoot: CgroupName(cgroupRoot),
 		}, nil
 	}
 
 	return &qosContainerManagerImpl{
 		subsystems:    subsystems,
-		cgroupManager: NewCgroupManager(subsystems, nodeConfig.CgroupDriver),
-		cgroupRoot:    cgroupRoot,
+		cgroupManager: cgroupManager,
+		cgroupRoot:    CgroupName(cgroupRoot),
 		qosReserved:   nodeConfig.ExperimentalQOSReserved,
 	}, nil
 }
@@ -81,7 +81,7 @@ func (m *qosContainerManagerImpl) GetQOSContainersInfo() QOSContainersInfo {
 
 func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceList, activePods ActivePodsFunc) error {
 	cm := m.cgroupManager
-	rootContainer := m.cgroupRoot
+	rootContainer := string(m.cgroupRoot)
 	if !cm.Exists(CgroupName(rootContainer)) {
 		return fmt.Errorf("root container %s doesn't exist", rootContainer)
 	}
