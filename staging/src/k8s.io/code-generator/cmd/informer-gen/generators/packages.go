@@ -71,7 +71,7 @@ func generatedBy() string {
 func objectMetaForPackage(p *types.Package) (*types.Type, bool, error) {
 	generatingForPackage := false
 	for _, t := range p.Types {
-		if !util.MustParseClientGenTags(t.SecondClosestCommentLines).GenerateClient {
+		if !util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...)).GenerateClient {
 			continue
 		}
 		generatingForPackage = true
@@ -176,7 +176,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 		var typesToGenerate []*types.Type
 		for _, t := range p.Types {
-			tags := util.MustParseClientGenTags(t.SecondClosestCommentLines)
+			tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
 			if !tags.GenerateClient || tags.NoVerbs || !tags.HasVerb("list") || !tags.HasVerb("watch") {
 				continue
 			}
@@ -308,7 +308,7 @@ func groupPackage(basePackage string, groupVersions clientgentypes.GroupVersions
 			return generators
 		},
 		FilterFunc: func(c *generator.Context, t *types.Type) bool {
-			tags := util.MustParseClientGenTags(t.SecondClosestCommentLines)
+			tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
 			return tags.GenerateClient && tags.HasVerb("list") && tags.HasVerb("watch")
 		},
 	}
@@ -351,7 +351,7 @@ func versionPackage(basePackage string, groupPkgName string, gv clientgentypes.G
 			return generators
 		},
 		FilterFunc: func(c *generator.Context, t *types.Type) bool {
-			tags := util.MustParseClientGenTags(t.SecondClosestCommentLines)
+			tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
 			return tags.GenerateClient && tags.HasVerb("list") && tags.HasVerb("watch")
 		},
 	}

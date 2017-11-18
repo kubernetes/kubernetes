@@ -72,7 +72,7 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 	clientSetInterface := c.Universe.Type(types.Name{Package: g.clientSetPackage, Name: "Interface"})
 	informerFor := "InformerFor"
 
-	tags, err := util.ParseClientGenTags(t.SecondClosestCommentLines)
+	tags, err := util.ParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
 	if err != nil {
 		return err
 	}
