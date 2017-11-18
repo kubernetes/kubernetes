@@ -312,6 +312,10 @@ func (elb *FakeELB) DescribeLoadBalancers(input *elb.DescribeLoadBalancersInput)
 	panic("Not implemented")
 }
 
+func (elb *FakeELB) AddTags(input *elb.AddTagsInput) (*elb.AddTagsOutput, error) {
+	panic("Not implemented")
+}
+
 func (elb *FakeELB) RegisterInstancesWithLoadBalancer(*elb.RegisterInstancesWithLoadBalancerInput) (*elb.RegisterInstancesWithLoadBalancerOutput, error) {
 	panic("Not implemented")
 }

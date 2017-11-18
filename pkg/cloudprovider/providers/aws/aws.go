@@ -271,6 +271,7 @@ type ELB interface {
 	CreateLoadBalancer(*elb.CreateLoadBalancerInput) (*elb.CreateLoadBalancerOutput, error)
 	DeleteLoadBalancer(*elb.DeleteLoadBalancerInput) (*elb.DeleteLoadBalancerOutput, error)
 	DescribeLoadBalancers(*elb.DescribeLoadBalancersInput) (*elb.DescribeLoadBalancersOutput, error)
+	AddTags(*elb.AddTagsInput) (*elb.AddTagsOutput, error)
 	RegisterInstancesWithLoadBalancer(*elb.RegisterInstancesWithLoadBalancerInput) (*elb.RegisterInstancesWithLoadBalancerOutput, error)
 	DeregisterInstancesFromLoadBalancer(*elb.DeregisterInstancesFromLoadBalancerInput) (*elb.DeregisterInstancesFromLoadBalancerOutput, error)
 	CreateLoadBalancerPolicy(*elb.CreateLoadBalancerPolicyInput) (*elb.CreateLoadBalancerPolicyOutput, error)
@@ -2246,6 +2247,27 @@ func (c *Cloud) describeLoadBalancer(name string) (*elb.LoadBalancerDescription,
 		ret = loadBalancer
 	}
 	return ret, nil
+}
+
+func (c *Cloud) addLoadBalancerTags(loadBalancerName string, requested map[string]string) error {
+	var tags []*elb.Tag
+	for k, v := range requested {
+		tag := &elb.Tag{
+			Key:   aws.String(k),
+			Value: aws.String(v),
+		}
+		tags = append(tags, tag)
+	}
+
+	request := &elb.AddTagsInput{}
+	request.LoadBalancerNames = []*string{&loadBalancerName}
+	request.Tags = tags
+
+	_, err := c.elb.AddTags(request)
+	if err != nil {
+		return fmt.Errorf("error adding tags to load balancer: %v", err)
+	}
+	return nil
 }
 
 // Retrieves instance's vpc id from metadata

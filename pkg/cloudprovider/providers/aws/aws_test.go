@@ -82,6 +82,11 @@ func (m *MockedFakeELB) expectDescribeLoadBalancers(loadBalancerName string) {
 	})
 }
 
+func (m *MockedFakeELB) AddTags(input *elb.AddTagsInput) (*elb.AddTagsOutput, error) {
+	args := m.Called(input)
+	return args.Get(0).(*elb.AddTagsOutput), nil
+}
+
 func TestReadAWSCloudConfig(t *testing.T) {
 	tests := []struct {
 		name string
@@ -1128,6 +1133,31 @@ func TestLBExtraSecurityGroupsAnnotation(t *testing.T) {
 				"Security Groups expected=%q , returned=%q", test.expectedSGs, extraSGs)
 		})
 	}
+}
+
+// Test that we can add a load balancer tag
+func TestAddLoadBalancerTags(t *testing.T) {
+	loadBalancerName := "test-elb"
+	awsServices := newMockedFakeAWSServices(TestClusterId)
+	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
+
+	want := make(map[string]string)
+	want["tag1"] = "val1"
+
+	expectedAddTagsRequest := &elb.AddTagsInput{
+		LoadBalancerNames: []*string{&loadBalancerName},
+		Tags: []*elb.Tag{
+			{
+				Key:   aws.String("tag1"),
+				Value: aws.String("val1"),
+			},
+		},
+	}
+	awsServices.elb.(*MockedFakeELB).On("AddTags", expectedAddTagsRequest).Return(&elb.AddTagsOutput{})
+
+	err := c.addLoadBalancerTags(loadBalancerName, want)
+	assert.Nil(t, err, "Error adding load balancer tags: %v", err)
+	awsServices.elb.(*MockedFakeELB).AssertExpectations(t)
 }
 
 func newMockedFakeAWSServices(id string) *FakeAWSServices {
