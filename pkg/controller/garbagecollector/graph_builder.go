@@ -342,6 +342,9 @@ func (gb *GraphBuilder) Run(stopCh <-chan struct{}) {
 			close(monitor.stopCh)
 		}
 	}
+
+	// reset monitors so that the graph builder can be safely re-run/synced.
+	gb.monitors = nil
 	glog.Infof("stopped %d of %d monitors", stopped, len(monitors))
 }
 

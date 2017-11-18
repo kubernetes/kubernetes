@@ -73,6 +73,7 @@ func (v *HistoryVisitor) VisitJob(kind kapps.GroupKindElement)                  
 func (v *HistoryVisitor) VisitPod(kind kapps.GroupKindElement)                   {}
 func (v *HistoryVisitor) VisitReplicaSet(kind kapps.GroupKindElement)            {}
 func (v *HistoryVisitor) VisitReplicationController(kind kapps.GroupKindElement) {}
+func (v *HistoryVisitor) VisitCronJob(kind kapps.GroupKindElement)               {}
 
 // HistoryViewerFor returns an implementation of HistoryViewer interface for the given schema kind
 func HistoryViewerFor(kind schema.GroupKind, c kubernetes.Interface) (HistoryViewer, error) {

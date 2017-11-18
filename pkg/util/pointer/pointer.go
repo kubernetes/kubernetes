@@ -60,3 +60,9 @@ func Int32PtrDerefOr(ptr *int32, def int32) int32 {
 	}
 	return def
 }
+
+// BoolPtr returns a pointer to a bool
+func BoolPtr(b bool) *bool {
+	o := b
+	return &o
+}

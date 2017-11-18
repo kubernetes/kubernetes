@@ -18,6 +18,7 @@ package stats
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/golang/glog"
@@ -32,6 +33,7 @@ import (
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // criStatsProvider implements the containerStatsProvider interface by getting
@@ -75,14 +77,9 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 		return nil, fmt.Errorf("failed to get rootFs info: %v", err)
 	}
 
-	// Creates container map.
-	containerMap := make(map[string]*runtimeapi.Container)
 	containers, err := p.runtimeService.ListContainers(&runtimeapi.ContainerFilter{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all containers: %v", err)
-	}
-	for _, c := range containers {
-		containerMap[c.Id] = c
 	}
 
 	// Creates pod sandbox map.
@@ -107,6 +104,14 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all container stats: %v", err)
 	}
+
+	containers = removeTerminatedContainer(containers)
+	// Creates container map.
+	containerMap := make(map[string]*runtimeapi.Container)
+	for _, c := range containers {
+		containerMap[c.Id] = c
+	}
+
 	for _, stats := range resp {
 		containerID := stats.Attributes.Id
 		container, found := containerMap[containerID]
@@ -284,5 +289,41 @@ func (p *criStatsProvider) makeContainerStats(
 		}
 	}
 
+	return result
+}
+
+// removeTerminatedContainer returns the specified container but with
+// the stats of the terminated containers removed.
+func removeTerminatedContainer(containers []*runtimeapi.Container) []*runtimeapi.Container {
+	containerMap := make(map[containerID][]*runtimeapi.Container)
+	// Sort order by create time
+	sort.Slice(containers, func(i, j int) bool {
+		return containers[i].CreatedAt < containers[j].CreatedAt
+	})
+	for _, container := range containers {
+		refID := containerID{
+			podRef:        buildPodRef(container.Labels),
+			containerName: kubetypes.GetContainerName(container.Labels),
+		}
+		containerMap[refID] = append(containerMap[refID], container)
+	}
+
+	result := make([]*runtimeapi.Container, 0)
+	for _, refs := range containerMap {
+		if len(refs) == 1 {
+			result = append(result, refs[0])
+			continue
+		}
+		found := false
+		for i := 0; i < len(refs); i++ {
+			if refs[i].State == runtimeapi.ContainerState_CONTAINER_RUNNING {
+				found = true
+				result = append(result, refs[i])
+			}
+		}
+		if !found {
+			result = append(result, refs[len(refs)-1])
+		}
+	}
 	return result
 }

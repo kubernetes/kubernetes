@@ -30,6 +30,10 @@ type fieldsPrinter interface {
 
 func splitDotNotation(model string) (string, []string) {
 	var fieldsPath []string
+
+	// ignore trailing period
+	model = strings.TrimSuffix(model, ".")
+
 	dotModel := strings.Split(model, ".")
 	if len(dotModel) >= 1 {
 		fieldsPath = dotModel[1:]

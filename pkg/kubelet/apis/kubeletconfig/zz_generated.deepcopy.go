@@ -133,7 +133,35 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
+	if in.EvictionHard != nil {
+		in, out := &in.EvictionHard, &out.EvictionHard
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.EvictionSoft != nil {
+		in, out := &in.EvictionSoft, &out.EvictionSoft
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.EvictionSoftGracePeriod != nil {
+		in, out := &in.EvictionSoftGracePeriod, &out.EvictionSoftGracePeriod
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	out.EvictionPressureTransitionPeriod = in.EvictionPressureTransitionPeriod
+	if in.EvictionMinimumReclaim != nil {
+		in, out := &in.EvictionMinimumReclaim, &out.EvictionMinimumReclaim
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.FeatureGates != nil {
 		in, out := &in.FeatureGates, &out.FeatureGates
 		*out = make(map[string]bool, len(*in))
@@ -143,14 +171,14 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	}
 	if in.SystemReserved != nil {
 		in, out := &in.SystemReserved, &out.SystemReserved
-		*out = make(ConfigurationMap, len(*in))
+		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
 		}
 	}
 	if in.KubeReserved != nil {
 		in, out := &in.KubeReserved, &out.KubeReserved
-		*out = make(ConfigurationMap, len(*in))
+		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
 		}

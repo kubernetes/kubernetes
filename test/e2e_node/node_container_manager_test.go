@@ -38,15 +38,15 @@ import (
 
 func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration) {
 	initialConfig.EnforceNodeAllocatable = []string{"pods", "kube-reserved", "system-reserved"}
-	initialConfig.SystemReserved = kubeletconfig.ConfigurationMap{
+	initialConfig.SystemReserved = map[string]string{
 		string(v1.ResourceCPU):    "100m",
 		string(v1.ResourceMemory): "100Mi",
 	}
-	initialConfig.KubeReserved = kubeletconfig.ConfigurationMap{
+	initialConfig.KubeReserved = map[string]string{
 		string(v1.ResourceCPU):    "100m",
 		string(v1.ResourceMemory): "100Mi",
 	}
-	initialConfig.EvictionHard = "memory.available<100Mi"
+	initialConfig.EvictionHard = map[string]string{"memory.available": "100Mi"}
 	// Necessary for allocatable cgroup creation.
 	initialConfig.CgroupsPerQOS = true
 	initialConfig.KubeReservedCgroup = kubeReservedCgroup

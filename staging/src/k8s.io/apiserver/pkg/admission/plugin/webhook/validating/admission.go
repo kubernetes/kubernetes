@@ -151,16 +151,16 @@ func (a *GenericAdmissionWebhook) SetExternalKubeInformerFactory(f informers.Sha
 // ValidateInitialization implements the InitializationValidator interface.
 func (a *GenericAdmissionWebhook) ValidateInitialization() error {
 	if a.hookSource == nil {
-		return fmt.Errorf("the GenericAdmissionWebhook admission plugin requires a Kubernetes client to be provided")
+		return fmt.Errorf("GenericAdmissionWebhook admission plugin requires a Kubernetes client to be provided")
 	}
 	if err := a.namespaceMatcher.Validate(); err != nil {
-		return fmt.Errorf("the GenericAdmissionWebhook.namespaceMatcher is not properly setup: %v", err)
+		return fmt.Errorf("GenericAdmissionWebhook.namespaceMatcher is not properly setup: %v", err)
 	}
 	if err := a.clientManager.Validate(); err != nil {
-		return fmt.Errorf("the GenericAdmissionWebhook.clientManager is not properly setup: %v", err)
+		return fmt.Errorf("GenericAdmissionWebhook.clientManager is not properly setup: %v", err)
 	}
 	if err := a.convertor.Validate(); err != nil {
-		return fmt.Errorf("the GenericAdmissionWebhook.convertor is not properly setup: %v", err)
+		return fmt.Errorf("GenericAdmissionWebhook.convertor is not properly setup: %v", err)
 	}
 	go a.hookSource.Run(wait.NeverStop)
 	return nil
@@ -248,7 +248,6 @@ func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
 				if ignoreClientCallFailures {
 					glog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
 					utilruntime.HandleError(callErr)
-					// Since we are failing open to begin with, we do not send an error down the channel
 					return
 				}
 
@@ -280,6 +279,7 @@ func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
 	return errs[0]
 }
 
+// TODO: factor into a common place along with the validating webhook version.
 func (a *GenericAdmissionWebhook) shouldCallHook(h *v1alpha1.Webhook, attr admission.Attributes) (bool, *apierrors.StatusError) {
 	var matches bool
 	for _, r := range h.Rules {
@@ -308,9 +308,11 @@ func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.Webh
 		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 
-	if response.Status.Allowed {
+	if response.Response == nil {
+		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook response was absent")}
+	}
+	if response.Response.Allowed {
 		return nil
 	}
-
-	return webhookerrors.ToStatusErr(h.Name, response.Status.Result)
+	return webhookerrors.ToStatusErr(h.Name, response.Response.Result)
 }

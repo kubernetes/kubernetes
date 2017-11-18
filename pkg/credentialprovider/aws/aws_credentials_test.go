@@ -59,12 +59,66 @@ func (p *testTokenGetter) GetAuthorizationToken(input *ecr.GetAuthorizationToken
 func TestEcrProvide(t *testing.T) {
 	registry := "123456789012.dkr.ecr.lala-land-1.amazonaws.com"
 	otherRegistries := []string{
+		"123456789012.dkr.ecr.cn-foo-1.amazonaws.com.cn",
 		"private.registry.com",
 		"gcr.io",
 	}
 	image := "foo/bar"
 
 	provider := newEcrProvider("lala-land-1",
+		&testTokenGetter{
+			user:     user,
+			password: password,
+			endpoint: registry,
+		})
+
+	keyring := &credentialprovider.BasicDockerKeyring{}
+	keyring.Add(provider.Provide())
+
+	// Verify that we get the expected username/password combo for
+	// an ECR image name.
+	fullImage := path.Join(registry, image)
+	creds, ok := keyring.Lookup(fullImage)
+	if !ok {
+		t.Errorf("Didn't find expected URL: %s", fullImage)
+		return
+	}
+	if len(creds) > 1 {
+		t.Errorf("Got more hits than expected: %s", creds)
+	}
+	val := creds[0]
+
+	if user != val.Username {
+		t.Errorf("Unexpected username value, want: _token, got: %s", val.Username)
+	}
+	if password != val.Password {
+		t.Errorf("Unexpected password value, want: %s, got: %s", password, val.Password)
+	}
+	if email != val.Email {
+		t.Errorf("Unexpected email value, want: %s, got: %s", email, val.Email)
+	}
+
+	// Verify that we get an error for other images.
+	for _, otherRegistry := range otherRegistries {
+		fullImage = path.Join(otherRegistry, image)
+		creds, ok = keyring.Lookup(fullImage)
+		if ok {
+			t.Errorf("Unexpectedly found image: %s", fullImage)
+			return
+		}
+	}
+}
+
+func TestChinaEcrProvide(t *testing.T) {
+	registry := "123456789012.dkr.ecr.cn-foo-1.amazonaws.com.cn"
+	otherRegistries := []string{
+		"123456789012.dkr.ecr.lala-land-1.amazonaws.com",
+		"private.registry.com",
+		"gcr.io",
+	}
+	image := "foo/bar"
+
+	provider := newEcrProvider("cn-foo-1",
 		&testTokenGetter{
 			user:     user,
 			password: password,

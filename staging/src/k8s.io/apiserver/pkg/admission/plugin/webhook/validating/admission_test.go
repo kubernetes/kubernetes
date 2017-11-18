@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/rest"
 )
@@ -96,7 +97,7 @@ func ccfgSVC(urlPath string) registrationv1alpha1.WebhookClientConfig {
 			Namespace: "default",
 			Path:      &urlPath,
 		},
-		CABundle: caCert,
+		CABundle: testcerts.CACert,
 	}
 }
 
@@ -111,7 +112,7 @@ func (c urlConfigGenerator) ccfgURL(urlPath string) registrationv1alpha1.Webhook
 	urlString := u2.String()
 	return registrationv1alpha1.WebhookClientConfig{
 		URL:      &urlString,
-		CABundle: caCert,
+		CABundle: testcerts.CACert,
 	}
 }
 
@@ -360,6 +361,28 @@ func TestAdmit(t *testing.T) {
 			},
 			errorContains: "without explanation",
 		},
+		"absent response and fail open": {
+			hookSource: fakeHookSource{
+				hooks: []registrationv1alpha1.Webhook{{
+					Name:          "nilResponse",
+					ClientConfig:  ccfgURL("nilResponse"),
+					FailurePolicy: &policyIgnore,
+					Rules:         matchEverythingRules,
+				}},
+			},
+			expectAllow: true,
+		},
+		"absent response and fail closed": {
+			hookSource: fakeHookSource{
+				hooks: []registrationv1alpha1.Webhook{{
+					Name:          "nilResponse",
+					ClientConfig:  ccfgURL("nilResponse"),
+					FailurePolicy: &policyFail,
+					Rules:         matchEverythingRules,
+				}},
+			},
+			errorContains: "Webhook response was absent",
+		},
 		// No need to test everything with the url case, since only the
 		// connection is different.
 	}
@@ -556,12 +579,12 @@ func TestAdmitCachedClient(t *testing.T) {
 
 func newTestServer(t *testing.T) *httptest.Server {
 	// Create the test webhook server
-	sCert, err := tls.X509KeyPair(serverCert, serverKey)
+	sCert, err := tls.X509KeyPair(testcerts.ServerCert, testcerts.ServerKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 	rootCAs := x509.NewCertPool()
-	rootCAs.AppendCertsFromPEM(caCert)
+	rootCAs.AppendCertsFromPEM(testcerts.CACert)
 	testServer := httptest.NewUnstartedServer(http.HandlerFunc(webhookHandler))
 	testServer.TLS = &tls.Config{
 		Certificates: []tls.Certificate{sCert},
@@ -587,14 +610,14 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 	case "/disallow":
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(&v1alpha1.AdmissionReview{
-			Status: v1alpha1.AdmissionReviewStatus{
+			Response: &v1alpha1.AdmissionResponse{
 				Allowed: false,
 			},
 		})
 	case "/disallowReason":
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(&v1alpha1.AdmissionReview{
-			Status: v1alpha1.AdmissionReviewStatus{
+			Response: &v1alpha1.AdmissionResponse{
 				Allowed: false,
 				Result: &metav1.Status{
 					Message: "you shall not pass",
@@ -604,10 +627,13 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 	case "/allow":
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(&v1alpha1.AdmissionReview{
-			Status: v1alpha1.AdmissionReviewStatus{
+			Response: &v1alpha1.AdmissionResponse{
 				Allowed: true,
 			},
 		})
+	case "/nilResposne":
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(&v1alpha1.AdmissionReview{})
 	default:
 		http.NotFound(w, r)
 	}
@@ -617,9 +643,9 @@ func newFakeAuthenticationInfoResolver(count *int32) *fakeAuthenticationInfoReso
 	return &fakeAuthenticationInfoResolver{
 		restConfig: &rest.Config{
 			TLSClientConfig: rest.TLSClientConfig{
-				CAData:   caCert,
-				CertData: clientCert,
-				KeyData:  clientKey,
+				CAData:   testcerts.CACert,
+				CertData: testcerts.ClientCert,
+				KeyData:  testcerts.ClientKey,
 			},
 		},
 		cachedCount: count,

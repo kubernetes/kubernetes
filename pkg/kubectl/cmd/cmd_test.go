@@ -75,17 +75,6 @@ func defaultClientConfig() *restclient.Config {
 	}
 }
 
-func defaultClientConfigForVersion(version *schema.GroupVersion) *restclient.Config {
-	return &restclient.Config{
-		APIPath: "/api",
-		ContentConfig: restclient.ContentConfig{
-			NegotiatedSerializer: scheme.Codecs,
-			ContentType:          runtime.ContentTypeJSON,
-			GroupVersion:         version,
-		},
-	}
-}
-
 func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList) {
 	pods := &api.PodList{
 		ListMeta: metav1.ListMeta{

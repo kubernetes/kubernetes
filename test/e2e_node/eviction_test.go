@@ -67,8 +67,8 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive] [Flak
 			if inodesFree <= inodesConsumed {
 				framework.Skipf("Too few inodes free on the host for the InodeEviction test to run")
 			}
-			initialConfig.EvictionHard = fmt.Sprintf("nodefs.inodesFree<%d", inodesFree-inodesConsumed)
-			initialConfig.EvictionMinimumReclaim = ""
+			initialConfig.EvictionHard = map[string]string{"nodefs.inodesFree": fmt.Sprintf("%d", inodesFree-inodesConsumed)}
+			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, logInodeMetrics, []podEvictSpec{
 			{
@@ -100,7 +100,9 @@ var _ = framework.KubeDescribe("MemoryAllocatableEviction [Slow] [Serial] [Disru
 			// The default hard eviction threshold is 250Mb, so Allocatable = Capacity - Reserved - 250Mb
 			// We want Allocatable = 50Mb, so set Reserved = Capacity - Allocatable - 250Mb = Capacity - 300Mb
 			kubeReserved.Sub(resource.MustParse("300Mi"))
-			initialConfig.KubeReserved = kubeletconfig.ConfigurationMap(map[string]string{string(v1.ResourceMemory): kubeReserved.String()})
+			initialConfig.KubeReserved = map[string]string{
+				string(v1.ResourceMemory): kubeReserved.String(),
+			}
 			initialConfig.EnforceNodeAllocatable = []string{cm.NodeAllocatableEnforcementKey}
 			initialConfig.CgroupsPerQOS = true
 		})
@@ -129,13 +131,15 @@ var _ = framework.KubeDescribe("LocalStorageAllocatableEviction [Slow] [Serial] 
 			diskConsumed := uint64(200000000) // At least 200 Mb for pods to consume
 			summary := eventuallyGetSummary()
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
-			initialConfig.KubeReserved = kubeletconfig.ConfigurationMap(map[string]string{string(v1.ResourceEphemeralStorage): fmt.Sprintf("%d", availableBytes-diskConsumed)})
+			initialConfig.KubeReserved = map[string]string{
+				string(v1.ResourceEphemeralStorage): fmt.Sprintf("%d", availableBytes-diskConsumed),
+			}
 			initialConfig.EnforceNodeAllocatable = []string{cm.NodeAllocatableEnforcementKey}
 			initialConfig.CgroupsPerQOS = true
 			initialConfig.FeatureGates[string(features.LocalStorageCapacityIsolation)] = true
 			// set evictionHard to be very small, so that only the allocatable eviction threshold triggers
-			initialConfig.EvictionHard = "nodefs.available<1"
-			initialConfig.EvictionMinimumReclaim = ""
+			initialConfig.EvictionHard = map[string]string{"nodefs.available": "1"}
+			initialConfig.EvictionMinimumReclaim = map[string]string{}
 			framework.Logf("KubeReserved: %+v", initialConfig.KubeReserved)
 		})
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, logDiskMetrics, []podEvictSpec{
@@ -162,8 +166,8 @@ var _ = framework.KubeDescribe("LocalStorageEviction [Slow] [Serial] [Disruptive
 			diskConsumed := uint64(100000000) // At least 100 Mb for pods to consume
 			summary := eventuallyGetSummary()
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
-			initialConfig.EvictionHard = fmt.Sprintf("nodefs.available<%d", availableBytes-diskConsumed)
-			initialConfig.EvictionMinimumReclaim = ""
+			initialConfig.EvictionHard = map[string]string{"nodefs.available": fmt.Sprintf("%d", availableBytes-diskConsumed)}
+			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, logDiskMetrics, []podEvictSpec{
 			{
@@ -190,13 +194,13 @@ var _ = framework.KubeDescribe("LocalStorageSoftEviction [Slow] [Serial] [Disrup
 			diskConsumed := uint64(100000000) // At least 100 Mb for pods to consume
 			summary := eventuallyGetSummary()
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
-			initialConfig.EvictionSoft = fmt.Sprintf("nodefs.available<%d", availableBytes-diskConsumed)
-			initialConfig.EvictionSoftGracePeriod = "nodefs.available=1m"
+			initialConfig.EvictionSoft = map[string]string{"nodefs.available": fmt.Sprintf("%d", availableBytes-diskConsumed)}
+			initialConfig.EvictionSoftGracePeriod = map[string]string{"nodefs.available": "1m"}
 			// Defer to the pod default grace period
 			initialConfig.EvictionMaxPodGracePeriod = 30
-			initialConfig.EvictionMinimumReclaim = ""
+			initialConfig.EvictionMinimumReclaim = map[string]string{}
 			// Ensure that pods are not evicted because of the eviction-hard threshold
-			initialConfig.EvictionHard = ""
+			initialConfig.EvictionHard = map[string]string{}
 		})
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, logDiskMetrics, []podEvictSpec{
 			{
@@ -218,7 +222,7 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 	Context(fmt.Sprintf(testContextFmt, "evictions due to pod local storage violations"), func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.FeatureGates[string(features.LocalStorageCapacityIsolation)] = true
-			initialConfig.EvictionHard = ""
+			initialConfig.EvictionHard = map[string]string{}
 		})
 		sizeLimit := resource.MustParse("100Mi")
 		used := int64(200) // Consume 200 Mb
@@ -269,8 +273,8 @@ var _ = framework.KubeDescribe("PriorityEvictionOrdering [Slow] [Serial] [Disrup
 			memoryConsumed := resource.MustParse("600Mi")
 			summary := eventuallyGetSummary()
 			availableBytes := *(summary.Node.Memory.AvailableBytes)
-			initialConfig.EvictionHard = fmt.Sprintf("memory.available<%d", availableBytes-uint64(memoryConsumed.Value()))
-			initialConfig.EvictionMinimumReclaim = ""
+			initialConfig.EvictionHard = map[string]string{"memory.available": fmt.Sprintf("%d", availableBytes-uint64(memoryConsumed.Value()))}
+			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
 		specs := []podEvictSpec{
 			{

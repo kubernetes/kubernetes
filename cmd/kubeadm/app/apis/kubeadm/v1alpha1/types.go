@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -27,13 +28,14 @@ import (
 type MasterConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	API                API        `json:"api"`
-	Etcd               Etcd       `json:"etcd"`
-	Networking         Networking `json:"networking"`
-	KubernetesVersion  string     `json:"kubernetesVersion"`
-	CloudProvider      string     `json:"cloudProvider"`
-	NodeName           string     `json:"nodeName"`
-	AuthorizationModes []string   `json:"authorizationModes,omitempty"`
+	API                  API                  `json:"api"`
+	Etcd                 Etcd                 `json:"etcd"`
+	KubeletConfiguration KubeletConfiguration `json:"kubeletConfiguration"`
+	Networking           Networking           `json:"networking"`
+	KubernetesVersion    string               `json:"kubernetesVersion"`
+	CloudProvider        string               `json:"cloudProvider"`
+	NodeName             string               `json:"nodeName"`
+	AuthorizationModes   []string             `json:"authorizationModes,omitempty"`
 
 	Token    string           `json:"token"`
 	TokenTTL *metav1.Duration `json:"tokenTTL,omitempty"`
@@ -136,6 +138,14 @@ type NodeConfiguration struct {
 	// without CA verification via DiscoveryTokenCACertHashes. This can weaken
 	// the security of kubeadm since other nodes can impersonate the master.
 	DiscoveryTokenUnsafeSkipCAVerification bool `json:"discoveryTokenUnsafeSkipCAVerification"`
+
+	// FeatureGates enabled by the user
+	FeatureGates map[string]bool `json:"featureGates,omitempty"`
+}
+
+// KubeletConfiguration contains elements describing initial remote configuration of kubelet
+type KubeletConfiguration struct {
+	BaseConfig *kubeletconfigv1alpha1.KubeletConfiguration `json:"baseConfig"`
 }
 
 // HostPathMount contains elements describing volumes that are mounted from the
