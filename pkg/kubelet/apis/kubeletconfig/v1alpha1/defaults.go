@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"path/filepath"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -176,9 +175,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	}
 	if obj.SerializeImagePulls == nil {
 		obj.SerializeImagePulls = boolVar(true)
-	}
-	if obj.SeccompProfileRoot == "" {
-		obj.SeccompProfileRoot = filepath.Join(DefaultRootDir, "seccomp")
 	}
 	if obj.StreamingConnectionIdleTimeout == zeroDuration {
 		obj.StreamingConnectionIdleTimeout = metav1.Duration{Duration: 4 * time.Hour}

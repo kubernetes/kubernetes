@@ -25,7 +25,6 @@ func KubeletConfigurationPathRefs(kc *KubeletConfiguration) []*string {
 	paths = append(paths, &kc.Authentication.X509.ClientCAFile)
 	paths = append(paths, &kc.TLSCertFile)
 	paths = append(paths, &kc.TLSPrivateKeyFile)
-	paths = append(paths, &kc.SeccompProfileRoot)
 	paths = append(paths, &kc.ResolverConfig)
 	return paths
 }
