@@ -1041,17 +1041,17 @@ func (r *Runtime) generateRunCommand(pod *v1.Pod, uuid, networkNamespaceID strin
 		}
 	} else {
 		// Setup DNS.
-		dnsServers, dnsSearches, _, _, err := r.runtimeHelper.GetClusterDNS(pod)
+		dnsConfig, err := r.runtimeHelper.GetPodDNS(pod)
 		if err != nil {
 			return "", err
 		}
-		for _, server := range dnsServers {
+		for _, server := range dnsConfig.Servers {
 			runPrepared = append(runPrepared, fmt.Sprintf("--dns=%s", server))
 		}
-		for _, search := range dnsSearches {
+		for _, search := range dnsConfig.Searches {
 			runPrepared = append(runPrepared, fmt.Sprintf("--dns-search=%s", search))
 		}
-		if len(dnsServers) > 0 || len(dnsSearches) > 0 {
+		if len(dnsConfig.Servers) > 0 || len(dnsConfig.Searches) > 0 {
 			runPrepared = append(runPrepared, fmt.Sprintf("--dns-opt=%s", defaultDNSOption))
 		}
 

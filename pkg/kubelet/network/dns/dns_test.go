@@ -25,10 +25,24 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+)
+
+var (
+	fetchEvent = func(recorder *record.FakeRecorder) string {
+		select {
+		case event := <-recorder.Events:
+			return event
+		default:
+			return ""
+		}
+	}
 )
 
 func TestParseResolvConf(t *testing.T) {
@@ -74,7 +88,7 @@ func TestParseResolvConf(t *testing.T) {
 	}
 }
 
-func TestComposeDNSSearch(t *testing.T) {
+func TestFormDNSSearchFitsLimits(t *testing.T) {
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
@@ -96,63 +110,271 @@ func TestComposeDNSSearch(t *testing.T) {
 	}
 
 	testCases := []struct {
-		dnsNames     []string
 		hostNames    []string
 		resultSearch []string
 		events       []string
 	}{
 		{
 			[]string{"testNS.svc.TEST", "svc.TEST", "TEST"},
-			[]string{},
 			[]string{"testNS.svc.TEST", "svc.TEST", "TEST"},
 			[]string{},
 		},
 
 		{
-			[]string{"testNS.svc.TEST", "svc.TEST", "TEST"},
-			[]string{"AAA", "svc.TEST", "BBB", "TEST"},
+			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", "BBB"},
 			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", "BBB"},
 			[]string{},
 		},
 
 		{
-			[]string{"testNS.svc.TEST", "svc.TEST", "TEST"},
-			[]string{"AAA", strings.Repeat("B", 256), "BBB"},
+			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", strings.Repeat("B", 256), "BBB"},
 			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA"},
-			[]string{"Search Line limits were exceeded, some dns names have been omitted, the applied search line is: testNS.svc.TEST svc.TEST TEST AAA"},
+			[]string{"Search Line limits were exceeded, some search paths have been omitted, the applied search line is: testNS.svc.TEST svc.TEST TEST AAA"},
 		},
 
 		{
-			[]string{"testNS.svc.TEST", "svc.TEST", "TEST"},
-			[]string{"AAA", "TEST", "BBB", "TEST", "CCC", "DDD"},
+			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", "BBB", "CCC", "DDD"},
 			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", "BBB", "CCC"},
-			[]string{
-				"Search Line limits were exceeded, some dns names have been omitted, the applied search line is: testNS.svc.TEST svc.TEST TEST AAA BBB CCC",
-			},
+			[]string{"Search Line limits were exceeded, some search paths have been omitted, the applied search line is: testNS.svc.TEST svc.TEST TEST AAA BBB CCC"},
 		},
 	}
 
-	fetchEvent := func(recorder *record.FakeRecorder) string {
-		select {
-		case event := <-recorder.Events:
-			return event
-		default:
-			return "No more events!"
-		}
-	}
-
 	for i, tc := range testCases {
-		dnsSearch := configurer.formDNSSearch(tc.hostNames, pod)
+		dnsSearch := configurer.formDNSSearchFitsLimits(tc.hostNames, pod)
 		assert.EqualValues(t, tc.resultSearch, dnsSearch, "test [%d]", i)
 		for _, expectedEvent := range tc.events {
-			expected := fmt.Sprintf("%s %s %s", v1.EventTypeWarning, "DNSSearchForming", expectedEvent)
+			expected := fmt.Sprintf("%s %s %s", v1.EventTypeWarning, "DNSConfigForming", expectedEvent)
 			event := fetchEvent(recorder)
 			assert.Equal(t, expected, event, "test [%d]", i)
 		}
 	}
 }
 
-func TestGetClusterDNS(t *testing.T) {
+func TestFormDNSNameserversFitsLimits(t *testing.T) {
+	recorder := record.NewFakeRecorder(20)
+	nodeRef := &v1.ObjectReference{
+		Kind:      "Node",
+		Name:      string("testNode"),
+		UID:       types.UID("testNode"),
+		Namespace: "",
+	}
+	testClusterDNSDomain := "TEST"
+
+	configurer := NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:         "",
+			Name:        "test_pod",
+			Namespace:   "testNS",
+			Annotations: map[string]string{},
+		},
+	}
+
+	testCases := []struct {
+		desc               string
+		nameservers        []string
+		expectedNameserver []string
+		expectedEvent      bool
+	}{
+		{
+			desc:               "valid: 1 nameserver",
+			nameservers:        []string{"127.0.0.1"},
+			expectedNameserver: []string{"127.0.0.1"},
+			expectedEvent:      false,
+		},
+		{
+			desc:               "valid: 3 nameservers",
+			nameservers:        []string{"127.0.0.1", "10.0.0.10", "8.8.8.8"},
+			expectedNameserver: []string{"127.0.0.1", "10.0.0.10", "8.8.8.8"},
+			expectedEvent:      false,
+		},
+		{
+			desc:               "invalid: 4 nameservers, trimmed to 3",
+			nameservers:        []string{"127.0.0.1", "10.0.0.10", "8.8.8.8", "1.2.3.4"},
+			expectedNameserver: []string{"127.0.0.1", "10.0.0.10", "8.8.8.8"},
+			expectedEvent:      true,
+		},
+	}
+
+	for _, tc := range testCases {
+		appliedNameservers := configurer.formDNSNameserversFitsLimits(tc.nameservers, pod)
+		assert.EqualValues(t, tc.expectedNameserver, appliedNameservers, tc.desc)
+		event := fetchEvent(recorder)
+		if tc.expectedEvent && len(event) == 0 {
+			t.Errorf("%s: formDNSNameserversFitsLimits(%v) expected event, got no event.", tc.desc, tc.nameservers)
+		} else if !tc.expectedEvent && len(event) > 0 {
+			t.Errorf("%s: formDNSNameserversFitsLimits(%v) expected no event, got event: %v", tc.desc, tc.nameservers, event)
+		}
+	}
+}
+
+func TestMergeDNSOptions(t *testing.T) {
+	testOptionValue := "3"
+
+	testCases := []struct {
+		desc             string
+		dnsConfigOptions []string
+		dnsParamsOptions []v1.PodDNSParamsOption
+		expectedOptions  []string
+	}{
+		{
+			desc:             "Empty dnsParamsOptions",
+			dnsConfigOptions: []string{"ndots:5", "debug"},
+			dnsParamsOptions: nil,
+			expectedOptions:  []string{"ndots:5", "debug"},
+		},
+		{
+			desc:             "No duplicated entries",
+			dnsConfigOptions: []string{"ndots:5", "debug"},
+			dnsParamsOptions: []v1.PodDNSParamsOption{
+				{Name: "single-request"},
+				{Name: "attempts", Value: &testOptionValue},
+			},
+			expectedOptions: []string{"ndots:5", "debug", "single-request", "attempts:3"},
+		},
+		{
+			desc:             "Overwrite duplicated entries",
+			dnsConfigOptions: []string{"ndots:5", "debug"},
+			dnsParamsOptions: []v1.PodDNSParamsOption{
+				{Name: "ndots", Value: &testOptionValue},
+				{Name: "debug"},
+				{Name: "single-request"},
+				{Name: "attempts", Value: &testOptionValue},
+			},
+			expectedOptions: []string{"ndots:3", "debug", "single-request", "attempts:3"},
+		},
+	}
+
+	for _, tc := range testCases {
+		options := mergeDNSOptions(tc.dnsConfigOptions, tc.dnsParamsOptions)
+		// Options order may be changed after conversion.
+		if !sets.NewString(options...).Equal(sets.NewString(tc.expectedOptions...)) {
+			t.Errorf("%s: mergeDNSOptions(%v, %v)=%v, want %v", tc.desc, tc.dnsConfigOptions, tc.dnsParamsOptions, options, tc.expectedOptions)
+		}
+	}
+}
+
+func TestGetPodDNSType(t *testing.T) {
+	customDNSEnabled := utilfeature.DefaultFeatureGate.Enabled("CustomPodDNS")
+	defer func() {
+		// Restoring the old value.
+		if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("CustomPodDNS=%v", customDNSEnabled)); err != nil {
+			t.Errorf("Failed to set CustomPodDNS feature gate: %v", err)
+		}
+	}()
+
+	recorder := record.NewFakeRecorder(20)
+	nodeRef := &v1.ObjectReference{
+		Kind:      "Node",
+		Name:      string("testNode"),
+		UID:       types.UID("testNode"),
+		Namespace: "",
+	}
+	testClusterDNSDomain := "TEST"
+	clusterNS := "203.0.113.1"
+	testClusterDNS := []net.IP{net.ParseIP(clusterNS)}
+
+	configurer := NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:         "",
+			Name:        "test_pod",
+			Namespace:   "testNS",
+			Annotations: map[string]string{},
+		},
+	}
+
+	testCases := []struct {
+		desc                    string
+		customPodDNSFeatureGate bool
+		hasClusterDNS           bool
+		hostNetwork             bool
+		dnsPolicy               v1.DNSPolicy
+		expectedDNSType         podDNSType
+	}{
+		{
+			desc:            "valid DNSClusterFirst without hostnetwork",
+			hasClusterDNS:   true,
+			dnsPolicy:       v1.DNSClusterFirst,
+			expectedDNSType: podDNSCluster,
+		},
+		{
+			desc:            "valid DNSClusterFirstWithHostNet with hostnetwork",
+			hasClusterDNS:   true,
+			hostNetwork:     true,
+			dnsPolicy:       v1.DNSClusterFirstWithHostNet,
+			expectedDNSType: podDNSCluster,
+		},
+		{
+			desc:            "valid DNSClusterFirstWithHostNet without hostnetwork",
+			hasClusterDNS:   true,
+			dnsPolicy:       v1.DNSClusterFirstWithHostNet,
+			expectedDNSType: podDNSCluster,
+		},
+		{
+			desc:            "valid DNSDefault without hostnetwork",
+			dnsPolicy:       v1.DNSDefault,
+			expectedDNSType: podDNSHost,
+		},
+		{
+			desc:            "valid DNSDefault with hostnetwork",
+			hostNetwork:     true,
+			dnsPolicy:       v1.DNSDefault,
+			expectedDNSType: podDNSHost,
+		},
+		{
+			desc:            "DNSClusterFirst with hostnetwork, fall back to DNSDefault",
+			hasClusterDNS:   true,
+			hostNetwork:     true,
+			dnsPolicy:       v1.DNSClusterFirst,
+			expectedDNSType: podDNSHost,
+		},
+		{
+			desc:            "DNSClusterFirstWithHostNet without clusterDNS, fallback to DNSDefault",
+			dnsPolicy:       v1.DNSClusterFirstWithHostNet,
+			expectedDNSType: podDNSHost,
+		},
+		{
+			desc:            "DNSClusterFirst without clusterDNS, fallback to DNSDefault",
+			dnsPolicy:       v1.DNSClusterFirst,
+			expectedDNSType: podDNSHost,
+		},
+		{
+			desc: "valid DNSCustom with feature gate",
+			customPodDNSFeatureGate: true,
+			dnsPolicy:               v1.DNSCustom,
+			expectedDNSType:         podDNSCustom,
+		},
+		{
+			desc:            "DNSCustom without feature gate, fallback to DNSDefault",
+			dnsPolicy:       v1.DNSCustom,
+			expectedDNSType: podDNSHost,
+		},
+	}
+
+	for _, tc := range testCases {
+		if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("CustomPodDNS=%v", tc.customPodDNSFeatureGate)); err != nil {
+			t.Errorf("Failed to set CustomPodDNS feature gate: %v", err)
+		}
+
+		if tc.hasClusterDNS {
+			configurer.clusterDNS = testClusterDNS
+		} else {
+			configurer.clusterDNS = nil
+		}
+		pod.Spec.DNSPolicy = tc.dnsPolicy
+		pod.Spec.HostNetwork = tc.hostNetwork
+
+		resType := configurer.getPodDNSType(pod)
+		if resType != tc.expectedDNSType {
+			t.Errorf("%s: GetPodDNSType(%v)=%v, want %v", tc.desc, pod, resType, tc.expectedDNSType)
+		}
+	}
+}
+
+func TestGetPodDNS(t *testing.T) {
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
@@ -179,10 +401,11 @@ func TestGetClusterDNS(t *testing.T) {
 	}, 4)
 	for i, pod := range pods {
 		var err error
-		options[i].DNS, options[i].DNSSearch, _, _, err = configurer.GetClusterDNS(pod)
+		dnsConfig, err := configurer.GetPodDNS(pod)
 		if err != nil {
 			t.Fatalf("failed to generate container options: %v", err)
 		}
+		options[i].DNS, options[i].DNSSearch = dnsConfig.Servers, dnsConfig.Searches
 	}
 	if len(options[0].DNS) != 1 || options[0].DNS[0] != clusterNS {
 		t.Errorf("expected nameserver %s, got %+v", clusterNS, options[0].DNS)
@@ -213,10 +436,11 @@ func TestGetClusterDNS(t *testing.T) {
 	configurer = NewConfigurer(recorder, nodeRef, nil, testClusterDNS, testClusterDNSDomain, testResolverConfig)
 	for i, pod := range pods {
 		var err error
-		options[i].DNS, options[i].DNSSearch, _, _, err = configurer.GetClusterDNS(pod)
+		dnsConfig, err := configurer.GetPodDNS(pod)
 		if err != nil {
 			t.Fatalf("failed to generate container options: %v", err)
 		}
+		options[i].DNS, options[i].DNSSearch = dnsConfig.Servers, dnsConfig.Searches
 	}
 	t.Logf("nameservers %+v", options[1].DNS)
 	if len(options[0].DNS) != 1 {
@@ -243,6 +467,118 @@ func TestGetClusterDNS(t *testing.T) {
 	} else if options[2].DNSSearch[0] != ".svc."+configurer.ClusterDomain {
 		t.Errorf("expected domain %s, got %s", ".svc."+configurer.ClusterDomain, options[0].DNSSearch)
 	}
+}
+
+func TestGetPodDNSCustom(t *testing.T) {
+	customDNSEnabled := utilfeature.DefaultFeatureGate.Enabled("CustomPodDNS")
+	defer func() {
+		// Restoring the old value.
+		if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("CustomPodDNS=%v", customDNSEnabled)); err != nil {
+			t.Errorf("Failed to set CustomPodDNS feature gate: %v", err)
+		}
+	}()
+
+	recorder := record.NewFakeRecorder(20)
+	nodeRef := &v1.ObjectReference{
+		Kind:      "Node",
+		Name:      string("testNode"),
+		UID:       types.UID("testNode"),
+		Namespace: "",
+	}
+	clusterNS := "203.0.113.1"
+	testClusterDNSDomain := "kubernetes.io"
+	testClusterDNS := []net.IP{net.ParseIP(clusterNS)}
+	testOptionValue := "3"
+
+	configurer := NewConfigurer(recorder, nodeRef, nil, testClusterDNS, testClusterDNSDomain, "")
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:         "",
+			Name:        "test_pod",
+			Namespace:   "testNS",
+			Annotations: map[string]string{},
+		},
+		Spec: v1.PodSpec{
+			DNSPolicy: v1.DNSDefault,
+		},
+	}
+	hostDNSConfig, err := configurer.GetPodDNS(pod)
+	if err != nil {
+		t.Fatalf("Preparing hostDNSConfig: GetPodDNS(%v), unexpected error: %v", pod, err)
+	}
+
+	pod.Spec.DNSPolicy = v1.DNSCustom
+
+	testCases := []struct {
+		desc                    string
+		customPodDNSFeatureGate bool
+		dnsParams               *v1.PodDNSParams
+		expectedDNSConfig       *runtimeapi.DNSConfig
+	}{
+		{
+			desc:              "feature gate is disabled, DNSCustom should fall back to DNSDefault",
+			expectedDNSConfig: hostDNSConfig,
+		},
+		{
+			desc: "feature gate is enabled, DNSCustom without DNSParams should have an empty DNS settings",
+			customPodDNSFeatureGate: true,
+			expectedDNSConfig:       &runtimeapi.DNSConfig{},
+		},
+		{
+			desc: "feature gate is enabled, DNSCustom with DNSParams should have a merged DNS settings",
+			customPodDNSFeatureGate: true,
+			dnsParams: &v1.PodDNSParams{
+				Nameservers: []string{"10.0.0.10"},
+				Searches:    []string{"my.domain", "second.domain"},
+				Options: []v1.PodDNSParamsOption{
+					{Name: "ndots", Value: &testOptionValue},
+					{Name: "debug"},
+				},
+			},
+			expectedDNSConfig: &runtimeapi.DNSConfig{
+				Servers:  []string{"10.0.0.10"},
+				Searches: []string{"my.domain", "second.domain"},
+				Options:  []string{"ndots:3", "debug"},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("CustomPodDNS=%v", tc.customPodDNSFeatureGate)); err != nil {
+			t.Errorf("Failed to set CustomPodDNS feature gate: %v", err)
+		}
+
+		pod.Spec.DNSParams = tc.dnsParams
+
+		resDNSConfig, err := configurer.GetPodDNS(pod)
+		if err != nil {
+			t.Errorf("%s: GetPodDNS(%v), unexpected error: %v", tc.desc, pod, err)
+		}
+		if !dnsConfigsAreEqual(resDNSConfig, tc.expectedDNSConfig) {
+			t.Errorf("%s: GetPodDNS(%v)=%v, want %v", tc.desc, pod, resDNSConfig, tc.expectedDNSConfig)
+		}
+	}
+}
+
+func dnsConfigsAreEqual(resConfig, expectedConfig *runtimeapi.DNSConfig) bool {
+	if len(resConfig.Servers) != len(expectedConfig.Servers) ||
+		len(resConfig.Searches) != len(expectedConfig.Searches) ||
+		len(resConfig.Options) != len(expectedConfig.Options) {
+		return false
+	}
+	for i, server := range resConfig.Servers {
+		if expectedConfig.Servers[i] != server {
+			return false
+		}
+	}
+	for i, search := range resConfig.Searches {
+		if expectedConfig.Searches[i] != search {
+			return false
+		}
+	}
+	// Options order may be changed after conversion.
+	return sets.NewString(resConfig.Options...).Equal(sets.NewString(expectedConfig.Options...))
 }
 
 func newTestPods(count int) []*v1.Pod {

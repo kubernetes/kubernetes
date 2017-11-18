@@ -2350,6 +2350,11 @@ const (
 	// determined by kubelet) DNS settings.
 	DNSDefault DNSPolicy = "Default"
 
+	// DNSCustom indicates that the pod should use an empty DNS settings. DNS
+	// parameters such as nameservers and search paths should be customized via
+	// DNSParams.
+	DNSCustom DNSPolicy = "Custom"
+
 	DefaultTerminationGracePeriodSeconds = 30
 )
 
@@ -2679,10 +2684,12 @@ type PodSpec struct {
 	// Value must be a positive integer.
 	// +optional
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,5,opt,name=activeDeadlineSeconds"`
-	// Set DNS policy for containers within the pod.
-	// One of 'ClusterFirstWithHostNet', 'ClusterFirst' or 'Default'.
+	// Set DNS policy for the pod.
 	// Defaults to "ClusterFirst".
-	// To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.
+	// Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'Custom'.
+	// DNS parameters given in DNSParams will be appended to the policy selected with DNSPolicy.
+	// To have DNS options set along with hostNetwork, you have to specify DNS policy
+	// explicitly to 'ClusterFirstWithHostNet'.
 	// +optional
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" protobuf:"bytes,6,opt,name=dnsPolicy,casttype=DNSPolicy"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node.
@@ -2775,6 +2782,11 @@ type PodSpec struct {
 	// The higher the value, the higher the priority.
 	// +optional
 	Priority *int32 `json:"priority,omitempty" protobuf:"bytes,25,opt,name=priority"`
+	// Specifies the DNS parameters of a pod.
+	// Parameters specified here will be appended to the generated DNS
+	// configuration based on DNSPolicy.
+	// +optional
+	DNSParams *PodDNSParams `json:"dnsParams,omitempty" protobuf:"bytes,26,opt,name=dnsParams"`
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
@@ -2841,6 +2853,27 @@ const (
 	// PodQOSBestEffort is the BestEffort qos class.
 	PodQOSBestEffort PodQOSClass = "BestEffort"
 )
+
+// PodDNSParams defines the DNS parameters of a pod.
+type PodDNSParams struct {
+	// A list of DNS name server IP addresses.
+	// +optional
+	Nameservers []string `json:"nameservers,omitempty" protobuf:"bytes,1,rep,name=nameservers"`
+	// A list of DNS search domains for host-name lookup.
+	// +optional
+	Searches []string `json:"searches,omitempty" protobuf:"bytes,2,rep,name=searches"`
+	// A list of DNS resolver options.
+	// +optional
+	Options []PodDNSParamsOption `json:"options,omitempty" protobuf:"bytes,3,rep,name=options"`
+}
+
+// PodDNSParamsOption defines DNS resolver options of a pod.
+type PodDNSParamsOption struct {
+	// Required.
+	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	// +optional
+	Value *string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
+}
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
 // state of a system.

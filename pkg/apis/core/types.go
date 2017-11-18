@@ -2103,6 +2103,11 @@ const (
 	// DNSDefault indicates that the pod should use the default (as
 	// determined by kubelet) DNS settings.
 	DNSDefault DNSPolicy = "Default"
+
+	// DNSCustom indicates that the pod should use an empty DNS settings. DNS
+	// parameters such as nameservers and search paths should be customized via
+	// DNSParams.
+	DNSCustom DNSPolicy = "Custom"
 )
 
 // A node selector represents the union of the results of one or more label queries
@@ -2402,7 +2407,12 @@ type PodSpec struct {
 	// before the system actively tries to terminate the pod; value must be positive integer
 	// +optional
 	ActiveDeadlineSeconds *int64
-	// Required: Set DNS policy.
+	// Set DNS policy for the pod.
+	// Defaults to "ClusterFirst".
+	// Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'Custom'.
+	// DNS parameters given in DNSParams will be appended to the policy selected with DNSPolicy.
+	// To have DNS options set along with hostNetwork, you have to specify DNS policy
+	// explicitly to 'ClusterFirstWithHostNet'.
 	// +optional
 	DNSPolicy DNSPolicy
 	// NodeSelector is a selector which must be true for the pod to fit on a node
@@ -2466,6 +2476,11 @@ type PodSpec struct {
 	// The higher the value, the higher the priority.
 	// +optional
 	Priority *int32
+	// Specifies the DNS parameters of a pod.
+	// Parameters specified here will be appended to the generated DNS
+	// configuration based on DNSPolicy.
+	// +optional
+	DNSParams *PodDNSParams
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
@@ -2554,6 +2569,27 @@ const (
 	// PodQOSBestEffort is the BestEffort qos class.
 	PodQOSBestEffort PodQOSClass = "BestEffort"
 )
+
+// PodDNSParams defines the DNS parameters of a pod.
+type PodDNSParams struct {
+	// A list of DNS name server IP addresses.
+	// +optional
+	Nameservers []string
+	// A list of DNS search domains for host-name lookup.
+	// +optional
+	Searches []string
+	// A list of DNS resolver options.
+	// +optional
+	Options []PodDNSParamsOption
+}
+
+// PodDNSParamsOption defines DNS resolver options of a pod.
+type PodDNSParamsOption struct {
+	// Required.
+	Name string
+	// +optional
+	Value *string
+}
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
 // state of a system.

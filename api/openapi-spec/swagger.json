@@ -76077,6 +76077,44 @@
      }
     }
    },
+   "io.k8s.api.core.v1.PodDNSParams": {
+    "description": "PodDNSParams defines the DNS parameters of a pod.",
+    "properties": {
+     "nameservers": {
+      "description": "A list of DNS name server IP addresses.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "options": {
+      "description": "A list of DNS resolver options.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.PodDNSParamsOption"
+      }
+     },
+     "searches": {
+      "description": "A list of DNS search domains for host-name lookup.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "io.k8s.api.core.v1.PodDNSParamsOption": {
+    "description": "PodDNSParamsOption defines DNS resolver options of a pod.",
+    "properties": {
+     "name": {
+      "description": "Required.",
+      "type": "string"
+     },
+     "value": {
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.api.core.v1.PodList": {
     "description": "PodList is a list of Pods.",
     "required": [
@@ -76170,8 +76208,12 @@
       "x-kubernetes-patch-merge-key": "name",
       "x-kubernetes-patch-strategy": "merge"
      },
+     "dnsParams": {
+      "description": "Specifies the DNS parameters of a pod. Parameters specified here will be appended to the generated DNS configuration based on DNSPolicy.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.PodDNSParams"
+     },
      "dnsPolicy": {
-      "description": "Set DNS policy for containers within the pod. One of 'ClusterFirstWithHostNet', 'ClusterFirst' or 'Default'. Defaults to \"ClusterFirst\". To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.",
+      "description": "Set DNS policy for the pod. Defaults to \"ClusterFirst\". Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'Custom'. DNS parameters given in DNSParams will be appended to the policy selected with DNSPolicy. To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.",
       "type": "string"
      },
      "hostAliases": {

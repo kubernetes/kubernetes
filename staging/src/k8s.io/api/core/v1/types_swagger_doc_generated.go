@@ -1334,6 +1334,26 @@ func (PodCondition) SwaggerDoc() map[string]string {
 	return map_PodCondition
 }
 
+var map_PodDNSParams = map[string]string{
+	"":            "PodDNSParams defines the DNS parameters of a pod.",
+	"nameservers": "A list of DNS name server IP addresses.",
+	"searches":    "A list of DNS search domains for host-name lookup.",
+	"options":     "A list of DNS resolver options.",
+}
+
+func (PodDNSParams) SwaggerDoc() map[string]string {
+	return map_PodDNSParams
+}
+
+var map_PodDNSParamsOption = map[string]string{
+	"":     "PodDNSParamsOption defines DNS resolver options of a pod.",
+	"name": "Required.",
+}
+
+func (PodDNSParamsOption) SwaggerDoc() map[string]string {
+	return map_PodDNSParamsOption
+}
+
 var map_PodExecOptions = map[string]string{
 	"":          "PodExecOptions is the query options to a Pod's remote exec call.",
 	"stdin":     "Redirect the standard input stream of the pod for this call. Defaults to false.",
@@ -1422,7 +1442,7 @@ var map_PodSpec = map[string]string{
 	"restartPolicy":                 "Restart policy for all containers within the pod. One of Always, OnFailure, Never. Default to Always. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy",
 	"terminationGracePeriodSeconds": "Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period will be used instead. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. Defaults to 30 seconds.",
 	"activeDeadlineSeconds":         "Optional duration in seconds the pod may be active on the node relative to StartTime before the system will actively try to mark it failed and kill associated containers. Value must be a positive integer.",
-	"dnsPolicy":                     "Set DNS policy for containers within the pod. One of 'ClusterFirstWithHostNet', 'ClusterFirst' or 'Default'. Defaults to \"ClusterFirst\". To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.",
+	"dnsPolicy":                     "Set DNS policy for the pod. Defaults to \"ClusterFirst\". Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'Custom'. DNS parameters given in DNSParams will be appended to the policy selected with DNSPolicy. To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.",
 	"nodeSelector":                  "NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node's labels for the pod to be scheduled on that node. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/",
 	"serviceAccountName":            "ServiceAccountName is the name of the ServiceAccount to use to run this pod. More info: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/",
 	"serviceAccount":                "DeprecatedServiceAccount is a depreciated alias for ServiceAccountName. Deprecated: Use serviceAccountName instead.",
@@ -1441,6 +1461,7 @@ var map_PodSpec = map[string]string{
 	"hostAliases":                   "HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified. This is only valid for non-hostNetwork pods.",
 	"priorityClassName":             "If specified, indicates the pod's priority. \"SYSTEM\" is a special keyword which indicates the highest priority. Any other name must be defined by creating a PriorityClass object with that name. If not specified, the pod priority will be default or zero if there is no default.",
 	"priority":                      "The priority value. Various system components use this field to find the priority of the pod. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority.",
+	"dnsParams":                     "Specifies the DNS parameters of a pod. Parameters specified here will be appended to the generated DNS configuration based on DNSPolicy.",
 }
 
 func (PodSpec) SwaggerDoc() map[string]string {
