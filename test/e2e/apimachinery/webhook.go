@@ -107,6 +107,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 
 	It("Should be able to deny pod and configmap creation", func() {
 		registerWebhook(f, context)
+		defer client.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations().Delete(webhookConfigName, nil)
 		testWebhook(f)
 	})
 
@@ -114,19 +115,19 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		crdCleanup, dynamicClient := createCRD(f)
 		defer crdCleanup()
 		registerWebhookForCRD(f, context)
+		defer client.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations().Delete(crdWebhookConfigName, nil)
 		testCRDWebhook(f, dynamicClient)
 	})
 
 	It("Should unconditionally reject operations on fail closed webhook", func() {
 		registerFailClosedWebhook(f, context)
+		defer f.ClientSet.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations().Delete(webhookFailClosedConfigName, nil)
 		testFailClosedWebhook(f)
-		// Clean up
-		err := f.ClientSet.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations().Delete(webhookFailClosedConfigName, nil)
-		Expect(err).NotTo(HaveOccurred(), "failed deleting fail closed webhook, this may cause subsequent e2e tests to fail")
 	})
 
 	It("Should mutate configmap", func() {
 		registerMutatingWebhookForConfigMap(f, context)
+		defer client.AdmissionregistrationV1alpha1().MutatingWebhookConfigurations().Delete(mutatingWebhookConfigName, nil)
 		testMutatingConfigMapWebhook(f)
 	})
 
@@ -134,6 +135,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		crdCleanup, dynamicClient := createCRD(f)
 		defer crdCleanup()
 		registerMutatingWebhookForCRD(f, context)
+		defer client.AdmissionregistrationV1alpha1().MutatingWebhookConfigurations().Delete(crdMutatingWebhookConfigName, nil)
 		testMutatingCRDWebhook(f, dynamicClient)
 	})
 
@@ -503,6 +505,8 @@ func testWebhook(f *framework.Framework) {
 		},
 	}})
 	framework.ExpectNoError(err, "creating namespace %q", skippedNamespaceName)
+	// clean up the namespace
+	defer client.CoreV1().Namespaces().Delete(skippedNamespaceName, nil)
 
 	By("create a configmap that violates the webhook policy but is in a whitelisted namespace")
 	configmap = nonCompliantConfigMap(f)
@@ -580,6 +584,7 @@ func testFailClosedWebhook(f *framework.Framework) {
 		},
 	}})
 	framework.ExpectNoError(err, "creating namespace %q", failNamespaceName)
+	defer client.CoreV1().Namespaces().Delete(failNamespaceName, nil)
 
 	By("create a configmap should be unconditionally rejected by the webhook")
 	configmap := &v1.ConfigMap{
@@ -675,16 +680,10 @@ func updateConfigMap(c clientset.Interface, ns, name string, update updateConfig
 }
 
 func cleanWebhookTest(client clientset.Interface, namespaceName string) {
-	_ = client.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations().Delete(webhookConfigName, nil)
-	_ = client.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations().Delete(crdWebhookConfigName, nil)
-	_ = client.AdmissionregistrationV1alpha1().MutatingWebhookConfigurations().Delete(mutatingWebhookConfigName, nil)
 	_ = client.CoreV1().Services(namespaceName).Delete(serviceName, nil)
 	_ = client.ExtensionsV1beta1().Deployments(namespaceName).Delete(deploymentName, nil)
 	_ = client.CoreV1().Secrets(namespaceName).Delete(secretName, nil)
 	_ = client.RbacV1beta1().RoleBindings("kube-system").Delete(roleBindingName, nil)
-	_ = client.CoreV1().ConfigMaps(skippedNamespaceName).Delete(disallowedConfigMapName, nil)
-	_ = client.CoreV1().Namespaces().Delete(skippedNamespaceName, nil)
-	_ = client.CoreV1().Namespaces().Delete(failNamespaceName, nil)
 }
 
 // newCRDForAdmissionWebhookTest generates a CRD
@@ -824,7 +823,7 @@ func registerMutatingWebhookForCRD(f *framework.Framework, context *certContext)
 			},
 		},
 	})
-	framework.ExpectNoError(err, "registering crd webhook config %s with namespace %s", webhookConfigName, namespace)
+	framework.ExpectNoError(err, "registering crd webhook config %s with namespace %s", crdMutatingWebhookConfigName, namespace)
 
 	// The webhook configuration is honored in 1s.
 	time.Sleep(10 * time.Second)
