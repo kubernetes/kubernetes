@@ -203,15 +203,15 @@ type AcceleratorStats struct {
 
 	// Total accelerator memory.
 	// unit: bytes
-	MemoryTotal uint64 `json:"memory_total"`
+	MemoryTotal uint64 `json:"memoryTotal"`
 
 	// Total accelerator memory allocated.
 	// unit: bytes
-	MemoryUsed uint64 `json:"memory_used"`
+	MemoryUsed uint64 `json:"memoryUsed"`
 
 	// Percent of time over the past sample period (10s) during which
 	// the accelerator was actively processing.
-	DutyCycle uint64 `json:"duty_cycle"`
+	DutyCycle uint64 `json:"dutyCycle"`
 }
 
 // VolumeStats contains data about Volume filesystem usage.
