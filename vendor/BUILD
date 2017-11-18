@@ -61,6 +61,7 @@ filegroup(
         "//vendor/github.com/clusterhq/flocker-go:all-srcs",
         "//vendor/github.com/codedellemc/goscaleio:all-srcs",
         "//vendor/github.com/codegangsta/negroni:all-srcs",
+        "//vendor/github.com/container-storage-interface/spec/lib/go/csi:all-srcs",
         "//vendor/github.com/containernetworking/cni/libcni:all-srcs",
         "//vendor/github.com/containernetworking/cni/pkg/invoke:all-srcs",
         "//vendor/github.com/containernetworking/cni/pkg/types:all-srcs",

@@ -6,7 +6,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/volume/csi/fake",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/volume/csi/proto/csi:go_default_library",
+        "//vendor/github.com/container-storage-interface/spec/lib/go/csi:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
     ],
