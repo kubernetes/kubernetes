@@ -321,7 +321,7 @@ if [[ -z "${KUBE_ADMISSION_CONTROL:-}" ]]; then
     ADMISSION_CONTROL="${ADMISSION_CONTROL},PodSecurityPolicy"
   fi
   # ResourceQuota must come last, or a creation is recorded, but the pod may be forbidden.
-  ADMISSION_CONTROL="${ADMISSION_CONTROL},GenericAdmissionWebhook,ResourceQuota"
+  ADMISSION_CONTROL="${ADMISSION_CONTROL},ValidatingAdmissionWebhook,ResourceQuota"
 else
   ADMISSION_CONTROL=${KUBE_ADMISSION_CONTROL}
 fi
