@@ -240,12 +240,13 @@ func (b *glusterfsMounter) GetAttributes() volume.Attributes {
 // to mount the volume are available on the underlying node.
 // If not, it returns an error
 func (b *glusterfsMounter) CanMount() error {
-	exe := b.plugin.host.GetExec(b.plugin.GetPluginName())
 	switch runtime.GOOS {
 	case "linux":
-		if _, err := exe.Run("/bin/ls", gciLinuxGlusterMountBinaryPath); err != nil {
-			return fmt.Errorf("Required binary %s is missing", gciLinuxGlusterMountBinaryPath)
+		if _, err := os.Stat(gciLinuxGlusterMountBinaryPath); err != nil {
+			return fmt.Errorf("required binary %s not found: %v", gciLinuxGlusterMountBinaryPath, err)
 		}
+	default:
+		return fmt.Errorf("unable to determine if glusterfs mounts are available on %s", runtime.GOOS)
 	}
 	return nil
 }

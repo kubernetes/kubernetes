@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
-// This is the primary entrypoint for volume plugins.
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 // The volumeConfig arg provides the ability to configure recycler behavior.  It is implemented as a pointer to allow nils.
 // The nfsPlugin is used to store the volumeConfig and give it, when needed, to the func that creates NFS Recyclers.
 // Tests that exercise recycling should not use this func but instead use ProbeRecyclablePlugins() to override default behavior.
@@ -190,21 +190,22 @@ func (nfsVolume *nfs) GetPath() string {
 // Checks prior to mount operations to verify that the required components (binaries, etc.)
 // to mount the volume are available on the underlying node.
 // If not, it returns an error
-func (nfsMounter *nfsMounter) CanMount() error {
-	exec := nfsMounter.plugin.host.GetExec(nfsMounter.plugin.GetPluginName())
+func (b *nfsMounter) CanMount() error {
 	switch runtime.GOOS {
 	case "linux":
-		if _, err := exec.Run("/bin/ls", "/sbin/mount.nfs"); err != nil {
-			return fmt.Errorf("Required binary /sbin/mount.nfs is missing")
+		for _, requiredPath := range []string{"/sbin/mount.nfs", "/sbin/mount.nfs4"} {
+			if _, err := os.Stat(requiredPath); err != nil {
+				return fmt.Errorf("required binary %q not found: %v", requiredPath, err)
+			}
 		}
-		if _, err := exec.Run("/bin/ls", "/sbin/mount.nfs4"); err != nil {
-			return fmt.Errorf("Required binary /sbin/mount.nfs4 is missing")
-		}
-		return nil
 	case "darwin":
-		if _, err := exec.Run("/bin/ls", "/sbin/mount_nfs"); err != nil {
-			return fmt.Errorf("Required binary /sbin/mount_nfs is missing")
+		for _, requiredPath := range []string{"/sbin/mount_nfs"} {
+			if _, err := os.Stat(requiredPath); err != nil {
+				return fmt.Errorf("required binary %q not found: %v", requiredPath, err)
+			}
 		}
+	default:
+		return fmt.Errorf("unable to determine if nfs mounts are available on %s", runtime.GOOS)
 	}
 	return nil
 }
