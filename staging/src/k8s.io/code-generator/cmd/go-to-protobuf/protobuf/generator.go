@@ -112,6 +112,9 @@ func isProtoable(seen map[*types.Type]bool, t *types.Type) bool {
 	case types.Map:
 		return isProtoable(seen, t.Key) && isProtoable(seen, t.Elem)
 	case types.Struct:
+		if len(t.Members) == 0 {
+			return true
+		}
 		for _, m := range t.Members {
 			if isProtoable(seen, m.Type) {
 				return true
