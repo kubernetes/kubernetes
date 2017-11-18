@@ -411,7 +411,8 @@ func (c *unstructuredConverter) ToUnstructured(obj interface{}) (map[string]inte
 	var u map[string]interface{}
 	var err error
 	if unstr, ok := obj.(Unstructured); ok {
-		u = DeepCopyJSON(unstr.UnstructuredContent())
+		// UnstructuredContent() mutates the object so we need to make a copy first
+		u = unstr.DeepCopyObject().(Unstructured).UnstructuredContent()
 	} else {
 		t := reflect.TypeOf(obj)
 		value := reflect.ValueOf(obj)
