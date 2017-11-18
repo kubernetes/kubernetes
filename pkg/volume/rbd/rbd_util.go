@@ -27,6 +27,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"os/exec"
 	"path"
 	"regexp"
 	"strings"
@@ -43,7 +44,6 @@ import (
 const (
 	imageWatcherStr = "watcher="
 	kubeLockMagic   = "kubelet_lock_magic_"
-	rbdCmdErr       = "executable file not found in $PATH"
 )
 
 var (
@@ -121,8 +121,10 @@ func (util *RBDUtil) MakeGlobalPDName(rbd rbd) string {
 }
 
 func rbdErrors(runErr, resultErr error) error {
-	if runErr.Error() == rbdCmdErr {
-		return fmt.Errorf("rbd: rbd cmd not found")
+	if err, ok := runErr.(*exec.Error); ok {
+		if err.Err == exec.ErrNotFound {
+			return fmt.Errorf("rbd: rbd cmd not found")
+		}
 	}
 	return resultErr
 }
@@ -482,10 +484,12 @@ func (util *RBDUtil) rbdStatus(b *rbdMounter) (bool, string, error) {
 			break
 		}
 
-		if err.Error() == rbdCmdErr {
-			glog.Errorf("rbd cmd not found")
-			// fail fast if command not found
-			return false, output, err
+		if err, ok := err.(*exec.Error); ok {
+			if err.Err == exec.ErrNotFound {
+				glog.Errorf("rbd cmd not found")
+				// fail fast if command not found
+				return false, output, err
+			}
 		}
 	}
 
