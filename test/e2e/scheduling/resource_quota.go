@@ -503,7 +503,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 		By("Creating a ReplicaSet")
 		replicaSet := newTestReplicaSetForQuota("test-rs", "nginx", 0)
-		replicaSet, err = f.ClientSet.Extensions().ReplicaSets(f.Namespace.Name).Create(replicaSet)
+		replicaSet, err = f.ClientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name).Create(replicaSet)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status captures replicaset creation")
@@ -513,7 +513,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting a ReplicaSet")
-		err = f.ClientSet.Extensions().ReplicaSets(f.Namespace.Name).Delete(replicaSet.Name, nil)
+		err = f.ClientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name).Delete(replicaSet.Name, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released usage")

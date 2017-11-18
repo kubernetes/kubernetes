@@ -113,7 +113,7 @@ func testHPA(f *framework.Framework, kubeClient clientset.Interface) {
 }
 
 func createDeploymentsToScale(f *framework.Framework, cs clientset.Interface) error {
-	_, err := cs.Extensions().Deployments(f.Namespace.ObjectMeta.Name).Create(monitoring.StackdriverExporterDeployment(stackdriverExporterDeployment, f.Namespace.Name, 2, 100))
+	_, err := cs.ExtensionsV1beta1().Deployments(f.Namespace.ObjectMeta.Name).Create(monitoring.StackdriverExporterDeployment(stackdriverExporterDeployment, f.Namespace.Name, 2, 100))
 	if err != nil {
 		return err
 	}
@@ -121,14 +121,14 @@ func createDeploymentsToScale(f *framework.Framework, cs clientset.Interface) er
 	if err != nil {
 		return err
 	}
-	_, err = cs.Extensions().Deployments(f.Namespace.ObjectMeta.Name).Create(monitoring.StackdriverExporterDeployment(dummyDeploymentName, f.Namespace.Name, 2, 100))
+	_, err = cs.ExtensionsV1beta1().Deployments(f.Namespace.ObjectMeta.Name).Create(monitoring.StackdriverExporterDeployment(dummyDeploymentName, f.Namespace.Name, 2, 100))
 	return err
 }
 
 func cleanupDeploymentsToScale(f *framework.Framework, cs clientset.Interface) {
-	_ = cs.Extensions().Deployments(f.Namespace.ObjectMeta.Name).Delete(stackdriverExporterDeployment, &metav1.DeleteOptions{})
+	_ = cs.ExtensionsV1beta1().Deployments(f.Namespace.ObjectMeta.Name).Delete(stackdriverExporterDeployment, &metav1.DeleteOptions{})
 	_ = cs.CoreV1().Pods(f.Namespace.ObjectMeta.Name).Delete(stackdriverExporterPod, &metav1.DeleteOptions{})
-	_ = cs.Extensions().Deployments(f.Namespace.ObjectMeta.Name).Delete(dummyDeploymentName, &metav1.DeleteOptions{})
+	_ = cs.ExtensionsV1beta1().Deployments(f.Namespace.ObjectMeta.Name).Delete(dummyDeploymentName, &metav1.DeleteOptions{})
 }
 
 func createPodsHPA(f *framework.Framework, cs clientset.Interface) error {
@@ -196,7 +196,7 @@ func createObjectHPA(f *framework.Framework, cs clientset.Interface) error {
 func waitForReplicas(deploymentName, namespace string, cs clientset.Interface, timeout time.Duration, desiredReplicas int) {
 	interval := 20 * time.Second
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		deployment, err := cs.Extensions().Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
+		deployment, err := cs.ExtensionsV1beta1().Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to get replication controller %s: %v", deployment, err)
 		}

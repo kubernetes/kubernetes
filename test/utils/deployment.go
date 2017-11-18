@@ -259,12 +259,12 @@ func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, 
 	var updateErr error
 	pollErr := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		var err error
-		if deployment, err = c.Extensions().Deployments(namespace).Get(name, metav1.GetOptions{}); err != nil {
+		if deployment, err = c.ExtensionsV1beta1().Deployments(namespace).Get(name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(deployment)
-		if deployment, err = c.Extensions().Deployments(namespace).Update(deployment); err == nil {
+		if deployment, err = c.ExtensionsV1beta1().Deployments(namespace).Update(deployment); err == nil {
 			logf("Updating deployment %s", name)
 			return true, nil
 		}
@@ -279,7 +279,7 @@ func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, 
 
 func WaitForObservedDeployment(c clientset.Interface, ns, deploymentName string, desiredGeneration int64) error {
 	return deploymentutil.WaitForObservedDeployment(func() (*extensions.Deployment, error) {
-		return c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
+		return c.ExtensionsV1beta1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 	}, desiredGeneration, 2*time.Second, 1*time.Minute)
 }
 

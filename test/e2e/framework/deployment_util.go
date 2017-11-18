@@ -215,7 +215,7 @@ func CheckDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName, 
 
 func CreateDeployment(client clientset.Interface, replicas int32, podLabels map[string]string, namespace string, pvclaims []*v1.PersistentVolumeClaim, command string) (*extensions.Deployment, error) {
 	deploymentSpec := MakeDeployment(replicas, podLabels, namespace, pvclaims, false, command)
-	deployment, err := client.Extensions().Deployments(namespace).Create(deploymentSpec)
+	deployment, err := client.ExtensionsV1beta1().Deployments(namespace).Create(deploymentSpec)
 	if err != nil {
 		return nil, fmt.Errorf("deployment %q Create API error: %v", deploymentSpec.Name, err)
 	}

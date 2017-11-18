@@ -405,7 +405,7 @@ func cleanupInitializer(c clientset.Interface, initializerConfigName, initialize
 // waits till the RS status.observedGeneration matches metadata.generation.
 func waitForRSObservedGeneration(c clientset.Interface, ns, name string, generation int64) error {
 	return wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		rs, err := c.Extensions().ReplicaSets(ns).Get(name, metav1.GetOptions{})
+		rs, err := c.ExtensionsV1beta1().ReplicaSets(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
