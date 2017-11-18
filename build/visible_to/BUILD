@@ -197,6 +197,7 @@ package_group(
         "//pkg/kubectl/cmd/auth",
         "//pkg/kubectl/cmd/resource",
         "//pkg/kubectl/cmd/set",
+        "//pkg/kubectl/explain",
     ],
 )
 
