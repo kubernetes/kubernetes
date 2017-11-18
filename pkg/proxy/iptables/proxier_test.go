@@ -408,6 +408,15 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	return p
 }
 
+func hasSessionAffinityRule(rules []iptablestest.Rule) bool {
+	for _, r := range rules {
+		if _, ok := r[iptablestest.Recent]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 func hasJump(rules []iptablestest.Rule, destChain, destIP string, destPort int) bool {
 	destPortStr := strconv.Itoa(destPort)
 	match := false
@@ -867,6 +876,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 				IP: svcLBIP,
 			}}
 			svc.Annotations[api.BetaAnnotationExternalTraffic] = api.AnnotationValueExternalTrafficLocal
+			svc.Spec.SessionAffinity = api.ServiceAffinityClientIP
 		}),
 	)
 
@@ -920,6 +930,9 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	}
 	if !hasJump(lbRules, localEpChain, "", 0) {
 		errorf(fmt.Sprintf("Didn't find jump from lb chain %v to local ep %v", lbChain, epStrNonLocal), lbRules, t)
+	}
+	if !hasSessionAffinityRule(lbRules) {
+		errorf(fmt.Sprintf("Didn't find session affinity rule from lb chain %v", lbChain), lbRules, t)
 	}
 }
 
