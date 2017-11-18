@@ -441,6 +441,10 @@ func (storage *SimpleRESTStorage) ConvertToTable(ctx request.Context, obj runtim
 func (storage *SimpleRESTStorage) List(ctx request.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	result := &genericapitesting.SimpleList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "10",
+			SelfLink:        "/test/link",
+		},
 		Items: storage.list,
 	}
 	storage.requestedLabelSelector = labels.Everything()
@@ -1832,24 +1836,10 @@ func TestGetPretty(t *testing.T) {
 
 func TestGetTable(t *testing.T) {
 	now := metav1.Now()
-	storage := map[string]rest.Storage{}
 	obj := genericapitesting.Simple{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", CreationTimestamp: now, UID: types.UID("abcdef0123")},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", ResourceVersion: "10", SelfLink: "/blah", CreationTimestamp: now, UID: types.UID("abcdef0123")},
 		Other:      "foo",
 	}
-	simpleStorage := SimpleRESTStorage{
-		item: obj,
-	}
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
-		name:        "id",
-		namespace:   "default",
-	}
-	storage["simple"] = &simpleStorage
-	handler := handleLinker(storage, selfLinker)
-	server := httptest.NewServer(handler)
-	defer server.Close()
 
 	m, err := meta.Accessor(&obj)
 	if err != nil {
@@ -1872,15 +1862,34 @@ func TestGetTable(t *testing.T) {
 		pretty     bool
 		expected   *metav1alpha1.Table
 		statusCode int
+		item       bool
 	}{
 		{
 			accept:     runtime.ContentTypeJSON + ";as=Table;v=v1;g=meta.k8s.io",
 			statusCode: http.StatusNotAcceptable,
 		},
 		{
+			item:   true,
 			accept: runtime.ContentTypeJSON + ";as=Table;v=v1alpha1;g=meta.k8s.io",
 			expected: &metav1alpha1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1alpha1"},
+				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
+				ColumnDefinitions: []metav1alpha1.TableColumnDefinition{
+					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
+					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
+				},
+				Rows: []metav1alpha1.TableRow{
+					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
+				},
+			},
+		},
+		{
+			item:   true,
+			accept: runtime.ContentTypeJSON + ";as=Table;v=v1alpha1;g=meta.k8s.io",
+			params: url.Values{"includeObject": []string{"Metadata"}},
+			expected: &metav1alpha1.Table{
+				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1alpha1"},
+				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
 				ColumnDefinitions: []metav1alpha1.TableColumnDefinition{
 					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
@@ -1895,6 +1904,7 @@ func TestGetTable(t *testing.T) {
 			params: url.Values{"includeObject": []string{"Metadata"}},
 			expected: &metav1alpha1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1alpha1"},
+				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/test/link"},
 				ColumnDefinitions: []metav1alpha1.TableColumnDefinition{
 					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
@@ -1906,45 +1916,69 @@ func TestGetTable(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id")
-		if err != nil {
-			t.Fatal(err)
-		}
-		u.RawQuery = test.params.Encode()
-		req := &http.Request{Method: "GET", URL: u}
-		req.Header = http.Header{}
-		req.Header.Set("Accept", test.accept)
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if test.statusCode != 0 {
-			if resp.StatusCode != test.statusCode {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			storage := map[string]rest.Storage{}
+			simpleStorage := SimpleRESTStorage{
+				item: obj,
+				list: []genericapitesting.Simple{obj},
+			}
+			selfLinker := &setTestSelfLinker{
+				t:           t,
+				expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple",
+				namespace:   "default",
+			}
+			if test.item {
+				selfLinker.expectedSet += "/id"
+				selfLinker.name = "id"
+			}
+			storage["simple"] = &simpleStorage
+			handler := handleLinker(storage, selfLinker)
+			server := httptest.NewServer(handler)
+			defer server.Close()
+
+			var id string
+			if test.item {
+				id = "/id"
+			}
+			u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple" + id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			u.RawQuery = test.params.Encode()
+			req := &http.Request{Method: "GET", URL: u}
+			req.Header = http.Header{}
+			req.Header.Set("Accept", test.accept)
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if test.statusCode != 0 {
+				if resp.StatusCode != test.statusCode {
+					t.Errorf("%d: unexpected response: %#v", i, resp)
+				}
+				obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
+				if err != nil {
+					t.Fatalf("%d: unexpected body read error: %v", err)
+				}
+				gvk := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
+				if obj.GetObjectKind().GroupVersionKind() != gvk {
+					t.Fatalf("%d: unexpected error body: %#v", obj)
+				}
+				return
+			}
+			if resp.StatusCode != http.StatusOK {
 				t.Errorf("%d: unexpected response: %#v", i, resp)
 			}
-			obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
+			var itemOut metav1alpha1.Table
+			body, err := extractBody(resp, &itemOut)
 			if err != nil {
-				t.Errorf("%d: unexpected body read error: %v", err)
-				continue
+				t.Fatal(err)
 			}
-			gvk := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
-			if obj.GetObjectKind().GroupVersionKind() != gvk {
-				t.Errorf("%d: unexpected error body: %#v", obj)
+			if !reflect.DeepEqual(test.expected, &itemOut) {
+				t.Log(body)
+				t.Errorf("%d: did not match: %s", i, diff.ObjectReflectDiff(test.expected, &itemOut))
 			}
-			continue
-		}
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("%d: unexpected response: %#v", i, resp)
-		}
-		var itemOut metav1alpha1.Table
-		body, err := extractBody(resp, &itemOut)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !reflect.DeepEqual(test.expected, &itemOut) {
-			t.Log(body)
-			t.Errorf("%d: did not match: %s", i, diff.ObjectReflectDiff(test.expected, &itemOut))
-		}
+		})
 	}
 }
 

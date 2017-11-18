@@ -89,7 +89,7 @@ func ListAccessor(obj interface{}) (List, error) {
 		}
 		return nil, errNotList
 	default:
-		panic(fmt.Errorf("%T does not implement the List interface", obj))
+		return nil, errNotList
 	}
 }
 
