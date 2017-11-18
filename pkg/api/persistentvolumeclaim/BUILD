@@ -9,7 +9,12 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["util.go"],
-    deps = ["//pkg/api:go_default_library"],
+    importpath = "k8s.io/kubernetes/pkg/api/persistentvolumeclaim",
+    deps = [
+        "//pkg/apis/core:go_default_library",
+        "//pkg/features:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+    ],
 )
 
 filegroup(
@@ -28,10 +33,11 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["util_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/api/persistentvolumeclaim",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//pkg/apis/core:go_default_library",
+        "//pkg/features:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )

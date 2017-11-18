@@ -73936,6 +73936,15 @@
       "description": "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
       "type": "boolean"
      },
+     "volumeDevices": {
+      "description": "volumeDevices is the list of block devices to be used by the container. This is an alpha feature and may change in the future.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.VolumeDevice"
+      },
+      "x-kubernetes-patch-merge-key": "devicePath",
+      "x-kubernetes-patch-strategy": "merge"
+     },
      "volumeMounts": {
       "description": "Pod volumes to mount into the container's filesystem. Cannot be updated.",
       "type": "array",
@@ -75704,6 +75713,10 @@
       "description": "Name of the StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1",
       "type": "string"
      },
+     "volumeMode": {
+      "description": "volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec. This is an alpha feature and may change in the future.",
+      "type": "string"
+     },
      "volumeName": {
       "description": "VolumeName is the binding reference to the PersistentVolume backing this claim.",
       "type": "string"
@@ -75911,6 +75924,10 @@
      "storageos": {
       "description": "StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md",
       "$ref": "#/definitions/io.k8s.api.core.v1.StorageOSPersistentVolumeSource"
+     },
+     "volumeMode": {
+      "description": "volumeMode defines if a volume is intended to be used with a formatted filesystem or to remain in raw block state. Value of Filesystem is implied when not included in spec. This is an alpha feature and may change in the future.",
+      "type": "string"
      },
      "vsphereVolume": {
       "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
@@ -77759,6 +77776,23 @@
      "vsphereVolume": {
       "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
       "$ref": "#/definitions/io.k8s.api.core.v1.VsphereVirtualDiskVolumeSource"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.VolumeDevice": {
+    "description": "volumeDevice describes a mapping of a raw block device within a container.",
+    "required": [
+     "name",
+     "devicePath"
+    ],
+    "properties": {
+     "devicePath": {
+      "description": "devicePath is the path inside of the container that the device will be mapped to.",
+      "type": "string"
+     },
+     "name": {
+      "description": "name must match the name of a persistentVolumeClaim in the pod",
+      "type": "string"
      }
     }
    },
