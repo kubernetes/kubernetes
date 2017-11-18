@@ -73464,6 +73464,27 @@
      }
     ]
    },
+   "io.k8s.api.core.v1.CSIPersistentVolumeSource": {
+    "description": "Represents storage that is managed by an external CSI volume driver",
+    "required": [
+     "driver",
+     "volumeHandle"
+    ],
+    "properties": {
+     "driver": {
+      "description": "Driver is the name of the driver to use for this volume. Required.",
+      "type": "string"
+     },
+     "readOnly": {
+      "description": "Optional: The value to pass to ControllerPublishVolumeRequest. Defaults to false (read/write).",
+      "type": "boolean"
+     },
+     "volumeHandle": {
+      "description": "VolumeHandle is the unique volume name returned by the CSI volume plugin’s CreateVolume to refer to the volume on all subsequent calls.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.api.core.v1.Capabilities": {
     "description": "Adds and removes POSIX capabilities from running containers.",
     "properties": {
@@ -75811,6 +75832,10 @@
      "claimRef": {
       "description": "ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim. Expected to be non-nil when bound. claim.VolumeName is the authoritative bind between PV and PVC. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding",
       "$ref": "#/definitions/io.k8s.api.core.v1.ObjectReference"
+     },
+     "csi": {
+      "description": "CSI represents storage that handled by an external CSI driver",
+      "$ref": "#/definitions/io.k8s.api.core.v1.CSIPersistentVolumeSource"
      },
      "fc": {
       "description": "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
