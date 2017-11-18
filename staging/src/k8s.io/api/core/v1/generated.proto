@@ -170,6 +170,23 @@ message Binding {
   optional ObjectReference target = 2;
 }
 
+// Represents storage that is managed by an external CSI volume driver
+message CSIPersistentVolumeSource {
+  // Driver is the name of the driver to use for this volume.
+  // Required.
+  optional string driver = 1;
+
+  // VolumeHandle is the unique volume name returned by the CSI volume
+  // plugin’s CreateVolume to refer to the volume on all subsequent calls.
+  // Required.
+  optional string volumeHandle = 2;
+
+  // Optional: The value to pass to ControllerPublishVolumeRequest.
+  // Defaults to false (read/write).
+  // +optional
+  optional bool readOnly = 3;
+}
+
 // Adds and removes POSIX capabilities from running containers.
 message Capabilities {
   // Added capabilities
@@ -2356,6 +2373,10 @@ message PersistentVolumeSource {
   // More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md
   // +optional
   optional StorageOSPersistentVolumeSource storageos = 21;
+
+  // CSI represents storage that handled by an external CSI driver
+  // +optional
+  optional CSIPersistentVolumeSource csi = 22;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
