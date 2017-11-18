@@ -17,6 +17,8 @@ limitations under the License.
 package upgrade
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -24,12 +26,14 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptoken "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
+	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
+	"k8s.io/kubernetes/pkg/util/version"
 )
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
 // Note that the markmaster phase is left out, not needed, and no token is created as that doesn't belong to the upgrade
-func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration) error {
+func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration, newK8sVer *version.Version) error {
 	errs := []error{}
 
 	// Upload currently used configuration to the cluster
@@ -62,6 +66,19 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 	// Create/update RBAC rules that makes the cluster-info ConfigMap reachable
 	if err := clusterinfo.CreateClusterInfoRBACRules(client); err != nil {
 		errs = append(errs, err)
+	}
+
+	// Don't fail the upgrade phase if failing to determine to backup kube-apiserver cert and key.
+	if shouldBackup, err := shouldBackupAPIServerCertAndKey(newK8sVer); err != nil {
+		fmt.Printf("[postupgrade] WARNING: failed to determine to backup kube-apiserver cert and key: %v", err)
+	} else if shouldBackup {
+		// Don't fail the upgrade phase if failing to backup kube-apiserver cert and key.
+		if err := backupAPIServerCertAndKey(); err != nil {
+			fmt.Printf("[postupgrade] WARNING: failed to backup kube-apiserver cert and key: %v", err)
+		}
+		if err := certsphase.CreateAPIServerCertAndKeyFiles(cfg); err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	// Upgrade kube-dns and kube-proxy
