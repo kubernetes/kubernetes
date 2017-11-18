@@ -360,6 +360,28 @@ func TestAdmit(t *testing.T) {
 			},
 			errorContains: "without explanation",
 		},
+		"absent response and fail open": {
+			hookSource: fakeHookSource{
+				hooks: []registrationv1alpha1.Webhook{{
+					Name:          "nilResponse",
+					ClientConfig:  ccfgURL("nilResponse"),
+					FailurePolicy: &policyIgnore,
+					Rules:         matchEverythingRules,
+				}},
+			},
+			expectAllow: true,
+		},
+		"absent response and fail closed": {
+			hookSource: fakeHookSource{
+				hooks: []registrationv1alpha1.Webhook{{
+					Name:          "nilResponse",
+					ClientConfig:  ccfgURL("nilResponse"),
+					FailurePolicy: &policyFail,
+					Rules:         matchEverythingRules,
+				}},
+			},
+			errorContains: "Webhook response was absent",
+		},
 		// No need to test everything with the url case, since only the
 		// connection is different.
 	}
@@ -587,14 +609,14 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 	case "/disallow":
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(&v1alpha1.AdmissionReview{
-			Status: v1alpha1.AdmissionReviewStatus{
+			Response: &v1alpha1.AdmissionResponse{
 				Allowed: false,
 			},
 		})
 	case "/disallowReason":
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(&v1alpha1.AdmissionReview{
-			Status: v1alpha1.AdmissionReviewStatus{
+			Response: &v1alpha1.AdmissionResponse{
 				Allowed: false,
 				Result: &metav1.Status{
 					Message: "you shall not pass",
@@ -604,10 +626,13 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 	case "/allow":
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(&v1alpha1.AdmissionReview{
-			Status: v1alpha1.AdmissionReviewStatus{
+			Response: &v1alpha1.AdmissionResponse{
 				Allowed: true,
 			},
 		})
+	case "/nilResposne":
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(&v1alpha1.AdmissionReview{})
 	default:
 		http.NotFound(w, r)
 	}

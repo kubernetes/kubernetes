@@ -71,19 +71,14 @@ var serverWebhookVersion = utilversion.MustParseSemantic("v1.8.0")
 
 var _ = SIGDescribe("AdmissionWebhook", func() {
 	var context *certContext
-	var ns string
-	var c clientset.Interface
 	f := framework.NewDefaultFramework("webhook")
-	framework.AddCleanupAction(func() {
-		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
-		if len(ns) > 0 {
-			cleanWebhookTest(c, ns)
-		}
-	})
+
+	var client clientset.Interface
+	var namespaceName string
 
 	BeforeEach(func() {
-		c = f.ClientSet
-		ns = f.Namespace.Name
+		client = f.ClientSet
+		namespaceName = f.Namespace.Name
 
 		// Make sure the relevant provider supports admission webhook
 		framework.SkipUnlessServerVersionGTE(serverWebhookVersion, f.ClientSet.Discovery())
@@ -95,14 +90,16 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		}
 
 		By("Setting up server cert")
-		namespaceName := f.Namespace.Name
 		context = setupServerCert(namespaceName, serviceName)
 		createAuthReaderRoleBinding(f, namespaceName)
 
 		// Note that in 1.9 we will have backwards incompatible change to
 		// admission webhooks, so the image will be updated to 1.9 sometime in
 		// the development 1.9 cycle.
-		deployWebhookAndService(f, "gcr.io/kubernetes-e2e-test-images/k8s-sample-admission-webhook-amd64:1.8v3", context)
+		deployWebhookAndService(f, "gcr.io/kubernetes-e2e-test-images/k8s-sample-admission-webhook-amd64:1.8v5", context)
+	})
+	AfterEach(func() {
+		cleanWebhookTest(client, namespaceName)
 	})
 
 	It("Should be able to deny pod and configmap creation", func() {
@@ -573,6 +570,7 @@ func updateConfigMap(c clientset.Interface, ns, name string, update updateConfig
 
 func cleanWebhookTest(client clientset.Interface, namespaceName string) {
 	_ = client.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations().Delete(webhookConfigName, nil)
+	_ = client.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations().Delete(crdWebhookConfigName, nil)
 	_ = client.CoreV1().Services(namespaceName).Delete(serviceName, nil)
 	_ = client.ExtensionsV1beta1().Deployments(namespaceName).Delete(deploymentName, nil)
 	_ = client.CoreV1().Secrets(namespaceName).Delete(secretName, nil)
