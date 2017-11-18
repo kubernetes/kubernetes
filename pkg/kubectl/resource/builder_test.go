@@ -51,7 +51,7 @@ import (
 
 var (
 	corev1GV     = schema.GroupVersion{Version: "v1"}
-	corev1Codec  = scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(corev1GV), scheme.Codecs.UniversalDecoder(corev1GV), corev1GV, corev1GV)
+	corev1Codec  = scheme.Codecs.CodecForVersions(false, scheme.Codecs.LegacyCodec(corev1GV), scheme.Codecs.UniversalDecoder(corev1GV), corev1GV, corev1GV)
 	metaAccessor = meta.NewAccessor()
 	restmapper   = scheme.Registry.RESTMapper()
 )

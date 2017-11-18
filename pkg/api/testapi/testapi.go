@@ -360,10 +360,11 @@ func (g TestGroup) ExternalTypes() map[string]reflect.Type {
 // Codec returns the codec for the API version to test against, as set by the
 // KUBE_TEST_API_TYPE env var.
 func (g TestGroup) Codec() runtime.Codec {
-	if serializer.Serializer == nil {
-		return legacyscheme.Codecs.LegacyCodec(g.externalGroupVersion)
+	s := serializer.Serializer
+	if s == nil {
+		s = legacyscheme.Codecs.SupportedMediaTypes()[0].Serializer
 	}
-	return legacyscheme.Codecs.CodecForVersions(serializer.Serializer, legacyscheme.Codecs.UniversalDeserializer(), schema.GroupVersions{g.externalGroupVersion}, nil)
+	return legacyscheme.Codecs.CodecForVersions(false, s, legacyscheme.Codecs.UniversalDeserializer(), schema.GroupVersions{g.externalGroupVersion}, nil)
 }
 
 // NegotiatedSerializer returns the negotiated serializer for the server.
@@ -381,7 +382,7 @@ func (g TestGroup) StorageCodec() runtime.Codec {
 	s := storageSerializer.Serializer
 
 	if s == nil {
-		return legacyscheme.Codecs.LegacyCodec(g.externalGroupVersion)
+		s = legacyscheme.Codecs.SupportedMediaTypes()[0].Serializer
 	}
 
 	// etcd2 only supports string data - we must wrap any result before returning
@@ -391,7 +392,7 @@ func (g TestGroup) StorageCodec() runtime.Codec {
 	}
 	ds := recognizer.NewDecoder(s, legacyscheme.Codecs.UniversalDeserializer())
 
-	return legacyscheme.Codecs.CodecForVersions(s, ds, schema.GroupVersions{g.externalGroupVersion}, nil)
+	return legacyscheme.Codecs.CodecForVersions(true, s, ds, schema.GroupVersions{g.externalGroupVersion}, nil)
 }
 
 // Converter returns the legacyscheme.Scheme for the API version to test against, as set by the

@@ -98,7 +98,7 @@ func (g TestGroup) Codec() runtime.Codec {
 	if serializer.Serializer == nil {
 		return legacyscheme.Codecs.LegacyCodec(g.externalGroupVersion)
 	}
-	return legacyscheme.Codecs.CodecForVersions(serializer.Serializer, legacyscheme.Codecs.UniversalDeserializer(), schema.GroupVersions{g.externalGroupVersion}, nil)
+	return legacyscheme.Codecs.CodecForVersions(false, serializer.Serializer, legacyscheme.Codecs.UniversalDeserializer(), schema.GroupVersions{g.externalGroupVersion}, nil)
 }
 
 // SelfLink returns a self link that will appear to be for the version Version().

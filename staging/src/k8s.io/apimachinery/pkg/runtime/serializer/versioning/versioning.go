@@ -101,7 +101,7 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 	}
 
 	if d, ok := obj.(runtime.NestedObjectDecoder); ok {
-		if err := d.DecodeNestedObjects(DirectDecoder{c.decoder}); err != nil {
+		if err := d.DecodeNestedObjects(DirectDecoder{Decoder: c.decoder, Defaulter: c.defaulter}); err != nil {
 			return nil, gvk, err
 		}
 	}
@@ -242,9 +242,10 @@ func (e DirectEncoder) Encode(obj runtime.Object, stream io.Writer) error {
 	return err
 }
 
-// DirectDecoder clears the group version kind of a deserialized object.
+// DirectDecoder clears the group version kind of a deserialized object and optionally performs defaulting.
 type DirectDecoder struct {
 	runtime.Decoder
+	Defaulter runtime.ObjectDefaulter
 }
 
 // Decode does not do conversion. It removes the gvk during deserialization.
@@ -254,6 +255,9 @@ func (d DirectDecoder) Decode(data []byte, defaults *schema.GroupVersionKind, in
 		kind := obj.GetObjectKind()
 		// clearing the gvk is just a convention of a codec
 		kind.SetGroupVersionKind(schema.GroupVersionKind{})
+	}
+	if d.Defaulter != nil {
+		d.Defaulter.Default(obj)
 	}
 	return obj, gvk, err
 }

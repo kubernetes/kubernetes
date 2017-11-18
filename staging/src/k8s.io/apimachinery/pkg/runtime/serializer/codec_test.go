@@ -149,7 +149,7 @@ func TestVersionedEncoding(t *testing.T) {
 	info, _ := runtime.SerializerInfoForMediaType(cf.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	encoder := info.Serializer
 
-	codec := cf.CodecForVersions(encoder, nil, schema.GroupVersion{Version: "v2"}, nil)
+	codec := cf.CodecForVersions(false, encoder, nil, schema.GroupVersion{Version: "v2"}, nil)
 	out, err := runtime.Encode(codec, &serializertesting.TestType1{})
 	if err != nil {
 		t.Fatal(err)
@@ -158,14 +158,14 @@ func TestVersionedEncoding(t *testing.T) {
 		t.Fatal(string(out))
 	}
 
-	codec = cf.CodecForVersions(encoder, nil, schema.GroupVersion{Version: "v3"}, nil)
+	codec = cf.CodecForVersions(false, encoder, nil, schema.GroupVersion{Version: "v3"}, nil)
 	_, err = runtime.Encode(codec, &serializertesting.TestType1{})
 	if err == nil {
 		t.Fatal(err)
 	}
 
 	// unversioned encode with no versions is written directly to wire
-	codec = cf.CodecForVersions(encoder, nil, runtime.InternalGroupVersioner, nil)
+	codec = cf.CodecForVersions(false, encoder, nil, runtime.InternalGroupVersioner, nil)
 	out, err = runtime.Encode(codec, &serializertesting.TestType1{})
 	if err != nil {
 		t.Fatal(err)

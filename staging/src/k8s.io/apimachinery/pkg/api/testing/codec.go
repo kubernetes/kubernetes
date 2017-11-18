@@ -40,7 +40,7 @@ func TestCodec(codecs runtimeserializer.CodecFactory, gvs ...schema.GroupVersion
 		if !ok {
 			panic(fmt.Sprintf("no serializer for %s", testCodecMediaType))
 		}
-		return codecs.CodecForVersions(serializerInfo.Serializer, codecs.UniversalDeserializer(), schema.GroupVersions(gvs), nil)
+		return codecs.CodecForVersions(false, serializerInfo.Serializer, codecs.UniversalDeserializer(), schema.GroupVersions(gvs), nil)
 	}
 	return codecs.LegacyCodec(gvs...)
 }
@@ -62,7 +62,7 @@ func TestStorageCodec(codecs runtimeserializer.CodecFactory, gvs ...schema.Group
 		}
 
 		decoder := recognizer.NewDecoder(serializer, codecs.UniversalDeserializer())
-		return codecs.CodecForVersions(serializer, decoder, schema.GroupVersions(gvs), nil)
+		return codecs.CodecForVersions(true, serializer, decoder, schema.GroupVersions(gvs), nil)
 
 	}
 	return codecs.LegacyCodec(gvs...)

@@ -184,17 +184,26 @@ func createSerializers(config ContentConfig) (*Serializers, error) {
 			Version: runtime.APIVersionInternal,
 		},
 	}
+	var decoder runtime.Decoder
+	if config.DecodeToInternal {
+		decoder = config.NegotiatedSerializer.DecoderToVersion(info.Serializer, internalGV)
+	} else {
+		decoder = info.Serializer
+	}
 
 	s := &Serializers{
+		Decoder: decoder,
 		Encoder: config.NegotiatedSerializer.EncoderForVersion(info.Serializer, *config.GroupVersion),
-		Decoder: config.NegotiatedSerializer.DecoderToVersion(info.Serializer, internalGV),
 
 		RenegotiatedDecoder: func(contentType string, params map[string]string) (runtime.Decoder, error) {
 			info, ok := runtime.SerializerInfoForMediaType(mediaTypes, contentType)
 			if !ok {
 				return nil, fmt.Errorf("serializer for %s not registered", contentType)
 			}
-			return config.NegotiatedSerializer.DecoderToVersion(info.Serializer, internalGV), nil
+			if config.DecodeToInternal {
+				return config.NegotiatedSerializer.DecoderToVersion(info.Serializer, internalGV), nil
+			}
+			return info.Serializer, nil
 		},
 	}
 	if info.StreamSerializer != nil {

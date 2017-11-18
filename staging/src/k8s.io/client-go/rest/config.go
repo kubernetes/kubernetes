@@ -172,8 +172,11 @@ type ContentConfig struct {
 	ContentType string
 	// GroupVersion is the API version to talk to. Must be provided when initializing
 	// a RESTClient directly. When initializing a Client, will be set with the default
-	// code version.
+	// codec version. This field controls the version the object is written to.
 	GroupVersion *schema.GroupVersion
+	// DecodeToInternal supports translating the object (if the serializer supports it)
+	// to the internal version when retrieving objects. It defaults to false.
+	DecodeToInternal bool
 	// NegotiatedSerializer is used for obtaining encoders and decoders for multiple
 	// supported media types.
 	NegotiatedSerializer runtime.NegotiatedSerializer

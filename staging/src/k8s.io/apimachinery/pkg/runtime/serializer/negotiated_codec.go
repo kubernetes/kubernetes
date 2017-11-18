@@ -20,8 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// TODO: We should split negotiated serializers that we can change versions on from those we can change
-// serialization formats on
+// TODO: this interface needs to be removed and replaced with a concrete type.
 type negotiatedSerializerWrapper struct {
 	info runtime.SerializerInfo
 }
@@ -39,5 +38,9 @@ func (n *negotiatedSerializerWrapper) EncoderForVersion(e runtime.Encoder, _ run
 }
 
 func (n *negotiatedSerializerWrapper) DecoderToVersion(d runtime.Decoder, _gv runtime.GroupVersioner) runtime.Decoder {
+	return d
+}
+
+func (n *negotiatedSerializerWrapper) DecoderToVersionWithDefaults(d runtime.Decoder, _gv runtime.GroupVersioner) runtime.Decoder {
 	return d
 }
