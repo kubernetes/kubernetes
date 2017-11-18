@@ -763,7 +763,7 @@ func TestDeletePods(t *testing.T) {
 
 	for _, test := range tests {
 		f, _, _, _ := cmdtesting.NewAPIFactory()
-		o := DrainOptions{}
+		o := DrainOptions{Factory: f}
 		o.mapper, _ = f.Object()
 		o.Out = os.Stdout
 		_, pods := createPods(false)

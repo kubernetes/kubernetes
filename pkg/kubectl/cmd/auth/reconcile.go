@@ -119,7 +119,7 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 		if len(output) > 0 && !shortOutput {
 			return f.PrintResourceInfoForCommand(cmd, info, o.Out)
 		}
-		cmdutil.PrintSuccess(mapper, shortOutput, o.Out, info.Mapping.Resource, info.Name, dryRun, "reconciled")
+		f.PrintSuccess(mapper, shortOutput, o.Out, info.Mapping.Resource, info.Name, dryRun, "reconciled")
 		return nil
 	}
 
