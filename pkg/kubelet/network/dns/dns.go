@@ -26,7 +26,9 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/features"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -37,6 +39,20 @@ import (
 var (
 	// The default dns opt strings.
 	defaultDNSOptions = []string{"ndots:5"}
+)
+
+const (
+	resolvNameserversLimit          = 3
+	resolvSearchLineDNSDomainsLimit = 6
+	resolvSearchLineLenLimit        = 256
+)
+
+type podDNSType int
+
+const (
+	podDNSCluster podDNSType = 0
+	podDNSHost    podDNSType = 1
+	podDNSCustom  podDNSType = 2
 )
 
 // Configurer is used for setting up DNS resolver configuration when launching pods.
@@ -67,22 +83,19 @@ func NewConfigurer(recorder record.EventRecorder, nodeRef *v1.ObjectReference, n
 	}
 }
 
-func omitDuplicates(pod *v1.Pod, combinedSearch []string) []string {
-	uniqueDomains := map[string]bool{}
+func omitDuplicates(strs []string) []string {
+	uniqueStr := make(map[string]bool)
 
-	for _, dnsDomain := range combinedSearch {
-		if _, exists := uniqueDomains[dnsDomain]; !exists {
-			combinedSearch[len(uniqueDomains)] = dnsDomain
-			uniqueDomains[dnsDomain] = true
+	for _, str := range strs {
+		if exists := uniqueStr[str]; !exists {
+			strs[len(uniqueStr)] = str
+			uniqueStr[str] = true
 		}
 	}
-	return combinedSearch[:len(uniqueDomains)]
+	return strs[:len(uniqueStr)]
 }
 
-func (c *Configurer) formDNSSearchFitsLimits(pod *v1.Pod, composedSearch []string) []string {
-	// resolver file Search line current limitations
-	resolvSearchLineDNSDomainsLimit := 6
-	resolvSearchLineLenLimit := 255
+func (c *Configurer) formDNSSearchFitsLimits(composedSearch []string, pod *v1.Pod) []string {
 	limitsExceeded := false
 
 	if len(composedSearch) > resolvSearchLineDNSDomainsLimit {
@@ -107,39 +120,43 @@ func (c *Configurer) formDNSSearchFitsLimits(pod *v1.Pod, composedSearch []strin
 	}
 
 	if limitsExceeded {
-		log := fmt.Sprintf("Search Line limits were exceeded, some dns names have been omitted, the applied search line is: %s", strings.Join(composedSearch, " "))
-		c.recorder.Event(pod, v1.EventTypeWarning, "DNSSearchForming", log)
+		log := fmt.Sprintf("Search Line limits were exceeded, some search paths have been omitted, the applied search line is: %s", strings.Join(composedSearch, " "))
+		c.recorder.Event(pod, v1.EventTypeWarning, "DNSConfigForming", log)
 		glog.Error(log)
 	}
 	return composedSearch
 }
 
-func (c *Configurer) formDNSSearchForDNSDefault(hostSearch []string, pod *v1.Pod) []string {
-	return c.formDNSSearchFitsLimits(pod, hostSearch)
+func (c *Configurer) formDNSNameserversFitsLimits(nameservers []string, pod *v1.Pod) []string {
+	if len(nameservers) > resolvNameserversLimit {
+		nameservers = nameservers[0:resolvNameserversLimit]
+		log := fmt.Sprintf("Nameserver limits were exceeded, some nameservers have been omitted, the applied nameserver line is: %s", strings.Join(nameservers, " "))
+		c.recorder.Event(pod, v1.EventTypeWarning, "DNSConfigForming", log)
+		glog.Error(log)
+	}
+	return nameservers
 }
 
-func (c *Configurer) formDNSSearch(hostSearch []string, pod *v1.Pod) []string {
+func (c *Configurer) formDNSConfigFitsLimits(dnsConfig *runtimeapi.DNSConfig, pod *v1.Pod) *runtimeapi.DNSConfig {
+	dnsConfig.Servers = c.formDNSNameserversFitsLimits(dnsConfig.Servers, pod)
+	dnsConfig.Searches = c.formDNSSearchFitsLimits(dnsConfig.Searches, pod)
+	return dnsConfig
+}
+
+func (c *Configurer) generateSearchesForDNSClusterFirst(hostSearch []string, pod *v1.Pod) []string {
 	if c.ClusterDomain == "" {
-		c.formDNSSearchFitsLimits(pod, hostSearch)
 		return hostSearch
 	}
 
 	nsSvcDomain := fmt.Sprintf("%s.svc.%s", pod.Namespace, c.ClusterDomain)
 	svcDomain := fmt.Sprintf("svc.%s", c.ClusterDomain)
-	dnsSearch := []string{nsSvcDomain, svcDomain, c.ClusterDomain}
+	clusterSearch := []string{nsSvcDomain, svcDomain, c.ClusterDomain}
 
-	combinedSearch := append(dnsSearch, hostSearch...)
-
-	combinedSearch = omitDuplicates(pod, combinedSearch)
-	return c.formDNSSearchFitsLimits(pod, combinedSearch)
+	return omitDuplicates(append(clusterSearch, hostSearch...))
 }
 
 // CheckLimitsForResolvConf checks limits in resolv.conf.
 func (c *Configurer) CheckLimitsForResolvConf() {
-	// resolver file Search line current limitations
-	resolvSearchLineDNSDomainsLimit := 6
-	resolvSearchLineLenLimit := 255
-
 	f, err := os.Open(c.ResolverConfig)
 	if err != nil {
 		c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", err.Error())
@@ -180,7 +197,6 @@ func (c *Configurer) CheckLimitsForResolvConf() {
 
 // parseResolveConf reads a resolv.conf file from the given reader, and parses
 // it into nameservers, searches and options, possibly returning an error.
-// TODO: move to utility package
 func parseResolvConf(reader io.Reader) (nameservers []string, searches []string, options []string, err error) {
 	file, err := ioutil.ReadAll(reader)
 	if err != nil {
@@ -218,15 +234,10 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 		}
 	}
 
-	// There used to be code here to scrub DNS for each cloud, but doesn't
-	// make sense anymore since cloudproviders are being factored out.
-	// contact @thockin or @wlan0 for more information
-
 	return nameservers, searches, options, nil
 }
 
-// GetPodDNS returns DNS setttings for the pod.
-func (c *Configurer) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
+func (c *Configurer) getHostDNSConfig(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
 	var hostDNS, hostSearch, hostOptions []string
 	// Get host DNS settings
 	if c.ResolverConfig != "" {
@@ -241,19 +252,96 @@ func (c *Configurer) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
 			return nil, err
 		}
 	}
-	useClusterFirstPolicy := ((pod.Spec.DNSPolicy == v1.DNSClusterFirst && !kubecontainer.IsHostNetworkPod(pod)) || pod.Spec.DNSPolicy == v1.DNSClusterFirstWithHostNet)
-	if useClusterFirstPolicy && len(c.clusterDNS) == 0 {
-		// clusterDNS is not known.
-		// pod with ClusterDNSFirst Policy cannot be created
-		c.recorder.Eventf(pod, v1.EventTypeWarning, "MissingClusterDNS", "kubelet does not have ClusterDNS IP configured and cannot create Pod using %q policy. Falling back to DNSDefault policy.", pod.Spec.DNSPolicy)
-		log := fmt.Sprintf("kubelet does not have ClusterDNS IP configured and cannot create Pod using %q policy. pod: %q. Falling back to DNSDefault policy.", pod.Spec.DNSPolicy, format.Pod(pod))
-		c.recorder.Eventf(c.nodeRef, v1.EventTypeWarning, "MissingClusterDNS", log)
+	return &runtimeapi.DNSConfig{
+		Servers:  hostDNS,
+		Searches: hostSearch,
+		Options:  hostOptions,
+	}, nil
+}
 
-		// fallback to DNSDefault
-		useClusterFirstPolicy = false
+func (c *Configurer) getPodDNSType(pod *v1.Pod) podDNSType {
+	dnsPolicy := pod.Spec.DNSPolicy
+	if dnsPolicy == v1.DNSCustom {
+		if utilfeature.DefaultFeatureGate.Enabled(features.CustomPodDNS) {
+			return podDNSCustom
+		}
+		// Fallback to DNSDefault. This should not happen as kube-apiserver should
+		// have rejected setting dnsPolicy to DNSCustom when feature gate is disabled.
+		return podDNSHost
 	}
 
-	if !useClusterFirstPolicy {
+	// Only attempt to use ClusterFirst Policy when:
+	// 1. dnsPolicy set to DNSClusterFirst on non-hostnetwork pod, or
+	// 2. dnsPolicy set to DNSClusterFirstWithHostNet.
+	// This behavior is defined by API.
+	useClusterFirstPolicy := ((dnsPolicy == v1.DNSClusterFirst && !kubecontainer.IsHostNetworkPod(pod)) || dnsPolicy == v1.DNSClusterFirstWithHostNet)
+	if useClusterFirstPolicy {
+		if len(c.clusterDNS) != 0 {
+			return podDNSCluster
+		}
+		// clusterDNS is not known.
+		// Pod with ClusterDNSFirst Policy cannot be created.
+		c.recorder.Eventf(pod, v1.EventTypeWarning, "MissingClusterDNS", "kubelet does not have ClusterDNS IP configured and cannot create Pod using %q policy. Falling back to DNSDefault policy.", dnsPolicy)
+		log := fmt.Sprintf("kubelet does not have ClusterDNS IP configured and cannot create Pod using %q policy. pod: %q. Falling back to DNSDefault policy.", dnsPolicy, format.Pod(pod))
+		c.recorder.Eventf(c.nodeRef, v1.EventTypeWarning, "MissingClusterDNS", log)
+		// Fallback to DNSDefault.
+	}
+	return podDNSHost
+}
+
+// Merge DNS options. If duplicated, entries given by DNSParams will overwrite
+// the existing ones.
+func mergeDNSOptions(dnsConfigOptions []string, dnsParamsOptions []v1.PodDNSParamsOption) []string {
+	optionsMap := make(map[string]string)
+	for _, op := range dnsConfigOptions {
+		var opName, opValue string
+		if index := strings.Index(op, ":"); index != -1 {
+			opName = op[:index]
+			opValue = op[index+1:]
+		} else {
+			opName = op
+		}
+		optionsMap[opName] = opValue
+	}
+	for _, op := range dnsParamsOptions {
+		if op.Value != nil {
+			optionsMap[op.Name] = *op.Value
+		} else {
+			optionsMap[op.Name] = ""
+		}
+	}
+	// Reconvert DNS options into a string array.
+	options := []string{}
+	for opName, opValue := range optionsMap {
+		op := opName
+		if len(opValue) > 0 {
+			op = op + ":" + opValue
+		}
+		options = append(options, op)
+	}
+	return options
+}
+
+// appendDNSParams appends DNS servers, search paths and options given by DNSParams
+// to the existing DNS config. Duplicated entries will be merged.
+// This assume dnsConfig and dnsParams are not nil.
+func appendDNSParams(dnsConfig *runtimeapi.DNSConfig, dnsParams *v1.PodDNSParams) *runtimeapi.DNSConfig {
+	dnsConfig.Servers = omitDuplicates(append(dnsConfig.Servers, dnsParams.Nameservers...))
+	dnsConfig.Searches = omitDuplicates(append(dnsConfig.Searches, dnsParams.Searches...))
+	dnsConfig.Options = mergeDNSOptions(dnsConfig.Options, dnsParams.Options)
+	return dnsConfig
+}
+
+// GetPodDNS returns DNS setttings for the pod.
+func (c *Configurer) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
+	dnsConfig, err := c.getHostDNSConfig(pod)
+	if err != nil {
+		return nil, err
+	}
+
+	dnsType := c.getPodDNSType(pod)
+	switch dnsType {
+	case podDNSHost:
 		// When the kubelet --resolv-conf flag is set to the empty string, use
 		// DNS settings that override the docker default (which is to use
 		// /etc/resolv.conf) and effectively disable DNS lookups. According to
@@ -262,35 +350,33 @@ func (c *Configurer) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
 		// local machine". A nameserver setting of localhost is equivalent to
 		// this documented behavior.
 		if c.ResolverConfig == "" {
-			hostSearch = []string{"."}
 			switch {
 			case c.nodeIP == nil || c.nodeIP.To4() != nil:
-				hostDNS = []string{"127.0.0.1"}
+				dnsConfig.Servers = []string{"127.0.0.1"}
 			case c.nodeIP.To16() != nil:
-				hostDNS = []string{"::1"}
+				dnsConfig.Servers = []string{"::1"}
 			}
-		} else {
-			hostSearch = c.formDNSSearchForDNSDefault(hostSearch, pod)
+			dnsConfig.Searches = []string{"."}
 		}
-		return &runtimeapi.DNSConfig{
-			Servers:  hostDNS,
-			Searches: hostSearch,
-			Options:  hostOptions}, nil
+	case podDNSCluster:
+		// for a pod with DNSClusterFirst policy, the cluster DNS server is the only nameserver configured for
+		// the pod. The cluster DNS server itself will forward queries to other nameservers that is configured to use,
+		// in case the cluster DNS server cannot resolve the DNS query itself
+		dnsConfig.Servers = []string{}
+		for _, ip := range c.clusterDNS {
+			dnsConfig.Servers = append(dnsConfig.Servers, ip.String())
+		}
+		dnsConfig.Searches = c.generateSearchesForDNSClusterFirst(dnsConfig.Searches, pod)
+		dnsConfig.Options = defaultDNSOptions
+	case podDNSCustom:
+		// DNSCustom should use an empty DNS settings as the base.
+		dnsConfig = &runtimeapi.DNSConfig{}
 	}
 
-	// for a pod with DNSClusterFirst policy, the cluster DNS server is the only nameserver configured for
-	// the pod. The cluster DNS server itself will forward queries to other nameservers that is configured to use,
-	// in case the cluster DNS server cannot resolve the DNS query itself
-	dns := make([]string, len(c.clusterDNS))
-	for i, ip := range c.clusterDNS {
-		dns[i] = ip.String()
+	if utilfeature.DefaultFeatureGate.Enabled(features.CustomPodDNS) && pod.Spec.DNSParams != nil {
+		dnsConfig = appendDNSParams(dnsConfig, pod.Spec.DNSParams)
 	}
-	dnsSearch := c.formDNSSearch(hostSearch, pod)
-
-	return &runtimeapi.DNSConfig{
-		Servers:  dns,
-		Searches: dnsSearch,
-		Options:  defaultDNSOptions}, nil
+	return c.formDNSConfigFitsLimits(dnsConfig, pod), nil
 }
 
 // SetupDNSinContainerizedMounter replaces the nameserver in containerized-mounter's rootfs/etc/resolve.conf with kubelet.ClusterDNS
