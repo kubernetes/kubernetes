@@ -54,24 +54,24 @@ DNS.1 = webhook-test.default.svc
 EOF
 
 # Create a certificate authority
-openssl genrsa -out caKey.pem 2048
-openssl req -x509 -new -nodes -key caKey.pem -days 100000 -out caCert.pem -subj "/CN=${CN_BASE}_ca"
+openssl genrsa -out CAKey.pem 2048
+openssl req -x509 -new -nodes -key CAKey.pem -days 100000 -out CACert.pem -subj "/CN=${CN_BASE}_ca"
 
 # Create a second certificate authority
-openssl genrsa -out badCAKey.pem 2048
-openssl req -x509 -new -nodes -key badCAKey.pem -days 100000 -out badCACert.pem -subj "/CN=${CN_BASE}_ca"
+openssl genrsa -out BadCAKey.pem 2048
+openssl req -x509 -new -nodes -key BadCAKey.pem -days 100000 -out BadCACert.pem -subj "/CN=${CN_BASE}_ca"
 
 # Create a server certiticate
-openssl genrsa -out serverKey.pem 2048
-openssl req -new -key serverKey.pem -out server.csr -subj "/CN=webhook-test.default.svc" -config server.conf
-openssl x509 -req -in server.csr -CA caCert.pem -CAkey caKey.pem -CAcreateserial -out serverCert.pem -days 100000 -extensions v3_req -extfile server.conf
+openssl genrsa -out ServerKey.pem 2048
+openssl req -new -key ServerKey.pem -out server.csr -subj "/CN=webhook-test.default.svc" -config server.conf
+openssl x509 -req -in server.csr -CA CACert.pem -CAkey CAKey.pem -CAcreateserial -out ServerCert.pem -days 100000 -extensions v3_req -extfile server.conf
 
 # Create a client certiticate
-openssl genrsa -out clientKey.pem 2048
-openssl req -new -key clientKey.pem -out client.csr -subj "/CN=${CN_BASE}_client" -config client.conf
-openssl x509 -req -in client.csr -CA caCert.pem -CAkey caKey.pem -CAcreateserial -out clientCert.pem -days 100000 -extensions v3_req -extfile client.conf
+openssl genrsa -out ClientKey.pem 2048
+openssl req -new -key ClientKey.pem -out client.csr -subj "/CN=${CN_BASE}_client" -config client.conf
+openssl x509 -req -in client.csr -CA CACert.pem -CAkey CAKey.pem -CAcreateserial -out ClientCert.pem -days 100000 -extensions v3_req -extfile client.conf
 
-outfile=certs_test.go
+outfile=certs.go
 
 cat > $outfile << EOF
 /*
@@ -95,8 +95,8 @@ EOF
 echo "// This file was generated using openssl by the gencerts.sh script" >> $outfile
 echo "// and holds raw certificates for the webhook tests." >> $outfile
 echo "" >> $outfile
-echo "package validating" >> $outfile
-for file in caKey caCert badCAKey badCACert serverKey serverCert clientKey clientCert; do
+echo "package testcerts" >> $outfile
+for file in CAKey CACert BadCAKey BadCACert ServerKey ServerCert ClientKey ClientCert; do
 	data=$(cat ${file}.pem)
 	echo "" >> $outfile
 	echo "var $file = []byte(\`$data\`)" >> $outfile
