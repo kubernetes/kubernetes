@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unstructured
+package runtime
 
 import (
 	"bytes"
@@ -27,19 +27,18 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/golang/glog"
 )
 
-// Converter is an interface for converting between interface{}
+// UnstructuredConverter is an interface for converting between interface{}
 // and map[string]interface representation.
-type Converter interface {
+type UnstructuredConverter interface {
 	ToUnstructured(obj interface{}) (map[string]interface{}, error)
 	FromUnstructured(u map[string]interface{}, obj interface{}) error
 }
@@ -78,7 +77,16 @@ var (
 	float64Type            = reflect.TypeOf(float64(0))
 	boolType               = reflect.TypeOf(bool(false))
 	fieldCache             = newFieldsCache()
-	DefaultConverter       = NewConverter(parseBool(os.Getenv("KUBE_PATCH_CONVERSION_DETECTOR")))
+
+	// DefaultUnstructuredConverter performs unstructured to Go typed object conversions.
+	DefaultUnstructuredConverter = &unstructuredConverter{
+		mismatchDetection: parseBool(os.Getenv("KUBE_PATCH_CONVERSION_DETECTOR")),
+		comparison: conversion.EqualitiesOrDie(
+			func(a, b time.Time) bool {
+				return a.UTC() == b.UTC()
+			},
+		),
+	}
 )
 
 func parseBool(key string) bool {
@@ -92,24 +100,30 @@ func parseBool(key string) bool {
 	return value
 }
 
-// ConverterImpl knows how to convert between interface{} and
+// unstructuredConverter knows how to convert between interface{} and
 // Unstructured in both ways.
-type converterImpl struct {
+type unstructuredConverter struct {
 	// If true, we will be additionally running conversion via json
 	// to ensure that the result is true.
 	// This is supposed to be set only in tests.
 	mismatchDetection bool
+	// comparison is the default test logic used to compare
+	comparison conversion.Equalities
 }
 
-func NewConverter(mismatchDetection bool) Converter {
-	return &converterImpl{
-		mismatchDetection: mismatchDetection,
+// NewTestUnstructuredConverter creates an UnstructuredConverter that accepts JSON typed maps and translates them
+// to Go types via reflection. It performs mismatch detection automatically and is intended for use by external
+// test tools. Use DefaultUnstructuredConverter if you do not explicitly need mismatch detection.
+func NewTestUnstructuredConverter(comparison conversion.Equalities) UnstructuredConverter {
+	return &unstructuredConverter{
+		mismatchDetection: true,
+		comparison:        comparison,
 	}
 }
 
 // FromUnstructured converts an object from map[string]interface{} representation into a concrete type.
 // It uses encoding/json/Unmarshaler if object implements it or reflection if not.
-func (c *converterImpl) FromUnstructured(u map[string]interface{}, obj interface{}) error {
+func (c *unstructuredConverter) FromUnstructured(u map[string]interface{}, obj interface{}) error {
 	t := reflect.TypeOf(obj)
 	value := reflect.ValueOf(obj)
 	if t.Kind() != reflect.Ptr || value.IsNil() {
@@ -122,8 +136,8 @@ func (c *converterImpl) FromUnstructured(u map[string]interface{}, obj interface
 		if (err != nil) != (newErr != nil) {
 			glog.Fatalf("FromUnstructured unexpected error for %v: error: %v", u, err)
 		}
-		if err == nil && !apiequality.Semantic.DeepEqual(obj, newObj) {
-			glog.Fatalf("FromUnstructured mismatch for %#v, diff: %v", obj, diff.ObjectReflectDiff(obj, newObj))
+		if err == nil && !c.comparison.DeepEqual(obj, newObj) {
+			glog.Fatalf("FromUnstructured mismatch\nobj1: %#v\nobj2: %#v", obj, newObj)
 		}
 	}
 	return err
@@ -393,10 +407,10 @@ func interfaceFromUnstructured(sv, dv reflect.Value) error {
 
 // ToUnstructured converts an object into map[string]interface{} representation.
 // It uses encoding/json/Marshaler if object implements it or reflection if not.
-func (c *converterImpl) ToUnstructured(obj interface{}) (map[string]interface{}, error) {
+func (c *unstructuredConverter) ToUnstructured(obj interface{}) (map[string]interface{}, error) {
 	var u map[string]interface{}
 	var err error
-	if unstr, ok := obj.(runtime.Unstructured); ok {
+	if unstr, ok := obj.(Unstructured); ok {
 		u = DeepCopyJSON(unstr.UnstructuredContent())
 	} else {
 		t := reflect.TypeOf(obj)
@@ -413,8 +427,8 @@ func (c *converterImpl) ToUnstructured(obj interface{}) (map[string]interface{},
 		if (err != nil) != (newErr != nil) {
 			glog.Fatalf("ToUnstructured unexpected error for %v: error: %v; newErr: %v", obj, err, newErr)
 		}
-		if err == nil && !apiequality.Semantic.DeepEqual(u, newUnstr) {
-			glog.Fatalf("ToUnstructured mismatch for %#v, diff: %v", u, diff.ObjectReflectDiff(u, newUnstr))
+		if err == nil && !c.comparison.DeepEqual(u, newUnstr) {
+			glog.Fatalf("ToUnstructured mismatch\nobj1: %#v\nobj2: %#v", u, newUnstr)
 		}
 	}
 	if err != nil {

@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metaunstruct "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -99,14 +98,14 @@ func doRoundTrip(t *testing.T, group testapi.TestGroup, kind string) {
 		return
 	}
 
-	newUnstr, err := unstructured.DefaultConverter.ToUnstructured(item)
+	newUnstr, err := runtime.NewTestUnstructuredConverter(apiequality.Semantic).ToUnstructured(item)
 	if err != nil {
 		t.Errorf("ToUnstructured failed: %v", err)
 		return
 	}
 
 	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
-	err = unstructured.DefaultConverter.FromUnstructured(newUnstr, newObj)
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(newUnstr, newObj)
 	if err != nil {
 		t.Errorf("FromUnstructured failed: %v", err)
 		return
@@ -146,7 +145,7 @@ func TestRoundTripWithEmptyCreationTimestamp(t *testing.T) {
 			}
 			t.Logf("Testing: %v in %v", kind, groupKey)
 
-			unstrBody, err := unstructured.DefaultConverter.ToUnstructured(item)
+			unstrBody, err := runtime.DefaultUnstructuredConverter.ToUnstructured(item)
 			if err != nil {
 				t.Fatalf("ToUnstructured failed: %v", err)
 			}
@@ -163,7 +162,7 @@ func TestRoundTripWithEmptyCreationTimestamp(t *testing.T) {
 			// attempt to re-convert unstructured object - conversion should not fail
 			// based on empty metadata fields, such as creationTimestamp
 			newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
-			err = unstructured.DefaultConverter.FromUnstructured(unstructObj.Object, newObj)
+			err = runtime.NewTestUnstructuredConverter(apiequality.Semantic).FromUnstructured(unstructObj.Object, newObj)
 			if err != nil {
 				t.Fatalf("FromUnstructured failed: %v", err)
 			}
@@ -176,12 +175,12 @@ func BenchmarkToFromUnstructured(b *testing.B) {
 	size := len(items)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		unstr, err := unstructured.DefaultConverter.ToUnstructured(&items[i%size])
+		unstr, err := runtime.NewTestUnstructuredConverter(apiequality.Semantic).ToUnstructured(&items[i%size])
 		if err != nil {
 			b.Fatalf("unexpected error: %v", err)
 		}
 		obj := v1.Pod{}
-		if err := unstructured.DefaultConverter.FromUnstructured(unstr, &obj); err != nil {
+		if err := runtime.NewTestUnstructuredConverter(apiequality.Semantic).FromUnstructured(unstr, &obj); err != nil {
 			b.Fatalf("unexpected error: %v", err)
 		}
 	}

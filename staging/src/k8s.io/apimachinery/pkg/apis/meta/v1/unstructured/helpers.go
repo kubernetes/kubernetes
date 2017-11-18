@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,7 +38,7 @@ func NestedFieldCopy(obj map[string]interface{}, fields ...string) (interface{},
 	if !ok {
 		return nil, false
 	}
-	return unstructured.DeepCopyJSONValue(val), true
+	return runtime.DeepCopyJSONValue(val), true
 }
 
 func nestedFieldNoCopy(obj map[string]interface{}, fields ...string) (interface{}, bool) {
@@ -131,7 +130,7 @@ func NestedSlice(obj map[string]interface{}, fields ...string) ([]interface{}, b
 		return nil, false
 	}
 	if _, ok := val.([]interface{}); ok {
-		return unstructured.DeepCopyJSONValue(val).([]interface{}), true
+		return runtime.DeepCopyJSONValue(val).([]interface{}), true
 	}
 	return nil, false
 }
@@ -165,7 +164,7 @@ func NestedMap(obj map[string]interface{}, fields ...string) (map[string]interfa
 		return nil, false
 	}
 	if m, ok := val.(map[string]interface{}); ok {
-		return unstructured.DeepCopyJSON(m), true
+		return runtime.DeepCopyJSON(m), true
 	}
 	return nil, false
 }
@@ -173,7 +172,7 @@ func NestedMap(obj map[string]interface{}, fields ...string) (map[string]interfa
 // SetNestedField sets the value of a nested field to a deep copy of the value provided.
 // Returns false if value cannot be set because one of the nesting levels is not a map[string]interface{}.
 func SetNestedField(obj map[string]interface{}, value interface{}, fields ...string) bool {
-	return setNestedFieldNoCopy(obj, unstructured.DeepCopyJSONValue(value), fields...)
+	return setNestedFieldNoCopy(obj, runtime.DeepCopyJSONValue(value), fields...)
 }
 
 func setNestedFieldNoCopy(obj map[string]interface{}, value interface{}, fields ...string) bool {
@@ -287,8 +286,6 @@ func setOwnerReference(src metav1.OwnerReference) map[string]interface{} {
 	}
 	return ret
 }
-
-var converter = unstructured.NewConverter(false)
 
 // UnstructuredJSONScheme is capable of converting JSON data into the Unstructured
 // type, which can be used for generic access to objects without a predefined scheme.

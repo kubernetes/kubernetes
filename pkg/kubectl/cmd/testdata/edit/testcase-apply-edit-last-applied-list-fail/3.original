@@ -1,6 +1,8 @@
 # Please edit the 'last-applied-configuration' annotations below.
 # Lines beginning with a '#' will be ignored, and an empty file will abort the edit.
 #
+# The edited file had a syntax error: unable to get type info from the object "*unstructured.Unstructured": Object 'apiVersion' is missing in 'unstructured object has no version'
+#
 apiVersion: v1
 items:
 - apiVersion: v1
@@ -16,7 +18,6 @@ items:
     name: cm1
     namespace: myproject
 - kind: Service
-  apiVersion: v1
   metadata:
     annotations: {}
     labels:

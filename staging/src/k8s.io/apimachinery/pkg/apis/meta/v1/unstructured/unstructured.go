@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -49,8 +48,6 @@ var _ metav1.Object = &Unstructured{}
 var _ runtime.Unstructured = &Unstructured{}
 
 func (obj *Unstructured) GetObjectKind() schema.ObjectKind { return obj }
-
-func (obj *Unstructured) IsUnstructuredObject() {}
 
 func (obj *Unstructured) IsList() bool {
 	if obj.Object != nil {
@@ -91,6 +88,10 @@ func (obj *Unstructured) UnstructuredContent() map[string]interface{} {
 	return obj.Object
 }
 
+func (obj *Unstructured) SetUnstructuredContent(content map[string]interface{}) {
+	obj.Object = content
+}
+
 // MarshalJSON ensures that the unstructured object produces proper
 // JSON when passed to Go's standard JSON library.
 func (u *Unstructured) MarshalJSON() ([]byte, error) {
@@ -112,7 +113,7 @@ func (in *Unstructured) DeepCopy() *Unstructured {
 	}
 	out := new(Unstructured)
 	*out = *in
-	out.Object = unstructured.DeepCopyJSON(in.Object)
+	out.Object = runtime.DeepCopyJSON(in.Object)
 	return out
 }
 
@@ -348,7 +349,7 @@ func (u *Unstructured) GetInitializers() *metav1.Initializers {
 		return nil
 	}
 	out := &metav1.Initializers{}
-	if err := converter.FromUnstructured(obj, out); err != nil {
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj, out); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to retrieve initializers for object: %v", err))
 	}
 	return out
@@ -359,7 +360,7 @@ func (u *Unstructured) SetInitializers(initializers *metav1.Initializers) {
 		RemoveNestedField(u.Object, "metadata", "initializers")
 		return
 	}
-	out, err := converter.ToUnstructured(initializers)
+	out, err := runtime.DefaultUnstructuredConverter.ToUnstructured(initializers)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to retrieve initializers for object: %v", err))
 	}

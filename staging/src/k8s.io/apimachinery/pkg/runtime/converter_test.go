@@ -18,7 +18,7 @@ limitations under the License.
 // Unstructured type depends on unstructured converter package but we want to test how the converter handles
 // the Unstructured type so we need to import both.
 
-package testing
+package runtime_test
 
 import (
 	encodingjson "encoding/json"
@@ -26,14 +26,22 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	conversionunstructured "k8s.io/apimachinery/pkg/conversion/unstructured"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+)
+
+var simpleEquality = conversion.EqualitiesOrDie(
+	func(a, b time.Time) bool {
+		return a.UTC() == b.UTC()
+	},
 )
 
 // Definte a number of test types.
@@ -137,14 +145,15 @@ func doRoundTrip(t *testing.T, item interface{}) {
 		return
 	}
 
-	newUnstr, err := conversionunstructured.DefaultConverter.ToUnstructured(item)
+	// TODO: should be using mismatch detection but fails due to another error
+	newUnstr, err := runtime.DefaultUnstructuredConverter.ToUnstructured(item)
 	if err != nil {
 		t.Errorf("ToUnstructured failed: %v", err)
 		return
 	}
 
 	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface()
-	err = conversionunstructured.DefaultConverter.FromUnstructured(newUnstr, newObj)
+	err = runtime.NewTestUnstructuredConverter(simpleEquality).FromUnstructured(newUnstr, newObj)
 	if err != nil {
 		t.Errorf("FromUnstructured failed: %v", err)
 		return
@@ -239,10 +248,9 @@ func TestRoundTrip(t *testing.T) {
 	}
 
 	for i := range testCases {
-		doRoundTrip(t, testCases[i].obj)
-		if t.Failed() {
-			break
-		}
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			doRoundTrip(t, testCases[i].obj)
+		})
 	}
 }
 
@@ -265,7 +273,7 @@ func doUnrecognized(t *testing.T, jsonData string, item interface{}, expectedErr
 		return
 	}
 	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface()
-	err = conversionunstructured.DefaultConverter.FromUnstructured(unstr, newObj)
+	err = runtime.NewTestUnstructuredConverter(simpleEquality).FromUnstructured(unstr, newObj)
 	if (err != nil) != (expectedErr != nil) {
 		t.Errorf("Unexpected error in FromUnstructured: %v, expected: %v", err, expectedErr)
 	}
@@ -479,7 +487,7 @@ func TestDeepCopyJSON(t *testing.T) {
 		"f": true,
 		"g": encodingjson.Number("123"),
 	}
-	deepCopy := conversionunstructured.DeepCopyJSON(src)
+	deepCopy := runtime.DeepCopyJSON(src)
 	assert.Equal(t, src, deepCopy)
 }
 
@@ -487,7 +495,7 @@ func TestFloatIntConversion(t *testing.T) {
 	unstr := map[string]interface{}{"fd": float64(3)}
 
 	var obj F
-	if err := conversionunstructured.DefaultConverter.FromUnstructured(unstr, &obj); err != nil {
+	if err := runtime.NewTestUnstructuredConverter(simpleEquality).FromUnstructured(unstr, &obj); err != nil {
 		t.Errorf("Unexpected error in FromUnstructured: %v", err)
 	}
 
@@ -525,7 +533,7 @@ func TestCustomToUnstructured(t *testing.T) {
 		tc := tc
 		t.Run(tc.Data, func(t *testing.T) {
 			t.Parallel()
-			result, err := conversionunstructured.DefaultConverter.ToUnstructured(&G{
+			result, err := runtime.NewTestUnstructuredConverter(simpleEquality).ToUnstructured(&G{
 				CustomValue1:   CustomValue{data: []byte(tc.Data)},
 				CustomValue2:   &CustomValue{data: []byte(tc.Data)},
 				CustomPointer1: CustomPointer{data: []byte(tc.Data)},
@@ -550,7 +558,7 @@ func TestCustomToUnstructuredTopLevel(t *testing.T) {
 		obj := obj
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			t.Parallel()
-			result, err := conversionunstructured.DefaultConverter.ToUnstructured(obj)
+			result, err := runtime.NewTestUnstructuredConverter(simpleEquality).ToUnstructured(obj)
 			require.NoError(t, err)
 			assert.Equal(t, expected, result)
 		})
