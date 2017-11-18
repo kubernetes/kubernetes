@@ -28,6 +28,7 @@ go_library(
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
+        "//pkg/kubelet/types:go_default_library",
         "//vendor/github.com/google/cadvisor/events:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
@@ -36,7 +37,6 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "//pkg/kubelet/types:go_default_library",
             "//vendor/github.com/golang/glog:go_default_library",
             "//vendor/github.com/google/cadvisor/cache/memory:go_default_library",
             "//vendor/github.com/google/cadvisor/container:go_default_library",
