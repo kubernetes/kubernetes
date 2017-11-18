@@ -65,15 +65,15 @@ var _ volume.Provisioner = &glusterfsVolumeProvisioner{}
 var _ volume.Deleter = &glusterfsVolumeDeleter{}
 
 const (
-	glusterfsPluginName            = "kubernetes.io/glusterfs"
-	volPrefix                      = "vol_"
-	dynamicEpSvcPrefix             = "glusterfs-dynamic-"
-	replicaCount                   = 3
-	durabilityType                 = "replicate"
-	secretKeyName                  = "key" // key name used in secret
-	gciLinuxGlusterMountBinaryPath = "/sbin/mount.glusterfs"
-	defaultGidMin                  = 2000
-	defaultGidMax                  = math.MaxInt32
+	glusterfsPluginName    = "kubernetes.io/glusterfs"
+	volPrefix              = "vol_"
+	dynamicEpSvcPrefix     = "glusterfs-dynamic-"
+	replicaCount           = 3
+	durabilityType         = "replicate"
+	secretKeyName          = "key" // key name used in secret
+	glusterMountBinaryPath = "/sbin/mount.glusterfs"
+	defaultGidMin          = 2000
+	defaultGidMax          = math.MaxInt32
 	// absoluteGidMin/Max are currently the same as the
 	// default values, but they play a different role and
 	// could take a different value. Only thing we need is:
@@ -242,8 +242,8 @@ func (b *glusterfsMounter) GetAttributes() volume.Attributes {
 func (b *glusterfsMounter) CanMount() error {
 	switch runtime.GOOS {
 	case "linux":
-		if _, err := os.Stat(gciLinuxGlusterMountBinaryPath); err != nil {
-			return fmt.Errorf("required binary %s not found: %v", gciLinuxGlusterMountBinaryPath, err)
+		if _, err := os.Stat(glusterMountBinaryPath); err != nil {
+			return fmt.Errorf("required binary %s not found: %v", glusterMountBinaryPath, err)
 		}
 	default:
 		return fmt.Errorf("unable to determine if glusterfs mounts are available on %s", runtime.GOOS)
