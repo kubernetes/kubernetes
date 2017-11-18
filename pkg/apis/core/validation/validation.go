@@ -2296,7 +2296,10 @@ func validateDNSPolicy(dnsPolicy *core.DNSPolicy, fldPath *field.Path) field.Err
 	allErrors := field.ErrorList{}
 	switch *dnsPolicy {
 	case core.DNSClusterFirstWithHostNet, core.DNSClusterFirst, core.DNSDefault:
-		break
+	case core.DNSCustom:
+		if !utilfeature.DefaultFeatureGate.Enabled(features.CustomPodDNS) {
+			allErrors = append(allErrors, field.Invalid(fldPath, dnsPolicy, "DNSPolicy: Custom is disabled by feature gate"))
+		}
 	case "":
 		allErrors = append(allErrors, field.Required(fldPath, ""))
 	default:
@@ -2304,6 +2307,41 @@ func validateDNSPolicy(dnsPolicy *core.DNSPolicy, fldPath *field.Path) field.Err
 		allErrors = append(allErrors, field.NotSupported(fldPath, dnsPolicy, validValues))
 	}
 	return allErrors
+}
+
+const (
+	maxDNSNameservers     = 3
+	maxDNSSearchPaths     = 6
+	maxDNSSearchListChars = 256
+)
+
+func validatePodDNSParams(dnsParams *core.PodDNSParams, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if dnsParams != nil {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.CustomPodDNS) {
+			allErrs = append(allErrs, field.Forbidden(fldPath, "DNSParams: custom pod DNS is disabled by feature gate"))
+		} else {
+			if len(dnsParams.Nameservers) > maxDNSNameservers {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("nameservers"), dnsParams.Nameservers, fmt.Sprintf("must not have more than %v nameservers", maxDNSNameservers)))
+			}
+			for _, ns := range dnsParams.Nameservers {
+				if ip := net.ParseIP(ns); ip == nil {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("nameservers"), ns, "must be valid IP address"))
+				}
+			}
+			if len(dnsParams.Searches) > maxDNSSearchPaths {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("searches"), dnsParams.Searches, fmt.Sprintf("must not have more than %v search paths", maxDNSSearchPaths)))
+			}
+			// Include the space between search paths.
+			if len(strings.Join(dnsParams.Searches, " ")) > maxDNSSearchListChars {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("searches"), dnsParams.Searches, "must not have more than 256 characters (including spaces) in the search list"))
+			}
+			for _, search := range dnsParams.Searches {
+				allErrs = append(allErrs, ValidateDNS1123Subdomain(search, fldPath.Child("searches"))...)
+			}
+		}
+	}
+	return allErrs
 }
 
 func validateHostNetwork(hostNetwork bool, containers []core.Container, fldPath *field.Path) field.ErrorList {
@@ -2556,6 +2594,7 @@ func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs = append(allErrs, ValidatePodSecurityContext(spec.SecurityContext, spec, fldPath, fldPath.Child("securityContext"))...)
 	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets, fldPath.Child("imagePullSecrets"))...)
 	allErrs = append(allErrs, validateAffinity(spec.Affinity, fldPath.Child("affinity"))...)
+	allErrs = append(allErrs, validatePodDNSParams(spec.DNSParams, fldPath.Child("dnsParams"))...)
 	if len(spec.ServiceAccountName) > 0 {
 		for _, msg := range ValidateServiceAccountName(spec.ServiceAccountName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("serviceAccountName"), spec.ServiceAccountName, msg))

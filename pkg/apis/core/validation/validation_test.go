@@ -4618,7 +4618,24 @@ func TestValidateRestartPolicy(t *testing.T) {
 }
 
 func TestValidateDNSPolicy(t *testing.T) {
-	successCases := []core.DNSPolicy{core.DNSClusterFirst, core.DNSDefault, core.DNSPolicy(core.DNSClusterFirst)}
+	customDNSEnabled := utilfeature.DefaultFeatureGate.Enabled("CustomPodDNS")
+	defer func() {
+		var err error
+		// Restoring the old value.
+		if customDNSEnabled {
+			err = utilfeature.DefaultFeatureGate.Set("CustomPodDNS=true")
+		} else {
+			err = utilfeature.DefaultFeatureGate.Set("CustomPodDNS=false")
+		}
+		if err != nil {
+			t.Errorf("Failed to restore CustomPodDNS feature gate: %v", err)
+		}
+	}()
+	if err := utilfeature.DefaultFeatureGate.Set("CustomPodDNS=true"); err != nil {
+		t.Errorf("Failed to enable CustomPodDNS feature gate: %v", err)
+	}
+
+	successCases := []core.DNSPolicy{core.DNSClusterFirst, core.DNSDefault, core.DNSPolicy(core.DNSClusterFirst), core.DNSCustom}
 	for _, policy := range successCases {
 		if errs := validateDNSPolicy(&policy, field.NewPath("field")); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
@@ -4629,6 +4646,141 @@ func TestValidateDNSPolicy(t *testing.T) {
 	for _, policy := range errorCases {
 		if errs := validateDNSPolicy(&policy, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %v", policy)
+		}
+	}
+}
+
+func TestValidatePodDNSParams(t *testing.T) {
+	customDNSEnabled := utilfeature.DefaultFeatureGate.Enabled("CustomPodDNS")
+	defer func() {
+		var err error
+		// Restoring the old value.
+		if customDNSEnabled {
+			err = utilfeature.DefaultFeatureGate.Set("CustomPodDNS=true")
+		} else {
+			err = utilfeature.DefaultFeatureGate.Set("CustomPodDNS=false")
+		}
+		if err != nil {
+			t.Errorf("Failed to restore CustomPodDNS feature gate: %v", err)
+		}
+	}()
+	if err := utilfeature.DefaultFeatureGate.Set("CustomPodDNS=true"); err != nil {
+		t.Errorf("Failed to enable CustomPodDNS feature gate: %v", err)
+	}
+
+	generateTestSearchPathFunc := func(numChars int) string {
+		res := ""
+		for i := 0; i < numChars; i++ {
+			res = res + "a"
+		}
+		return res
+	}
+
+	testCases := []struct {
+		desc          string
+		dnsParams     *core.PodDNSParams
+		expectedError bool
+	}{
+		{
+			desc:          "valid: empty DNSParams",
+			dnsParams:     &core.PodDNSParams{},
+			expectedError: false,
+		},
+		{
+			desc: "valid: 1 nameserver",
+			dnsParams: &core.PodDNSParams{
+				Nameservers: []string{"127.0.0.1"},
+			},
+			expectedError: false,
+		},
+		{
+			desc: "valid: 1 search path",
+			dnsParams: &core.PodDNSParams{
+				Searches: []string{"custom"},
+			},
+			expectedError: false,
+		},
+		{
+			desc: "valid: 3 nameservers and 6 search paths",
+			dnsParams: &core.PodDNSParams{
+				Nameservers: []string{"127.0.0.1", "10.0.0.10", "8.8.8.8"},
+				Searches:    []string{"custom", "mydomain.com", "local", "cluster.local", "svc.cluster.local", "default.svc.cluster.local"},
+			},
+			expectedError: false,
+		},
+		{
+			desc: "valid: 256 characters in search path list",
+			dnsParams: &core.PodDNSParams{
+				// We can have 256 - (6 - 1) = 251 characters in total for 6 search paths.
+				Searches: []string{
+					generateTestSearchPathFunc(1),
+					generateTestSearchPathFunc(50),
+					generateTestSearchPathFunc(50),
+					generateTestSearchPathFunc(50),
+					generateTestSearchPathFunc(50),
+					generateTestSearchPathFunc(50),
+				},
+			},
+			expectedError: false,
+		},
+		{
+			desc: "valid: ipv6 nameserver",
+			dnsParams: &core.PodDNSParams{
+				Nameservers: []string{"FE80::0202:B3FF:FE1E:8329"},
+			},
+			expectedError: false,
+		},
+		{
+			desc: "invalid: 4 nameservers",
+			dnsParams: &core.PodDNSParams{
+				Nameservers: []string{"127.0.0.1", "10.0.0.10", "8.8.8.8", "1.2.3.4"},
+			},
+			expectedError: true,
+		},
+		{
+			desc: "invalid: 7 search paths",
+			dnsParams: &core.PodDNSParams{
+				Searches: []string{"custom", "mydomain.com", "local", "cluster.local", "svc.cluster.local", "default.svc.cluster.local", "exceeded"},
+			},
+			expectedError: true,
+		},
+		{
+			desc: "invalid: 257 characters in search path list",
+			dnsParams: &core.PodDNSParams{
+				// We can have 256 - (6 - 1) = 251 characters in total for 6 search paths.
+				Searches: []string{
+					generateTestSearchPathFunc(2),
+					generateTestSearchPathFunc(50),
+					generateTestSearchPathFunc(50),
+					generateTestSearchPathFunc(50),
+					generateTestSearchPathFunc(50),
+					generateTestSearchPathFunc(50),
+				},
+			},
+			expectedError: true,
+		},
+		{
+			desc: "invalid search path",
+			dnsParams: &core.PodDNSParams{
+				Searches: []string{"custom?"},
+			},
+			expectedError: true,
+		},
+		{
+			desc: "invalid nameserver",
+			dnsParams: &core.PodDNSParams{
+				Nameservers: []string{"invalid"},
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		errs := validatePodDNSParams(tc.dnsParams, field.NewPath("dnsParams"))
+		if len(errs) != 0 && !tc.expectedError {
+			t.Errorf("%v: validatePodDNSParams(%v) = %v, want nil", tc.desc, tc.dnsParams, errs)
+		} else if len(errs) == 0 && tc.expectedError {
+			t.Errorf("%v: validatePodDNSParams(%v) = nil, want error", tc.desc, tc.dnsParams)
 		}
 	}
 }
