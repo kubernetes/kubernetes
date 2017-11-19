@@ -61,7 +61,6 @@ import (
 var RepairMalformedUpdates bool = apimachineryvalidation.RepairMalformedUpdates
 
 const isInvalidQuotaResource string = `must be a standard resource for quota`
-const fieldImmutableErrorMsg string = apimachineryvalidation.FieldImmutableErrorMsg
 const isNotIntegerErrorMsg string = `must be an integer`
 
 var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
@@ -252,10 +251,6 @@ var ValidateClassName = apimachineryvalidation.NameIsDNSSubdomain
 // ValidatePiorityClassName can be used to check whether the given priority
 // class name is valid.
 var ValidatePriorityClassName = apimachineryvalidation.NameIsDNSSubdomain
-
-func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) field.ErrorList {
-	return apimachineryvalidation.ValidateImmutableField(newVal, oldVal, fldPath)
-}
 
 // ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
 // been performed.
@@ -1680,20 +1675,18 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume) field.E
 	allErrs = ValidatePersistentVolume(newPv)
 
 	// PersistentVolumeSource should be immutable after creation.
-	if !apiequality.Semantic.DeepEqual(newPv.Spec.PersistentVolumeSource, oldPv.Spec.PersistentVolumeSource) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "persistentvolumesource"), "is immutable after creation"))
-	}
+	allErrs = append(allErrs, validate.Immutable(newPv.Spec.PersistentVolumeSource, oldPv.Spec.PersistentVolumeSource, field.NewPath("spec", "persistentvolumesource"))...)
 
 	newPv.Status = oldPv.Status
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.VolumeMode, oldPv.Spec.VolumeMode, field.NewPath("volumeMode"))...)
+		allErrs = append(allErrs, validate.Immutable(newPv.Spec.VolumeMode, oldPv.Spec.VolumeMode, field.NewPath("volumeMode"))...)
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		// Allow setting NodeAffinity if oldPv NodeAffinity was not set
 		if oldPv.Spec.NodeAffinity != nil {
-			allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.NodeAffinity, oldPv.Spec.NodeAffinity, field.NewPath("nodeAffinity"))...)
+			allErrs = append(allErrs, validate.Immutable(newPv.Spec.NodeAffinity, oldPv.Spec.NodeAffinity, field.NewPath("nodeAffinity"))...)
 		}
 	}
 
@@ -1772,7 +1765,7 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 	} else {
 		// storageclass annotation should be immutable after creation
 		// TODO: remove Beta when no longer needed
-		allErrs = append(allErrs, validate.ImmutableStringUpdate(newPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], oldPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], field.NewPath("metadata", "annotations").Key(v1.BetaStorageClassAnnotation))...)
+		allErrs = append(allErrs, validate.Immutable(newPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], oldPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], field.NewPath("metadata", "annotations").Key(v1.BetaStorageClassAnnotation))...)
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
@@ -1784,8 +1777,9 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 		oldSize := oldPvc.Spec.Resources.Requests["storage"]
 		newSize := newPvc.Spec.Resources.Requests["storage"]
 
+		// This doesn't call validate.Immutable because the error message needs more nuance.
 		if !apiequality.Semantic.DeepEqual(newPvcClone.Spec, oldPvcClone.Spec) {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "is immutable after creation except resources.requests for bound claims"))
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "field is immutable after creation except resources.requests for bound claims"))
 		}
 		if newSize.Cmp(oldSize) < 0 {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "resources", "requests", "storage"), "field can not be less than previous value"))
@@ -1794,13 +1788,11 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 	} else {
 		// changes to Spec are not allowed, but updates to label/and some annotations are OK.
 		// no-op updates pass validation.
-		if !apiequality.Semantic.DeepEqual(newPvcClone.Spec, oldPvcClone.Spec) {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "field is immutable after creation"))
-		}
+		allErrs = append(allErrs, validate.Immutable(newPvcClone.Spec, oldPvcClone.Spec, field.NewPath("spec"))...)
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		allErrs = append(allErrs, ValidateImmutableField(newPvc.Spec.VolumeMode, oldPvc.Spec.VolumeMode, field.NewPath("volumeMode"))...)
+		allErrs = append(allErrs, validate.Immutable(newPvc.Spec.VolumeMode, oldPvc.Spec.VolumeMode, field.NewPath("volumeMode"))...)
 	}
 	return allErrs
 }
@@ -3713,7 +3705,7 @@ func ValidateServiceUpdate(service, oldService *core.Service) field.ErrorList {
 	// which do not have ClusterIP assigned yet (empty string value)
 	if service.Spec.Type != core.ServiceTypeExternalName {
 		if oldService.Spec.Type != core.ServiceTypeExternalName && oldService.Spec.ClusterIP != "" {
-			allErrs = append(allErrs, ValidateImmutableField(service.Spec.ClusterIP, oldService.Spec.ClusterIP, field.NewPath("spec", "clusterIP"))...)
+			allErrs = append(allErrs, validate.Immutable(service.Spec.ClusterIP, oldService.Spec.ClusterIP, field.NewPath("spec", "clusterIP"))...)
 		}
 	}
 
@@ -4387,7 +4379,7 @@ func ValidateSecretUpdate(newSecret, oldSecret *core.Secret) field.ErrorList {
 		newSecret.Type = oldSecret.Type
 	}
 
-	allErrs = append(allErrs, ValidateImmutableField(newSecret.Type, oldSecret.Type, field.NewPath("type"))...)
+	allErrs = append(allErrs, validate.Immutable(newSecret.Type, oldSecret.Type, field.NewPath("type"))...)
 
 	allErrs = append(allErrs, ValidateSecret(newSecret)...)
 	return allErrs
@@ -4620,9 +4612,7 @@ func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *core.Resour
 	for _, scope := range oldResourceQuota.Spec.Scopes {
 		oldScopes.Insert(string(scope))
 	}
-	if !oldScopes.Equal(newScopes) {
-		allErrs = append(allErrs, field.Invalid(fldPath, newResourceQuota.Spec.Scopes, fieldImmutableErrorMsg))
-	}
+	allErrs = append(allErrs, validate.Immutable(oldScopes, newScopes, fldPath)...)
 
 	newResourceQuota.Status = oldResourceQuota.Status
 	return allErrs

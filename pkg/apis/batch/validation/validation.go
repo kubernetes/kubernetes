@@ -151,9 +151,9 @@ func ValidateJobUpdateStatus(job, oldJob *batch.Job) field.ErrorList {
 func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateJobSpec(&spec, fldPath)...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Completions, oldSpec.Completions, fldPath.Child("completions"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Selector, oldSpec.Selector, fldPath.Child("selector"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Template, oldSpec.Template, fldPath.Child("template"))...)
+	allErrs = append(allErrs, validate.Immutable(spec.Completions, oldSpec.Completions, fldPath.Child("completions"))...)
+	allErrs = append(allErrs, validate.Immutable(spec.Selector, oldSpec.Selector, fldPath.Child("selector"))...)
+	allErrs = append(allErrs, validate.Immutable(spec.Template, oldSpec.Template, fldPath.Child("template"))...)
 	return allErrs
 }
 

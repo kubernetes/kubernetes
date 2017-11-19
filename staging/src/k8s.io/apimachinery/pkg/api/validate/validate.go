@@ -19,6 +19,7 @@ package validate
 import (
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -107,12 +108,11 @@ func DNS1123Subdomain(value string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-// ImmutableStringUpdate validates that a string field has not changed.
-func ImmutableStringUpdate(after string, before string, fldPath *field.Path) field.ErrorList {
+// Immutablevalidates that a value has not changed.
+func Immutable(after, before interface{}, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-
-	if after != before {
-		allErrs = append(allErrs, field.Invalid(fldPath, after, "may not be changed"))
+	if !equality.Semantic.DeepEqual(before, after) {
+		allErrs = append(allErrs, field.Invalid(fldPath, after, `field is immutable`))
 	}
 	return allErrs
 }

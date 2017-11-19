@@ -20,7 +20,6 @@ import (
 	"reflect"
 	"strings"
 
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/validate"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -67,7 +66,7 @@ func ValidateStorageClassUpdate(storageClass, oldStorageClass *storage.StorageCl
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("reclaimPolicy"), "updates to reclaimPolicy are forbidden."))
 	}
 
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(storageClass.VolumeBindingMode, oldStorageClass.VolumeBindingMode, field.NewPath("volumeBindingMode"))...)
+	allErrs = append(allErrs, validate.Immutable(storageClass.VolumeBindingMode, oldStorageClass.VolumeBindingMode, field.NewPath("volumeBindingMode"))...)
 	return allErrs
 }
 
@@ -211,11 +210,7 @@ func validateVolumeError(e *storage.VolumeError, fldPath *field.Path) field.Erro
 // ValidateVolumeAttachmentUpdate validates a VolumeAttachment.
 func ValidateVolumeAttachmentUpdate(new, old *storage.VolumeAttachment) field.ErrorList {
 	allErrs := ValidateVolumeAttachment(new)
-
-	// Spec is read-only
-	if !apiequality.Semantic.DeepEqual(old.Spec, new.Spec) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec"), new.Spec, "field is immutable"))
-	}
+	allErrs = append(allErrs, validate.Immutable(new.spec, old.spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
