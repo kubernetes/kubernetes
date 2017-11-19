@@ -77,6 +77,7 @@ func (v *RollbackVisitor) VisitJob(kind kapps.GroupKindElement)                 
 func (v *RollbackVisitor) VisitPod(kind kapps.GroupKindElement)                   {}
 func (v *RollbackVisitor) VisitReplicaSet(kind kapps.GroupKindElement)            {}
 func (v *RollbackVisitor) VisitReplicationController(kind kapps.GroupKindElement) {}
+func (v *RollbackVisitor) VisitCronJob(kind kapps.GroupKindElement)               {}
 
 // RollbackerFor returns an implementation of Rollbacker interface for the given schema kind
 func RollbackerFor(kind schema.GroupKind, c kubernetes.Interface) (Rollbacker, error) {
