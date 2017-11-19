@@ -338,17 +338,26 @@ func TestSelectorSpreadPriority(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, nil)
+	for i, test := range tests {
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, makeNodeList(test.nodes))
 		selectorSpread := SelectorSpread{
 			serviceLister:     schedulertesting.FakeServiceLister(test.services),
 			controllerLister:  schedulertesting.FakeControllerLister(test.rcs),
 			replicaSetLister:  schedulertesting.FakeReplicaSetLister(test.rss),
 			statefulSetLister: schedulertesting.FakeStatefulSetLister(test.sss),
 		}
-		list, err := selectorSpread.CalculateSpreadPriority(test.pod, nodeNameToInfo, makeNodeList(test.nodes))
+
+		mataDataProducer := NewPriorityMetadataFactory(
+			schedulertesting.FakeServiceLister(test.services),
+			schedulertesting.FakeControllerLister(test.rcs),
+			schedulertesting.FakeReplicaSetLister(test.rss),
+			schedulertesting.FakeStatefulSetLister(test.sss))
+		mataData := mataDataProducer(test.pod, nodeNameToInfo)
+
+		ttp := priorityFunction(selectorSpread.CalculateSpreadPriorityMap, selectorSpread.CalculateSpreadPriorityReduce, mataData)
+		list, err := ttp(test.pod, nodeNameToInfo, makeNodeList(test.nodes))
 		if err != nil {
-			t.Errorf("unexpected error: %v", err)
+			t.Errorf("unexpected error: %v index : %d\n", err, i)
 		}
 		if !reflect.DeepEqual(test.expectedList, list) {
 			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
@@ -564,17 +573,25 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, nil)
+	for i, test := range tests {
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, makeLabeledNodeList(labeledNodes))
 		selectorSpread := SelectorSpread{
 			serviceLister:     schedulertesting.FakeServiceLister(test.services),
 			controllerLister:  schedulertesting.FakeControllerLister(test.rcs),
 			replicaSetLister:  schedulertesting.FakeReplicaSetLister(test.rss),
 			statefulSetLister: schedulertesting.FakeStatefulSetLister(test.sss),
 		}
-		list, err := selectorSpread.CalculateSpreadPriority(test.pod, nodeNameToInfo, makeLabeledNodeList(labeledNodes))
+
+		mataDataProducer := NewPriorityMetadataFactory(
+			schedulertesting.FakeServiceLister(test.services),
+			schedulertesting.FakeControllerLister(test.rcs),
+			schedulertesting.FakeReplicaSetLister(test.rss),
+			schedulertesting.FakeStatefulSetLister(test.sss))
+		mataData := mataDataProducer(test.pod, nodeNameToInfo)
+		ttp := priorityFunction(selectorSpread.CalculateSpreadPriorityMap, selectorSpread.CalculateSpreadPriorityReduce, mataData)
+		list, err := ttp(test.pod, nodeNameToInfo, makeLabeledNodeList(labeledNodes))
 		if err != nil {
-			t.Errorf("unexpected error: %v", err)
+			t.Errorf("unexpected error: %v index : %d", err, i)
 		}
 		// sort the two lists to avoid failures on account of different ordering
 		sort.Sort(test.expectedList)

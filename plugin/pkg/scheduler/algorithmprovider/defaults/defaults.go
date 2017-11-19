@@ -46,7 +46,7 @@ func init() {
 		})
 	factory.RegisterPriorityMetadataProducerFactory(
 		func(args factory.PluginFactoryArgs) algorithm.MetadataProducer {
-			return priorities.PriorityMetadata
+			return priorities.NewPriorityMetadataFactory(args.ServiceLister, args.ControllerLister, args.ReplicaSetLister, args.StatefulSetLister)
 		})
 
 	registerAlgorithmProvider(defaultPredicates(), defaultPriorities())
@@ -90,13 +90,12 @@ func init() {
 	factory.RegisterPriorityConfigFactory(
 		"ServiceSpreadingPriority",
 		factory.PriorityConfigFactory{
-			Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
+			MapReduceFunction: func(args factory.PluginFactoryArgs) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
 				return priorities.NewSelectorSpreadPriority(args.ServiceLister, algorithm.EmptyControllerLister{}, algorithm.EmptyReplicaSetLister{}, algorithm.EmptyStatefulSetLister{})
 			},
 			Weight: 1,
 		},
 	)
-
 	// EqualPriority is a prioritizer function that gives an equal weight of one to all nodes
 	// Register the priority function so that its available
 	// but do not include it as part of the default priorities
@@ -213,7 +212,7 @@ func defaultPriorities() sets.String {
 		factory.RegisterPriorityConfigFactory(
 			"SelectorSpreadPriority",
 			factory.PriorityConfigFactory{
-				Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
+				MapReduceFunction: func(args factory.PluginFactoryArgs) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
 					return priorities.NewSelectorSpreadPriority(args.ServiceLister, args.ControllerLister, args.ReplicaSetLister, args.StatefulSetLister)
 				},
 				Weight: 1,
