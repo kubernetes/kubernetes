@@ -270,15 +270,6 @@ func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) fie
 	return apimachineryvalidation.ValidateImmutableField(newVal, oldVal, fldPath)
 }
 
-func ValidateImmutableAnnotation(newVal string, oldVal string, annotation string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	if oldVal != newVal {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("annotations", annotation), newVal, fieldImmutableErrorMsg))
-	}
-	return allErrs
-}
-
 // ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
 // been performed.
 // It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
@@ -1752,7 +1743,7 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 
 	// storageclass annotation should be immutable after creation
 	// TODO: remove Beta when no longer needed
-	allErrs = append(allErrs, ValidateImmutableAnnotation(newPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], oldPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], v1.BetaStorageClassAnnotation, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, ValidateImmutable(newPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], oldPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], field.NewPath("metadata", "annotations").Key(v1.BetaStorageClassAnnotation))...)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
 		allErrs = append(allErrs, ValidateImmutableField(newPvc.Spec.VolumeMode, oldPvc.Spec.VolumeMode, field.NewPath("volumeMode"))...)
