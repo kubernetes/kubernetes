@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
@@ -162,7 +163,12 @@ func SetDefaults_KubeletConfiguration(obj *MasterConfiguration) {
 		obj.KubeletConfiguration.BaseConfig.AllowPrivileged = utilpointer.BoolPtr(true)
 	}
 	if obj.KubeletConfiguration.BaseConfig.ClusterDNS == nil {
-		obj.KubeletConfiguration.BaseConfig.ClusterDNS = []string{DefaultClusterDNSIP}
+		dnsIP, err := dns.GetDNSIP(obj.Networking.ServiceSubnet)
+		if err != nil {
+			obj.KubeletConfiguration.BaseConfig.ClusterDNS = []string{DefaultClusterDNSIP}
+		} else {
+			obj.KubeletConfiguration.BaseConfig.ClusterDNS = []string{dnsIP.String()}
+		}
 	}
 	if obj.KubeletConfiguration.BaseConfig.ClusterDomain == "" {
 		obj.KubeletConfiguration.BaseConfig.ClusterDomain = DefaultServiceDNSDomain
