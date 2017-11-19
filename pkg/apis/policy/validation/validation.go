@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/validate"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -80,10 +81,10 @@ func ValidatePodDisruptionBudgetSpec(spec policy.PodDisruptionBudgetSpec, fldPat
 
 func ValidatePodDisruptionBudgetStatus(status policy.PodDisruptionBudgetStatus, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.PodDisruptionsAllowed), fldPath.Child("podDisruptionsAllowed"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.CurrentHealthy), fldPath.Child("currentHealthy"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.DesiredHealthy), fldPath.Child("desiredHealthy"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ExpectedPods), fldPath.Child("expectedPods"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(status.PodDisruptionsAllowed), fldPath.Child("podDisruptionsAllowed"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(status.CurrentHealthy), fldPath.Child("currentHealthy"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(status.DesiredHealthy), fldPath.Child("desiredHealthy"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(status.ExpectedPods), fldPath.Child("expectedPods"))...)
 	return allErrs
 }
 

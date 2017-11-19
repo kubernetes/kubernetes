@@ -19,6 +19,7 @@ package validation
 import (
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/validate"
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -97,8 +98,8 @@ func ValidateHorizontalPodAutoscalerUpdate(newAutoscaler, oldAutoscaler *autosca
 func ValidateHorizontalPodAutoscalerStatusUpdate(newAutoscaler, oldAutoscaler *autoscaling.HorizontalPodAutoscaler) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&newAutoscaler.ObjectMeta, &oldAutoscaler.ObjectMeta, field.NewPath("metadata"))
 	status := newAutoscaler.Status
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.CurrentReplicas), field.NewPath("status", "currentReplicas"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.DesiredReplicas), field.NewPath("status", "desiredReplicasa"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(status.CurrentReplicas), field.NewPath("status", "currentReplicas"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(status.DesiredReplicas), field.NewPath("status", "desiredReplicasa"))...)
 	return allErrs
 }
 

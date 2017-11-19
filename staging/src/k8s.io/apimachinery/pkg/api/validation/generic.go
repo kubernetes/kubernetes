@@ -20,7 +20,6 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 const IsNegativeErrorMsg string = `must be greater than or equal to 0`
@@ -73,13 +72,4 @@ func maskTrailingDash(name string) string {
 		return name[:len(name)-2] + "a"
 	}
 	return name
-}
-
-// Validates that given value is not negative.
-func ValidateNonnegativeField(value int64, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if value < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, IsNegativeErrorMsg))
-	}
-	return allErrs
 }

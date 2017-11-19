@@ -15,6 +15,7 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
         "//vendor/github.com/robfig/cron:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/validate:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/validation:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",

@@ -13,6 +13,7 @@ go_library(
     deps = [
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/validate:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/validation/path:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
