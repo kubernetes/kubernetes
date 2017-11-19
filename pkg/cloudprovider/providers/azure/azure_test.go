@@ -1051,3 +1051,49 @@ func addTestSubnet(t *testing.T, svc *v1.Service) {
 	}
 	svc.Annotations[ServiceAnnotationLoadBalancerInternalSubnet] = "TestSubnet"
 }
+
+func TestGetBlobNameAndAccountFromURI(t *testing.T) {
+	tests := []struct {
+		diskURI               string
+		expectedFail          bool
+		expectedAccount       string
+		expectedBlobName      string
+		storageEndpointSuffix string
+	}{
+		{
+			diskURI:               "https://foo.blob.core.windows.net/vhds/bar.vhd",
+			expectedFail:          false,
+			expectedAccount:       "foo",
+			expectedBlobName:      "bar.vhd",
+			storageEndpointSuffix: "core.windows.net",
+		},
+		{
+			diskURI:               "https://foo.blob.core.windows.net/bar.vhd",
+			expectedFail:          true,
+			expectedAccount:       "",
+			expectedBlobName:      "",
+			storageEndpointSuffix: "core.windows.net",
+		},
+		{
+			diskURI:               "https://foo.blob.core.chinacloudapi.cn/test/bar.vhd",
+			expectedFail:          false,
+			expectedAccount:       "foo",
+			expectedBlobName:      "bar.vhd",
+			storageEndpointSuffix: "core.chinacloudapi.cn",
+		},
+	}
+
+	for _, test := range tests {
+		account, blobName, err := getBlobNameAndAccountFromURI(test.diskURI, test.storageEndpointSuffix)
+		if (err != nil) != test.expectedFail {
+			t.Errorf("Expected to fail=%t, with pattern %v", test.expectedFail, test)
+		} else {
+			if !test.expectedFail {
+				if account != test.expectedAccount || blobName != test.expectedBlobName {
+					t.Errorf("diskURI: %q, expectedAccount: %q, expectedBlobName: %q, account: %q, blobName: %q",
+						test.diskURI, test.expectedAccount, test.expectedBlobName, account, blobName)
+				}
+			}
+		}
+	}
+}
