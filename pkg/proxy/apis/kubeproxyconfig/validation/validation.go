@@ -83,9 +83,7 @@ func validateKubeProxyIPTablesConfiguration(config kubeproxyconfig.KubeProxyIPTa
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.SyncPeriod, "must be greater than 0"))
 	}
 
-	if config.MinSyncPeriod.Duration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("MinSyncPeriod"), config.MinSyncPeriod, "must be greater than or equal to 0"))
-	}
+	allErrs = append(allErrs, validate.NonNegativeDuration(config.MinSyncPeriod.Duration, fldPath.Child("MinSyncPeriod"))...)
 
 	if config.MinSyncPeriod.Duration > config.SyncPeriod.Duration {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.MinSyncPeriod, fmt.Sprintf("must be greater than or equal to %s", fldPath.Child("MinSyncPeriod").String())))
@@ -101,9 +99,7 @@ func validateKubeProxyIPVSConfiguration(config kubeproxyconfig.KubeProxyIPVSConf
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.SyncPeriod, "must be greater than 0"))
 	}
 
-	if config.MinSyncPeriod.Duration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("MinSyncPeriod"), config.MinSyncPeriod, "must be greater than or equal to 0"))
-	}
+	allErrs = append(allErrs, validate.NonNegativeDuration(config.MinSyncPeriod.Duration, fldPath.Child("MinSyncPeriod"))...)
 
 	if config.MinSyncPeriod.Duration > config.SyncPeriod.Duration {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.MinSyncPeriod, fmt.Sprintf("must be greater than or equal to %s", fldPath.Child("MinSyncPeriod").String())))
@@ -117,25 +113,20 @@ func validateKubeProxyIPVSConfiguration(config kubeproxyconfig.KubeProxyIPVSConf
 func validateKubeProxyConntrackConfiguration(config kubeproxyconfig.KubeProxyConntrackConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if config.Max != nil && *config.Max < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("Max"), config.Max, "must be greater than or equal to 0"))
+	if config.Max != nil {
+		allErrs = append(allErrs, validate.NonNegative(int64(*config.Max), fldPath.Child("Max"))...)
 	}
 
-	if config.MaxPerCore != nil && *config.MaxPerCore < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("MaxPerCore"), config.MaxPerCore, "must be greater than or equal to 0"))
+	if config.MaxPerCore != nil {
+		allErrs = append(allErrs, validate.NonNegative(int64(*config.MaxPerCore), fldPath.Child("MaxPerCore"))...)
 	}
 
-	if config.Min != nil && *config.Min < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("Min"), config.Min, "must be greater than or equal to 0"))
+	if config.Min != nil {
+		allErrs = append(allErrs, validate.NonNegative(int64(*config.Min), fldPath.Child("Min"))...)
 	}
 
-	if config.TCPEstablishedTimeout.Duration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("TCPEstablishedTimeout"), config.TCPEstablishedTimeout, "must be greater than or equal to 0"))
-	}
-
-	if config.TCPCloseWaitTimeout.Duration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("TCPCloseWaitTimeout"), config.TCPCloseWaitTimeout, "must be greater than or equal to 0"))
-	}
+	allErrs = append(allErrs, validate.NonNegativeDuration(config.TCPEstablishedTimeout.Duration, fldPath.Child("TCPEstablishedTimeout"))...)
+	allErrs = append(allErrs, validate.NonNegativeDuration(config.TCPCloseWaitTimeout.Duration, fldPath.Child("TCPCloseWaitTimeout"))...)
 
 	return allErrs
 }
