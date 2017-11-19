@@ -39,8 +39,9 @@ func IPPart(s string) string {
 	}
 	// Check if host string is a valid IP address
 	if ip := net.ParseIP(host); ip != nil {
+		return ip.String()
+	} else {
 		glog.Errorf("invalid IP part '%s'", host)
-		return host
 	}
 	return ""
 }
