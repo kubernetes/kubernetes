@@ -218,7 +218,6 @@ func defaultPriorities() sets.String {
 				Weight: 1,
 			},
 		),
-
 		// pods should be placed in the same topological domain (e.g. same node, same rack, same zone, same power domain, etc.)
 		// as some other pods, or, conversely, should not be placed in the same topological domain as some other pods.
 		factory.RegisterPriorityConfigFactory(

@@ -553,7 +553,6 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 				buildPod(nodeMachine1Zone2, labels1, controllerRef("ReplicationController", "name", "abc123")),
 				buildPod(nodeMachine1Zone3, labels1, controllerRef("ReplicationController", "name", "abc123")),
 			},
-			//nodes:        []string{nodeMachine1Zone3, nodeMachine1Zone2, nodeMachine1Zone3},
 			rcs: []*v1.ReplicationController{{Spec: v1.ReplicationControllerSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{
 				// Note that because we put two pods on the same node (nodeMachine1Zone3),

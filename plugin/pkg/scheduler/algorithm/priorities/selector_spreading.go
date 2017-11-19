@@ -54,11 +54,13 @@ func NewSelectorSpreadPriority(
 	return selectorSpread.CalculateSpreadPriorityMap, selectorSpread.CalculateSpreadPriorityReduce
 }
 
-// CalculateSpreadPriorityMap spreads pods across hosts, considering pods belonging to the same service or replication controller.
-// When a pod is scheduled, it looks for services, RCs or RSs that match the pod, then finds existing pods that match those selectors.
+// CalculateSpreadPriorityMap spreads pods across hosts, considering pods
+// belonging to the same service,RC,RS or StatefulSet.
+// When a pod is scheduled, it looks for services, RCs,RSs and StatefulSets that match the pod,
+// then finds existing pods that match those selectors.
 // It favors nodes that have fewer existing matching pods.
 // i.e. it pushes the scheduler towards a node where there's the smallest number of
-// pods which match the same service, RC or RS selectors as the pod being scheduled.
+// pods which match the same service, RC,RSs or StatefulSets selectors as the pod being scheduled.
 func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
 	var selectors []labels.Selector
 	node := nodeInfo.Node()
@@ -80,7 +82,7 @@ func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{
 		}, nil
 	}
 
-	count := float64(0)
+	count := int(0)
 	for _, nodePod := range nodeInfo.Pods() {
 		if pod.Namespace != nodePod.Namespace {
 			continue
@@ -110,32 +112,24 @@ func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{
 	}, nil
 }
 
-// CalculateSpreadPriorityReduce calculates the source of each node based on the number of existing matching pods on the node
-// where zone information is included on the nodes, it favors nodes in zones with fewer existing matching pods.
+// CalculateSpreadPriorityReduce calculates the source of each node
+// based on the number of existing matching pods on the node
+// where zone information is included on the nodes, it favors nodes
+// in zones with fewer existing matching pods.
 func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulercache.NodeInfo, result schedulerapi.HostPriorityList) error {
-	var selectors []labels.Selector
 	countsByZone := make(map[string]int, 10)
 	maxCountByZone := int(0)
 	maxCountByNodeName := int(0)
 
-	priorityMeta, ok := meta.(*priorityMetadata)
-	if ok {
-		selectors = priorityMeta.podSelectors
-	} else {
-		selectors = getSelectors(pod, s.serviceLister, s.controllerLister, s.replicaSetLister, s.statefulSetLister)
-	}
-
-	if len(selectors) > 0 {
-		for i := range result {
-			if result[i].Score > maxCountByNodeName {
-				maxCountByNodeName = result[i].Score
-			}
-			zoneId := utilnode.GetZoneKey(nodeNameToInfo[result[i].Host].Node())
-			if zoneId == "" {
-				continue
-			}
-			countsByZone[zoneId] += result[i].Score
+	for i := range result {
+		if result[i].Score > maxCountByNodeName {
+			maxCountByNodeName = result[i].Score
 		}
+		zoneId := utilnode.GetZoneKey(nodeNameToInfo[result[i].Host].Node())
+		if zoneId == "" {
+			continue
+		}
+		countsByZone[zoneId] += result[i].Score
 	}
 
 	for zoneId := range countsByZone {
@@ -146,19 +140,23 @@ func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interfa
 
 	haveZones := len(countsByZone) != 0
 
+	maxCountByNodeNameFloat64 := float64(maxCountByNodeName)
+	maxCountByZoneFloat64 := float64(maxCountByZone)
+	MaxPriorityFloat64 := float64(schedulerapi.MaxPriority)
+
 	for i := range result {
 		// initializing to the default/max node score of maxPriority
-		fScore := float64(schedulerapi.MaxPriority)
+		fScore := MaxPriorityFloat64
 		if maxCountByNodeName > 0 {
-			fScore = float64(schedulerapi.MaxPriority) * (float64(maxCountByNodeName-result[i].Score) / float64(maxCountByNodeName))
+			fScore = MaxPriorityFloat64 * (float64(maxCountByNodeName-result[i].Score) / maxCountByNodeNameFloat64)
 		}
 		// If there is zone information present, incorporate it
 		if haveZones {
 			zoneId := utilnode.GetZoneKey(nodeNameToInfo[result[i].Host].Node())
 			if zoneId != "" {
-				zoneScore := float64(schedulerapi.MaxPriority)
+				zoneScore := MaxPriorityFloat64
 				if maxCountByZone > 0 {
-					zoneScore = float64(schedulerapi.MaxPriority) * (float64(maxCountByZone-countsByZone[zoneId]) / float64(maxCountByZone))
+					zoneScore = MaxPriorityFloat64 * (float64(maxCountByZone-countsByZone[zoneId]) / maxCountByZoneFloat64)
 				}
 				fScore = (fScore * (1.0 - zoneWeighting)) + (zoneWeighting * zoneScore)
 			}
