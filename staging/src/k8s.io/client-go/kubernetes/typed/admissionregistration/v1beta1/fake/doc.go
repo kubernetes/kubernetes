@@ -14,6 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
-
-type InitializerConfigurationExpansion interface{}
+// Package fake has the automatically generated clients.
+package fake

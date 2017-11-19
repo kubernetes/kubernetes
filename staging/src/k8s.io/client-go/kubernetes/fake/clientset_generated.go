@@ -24,6 +24,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	admissionregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1"
 	fakeadmissionregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1/fake"
+	admissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1"
+	fakeadmissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1/fake"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	fakeappsv1 "k8s.io/client-go/kubernetes/typed/apps/v1/fake"
 	appsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
@@ -115,9 +117,14 @@ func (c *Clientset) AdmissionregistrationV1alpha1() admissionregistrationv1alpha
 	return &fakeadmissionregistrationv1alpha1.FakeAdmissionregistrationV1alpha1{Fake: &c.Fake}
 }
 
-// Admissionregistration retrieves the AdmissionregistrationV1alpha1Client
-func (c *Clientset) Admissionregistration() admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Interface {
-	return &fakeadmissionregistrationv1alpha1.FakeAdmissionregistrationV1alpha1{Fake: &c.Fake}
+// AdmissionregistrationV1beta1 retrieves the AdmissionregistrationV1beta1Client
+func (c *Clientset) AdmissionregistrationV1beta1() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface {
+	return &fakeadmissionregistrationv1beta1.FakeAdmissionregistrationV1beta1{Fake: &c.Fake}
+}
+
+// Admissionregistration retrieves the AdmissionregistrationV1beta1Client
+func (c *Clientset) Admissionregistration() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface {
+	return &fakeadmissionregistrationv1beta1.FakeAdmissionregistrationV1beta1{Fake: &c.Fake}
 }
 
 // AppsV1beta1 retrieves the AppsV1beta1Client

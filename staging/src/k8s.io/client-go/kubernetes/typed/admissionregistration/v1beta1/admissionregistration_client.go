@@ -14,31 +14,36 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
-	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
+	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
 
-type AdmissionregistrationV1alpha1Interface interface {
+type AdmissionregistrationV1beta1Interface interface {
 	RESTClient() rest.Interface
-	InitializerConfigurationsGetter
+	MutatingWebhookConfigurationsGetter
+	ValidatingWebhookConfigurationsGetter
 }
 
-// AdmissionregistrationV1alpha1Client is used to interact with features provided by the admissionregistration.k8s.io group.
-type AdmissionregistrationV1alpha1Client struct {
+// AdmissionregistrationV1beta1Client is used to interact with features provided by the admissionregistration.k8s.io group.
+type AdmissionregistrationV1beta1Client struct {
 	restClient rest.Interface
 }
 
-func (c *AdmissionregistrationV1alpha1Client) InitializerConfigurations() InitializerConfigurationInterface {
-	return newInitializerConfigurations(c)
+func (c *AdmissionregistrationV1beta1Client) MutatingWebhookConfigurations() MutatingWebhookConfigurationInterface {
+	return newMutatingWebhookConfigurations(c)
 }
 
-// NewForConfig creates a new AdmissionregistrationV1alpha1Client for the given config.
-func NewForConfig(c *rest.Config) (*AdmissionregistrationV1alpha1Client, error) {
+func (c *AdmissionregistrationV1beta1Client) ValidatingWebhookConfigurations() ValidatingWebhookConfigurationInterface {
+	return newValidatingWebhookConfigurations(c)
+}
+
+// NewForConfig creates a new AdmissionregistrationV1beta1Client for the given config.
+func NewForConfig(c *rest.Config) (*AdmissionregistrationV1beta1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -47,12 +52,12 @@ func NewForConfig(c *rest.Config) (*AdmissionregistrationV1alpha1Client, error) 
 	if err != nil {
 		return nil, err
 	}
-	return &AdmissionregistrationV1alpha1Client{client}, nil
+	return &AdmissionregistrationV1beta1Client{client}, nil
 }
 
-// NewForConfigOrDie creates a new AdmissionregistrationV1alpha1Client for the given config and
+// NewForConfigOrDie creates a new AdmissionregistrationV1beta1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *rest.Config) *AdmissionregistrationV1alpha1Client {
+func NewForConfigOrDie(c *rest.Config) *AdmissionregistrationV1beta1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -60,13 +65,13 @@ func NewForConfigOrDie(c *rest.Config) *AdmissionregistrationV1alpha1Client {
 	return client
 }
 
-// New creates a new AdmissionregistrationV1alpha1Client for the given RESTClient.
-func New(c rest.Interface) *AdmissionregistrationV1alpha1Client {
-	return &AdmissionregistrationV1alpha1Client{c}
+// New creates a new AdmissionregistrationV1beta1Client for the given RESTClient.
+func New(c rest.Interface) *AdmissionregistrationV1beta1Client {
+	return &AdmissionregistrationV1beta1Client{c}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv := v1alpha1.SchemeGroupVersion
+	gv := v1beta1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
 	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
@@ -80,7 +85,7 @@ func setConfigDefaults(config *rest.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *AdmissionregistrationV1alpha1Client) RESTClient() rest.Interface {
+func (c *AdmissionregistrationV1beta1Client) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}

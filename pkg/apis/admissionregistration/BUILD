@@ -35,6 +35,7 @@ filegroup(
         "//pkg/apis/admissionregistration/fuzzer:all-srcs",
         "//pkg/apis/admissionregistration/install:all-srcs",
         "//pkg/apis/admissionregistration/v1alpha1:all-srcs",
+        "//pkg/apis/admissionregistration/v1beta1:all-srcs",
         "//pkg/apis/admissionregistration/validation:all-srcs",
     ],
     tags = ["automanaged"],

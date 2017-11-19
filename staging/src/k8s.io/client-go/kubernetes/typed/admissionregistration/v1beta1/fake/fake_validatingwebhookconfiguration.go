@@ -17,7 +17,7 @@ limitations under the License.
 package fake
 
 import (
-	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
+	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -28,27 +28,27 @@ import (
 
 // FakeValidatingWebhookConfigurations implements ValidatingWebhookConfigurationInterface
 type FakeValidatingWebhookConfigurations struct {
-	Fake *FakeAdmissionregistrationV1alpha1
+	Fake *FakeAdmissionregistrationV1beta1
 }
 
-var validatingwebhookconfigurationsResource = schema.GroupVersionResource{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Resource: "validatingwebhookconfigurations"}
+var validatingwebhookconfigurationsResource = schema.GroupVersionResource{Group: "admissionregistration.k8s.io", Version: "v1beta1", Resource: "validatingwebhookconfigurations"}
 
-var validatingwebhookconfigurationsKind = schema.GroupVersionKind{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ValidatingWebhookConfiguration"}
+var validatingwebhookconfigurationsKind = schema.GroupVersionKind{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "ValidatingWebhookConfiguration"}
 
 // Get takes name of the validatingWebhookConfiguration, and returns the corresponding validatingWebhookConfiguration object, and an error if there is any.
-func (c *FakeValidatingWebhookConfigurations) Get(name string, options v1.GetOptions) (result *v1alpha1.ValidatingWebhookConfiguration, err error) {
+func (c *FakeValidatingWebhookConfigurations) Get(name string, options v1.GetOptions) (result *v1beta1.ValidatingWebhookConfiguration, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(validatingwebhookconfigurationsResource, name), &v1alpha1.ValidatingWebhookConfiguration{})
+		Invokes(testing.NewRootGetAction(validatingwebhookconfigurationsResource, name), &v1beta1.ValidatingWebhookConfiguration{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.ValidatingWebhookConfiguration), err
+	return obj.(*v1beta1.ValidatingWebhookConfiguration), err
 }
 
 // List takes label and field selectors, and returns the list of ValidatingWebhookConfigurations that match those selectors.
-func (c *FakeValidatingWebhookConfigurations) List(opts v1.ListOptions) (result *v1alpha1.ValidatingWebhookConfigurationList, err error) {
+func (c *FakeValidatingWebhookConfigurations) List(opts v1.ListOptions) (result *v1beta1.ValidatingWebhookConfigurationList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(validatingwebhookconfigurationsResource, validatingwebhookconfigurationsKind, opts), &v1alpha1.ValidatingWebhookConfigurationList{})
+		Invokes(testing.NewRootListAction(validatingwebhookconfigurationsResource, validatingwebhookconfigurationsKind, opts), &v1beta1.ValidatingWebhookConfigurationList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -57,8 +57,8 @@ func (c *FakeValidatingWebhookConfigurations) List(opts v1.ListOptions) (result 
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1alpha1.ValidatingWebhookConfigurationList{}
-	for _, item := range obj.(*v1alpha1.ValidatingWebhookConfigurationList).Items {
+	list := &v1beta1.ValidatingWebhookConfigurationList{}
+	for _, item := range obj.(*v1beta1.ValidatingWebhookConfigurationList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -73,29 +73,29 @@ func (c *FakeValidatingWebhookConfigurations) Watch(opts v1.ListOptions) (watch.
 }
 
 // Create takes the representation of a validatingWebhookConfiguration and creates it.  Returns the server's representation of the validatingWebhookConfiguration, and an error, if there is any.
-func (c *FakeValidatingWebhookConfigurations) Create(validatingWebhookConfiguration *v1alpha1.ValidatingWebhookConfiguration) (result *v1alpha1.ValidatingWebhookConfiguration, err error) {
+func (c *FakeValidatingWebhookConfigurations) Create(validatingWebhookConfiguration *v1beta1.ValidatingWebhookConfiguration) (result *v1beta1.ValidatingWebhookConfiguration, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(validatingwebhookconfigurationsResource, validatingWebhookConfiguration), &v1alpha1.ValidatingWebhookConfiguration{})
+		Invokes(testing.NewRootCreateAction(validatingwebhookconfigurationsResource, validatingWebhookConfiguration), &v1beta1.ValidatingWebhookConfiguration{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.ValidatingWebhookConfiguration), err
+	return obj.(*v1beta1.ValidatingWebhookConfiguration), err
 }
 
 // Update takes the representation of a validatingWebhookConfiguration and updates it. Returns the server's representation of the validatingWebhookConfiguration, and an error, if there is any.
-func (c *FakeValidatingWebhookConfigurations) Update(validatingWebhookConfiguration *v1alpha1.ValidatingWebhookConfiguration) (result *v1alpha1.ValidatingWebhookConfiguration, err error) {
+func (c *FakeValidatingWebhookConfigurations) Update(validatingWebhookConfiguration *v1beta1.ValidatingWebhookConfiguration) (result *v1beta1.ValidatingWebhookConfiguration, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(validatingwebhookconfigurationsResource, validatingWebhookConfiguration), &v1alpha1.ValidatingWebhookConfiguration{})
+		Invokes(testing.NewRootUpdateAction(validatingwebhookconfigurationsResource, validatingWebhookConfiguration), &v1beta1.ValidatingWebhookConfiguration{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.ValidatingWebhookConfiguration), err
+	return obj.(*v1beta1.ValidatingWebhookConfiguration), err
 }
 
 // Delete takes name of the validatingWebhookConfiguration and deletes it. Returns an error if one occurs.
 func (c *FakeValidatingWebhookConfigurations) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(validatingwebhookconfigurationsResource, name), &v1alpha1.ValidatingWebhookConfiguration{})
+		Invokes(testing.NewRootDeleteAction(validatingwebhookconfigurationsResource, name), &v1beta1.ValidatingWebhookConfiguration{})
 	return err
 }
 
@@ -103,16 +103,16 @@ func (c *FakeValidatingWebhookConfigurations) Delete(name string, options *v1.De
 func (c *FakeValidatingWebhookConfigurations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(validatingwebhookconfigurationsResource, listOptions)
 
-	_, err := c.Fake.Invokes(action, &v1alpha1.ValidatingWebhookConfigurationList{})
+	_, err := c.Fake.Invokes(action, &v1beta1.ValidatingWebhookConfigurationList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched validatingWebhookConfiguration.
-func (c *FakeValidatingWebhookConfigurations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ValidatingWebhookConfiguration, err error) {
+func (c *FakeValidatingWebhookConfigurations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ValidatingWebhookConfiguration, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(validatingwebhookconfigurationsResource, name, data, subresources...), &v1alpha1.ValidatingWebhookConfiguration{})
+		Invokes(testing.NewRootPatchSubresourceAction(validatingwebhookconfigurationsResource, name, data, subresources...), &v1beta1.ValidatingWebhookConfiguration{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.ValidatingWebhookConfiguration), err
+	return obj.(*v1beta1.ValidatingWebhookConfiguration), err
 }
