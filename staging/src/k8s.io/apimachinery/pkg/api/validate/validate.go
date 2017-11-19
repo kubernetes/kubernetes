@@ -17,6 +17,8 @@ limitations under the License.
 package validate
 
 import (
+	"time"
+
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -24,6 +26,15 @@ import (
 func NonNegative(value int64, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if value < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, value, `must be greater than or equal to 0`))
+	}
+	return allErrs
+}
+
+// NonNegativeDuration validates that given Duration is not negative.
+func NonNegativeDuration(value time.Duration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if int64(value) < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, value, `must be greater than or equal to 0`))
 	}
 	return allErrs
