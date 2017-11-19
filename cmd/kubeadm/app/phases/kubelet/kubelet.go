@@ -19,6 +19,10 @@ package kubelet
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
+
+	"github.com/ghodss/yaml"
 
 	"k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
@@ -90,6 +94,15 @@ func UpdateNodeWithConfigMap(client clientset.Interface, nodeName string) error 
 		kubeletCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeletBaseConfigurationConfigMap, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
+		}
+
+		baseCongfig, err := yaml.Marshal(kubeletCfg.Data[kubeadmconstants.KubeletBaseConfigurationConfigMapKey])
+		if err != nil {
+			return false, err
+		}
+		baseCongfigFile := filepath.Join(kubeadmconstants.KubeletBaseConfigurationDir, kubeadmconstants.KubeletBaseConfigurationFile)
+		if err := ioutil.WriteFile(baseCongfigFile, baseCongfig, 0644); err != nil {
+			return false, fmt.Errorf("failed to write initial remote configuration of kubelet into file %q for node %s: %v", baseCongfigFile, nodeName, err)
 		}
 
 		node.Spec.ConfigSource = &v1.NodeConfigSource{
