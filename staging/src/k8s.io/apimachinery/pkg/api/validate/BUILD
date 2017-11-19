@@ -14,6 +14,7 @@ go_library(
     importpath = "k8s.io/apimachinery/pkg/api/validate",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/validation:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )

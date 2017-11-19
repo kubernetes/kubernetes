@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -55,6 +56,24 @@ func NonNegativeDuration(value time.Duration, fldPath *field.Path) field.ErrorLi
 	allErrs := field.ErrorList{}
 	if int64(value) < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, value, `must be greater than or equal to 0`))
+	}
+	return allErrs
+}
+
+// DNS1123Label validates that a name is a proper DNS label.
+func DNS1123Label(value string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, msg := range validation.IsDNS1123Label(value) {
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
+	}
+	return allErrs
+}
+
+// DNS1123Subdomain validates that a name is a proper DNS subdomain.
+func DNS1123Subdomain(value string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, msg := range validation.IsDNS1123Subdomain(value) {
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
 	}
 	return allErrs
 }

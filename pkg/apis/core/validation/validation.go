@@ -94,23 +94,6 @@ func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) fie
 	return apimachineryvalidation.ValidateAnnotations(annotations, fldPath)
 }
 
-func ValidateDNS1123Label(value string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	for _, msg := range validation.IsDNS1123Label(value) {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
-	}
-	return allErrs
-}
-
-// ValidateDNS1123Subdomain validates that a name is a proper DNS subdomain.
-func ValidateDNS1123Subdomain(value string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	for _, msg := range validation.IsDNS1123Subdomain(value) {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
-	}
-	return allErrs
-}
-
 func ValidatePodSpecificAnnotations(annotations map[string]string, spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -355,7 +338,7 @@ func ValidateVolumes(volumes []core.Volume, fldPath *field.Path) (map[string]cor
 		if len(vol.Name) == 0 {
 			el = append(el, field.Required(namePath, ""))
 		} else {
-			el = append(el, ValidateDNS1123Label(vol.Name, namePath)...)
+			el = append(el, validate.DNS1123Label(vol.Name, namePath)...)
 		}
 		if allNames.Has(vol.Name) {
 			el = append(el, field.Duplicate(namePath, vol.Name))
@@ -1366,10 +1349,10 @@ func validateStorageOSVolumeSource(storageos *core.StorageOSVolumeSource, fldPat
 	if len(storageos.VolumeName) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeName"), ""))
 	} else {
-		allErrs = append(allErrs, ValidateDNS1123Label(storageos.VolumeName, fldPath.Child("volumeName"))...)
+		allErrs = append(allErrs, validate.DNS1123Label(storageos.VolumeName, fldPath.Child("volumeName"))...)
 	}
 	if len(storageos.VolumeNamespace) > 0 {
-		allErrs = append(allErrs, ValidateDNS1123Label(storageos.VolumeNamespace, fldPath.Child("volumeNamespace"))...)
+		allErrs = append(allErrs, validate.DNS1123Label(storageos.VolumeNamespace, fldPath.Child("volumeNamespace"))...)
 	}
 	if storageos.SecretRef != nil {
 		if len(storageos.SecretRef.Name) == 0 {
@@ -1384,10 +1367,10 @@ func validateStorageOSPersistentVolumeSource(storageos *core.StorageOSPersistent
 	if len(storageos.VolumeName) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeName"), ""))
 	} else {
-		allErrs = append(allErrs, ValidateDNS1123Label(storageos.VolumeName, fldPath.Child("volumeName"))...)
+		allErrs = append(allErrs, validate.DNS1123Label(storageos.VolumeName, fldPath.Child("volumeName"))...)
 	}
 	if len(storageos.VolumeNamespace) > 0 {
-		allErrs = append(allErrs, ValidateDNS1123Label(storageos.VolumeNamespace, fldPath.Child("volumeNamespace"))...)
+		allErrs = append(allErrs, validate.DNS1123Label(storageos.VolumeNamespace, fldPath.Child("volumeNamespace"))...)
 	}
 	if storageos.SecretRef != nil {
 		if len(storageos.SecretRef.Name) == 0 {
@@ -2421,7 +2404,7 @@ func validateContainers(containers []core.Container, volumes map[string]core.Vol
 		if len(ctr.Name) == 0 {
 			allErrs = append(allErrs, field.Required(namePath, ""))
 		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(ctr.Name, namePath)...)
+			allErrs = append(allErrs, validate.DNS1123Label(ctr.Name, namePath)...)
 		}
 		if allNames.Has(ctr.Name) {
 			allErrs = append(allErrs, field.Duplicate(namePath, ctr.Name))
@@ -2549,7 +2532,7 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("searches"), dnsConfig.Searches, "must not have more than 256 characters (including spaces) in the search list"))
 		}
 		for i, search := range dnsConfig.Searches {
-			allErrs = append(allErrs, ValidateDNS1123Subdomain(search, fldPath.Child("searches").Index(i))...)
+			allErrs = append(allErrs, validate.DNS1123Subdomain(search, fldPath.Child("searches").Index(i))...)
 		}
 		// Validate options.
 		for i, option := range dnsConfig.Options {
@@ -2676,7 +2659,7 @@ func ValidateHostAliases(hostAliases []core.HostAlias, fldPath *field.Path) fiel
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), hostAlias.IP, "must be valid IP address"))
 		}
 		for _, hostname := range hostAlias.Hostnames {
-			allErrs = append(allErrs, ValidateDNS1123Subdomain(hostname, fldPath.Child("hostnames"))...)
+			allErrs = append(allErrs, validate.DNS1123Subdomain(hostname, fldPath.Child("hostnames"))...)
 		}
 	}
 	return allErrs
@@ -2832,11 +2815,11 @@ func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	}
 
 	if len(spec.Hostname) > 0 {
-		allErrs = append(allErrs, ValidateDNS1123Label(spec.Hostname, fldPath.Child("hostname"))...)
+		allErrs = append(allErrs, validate.DNS1123Label(spec.Hostname, fldPath.Child("hostname"))...)
 	}
 
 	if len(spec.Subdomain) > 0 {
-		allErrs = append(allErrs, ValidateDNS1123Label(spec.Subdomain, fldPath.Child("subdomain"))...)
+		allErrs = append(allErrs, validate.DNS1123Label(spec.Subdomain, fldPath.Child("subdomain"))...)
 	}
 
 	if len(spec.Tolerations) > 0 {
@@ -3358,7 +3341,7 @@ func ValidateService(service *core.Service) field.ErrorList {
 			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterIP"), service.Spec.ClusterIP, "must be empty for ExternalName services"))
 		}
 		if len(service.Spec.ExternalName) > 0 {
-			allErrs = append(allErrs, ValidateDNS1123Subdomain(service.Spec.ExternalName, specPath.Child("externalName"))...)
+			allErrs = append(allErrs, validate.DNS1123Subdomain(service.Spec.ExternalName, specPath.Child("externalName"))...)
 		} else {
 			allErrs = append(allErrs, field.Required(specPath.Child("externalName"), ""))
 		}
@@ -3503,7 +3486,7 @@ func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService bo
 	if requireName && len(sp.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	} else if len(sp.Name) != 0 {
-		allErrs = append(allErrs, ValidateDNS1123Label(sp.Name, fldPath.Child("name"))...)
+		allErrs = append(allErrs, validate.DNS1123Label(sp.Name, fldPath.Child("name"))...)
 		if allNames.Has(sp.Name) {
 			allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), sp.Name))
 		} else {
@@ -4612,7 +4595,7 @@ func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path,
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), address.IP, msg))
 	}
 	if len(address.Hostname) > 0 {
-		allErrs = append(allErrs, ValidateDNS1123Label(address.Hostname, fldPath.Child("hostname"))...)
+		allErrs = append(allErrs, validate.DNS1123Label(address.Hostname, fldPath.Child("hostname"))...)
 	}
 	// During endpoint update, verify that NodeName is a DNS subdomain and transition rules allow the update
 	if address.NodeName != nil {
@@ -4659,7 +4642,7 @@ func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *fi
 	if requireName && len(port.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	} else if len(port.Name) != 0 {
-		allErrs = append(allErrs, ValidateDNS1123Label(port.Name, fldPath.Child("name"))...)
+		allErrs = append(allErrs, validate.DNS1123Label(port.Name, fldPath.Child("name"))...)
 	}
 	for _, msg := range validation.IsValidPortNum(int(port.Port)) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("port"), port.Port, msg))
