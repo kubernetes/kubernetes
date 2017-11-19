@@ -23,6 +23,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
+// NameValidator validates that the provided name is valid for a given resource type.
+// Not all resources have the same validation rules for names. Prefix is true
+// if the name will have a value appended to it.  If the name is not valid,
+// this returns a list of descriptions of individual characteristics of the
+// value that were not valid.  Otherwise this returns an empty list or nil.
+type NameValidator func(name string, prefix bool) []string
+
 const isNegativeErrorMsg string = `must be greater than or equal to 0`
 
 // NonNegative validates that given int64 is not negative.

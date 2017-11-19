@@ -204,13 +204,6 @@ func ValidateOwnerReferences(ownerReferences []metav1.OwnerReference, fldPath *f
 	return apimachineryvalidation.ValidateOwnerReferences(ownerReferences, fldPath)
 }
 
-// ValidateNameFunc validates that the provided name is valid for a given resource type.
-// Not all resources have the same validation rules for names. Prefix is true
-// if the name will have a value appended to it.  If the name is not valid,
-// this returns a list of descriptions of individual characteristics of the
-// value that were not valid.  Otherwise this returns an empty list or nil.
-type ValidateNameFunc apimachineryvalidation.ValidateNameFunc
-
 // maskTrailingDash replaces the final character of a string with a subdomain safe
 // value if is a dash.
 func maskTrailingDash(name string) string {
@@ -285,17 +278,17 @@ var ValidateClassName = NameIsDNSSubdomain
 var ValidatePriorityClassName = NameIsDNSSubdomain
 
 // TODO update all references to these functions to point to the apimachineryvalidation ones
-// NameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
+// NameIsDNSSubdomain is a validate.NameValidator for names that must be a DNS subdomain.
 func NameIsDNSSubdomain(name string, prefix bool) []string {
 	return apimachineryvalidation.NameIsDNSSubdomain(name, prefix)
 }
 
-// NameIsDNSLabel is a ValidateNameFunc for names that must be a DNS 1123 label.
+// NameIsDNSLabel is a validate.NameValidator for names that must be a DNS 1123 label.
 func NameIsDNSLabel(name string, prefix bool) []string {
 	return apimachineryvalidation.NameIsDNSLabel(name, prefix)
 }
 
-// NameIsDNS1035Label is a ValidateNameFunc for names that must be a DNS 952 label.
+// NameIsDNS1035Label is a validate.NameValidator for names that must be a DNS 952 label.
 func NameIsDNS1035Label(name string, prefix bool) []string {
 	return apimachineryvalidation.NameIsDNS1035Label(name, prefix)
 }
@@ -326,8 +319,8 @@ func ValidateImmutableAnnotation(newVal string, oldVal string, annotation string
 // been performed.
 // It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
 // TODO: Remove calls to this method scattered in validations of specific resources, e.g., ValidatePodUpdate.
-func ValidateObjectMeta(meta *metav1.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
-	allErrs := apimachineryvalidation.ValidateObjectMeta(meta, requiresNamespace, apimachineryvalidation.ValidateNameFunc(nameFn), fldPath)
+func ValidateObjectMeta(meta *metav1.ObjectMeta, requiresNamespace bool, nameFn validate.NameValidator, fldPath *field.Path) field.ErrorList {
+	allErrs := apimachineryvalidation.ValidateObjectMeta(meta, requiresNamespace, validate.NameValidator(nameFn), fldPath)
 	// run additional checks for the finalizer name
 	for i := range meta.Finalizers {
 		allErrs = append(allErrs, validateKubeFinalizerName(string(meta.Finalizers[i]), fldPath.Child("finalizers").Index(i))...)
@@ -2051,7 +2044,7 @@ func validateContainerResourceDivisor(rName string, divisor resource.Quantity, f
 func validateConfigMapKeySelector(s *core.ConfigMapKeySelector, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	nameFn := ValidateNameFunc(ValidateSecretName)
+	nameFn := validate.NameValidator(ValidateSecretName)
 	for _, msg := range nameFn(s.Name, false) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), s.Name, msg))
 	}
@@ -2069,7 +2062,7 @@ func validateConfigMapKeySelector(s *core.ConfigMapKeySelector, fldPath *field.P
 func validateSecretKeySelector(s *core.SecretKeySelector, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	nameFn := ValidateNameFunc(ValidateSecretName)
+	nameFn := validate.NameValidator(ValidateSecretName)
 	for _, msg := range nameFn(s.Name, false) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), s.Name, msg))
 	}

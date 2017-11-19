@@ -132,7 +132,7 @@ func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) fie
 // ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
 // been performed.
 // It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
-func ValidateObjectMeta(objMeta *metav1.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
+func ValidateObjectMeta(objMeta *metav1.ObjectMeta, requiresNamespace bool, nameFn validate.NameValidator, fldPath *field.Path) field.ErrorList {
 	metadata, err := meta.Accessor(objMeta)
 	if err != nil {
 		allErrs := field.ErrorList{}
@@ -145,7 +145,7 @@ func ValidateObjectMeta(objMeta *metav1.ObjectMeta, requiresNamespace bool, name
 // ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
 // been performed.
 // It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
-func ValidateObjectMetaAccessor(meta metav1.Object, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
+func ValidateObjectMetaAccessor(meta metav1.Object, requiresNamespace bool, nameFn validate.NameValidator, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(meta.GetGenerateName()) != 0 {
