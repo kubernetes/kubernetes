@@ -76152,6 +76152,44 @@
      }
     }
    },
+   "io.k8s.api.core.v1.PodDNSConfig": {
+    "description": "PodDNSConfig defines the DNS parameters of a pod in addition to those generated from DNSPolicy.",
+    "properties": {
+     "nameservers": {
+      "description": "A list of DNS name server IP addresses. This will be appended to the base nameservers generated from DNSPolicy. Duplicated nameservers will be removed.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "options": {
+      "description": "A list of DNS resolver options. This will be merged with the base options generated from DNSPolicy. Duplicated entries will be removed. Resolution options given in Options will override those that appear in the base DNSPolicy.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.PodDNSConfigOption"
+      }
+     },
+     "searches": {
+      "description": "A list of DNS search domains for host-name lookup. This will be appended to the base search paths generated from DNSPolicy. Duplicated search paths will be removed.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "io.k8s.api.core.v1.PodDNSConfigOption": {
+    "description": "PodDNSConfigOption defines DNS resolver options of a pod.",
+    "properties": {
+     "name": {
+      "description": "Required.",
+      "type": "string"
+     },
+     "value": {
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.api.core.v1.PodList": {
     "description": "PodList is a list of Pods.",
     "required": [
@@ -76245,8 +76283,12 @@
       "x-kubernetes-patch-merge-key": "name",
       "x-kubernetes-patch-strategy": "merge"
      },
+     "dnsConfig": {
+      "description": "Specifies the DNS parameters of a pod. Parameters specified here will be merged to the generated DNS configuration based on DNSPolicy.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.PodDNSConfig"
+     },
      "dnsPolicy": {
-      "description": "Set DNS policy for containers within the pod. One of 'ClusterFirstWithHostNet', 'ClusterFirst' or 'Default'. Defaults to \"ClusterFirst\". To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.",
+      "description": "Set DNS policy for the pod. Defaults to \"ClusterFirst\". Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'. DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy. To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.",
       "type": "string"
      },
      "hostAliases": {

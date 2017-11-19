@@ -2681,6 +2681,38 @@ message PodCondition {
   optional string message = 6;
 }
 
+// PodDNSConfig defines the DNS parameters of a pod in addition to
+// those generated from DNSPolicy.
+message PodDNSConfig {
+  // A list of DNS name server IP addresses.
+  // This will be appended to the base nameservers generated from DNSPolicy.
+  // Duplicated nameservers will be removed.
+  // +optional
+  repeated string nameservers = 1;
+
+  // A list of DNS search domains for host-name lookup.
+  // This will be appended to the base search paths generated from DNSPolicy.
+  // Duplicated search paths will be removed.
+  // +optional
+  repeated string searches = 2;
+
+  // A list of DNS resolver options.
+  // This will be merged with the base options generated from DNSPolicy.
+  // Duplicated entries will be removed. Resolution options given in Options
+  // will override those that appear in the base DNSPolicy.
+  // +optional
+  repeated PodDNSConfigOption options = 3;
+}
+
+// PodDNSConfigOption defines DNS resolver options of a pod.
+message PodDNSConfigOption {
+  // Required.
+  optional string name = 1;
+
+  // +optional
+  optional string value = 2;
+}
+
 // PodExecOptions is the query options to a Pod's remote exec call.
 // ---
 // TODO: This is largely identical to PodAttachOptions above, make sure they stay in sync and see about merging
@@ -2905,10 +2937,12 @@ message PodSpec {
   // +optional
   optional int64 activeDeadlineSeconds = 5;
 
-  // Set DNS policy for containers within the pod.
-  // One of 'ClusterFirstWithHostNet', 'ClusterFirst' or 'Default'.
+  // Set DNS policy for the pod.
   // Defaults to "ClusterFirst".
-  // To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.
+  // Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'.
+  // DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.
+  // To have DNS options set along with hostNetwork, you have to specify DNS policy
+  // explicitly to 'ClusterFirstWithHostNet'.
   // +optional
   optional string dnsPolicy = 6;
 
@@ -3017,6 +3051,12 @@ message PodSpec {
   // The higher the value, the higher the priority.
   // +optional
   optional int32 priority = 25;
+
+  // Specifies the DNS parameters of a pod.
+  // Parameters specified here will be merged to the generated DNS
+  // configuration based on DNSPolicy.
+  // +optional
+  optional PodDNSConfig dnsConfig = 26;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
