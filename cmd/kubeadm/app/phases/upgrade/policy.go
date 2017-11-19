@@ -63,7 +63,7 @@ func EnforceVersionPolicies(versionGetter VersionGetter, newK8sVersionStr string
 	kubeletVersions, err := versionGetter.KubeletVersions()
 	if err != nil {
 		// This is a non-critical error; continue although kubeadm couldn't look this up
-		skewErrors.Skippable = append(skewErrors.Skippable, fmt.Errorf("Unable to fetch kubeadm version: %v", err))
+		skewErrors.Skippable = append(skewErrors.Skippable, fmt.Errorf("Unable to fetch kubelet version: %v", err))
 	}
 
 	// Make sure the new version is a supported version (higher than the minimum one supported)
