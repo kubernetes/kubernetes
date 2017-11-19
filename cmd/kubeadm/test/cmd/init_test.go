@@ -120,7 +120,7 @@ func TestCmdInitAPIPort(t *testing.T) {
 		args     string
 		expected bool
 	}{
-		{"--api-port=foobar", false},
+		{"--apiserver-bind-port=6443", false},
 	}
 
 	for _, rt := range initTest {
@@ -148,7 +148,7 @@ func TestCmdInitArgsMixed(t *testing.T) {
 		args     string
 		expected bool
 	}{
-		{"--api-port=1000 --config=/etc/kubernets/kubeadm.config", false},
+		{"--api	server-bind-port=1000 --config=/etc/kubernets/kubeadm.config", false},
 	}
 
 	for _, rt := range initTest {
