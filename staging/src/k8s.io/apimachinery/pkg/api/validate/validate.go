@@ -23,6 +23,22 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
+// NameValidator validates that the provided name is valid for a given resource type.
+// Not all resources have the same validation rules for names.  If the name is
+// not valid for any reason, this returns a list of descriptions of individual
+// characteristics of the value that were not valid.  Otherwise this returns an
+// empty list or nil.
+type NameValidator = func(name string) []string
+
+// Name calls a provided NameValidator and turns the results into a field.ErrorList.
+func Name(fn NameValidator, name string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, msg := range fn(name) {
+		allErrs = append(allErrs, field.Invalid(fldPath, name, msg))
+	}
+	return allErrs
+}
+
 const isNegativeErrorMsg string = `must be greater than or equal to 0`
 
 // NonNegative validates that given int64 is not negative.

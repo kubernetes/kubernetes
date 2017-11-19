@@ -1132,8 +1132,3 @@ func IsValidPathSegmentName(name string) []string {
 
 	return errors
 }
-
-// ValidatePathSegmentName validates the name can be safely encoded as a path segment
-func ValidatePathSegmentName(name string, prefix bool) []string {
-	return IsValidPathSegmentName(name)
-}

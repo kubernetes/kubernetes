@@ -409,7 +409,7 @@ func (hc HostnameCheck) Check() (warnings, errors []error) {
 	glog.V(1).Infof("validating if hostname match dns sub domain")
 	errors = []error{}
 	warnings = []error{}
-	for _, msg := range validation.ValidateNodeName(hc.nodeName, false) {
+	for _, msg := range validation.ValidateNodeName(hc.nodeName) {
 		errors = append(errors, fmt.Errorf("hostname \"%s\" %s", hc.nodeName, msg))
 	}
 	addr, err := net.LookupHost(hc.nodeName)

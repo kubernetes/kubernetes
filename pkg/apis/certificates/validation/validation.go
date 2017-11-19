@@ -41,7 +41,7 @@ func validateCSR(obj *certificates.CertificateSigningRequest) error {
 }
 
 // We don't care what you call your certificate requests.
-func ValidateCertificateRequestName(name string, prefix bool) []string {
+func ValidateCertificateRequestName(name string) []string {
 	return nil
 }
 

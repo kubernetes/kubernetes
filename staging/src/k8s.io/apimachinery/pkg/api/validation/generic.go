@@ -17,41 +17,25 @@ limitations under the License.
 package validation
 
 import (
-	"strings"
-
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 const IsNegativeErrorMsg string = `must be greater than or equal to 0`
 
-// ValidateNameFunc validates that the provided name is valid for a given resource type.
-// Not all resources have the same validation rules for names. Prefix is true
-// if the name will have a value appended to it.  If the name is not valid,
-// this returns a list of descriptions of individual characteristics of the
-// value that were not valid.  Otherwise this returns an empty list or nil.
-type ValidateNameFunc func(name string, prefix bool) []string
-
-// NameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
-func NameIsDNSSubdomain(name string, prefix bool) []string {
-	if prefix {
-		name = maskTrailingDash(name)
-	}
+//FIXME: call the func signature "validate.ValidatorFunc" or something more generic
+//FIXME: get rid of all this, just use "content.IsDNS..." ?
+// NameIsDNSSubdomain is a validate.NameValidator for names that must be a DNS subdomain.
+func NameIsDNSSubdomain(name string) []string {
 	return validation.IsDNS1123Subdomain(name)
 }
 
-// NameIsDNSLabel is a ValidateNameFunc for names that must be a DNS 1123 label.
-func NameIsDNSLabel(name string, prefix bool) []string {
-	if prefix {
-		name = maskTrailingDash(name)
-	}
+// NameIsDNSLabel is a validate.NameValidator for names that must be a DNS 1123 label.
+func NameIsDNSLabel(name string) []string {
 	return validation.IsDNS1123Label(name)
 }
 
-// NameIsDNS1035Label is a ValidateNameFunc for names that must be a DNS 952 label.
-func NameIsDNS1035Label(name string, prefix bool) []string {
-	if prefix {
-		name = maskTrailingDash(name)
-	}
+// NameIsDNS1035Label is a validate.NameValidator for names that must be a DNS 952 label.
+func NameIsDNS1035Label(name string) []string {
 	return validation.IsDNS1035Label(name)
 }
 
@@ -64,12 +48,3 @@ var ValidateNamespaceName = NameIsDNSLabel
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
 var ValidateServiceAccountName = NameIsDNSSubdomain
-
-// maskTrailingDash replaces the final character of a string with a subdomain safe
-// value if is a dash.
-func maskTrailingDash(name string) string {
-	if strings.HasSuffix(name, "-") {
-		return name[:len(name)-2] + "a"
-	}
-	return name
-}

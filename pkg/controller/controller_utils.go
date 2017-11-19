@@ -489,7 +489,7 @@ func getPodsAnnotationSet(template *v1.PodTemplateSpec) labels.Set {
 func getPodsPrefix(controllerName string) string {
 	// use the dash (if the name isn't too long) to make the pod name a bit prettier
 	prefix := fmt.Sprintf("%s-", controllerName)
-	if len(validation.ValidatePodName(prefix, true)) != 0 {
+	if len(validation.ValidatePodName(controllerName)) != 0 {
 		prefix = controllerName
 	}
 	return prefix

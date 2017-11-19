@@ -25,13 +25,11 @@ import (
 )
 
 // ValidatePodPresetName can be used to check whether the given PodPreset name is valid.
-// Prefix indicates this name will be used as part of generation, in which case
-// trailing dashes are allowed.
-func ValidatePodPresetName(name string, prefix bool) []string {
+func ValidatePodPresetName(name string) []string {
 	// TODO: Validate that there's name for the suffix inserted by the pods.
 	// Currently this is just "-index". In the future we may allow a user
 	// specified list of suffixes and we need  to validate the longest one.
-	return apimachineryvalidation.NameIsDNSSubdomain(name, prefix)
+	return apimachineryvalidation.NameIsDNSSubdomain(name)
 }
 
 // ValidatePodPresetSpec tests if required fields in the PodPreset spec are set.

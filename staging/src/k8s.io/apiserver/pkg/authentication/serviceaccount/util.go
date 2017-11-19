@@ -50,10 +50,10 @@ func SplitUsername(username string) (string, string, error) {
 		return "", "", invalidUsernameErr
 	}
 	namespace, name := parts[0], parts[1]
-	if len(apimachineryvalidation.ValidateNamespaceName(namespace, false)) != 0 {
+	if len(apimachineryvalidation.ValidateNamespaceName(namespace)) != 0 {
 		return "", "", invalidUsernameErr
 	}
-	if len(apimachineryvalidation.ValidateServiceAccountName(name, false)) != 0 {
+	if len(apimachineryvalidation.ValidateServiceAccountName(name)) != 0 {
 		return "", "", invalidUsernameErr
 	}
 	return namespace, name, nil

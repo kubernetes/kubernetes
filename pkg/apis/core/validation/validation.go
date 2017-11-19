@@ -206,13 +206,6 @@ func ValidateEndpointsSpecificAnnotations(annotations map[string]string, fldPath
 	return allErrs
 }
 
-// ValidateNameFunc validates that the provided name is valid for a given resource type.
-// Not all resources have the same validation rules for names. Prefix is true
-// if the name will have a value appended to it.  If the name is not valid,
-// this returns a list of descriptions of individual characteristics of the
-// value that were not valid.  Otherwise this returns an empty list or nil.
-type ValidateNameFunc apimachineryvalidation.ValidateNameFunc
-
 // ValidatePodName can be used to check whether the given pod name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
@@ -303,8 +296,8 @@ func ValidateImmutableAnnotation(newVal string, oldVal string, annotation string
 // been performed.
 // It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
 // TODO: Remove calls to this method scattered in validations of specific resources, e.g., ValidatePodUpdate.
-func ValidateObjectMeta(meta *metav1.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
-	allErrs := apimachineryvalidation.ValidateObjectMeta(meta, requiresNamespace, apimachineryvalidation.ValidateNameFunc(nameFn), fldPath)
+func ValidateObjectMeta(meta *metav1.ObjectMeta, requiresNamespace bool, nameFn validate.NameValidator, fldPath *field.Path) field.ErrorList {
+	allErrs := apimachineryvalidation.ValidateObjectMeta(meta, requiresNamespace, nameFn, fldPath)
 	// run additional checks for the finalizer name
 	for i := range meta.Finalizers {
 		allErrs = append(allErrs, validateKubeFinalizerName(string(meta.Finalizers[i]), fldPath.Child("finalizers").Index(i))...)
@@ -1423,12 +1416,12 @@ func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldP
 		if len(csi.ControllerPublishSecretRef.Name) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("controllerPublishSecretRef", "name"), ""))
 		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(csi.ControllerPublishSecretRef.Name, fldPath.Child("name"))...)
+			allErrs = append(allErrs, validate.Name(ValidateSecretName, csi.ControllerPublishSecretRef.Name, fldPath.Child("name"))...)
 		}
 		if len(csi.ControllerPublishSecretRef.Namespace) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("controllerPublishSecretRef", "namespace"), ""))
 		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(csi.ControllerPublishSecretRef.Namespace, fldPath.Child("namespace"))...)
+			allErrs = append(allErrs, validate.Name(ValidateNamespaceName, csi.ControllerPublishSecretRef.Namespace, fldPath.Child("namespace"))...)
 		}
 	}
 
@@ -1436,12 +1429,12 @@ func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldP
 		if len(csi.NodePublishSecretRef.Name) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("nodePublishSecretRef ", "name"), ""))
 		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(csi.NodePublishSecretRef.Name, fldPath.Child("name"))...)
+			allErrs = append(allErrs, validate.Name(ValidateSecretName, csi.NodePublishSecretRef.Name, fldPath.Child("name"))...)
 		}
 		if len(csi.NodePublishSecretRef.Namespace) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("nodePublishSecretRef ", "namespace"), ""))
 		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(csi.NodePublishSecretRef.Namespace, fldPath.Child("namespace"))...)
+			allErrs = append(allErrs, validate.Name(ValidateNamespaceName, csi.NodePublishSecretRef.Namespace, fldPath.Child("namespace"))...)
 		}
 	}
 
@@ -1449,12 +1442,12 @@ func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldP
 		if len(csi.NodeStageSecretRef.Name) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("nodeStageSecretRef", "name"), ""))
 		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(csi.NodeStageSecretRef.Name, fldPath.Child("name"))...)
+			allErrs = append(allErrs, validate.Name(ValidateSecretName, csi.NodeStageSecretRef.Name, fldPath.Child("name"))...)
 		}
 		if len(csi.NodeStageSecretRef.Namespace) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("nodeStageSecretRef", "namespace"), ""))
 		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(csi.NodeStageSecretRef.Namespace, fldPath.Child("namespace"))...)
+			allErrs = append(allErrs, validate.Name(ValidateNamespaceName, csi.NodeStageSecretRef.Namespace, fldPath.Child("namespace"))...)
 		}
 	}
 
@@ -1705,9 +1698,7 @@ func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
 	}
 
 	if len(pv.Spec.StorageClassName) > 0 {
-		for _, msg := range ValidateClassName(pv.Spec.StorageClassName, false) {
-			allErrs = append(allErrs, field.Invalid(specPath.Child("storageClassName"), pv.Spec.StorageClassName, msg))
-		}
+		allErrs = append(allErrs, validate.Name(ValidateClassName, pv.Spec.StorageClassName, specPath.Child("storageClassName"))...)
 	}
 	if pv.Spec.VolumeMode != nil && !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
 		allErrs = append(allErrs, field.Forbidden(specPath.Child("volumeMode"), "PersistentVolume volumeMode is disabled by feature-gate"))
@@ -1785,9 +1776,7 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 	}
 
 	if spec.StorageClassName != nil && len(*spec.StorageClassName) > 0 {
-		for _, msg := range ValidateClassName(*spec.StorageClassName, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("storageClassName"), *spec.StorageClassName, msg))
-		}
+		allErrs = append(allErrs, validate.Name(ValidateClassName, *spec.StorageClassName, fldPath.Child("storageClassName"))...)
 	}
 	if spec.VolumeMode != nil && !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("volumeMode"), "PersistentVolumeClaim volumeMode is disabled by feature-gate"))
@@ -2091,9 +2080,7 @@ func validateConfigMapEnvSource(configMapSource *core.ConfigMapEnvSource, fldPat
 	if len(configMapSource.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	} else {
-		for _, msg := range ValidateConfigMapName(configMapSource.Name, true) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), configMapSource.Name, msg))
-		}
+		allErrs = append(allErrs, validate.Name(ValidateConfigMapName, configMapSource.Name, fldPath.Child("name"))...)
 	}
 	return allErrs
 }
@@ -2103,9 +2090,7 @@ func validateSecretEnvSource(secretSource *core.SecretEnvSource, fldPath *field.
 	if len(secretSource.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	} else {
-		for _, msg := range ValidateSecretName(secretSource.Name, true) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), secretSource.Name, msg))
-		}
+		allErrs = append(allErrs, validate.Name(ValidateSecretName, secretSource.Name, fldPath.Child("name"))...)
 	}
 	return allErrs
 }
@@ -2140,10 +2125,7 @@ func validateContainerResourceDivisor(rName string, divisor resource.Quantity, f
 func validateConfigMapKeySelector(s *core.ConfigMapKeySelector, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	nameFn := ValidateNameFunc(ValidateSecretName)
-	for _, msg := range nameFn(s.Name, false) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), s.Name, msg))
-	}
+	allErrs = append(allErrs, validate.Name(ValidateSecretName, s.Name, fldPath.Child("name"))...)
 	if len(s.Key) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("key"), ""))
 	} else {
@@ -2158,10 +2140,7 @@ func validateConfigMapKeySelector(s *core.ConfigMapKeySelector, fldPath *field.P
 func validateSecretKeySelector(s *core.SecretKeySelector, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	nameFn := ValidateNameFunc(ValidateSecretName)
-	for _, msg := range nameFn(s.Name, false) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), s.Name, msg))
-	}
+	allErrs = append(allErrs, validate.Name(ValidateSecretName, s.Name, fldPath.Child("name"))...)
 	if len(s.Key) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("key"), ""))
 	} else {
@@ -2910,15 +2889,11 @@ func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs = append(allErrs, validateAffinity(spec.Affinity, fldPath.Child("affinity"))...)
 	allErrs = append(allErrs, validatePodDNSConfig(spec.DNSConfig, &spec.DNSPolicy, fldPath.Child("dnsConfig"))...)
 	if len(spec.ServiceAccountName) > 0 {
-		for _, msg := range ValidateServiceAccountName(spec.ServiceAccountName, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("serviceAccountName"), spec.ServiceAccountName, msg))
-		}
+		allErrs = append(allErrs, validate.Name(ValidateServiceAccountName, spec.ServiceAccountName, fldPath.Child("serviceAccountName"))...)
 	}
 
 	if len(spec.NodeName) > 0 {
-		for _, msg := range ValidateNodeName(spec.NodeName, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeName"), spec.NodeName, msg))
-		}
+		allErrs = append(allErrs, validate.Name(ValidateNodeName, spec.NodeName, fldPath.Child("nodeName"))...)
 	}
 
 	if spec.ActiveDeadlineSeconds != nil {
@@ -2946,9 +2921,7 @@ func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 
 	if len(spec.PriorityClassName) > 0 {
 		if utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
-			for _, msg := range ValidatePriorityClassName(spec.PriorityClassName, false) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("priorityClassName"), spec.PriorityClassName, msg))
-			}
+			allErrs = append(allErrs, validate.Name(ValidatePriorityClassName, spec.PriorityClassName, fldPath.Child("priorityClassName"))...)
 		}
 	}
 
@@ -2981,7 +2954,7 @@ func ValidateNodeSelectorRequirement(rq core.NodeSelectorRequirement, fldPath *f
 	return allErrs
 }
 
-var nodeFieldSelectorValidators = map[string]func(string, bool) []string{
+var nodeFieldSelectorValidators = map[string]func(string) []string{
 	core.ObjectNameField: ValidateNodeName,
 }
 
@@ -3003,7 +2976,7 @@ func ValidateNodeFieldSelectorRequirement(req core.NodeSelectorRequirement, fldP
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), req.Key, "not a valid field selector key"))
 	} else {
 		for i, v := range req.Values {
-			for _, msg := range vf(v, false) {
+			for _, msg := range vf(v) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("values").Index(i), v, msg))
 			}
 		}
@@ -3103,9 +3076,7 @@ func validatePodAffinityTerm(podAffinityTerm core.PodAffinityTerm, fldPath *fiel
 
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(podAffinityTerm.LabelSelector, fldPath.Child("matchExpressions"))...)
 	for _, name := range podAffinityTerm.Namespaces {
-		for _, msg := range ValidateNamespaceName(name, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), name, msg))
-		}
+		allErrs = append(allErrs, validate.Name(ValidateNamespaceName, name, fldPath.Child("namespace"))...)
 	}
 	if len(podAffinityTerm.TopologyKey) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("topologyKey"), "can not be empty"))
@@ -3466,9 +3437,7 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod) field.ErrorList {
 	}
 
 	if newPod.Status.NominatedNodeName != oldPod.Status.NominatedNodeName && len(newPod.Status.NominatedNodeName) > 0 {
-		for _, msg := range ValidateNodeName(newPod.Status.NominatedNodeName, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("nominatedNodeName"), newPod.Status.NominatedNodeName, msg))
-		}
+		allErrs = append(allErrs, validate.Name(ValidateNodeName, newPod.Status.NominatedNodeName, fldPath.Child("nominatedNodeName"))...)
 	}
 
 	// If pod should not restart, make sure the status update does not transition
@@ -4864,9 +4833,7 @@ func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path,
 	}
 	// During endpoint update, verify that NodeName is a DNS subdomain and transition rules allow the update
 	if address.NodeName != nil {
-		for _, msg := range ValidateNodeName(*address.NodeName, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeName"), *address.NodeName, msg))
-		}
+		allErrs = append(allErrs, validate.Name(ValidateNodeName, *address.NodeName, fldPath.Child("nodeName"))...)
 	}
 	allErrs = append(allErrs, validateEpAddrNodeNameTransition(address, ipToNodeName, fldPath.Child("nodeName"))...)
 	if len(allErrs) > 0 {

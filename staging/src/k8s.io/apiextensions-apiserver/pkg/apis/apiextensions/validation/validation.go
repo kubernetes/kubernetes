@@ -33,8 +33,8 @@ import (
 
 // ValidateCustomResourceDefinition statically validates
 func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinition) field.ErrorList {
-	nameValidationFn := func(name string, prefix bool) []string {
-		ret := genericvalidation.NameIsDNSSubdomain(name, prefix)
+	nameValidationFn := func(name string) []string {
+		ret := genericvalidation.NameIsDNSSubdomain(name)
 		requiredName := obj.Spec.Names.Plural + "." + obj.Spec.Group
 		if name != requiredName {
 			ret = append(ret, fmt.Sprintf(`must be spec.names.plural+"."+spec.group`))

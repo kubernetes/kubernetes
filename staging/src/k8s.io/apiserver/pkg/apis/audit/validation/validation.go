@@ -102,7 +102,7 @@ func validateResources(groupResources []audit.GroupResources, fldPath *field.Pat
 			// reference: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md
 			// an error is returned for group name like rbac.authorization.k8s.io/v1beta1
 			// rbac.authorization.k8s.io is the valid one
-			if msgs := validation.NameIsDNSSubdomain(groupResource.Group, false); len(msgs) != 0 {
+			if msgs := validation.NameIsDNSSubdomain(groupResource.Group); len(msgs) != 0 {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("group"), groupResource.Group, strings.Join(msgs, ",")))
 			}
 		}

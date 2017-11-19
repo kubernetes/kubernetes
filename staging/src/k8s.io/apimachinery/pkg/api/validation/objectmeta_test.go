@@ -38,7 +38,7 @@ func TestValidateObjectMetaCustomName(t *testing.T) {
 	errs := ValidateObjectMeta(
 		&metav1.ObjectMeta{Name: "test", GenerateName: "foo"},
 		false,
-		func(s string, prefix bool) []string {
+		func(s string) []string {
 			if s == "test" {
 				return nil
 			}
@@ -58,7 +58,7 @@ func TestValidateObjectMetaNamespaces(t *testing.T) {
 	errs := ValidateObjectMeta(
 		&metav1.ObjectMeta{Name: "test", Namespace: "foo.bar"},
 		true,
-		func(s string, prefix bool) []string {
+		func(s string) []string {
 			return nil
 		},
 		field.NewPath("field"))
@@ -77,7 +77,7 @@ func TestValidateObjectMetaNamespaces(t *testing.T) {
 	errs = ValidateObjectMeta(
 		&metav1.ObjectMeta{Name: "test", Namespace: string(b)},
 		true,
-		func(s string, prefix bool) []string {
+		func(s string) []string {
 			return nil
 		},
 		field.NewPath("field"))
@@ -198,7 +198,7 @@ func TestValidateObjectMetaOwnerReferences(t *testing.T) {
 		errs := ValidateObjectMeta(
 			&metav1.ObjectMeta{Name: "test", Namespace: "test", OwnerReferences: tc.ownerReferences},
 			true,
-			func(s string, prefix bool) []string {
+			func(s string) []string {
 				return nil
 			},
 			field.NewPath("field"))

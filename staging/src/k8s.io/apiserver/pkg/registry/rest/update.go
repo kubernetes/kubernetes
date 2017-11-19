@@ -74,7 +74,7 @@ func validateCommonFields(obj, old runtime.Object, strategy RESTUpdateStrategy) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get old object metadata: %v", err)
 	}
-	allErrs = append(allErrs, genericvalidation.ValidateObjectMetaAccessor(objectMeta, strategy.NamespaceScoped(), path.ValidatePathSegmentName, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, genericvalidation.ValidateObjectMetaAccessor(objectMeta, strategy.NamespaceScoped(), path.IsValidPathSegmentName, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, genericvalidation.ValidateObjectMetaAccessorUpdate(objectMeta, oldObjectMeta, field.NewPath("metadata"))...)
 
 	return allErrs, nil

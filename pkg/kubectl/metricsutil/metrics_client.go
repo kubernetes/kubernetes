@@ -72,13 +72,13 @@ func podMetricsUrl(namespace string, name string) (string, error) {
 	if namespace == metav1.NamespaceAll {
 		return fmt.Sprintf("%s/pods", metricsRoot), nil
 	}
-	errs := validation.ValidateNamespaceName(namespace, false)
+	errs := validation.ValidateNamespaceName(namespace)
 	if len(errs) > 0 {
 		message := fmt.Sprintf("invalid namespace: %s - %v", namespace, errs)
 		return "", errors.New(message)
 	}
 	if len(name) > 0 {
-		errs = validation.ValidatePodName(name, false)
+		errs = validation.ValidatePodName(name)
 		if len(errs) > 0 {
 			message := fmt.Sprintf("invalid pod name: %s - %v", name, errs)
 			return "", errors.New(message)
@@ -89,7 +89,7 @@ func podMetricsUrl(namespace string, name string) (string, error) {
 
 func nodeMetricsUrl(name string) (string, error) {
 	if len(name) > 0 {
-		errs := validation.ValidateNodeName(name, false)
+		errs := validation.ValidateNodeName(name)
 		if len(errs) > 0 {
 			message := fmt.Sprintf("invalid node name: %s - %v", name, errs)
 			return "", errors.New(message)

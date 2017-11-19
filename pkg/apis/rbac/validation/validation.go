@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"k8s.io/apimachinery/pkg/api/validate"
 	"k8s.io/apimachinery/pkg/api/validation/path"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -29,9 +30,7 @@ import (
 // Minimal validation of names for roles and bindings. Identical to the validation for Openshift. See:
 // * https://github.com/kubernetes/kubernetes/blob/60db50/pkg/api/validation/name.go
 // * https://github.com/openshift/origin/blob/388478/pkg/api/helpers.go
-func ValidateRBACName(name string, prefix bool) []string {
-	return path.IsValidPathSegmentName(name)
-}
+var ValidateRBACName = path.IsValidPathSegmentName
 
 func ValidateRole(role *rbac.Role) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -139,9 +138,7 @@ func ValidateRoleBinding(roleBinding *rbac.RoleBinding) field.ErrorList {
 	if len(roleBinding.RoleRef.Name) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("roleRef", "name"), ""))
 	} else {
-		for _, msg := range ValidateRBACName(roleBinding.RoleRef.Name, false) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef", "name"), roleBinding.RoleRef.Name, msg))
-		}
+		allErrs = append(allErrs, validate.Name(ValidateRBACName, roleBinding.RoleRef.Name, field.NewPath("roleRef", "name"))...)
 	}
 
 	subjectsPath := field.NewPath("subjects")
@@ -183,9 +180,7 @@ func ValidateClusterRoleBinding(roleBinding *rbac.ClusterRoleBinding) field.Erro
 	if len(roleBinding.RoleRef.Name) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("roleRef", "name"), ""))
 	} else {
-		for _, msg := range ValidateRBACName(roleBinding.RoleRef.Name, false) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef", "name"), roleBinding.RoleRef.Name, msg))
-		}
+		allErrs = append(allErrs, validate.Name(ValidateRBACName, roleBinding.RoleRef.Name, field.NewPath("roleRef", "name"))...)
 	}
 
 	subjectsPath := field.NewPath("subjects")
@@ -218,9 +213,7 @@ func ValidateRoleBindingSubject(subject rbac.Subject, isNamespaced bool, fldPath
 	switch subject.Kind {
 	case rbac.ServiceAccountKind:
 		if len(subject.Name) > 0 {
-			for _, msg := range validation.ValidateServiceAccountName(subject.Name, false) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), subject.Name, msg))
-			}
+			allErrs = append(allErrs, validate.Name(validation.ValidateServiceAccountName, subject.Name, fldPath.Child("name"))...)
 		}
 		if len(subject.APIGroup) > 0 {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("apiGroup"), subject.APIGroup, []string{""}))

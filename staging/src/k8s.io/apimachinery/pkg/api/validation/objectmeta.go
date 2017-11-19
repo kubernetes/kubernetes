@@ -132,7 +132,7 @@ func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) fie
 // ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
 // been performed.
 // It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
-func ValidateObjectMeta(objMeta *metav1.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
+func ValidateObjectMeta(objMeta *metav1.ObjectMeta, requiresNamespace bool, nameFn validate.NameValidator, fldPath *field.Path) field.ErrorList {
 	metadata, err := meta.Accessor(objMeta)
 	if err != nil {
 		allErrs := field.ErrorList{}
@@ -145,13 +145,12 @@ func ValidateObjectMeta(objMeta *metav1.ObjectMeta, requiresNamespace bool, name
 // ValidateObjectMetaAccessor validates an object's metadata on creation. It expects that name generation has already
 // been performed.
 // It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
-func ValidateObjectMetaAccessor(meta metav1.Object, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
+func ValidateObjectMetaAccessor(meta metav1.Object, requiresNamespace bool, nameFn validate.NameValidator, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(meta.GetGenerateName()) != 0 {
-		for _, msg := range nameFn(meta.GetGenerateName(), true) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("generateName"), meta.GetGenerateName(), msg))
-		}
+		prefix := maskTrailingDash(meta.GetGenerateName())
+		allErrs = append(allErrs, validate.Name(nameFn, prefix, fldPath.Child("generateName"))...)
 	}
 	// If the generated name validates, but the calculated value does not, it's a problem with generation, and we
 	// report it here. This may confuse users, but indicates a programming bug and still must be validated.
@@ -159,17 +158,13 @@ func ValidateObjectMetaAccessor(meta metav1.Object, requiresNamespace bool, name
 	if len(meta.GetName()) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "name or generateName is required"))
 	} else {
-		for _, msg := range nameFn(meta.GetName(), false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), meta.GetName(), msg))
-		}
+		allErrs = append(allErrs, validate.Name(nameFn, meta.GetName(), fldPath.Child("name"))...)
 	}
 	if requiresNamespace {
 		if len(meta.GetNamespace()) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), ""))
 		} else {
-			for _, msg := range ValidateNamespaceName(meta.GetNamespace(), false) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), meta.GetNamespace(), msg))
-			}
+			allErrs = append(allErrs, validate.Name(ValidateNamespaceName, meta.GetNamespace(), fldPath.Child("namespace"))...)
 		}
 	} else {
 		if len(meta.GetNamespace()) != 0 {
@@ -177,9 +172,7 @@ func ValidateObjectMetaAccessor(meta metav1.Object, requiresNamespace bool, name
 		}
 	}
 	if len(meta.GetClusterName()) != 0 {
-		for _, msg := range ValidateClusterName(meta.GetClusterName(), false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("clusterName"), meta.GetClusterName(), msg))
-		}
+		allErrs = append(allErrs, validate.Name(ValidateClusterName, meta.GetClusterName(), fldPath.Child("clusterName"))...)
 	}
 	allErrs = append(allErrs, validate.NonNegative(meta.GetGeneration(), fldPath.Child("generation"))...)
 	allErrs = append(allErrs, v1validation.ValidateLabels(meta.GetLabels(), fldPath.Child("labels"))...)
@@ -188,6 +181,15 @@ func ValidateObjectMetaAccessor(meta metav1.Object, requiresNamespace bool, name
 	allErrs = append(allErrs, ValidateInitializers(meta.GetInitializers(), fldPath.Child("initializers"))...)
 	allErrs = append(allErrs, ValidateFinalizers(meta.GetFinalizers(), fldPath.Child("finalizers"))...)
 	return allErrs
+}
+
+// maskTrailingDash replaces the final character of a string with a subdomain safe
+// value if is a dash.
+func maskTrailingDash(name string) string {
+	if strings.HasSuffix(name, "-") {
+		return name[:len(name)-2] + "a"
+	}
+	return name
 }
 
 func ValidateInitializers(initializers *metav1.Initializers, fldPath *field.Path) field.ErrorList {

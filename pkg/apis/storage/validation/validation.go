@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/validate"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -170,11 +171,7 @@ func validateVolumeAttachmentSource(source *storage.VolumeAttachmentSource, fldP
 
 // validateNodeName tests if the nodeName is valid for VolumeAttachment.
 func validateNodeName(nodeName string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	for _, msg := range apivalidation.ValidateNodeName(nodeName, false /* prefix */) {
-		allErrs = append(allErrs, field.Invalid(fldPath, nodeName, msg))
-	}
-	return allErrs
+	return validate.Name(apivalidation.ValidateNodeName, nodeName, fldPath)
 }
 
 // validaVolumeAttachmentStatus tests if volumeAttachmentStatus is valid.

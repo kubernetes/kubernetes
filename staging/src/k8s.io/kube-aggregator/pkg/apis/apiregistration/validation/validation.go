@@ -31,7 +31,7 @@ func ValidateAPIService(apiService *apiregistration.APIService) field.ErrorList 
 	requiredName := apiService.Spec.Version + "." + apiService.Spec.Group
 
 	allErrs := validation.ValidateObjectMeta(&apiService.ObjectMeta, false,
-		func(name string, prefix bool) []string {
+		func(name string) []string {
 			if minimalFailures := path.IsValidPathSegmentName(name); len(minimalFailures) > 0 {
 				return minimalFailures
 			}
