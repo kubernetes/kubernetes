@@ -206,7 +206,7 @@ func IsValidPortNum(port int) []string {
 }
 
 // IsInRange tests that the argument is in an inclusive range.
-func IsInRange(value int, min int, max int) []string {
+func IsInRange(value int64, min int64, max int64) []string {
 	if value >= min && value <= max {
 		return nil
 	}
@@ -373,7 +373,7 @@ func prefixEach(msgs []string, prefix string) []string {
 
 // InclusiveRangeError returns a string explanation of a numeric "must be
 // between" validation failure.
-func InclusiveRangeError(lo, hi int) string {
+func InclusiveRangeError(lo, hi int64) string {
 	return fmt.Sprintf(`must be between %d and %d, inclusive`, lo, hi)
 }
 
