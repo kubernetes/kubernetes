@@ -51,6 +51,7 @@ type CreateJobOptions struct {
 	Mapper       meta.RESTMapper
 	Out          io.Writer
 	PrintObject  func(obj runtime.Object) error
+	PrintSuccess func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
 }
 
 // Job is a command to ease creating Jobs from CronJobs.
@@ -93,6 +94,7 @@ func (c *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	c.PrintObject = func(obj runtime.Object) error {
 		return f.PrintObject(cmd, false, c.Mapper, obj, c.Out)
 	}
+	c.PrintSuccess = f.PrintSuccess
 
 	clientSet, err := f.ClientSetForVersion(&schema.GroupVersion{Group: "batch", Version: "v2alpha1"})
 	if err != nil {
@@ -120,7 +122,7 @@ func (c *CreateJobOptions) RunCreateJob() (err error) {
 	}
 
 	if useShortOutput := c.OutputFormat == "name"; useShortOutput || len(c.OutputFormat) == 0 {
-		cmdutil.PrintSuccess(c.Mapper, useShortOutput, c.Out, "jobs", result.CreatedJob.Name, false, "created")
+		c.PrintSuccess(c.Mapper, useShortOutput, c.Out, "jobs", result.CreatedJob.Name, false, "created")
 		return nil
 	}
 
