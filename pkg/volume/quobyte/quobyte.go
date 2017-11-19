@@ -102,13 +102,13 @@ func (plugin *quobytePlugin) CanSupport(spec *volume.Spec) bool {
 		glog.V(4).Infof("quobyte: Error: %v", err)
 	}
 
-	exec := plugin.host.GetExec(plugin.GetPluginName())
-	if out, err := exec.Run("ls", "/sbin/mount.quobyte"); err == nil {
-		glog.V(4).Infof("quobyte: can support: %s", string(out))
-		return true
+	stat, err := os.Stat("/sbin/mount.quobyte")
+	if err != nil {
+		glog.Warningf("quobyte support not available; could not find '/sbin/mount.quobyte': %v", err)
+		return false
 	}
-
-	return false
+	glog.V(4).Infof("quobyte: can support: %s", stat.Name())
+	return true
 }
 
 func (plugin *quobytePlugin) RequiresRemount() bool {
