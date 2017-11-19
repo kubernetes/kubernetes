@@ -462,6 +462,13 @@ function start_apiserver {
         RUNTIME_CONFIG+="admissionregistration.k8s.io/v1alpha1"
     fi
 
+    if [[ ${ADMISSION_CONTROL} == *"AdmissionWebhook"* ]]; then
+        if [[ -n "${RUNTIME_CONFIG}" ]]; then
+          RUNTIME_CONFIG+=","
+        fi
+        RUNTIME_CONFIG+="admissionregistration.k8s.io/v1beta1"
+    fi
+
     runtime_config=""
     if [[ -n "${RUNTIME_CONFIG}" ]]; then
       runtime_config="--runtime-config=${RUNTIME_CONFIG}"
