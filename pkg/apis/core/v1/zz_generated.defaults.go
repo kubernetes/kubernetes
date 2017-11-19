@@ -138,7 +138,7 @@ func SetObjectDefaults_PersistentVolume(in *v1.PersistentVolume) {
 		SetDefaults_RBDPersistentVolumeSource(in.Spec.PersistentVolumeSource.RBD)
 	}
 	if in.Spec.PersistentVolumeSource.ISCSI != nil {
-		SetDefaults_ISCSIVolumeSource(in.Spec.PersistentVolumeSource.ISCSI)
+		SetDefaults_ISCSIPersistentVolumeSource(in.Spec.PersistentVolumeSource.ISCSI)
 	}
 	if in.Spec.PersistentVolumeSource.AzureDisk != nil {
 		SetDefaults_AzureDiskVolumeSource(in.Spec.PersistentVolumeSource.AzureDisk)

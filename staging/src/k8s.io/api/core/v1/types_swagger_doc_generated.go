@@ -710,19 +710,38 @@ func (HostPathVolumeSource) SwaggerDoc() map[string]string {
 	return map_HostPathVolumeSource
 }
 
-var map_ISCSIVolumeSource = map[string]string{
-	"":                  "Represents an ISCSI disk. ISCSI volumes can only be mounted as read/write once. ISCSI volumes support ownership management and SELinux relabeling.",
-	"targetPortal":      "iSCSI target portal. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+var map_ISCSIPersistentVolumeSource = map[string]string{
+	"":                  "ISCSIPersistentVolumeSource represents an ISCSI disk. ISCSI volumes can only be mounted as read/write once. ISCSI volumes support ownership management and SELinux relabeling.",
+	"targetPortal":      "iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
 	"iqn":               "Target iSCSI Qualified Name.",
-	"lun":               "iSCSI target lun number.",
-	"iscsiInterface":    "Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport.",
+	"lun":               "iSCSI Target Lun number.",
+	"iscsiInterface":    "iSCSI Interface Name that uses an iSCSI transport. Defaults to 'default' (tcp).",
 	"fsType":            "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#iscsi",
 	"readOnly":          "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
-	"portals":           "iSCSI target portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+	"portals":           "iSCSI Target Portal List. The Portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
 	"chapAuthDiscovery": "whether support iSCSI Discovery CHAP authentication",
 	"chapAuthSession":   "whether support iSCSI Session CHAP authentication",
-	"secretRef":         "CHAP secret for iSCSI target and initiator authentication",
-	"initiatorName":     "Custom iSCSI initiator name. If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface <target portal>:<volume name> will be created for the connection.",
+	"secretRef":         "CHAP Secret for iSCSI target and initiator authentication",
+	"initiatorName":     "Custom iSCSI Initiator Name. If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface <target portal>:<volume name> will be created for the connection.",
+}
+
+func (ISCSIPersistentVolumeSource) SwaggerDoc() map[string]string {
+	return map_ISCSIPersistentVolumeSource
+}
+
+var map_ISCSIVolumeSource = map[string]string{
+	"":                  "Represents an ISCSI disk. ISCSI volumes can only be mounted as read/write once. ISCSI volumes support ownership management and SELinux relabeling.",
+	"targetPortal":      "iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+	"iqn":               "Target iSCSI Qualified Name.",
+	"lun":               "iSCSI Target Lun number.",
+	"iscsiInterface":    "iSCSI Interface Name that uses an iSCSI transport. Defaults to 'default' (tcp).",
+	"fsType":            "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#iscsi",
+	"readOnly":          "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
+	"portals":           "iSCSI Target Portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+	"chapAuthDiscovery": "whether support iSCSI Discovery CHAP authentication",
+	"chapAuthSession":   "whether support iSCSI Session CHAP authentication",
+	"secretRef":         "CHAP Secret for iSCSI target and initiator authentication",
+	"initiatorName":     "Custom iSCSI Initiator Name. If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface <target portal>:<volume name> will be created for the connection.",
 }
 
 func (ISCSIVolumeSource) SwaggerDoc() map[string]string {
