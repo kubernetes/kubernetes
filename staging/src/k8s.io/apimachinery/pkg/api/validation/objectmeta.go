@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/validate"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +33,6 @@ import (
 // TODO: delete this global variable when we enable the validation of common
 // fields by default.
 var RepairMalformedUpdates bool = true
-
-const FieldImmutableErrorMsg string = `field is immutable`
 
 const totalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB
 
@@ -117,14 +114,6 @@ func ValidateNoNewFinalizers(newFinalizers []string, oldFinalizers []string, fld
 	extra := sets.NewString(newFinalizers...).Difference(sets.NewString(oldFinalizers...))
 	if len(extra) != 0 {
 		allErrs = append(allErrs, field.Forbidden(fldPath, fmt.Sprintf("no new finalizers can be added if the object is being deleted, found new finalizers %#v", extra.List())))
-	}
-	return allErrs
-}
-
-func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if !apiequality.Semantic.DeepEqual(oldVal, newVal) {
-		allErrs = append(allErrs, field.Invalid(fldPath, newVal, FieldImmutableErrorMsg))
 	}
 	return allErrs
 }
@@ -305,11 +294,11 @@ func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *f
 
 	allErrs = append(allErrs, ValidateInitializersUpdate(newMeta.GetInitializers(), oldMeta.GetInitializers(), fldPath.Child("initializers"))...)
 
-	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetName(), oldMeta.GetName(), fldPath.Child("name"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetNamespace(), oldMeta.GetNamespace(), fldPath.Child("namespace"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetUID(), oldMeta.GetUID(), fldPath.Child("uid"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetCreationTimestamp(), oldMeta.GetCreationTimestamp(), fldPath.Child("creationTimestamp"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetClusterName(), oldMeta.GetClusterName(), fldPath.Child("clusterName"))...)
+	allErrs = append(allErrs, validate.Immutable(newMeta.GetName(), oldMeta.GetName(), fldPath.Child("name"))...)
+	allErrs = append(allErrs, validate.Immutable(newMeta.GetNamespace(), oldMeta.GetNamespace(), fldPath.Child("namespace"))...)
+	allErrs = append(allErrs, validate.Immutable(newMeta.GetUID(), oldMeta.GetUID(), fldPath.Child("uid"))...)
+	allErrs = append(allErrs, validate.Immutable(newMeta.GetCreationTimestamp(), oldMeta.GetCreationTimestamp(), fldPath.Child("creationTimestamp"))...)
+	allErrs = append(allErrs, validate.Immutable(newMeta.GetClusterName(), oldMeta.GetClusterName(), fldPath.Child("clusterName"))...)
 
 	allErrs = append(allErrs, v1validation.ValidateLabels(newMeta.GetLabels(), fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(newMeta.GetAnnotations(), fldPath.Child("annotations"))...)
@@ -335,7 +324,7 @@ func ValidateInitializersUpdate(newInit, oldInit *metav1.Initializers, fldPath *
 			allErrs = append(allErrs, validateInitializersResult(newInit.Result, fldPath.Child("result"))...)
 		case oldInit.Result != nil:
 			// setting Result implies permanent failure, and all future updates will be prevented
-			allErrs = append(allErrs, ValidateImmutableField(newInit.Result, oldInit.Result, fldPath.Child("result"))...)
+			allErrs = append(allErrs, validate.Immutable(newInit.Result, oldInit.Result, fldPath.Child("result"))...)
 		default:
 			// leaving the result nil is allowed
 		}

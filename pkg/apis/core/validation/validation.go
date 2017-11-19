@@ -59,7 +59,6 @@ import (
 var RepairMalformedUpdates bool = apimachineryvalidation.RepairMalformedUpdates
 
 const isInvalidQuotaResource string = `must be a standard resource for quota`
-const fieldImmutableErrorMsg string = apimachineryvalidation.FieldImmutableErrorMsg
 const isNotIntegerErrorMsg string = `must be an integer`
 
 var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
@@ -264,10 +263,6 @@ func NameIsDNSLabel(name string, prefix bool) []string {
 // NameIsDNS1035Label is a validate.NameValidator for names that must be a DNS 952 label.
 func NameIsDNS1035Label(name string, prefix bool) []string {
 	return apimachineryvalidation.NameIsDNS1035Label(name, prefix)
-}
-
-func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) field.ErrorList {
-	return apimachineryvalidation.ValidateImmutableField(newVal, oldVal, fldPath)
 }
 
 // ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
@@ -1643,7 +1638,7 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume) field.E
 	newPv.Status = oldPv.Status
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.VolumeMode, oldPv.Spec.VolumeMode, field.NewPath("volumeMode"))...)
+		allErrs = append(allErrs, validate.Immutable(newPv.Spec.VolumeMode, oldPv.Spec.VolumeMode, field.NewPath("volumeMode"))...)
 	}
 
 	return allErrs
@@ -1743,10 +1738,10 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 
 	// storageclass annotation should be immutable after creation
 	// TODO: remove Beta when no longer needed
-	allErrs = append(allErrs, ValidateImmutable(newPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], oldPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], field.NewPath("metadata", "annotations").Key(v1.BetaStorageClassAnnotation))...)
+	allErrs = append(allErrs, validate.Immutable(newPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], oldPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], field.NewPath("metadata", "annotations").Key(v1.BetaStorageClassAnnotation))...)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		allErrs = append(allErrs, ValidateImmutableField(newPvc.Spec.VolumeMode, oldPvc.Spec.VolumeMode, field.NewPath("volumeMode"))...)
+		allErrs = append(allErrs, validate.Immutable(newPvc.Spec.VolumeMode, oldPvc.Spec.VolumeMode, field.NewPath("volumeMode"))...)
 	}
 
 	newPvc.Status = oldPvc.Status
@@ -3542,7 +3537,7 @@ func ValidateServiceUpdate(service, oldService *core.Service) field.ErrorList {
 	// which do not have ClusterIP assigned yet (empty string value)
 	if service.Spec.Type != core.ServiceTypeExternalName {
 		if oldService.Spec.Type != core.ServiceTypeExternalName && oldService.Spec.ClusterIP != "" {
-			allErrs = append(allErrs, ValidateImmutableField(service.Spec.ClusterIP, oldService.Spec.ClusterIP, field.NewPath("spec", "clusterIP"))...)
+			allErrs = append(allErrs, validate.Immutable(service.Spec.ClusterIP, oldService.Spec.ClusterIP, field.NewPath("spec", "clusterIP"))...)
 		}
 	}
 
@@ -4195,7 +4190,7 @@ func ValidateSecretUpdate(newSecret, oldSecret *core.Secret) field.ErrorList {
 		newSecret.Type = oldSecret.Type
 	}
 
-	allErrs = append(allErrs, ValidateImmutableField(newSecret.Type, oldSecret.Type, field.NewPath("type"))...)
+	allErrs = append(allErrs, validate.Immutable(newSecret.Type, oldSecret.Type, field.NewPath("type"))...)
 
 	allErrs = append(allErrs, ValidateSecret(newSecret)...)
 	return allErrs
@@ -4393,9 +4388,7 @@ func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *core.Resour
 	for _, scope := range oldResourceQuota.Spec.Scopes {
 		oldScopes.Insert(string(scope))
 	}
-	if !oldScopes.Equal(newScopes) {
-		allErrs = append(allErrs, field.Invalid(fldPath, newResourceQuota.Spec.Scopes, fieldImmutableErrorMsg))
-	}
+	allErrs = append(allErrs, validate.Immutable(oldScopes, newScopes, fldPath)...)
 
 	newResourceQuota.Status = oldResourceQuota.Status
 	return allErrs
