@@ -44,13 +44,8 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("OOMScoreAdj"), *config.OOMScoreAdj, "must be within the range [-1000, 1000]"))
 	}
 
-	if config.UDPIdleTimeout.Duration <= 0 {
-		allErrs = append(allErrs, field.Invalid(newPath.Child("UDPIdleTimeout"), config.UDPIdleTimeout, "must be greater than 0"))
-	}
-
-	if config.ConfigSyncPeriod.Duration <= 0 {
-		allErrs = append(allErrs, field.Invalid(newPath.Child("ConfigSyncPeriod"), config.ConfigSyncPeriod, "must be greater than 0"))
-	}
+	allErrs = append(allErrs, validate.Positive(int64(config.UDPIdleTimeout.Duration), newPath.Child("UDPIdleTimeout"))...)
+	allErrs = append(allErrs, validate.Positive(int64(config.ConfigSyncPeriod.Duration), newPath.Child("ConfigSyncPeriod"))...)
 
 	if net.ParseIP(config.BindAddress) == nil {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("BindAddress"), config.BindAddress, "not a valid textual representation of an IP address"))
@@ -79,9 +74,7 @@ func validateKubeProxyIPTablesConfiguration(config kubeproxyconfig.KubeProxyIPTa
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("MasqueradeBit"), config.MasqueradeBit, "must be within the range [0, 31]"))
 	}
 
-	if config.SyncPeriod.Duration <= 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.SyncPeriod, "must be greater than 0"))
-	}
+	allErrs = append(allErrs, validate.Positive(int64(config.SyncPeriod.Duration), fldPath.Child("SyncPeriod"))...)
 
 	allErrs = append(allErrs, validate.NonNegativeDuration(config.MinSyncPeriod.Duration, fldPath.Child("MinSyncPeriod"))...)
 
@@ -95,9 +88,7 @@ func validateKubeProxyIPTablesConfiguration(config kubeproxyconfig.KubeProxyIPTa
 func validateKubeProxyIPVSConfiguration(config kubeproxyconfig.KubeProxyIPVSConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if config.SyncPeriod.Duration <= 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.SyncPeriod, "must be greater than 0"))
-	}
+	allErrs = append(allErrs, validate.Positive(int64(config.SyncPeriod.Duration), fldPath.Child("SyncPeriod"))...)
 
 	allErrs = append(allErrs, validate.NonNegativeDuration(config.MinSyncPeriod.Duration, fldPath.Child("MinSyncPeriod"))...)
 

@@ -2184,15 +2184,16 @@ func validateClientIPAffinityConfig(config *core.SessionAffinityConfig, fldPath 
 		allErrs = append(allErrs, field.Required(fldPath.Child("clientIP").Child("timeoutSeconds"), fmt.Sprintf("when session affinity type is %s", core.ServiceAffinityClientIP)))
 		return allErrs
 	}
-	allErrs = append(allErrs, validateAffinityTimeout(config.ClientIP.TimeoutSeconds, fldPath.Child("clientIP").Child("timeoutSeconds"))...)
+	allErrs = append(allErrs, validateAffinityTimeout(*config.ClientIP.TimeoutSeconds, fldPath.Child("clientIP").Child("timeoutSeconds"))...)
 
 	return allErrs
 }
 
-func validateAffinityTimeout(timeout *int32, fldPath *field.Path) field.ErrorList {
+func validateAffinityTimeout(timeout int32, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if *timeout <= 0 || *timeout > core.MaxClientIPServiceAffinitySeconds {
-		allErrs = append(allErrs, field.Invalid(fldPath, timeout, fmt.Sprintf("must be greater than 0 and less than %d", core.MaxClientIPServiceAffinitySeconds)))
+	allErrs = append(allErrs, validate.Positive(int64(timeout), fldPath)...)
+	if timeout > core.MaxClientIPServiceAffinitySeconds {
+		allErrs = append(allErrs, field.Invalid(fldPath, timeout, fmt.Sprintf("must be less than or equal to %d", core.MaxClientIPServiceAffinitySeconds)))
 	}
 	return allErrs
 }
@@ -4684,16 +4685,14 @@ func ValidatePodLogOptions(opts *core.PodLogOptions) field.ErrorList {
 	if opts.TailLines != nil {
 		allErrs = append(allErrs, validate.NonNegative(int64(*opts.TailLines), field.NewPath("tailLines"))...)
 	}
-	if opts.LimitBytes != nil && *opts.LimitBytes < 1 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("limitBytes"), *opts.LimitBytes, "must be greater than 0"))
+	if opts.LimitBytes != nil {
+		allErrs = append(allErrs, validate.Positive(int64(*opts.LimitBytes), field.NewPath("limitBytes"))...)
 	}
 	switch {
 	case opts.SinceSeconds != nil && opts.SinceTime != nil:
 		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "at most one of `sinceTime` or `sinceSeconds` may be specified"))
 	case opts.SinceSeconds != nil:
-		if *opts.SinceSeconds < 1 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("sinceSeconds"), *opts.SinceSeconds, "must be greater than 0"))
-		}
+		allErrs = append(allErrs, validate.Positive(int64(*opts.SinceSeconds), field.NewPath("sinceSeconds"))...)
 	}
 	return allErrs
 }
