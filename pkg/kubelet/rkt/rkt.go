@@ -144,6 +144,8 @@ const (
 
 	etcHostsPath      = "/etc/hosts"
 	etcResolvConfPath = "/etc/resolv.conf"
+
+	restartDone = "done"
 )
 
 // Runtime implements the Containerruntime for rkt. The implementation
@@ -1436,16 +1438,16 @@ func (r *Runtime) RunPod(pod *v1.Pod, pullSecrets []v1.Secret) error {
 
 	// RestartUnit has the same effect as StartUnit if the unit is not running, besides it can restart
 	// a unit if the unit file is changed and reloaded.
-	reschan := make(chan string)
-	_, err = r.systemd.RestartUnit(name, "replace", reschan)
+	restartChannel := make(chan string)
+	_, err = r.systemd.RestartUnit(name, "replace", restartChannel)
 	if err != nil {
 		r.generateEvents(runtimePod, "Failed", err)
 		r.cleanupPodNetwork(pod, networkNamespace)
 		return err
 	}
 
-	res := <-reschan
-	if res != "done" {
+	res := <-restartChannel
+	if res != restartDone {
 		err := fmt.Errorf("Failed to restart unit %q: %s", name, res)
 		r.generateEvents(runtimePod, "Failed", err)
 		r.cleanupPodNetwork(pod, networkNamespace)
@@ -1760,14 +1762,14 @@ func (r *Runtime) KillPod(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriod
 
 	// Since all service file have 'KillMode=mixed', the processes in
 	// the unit's cgroup will receive a SIGKILL if the normal stop timeouts.
-	reschan := make(chan string)
-	if _, err = r.systemd.StopUnit(serviceName, "replace", reschan); err != nil {
+	restartChannel := make(chan string)
+	if _, err = r.systemd.StopUnit(serviceName, "replace", restartChannel); err != nil {
 		glog.Errorf("rkt: Failed to stop unit %q: %v", serviceName, err)
 		return err
 	}
 
-	res := <-reschan
-	if res != "done" {
+	res := <-restartChannel
+	if res != restartDone {
 		err := fmt.Errorf("invalid result: %s", res)
 		glog.Errorf("rkt: Failed to stop unit %q: %v", serviceName, err)
 		return err
