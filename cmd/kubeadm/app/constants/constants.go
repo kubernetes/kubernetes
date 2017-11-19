@@ -19,11 +19,13 @@ package constants
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -255,4 +257,21 @@ func CreateTempDirForKubeadm(dirName string) (string, error) {
 		return "", fmt.Errorf("couldn't create a temporary directory: %v", err)
 	}
 	return tempDir, nil
+}
+
+// GetDNSIP returns a dnsIP, which is 10th IP in svcSubnet CIDR range
+func GetDNSIP(svcSubnet string) (net.IP, error) {
+	// Get the service subnet CIDR
+	_, svcSubnetCIDR, err := net.ParseCIDR(svcSubnet)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't parse service subnet CIDR %q: %v", svcSubnet, err)
+	}
+
+	// Selects the 10th IP in service subnet CIDR range as dnsIP
+	dnsIP, err := ipallocator.GetIndexedIP(svcSubnetCIDR, 10)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get tenth IP address from service subnet CIDR %s: %v", svcSubnetCIDR.String(), err)
+	}
+
+	return dnsIP, nil
 }
