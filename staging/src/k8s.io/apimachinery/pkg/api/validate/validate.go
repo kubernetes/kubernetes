@@ -42,7 +42,7 @@ func NonNegative(value int64, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-// NonNegativeQuantity validates that a given Quantity is not negative
+// NonNegativeQuantity validates that a given Quantity is not negative.
 func NonNegativeQuantity(value resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if value.Cmp(resource.Quantity{}) < 0 {
@@ -56,6 +56,17 @@ func NonNegativeDuration(value time.Duration, fldPath *field.Path) field.ErrorLi
 	allErrs := field.ErrorList{}
 	if int64(value) < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, value, `must be greater than or equal to 0`))
+	}
+	return allErrs
+}
+
+const isNotPositiveErrorMsg string = `must be greater than 0`
+
+// PositiveQuantity validates that a given Quantity is positive.
+func PositiveQuantity(value resource.Quantity, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if value.Cmp(resource.Quantity{}) <= 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, value.String(), isNotPositiveErrorMsg))
 	}
 	return allErrs
 }
