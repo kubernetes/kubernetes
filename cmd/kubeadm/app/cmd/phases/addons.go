@@ -30,15 +30,39 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/util/normalizer"
+)
+
+var (
+	allAddonsLongDesc = normalizer.LongDesc(`
+		Installs the kube-dns and the kube-proxys addons components via the API server.  
+		Please note that although the DNS server is deployed, it will not be scheduled until CNI is installed.
+		` + cmdutil.AlphaDisclaimer)
+
+	allAddonsExample = normalizer.Examples(`
+		# Installs the kube-dns and the kube-proxys addons components via the API server, 
+		# functionally equivalent to what installed by kubeadm init. 
+
+		kubeadm alpha phase selfhosting from-staticpods
+		`)
+
+	kubednsAddonsLongDesc = normalizer.LongDesc(`
+		Installs the kube-dns addon components via the API server.  
+		Please note that although the DNS server is deployed, it will not be scheduled until CNI is installed.
+		` + cmdutil.AlphaDisclaimer)
+
+	kubeproxyAddonsLongDesc = normalizer.LongDesc(`
+		Installs the kube-proxy addon components via the API server.  
+		` + cmdutil.AlphaDisclaimer)
 )
 
 // NewCmdAddon returns the addon Cobra command
 func NewCmdAddon() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "addon <addon-name>",
+		Use:     "addon",
 		Aliases: []string{"addons"},
-		Short:   "Install an addon to a Kubernetes cluster.",
-		RunE:    cmdutil.SubCmdRunE("addon"),
+		Short:   "Installs required addons for passing Conformance tests",
+		Long:    cmdutil.MacroCommandLongDescription,
 	}
 
 	cmd.AddCommand(getAddonsSubCommands()...)
@@ -73,23 +97,29 @@ func getAddonsSubCommands() []*cobra.Command {
 	var subCmds []*cobra.Command
 
 	subCmdProperties := []struct {
-		use     string
-		short   string
-		cmdFunc func(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error
+		use      string
+		short    string
+		long     string
+		examples string
+		cmdFunc  func(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error
 	}{
 		{
-			use:     "all",
-			short:   "Install all addons to a Kubernetes cluster.",
-			cmdFunc: EnsureAllAddons,
+			use:      "all",
+			short:    "Installs all addons to a Kubernetes cluster",
+			long:     allAddonsLongDesc,
+			examples: allAddonsExample,
+			cmdFunc:  EnsureAllAddons,
 		},
 		{
 			use:     "kube-dns",
-			short:   "Install the kube-dns addon to a Kubernetes cluster.",
+			short:   "Installs the kube-dns addon to a Kubernetes cluster",
+			long:    kubednsAddonsLongDesc,
 			cmdFunc: dnsaddon.EnsureDNSAddon,
 		},
 		{
 			use:     "kube-proxy",
-			short:   "Install the kube-proxy addon to a Kubernetes cluster.",
+			short:   "Installs the kube-proxy addon to a Kubernetes cluster",
+			long:    kubeproxyAddonsLongDesc,
 			cmdFunc: proxyaddon.EnsureProxyAddon,
 		},
 	}
@@ -97,26 +127,28 @@ func getAddonsSubCommands() []*cobra.Command {
 	for _, properties := range subCmdProperties {
 		// Creates the UX Command
 		cmd := &cobra.Command{
-			Use:   properties.use,
-			Short: properties.short,
-			Run:   runAddonsCmdFunc(properties.cmdFunc, cfg, &kubeConfigFile, &cfgPath),
+			Use:     properties.use,
+			Short:   properties.short,
+			Long:    properties.long,
+			Example: properties.examples,
+			Run:     runAddonsCmdFunc(properties.cmdFunc, cfg, &kubeConfigFile, &cfgPath),
 		}
 
 		// Add flags to the command
 		cmd.Flags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use when talking to the cluster")
 		cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to a kubeadm config file. WARNING: Usage of a configuration file is experimental!")
-		cmd.Flags().StringVar(&cfg.KubernetesVersion, "kubernetes-version", cfg.KubernetesVersion, `Choose a specific Kubernetes version for the control plane.`)
-		cmd.Flags().StringVar(&cfg.ImageRepository, "image-repository", cfg.ImageRepository, `Choose a container registry to pull control plane images from.`)
+		cmd.Flags().StringVar(&cfg.KubernetesVersion, "kubernetes-version", cfg.KubernetesVersion, `Choose a specific Kubernetes version for the control plane`)
+		cmd.Flags().StringVar(&cfg.ImageRepository, "image-repository", cfg.ImageRepository, `Choose a container registry to pull control plane images from`)
 
 		if properties.use == "all" || properties.use == "kube-proxy" {
-			cmd.Flags().StringVar(&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress, `The IP address the API Server will advertise it's listening on. Specify '0.0.0.0' to use the address of the default network interface.`)
-			cmd.Flags().Int32Var(&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort, `Port for the API Server to bind to.`)
-			cmd.Flags().StringVar(&cfg.Networking.PodSubnet, "pod-network-cidr", cfg.Networking.PodSubnet, `Specify range of IP addresses for the pod network. If set, the control plane will automatically allocate CIDRs for every node.`)
+			cmd.Flags().StringVar(&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress, `The IP address or DNS name the API server is accessible on`)
+			cmd.Flags().Int32Var(&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort, `The port the API server is accessible on`)
+			cmd.Flags().StringVar(&cfg.Networking.PodSubnet, "pod-network-cidr", cfg.Networking.PodSubnet, `The range of IP addresses used for the Pod network`)
 		}
 
 		if properties.use == "all" || properties.use == "kube-dns" {
-			cmd.Flags().StringVar(&cfg.Networking.DNSDomain, "service-dns-domain", cfg.Networking.DNSDomain, `Use alternative domain for services, e.g. "myorg.internal.`)
-			cmd.Flags().StringVar(&cfg.Networking.ServiceSubnet, "service-cidr", cfg.Networking.ServiceSubnet, `Use alternative range of IP address for service VIPs`)
+			cmd.Flags().StringVar(&cfg.Networking.DNSDomain, "service-dns-domain", cfg.Networking.DNSDomain, `Alternative domain for services`)
+			cmd.Flags().StringVar(&cfg.Networking.ServiceSubnet, "service-cidr", cfg.Networking.ServiceSubnet, `The range of IP address used for service VIPs`)
 		}
 		subCmds = append(subCmds, cmd)
 	}
