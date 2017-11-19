@@ -38,7 +38,7 @@ the tls client, and the webhook is the tls server.
 The webhook proves its identity by the `serverCert` in the certs.go. The server
 cert is signed by the CA in certs.go. To let the apiserver trust the `caCert`,
 the webhook registers itself with the apiserver via the
-`admissionregistration/v1alpha1/externalAdmissionHook` API, with
+`admissionregistration/v1beta1/externalAdmissionHook` API, with
 `clientConfig.caBundle=caCert`.
 
 For maximum protection, this example webhook requires and verifies the client

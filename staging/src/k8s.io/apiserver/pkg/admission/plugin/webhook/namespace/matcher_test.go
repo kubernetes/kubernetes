@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	registrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
+	registrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -114,7 +114,7 @@ func TestGetNamespaceLabels(t *testing.T) {
 }
 
 func TestExemptClusterScopedResource(t *testing.T) {
-	hook := &registrationv1alpha1.Webhook{
+	hook := &registrationv1beta1.Webhook{
 		NamespaceSelector: &metav1.LabelSelector{},
 	}
 	attr := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "mock-name", schema.GroupVersionResource{Version: "v1", Resource: "nodes"}, "", admission.Create, nil)

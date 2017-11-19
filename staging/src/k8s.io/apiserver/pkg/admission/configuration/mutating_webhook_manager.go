@@ -23,14 +23,14 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type MutatingWebhookConfigurationLister interface {
-	List(opts metav1.ListOptions) (*v1alpha1.MutatingWebhookConfigurationList, error)
+	List(opts metav1.ListOptions) (*v1beta1.MutatingWebhookConfigurationList, error)
 }
 
 // MutatingWebhookConfigurationManager collects the mutating webhook objects so that they can be called.
@@ -57,12 +57,12 @@ func NewMutatingWebhookConfigurationManager(c MutatingWebhookConfigurationLister
 }
 
 // Webhooks returns the merged MutatingWebhookConfiguration.
-func (im *MutatingWebhookConfigurationManager) Webhooks() (*v1alpha1.MutatingWebhookConfiguration, error) {
+func (im *MutatingWebhookConfigurationManager) Webhooks() (*v1beta1.MutatingWebhookConfiguration, error) {
 	configuration, err := im.poller.configuration()
 	if err != nil {
 		return nil, err
 	}
-	mutatingWebhookConfiguration, ok := configuration.(*v1alpha1.MutatingWebhookConfiguration)
+	mutatingWebhookConfiguration, ok := configuration.(*v1beta1.MutatingWebhookConfiguration)
 	if !ok {
 		return nil, fmt.Errorf("expected type %v, got type %v", reflect.TypeOf(mutatingWebhookConfiguration), reflect.TypeOf(configuration))
 	}
@@ -74,10 +74,10 @@ func (im *MutatingWebhookConfigurationManager) Run(stopCh <-chan struct{}) {
 }
 
 func mergeMutatingWebhookConfigurations(
-	list *v1alpha1.MutatingWebhookConfigurationList,
-) *v1alpha1.MutatingWebhookConfiguration {
-	configurations := append([]v1alpha1.MutatingWebhookConfiguration{}, list.Items...)
-	var ret v1alpha1.MutatingWebhookConfiguration
+	list *v1beta1.MutatingWebhookConfigurationList,
+) *v1beta1.MutatingWebhookConfiguration {
+	configurations := append([]v1beta1.MutatingWebhookConfiguration{}, list.Items...)
+	var ret v1beta1.MutatingWebhookConfiguration
 	// The internal order of webhooks for each configuration is provided by the user
 	// but configurations themselves can be in any order. As we are going to run these
 	// webhooks in serial, they are sorted here to have a deterministic order.
@@ -90,7 +90,7 @@ func mergeMutatingWebhookConfigurations(
 
 // byName sorts MutatingWebhookConfiguration by name. These objects are all in
 // cluster namespace (aka no namespace) thus they all have unique names.
-type byName []v1alpha1.MutatingWebhookConfiguration
+type byName []v1beta1.MutatingWebhookConfiguration
 
 func (x byName) Len() int { return len(x) }
 

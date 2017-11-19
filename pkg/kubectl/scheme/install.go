@@ -17,7 +17,7 @@ limitations under the License.
 package scheme
 
 import (
-	admissionv1alpha1 "k8s.io/api/admission/v1alpha1"
+	admissionv1alpha1 "k8s.io/api/admission/v1beta1"
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
