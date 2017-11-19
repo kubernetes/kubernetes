@@ -479,6 +479,7 @@ func TestComponentPod(t *testing.T) {
 }
 
 func TestGetComponentBaseCommand(t *testing.T) {
+	cfg := &kubeadmapi.MasterConfiguration{}
 	var tests = []struct {
 		c        string
 		expected []string
@@ -494,7 +495,7 @@ func TestGetComponentBaseCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getComponentBaseCommand(rt.c)
+		actual := getComponentBaseCommand(cfg, rt.c)
 		for i := range actual {
 			if actual[i] != rt.expected[i] {
 				t.Errorf(

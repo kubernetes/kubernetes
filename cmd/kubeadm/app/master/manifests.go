@@ -90,7 +90,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 	staticPodSpecs := map[string]api.Pod{
 		kubeAPIServer: componentPod(api.Container{
 			Name:          kubeAPIServer,
-			Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
+			Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, cfg.UnifiedControlPlaneImage),
 			Command:       getAPIServerCommand(cfg, false, k8sVersion),
 			VolumeMounts:  volumeMounts,
 			LivenessProbe: componentProbe(int(cfg.API.BindPort), "/healthz", api.URISchemeHTTPS),
@@ -99,7 +99,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		}, volumes...),
 		kubeControllerManager: componentPod(api.Container{
 			Name:          kubeControllerManager,
-			Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
+			Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, cfg.UnifiedControlPlaneImage),
 			Command:       getControllerManagerCommand(cfg, false, k8sVersion),
 			VolumeMounts:  volumeMounts,
 			LivenessProbe: componentProbe(10252, "/healthz", api.URISchemeHTTP),
@@ -108,7 +108,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		}, volumes...),
 		kubeScheduler: componentPod(api.Container{
 			Name:          kubeScheduler,
-			Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
+			Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, cfg.UnifiedControlPlaneImage),
 			Command:       getSchedulerCommand(cfg, false),
 			VolumeMounts:  []api.VolumeMount{k8sVolumeMount()},
 			LivenessProbe: componentProbe(10251, "/healthz", api.URISchemeHTTP),
@@ -123,7 +123,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			Name:          etcd,
 			Command:       getEtcdCommand(cfg),
 			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(cfg.Etcd.DataDir), k8sVolumeMount()},
-			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, kubeadmapi.GlobalEnvParams.EtcdImage),
+			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, cfg.Etcd.Image),
 			LivenessProbe: componentProbe(2379, "/health", api.URISchemeHTTP),
 		}, certsVolume(cfg), etcdVolume(cfg), k8sVolume())
 
@@ -308,8 +308,8 @@ func componentPod(container api.Container, volumes ...api.Volume) api.Pod {
 	}
 }
 
-func getComponentBaseCommand(component string) []string {
-	if kubeadmapi.GlobalEnvParams.HyperkubeImage != "" {
+func getComponentBaseCommand(cfg *kubeadmapi.MasterConfiguration, component string) []string {
+	if cfg.UnifiedControlPlaneImage != "" {
 		return []string{"/hyperkube", component}
 	}
 
@@ -356,7 +356,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k
 		defaultArguments["admission-control"] = defaultv17AdmissionControl
 	}
 
-	command = getComponentBaseCommand(apiServer)
+	command = getComponentBaseCommand(cfg, apiServer)
 	command = append(command, getExtraParameters(cfg.APIServerExtraArgs, defaultArguments)...)
 	command = append(command, getAuthzParameters(cfg.AuthorizationModes)...)
 
@@ -435,7 +435,7 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 		defaultArguments["insecure-experimental-approve-all-kubelet-csrs-for-group"] = bootstrapapi.BootstrapGroup
 	}
 
-	command = getComponentBaseCommand(controllerManager)
+	command = getComponentBaseCommand(cfg, controllerManager)
 	command = append(command, getExtraParameters(cfg.ControllerManagerExtraArgs, defaultArguments)...)
 
 	if cfg.CloudProvider != "" {
@@ -470,7 +470,7 @@ func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		"kubeconfig":   filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName),
 	}
 
-	command = getComponentBaseCommand(scheduler)
+	command = getComponentBaseCommand(cfg, scheduler)
 	command = append(command, getExtraParameters(cfg.SchedulerExtraArgs, defaultArguments)...)
 
 	return command

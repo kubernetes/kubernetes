@@ -90,6 +90,9 @@ const (
 
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
 	MinExternalEtcdVersion = "3.0.14"
+
+	// DefaultCIImageRepository points to image registry where CI uploads images from ci-cross build job
+	DefaultCIImageRepository = "gcr.io/kubernetes-ci-images"
 )
 
 var (

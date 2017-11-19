@@ -25,15 +25,10 @@ import (
 
 var GlobalEnvParams = SetEnvParams()
 
-// TODO(phase1+) Move these paramaters to the API group
-// we need some params for testing etc, let's keep these hidden for now
 func SetEnvParams() *EnvParams {
 
 	envParams := map[string]string{
-		"kubernetes_dir":  "/etc/kubernetes",
-		"hyperkube_image": "",
-		"repo_prefix":     "gcr.io/google_containers",
-		"etcd_image":      "",
+		"kubernetes_dir": "/etc/kubernetes",
 	}
 
 	for k := range envParams {
@@ -43,9 +38,6 @@ func SetEnvParams() *EnvParams {
 	}
 
 	return &EnvParams{
-		KubernetesDir:    path.Clean(envParams["kubernetes_dir"]),
-		HyperkubeImage:   envParams["hyperkube_image"],
-		RepositoryPrefix: envParams["repo_prefix"],
-		EtcdImage:        envParams["etcd_image"],
+		KubernetesDir: path.Clean(envParams["kubernetes_dir"]),
 	}
 }
