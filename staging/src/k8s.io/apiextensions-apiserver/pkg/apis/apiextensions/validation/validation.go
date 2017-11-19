@@ -22,11 +22,11 @@ import (
 
 	"github.com/go-openapi/spec"
 
+	"k8s.io/apimachinery/pkg/api/validate"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/api/validate"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"

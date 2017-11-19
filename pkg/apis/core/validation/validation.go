@@ -61,7 +61,6 @@ var RepairMalformedUpdates bool = apimachineryvalidation.RepairMalformedUpdates
 const isInvalidQuotaResource string = `must be a standard resource for quota`
 const isNotIntegerErrorMsg string = `must be an integer`
 
-var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
 var fileModeErrorMsg string = "must be a number between 0 and 0777 (octal), both inclusive"
 
 // BannedOwners is a black list of object that are not allowed to be owners.
@@ -658,9 +657,7 @@ func validateISCSIVolumeSource(iscsi *core.ISCSIVolumeSource, fldPath *field.Pat
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("iqn"), iscsi.IQN, "must be valid format"))
 		}
 	}
-	if iscsi.Lun < 0 || iscsi.Lun > 255 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), iscsi.Lun, validation.InclusiveRangeError(0, 255)))
-	}
+	allErrs = append(allErrs, validate.InRange(int64(iscsi.Lun), 0, 255, fldPath.Child("lun"))...)
 	if (iscsi.DiscoveryCHAPAuth || iscsi.SessionCHAPAuth) && iscsi.SecretRef == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("secretRef"), ""))
 	}
@@ -698,9 +695,7 @@ func validateISCSIPersistentVolumeSource(iscsi *core.ISCSIPersistentVolumeSource
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("iqn"), iscsi.IQN, "must be valid format"))
 		}
 	}
-	if iscsi.Lun < 0 || iscsi.Lun > 255 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), iscsi.Lun, validation.InclusiveRangeError(0, 255)))
-	}
+	allErrs = append(allErrs, validate.InRange(int64(iscsi.Lun), 0, 255, fldPath.Child("lun"))...)
 	if (iscsi.DiscoveryCHAPAuth || iscsi.SessionCHAPAuth) && iscsi.SecretRef == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("secretRef"), ""))
 	}
@@ -739,9 +734,7 @@ func validateFCVolumeSource(fc *core.FCVolumeSource, fldPath *field.Path) field.
 		if fc.Lun == nil {
 			allErrs = append(allErrs, field.Required(fldPath.Child("lun"), "lun is required if targetWWNs is specified"))
 		} else {
-			if *fc.Lun < 0 || *fc.Lun > 255 {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), fc.Lun, validation.InclusiveRangeError(0, 255)))
-			}
+			allErrs = append(allErrs, validate.InRange(int64(*fc.Lun), 0, 255, fldPath.Child("lun"))...)
 		}
 	}
 	return allErrs
@@ -752,20 +745,16 @@ func validateGCEPersistentDiskVolumeSource(pd *core.GCEPersistentDiskVolumeSourc
 	if len(pd.PDName) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("pdName"), ""))
 	}
-	if pd.Partition < 0 || pd.Partition > 255 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("partition"), pd.Partition, pdPartitionErrorMsg))
-	}
+	allErrs = append(allErrs, validate.InRange(int64(pd.Partition), 0, 255, fldPath.Child("partition"))...)
 	return allErrs
 }
 
-func validateAWSElasticBlockStoreVolumeSource(PD *core.AWSElasticBlockStoreVolumeSource, fldPath *field.Path) field.ErrorList {
+func validateAWSElasticBlockStoreVolumeSource(ebs *core.AWSElasticBlockStoreVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(PD.VolumeID) == 0 {
+	if len(ebs.VolumeID) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeID"), ""))
 	}
-	if PD.Partition < 0 || PD.Partition > 255 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("partition"), PD.Partition, pdPartitionErrorMsg))
-	}
+	allErrs = append(allErrs, validate.InRange(int64(ebs.Partition), 0, 255, fldPath.Child("partition"))...)
 	return allErrs
 }
 
@@ -2776,10 +2765,7 @@ func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	}
 
 	if spec.ActiveDeadlineSeconds != nil {
-		value := *spec.ActiveDeadlineSeconds
-		if value < 1 || value > math.MaxInt32 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("activeDeadlineSeconds"), value, validation.InclusiveRangeError(1, math.MaxInt32)))
-		}
+		allErrs = append(allErrs, validate.InRange(*spec.ActiveDeadlineSeconds, 1, math.MaxInt32, fldPath.Child("activeDeadlineSeconds"))...)
 	}
 
 	if len(spec.Hostname) > 0 {
@@ -3172,8 +3158,8 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod) field.ErrorList {
 	// 2.  from a positive value to a lesser, non-negative value
 	if newPod.Spec.ActiveDeadlineSeconds != nil {
 		newActiveDeadlineSeconds := *newPod.Spec.ActiveDeadlineSeconds
-		if newActiveDeadlineSeconds < 0 || newActiveDeadlineSeconds > math.MaxInt32 {
-			allErrs = append(allErrs, field.Invalid(specPath.Child("activeDeadlineSeconds"), newActiveDeadlineSeconds, validation.InclusiveRangeError(0, math.MaxInt32)))
+		if newErrs := validate.InRange(newActiveDeadlineSeconds, 0, math.MaxInt32, specPath.Child("activeDeadlineSeconds")); len(newErrs) > 0 {
+			allErrs = append(allErrs, newErrs...)
 			return allErrs
 		}
 		if oldPod.Spec.ActiveDeadlineSeconds != nil {

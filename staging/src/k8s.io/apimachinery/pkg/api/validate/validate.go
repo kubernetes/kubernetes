@@ -81,6 +81,15 @@ func PositiveQuantity(value resource.Quantity, fldPath *field.Path) field.ErrorL
 	return allErrs
 }
 
+// InRange validates that a given int64 is within an inclusive range.
+func InRange(value, lo, hi int64, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, msg := range validation.IsInRange(value, lo, hi) {
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
+	}
+	return allErrs
+}
+
 // DNS1123Label validates that a name is a proper DNS label.
 func DNS1123Label(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
