@@ -317,6 +317,18 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 				}
 			}
 		}
+
+		{
+			// Add additional tags
+			glog.V(2).Infof("Creating additional load balancer tags for %s", loadBalancerName)
+			tags := getLoadBalancerAdditionalTags(annotations)
+			if len(tags) > 0 {
+				err := c.addLoadBalancerTags(loadBalancerName, tags)
+				if err != nil {
+					return nil, fmt.Errorf("unable to create additional load balancer tags: %v", err)
+				}
+			}
+		}
 	}
 
 	// Whether the ELB was new or existing, sync attributes regardless. This accounts for things

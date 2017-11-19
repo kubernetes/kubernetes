@@ -63,6 +63,16 @@ func (c defaultTableConvertor) ConvertToTable(ctx genericapirequest.Context, obj
 			return nil, err
 		}
 	}
+	if m, err := meta.ListAccessor(object); err == nil {
+		table.ResourceVersion = m.GetResourceVersion()
+		table.SelfLink = m.GetSelfLink()
+		table.Continue = m.GetContinue()
+	} else {
+		if m, err := meta.CommonAccessor(object); err == nil {
+			table.ResourceVersion = m.GetResourceVersion()
+			table.SelfLink = m.GetSelfLink()
+		}
+	}
 	table.ColumnDefinitions = []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: swaggerMetadataDescriptions["name"]},
 		{Name: "Created At", Type: "date", Description: swaggerMetadataDescriptions["creationTimestamp"]},

@@ -50,13 +50,13 @@ import (
 
 const (
 	// Name of admission plug-in
-	PluginName = "GenericAdmissionWebhook"
+	PluginName = "ValidatingAdmissionWebhook"
 )
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register(PluginName, func(configFile io.Reader) (admission.Interface, error) {
-		plugin, err := NewGenericAdmissionWebhook(configFile)
+		plugin, err := NewValidatingAdmissionWebhook(configFile)
 		if err != nil {
 			return nil, err
 		}
@@ -71,8 +71,8 @@ type WebhookSource interface {
 	Webhooks() (*v1alpha1.ValidatingWebhookConfiguration, error)
 }
 
-// NewGenericAdmissionWebhook returns a generic admission webhook plugin.
-func NewGenericAdmissionWebhook(configFile io.Reader) (*GenericAdmissionWebhook, error) {
+// NewValidatingAdmissionWebhook returns a generic admission webhook plugin.
+func NewValidatingAdmissionWebhook(configFile io.Reader) (*ValidatingAdmissionWebhook, error) {
 	kubeconfigFile, err := config.LoadConfig(configFile)
 	if err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func NewGenericAdmissionWebhook(configFile io.Reader) (*GenericAdmissionWebhook,
 	cm.SetAuthenticationInfoResolver(authInfoResolver)
 	cm.SetServiceResolver(config.NewDefaultServiceResolver())
 
-	return &GenericAdmissionWebhook{
+	return &ValidatingAdmissionWebhook{
 		Handler: admission.NewHandler(
 			admission.Connect,
 			admission.Create,
@@ -101,8 +101,8 @@ func NewGenericAdmissionWebhook(configFile io.Reader) (*GenericAdmissionWebhook,
 	}, nil
 }
 
-// GenericAdmissionWebhook is an implementation of admission.Interface.
-type GenericAdmissionWebhook struct {
+// ValidatingAdmissionWebhook is an implementation of admission.Interface.
+type ValidatingAdmissionWebhook struct {
 	*admission.Handler
 	hookSource       WebhookSource
 	namespaceMatcher namespace.Matcher
@@ -111,22 +111,22 @@ type GenericAdmissionWebhook struct {
 }
 
 var (
-	_ = genericadmissioninit.WantsExternalKubeClientSet(&GenericAdmissionWebhook{})
+	_ = genericadmissioninit.WantsExternalKubeClientSet(&ValidatingAdmissionWebhook{})
 )
 
 // TODO find a better way wire this, but keep this pull small for now.
-func (a *GenericAdmissionWebhook) SetAuthenticationInfoResolverWrapper(wrapper config.AuthenticationInfoResolverWrapper) {
+func (a *ValidatingAdmissionWebhook) SetAuthenticationInfoResolverWrapper(wrapper config.AuthenticationInfoResolverWrapper) {
 	a.clientManager.SetAuthenticationInfoResolverWrapper(wrapper)
 }
 
 // SetServiceResolver sets a service resolver for the webhook admission plugin.
 // Passing a nil resolver does not have an effect, instead a default one will be used.
-func (a *GenericAdmissionWebhook) SetServiceResolver(sr config.ServiceResolver) {
+func (a *ValidatingAdmissionWebhook) SetServiceResolver(sr config.ServiceResolver) {
 	a.clientManager.SetServiceResolver(sr)
 }
 
 // SetScheme sets a serializer(NegotiatedSerializer) which is derived from the scheme
-func (a *GenericAdmissionWebhook) SetScheme(scheme *runtime.Scheme) {
+func (a *ValidatingAdmissionWebhook) SetScheme(scheme *runtime.Scheme) {
 	if scheme != nil {
 		a.clientManager.SetNegotiatedSerializer(serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{
 			Serializer: serializer.NewCodecFactory(scheme).LegacyCodec(admissionv1alpha1.SchemeGroupVersion),
@@ -136,37 +136,37 @@ func (a *GenericAdmissionWebhook) SetScheme(scheme *runtime.Scheme) {
 }
 
 // WantsExternalKubeClientSet defines a function which sets external ClientSet for admission plugins that need it
-func (a *GenericAdmissionWebhook) SetExternalKubeClientSet(client clientset.Interface) {
+func (a *ValidatingAdmissionWebhook) SetExternalKubeClientSet(client clientset.Interface) {
 	a.namespaceMatcher.Client = client
 	a.hookSource = configuration.NewValidatingWebhookConfigurationManager(client.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations())
 }
 
 // SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
-func (a *GenericAdmissionWebhook) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+func (a *ValidatingAdmissionWebhook) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().V1().Namespaces()
 	a.namespaceMatcher.NamespaceLister = namespaceInformer.Lister()
 	a.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 }
 
 // ValidateInitialization implements the InitializationValidator interface.
-func (a *GenericAdmissionWebhook) ValidateInitialization() error {
+func (a *ValidatingAdmissionWebhook) ValidateInitialization() error {
 	if a.hookSource == nil {
-		return fmt.Errorf("GenericAdmissionWebhook admission plugin requires a Kubernetes client to be provided")
+		return fmt.Errorf("ValidatingAdmissionWebhook admission plugin requires a Kubernetes client to be provided")
 	}
 	if err := a.namespaceMatcher.Validate(); err != nil {
-		return fmt.Errorf("GenericAdmissionWebhook.namespaceMatcher is not properly setup: %v", err)
+		return fmt.Errorf("ValidatingAdmissionWebhook.namespaceMatcher is not properly setup: %v", err)
 	}
 	if err := a.clientManager.Validate(); err != nil {
-		return fmt.Errorf("GenericAdmissionWebhook.clientManager is not properly setup: %v", err)
+		return fmt.Errorf("ValidatingAdmissionWebhook.clientManager is not properly setup: %v", err)
 	}
 	if err := a.convertor.Validate(); err != nil {
-		return fmt.Errorf("GenericAdmissionWebhook.convertor is not properly setup: %v", err)
+		return fmt.Errorf("ValidatingAdmissionWebhook.convertor is not properly setup: %v", err)
 	}
 	go a.hookSource.Run(wait.NeverStop)
 	return nil
 }
 
-func (a *GenericAdmissionWebhook) loadConfiguration(attr admission.Attributes) (*v1alpha1.ValidatingWebhookConfiguration, error) {
+func (a *ValidatingAdmissionWebhook) loadConfiguration(attr admission.Attributes) (*v1alpha1.ValidatingWebhookConfiguration, error) {
 	hookConfig, err := a.hookSource.Webhooks()
 	// if Webhook configuration is disabled, fail open
 	if err == configuration.ErrDisabled {
@@ -186,7 +186,7 @@ func (a *GenericAdmissionWebhook) loadConfiguration(attr admission.Attributes) (
 }
 
 // Admit makes an admission decision based on the request attributes.
-func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
+func (a *ValidatingAdmissionWebhook) Admit(attr admission.Attributes) error {
 	hookConfig, err := a.loadConfiguration(attr)
 	if err != nil {
 		return err
@@ -280,7 +280,7 @@ func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
 }
 
 // TODO: factor into a common place along with the validating webhook version.
-func (a *GenericAdmissionWebhook) shouldCallHook(h *v1alpha1.Webhook, attr admission.Attributes) (bool, *apierrors.StatusError) {
+func (a *ValidatingAdmissionWebhook) shouldCallHook(h *v1alpha1.Webhook, attr admission.Attributes) (bool, *apierrors.StatusError) {
 	var matches bool
 	for _, r := range h.Rules {
 		m := rules.Matcher{Rule: r, Attr: attr}
@@ -296,7 +296,7 @@ func (a *GenericAdmissionWebhook) shouldCallHook(h *v1alpha1.Webhook, attr admis
 	return a.namespaceMatcher.MatchNamespaceSelector(h, attr)
 }
 
-func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.Webhook, attr admission.Attributes) error {
+func (a *ValidatingAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.Webhook, attr admission.Attributes) error {
 	// Make the webhook request
 	request := request.CreateAdmissionReview(attr)
 	client, err := a.clientManager.HookClient(h)

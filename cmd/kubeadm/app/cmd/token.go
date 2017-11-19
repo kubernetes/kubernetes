@@ -218,6 +218,11 @@ func RunCreateToken(out io.Writer, client clientset.Interface, token string, tok
 		}
 	}
 
+	// validate usages
+	if err := bootstrapapi.ValidateUsages(usages); err != nil {
+		return err
+	}
+
 	err := tokenphase.CreateNewToken(client, token, tokenDuration, usages, extraGroups, description)
 	if err != nil {
 		return err

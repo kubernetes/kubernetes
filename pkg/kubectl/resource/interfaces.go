@@ -44,3 +44,41 @@ type ClientMapperFunc func(mapping *meta.RESTMapping) (RESTClient, error)
 func (f ClientMapperFunc) ClientForMapping(mapping *meta.RESTMapping) (RESTClient, error) {
 	return f(mapping)
 }
+
+// RequestTransform is a function that is given a chance to modify the outgoing request.
+type RequestTransform func(*client.Request)
+
+// NewClientWithOptions wraps the provided RESTClient and invokes each transform on each
+// newly created request.
+func NewClientWithOptions(c RESTClient, transforms ...RequestTransform) RESTClient {
+	return &clientOptions{c: c, transforms: transforms}
+}
+
+type clientOptions struct {
+	c          RESTClient
+	transforms []RequestTransform
+}
+
+func (c *clientOptions) modify(req *client.Request) *client.Request {
+	for _, transform := range c.transforms {
+		transform(req)
+	}
+	return req
+}
+
+func (c *clientOptions) Get() *client.Request {
+	return c.modify(c.c.Get())
+}
+
+func (c *clientOptions) Post() *client.Request {
+	return c.modify(c.c.Post())
+}
+func (c *clientOptions) Patch(t types.PatchType) *client.Request {
+	return c.modify(c.c.Patch(t))
+}
+func (c *clientOptions) Delete() *client.Request {
+	return c.modify(c.c.Delete())
+}
+func (c *clientOptions) Put() *client.Request {
+	return c.modify(c.c.Put())
+}

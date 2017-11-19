@@ -113,7 +113,7 @@ type containerManagerImpl struct {
 	qosContainers    QOSContainersInfo
 	// Tasks that are run periodically
 	periodicTasks []func()
-	// holds all the mounted cgroup subsystems
+	// Holds all the mounted cgroup subsystems
 	subsystems *CgroupSubsystems
 	nodeInfo   *v1.Node
 	// Interface for cgroup management
@@ -245,7 +245,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	}
 	glog.Infof("Creating Container Manager object based on Node Config: %+v", nodeConfig)
 
-	qosContainerManager, err := NewQOSContainerManager(subsystems, cgroupRoot, nodeConfig)
+	qosContainerManager, err := NewQOSContainerManager(subsystems, cgroupRoot, nodeConfig, cgroupManager)
 	if err != nil {
 		return nil, err
 	}

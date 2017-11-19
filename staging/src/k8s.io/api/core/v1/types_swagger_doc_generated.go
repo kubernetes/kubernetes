@@ -289,6 +289,7 @@ var map_Container = map[string]string{
 	"env":                      "List of environment variables to set in the container. Cannot be updated.",
 	"resources":                "Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
 	"volumeMounts":             "Pod volumes to mount into the container's filesystem. Cannot be updated.",
+	"volumeDevices":            "volumeDevices is the list of block devices to be used by the container. This is an alpha feature and may change in the future.",
 	"livenessProbe":            "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
 	"readinessProbe":           "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
 	"lifecycle":                "Actions that the management system should take in response to container lifecycle events. Cannot be updated.",
@@ -709,19 +710,38 @@ func (HostPathVolumeSource) SwaggerDoc() map[string]string {
 	return map_HostPathVolumeSource
 }
 
-var map_ISCSIVolumeSource = map[string]string{
-	"":                  "Represents an ISCSI disk. ISCSI volumes can only be mounted as read/write once. ISCSI volumes support ownership management and SELinux relabeling.",
-	"targetPortal":      "iSCSI target portal. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+var map_ISCSIPersistentVolumeSource = map[string]string{
+	"":                  "ISCSIPersistentVolumeSource represents an ISCSI disk. ISCSI volumes can only be mounted as read/write once. ISCSI volumes support ownership management and SELinux relabeling.",
+	"targetPortal":      "iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
 	"iqn":               "Target iSCSI Qualified Name.",
-	"lun":               "iSCSI target lun number.",
-	"iscsiInterface":    "Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport.",
+	"lun":               "iSCSI Target Lun number.",
+	"iscsiInterface":    "iSCSI Interface Name that uses an iSCSI transport. Defaults to 'default' (tcp).",
 	"fsType":            "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#iscsi",
 	"readOnly":          "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
-	"portals":           "iSCSI target portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+	"portals":           "iSCSI Target Portal List. The Portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
 	"chapAuthDiscovery": "whether support iSCSI Discovery CHAP authentication",
 	"chapAuthSession":   "whether support iSCSI Session CHAP authentication",
-	"secretRef":         "CHAP secret for iSCSI target and initiator authentication",
-	"initiatorName":     "Custom iSCSI initiator name. If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface <target portal>:<volume name> will be created for the connection.",
+	"secretRef":         "CHAP Secret for iSCSI target and initiator authentication",
+	"initiatorName":     "Custom iSCSI Initiator Name. If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface <target portal>:<volume name> will be created for the connection.",
+}
+
+func (ISCSIPersistentVolumeSource) SwaggerDoc() map[string]string {
+	return map_ISCSIPersistentVolumeSource
+}
+
+var map_ISCSIVolumeSource = map[string]string{
+	"":                  "Represents an ISCSI disk. ISCSI volumes can only be mounted as read/write once. ISCSI volumes support ownership management and SELinux relabeling.",
+	"targetPortal":      "iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+	"iqn":               "Target iSCSI Qualified Name.",
+	"lun":               "iSCSI Target Lun number.",
+	"iscsiInterface":    "iSCSI Interface Name that uses an iSCSI transport. Defaults to 'default' (tcp).",
+	"fsType":            "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#iscsi",
+	"readOnly":          "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
+	"portals":           "iSCSI Target Portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+	"chapAuthDiscovery": "whether support iSCSI Discovery CHAP authentication",
+	"chapAuthSession":   "whether support iSCSI Session CHAP authentication",
+	"secretRef":         "CHAP Secret for iSCSI target and initiator authentication",
+	"initiatorName":     "Custom iSCSI Initiator Name. If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface <target portal>:<volume name> will be created for the connection.",
 }
 
 func (ISCSIVolumeSource) SwaggerDoc() map[string]string {
@@ -1162,6 +1182,7 @@ var map_PersistentVolumeClaimSpec = map[string]string{
 	"resources":        "Resources represents the minimum resources the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
 	"volumeName":       "VolumeName is the binding reference to the PersistentVolume backing this claim.",
 	"storageClassName": "Name of the StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1",
+	"volumeMode":       "volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec. This is an alpha feature and may change in the future.",
 }
 
 func (PersistentVolumeClaimSpec) SwaggerDoc() map[string]string {
@@ -1238,6 +1259,7 @@ var map_PersistentVolumeSpec = map[string]string{
 	"persistentVolumeReclaimPolicy": "What happens to a persistent volume when released from its claim. Valid options are Retain (default) and Recycle. Recycling must be supported by the volume plugin underlying this persistent volume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming",
 	"storageClassName":              "Name of StorageClass to which this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.",
 	"mountOptions":                  "A list of mount options, e.g. [\"ro\", \"soft\"]. Not validated - mount will simply fail if one is invalid. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options",
+	"volumeMode":                    "volumeMode defines if a volume is intended to be used with a formatted filesystem or to remain in raw block state. Value of Filesystem is implied when not included in spec. This is an alpha feature and may change in the future.",
 }
 
 func (PersistentVolumeSpec) SwaggerDoc() map[string]string {
@@ -1968,7 +1990,7 @@ var map_ServiceSpec = map[string]string{
 	"sessionAffinity":          "Supports \"ClientIP\" and \"None\". Used to maintain session affinity. Enable client IP based session affinity. Must be ClientIP or None. Defaults to None. More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies",
 	"loadBalancerIP":           "Only applies to Service Type: LoadBalancer LoadBalancer will get created with the IP specified in this field. This feature depends on whether the underlying cloud-provider supports specifying the loadBalancerIP when a load balancer is created. This field will be ignored if the cloud-provider does not support the feature.",
 	"loadBalancerSourceRanges": "If specified and supported by the platform, this will restrict traffic through the cloud-provider load-balancer will be restricted to the specified client IPs. This field will be ignored if the cloud-provider does not support the feature.\" More info: https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/",
-	"externalName":             "externalName is the external reference that kubedns or equivalent will return as a CNAME record for this service. No proxying will be involved. Must be a valid DNS name and requires Type to be ExternalName.",
+	"externalName":             "externalName is the external reference that kubedns or equivalent will return as a CNAME record for this service. No proxying will be involved. Must be a valid RFC-1123 hostname (https://tools.ietf.org/html/rfc1123) and requires Type to be ExternalName.",
 	"externalTrafficPolicy":    "externalTrafficPolicy denotes if this Service desires to route external traffic to node-local or cluster-wide endpoints. \"Local\" preserves the client source IP and avoids a second hop for LoadBalancer and Nodeport type services, but risks potentially imbalanced traffic spreading. \"Cluster\" obscures the client source IP and may cause a second hop to another node, but should have good overall load-spreading.",
 	"healthCheckNodePort":      "healthCheckNodePort specifies the healthcheck nodePort for the service. If not specified, HealthCheckNodePort is created by the service api backend with the allocated nodePort. Will use user-specified nodePort value if specified by the client. Only effects when Type is set to LoadBalancer and ExternalTrafficPolicy is set to Local.",
 	"publishNotReadyAddresses": "publishNotReadyAddresses, when set to true, indicates that DNS implementations must publish the notReadyAddresses of subsets for the Endpoints associated with the Service. The default value is false. The primary use case for setting this field is to use a StatefulSet's Headless Service to propagate SRV records for its Pods without respect to their readiness for purpose of peer discovery. This field will replace the service.alpha.kubernetes.io/tolerate-unready-endpoints when that annotation is deprecated and all clients have been converted to use this field.",
@@ -2075,6 +2097,16 @@ var map_Volume = map[string]string{
 
 func (Volume) SwaggerDoc() map[string]string {
 	return map_Volume
+}
+
+var map_VolumeDevice = map[string]string{
+	"":           "volumeDevice describes a mapping of a raw block device within a container.",
+	"name":       "name must match the name of a persistentVolumeClaim in the pod",
+	"devicePath": "devicePath is the path inside of the container that the device will be mapped to.",
+}
+
+func (VolumeDevice) SwaggerDoc() map[string]string {
+	return map_VolumeDevice
 }
 
 var map_VolumeMount = map[string]string{

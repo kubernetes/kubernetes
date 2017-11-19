@@ -17,9 +17,7 @@ limitations under the License.
 package scheme
 
 import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
@@ -34,7 +32,6 @@ var (
 )
 
 func init() {
-	v1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
 	AddToScheme(Scheme)
 }
 

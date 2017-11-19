@@ -97,6 +97,10 @@
 			"Rev": "e14a70c556c8e0db173358d1a903dca345a8e75e"
 		},
 		{
+			"ImportPath": "github.com/JeffAshton/win_pdh",
+			"Rev": "76bb4ee9f0ab50f77826f2a2ee7fb9d3880d6ec2"
+		},
+		{
 			"ImportPath": "github.com/MakeNowJust/heredoc",
 			"Rev": "bb23615498cded5e105af4ce27de75b089cbe851"
 		},
@@ -1883,10 +1887,6 @@
 			"ImportPath": "github.com/lpabon/godbc",
 			"Comment": "v1.0-1-g9577782",
 			"Rev": "9577782540c1398b710ddae1b86268ba03a19b0c"
-		},
-		{
-			"ImportPath": "github.com/lxn/win",
-			"Rev": "712da405e3eb60e148bf5086991cd1e9eb570001"
 		},
 		{
 			"ImportPath": "github.com/magiconair/properties",

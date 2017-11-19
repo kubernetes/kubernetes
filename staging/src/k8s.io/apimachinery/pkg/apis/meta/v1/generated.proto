@@ -621,6 +621,10 @@ message OwnerReference {
   optional bool blockOwnerDeletion = 7;
 }
 
+// Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.
+message Patch {
+}
+
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
 message Preconditions {
   // Specifies the target UID.

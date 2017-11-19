@@ -27,10 +27,16 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 
 	"github.com/golang/glog"
+)
+
+var (
+	// The default dns opt strings.
+	defaultDNSOptions = []string{"ndots:5"}
 )
 
 // Configurer is used for setting up DNS resolver configuration when launching pods.
@@ -219,22 +225,20 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 	return nameservers, searches, options, nil
 }
 
-// GetClusterDNS returns a list of the DNS servers, a list of the DNS search
-// domains of the cluster, and a list of resolv.conf options.
-// TODO: This should return a struct.
-func (c *Configurer) GetClusterDNS(pod *v1.Pod) ([]string, []string, []string, bool, error) {
+// GetPodDNS returns DNS setttings for the pod.
+func (c *Configurer) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
 	var hostDNS, hostSearch, hostOptions []string
 	// Get host DNS settings
 	if c.ResolverConfig != "" {
 		f, err := os.Open(c.ResolverConfig)
 		if err != nil {
-			return nil, nil, nil, false, err
+			return nil, err
 		}
 		defer f.Close()
 
 		hostDNS, hostSearch, hostOptions, err = parseResolvConf(f)
 		if err != nil {
-			return nil, nil, nil, false, err
+			return nil, err
 		}
 	}
 	useClusterFirstPolicy := ((pod.Spec.DNSPolicy == v1.DNSClusterFirst && !kubecontainer.IsHostNetworkPod(pod)) || pod.Spec.DNSPolicy == v1.DNSClusterFirstWithHostNet)
@@ -268,7 +272,10 @@ func (c *Configurer) GetClusterDNS(pod *v1.Pod) ([]string, []string, []string, b
 		} else {
 			hostSearch = c.formDNSSearchForDNSDefault(hostSearch, pod)
 		}
-		return hostDNS, hostSearch, hostOptions, useClusterFirstPolicy, nil
+		return &runtimeapi.DNSConfig{
+			Servers:  hostDNS,
+			Searches: hostSearch,
+			Options:  hostOptions}, nil
 	}
 
 	// for a pod with DNSClusterFirst policy, the cluster DNS server is the only nameserver configured for
@@ -280,7 +287,10 @@ func (c *Configurer) GetClusterDNS(pod *v1.Pod) ([]string, []string, []string, b
 	}
 	dnsSearch := c.formDNSSearch(hostSearch, pod)
 
-	return dns, dnsSearch, hostOptions, useClusterFirstPolicy, nil
+	return &runtimeapi.DNSConfig{
+		Servers:  dns,
+		Searches: dnsSearch,
+		Options:  defaultDNSOptions}, nil
 }
 
 // SetupDNSinContainerizedMounter replaces the nameserver in containerized-mounter's rootfs/etc/resolve.conf with kubelet.ClusterDNS

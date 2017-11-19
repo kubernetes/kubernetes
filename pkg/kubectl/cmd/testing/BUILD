@@ -22,6 +22,7 @@ go_library(
         "//pkg/kubectl/categories:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
+        "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",
         "//pkg/kubectl/plugins:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
         "//pkg/kubectl/validation:go_default_library",

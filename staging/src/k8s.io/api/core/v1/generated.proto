@@ -533,6 +533,13 @@ message Container {
   // +patchStrategy=merge
   repeated VolumeMount volumeMounts = 9;
 
+  // volumeDevices is the list of block devices to be used by the container.
+  // This is an alpha feature and may change in the future.
+  // +patchMergeKey=devicePath
+  // +patchStrategy=merge
+  // +optional
+  repeated VolumeDevice volumeDevices = 21;
+
   // Periodic probe of container liveness.
   // Container will be restarted if the probe fails.
   // Cannot be updated.
@@ -1320,21 +1327,22 @@ message HostPathVolumeSource {
   optional string type = 2;
 }
 
-// Represents an ISCSI disk.
+// ISCSIPersistentVolumeSource represents an ISCSI disk.
 // ISCSI volumes can only be mounted as read/write once.
 // ISCSI volumes support ownership management and SELinux relabeling.
-message ISCSIVolumeSource {
-  // iSCSI target portal. The portal is either an IP or ip_addr:port if the port
+message ISCSIPersistentVolumeSource {
+  // iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port
   // is other than default (typically TCP ports 860 and 3260).
   optional string targetPortal = 1;
 
   // Target iSCSI Qualified Name.
   optional string iqn = 2;
 
-  // iSCSI target lun number.
+  // iSCSI Target Lun number.
   optional int32 lun = 3;
 
-  // Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport.
+  // iSCSI Interface Name that uses an iSCSI transport.
+  // Defaults to 'default' (tcp).
   // +optional
   optional string iscsiInterface = 4;
 
@@ -1351,7 +1359,7 @@ message ISCSIVolumeSource {
   // +optional
   optional bool readOnly = 6;
 
-  // iSCSI target portal List. The portal is either an IP or ip_addr:port if the port
+  // iSCSI Target Portal List. The Portal is either an IP or ip_addr:port if the port
   // is other than default (typically TCP ports 860 and 3260).
   // +optional
   repeated string portals = 7;
@@ -1364,11 +1372,67 @@ message ISCSIVolumeSource {
   // +optional
   optional bool chapAuthSession = 11;
 
-  // CHAP secret for iSCSI target and initiator authentication
+  // CHAP Secret for iSCSI target and initiator authentication
+  // +optional
+  optional SecretReference secretRef = 10;
+
+  // Custom iSCSI Initiator Name.
+  // If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface
+  // <target portal>:<volume name> will be created for the connection.
+  // +optional
+  optional string initiatorName = 12;
+}
+
+// Represents an ISCSI disk.
+// ISCSI volumes can only be mounted as read/write once.
+// ISCSI volumes support ownership management and SELinux relabeling.
+message ISCSIVolumeSource {
+  // iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port
+  // is other than default (typically TCP ports 860 and 3260).
+  optional string targetPortal = 1;
+
+  // Target iSCSI Qualified Name.
+  optional string iqn = 2;
+
+  // iSCSI Target Lun number.
+  optional int32 lun = 3;
+
+  // iSCSI Interface Name that uses an iSCSI transport.
+  // Defaults to 'default' (tcp).
+  // +optional
+  optional string iscsiInterface = 4;
+
+  // Filesystem type of the volume that you want to mount.
+  // Tip: Ensure that the filesystem type is supported by the host operating system.
+  // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // More info: https://kubernetes.io/docs/concepts/storage/volumes#iscsi
+  // TODO: how do we prevent errors in the filesystem from compromising the machine
+  // +optional
+  optional string fsType = 5;
+
+  // ReadOnly here will force the ReadOnly setting in VolumeMounts.
+  // Defaults to false.
+  // +optional
+  optional bool readOnly = 6;
+
+  // iSCSI Target Portal List. The portal is either an IP or ip_addr:port if the port
+  // is other than default (typically TCP ports 860 and 3260).
+  // +optional
+  repeated string portals = 7;
+
+  // whether support iSCSI Discovery CHAP authentication
+  // +optional
+  optional bool chapAuthDiscovery = 8;
+
+  // whether support iSCSI Session CHAP authentication
+  // +optional
+  optional bool chapAuthSession = 11;
+
+  // CHAP Secret for iSCSI target and initiator authentication
   // +optional
   optional LocalObjectReference secretRef = 10;
 
-  // Custom iSCSI initiator name.
+  // Custom iSCSI Initiator Name.
   // If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface
   // <target portal>:<volume name> will be created for the connection.
   // +optional
@@ -2219,6 +2283,12 @@ message PersistentVolumeClaimSpec {
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1
   // +optional
   optional string storageClassName = 5;
+
+  // volumeMode defines what type of volume is required by the claim.
+  // Value of Filesystem is implied when not included in claim spec.
+  // This is an alpha feature and may change in the future.
+  // +optional
+  optional string volumeMode = 6;
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -2313,7 +2383,7 @@ message PersistentVolumeSource {
   // ISCSI represents an ISCSI Disk resource that is attached to a
   // kubelet's host machine and then exposed to the pod. Provisioned by an admin.
   // +optional
-  optional ISCSIVolumeSource iscsi = 7;
+  optional ISCSIPersistentVolumeSource iscsi = 7;
 
   // Cinder represents a cinder volume attached and mounted on kubelets host machine
   // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
@@ -2418,6 +2488,12 @@ message PersistentVolumeSpec {
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options
   // +optional
   repeated string mountOptions = 7;
+
+  // volumeMode defines if a volume is intended to be used with a formatted filesystem
+  // or to remain in raw block state. Value of Filesystem is implied when not included in spec.
+  // This is an alpha feature and may change in the future.
+  // +optional
+  optional string volumeMode = 8;
 }
 
 // PersistentVolumeStatus is the current status of a persistent volume.
@@ -4000,7 +4076,8 @@ message ServiceSpec {
 
   // externalName is the external reference that kubedns or equivalent will
   // return as a CNAME record for this service. No proxying will be involved.
-  // Must be a valid DNS name and requires Type to be ExternalName.
+  // Must be a valid RFC-1123 hostname (https://tools.ietf.org/html/rfc1123)
+  // and requires Type to be ExternalName.
   // +optional
   optional string externalName = 10;
 
@@ -4203,6 +4280,15 @@ message Volume {
   // If not specified, the Volume is implied to be an EmptyDir.
   // This implied behavior is deprecated and will be removed in a future version.
   optional VolumeSource volumeSource = 2;
+}
+
+// volumeDevice describes a mapping of a raw block device within a container.
+message VolumeDevice {
+  // name must match the name of a persistentVolumeClaim in the pod
+  optional string name = 1;
+
+  // devicePath is the path inside of the container that the device will be mapped to.
+  optional string devicePath = 2;
 }
 
 // VolumeMount describes a mounting of a Volume within a container.

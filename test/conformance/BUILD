@@ -30,9 +30,12 @@ filegroup(
 
 genrule(
     name = "list_conformance_tests",
-    srcs = ["//test/e2e:all-srcs"],
+    srcs = [
+        "//test/e2e:all-srcs",
+        "//test/e2e_node:all-srcs",
+    ],
     outs = ["conformance.txt"],
-    cmd = "./$(location :conformance) $(locations //test/e2e:all-srcs) > $@",
+    cmd = "./$(location :conformance) $(locations //test/e2e:all-srcs) $(locations //test/e2e_node:all-srcs) > $@",
     message = "Listing all conformance tests.",
     tools = [":conformance"],
 )

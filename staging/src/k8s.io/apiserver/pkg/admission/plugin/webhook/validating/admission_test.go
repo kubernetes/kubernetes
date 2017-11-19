@@ -116,7 +116,7 @@ func (c urlConfigGenerator) ccfgURL(urlPath string) registrationv1alpha1.Webhook
 	}
 }
 
-// TestAdmit tests that GenericAdmissionWebhook#Admit works as expected
+// TestAdmit tests that ValidatingAdmissionWebhook#Admit works as expected
 func TestAdmit(t *testing.T) {
 	scheme := runtime.NewScheme()
 	v1alpha1.AddToScheme(scheme)
@@ -129,7 +129,7 @@ func TestAdmit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("this should never happen? %v", err)
 	}
-	wh, err := NewGenericAdmissionWebhook(nil)
+	wh, err := NewValidatingAdmissionWebhook(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -410,7 +410,7 @@ func TestAdmit(t *testing.T) {
 	}
 }
 
-// TestAdmitCachedClient tests that GenericAdmissionWebhook#Admit should cache restClient
+// TestAdmitCachedClient tests that ValidatingAdmissionWebhook#Admit should cache restClient
 func TestAdmitCachedClient(t *testing.T) {
 	scheme := runtime.NewScheme()
 	v1alpha1.AddToScheme(scheme)
@@ -423,7 +423,7 @@ func TestAdmitCachedClient(t *testing.T) {
 	if err != nil {
 		t.Fatalf("this should never happen? %v", err)
 	}
-	wh, err := NewGenericAdmissionWebhook(nil)
+	wh, err := NewValidatingAdmissionWebhook(nil)
 	if err != nil {
 		t.Fatal(err)
 	}

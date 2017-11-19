@@ -24,7 +24,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestPVSecrets(t *testing.T) {
@@ -91,8 +93,15 @@ func TestPVSecrets(t *testing.T) {
 		{Spec: api.PersistentVolumeSpec{
 			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: api.PersistentVolumeSource{
-				ISCSI: &api.ISCSIVolumeSource{
-					SecretRef: &api.LocalObjectReference{
+				ISCSI: &api.ISCSIPersistentVolumeSource{
+					SecretRef: &api.SecretReference{
+						Name:      "Spec.PersistentVolumeSource.ISCSI.SecretRef",
+						Namespace: "iscsi"}}}}},
+		{Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				ISCSI: &api.ISCSIPersistentVolumeSource{
+					SecretRef: &api.SecretReference{
 						Name: "Spec.PersistentVolumeSource.ISCSI.SecretRef"}}}}},
 		{Spec: api.PersistentVolumeSpec{
 			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
@@ -159,6 +168,7 @@ func TestPVSecrets(t *testing.T) {
 		"claimrefns/Spec.PersistentVolumeSource.ScaleIO.SecretRef",
 		"scaleions/Spec.PersistentVolumeSource.ScaleIO.SecretRef",
 		"claimrefns/Spec.PersistentVolumeSource.ISCSI.SecretRef",
+		"iscsi/Spec.PersistentVolumeSource.ISCSI.SecretRef",
 		"storageosns/Spec.PersistentVolumeSource.StorageOS.SecretRef",
 	)
 	if missingNames := expectedNamespacedNames.Difference(extractedNamesWithNamespace); len(missingNames) > 0 {
@@ -203,4 +213,63 @@ func collectSecretPaths(t *testing.T, path *field.Path, name string, tp reflect.
 	}
 
 	return secretPaths
+}
+
+func newHostPathType(pathType string) *api.HostPathType {
+	hostPathType := new(api.HostPathType)
+	*hostPathType = api.HostPathType(pathType)
+	return hostPathType
+}
+
+func TestDropAlphaPVVolumeMode(t *testing.T) {
+	vmode := api.PersistentVolumeFilesystem
+
+	// PersistentVolume with VolumeMode set
+	pv := api.PersistentVolume{
+		Spec: api.PersistentVolumeSpec{
+			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo",
+					Type: newHostPathType(string(api.HostPathDirectory)),
+				},
+			},
+			StorageClassName: "test-storage-class",
+			VolumeMode:       &vmode,
+		},
+	}
+
+	// Enable alpha feature BlockVolume
+	err1 := utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
+	if err1 != nil {
+		t.Fatalf("Failed to enable feature gate for BlockVolume: %v", err1)
+	}
+
+	// now test dropping the fields - should not be dropped
+	DropDisabledAlphaFields(&pv.Spec)
+
+	// check to make sure VolumeDevices is still present
+	// if featureset is set to true
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		if pv.Spec.VolumeMode == nil {
+			t.Error("VolumeMode in pv.Spec should not have been dropped based on feature-gate")
+		}
+	}
+
+	// Disable alpha feature BlockVolume
+	err := utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
+	if err != nil {
+		t.Fatalf("Failed to disable feature gate for BlockVolume: %v", err)
+	}
+
+	// now test dropping the fields
+	DropDisabledAlphaFields(&pv.Spec)
+
+	// check to make sure VolumeDevices is nil
+	// if featureset is set to false
+	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		if pv.Spec.VolumeMode != nil {
+			t.Error("DropDisabledAlphaFields VolumeMode for pv.Spec failed")
+		}
+	}
 }

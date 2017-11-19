@@ -75,7 +75,7 @@ var (
 		You can filter the list using a label selector and the --selector flag. If the
 		desired resource type is namespaced you will only see results in your current
 		namespace unless you pass --all-namespaces.
-		
+
 		This command will hide resources that have completed, such as pods that are
 		in the Succeeded or Failed phases. You can see the full results for any
 		resource by providing the --show-all flag. Uninitialized objects are not
@@ -114,7 +114,7 @@ var (
 )
 
 const (
-	useOpenAPIPrintColumnFlagLabel = "experimental-use-openapi-print-columns"
+	useOpenAPIPrintColumnFlagLabel = "use-openapi-print-columns"
 )
 
 // NewCmdGet creates a command object for the generic "get" action, which
@@ -647,9 +647,7 @@ func (options *GetOptions) printGeneric(printer printers.ResourcePrinter, r *res
 }
 
 func addOpenAPIPrintColumnFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool(useOpenAPIPrintColumnFlagLabel, false, "If true, use x-kubernetes-print-column metadata (if present) from the OpenAPI schema for displaying a resource.")
-	// marking it deprecated so that it is hidden from usage/help text.
-	cmd.Flags().MarkDeprecated(useOpenAPIPrintColumnFlagLabel, "This flag is experimental and may be removed in the future.")
+	cmd.Flags().Bool(useOpenAPIPrintColumnFlagLabel, true, "If true, use x-kubernetes-print-column metadata (if present) from the OpenAPI schema for displaying a resource.")
 }
 
 func shouldGetNewPrinterForMapping(printer printers.ResourcePrinter, lastMapping, mapping *meta.RESTMapping) bool {

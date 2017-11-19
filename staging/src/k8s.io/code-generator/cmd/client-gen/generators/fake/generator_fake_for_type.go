@@ -69,7 +69,7 @@ func genStatus(t *types.Type) bool {
 		}
 	}
 
-	tags := util.MustParseClientGenTags(t.SecondClosestCommentLines)
+	tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
 	return hasStatus && !tags.NoStatus
 }
 
@@ -87,7 +87,7 @@ func hasObjectMeta(t *types.Type) bool {
 func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	pkg := filepath.Base(t.Name.Package)
-	tags, err := util.ParseClientGenTags(t.SecondClosestCommentLines)
+	tags, err := util.ParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
 	if err != nil {
 		return err
 	}

@@ -22,6 +22,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -281,10 +282,9 @@ func getIPTablesMark(bit int) string {
 	return fmt.Sprintf("%#08x/%#08x", value, value)
 }
 
-// GetClusterDNS returns a list of the DNS servers, a list of the DNS search
-// domains of the cluster, and a list of resolv.conf options.
+// GetPodDNS returns DNS setttings for the pod.
 // This function is defined in kubecontainer.RuntimeHelper interface so we
 // have to implement it.
-func (kl *Kubelet) GetClusterDNS(pod *v1.Pod) ([]string, []string, []string, bool, error) {
-	return kl.dnsConfigurer.GetClusterDNS(pod)
+func (kl *Kubelet) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
+	return kl.dnsConfigurer.GetPodDNS(pod)
 }

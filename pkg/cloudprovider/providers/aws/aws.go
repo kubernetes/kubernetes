@@ -41,13 +41,18 @@ import (
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 
 	"path"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes/scheme"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
@@ -148,6 +153,12 @@ const ServiceAnnotationLoadBalancerBEProtocol = "service.beta.kubernetes.io/aws-
 // additional tags in the ELB.
 // For example: "Key1=Val1,Key2=Val2,KeyNoVal1=,KeyNoVal2"
 const ServiceAnnotationLoadBalancerAdditionalTags = "service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags"
+
+// Event key when a volume is stuck on attaching state when being attached to a volume
+const volumeAttachmentStuck = "VolumeAttachmentStuck"
+
+// Indicates that a node has volumes stuck in attaching state and hence it is not fit for scheduling more pods
+const nodeWithImpairedVolumes = "NodeWithImpairedVolumes"
 
 const (
 	// volumeAttachmentConsecutiveErrorLimit is the number of consecutive errors we will ignore when waiting for a volume to attach/detach
@@ -260,6 +271,7 @@ type ELB interface {
 	CreateLoadBalancer(*elb.CreateLoadBalancerInput) (*elb.CreateLoadBalancerOutput, error)
 	DeleteLoadBalancer(*elb.DeleteLoadBalancerInput) (*elb.DeleteLoadBalancerOutput, error)
 	DescribeLoadBalancers(*elb.DescribeLoadBalancersInput) (*elb.DescribeLoadBalancersOutput, error)
+	AddTags(*elb.AddTagsInput) (*elb.AddTagsOutput, error)
 	RegisterInstancesWithLoadBalancer(*elb.RegisterInstancesWithLoadBalancerInput) (*elb.RegisterInstancesWithLoadBalancerOutput, error)
 	DeregisterInstancesFromLoadBalancer(*elb.DeregisterInstancesFromLoadBalancerInput) (*elb.DeregisterInstancesFromLoadBalancerOutput, error)
 	CreateLoadBalancerPolicy(*elb.CreateLoadBalancerPolicyInput) (*elb.CreateLoadBalancerPolicyOutput, error)
@@ -404,6 +416,11 @@ type Cloud struct {
 	selfAWSInstance *awsInstance
 
 	instanceCache instanceCache
+
+	clientBuilder    controller.ControllerClientBuilder
+	kubeClient       clientset.Interface
+	eventBroadcaster record.EventBroadcaster
+	eventRecorder    record.EventRecorder
 
 	// We keep an active list of devices we have assigned but not yet
 	// attached, to avoid a race condition where we assign a device mapping
@@ -964,7 +981,14 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (c *Cloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
+func (c *Cloud) Initialize(clientBuilder controller.ControllerClientBuilder) {
+	c.clientBuilder = clientBuilder
+	c.kubeClient = clientBuilder.ClientOrDie("cloud-provider")
+	c.eventBroadcaster = record.NewBroadcaster()
+	c.eventBroadcaster.StartLogging(glog.Infof)
+	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(c.kubeClient.CoreV1().RESTClient()).Events("")})
+	c.eventRecorder = c.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "aws-cloudprovider"})
+}
 
 // Clusters returns the list of clusters.
 func (c *Cloud) Clusters() (cloudprovider.Clusters, bool) {
@@ -1532,6 +1556,28 @@ func (d *awsDisk) describeVolume() (*ec2.Volume, error) {
 	return volumes[0], nil
 }
 
+// applyUnSchedulableTaint applies a unschedulable taint to a node after verifying
+// if node has become unusable because of volumes getting stuck in attaching state.
+func (c *Cloud) applyUnSchedulableTaint(nodeName types.NodeName, reason string) {
+	node, fetchErr := c.kubeClient.CoreV1().Nodes().Get(string(nodeName), metav1.GetOptions{})
+	if fetchErr != nil {
+		glog.Errorf("Error fetching node %s with %v", nodeName, fetchErr)
+		return
+	}
+
+	taint := &v1.Taint{
+		Key:    nodeWithImpairedVolumes,
+		Value:  "true",
+		Effect: v1.TaintEffectNoSchedule,
+	}
+	err := controller.AddOrUpdateTaintOnNode(c.kubeClient, string(nodeName), taint)
+	if err != nil {
+		glog.Errorf("Error applying taint to node %s with error %v", nodeName, err)
+		return
+	}
+	c.eventRecorder.Eventf(node, v1.EventTypeWarning, volumeAttachmentStuck, reason)
+}
+
 // waitForAttachmentStatus polls until the attachment status is the expected value
 // On success, it returns the last attachment state.
 func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment, error) {
@@ -1751,7 +1797,11 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 	}
 
 	attachment, err := disk.waitForAttachmentStatus("attached")
+
 	if err != nil {
+		if err == wait.ErrWaitTimeout {
+			c.applyUnSchedulableTaint(nodeName, "Volume stuck in attaching state - node needs reboot to fix impaired state.")
+		}
 		return "", err
 	}
 
@@ -2197,6 +2247,27 @@ func (c *Cloud) describeLoadBalancer(name string) (*elb.LoadBalancerDescription,
 		ret = loadBalancer
 	}
 	return ret, nil
+}
+
+func (c *Cloud) addLoadBalancerTags(loadBalancerName string, requested map[string]string) error {
+	var tags []*elb.Tag
+	for k, v := range requested {
+		tag := &elb.Tag{
+			Key:   aws.String(k),
+			Value: aws.String(v),
+		}
+		tags = append(tags, tag)
+	}
+
+	request := &elb.AddTagsInput{}
+	request.LoadBalancerNames = []*string{&loadBalancerName}
+	request.Tags = tags
+
+	_, err := c.elb.AddTags(request)
+	if err != nil {
+		return fmt.Errorf("error adding tags to load balancer: %v", err)
+	}
+	return nil
 }
 
 // Retrieves instance's vpc id from metadata

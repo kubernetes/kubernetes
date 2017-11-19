@@ -525,6 +525,16 @@ func (h *HumanReadablePrinter) PrintTable(obj runtime.Object, options PrintOptio
 		ColumnDefinitions: columns,
 		Rows:              results[0].Interface().([]metav1alpha1.TableRow),
 	}
+	if m, err := meta.ListAccessor(obj); err == nil {
+		table.ResourceVersion = m.GetResourceVersion()
+		table.SelfLink = m.GetSelfLink()
+		table.Continue = m.GetContinue()
+	} else {
+		if m, err := meta.CommonAccessor(obj); err == nil {
+			table.ResourceVersion = m.GetResourceVersion()
+			table.SelfLink = m.GetSelfLink()
+		}
+	}
 	if err := DecorateTable(table, options); err != nil {
 		return nil, err
 	}

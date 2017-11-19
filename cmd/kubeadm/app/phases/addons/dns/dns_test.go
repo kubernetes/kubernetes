@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -159,7 +160,7 @@ func TestGetDNSIP(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		dnsIP, err := GetDNSIP(rt.svcSubnet)
+		dnsIP, err := kubeadmconstants.GetDNSIP(rt.svcSubnet)
 		if err != nil {
 			t.Fatalf("couldn't get dnsIP : %v", err)
 		}

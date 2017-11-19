@@ -27,7 +27,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -232,7 +231,7 @@ func patchResource(
 					return nil, err
 				}
 				// Capture the original object map and patch for possible retries.
-				originalMap, err := unstructured.DefaultConverter.ToUnstructured(currentVersionedObject)
+				originalMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(currentVersionedObject)
 				if err != nil {
 					return nil, err
 				}
@@ -278,7 +277,7 @@ func patchResource(
 			if err != nil {
 				return nil, err
 			}
-			currentObjMap, err := unstructured.DefaultConverter.ToUnstructured(currentVersionedObject)
+			currentObjMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(currentVersionedObject)
 			if err != nil {
 				return nil, err
 			}
@@ -425,7 +424,7 @@ func strategicPatchObject(
 	objToUpdate runtime.Object,
 	versionedObj runtime.Object,
 ) error {
-	originalObjMap, err := unstructured.DefaultConverter.ToUnstructured(originalObject)
+	originalObjMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(originalObject)
 	if err != nil {
 		return err
 	}
@@ -458,7 +457,7 @@ func applyPatchToObject(
 	}
 
 	// Rather than serialize the patched map to JSON, then decode it to an object, we go directly from a map to an object
-	if err := unstructured.DefaultConverter.FromUnstructured(patchedObjMap, objToUpdate); err != nil {
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(patchedObjMap, objToUpdate); err != nil {
 		return err
 	}
 	// Decoding from JSON to a versioned object would apply defaults, so we do the same here
