@@ -106,3 +106,13 @@ func DNS1123Subdomain(value string, fldPath *field.Path) field.ErrorList {
 	}
 	return allErrs
 }
+
+// ImmutableStringUpdate validates that a string field has not changed.
+func ImmutableStringUpdate(after string, before string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if after != before {
+		allErrs = append(allErrs, field.Invalid(fldPath, after, "may not be changed"))
+	}
+	return allErrs
+}
