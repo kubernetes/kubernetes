@@ -52,6 +52,7 @@ filegroup(
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/api/testing:all-srcs",
+        "//staging/src/k8s.io/apimachinery/pkg/api/validate:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/api/validation:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/apimachinery:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/fuzzer:all-srcs",

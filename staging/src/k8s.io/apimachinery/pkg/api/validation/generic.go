@@ -19,8 +19,8 @@ package validation
 import (
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/validate"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 const IsNegativeErrorMsg string = `must be greater than or equal to 0`
@@ -75,11 +75,6 @@ func maskTrailingDash(name string) string {
 	return name
 }
 
-// Validates that given value is not negative.
-func ValidateNonnegativeField(value int64, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if value < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, IsNegativeErrorMsg))
-	}
-	return allErrs
-}
+// Validates that given value is not negative. This is deprecated, new callers
+// should use k8s.io/apimachinery/pkg/api/validate.NonNegative().
+var ValidateNonnegativeField = validate.NonNegative
