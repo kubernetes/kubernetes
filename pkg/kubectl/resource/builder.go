@@ -58,6 +58,7 @@ type Builder struct {
 	selectAll            bool
 	includeUninitialized bool
 	limitChunks          int64
+	requestTransforms    []RequestTransform
 
 	resources []string
 
@@ -351,6 +352,13 @@ func (b *Builder) RequireNamespace() *Builder {
 // no chunking.
 func (b *Builder) RequestChunksOf(chunkSize int64) *Builder {
 	b.limitChunks = chunkSize
+	return b
+}
+
+// TransformRequests alters API calls made by clients requested from this builder. Pass
+// an empty list to clear modifiers.
+func (b *Builder) TransformRequests(opts ...RequestTransform) *Builder {
+	b.requestTransforms = opts
 	return b
 }
 
@@ -656,6 +664,7 @@ func (b *Builder) visitBySelector() *Result {
 			result.err = err
 			return result
 		}
+		client = NewClientWithOptions(client, b.requestTransforms...)
 		selectorNamespace := b.namespace
 		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 			selectorNamespace = ""
@@ -705,6 +714,7 @@ func (b *Builder) visitByResource() *Result {
 			result.err = err
 			return result
 		}
+		client = NewClientWithOptions(client, b.requestTransforms...)
 		clients[s] = client
 	}
 
