@@ -8,20 +8,20 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "defaults.go",
         "doc.go",
         "register.go",
         "zz_generated.conversion.go",
         "zz_generated.defaults.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/admission/v1alpha1",
+    importpath = "k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1",
     deps = [
-        "//pkg/apis/admission:go_default_library",
-        "//vendor/k8s.io/api/admission/v1alpha1:go_default_library",
+        "//pkg/apis/admissionregistration:go_default_library",
+        "//vendor/k8s.io/api/admissionregistration/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
 )
 

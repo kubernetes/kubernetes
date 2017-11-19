@@ -14,12 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+// +k8s:deepcopy-gen=package
+// +k8s:openapi-gen=false
 
-import (
-	"k8s.io/apimachinery/pkg/runtime"
-)
-
-func addDefaultingFuncs(scheme *runtime.Scheme) error {
-	return RegisterDefaults(scheme)
-}
+// +groupName=admission.k8s.io
+package v1beta1 // import "k8s.io/api/admission/v1beta1"

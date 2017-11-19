@@ -1,31 +1,28 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+package(default_visibility = ["//visibility:public"])
+
+load(
+    "@io_bazel_rules_go//go:def.bzl",
+    "go_library",
+)
 
 go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
-        "generated.pb.go",
         "register.go",
-        "types.go",
-        "types_swagger_doc_generated.go",
-        "zz_generated.deepcopy.go",
+        "zz_generated.conversion.go",
+        "zz_generated.defaults.go",
     ],
-    importpath = "k8s.io/api/admission/v1alpha1",
-    visibility = ["//visibility:public"],
+    importpath = "k8s.io/kubernetes/pkg/apis/admission/v1beta1",
     deps = [
-        "//vendor/github.com/gogo/protobuf/proto:go_default_library",
-        "//vendor/k8s.io/api/authentication/v1:go_default_library",
+        "//pkg/apis/admission:go_default_library",
+        "//vendor/k8s.io/api/admission/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
-)
-
-filegroup(
-    name = "go_default_library_protos",
-    srcs = ["generated.proto"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(
@@ -39,5 +36,4 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
-    visibility = ["//visibility:public"],
 )
