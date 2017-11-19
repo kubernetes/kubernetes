@@ -40,6 +40,8 @@ type Waiter interface {
 	WaitForPodsWithLabel(kvLabel string) error
 	// WaitForPodToDisappear waits for the given Pod in the kube-system namespace to be deleted
 	WaitForPodToDisappear(staticPodName string) error
+	// WaitForStaticPodSingleHash fetches sha256 hash for the control plane static pod
+	WaitForStaticPodSingleHash(nodeName string, component string) (string, error)
 	// WaitForStaticPodControlPlaneHashes fetches sha256 hashes for the control plane static pods
 	WaitForStaticPodControlPlaneHashes(nodeName string) (map[string]string, error)
 	// WaitForStaticPodControlPlaneHashChange waits for the given static pod component's static pod hash to get updated.
@@ -154,17 +156,40 @@ func (w *KubeWaiter) SetTimeout(timeout time.Duration) {
 // WaitForStaticPodControlPlaneHashes blocks until it timeouts or gets a hash map for all components and their Static Pods
 func (w *KubeWaiter) WaitForStaticPodControlPlaneHashes(nodeName string) (map[string]string, error) {
 
-	var mirrorPodHashes map[string]string
-	err := wait.PollImmediate(constants.APICallRetryInterval, w.timeout, func() (bool, error) {
+	componentHash := ""
+	var err error
+	mirrorPodHashes := map[string]string{}
+	for _, component := range constants.MasterComponents {
+		err = wait.PollImmediate(constants.APICallRetryInterval, w.timeout, func() (bool, error) {
+			componentHash, err = getStaticPodSingleHash(w.client, nodeName, component)
+			if err != nil {
+				return false, nil
+			}
+			return true, nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		mirrorPodHashes[component] = componentHash
+	}
 
-		hashes, err := getStaticPodControlPlaneHashes(w.client, nodeName)
+	return mirrorPodHashes, nil
+}
+
+// WaitForStaticPodSingleHash blocks until it timeouts or gets a hash for a single component and its Static Pod
+func (w *KubeWaiter) WaitForStaticPodSingleHash(nodeName string, component string) (string, error) {
+
+	componentPodHash := ""
+	var err error
+	err = wait.PollImmediate(constants.APICallRetryInterval, w.timeout, func() (bool, error) {
+		componentPodHash, err = getStaticPodSingleHash(w.client, nodeName, component)
 		if err != nil {
 			return false, nil
 		}
-		mirrorPodHashes = hashes
 		return true, nil
 	})
-	return mirrorPodHashes, err
+
+	return componentPodHash, err
 }
 
 // WaitForStaticPodControlPlaneHashChange blocks until it timeouts or notices that the Mirror Pod (for the Static Pod, respectively) has changed
@@ -190,20 +215,30 @@ func getStaticPodControlPlaneHashes(client clientset.Interface, nodeName string)
 
 	mirrorPodHashes := map[string]string{}
 	for _, component := range constants.MasterComponents {
-		staticPodName := fmt.Sprintf("%s-%s", component, nodeName)
-		staticPod, err := client.CoreV1().Pods(metav1.NamespaceSystem).Get(staticPodName, metav1.GetOptions{})
+		hash, err := getStaticPodSingleHash(client, nodeName, component)
 		if err != nil {
 			return nil, err
 		}
-
-		podBytes, err := json.Marshal(staticPod)
-		if err != nil {
-			return nil, err
-		}
-
-		mirrorPodHashes[component] = fmt.Sprintf("%x", sha256.Sum256(podBytes))
+		mirrorPodHashes[component] = hash
 	}
 	return mirrorPodHashes, nil
+}
+
+// getStaticSinglePodHash computes hashes for a single Static Pod resource
+func getStaticPodSingleHash(client clientset.Interface, nodeName string, component string) (string, error) {
+
+	staticPodName := fmt.Sprintf("%s-%s", component, nodeName)
+	staticPod, err := client.CoreV1().Pods(metav1.NamespaceSystem).Get(staticPodName, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	podBytes, err := json.Marshal(staticPod)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%x", sha256.Sum256(podBytes)), nil
 }
 
 // TryRunCommand runs a function a maximum of failureThreshold times, and retries on error. If failureThreshold is hit; the last error is returned
