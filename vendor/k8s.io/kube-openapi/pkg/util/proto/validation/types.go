@@ -163,11 +163,11 @@ func (item *arrayItem) VisitArray(schema *proto.Array) {
 }
 
 func (item *arrayItem) VisitMap(schema *proto.Map) {
-	item.AddValidationError(InvalidTypeError{Path: schema.GetPath().String(), Expected: "array", Actual: "map"})
+	item.AddValidationError(InvalidTypeError{Path: schema.GetPath().String(), Expected: "map", Actual: "array"})
 }
 
 func (item *arrayItem) VisitKind(schema *proto.Kind) {
-	item.AddValidationError(InvalidTypeError{Path: schema.GetPath().String(), Expected: "array", Actual: "map"})
+	item.AddValidationError(InvalidTypeError{Path: schema.GetPath().String(), Expected: "map", Actual: "array"})
 }
 
 func (item *arrayItem) VisitReference(schema proto.Reference) {
