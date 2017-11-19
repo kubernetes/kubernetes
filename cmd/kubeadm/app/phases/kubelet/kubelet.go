@@ -86,7 +86,13 @@ func UpdateNodeWithConfigMap(client clientset.Interface, nodeName string) error 
 			return false, nil
 		}
 
-		node.Spec.ConfigSource.ConfigMapRef.UID = kubeletCfg.UID
+		node.Spec.ConfigSource = &v1.NodeConfigSource{
+			ConfigMapRef: &v1.ObjectReference{
+				Name:      kubeadmconstants.KubeletBaseConfigurationConfigMap,
+				Namespace: metav1.NamespaceSystem,
+				UID:       kubeletCfg.UID,
+			},
+		}
 
 		newData, err := json.Marshal(node)
 		if err != nil {
