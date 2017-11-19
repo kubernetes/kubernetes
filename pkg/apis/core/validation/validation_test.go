@@ -39,6 +39,7 @@ import (
 )
 
 const (
+	isNegativeErrorMsg      = "greater than or equal to 0"
 	dnsLabelErrMsg          = "a DNS-1123 label must consist of"
 	dnsSubdomainLabelErrMsg = "a DNS-1123 subdomain"
 	envVarNameErrMsg        = "a valid environment variable name must consist of"

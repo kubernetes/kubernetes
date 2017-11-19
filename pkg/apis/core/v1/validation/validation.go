@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/validate"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -29,7 +30,6 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
-const isNegativeErrorMsg string = `must be greater than or equal to 0`
 const isNotIntegerErrorMsg string = `must be an integer`
 
 func ValidateResourceRequirements(requirements *v1.ResourceRequirements, fldPath *field.Path) field.ErrorList {
@@ -82,20 +82,11 @@ func validateContainerResourceName(value string, fldPath *field.Path) field.Erro
 // ValidateResourceQuantityValue enforces that specified quantity is valid for specified resource
 func ValidateResourceQuantityValue(resource string, value resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateNonnegativeQuantity(value, fldPath)...)
+	allErrs = append(allErrs, validate.NonNegativeQuantity(value, fldPath)...)
 	if helper.IsIntegerResourceName(resource) {
 		if value.MilliValue()%int64(1000) != int64(0) {
 			allErrs = append(allErrs, field.Invalid(fldPath, value, isNotIntegerErrorMsg))
 		}
-	}
-	return allErrs
-}
-
-// Validates that a Quantity is not negative
-func ValidateNonnegativeQuantity(value resource.Quantity, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if value.Cmp(resource.Quantity{}) < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, value.String(), isNegativeErrorMsg))
 	}
 	return allErrs
 }
@@ -122,8 +113,8 @@ func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 
 func ValidatePodLogOptions(opts *v1.PodLogOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if opts.TailLines != nil && *opts.TailLines < 0 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("tailLines"), *opts.TailLines, isNegativeErrorMsg))
+	if opts.TailLines != nil {
+		allErrs = append(allErrs, validate.NonNegative(int64(*opts.TailLines), field.NewPath("tailLines"))...)
 	}
 	if opts.LimitBytes != nil && *opts.LimitBytes < 1 {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("limitBytes"), *opts.LimitBytes, "must be greater than 0"))

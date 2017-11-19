@@ -19,14 +19,26 @@ package validate
 import (
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-// Validates that given value is not negative.
+const isNegativeErrorMsg string = `must be greater than or equal to 0`
+
+// NonNegative validates that given int64 is not negative.
 func NonNegative(value int64, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if value < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, `must be greater than or equal to 0`))
+		allErrs = append(allErrs, field.Invalid(fldPath, value, isNegativeErrorMsg))
+	}
+	return allErrs
+}
+
+// NonNegativeQuantity validates that a given Quantity is not negative
+func NonNegativeQuantity(value resource.Quantity, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if value.Cmp(resource.Quantity{}) < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, value.String(), isNegativeErrorMsg))
 	}
 	return allErrs
 }
