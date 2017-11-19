@@ -192,6 +192,11 @@ func (in *Policy) DeepCopyInto(out *Policy) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.OmitStages != nil {
+		in, out := &in.OmitStages, &out.OmitStages
+		*out = make([]Stage, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
