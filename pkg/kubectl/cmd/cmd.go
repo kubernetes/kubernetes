@@ -299,7 +299,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 				NewCmdApply("kubectl", f, out, err),
 				NewCmdPatch(f, out),
 				NewCmdReplace(f, out),
-				NewCmdConvert(f, out),
+				NewCmdConvert(f, out, err),
 			},
 		},
 		{
