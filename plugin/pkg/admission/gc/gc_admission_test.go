@@ -87,7 +87,7 @@ func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 	}
 
 	genericPluginInitializer := initializer.New(nil, nil, fakeAuthorizer{}, nil)
-	pluginInitializer := kubeadmission.NewPluginInitializer(nil, nil, nil, legacyscheme.Registry.RESTMapper(), nil, nil, nil)
+	pluginInitializer := kubeadmission.NewPluginInitializer(nil, nil, nil, legacyscheme.Registry.RESTMapper(), nil)
 	initializersChain := admission.PluginInitializers{}
 	initializersChain = append(initializersChain, genericPluginInitializer)
 	initializersChain = append(initializersChain, pluginInitializer)

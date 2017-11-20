@@ -55,13 +55,16 @@ import (
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	openapi "k8s.io/kube-openapi/pkg/common"
 
+	webhookinit "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer"
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/storage"
@@ -86,8 +89,6 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 
-	"k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration
 	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration
 )
@@ -462,7 +463,7 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 			return ret, err
 		})
 	}
-	pluginInitializer, err := BuildAdmissionPluginInitializer(
+	pluginInitializers, err := BuildAdmissionPluginInitializers(
 		s,
 		client,
 		sharedInformers,
@@ -478,7 +479,7 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 		versionedInformers,
 		kubeClientConfig,
 		legacyscheme.Scheme,
-		pluginInitializer)
+		pluginInitializers...)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to initialize admission: %v", err)
 	}
@@ -486,8 +487,8 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 	return genericConfig, sharedInformers, versionedInformers, insecureServingOptions, serviceResolver, nil
 }
 
-// BuildAdmissionPluginInitializer constructs the admission plugin initializer
-func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory, serviceResolver aggregatorapiserver.ServiceResolver, webhookAuthWrapper webhookconfig.AuthenticationInfoResolverWrapper) (admission.PluginInitializer, error) {
+// BuildAdmissionPluginInitializers constructs the admission plugin initializer
+func BuildAdmissionPluginInitializers(s *options.ServerRunOptions, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory, serviceResolver aggregatorapiserver.ServiceResolver, webhookAuthWrapper webhookconfig.AuthenticationInfoResolverWrapper) ([]admission.PluginInitializer, error) {
 	var cloudConfig []byte
 
 	if s.CloudProvider.CloudConfigFile != "" {
@@ -503,9 +504,10 @@ func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client interna
 
 	quotaConfiguration := quotainstall.NewQuotaConfigurationForAdmission()
 
-	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, cloudConfig, restMapper, quotaConfiguration, webhookAuthWrapper, serviceResolver)
+	kubePluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, cloudConfig, restMapper, quotaConfiguration)
+	webhookPluginInitializer := webhookinit.NewPluginInitializer(webhookAuthWrapper, serviceResolver)
 
-	return pluginInitializer, nil
+	return []admission.PluginInitializer{webhookPluginInitializer, kubePluginInitializer}, nil
 }
 
 // BuildAuthenticator constructs the authenticator
