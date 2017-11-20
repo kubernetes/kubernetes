@@ -1702,40 +1702,6 @@ func (proxier *Proxier) linkKubeServiceChain(existingNATChains map[utiliptables.
 	return nil
 }
 
-//// linkKubeIPSetsChain will Create chain KUBE-SVC-IPSETS and link the chin in KUBE-SERVICES
-//
-//// Chain KUBE-SERVICES (policy ACCEPT)
-//// target            prot opt source               destination
-//// KUBE-SVC-IPSETS   all  --  0.0.0.0/0            0.0.0.0/0     match-set KUBE-SERVICE-ACCESS dst,dst
-//
-//// Chain KUBE-SVC-IPSETS (1 references)
-//// target     prot opt source               destination
-//// KUBE-MARK-MASQ  all  --  0.0.0.0/0       0.0.0.0/0            match-set KUBE-EXTERNAL-IP dst,dst
-//// ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-EXTERNAL-IP dst,dst PHYSDEV match ! --physdev-is-in ADDRTYPE match src-type !LOCAL
-//// ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-EXTERNAL-IP dst,dst ADDRTYPE match dst-type LOCAL
-//// ...
-//func (proxier *Proxier) linkKubeIPSetsChain(existingNATChains map[utiliptables.Chain]string, natChains *bytes.Buffer) error {
-//	if _, err := proxier.iptables.EnsureChain(utiliptables.TableNAT, KubeServiceIPSetsChain); err != nil {
-//		return fmt.Errorf("Failed to ensure that %s chain %s exists: %v", utiliptables.TableNAT, KubeServiceIPSetsChain, err)
-//	}
-//
-//	// TODO: iptables comment message for ipset?
-//	// The hash:ip,port type of sets require two src/dst parameters of the set match and SET target kernel modules.
-//	args := []string{"-m", "set", "--match-set", proxier.kubeServiceAccessSet.Name, "dst,dst", "-j", string(KubeServiceIPSetsChain)}
-//	if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, utiliptables.TableNAT, kubeServicesChain, args...); err != nil {
-//		return fmt.Errorf("Failed to ensure that ipset %s chain %s jumps to %s: %v", proxier.kubeServiceAccessSet.Name, kubeServicesChain, KubeServiceIPSetsChain, err)
-//	}
-//
-//	// equal to `iptables -t nat -N KUBE-SVC-IPSETS`
-//	// write `:KUBE-SERVICES - [0:0]` in nat table
-//	if chain, ok := existingNATChains[KubeServiceIPSetsChain]; ok {
-//		writeLine(natChains, chain)
-//	} else {
-//		writeLine(natChains, utiliptables.MakeChainLine(KubeServiceIPSetsChain))
-//	}
-//	return nil
-//}
-
 func (proxier *Proxier) createKubeFireWallChain(existingNATChains map[utiliptables.Chain]string, natChains *bytes.Buffer) error {
 	// `iptables -t nat -N KUBE-FIRE-WALL`
 	if _, err := proxier.iptables.EnsureChain(utiliptables.TableNAT, KubeFireWallChain); err != nil {
