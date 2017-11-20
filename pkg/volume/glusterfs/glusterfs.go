@@ -729,7 +729,7 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	}
 
 	pv.Spec.Capacity = v1.ResourceList{
-		v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
+		v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dG", sizeGB)),
 	}
 	return pv, nil
 }
