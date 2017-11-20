@@ -814,7 +814,7 @@ func getResourceAllocatable(capacity v1.ResourceList, reservation v1.ResourceLis
 		}
 		return capacity.Copy(), allocate, true
 	}
-	glog.Errorf("Could not find capacity information for resource %v", resourceName)
+	glog.Warningf("Could not find capacity information for resource %v, node capacity may not be initialized yet.", resourceName)
 	return nil, nil, false
 }
 
