@@ -248,6 +248,13 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout tim
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
 
+	case *extensions.DaemonSet:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+
 	case *batch.Job:
 		namespace = t.Namespace
 		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
@@ -340,6 +347,12 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout tim
 		selector = labels.SelectorFromSet(t.Spec.Selector)
 
 	case *apps.StatefulSet:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+	case *extensions.DaemonSet:
 		namespace = t.Namespace
 		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
 		if err != nil {
