@@ -102,6 +102,8 @@ func NewMutatingWebhook(configFile io.Reader) (*MutatingWebhook, error) {
 	}, nil
 }
 
+var _ admission.MutationInterface = &MutatingWebhook{}
+
 // MutatingWebhook is an implementation of admission.Interface.
 type MutatingWebhook struct {
 	*admission.Handler
