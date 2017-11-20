@@ -21,9 +21,13 @@ limitations under the License.
 package app
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
 	"k8s.io/kubernetes/pkg/controller/certificates/cleaner"
 	"k8s.io/kubernetes/pkg/controller/certificates/signer"
@@ -36,6 +40,45 @@ func startCSRSigningController(ctx ControllerContext) (bool, error) {
 	if ctx.Options.ClusterSigningCertFile == "" || ctx.Options.ClusterSigningKeyFile == "" {
 		return false, nil
 	}
+
+	// Deprecation warning for old defaults.
+	//
+	// * If the signing cert and key are the default paths but the files
+	// exist, warn that the paths need to be specified explicitly in a
+	// later release and the defaults will be removed. We don't expect this
+	// to be the case.
+	//
+	// * If the signing cert and key are default paths but the files don't exist,
+	// bail out of startController without logging.
+	var keyFileExists, keyUsesDefault, certFileExists, certUsesDefault bool
+
+	_, err := os.Stat(ctx.Options.ClusterSigningCertFile)
+	certFileExists = !os.IsNotExist(err)
+
+	certUsesDefault = (ctx.Options.ClusterSigningCertFile == options.DefaultClusterSigningCertFile)
+
+	_, err = os.Stat(ctx.Options.ClusterSigningKeyFile)
+	keyFileExists = !os.IsNotExist(err)
+
+	keyUsesDefault = (ctx.Options.ClusterSigningKeyFile == options.DefaultClusterSigningKeyFile)
+
+	switch {
+	case (keyFileExists && keyUsesDefault) || (certFileExists && certUsesDefault):
+		glog.Warningf("You might be using flag defaulting for --cluster-signing-cert-file and" +
+			" --cluster-signing-key-file. These defaults are deprecated and will be removed" +
+			" in a subsequent release. Please pass these options explicitly.")
+	case (!keyFileExists && keyUsesDefault) && (!certFileExists && certUsesDefault):
+		// This is what we expect right now if people aren't
+		// setting up the signing controller. This isn't
+		// actually a problem since the signer is not a
+		// required controller.
+		return false, nil
+	default:
+		// Note that '!filesExist && !usesDefaults' is obviously
+		// operator error. We don't handle this case here and instead
+		// allow it to be handled by NewCSR... below.
+	}
+
 	c := ctx.ClientBuilder.ClientOrDie("certificate-controller")
 
 	signer, err := signer.NewCSRSigningController(
@@ -46,8 +89,7 @@ func startCSRSigningController(ctx ControllerContext) (bool, error) {
 		ctx.Options.ClusterSigningDuration.Duration,
 	)
 	if err != nil {
-		glog.Errorf("Failed to start certificate controller: %v", err)
-		return false, nil
+		return false, fmt.Errorf("failed to start certificate controller: %v", err)
 	}
 	go signer.Run(1, ctx.Stop)
 
