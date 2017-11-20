@@ -223,7 +223,31 @@ var (
 
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
 	MinimumKubeletVersion = version.MustParseSemantic("v1.8.0")
+
+	// SupportedEtcdVersion lists officially supported etcd versions with corresponding kubernetes releases
+	SupportedEtcdVersion = map[uint8]string{
+		8: "3.0.17",
+		9: "3.1.10",
+	}
 )
+
+// EtcdSupportedVersion returns officially supported version of etcd for a specific kubernetes release
+// if passed version is not listed, the function returns nil and an error
+func EtcdSupportedVersion(versionString string) (*version.Version, error) {
+	kubernetesVersion, err := version.ParseSemantic(versionString)
+	if err != nil {
+		return nil, err
+	}
+
+	if etcdStringVersion, ok := SupportedEtcdVersion[uint8(kubernetesVersion.Minor())]; ok {
+		etcdVersion, err := version.ParseSemantic(etcdStringVersion)
+		if err != nil {
+			return nil, err
+		}
+		return etcdVersion, nil
+	}
+	return nil, fmt.Errorf("Unsupported or unknown kubernetes version")
+}
 
 // GetStaticPodDirectory returns the location on the disk where the Static Pod should be present
 func GetStaticPodDirectory() string {

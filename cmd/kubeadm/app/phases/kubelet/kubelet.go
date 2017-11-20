@@ -39,6 +39,9 @@ import (
 
 // CreateBaseKubeletConfiguration creates base kubelet configuration for dynamic kubelet configuration feature.
 func CreateBaseKubeletConfiguration(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
+	fmt.Printf("[kubelet] Uploading a ConfigMap %q in namespace %s with base configuration for the kubelets in the cluster",
+		kubeadmconstants.KubeletBaseConfigurationConfigMap, metav1.NamespaceSystem)
+
 	_, kubeletCodecs, err := kubeletconfigscheme.NewSchemeAndCodecs()
 	if err != nil {
 		return err
@@ -69,6 +72,9 @@ func CreateBaseKubeletConfiguration(cfg *kubeadmapi.MasterConfiguration, client 
 
 // UpdateNodeWithConfigMap updates node ConfigSource with KubeletBaseConfigurationConfigMap
 func UpdateNodeWithConfigMap(client clientset.Interface, nodeName string) error {
+	fmt.Printf("[kubelet] Using Dynamic Kubelet Config for node %q; config sourced from ConfigMap %q in namespace %s",
+		nodeName, kubeadmconstants.KubeletBaseConfigurationConfigMap, metav1.NamespaceSystem)
+
 	// Loop on every falsy return. Return with an error if raised. Exit successfully if true is returned.
 	return wait.Poll(kubeadmconstants.APICallRetryInterval, kubeadmconstants.UpdateNodeTimeout, func() (bool, error) {
 		node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})

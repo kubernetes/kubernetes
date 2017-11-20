@@ -21,7 +21,9 @@ import (
 	"sort"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const DefaultBindAllHostIP = "0.0.0.0"
@@ -57,6 +59,11 @@ func GetUsedPorts(pods ...*v1.Pod) map[string]bool {
 		}
 	}
 	return ports
+}
+
+// PodPriorityEnabled indicates whether pod priority feature is enabled.
+func PodPriorityEnabled() bool {
+	return feature.DefaultFeatureGate.Enabled(features.PodPriority)
 }
 
 // GetPodFullName returns a name that uniquely identifies a pod.

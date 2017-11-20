@@ -63,6 +63,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
 	"k8s.io/kubernetes/pkg/proxy/userspace"
 	"k8s.io/kubernetes/pkg/util/configz"
+	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
@@ -356,6 +357,7 @@ type ProxyServer struct {
 	EventClient            v1core.EventsGetter
 	IptInterface           utiliptables.Interface
 	IpvsInterface          utilipvs.Interface
+	IpsetInterface         utilipset.Interface
 	execer                 exec.Interface
 	Proxier                proxy.ProxyProvider
 	Broadcaster            record.EventBroadcaster
@@ -422,7 +424,7 @@ func (s *ProxyServer) Run() error {
 	if s.CleanupAndExit {
 		encounteredError := userspace.CleanupLeftovers(s.IptInterface)
 		encounteredError = iptables.CleanupLeftovers(s.IptInterface) || encounteredError
-		encounteredError = ipvs.CleanupLeftovers(s.IpvsInterface, s.IptInterface) || encounteredError
+		encounteredError = ipvs.CleanupLeftovers(s.IpvsInterface, s.IptInterface, s.IpsetInterface) || encounteredError
 		if encounteredError {
 			return errors.New("encountered an error while tearing down rules.")
 		}
