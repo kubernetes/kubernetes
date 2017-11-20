@@ -30,6 +30,7 @@ import (
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -118,7 +119,7 @@ func (ds *dockerService) RunPodSandbox(ctx context.Context, r *runtimeapi.RunPod
 	}(&err)
 
 	// Step 3: Create Sandbox Checkpoint.
-	if err = ds.checkpointHandler.CreateCheckpoint(createResp.ID, constructPodSandboxCheckpoint(config)); err != nil {
+	if err = ds.checkpointManager.CreateCheckpoint(createResp.ID, constructPodSandboxCheckpoint(config)); err != nil {
 		return nil, err
 	}
 
@@ -189,7 +190,8 @@ func (ds *dockerService) StopPodSandbox(ctx context.Context, r *runtimeapi.StopP
 		name = metadata.Name
 		hostNetwork = (networkNamespaceMode(inspectResult) == runtimeapi.NamespaceMode_NODE)
 	} else {
-		checkpoint, checkpointErr := ds.checkpointHandler.GetCheckpoint(podSandboxID)
+		checkpoint := NewPodSandboxCheckpoint("", "", &CheckpointData{})
+		checkpointErr := ds.checkpointManager.GetCheckpoint(podSandboxID, checkpoint)
 
 		// Proceed if both sandbox container and checkpoint could not be found. This means that following
 		// actions will only have sandbox ID and not have pod namespace and name information.
@@ -204,9 +206,7 @@ func (ds *dockerService) StopPodSandbox(ctx context.Context, r *runtimeapi.StopP
 					fmt.Errorf("failed to get sandbox status: %v", statusErr)})
 			}
 		} else {
-			namespace = checkpoint.Namespace
-			name = checkpoint.Name
-			hostNetwork = checkpoint.Data != nil && checkpoint.Data.HostNetwork
+			_, name, namespace, _, hostNetwork = checkpoint.GetData()
 		}
 	}
 
@@ -237,7 +237,7 @@ func (ds *dockerService) StopPodSandbox(ctx context.Context, r *runtimeapi.StopP
 			errList = append(errList, err)
 		} else {
 			// remove the checkpoint for any sandbox that is not found in the runtime
-			ds.checkpointHandler.RemoveCheckpoint(podSandboxID)
+			ds.checkpointManager.RemoveCheckpoint(podSandboxID)
 		}
 	}
 
@@ -284,7 +284,7 @@ func (ds *dockerService) RemovePodSandbox(ctx context.Context, r *runtimeapi.Rem
 	}
 
 	// Remove the checkpoint of the sandbox.
-	if err := ds.checkpointHandler.RemoveCheckpoint(podSandboxID); err != nil {
+	if err := ds.checkpointManager.RemoveCheckpoint(podSandboxID); err != nil {
 		errs = append(errs, err)
 	}
 	if len(errs) == 0 {
@@ -465,7 +465,7 @@ func (ds *dockerService) ListPodSandbox(_ context.Context, r *runtimeapi.ListPod
 	var err error
 	checkpoints := []string{}
 	if filter == nil {
-		checkpoints, err = ds.checkpointHandler.ListCheckpoints()
+		checkpoints, err = ds.checkpointManager.ListCheckpoints()
 		if err != nil {
 			glog.Errorf("Failed to list checkpoints: %v", err)
 		}
@@ -501,7 +501,8 @@ func (ds *dockerService) ListPodSandbox(_ context.Context, r *runtimeapi.ListPod
 		if _, ok := sandboxIDs[id]; ok {
 			continue
 		}
-		checkpoint, err := ds.checkpointHandler.GetCheckpoint(id)
+		checkpoint := NewPodSandboxCheckpoint("", "", &CheckpointData{})
+		err := ds.checkpointManager.GetCheckpoint(id, checkpoint)
 		if err != nil {
 			glog.Errorf("Failed to retrieve checkpoint for sandbox %q: %v", id, err)
 			continue
@@ -624,20 +625,20 @@ func ipcNamespaceMode(container *dockertypes.ContainerJSON) runtimeapi.Namespace
 	return runtimeapi.NamespaceMode_POD
 }
 
-func constructPodSandboxCheckpoint(config *runtimeapi.PodSandboxConfig) *PodSandboxCheckpoint {
-	checkpoint := NewPodSandboxCheckpoint(config.Metadata.Namespace, config.Metadata.Name)
+func constructPodSandboxCheckpoint(config *runtimeapi.PodSandboxConfig) checkpointmanager.Checkpoint {
+	data := CheckpointData{}
 	for _, pm := range config.GetPortMappings() {
 		proto := toCheckpointProtocol(pm.Protocol)
-		checkpoint.Data.PortMappings = append(checkpoint.Data.PortMappings, &PortMapping{
+		data.PortMappings = append(data.PortMappings, &PortMapping{
 			HostPort:      &pm.HostPort,
 			ContainerPort: &pm.ContainerPort,
 			Protocol:      &proto,
 		})
 	}
 	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtimeapi.NamespaceMode_NODE {
-		checkpoint.Data.HostNetwork = true
+		data.HostNetwork = true
 	}
-	return checkpoint
+	return NewPodSandboxCheckpoint(config.Metadata.Namespace, config.Metadata.Name, &data)
 }
 
 func toCheckpointProtocol(protocol runtimeapi.Protocol) Protocol {

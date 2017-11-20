@@ -15,13 +15,14 @@ go_library(
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/kubelet/apis/deviceplugin/v1beta1:go_default_library",
+        "//pkg/kubelet/checkpointmanager:go_default_library",
+        "//pkg/kubelet/checkpointmanager/errors:go_default_library",
+        "//pkg/kubelet/cm/devicemanager/checkpoint:go_default_library",
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
-        "//pkg/kubelet/util/store:go_default_library",
         "//pkg/scheduler/schedulercache:go_default_library",
-        "//pkg/util/filesystem:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -39,10 +40,9 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubelet/apis/deviceplugin/v1beta1:go_default_library",
+        "//pkg/kubelet/checkpointmanager:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
-        "//pkg/kubelet/util/store:go_default_library",
         "//pkg/scheduler/schedulercache:go_default_library",
-        "//pkg/util/filesystem:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -62,7 +62,10 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubelet/cm/devicemanager/checkpoint:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )
