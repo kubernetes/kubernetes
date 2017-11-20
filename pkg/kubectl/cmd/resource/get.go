@@ -30,9 +30,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -61,10 +63,13 @@ type GetOptions struct {
 	Namespace         string
 	ExplicitNamespace bool
 
+	ServerPrint    bool
 	IgnoreNotFound bool
 	ShowKind       bool
 	LabelColumns   []string
 	Export         bool
+
+	Filters Filters
 }
 
 var (
@@ -121,8 +126,9 @@ const (
 // retrieves one or more resources from a server.
 func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
 	options := &GetOptions{
-		Out:    out,
-		ErrOut: errOut,
+		Out:     out,
+		ErrOut:  errOut,
+		Filters: DefaultFilters(),
 	}
 
 	// TODO: this needs to be abstracted behind the factory like ValidResourceTypeList
@@ -167,6 +173,7 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 	cmd.Flags().BoolVar(&options.ShowKind, "show-kind", options.ShowKind, "If present, list the resource type for the requested object(s).")
 	cmd.Flags().StringSliceVarP(&options.LabelColumns, "label-columns", "L", options.LabelColumns, "Accepts a comma separated list of labels that are going to be presented as columns. Names are case-sensitive. You can also use multiple flag options like -L label1 -L label2...")
 	cmd.Flags().BoolVar(&options.Export, "export", options.Export, "If true, use 'export' for the resources.  Exported resources are stripped of cluster-specific information.")
+	cmd.Flags().BoolVar(&options.ServerPrint, "experimental-server-print", options.ServerPrint, "If true, have the server return the appropriate table output. Supports extension APIs and CRD. Experimental.")
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, "identifying the resource to get from a server.")
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
@@ -232,6 +239,18 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 		return options.watch(f, cmd, args)
 	}
 
+	sorting, err := cmd.Flags().GetString("sort-by")
+	if err != nil {
+		return err
+	}
+
+	printOpts := cmdutil.ExtractCmdPrintOptions(cmd, options.AllNamespaces)
+	printer, err := f.PrinterForOptions(printOpts)
+	if err != nil {
+		return err
+	}
+	filters := options.Filters
+
 	r := f.NewBuilder().
 		Unstructured().
 		NamespaceParam(options.Namespace).DefaultNamespace().AllNamespaces(options.AllNamespaces).
@@ -245,47 +264,38 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 		ContinueOnError().
 		Latest().
 		Flatten().
+		TransformRequests(func(req *rest.Request) {
+			if options.ServerPrint && !printer.IsGeneric() {
+				req.SetHeader("Accept", "application/json;g=meta.k8s.io;v=v1alpha1;as=Table,application/json")
+			}
+		}).
 		Do()
 
 	if options.IgnoreNotFound {
 		r.IgnoreErrors(kapierrors.IsNotFound)
 	}
-	if err := r.Err(); err != nil {
-		return err
+
+	if printOpts.ShowAll || r.TargetsSingleItems() {
+		filters = nil
 	}
 
-	printOpts := cmdutil.ExtractCmdPrintOptions(cmd, options.AllNamespaces)
-	printer, err := f.PrinterForOptions(printOpts)
+	infos, err := r.Infos()
 	if err != nil {
 		return err
-	}
-
-	filterOpts := cmdutil.ExtractCmdPrintOptions(cmd, options.AllNamespaces)
-	filterFuncs := f.DefaultResourceFilterFunc()
-	if r.TargetsSingleItems() {
-		filterFuncs = nil
 	}
 
 	if printer.IsGeneric() {
-		return options.printGeneric(printer, r, filterFuncs, filterOpts)
+		return options.printGeneric(printer, r)
 	}
 
-	allErrs := []error{}
+	var allErrs []error
 	errs := sets.NewString()
-	infos, err := r.Infos()
-	if err != nil {
-		allErrs = append(allErrs, err)
-	}
 
 	objs := make([]runtime.Object, len(infos))
 	for ix := range infos {
 		objs[ix] = infos[ix].Object
 	}
 
-	sorting, err := cmd.Flags().GetString("sort-by")
-	if err != nil {
-		return err
-	}
 	var sorter *kubectl.RuntimeSort
 	if len(sorting) > 0 && len(objs) > 1 {
 		// TODO: questionable
@@ -358,10 +368,18 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 			lastMapping = mapping
 		}
 
-		typedObj := info.AsInternal()
+		typedObj, err := info.Mapping.ObjectConvertor.ConvertToVersion(info.Object, schema.GroupVersions{
+			schema.GroupVersion{Group: info.Mapping.GroupVersionKind.Group, Version: runtime.APIVersionInternal},
+			info.Mapping.GroupVersionKind.GroupVersion(),
+			schema.GroupVersion{Group: "meta.k8s.io", Version: "v1alpha1"},
+		})
+		if err != nil {
+			glog.V(3).Infof("Unable to convert object to any of the preferred forms, may be unprintable: %v", err)
+			typedObj = info.Object
+		}
 
-		// filter objects if filter has been defined for current object
-		if isFiltered, err := filterFuncs.Filter(typedObj, filterOpts); isFiltered {
+		// filter objects if filter has been defined
+		if isFiltered, err := filters.Filter(typedObj); isFiltered {
 			if err == nil {
 				filteredResourceCount++
 				continue
@@ -414,7 +432,7 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 		}
 	}
 	w.Flush()
-	cmdutil.PrintFilterCount(options.ErrOut, len(objs), filteredResourceCount, len(allErrs), filterOpts, options.IgnoreNotFound)
+	PrintFilterCount(options.ErrOut, len(objs), filteredResourceCount, len(allErrs), filterOpts, options.IgnoreNotFound)
 	return utilerrors.NewAggregate(allErrs)
 }
 
@@ -447,6 +465,9 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 	// unless explicitly set --include-uninitialized=false
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, len(args) == 2)
 
+	filters := options.Filters
+	printOpts := cmdutil.ExtractCmdPrintOptions(cmd, options.AllNamespaces)
+
 	r := f.NewBuilder().
 		Unstructured().
 		NamespaceParam(options.Namespace).DefaultNamespace().AllNamespaces(options.AllNamespaces).
@@ -463,6 +484,11 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 	if err := r.Err(); err != nil {
 		return err
 	}
+
+	if printOpts.ShowAll || r.TargetsSingleItems() {
+		filters = nil
+	}
+
 	infos, err := r.Infos()
 	if err != nil {
 		return err
@@ -471,15 +497,8 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 		return i18n.Errorf("watch is only supported on individual resources and resource collections - %d resources were found", len(infos))
 	}
 
-	filterOpts := cmdutil.ExtractCmdPrintOptions(cmd, options.AllNamespaces)
-	filterFuncs := f.DefaultResourceFilterFunc()
-	if r.TargetsSingleItems() {
-		filterFuncs = nil
-	}
-
 	info := infos[0]
 	mapping := info.ResourceMapping()
-	printOpts := cmdutil.ExtractCmdPrintOptions(cmd, options.AllNamespaces)
 	printer, err := f.PrinterForMapping(printOpts, mapping)
 	if err != nil {
 		return err
@@ -556,7 +575,7 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 	return nil
 }
 
-func (options *GetOptions) printGeneric(printer printers.ResourcePrinter, r *resource.Result, filterFuncs kubectl.Filters, filterOpts *printers.PrintOptions) error {
+func (options *GetOptions) printGeneric(printer printers.ResourcePrinter, r *resource.Result) error {
 	// we flattened the data from the builder, so we have individual items, but now we'd like to either:
 	// 1. if there is more than one item, combine them all into a single list
 	// 2. if there is a single item and that item is a list, leave it as its specific list
@@ -610,11 +629,6 @@ func (options *GetOptions) printGeneric(printer printers.ResourcePrinter, r *res
 
 	isList := meta.IsListType(obj)
 	if isList {
-		_, items, err := cmdutil.FilterResourceList(obj, filterFuncs, filterOpts)
-		if err != nil {
-			return err
-		}
-
 		// take the filtered items and create a new list for display
 		list := &unstructured.UnstructuredList{
 			Object: map[string]interface{}{
@@ -637,14 +651,6 @@ func (options *GetOptions) printGeneric(printer printers.ResourcePrinter, r *res
 			errs = append(errs, err)
 		}
 		return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
-	}
-
-	if isFiltered, err := filterFuncs.Filter(obj, filterOpts); !isFiltered {
-		if err != nil {
-			glog.V(2).Infof("Unable to filter resource: %v", err)
-		} else if err := printer.PrintObj(obj, options.Out); err != nil {
-			errs = append(errs, err)
-		}
 	}
 
 	return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
@@ -704,4 +710,67 @@ func outputOptsFromStr(columnStr string, printOpts *printers.PrintOptions) bool 
 	printOpts.AllowMissingKeys = true
 
 	return true
+}
+
+// FilterFunc is a function that knows how to filter a specific resource kind.
+// It receives a generic runtime.Object which must be type-checked by the function.
+// Returns a boolean value true if a resource is filtered, or false otherwise.
+type FilterFunc func(runtime.Object) bool
+
+// Filters is a collection of filter funcs
+type Filters []FilterFunc
+
+// Filter loops through a collection of FilterFuncs until it finds one that can filter the given resource
+func (f Filters) Filter(obj runtime.Object) (bool, error) {
+	for _, filter := range f {
+		if ok := filter(obj); ok {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// DefaultFilters returns the default filter chain for resources.
+// TODO: this is deprecated and will be removed.
+func DefaultFilters() Filters {
+	return []FilterFunc{
+		filterPods,
+	}
+}
+
+// filterPods returns true if a pod should be skipped.
+// If show-all is true, the pod will be never be skipped (return false);
+// otherwise, skip terminated pod.
+func filterPods(obj runtime.Object) bool {
+	switch t := obj.(type) {
+	case runtime.Unstructured:
+		if t.UnstructuredContent().GetString("kind") == "Pod" && t.UnstructuredContent().GetString("apiVersion") == "v1" {
+			phase := t.UnstructuredContent().GetString("status", "phase")
+			return phase == "Succeeded" || phase == "Failed"
+		}
+	}
+	return false
+}
+
+// PrintFilterCount displays informational messages based on the number of resources found, hidden, or
+// config flags shown.
+func PrintFilterCount(out io.Writer, found, hidden, errors int, options *printers.PrintOptions, ignoreNotFound bool) {
+	switch {
+	case errors > 0 || ignoreNotFound:
+		// print nothing
+	case found <= hidden:
+		if found == 0 {
+			fmt.Fprintln(out, "No resources found.")
+		} else {
+			fmt.Fprintln(out, "No resources found, use --show-all to see completed objects.")
+		}
+	case hidden > 0 && !options.ShowAll && !options.NoHeaders:
+		if glog.V(2) {
+			if hidden > 1 {
+				fmt.Fprintf(out, "info: %d objects not shown, use --show-all to see completed objects.\n", hidden)
+			} else {
+				fmt.Fprintf(out, "info: 1 object not shown, use --show-all to see completed objects.\n")
+			}
+		}
+	}
 }

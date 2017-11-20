@@ -537,14 +537,6 @@ func (f *FakeFactory) NewBuilder() *resource.Builder {
 	)
 }
 
-func (f *FakeFactory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions {
-	return &printers.PrintOptions{}
-}
-
-func (f *FakeFactory) DefaultResourceFilterFunc() kubectl.Filters {
-	return nil
-}
-
 func (f *FakeFactory) SuggestedPodTemplateResources() []schema.GroupResource {
 	return []schema.GroupResource{}
 }

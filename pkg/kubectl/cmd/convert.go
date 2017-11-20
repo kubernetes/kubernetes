@@ -190,8 +190,11 @@ func (o *ConvertOptions) RunConvert() error {
 	}
 
 	if meta.IsListType(objects) {
-		_, items, err := cmdutil.FilterResourceList(objects, nil, nil)
+		items, err := meta.ExtractList(objects)
 		if err != nil {
+			return err
+		}
+		if errs := runtime.DecodeList(items, legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme); len(errs) > 0 {
 			return err
 		}
 		filteredObj, err := objectListToVersionedObject(items, o.outputVersion)

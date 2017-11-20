@@ -38,7 +38,7 @@ var scheme = runtime.NewScheme()
 // ParameterCodec knows about query parameters used with the meta v1alpha1 API spec.
 var ParameterCodec = runtime.NewParameterCodec(scheme)
 
-func init() {
+func AddToScheme(scheme *runtime.Scheme) {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Table{},
 		&TableOptions{},
@@ -51,7 +51,10 @@ func init() {
 	); err != nil {
 		panic(err)
 	}
+}
 
+func init() {
+	AddToScheme(scheme)
 	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
 	//scheme.AddGeneratedDeepCopyFuncs(GetGeneratedDeepCopyFuncs()...)
 }

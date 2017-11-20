@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 )
@@ -44,3 +45,7 @@ var Codecs = serializer.NewCodecFactory(Scheme)
 
 // ParameterCodec handles versioning of objects that are converted to query parameters.
 var ParameterCodec = runtime.NewParameterCodec(Scheme)
+
+func init() {
+	metav1alpha1.AddToScheme(Scheme)
+}
