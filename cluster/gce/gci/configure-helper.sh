@@ -1361,6 +1361,9 @@ function start-kube-apiserver {
   if [[ -n "${ETCD_QUORUM_READ:-}" ]]; then
     params+=" --etcd-quorum-read=${ETCD_QUORUM_READ}"
   fi
+  if [[ -n "${UI_REDIRECT_URL:-}" ]]; then
+    params+=" --ui-redirect-url=${UI_REDIRECT_URL}"
+  fi
 
   local audit_policy_config_mount=""
   local audit_policy_config_volume=""
