@@ -1917,15 +1917,21 @@ func RestclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 	if TestContext.KubeConfig == "" {
 		return nil, fmt.Errorf("KubeConfig must be specified to load client config")
 	}
-	c, err := clientcmd.LoadFromFile(TestContext.KubeConfig)
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	configOverrides := &clientcmd.ConfigOverrides{}
+	// if you want to change override values or bind them to flags, there are methods to help you
+
+	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
+	c, err := kubeConfig.RawConfig()
 	if err != nil {
 		return nil, fmt.Errorf("error loading KubeConfig: %v", err.Error())
 	}
+
 	if kubeContext != "" {
 		Logf(">>> kubeContext: %s", kubeContext)
 		c.CurrentContext = kubeContext
 	}
-	return c, nil
+	return &c, nil
 }
 
 type ClientConfigGetter func() (*restclient.Config, error)
