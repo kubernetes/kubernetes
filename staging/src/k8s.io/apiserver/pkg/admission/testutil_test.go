@@ -28,9 +28,14 @@ import (
 // methods have been called and always returns an error if admit is false.
 type FakeHandler struct {
 	*Handler
+	name           string
 	admit          bool
 	admitCalled    bool
 	validateCalled bool
+}
+
+func (h *FakeHandler) Name() string {
+	return h.name
 }
 
 func (h *FakeHandler) Admit(a Attributes) (err error) {
@@ -57,12 +62,10 @@ func makeHandler(admit bool, ops ...Operation) *FakeHandler {
 }
 
 func makeNamedHandler(name string, admit bool, ops ...Operation) NamedHandler {
-	return &pluginHandler{
-		i: &FakeHandler{
-			admit:   admit,
-			Handler: NewHandler(ops...),
-		},
-		name: name,
+	return &FakeHandler{
+		name:    name,
+		admit:   admit,
+		Handler: NewHandler(ops...),
 	}
 }
 
@@ -90,7 +93,7 @@ func makeValidatingHandler(validate bool, ops ...Operation) *FakeValidatingHandl
 
 func makeValidatingNamedHandler(name string, validate bool, ops ...Operation) NamedHandler {
 	return &pluginHandler{
-		i: &FakeValidatingHandler{
+		Interface: &FakeValidatingHandler{
 			validate: validate,
 			Handler:  NewHandler(ops...),
 		},
