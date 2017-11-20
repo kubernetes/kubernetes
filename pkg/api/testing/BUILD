@@ -16,7 +16,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/api/testing",
     deps = [
-        "//cmd/kubeadm/app/apis/kubeadm/fuzzer:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/admissionregistration/fuzzer:go_default_library",
         "//pkg/apis/apps/fuzzer:go_default_library",
