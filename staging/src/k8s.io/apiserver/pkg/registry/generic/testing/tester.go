@@ -39,9 +39,9 @@ type Tester struct {
 }
 type UpdateFunc func(runtime.Object) runtime.Object
 
-func New(t *testing.T, storage *genericregistry.Store, scheme *runtime.Scheme) *Tester {
+func New(t *testing.T, storage *genericregistry.Store) *Tester {
 	return &Tester{
-		tester:  resttest.New(t, storage, scheme),
+		tester:  resttest.New(t, storage),
 		storage: storage,
 	}
 }
