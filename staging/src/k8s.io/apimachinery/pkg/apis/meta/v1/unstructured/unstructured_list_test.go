@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/jsonlike"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,7 +36,7 @@ func TestUnstructuredList(t *testing.T) {
 	content := list.UnstructuredContent()
 	items := content["items"].([]interface{})
 	require.Len(t, items, 1)
-	val, ok := NestedFieldCopy(items[0].(map[string]interface{}), "metadata", "name")
+	val, ok := jsonlike.Object(items[0].(map[string]interface{})).FieldCopy("metadata", "name")
 	require.True(t, ok)
 	assert.Equal(t, "test", val)
 }

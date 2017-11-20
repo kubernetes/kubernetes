@@ -20,6 +20,7 @@ import (
 	"io"
 	"net/url"
 
+	"k8s.io/apimachinery/pkg/runtime/jsonlike"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -237,7 +238,7 @@ type Unstructured interface {
 	// UnstructuredContent returns a non-nil, mutable map of the contents of this object. Values may be
 	// []interface{}, map[string]interface{}, or any primitive type. Contents are typically serialized to
 	// and from JSON.
-	UnstructuredContent() map[string]interface{}
+	UnstructuredContent() jsonlike.Object
 	// SetUnstructuredContent updates the object content to match the provided map.
 	SetUnstructuredContent(map[string]interface{})
 	// IsList returns true if this type is a list or matches the list convention - has an array called "items".

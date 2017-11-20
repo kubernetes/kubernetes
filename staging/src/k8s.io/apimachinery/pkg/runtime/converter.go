@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime/jsonlike"
 	"k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
@@ -68,15 +69,16 @@ func newFieldsCache() *fieldsCache {
 }
 
 var (
-	marshalerType          = reflect.TypeOf(new(encodingjson.Marshaler)).Elem()
-	unmarshalerType        = reflect.TypeOf(new(encodingjson.Unmarshaler)).Elem()
-	mapStringInterfaceType = reflect.TypeOf(map[string]interface{}{})
-	stringType             = reflect.TypeOf(string(""))
-	int64Type              = reflect.TypeOf(int64(0))
-	uint64Type             = reflect.TypeOf(uint64(0))
-	float64Type            = reflect.TypeOf(float64(0))
-	boolType               = reflect.TypeOf(bool(false))
-	fieldCache             = newFieldsCache()
+	marshalerType             = reflect.TypeOf(new(encodingjson.Marshaler)).Elem()
+	unmarshalerType           = reflect.TypeOf(new(encodingjson.Unmarshaler)).Elem()
+	unstructuredInterfaceType = reflect.TypeOf(new(Unstructured)).Elem()
+	mapStringInterfaceType    = reflect.TypeOf(map[string]interface{}{})
+	stringType                = reflect.TypeOf(string(""))
+	int64Type                 = reflect.TypeOf(int64(0))
+	uint64Type                = reflect.TypeOf(uint64(0))
+	float64Type               = reflect.TypeOf(float64(0))
+	boolType                  = reflect.TypeOf(bool(false))
+	fieldCache                = newFieldsCache()
 
 	// DefaultUnstructuredConverter performs unstructured to Go typed object conversions.
 	DefaultUnstructuredConverter = &unstructuredConverter{
@@ -206,6 +208,13 @@ func fromUnstructured(sv, dv reflect.Value) error {
 			}
 			return fmt.Errorf("cannot convert %s to %s", st.String(), dt.String())
 		}
+	}
+
+	// Perform a fast path conversion for any object that declares itself unstructured
+	if reflect.PtrTo(dt).Implements(unstructuredInterfaceType) && st == mapStringInterfaceType {
+		dv.Addr().Interface().(Unstructured).SetUnstructuredContent(sv.Interface().(map[string]interface{}))
+		// TODO: may need to check error for this to be really safe...
+		return nil
 	}
 
 	// Check if the object has a custom JSON marshaller/unmarshaller.
@@ -411,8 +420,7 @@ func (c *unstructuredConverter) ToUnstructured(obj interface{}) (map[string]inte
 	var u map[string]interface{}
 	var err error
 	if unstr, ok := obj.(Unstructured); ok {
-		// UnstructuredContent() mutates the object so we need to make a copy first
-		u = unstr.DeepCopyObject().(Unstructured).UnstructuredContent()
+		u = jsonlike.Object(unstr.UnstructuredContent()).DeepCopy()
 	} else {
 		t := reflect.TypeOf(obj)
 		value := reflect.ValueOf(obj)
@@ -436,35 +444,6 @@ func (c *unstructuredConverter) ToUnstructured(obj interface{}) (map[string]inte
 		return nil, err
 	}
 	return u, nil
-}
-
-// DeepCopyJSON deep copies the passed value, assuming it is a valid JSON representation i.e. only contains
-// types produced by json.Unmarshal().
-func DeepCopyJSON(x map[string]interface{}) map[string]interface{} {
-	return DeepCopyJSONValue(x).(map[string]interface{})
-}
-
-// DeepCopyJSONValue deep copies the passed value, assuming it is a valid JSON representation i.e. only contains
-// types produced by json.Unmarshal().
-func DeepCopyJSONValue(x interface{}) interface{} {
-	switch x := x.(type) {
-	case map[string]interface{}:
-		clone := make(map[string]interface{}, len(x))
-		for k, v := range x {
-			clone[k] = DeepCopyJSONValue(v)
-		}
-		return clone
-	case []interface{}:
-		clone := make([]interface{}, len(x))
-		for i, v := range x {
-			clone[i] = DeepCopyJSONValue(v)
-		}
-		return clone
-	case string, int64, bool, float64, nil, encodingjson.Number:
-		return x
-	default:
-		panic(fmt.Errorf("cannot deep copy %T", x))
-	}
 }
 
 func toUnstructuredViaJSON(obj interface{}, u *map[string]interface{}) error {

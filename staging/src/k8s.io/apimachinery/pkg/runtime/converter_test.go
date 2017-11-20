@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/jsonlike"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 
@@ -153,6 +154,9 @@ func doRoundTrip(t *testing.T, item interface{}) {
 	}
 
 	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface()
+	t.Logf("newUnstr: %#v", newUnstr)
+	t.Logf("newObj: %#v", newObj)
+
 	err = runtime.NewTestUnstructuredConverter(simpleEquality).FromUnstructured(newUnstr, newObj)
 	if err != nil {
 		t.Errorf("FromUnstructured failed: %v", err)
@@ -172,7 +176,8 @@ func TestRoundTrip(t *testing.T) {
 		{
 			obj: &unstructured.UnstructuredList{
 				Object: map[string]interface{}{
-					"kind": "List",
+					"kind":  "List",
+					"items": []interface{}{},
 				},
 				// Not testing a list with nil Items because items is a non-optional field and hence
 				// is always marshaled into an empty array which is not equal to nil when unmarshalled and will fail.
@@ -183,7 +188,8 @@ func TestRoundTrip(t *testing.T) {
 		{
 			obj: &unstructured.UnstructuredList{
 				Object: map[string]interface{}{
-					"kind": "List",
+					"kind":  "List",
+					"items": []interface{}{map[string]interface{}{"kind": "Pod"}},
 				},
 				Items: []unstructured.Unstructured{
 					{
@@ -518,7 +524,7 @@ func TestDeepCopyJSON(t *testing.T) {
 		"f": true,
 		"g": encodingjson.Number("123"),
 	}
-	deepCopy := runtime.DeepCopyJSON(src)
+	deepCopy := jsonlike.Object(src).DeepCopy()
 	assert.Equal(t, src, deepCopy)
 }
 

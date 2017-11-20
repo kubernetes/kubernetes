@@ -18,9 +18,11 @@ package unstructured
 
 import (
 	"bytes"
+	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/jsonlike"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -33,7 +35,7 @@ var _ metav1.ListInterface = &UnstructuredList{}
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:deepcopy-gen=true
 type UnstructuredList struct {
-	Object map[string]interface{}
+	Object jsonlike.Object
 
 	// Items is a list of unstructured objects.
 	Items []Unstructured `json:"items"`
@@ -56,16 +58,14 @@ func (u *UnstructuredList) EachListItem(fn func(runtime.Object) error) error {
 // the Object field. Items always overwrites overlay. Changing "items" in the
 // returned object will affect items in the underlying Items field, but changing
 // the "items" slice itself will have no effect.
-// TODO: expose SetUnstructuredContent on runtime.Unstructured that allows
-// items to be changed.
-func (u *UnstructuredList) UnstructuredContent() map[string]interface{} {
+func (u *UnstructuredList) UnstructuredContent() jsonlike.Object {
 	out := u.Object
 	if out == nil {
 		out = make(map[string]interface{})
 	}
 	items := make([]interface{}, len(u.Items))
 	for i, item := range u.Items {
-		items[i] = item.Object
+		items[i] = map[string]interface{}(item.Object)
 	}
 	out["items"] = items
 	return out
@@ -75,10 +75,18 @@ func (u *UnstructuredList) UnstructuredContent() map[string]interface{} {
 // array in sync. If items is not an array of objects in the incoming map, then any
 // mismatched item will be removed.
 func (obj *UnstructuredList) SetUnstructuredContent(content map[string]interface{}) {
+	obj.setUnstructuredContent(content, true)
+}
+
+// setUnstructuredContent obeys the conventions of List and keeps Items and the items
+// array in sync. If items is not an array of objects in the incoming map, then any
+// mismatched item will be removed. If ignoreErrors is not true and an item is not
+// map[string]interface{}, the method will return an error.
+func (obj *UnstructuredList) setUnstructuredContent(content map[string]interface{}, ignoreErrors bool) error {
 	obj.Object = content
 	if content == nil {
 		obj.Items = nil
-		return
+		return nil
 	}
 	items, ok := obj.Object["items"].([]interface{})
 	if !ok || items == nil {
@@ -86,16 +94,20 @@ func (obj *UnstructuredList) SetUnstructuredContent(content map[string]interface
 	}
 	unstructuredItems := make([]Unstructured, 0, len(items))
 	newItems := make([]interface{}, 0, len(items))
-	for _, item := range items {
+	for i, item := range items {
 		o, ok := item.(map[string]interface{})
 		if !ok {
-			continue
+			if ignoreErrors {
+				continue
+			}
+			return fmt.Errorf("unstructured: items[%d] must be a map, got %T", i, item)
 		}
 		unstructuredItems = append(unstructuredItems, Unstructured{Object: o})
 		newItems = append(newItems, o)
 	}
 	obj.Items = unstructuredItems
 	obj.Object["items"] = newItems
+	return nil
 }
 
 func (u *UnstructuredList) DeepCopy() *UnstructuredList {
@@ -104,7 +116,7 @@ func (u *UnstructuredList) DeepCopy() *UnstructuredList {
 	}
 	out := new(UnstructuredList)
 	*out = *u
-	out.Object = runtime.DeepCopyJSON(u.Object)
+	out.Object = u.Object.DeepCopy()
 	out.Items = make([]Unstructured, len(u.Items))
 	for i := range u.Items {
 		u.Items[i].DeepCopyInto(&out.Items[i])
@@ -128,43 +140,43 @@ func (u *UnstructuredList) UnmarshalJSON(b []byte) error {
 }
 
 func (u *UnstructuredList) GetAPIVersion() string {
-	return getNestedString(u.Object, "apiVersion")
+	return u.Object.GetString("apiVersion")
 }
 
 func (u *UnstructuredList) SetAPIVersion(version string) {
-	u.setNestedField(version, "apiVersion")
+	u.Object.SetField(version, "apiVersion")
 }
 
 func (u *UnstructuredList) GetKind() string {
-	return getNestedString(u.Object, "kind")
+	return u.Object.GetString("kind")
 }
 
 func (u *UnstructuredList) SetKind(kind string) {
-	u.setNestedField(kind, "kind")
+	u.Object.SetField(kind, "kind")
 }
 
 func (u *UnstructuredList) GetResourceVersion() string {
-	return getNestedString(u.Object, "metadata", "resourceVersion")
+	return u.Object.GetString("metadata", "resourceVersion")
 }
 
 func (u *UnstructuredList) SetResourceVersion(version string) {
-	u.setNestedField(version, "metadata", "resourceVersion")
+	u.Object.SetField(version, "metadata", "resourceVersion")
 }
 
 func (u *UnstructuredList) GetSelfLink() string {
-	return getNestedString(u.Object, "metadata", "selfLink")
+	return u.Object.GetString("metadata", "selfLink")
 }
 
 func (u *UnstructuredList) SetSelfLink(selfLink string) {
-	u.setNestedField(selfLink, "metadata", "selfLink")
+	u.Object.SetField(selfLink, "metadata", "selfLink")
 }
 
 func (u *UnstructuredList) GetContinue() string {
-	return getNestedString(u.Object, "metadata", "continue")
+	return u.Object.GetString("metadata", "continue")
 }
 
 func (u *UnstructuredList) SetContinue(c string) {
-	u.setNestedField(c, "metadata", "continue")
+	u.Object.SetField(c, "metadata", "continue")
 }
 
 func (u *UnstructuredList) SetGroupVersionKind(gvk schema.GroupVersionKind) {
@@ -181,9 +193,9 @@ func (u *UnstructuredList) GroupVersionKind() schema.GroupVersionKind {
 	return gvk
 }
 
-func (u *UnstructuredList) setNestedField(value interface{}, fields ...string) {
+func (u *UnstructuredList) setField(value interface{}, fields ...string) {
 	if u.Object == nil {
 		u.Object = make(map[string]interface{})
 	}
-	SetNestedField(u.Object, value, fields...)
+	u.Object.SetField(value, fields...)
 }

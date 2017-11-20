@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/jsonlike"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -42,7 +43,7 @@ type Unstructured struct {
 	// Object is a JSON compatible map with string, float, int, bool, []interface{}, or
 	// map[string]interface{}
 	// children.
-	Object map[string]interface{}
+	Object jsonlike.Object
 }
 
 var _ metav1.Object = &Unstructured{}
@@ -80,7 +81,7 @@ func (obj *Unstructured) EachListItem(fn func(runtime.Object) error) error {
 	return nil
 }
 
-func (obj *Unstructured) UnstructuredContent() map[string]interface{} {
+func (obj *Unstructured) UnstructuredContent() jsonlike.Object {
 	if obj.Object == nil {
 		obj.Object = make(map[string]interface{})
 	}
@@ -112,33 +113,12 @@ func (in *Unstructured) DeepCopy() *Unstructured {
 	}
 	out := new(Unstructured)
 	*out = *in
-	out.Object = runtime.DeepCopyJSON(in.Object)
+	out.Object = in.Object.DeepCopy()
 	return out
 }
 
-func (u *Unstructured) setNestedField(value interface{}, fields ...string) {
-	if u.Object == nil {
-		u.Object = make(map[string]interface{})
-	}
-	SetNestedField(u.Object, value, fields...)
-}
-
-func (u *Unstructured) setNestedSlice(value []string, fields ...string) {
-	if u.Object == nil {
-		u.Object = make(map[string]interface{})
-	}
-	SetNestedStringSlice(u.Object, value, fields...)
-}
-
-func (u *Unstructured) setNestedMap(value map[string]string, fields ...string) {
-	if u.Object == nil {
-		u.Object = make(map[string]interface{})
-	}
-	SetNestedStringMap(u.Object, value, fields...)
-}
-
 func (u *Unstructured) GetOwnerReferences() []metav1.OwnerReference {
-	field, ok := nestedFieldNoCopy(u.Object, "metadata", "ownerReferences")
+	field, ok := u.Object.Field("metadata", "ownerReferences")
 	if !ok {
 		return nil
 	}
@@ -168,67 +148,67 @@ func (u *Unstructured) SetOwnerReferences(references []metav1.OwnerReference) {
 		}
 		newReferences = append(newReferences, out)
 	}
-	u.setNestedField(newReferences, "metadata", "ownerReferences")
+	u.Object.SetField(newReferences, "metadata", "ownerReferences")
 }
 
 func (u *Unstructured) GetAPIVersion() string {
-	return getNestedString(u.Object, "apiVersion")
+	return u.Object.GetString("apiVersion")
 }
 
 func (u *Unstructured) SetAPIVersion(version string) {
-	u.setNestedField(version, "apiVersion")
+	u.UnstructuredContent().SetField(version, "apiVersion")
 }
 
 func (u *Unstructured) GetKind() string {
-	return getNestedString(u.Object, "kind")
+	return u.Object.GetString("kind")
 }
 
 func (u *Unstructured) SetKind(kind string) {
-	u.setNestedField(kind, "kind")
+	u.UnstructuredContent().SetField(kind, "kind")
 }
 
 func (u *Unstructured) GetNamespace() string {
-	return getNestedString(u.Object, "metadata", "namespace")
+	return u.Object.GetString("metadata", "namespace")
 }
 
 func (u *Unstructured) SetNamespace(namespace string) {
-	u.setNestedField(namespace, "metadata", "namespace")
+	u.UnstructuredContent().SetField(namespace, "metadata", "namespace")
 }
 
 func (u *Unstructured) GetName() string {
-	return getNestedString(u.Object, "metadata", "name")
+	return u.Object.GetString("metadata", "name")
 }
 
 func (u *Unstructured) SetName(name string) {
-	u.setNestedField(name, "metadata", "name")
+	u.UnstructuredContent().SetField(name, "metadata", "name")
 }
 
 func (u *Unstructured) GetGenerateName() string {
-	return getNestedString(u.Object, "metadata", "generateName")
+	return u.Object.GetString("metadata", "generateName")
 }
 
 func (u *Unstructured) SetGenerateName(name string) {
-	u.setNestedField(name, "metadata", "generateName")
+	u.UnstructuredContent().SetField(name, "metadata", "generateName")
 }
 
 func (u *Unstructured) GetUID() types.UID {
-	return types.UID(getNestedString(u.Object, "metadata", "uid"))
+	return types.UID(u.Object.GetString("metadata", "uid"))
 }
 
 func (u *Unstructured) SetUID(uid types.UID) {
-	u.setNestedField(string(uid), "metadata", "uid")
+	u.UnstructuredContent().SetField(string(uid), "metadata", "uid")
 }
 
 func (u *Unstructured) GetResourceVersion() string {
-	return getNestedString(u.Object, "metadata", "resourceVersion")
+	return u.Object.GetString("metadata", "resourceVersion")
 }
 
 func (u *Unstructured) SetResourceVersion(version string) {
-	u.setNestedField(version, "metadata", "resourceVersion")
+	u.UnstructuredContent().SetField(version, "metadata", "resourceVersion")
 }
 
 func (u *Unstructured) GetGeneration() int64 {
-	val, ok := NestedInt64(u.Object, "metadata", "generation")
+	val, ok := u.Object.Int64("metadata", "generation")
 	if !ok {
 		return 0
 	}
@@ -236,43 +216,43 @@ func (u *Unstructured) GetGeneration() int64 {
 }
 
 func (u *Unstructured) SetGeneration(generation int64) {
-	u.setNestedField(generation, "metadata", "generation")
+	u.UnstructuredContent().SetField(generation, "metadata", "generation")
 }
 
 func (u *Unstructured) GetSelfLink() string {
-	return getNestedString(u.Object, "metadata", "selfLink")
+	return u.Object.GetString("metadata", "selfLink")
 }
 
 func (u *Unstructured) SetSelfLink(selfLink string) {
-	u.setNestedField(selfLink, "metadata", "selfLink")
+	u.UnstructuredContent().SetField(selfLink, "metadata", "selfLink")
 }
 
 func (u *Unstructured) GetContinue() string {
-	return getNestedString(u.Object, "metadata", "continue")
+	return u.Object.GetString("metadata", "continue")
 }
 
 func (u *Unstructured) SetContinue(c string) {
-	u.setNestedField(c, "metadata", "continue")
+	u.UnstructuredContent().SetField(c, "metadata", "continue")
 }
 
 func (u *Unstructured) GetCreationTimestamp() metav1.Time {
 	var timestamp metav1.Time
-	timestamp.UnmarshalQueryParameter(getNestedString(u.Object, "metadata", "creationTimestamp"))
+	timestamp.UnmarshalQueryParameter(u.Object.GetString("metadata", "creationTimestamp"))
 	return timestamp
 }
 
 func (u *Unstructured) SetCreationTimestamp(timestamp metav1.Time) {
 	ts, _ := timestamp.MarshalQueryParameter()
 	if len(ts) == 0 || timestamp.Time.IsZero() {
-		RemoveNestedField(u.Object, "metadata", "creationTimestamp")
+		u.Object.RemoveField("metadata", "creationTimestamp")
 		return
 	}
-	u.setNestedField(ts, "metadata", "creationTimestamp")
+	u.UnstructuredContent().SetField(ts, "metadata", "creationTimestamp")
 }
 
 func (u *Unstructured) GetDeletionTimestamp() *metav1.Time {
 	var timestamp metav1.Time
-	timestamp.UnmarshalQueryParameter(getNestedString(u.Object, "metadata", "deletionTimestamp"))
+	timestamp.UnmarshalQueryParameter(u.Object.GetString("metadata", "deletionTimestamp"))
 	if timestamp.IsZero() {
 		return nil
 	}
@@ -281,15 +261,15 @@ func (u *Unstructured) GetDeletionTimestamp() *metav1.Time {
 
 func (u *Unstructured) SetDeletionTimestamp(timestamp *metav1.Time) {
 	if timestamp == nil {
-		RemoveNestedField(u.Object, "metadata", "deletionTimestamp")
+		u.Object.RemoveField("metadata", "deletionTimestamp")
 		return
 	}
 	ts, _ := timestamp.MarshalQueryParameter()
-	u.setNestedField(ts, "metadata", "deletionTimestamp")
+	u.UnstructuredContent().SetField(ts, "metadata", "deletionTimestamp")
 }
 
 func (u *Unstructured) GetDeletionGracePeriodSeconds() *int64 {
-	val, ok := NestedInt64(u.Object, "metadata", "deletionGracePeriodSeconds")
+	val, ok := u.Object.Int64("metadata", "deletionGracePeriodSeconds")
 	if !ok {
 		return nil
 	}
@@ -298,28 +278,28 @@ func (u *Unstructured) GetDeletionGracePeriodSeconds() *int64 {
 
 func (u *Unstructured) SetDeletionGracePeriodSeconds(deletionGracePeriodSeconds *int64) {
 	if deletionGracePeriodSeconds == nil {
-		RemoveNestedField(u.Object, "metadata", "deletionGracePeriodSeconds")
+		u.Object.RemoveField("metadata", "deletionGracePeriodSeconds")
 		return
 	}
-	u.setNestedField(*deletionGracePeriodSeconds, "metadata", "deletionGracePeriodSeconds")
+	u.UnstructuredContent().SetField(*deletionGracePeriodSeconds, "metadata", "deletionGracePeriodSeconds")
 }
 
 func (u *Unstructured) GetLabels() map[string]string {
-	m, _ := NestedStringMap(u.Object, "metadata", "labels")
+	m, _ := u.Object.StringMap("metadata", "labels")
 	return m
 }
 
 func (u *Unstructured) SetLabels(labels map[string]string) {
-	u.setNestedMap(labels, "metadata", "labels")
+	u.UnstructuredContent().SetStringMap(labels, "metadata", "labels")
 }
 
 func (u *Unstructured) GetAnnotations() map[string]string {
-	m, _ := NestedStringMap(u.Object, "metadata", "annotations")
+	m, _ := u.Object.StringMap("metadata", "annotations")
 	return m
 }
 
 func (u *Unstructured) SetAnnotations(annotations map[string]string) {
-	u.setNestedMap(annotations, "metadata", "annotations")
+	u.UnstructuredContent().SetStringMap(annotations, "metadata", "annotations")
 }
 
 func (u *Unstructured) SetGroupVersionKind(gvk schema.GroupVersionKind) {
@@ -337,12 +317,16 @@ func (u *Unstructured) GroupVersionKind() schema.GroupVersionKind {
 }
 
 func (u *Unstructured) GetInitializers() *metav1.Initializers {
-	m, ok := nestedMapNoCopy(u.Object, "metadata", "initializers")
+	field, ok := u.Object.Field("metadata", "initializers")
+	if !ok {
+		return nil
+	}
+	obj, ok := field.(map[string]interface{})
 	if !ok {
 		return nil
 	}
 	out := &metav1.Initializers{}
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(m, out); err != nil {
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj, out); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to retrieve initializers for object: %v", err))
 		return nil
 	}
@@ -351,29 +335,69 @@ func (u *Unstructured) GetInitializers() *metav1.Initializers {
 
 func (u *Unstructured) SetInitializers(initializers *metav1.Initializers) {
 	if initializers == nil {
-		RemoveNestedField(u.Object, "metadata", "initializers")
+		u.Object.RemoveField("metadata", "initializers")
 		return
 	}
 	out, err := runtime.DefaultUnstructuredConverter.ToUnstructured(initializers)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to retrieve initializers for object: %v", err))
 	}
-	u.setNestedField(out, "metadata", "initializers")
+	u.UnstructuredContent().SetField(out, "metadata", "initializers")
 }
 
 func (u *Unstructured) GetFinalizers() []string {
-	val, _ := NestedStringSlice(u.Object, "metadata", "finalizers")
+	val, _ := u.Object.StringSlice("metadata", "finalizers")
 	return val
 }
 
 func (u *Unstructured) SetFinalizers(finalizers []string) {
-	u.setNestedSlice(finalizers, "metadata", "finalizers")
+	u.UnstructuredContent().SetStringSlice(finalizers, "metadata", "finalizers")
 }
 
 func (u *Unstructured) GetClusterName() string {
-	return getNestedString(u.Object, "metadata", "clusterName")
+	return u.Object.GetString("metadata", "clusterName")
 }
 
 func (u *Unstructured) SetClusterName(clusterName string) {
-	u.setNestedField(clusterName, "metadata", "clusterName")
+	u.UnstructuredContent().SetField(clusterName, "metadata", "clusterName")
+}
+
+func extractOwnerReference(v jsonlike.Object) metav1.OwnerReference {
+	// though this field is a *bool, but when decoded from JSON, it's
+	// unmarshalled as bool.
+	var controllerPtr *bool
+	if controller, ok := v.Bool("controller"); ok {
+		controllerPtr = &controller
+	}
+	var blockOwnerDeletionPtr *bool
+	if blockOwnerDeletion, ok := v.Bool("blockOwnerDeletion"); ok {
+		blockOwnerDeletionPtr = &blockOwnerDeletion
+	}
+	return metav1.OwnerReference{
+		Kind:               v.GetString("kind"),
+		Name:               v.GetString("name"),
+		APIVersion:         v.GetString("apiVersion"),
+		UID:                types.UID(v.GetString("uid")),
+		Controller:         controllerPtr,
+		BlockOwnerDeletion: blockOwnerDeletionPtr,
+	}
+}
+
+func setOwnerReference(src metav1.OwnerReference) map[string]interface{} {
+	ret := map[string]interface{}{
+		"kind":       src.Kind,
+		"name":       src.Name,
+		"apiVersion": src.APIVersion,
+		"uid":        string(src.UID),
+	}
+	// json.Unmarshal() extracts boolean json fields as bool, not as *bool and hence extractOwnerReference()
+	// expects bool or a missing field, not *bool. So if pointer is nil, fields are omitted from the ret object.
+	// If pointer is non-nil, they are set to the referenced value.
+	if src.Controller != nil {
+		ret["controller"] = *src.Controller
+	}
+	if src.BlockOwnerDeletion != nil {
+		ret["blockOwnerDeletion"] = *src.BlockOwnerDeletion
+	}
+	return ret
 }

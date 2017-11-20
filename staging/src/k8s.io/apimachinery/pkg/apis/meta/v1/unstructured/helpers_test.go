@@ -41,20 +41,3 @@ func TestCodecOfUnstructuredList(t *testing.T) {
 	}
 	wg.Wait()
 }
-
-func TestRemoveNestedField(t *testing.T) {
-	obj := map[string]interface{}{
-		"x": map[string]interface{}{
-			"y": 1,
-			"a": "foo",
-		},
-	}
-	RemoveNestedField(obj, "x", "a")
-	assert.Len(t, obj["x"], 1)
-	RemoveNestedField(obj, "x", "y")
-	assert.Empty(t, obj["x"])
-	RemoveNestedField(obj, "x")
-	assert.Empty(t, obj)
-	RemoveNestedField(obj, "x") // Remove of a non-existent field
-	assert.Empty(t, obj)
-}

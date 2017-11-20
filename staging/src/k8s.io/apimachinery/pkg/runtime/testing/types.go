@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/jsonlike"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/json"
 )
@@ -222,7 +223,7 @@ type Unstructured struct {
 	// Object is a JSON compatible map with string, float, int, bool, []interface{}, or
 	// map[string]interface{}
 	// children.
-	Object map[string]interface{}
+	Object jsonlike.Object
 }
 
 var _ runtime.Unstructured = &Unstructured{}
@@ -261,7 +262,7 @@ func (obj *Unstructured) EachListItem(fn func(runtime.Object) error) error {
 	return nil
 }
 
-func (obj *Unstructured) UnstructuredContent() map[string]interface{} {
+func (obj *Unstructured) UnstructuredContent() jsonlike.Object {
 	if obj.Object == nil {
 		obj.Object = make(map[string]interface{})
 	}
@@ -294,7 +295,7 @@ func (in *Unstructured) DeepCopy() *Unstructured {
 	}
 	out := new(Unstructured)
 	*out = *in
-	out.Object = runtime.DeepCopyJSON(in.Object)
+	out.Object = in.Object.DeepCopy()
 	return out
 }
 
