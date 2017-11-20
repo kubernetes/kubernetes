@@ -92,6 +92,10 @@ func NewHandlerImpl(updateCapacityFunc func(v1.ResourceList)) (*HandlerImpl, err
 	deviceManagerMonitorCallback := func(resourceName string, added, updated, deleted []pluginapi.Device) {
 		var capacity = v1.ResourceList{}
 		kept := append(updated, added...)
+
+		handler.Lock()
+		defer handler.Unlock()
+
 		if _, ok := handler.allDevices[resourceName]; !ok {
 			handler.allDevices[resourceName] = sets.NewString()
 		}
