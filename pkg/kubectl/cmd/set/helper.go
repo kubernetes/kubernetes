@@ -17,16 +17,12 @@ limitations under the License.
 package set
 
 import (
-	"fmt"
-	"io"
 	"strings"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
@@ -44,33 +40,6 @@ func selectContainers(containers []v1.Container, spec string) ([]*v1.Container, 
 	return out, skipped
 }
 
-// handlePodUpdateError prints a more useful error to the end user when mutating a pod.
-func handlePodUpdateError(out io.Writer, err error, resource string) {
-	if statusError, ok := err.(*errors.StatusError); ok && errors.IsInvalid(err) {
-		errorDetails := statusError.Status().Details
-		if errorDetails.Kind == "Pod" {
-			all, match := true, false
-			for _, cause := range errorDetails.Causes {
-				if cause.Field == "spec" && strings.Contains(cause.Message, "may not update fields other than") {
-					fmt.Fprintf(out, "error: may not update %s in pod %q directly\n", resource, errorDetails.Name)
-					match = true
-				} else {
-					all = false
-				}
-			}
-			if all && match {
-				return
-			}
-		} else {
-			if ok := cmdutil.PrintErrorWithCauses(err, out); ok {
-				return
-			}
-		}
-	}
-
-	fmt.Fprintf(out, "error: %v\n", err)
-}
-
 // selectString returns true if the provided string matches spec, where spec is a string with
 // a non-greedy '*' wildcard operator.
 // TODO: turn into a regex and handle greedy matches and backtracking.
@@ -85,8 +54,12 @@ func selectString(s, spec string) bool {
 	pos := 0
 	match := true
 	parts := strings.Split(spec, "*")
+	partsLen := len(parts)
+	partLen := 0
+	sLen := len(s)
 	for i, part := range parts {
-		if len(part) == 0 {
+		partLen = len(part)
+		if partLen == 0 {
 			continue
 		}
 		next := strings.Index(s[pos:], part)
@@ -98,7 +71,7 @@ func selectString(s, spec string) bool {
 		case i == 0 && pos != 0:
 			fallthrough
 		// last part does not exactly match remaining part of string
-		case i == (len(parts)-1) && len(s) != (len(part)+next):
+		case i == (partsLen-1) && sLen != (partLen+next):
 			match = false
 			break
 		default:
