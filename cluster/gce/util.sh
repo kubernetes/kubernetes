@@ -1318,11 +1318,6 @@ function create-nodes() {
   #TODO: parallelize this loop to speed up the process
   for ((i=1; i<=${NUM_MIGS}; i++)); do
     local group_name="${NODE_INSTANCE_PREFIX}-group-$i"
-    if [[ $i == ${NUM_MIGS} ]]; then
-      # TODO: We don't add a suffix for the last group to keep backward compatibility when there's only one MIG.
-      # We should change it at some point, but note #18545 when changing this.
-      group_name="${NODE_INSTANCE_PREFIX}-group"
-    fi
     # Spread the remaining number of nodes evenly
     this_mig_size=$((${instances_left} / (${NUM_MIGS}-${i}+1)))
     instances_left=$((instances_left-${this_mig_size}))
