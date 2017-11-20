@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
+	"time"
 )
 
 func CreateHTTPClient(roundTripper func(*http.Request) (*http.Response, error)) *http.Client {
@@ -43,10 +44,11 @@ func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // RESTClient provides a fake RESTClient interface.
 type RESTClient struct {
-	Client               *http.Client
-	NegotiatedSerializer runtime.NegotiatedSerializer
-	GroupVersion         schema.GroupVersion
-	VersionedAPIPath     string
+	Client                    *http.Client
+	NegotiatedSerializer      runtime.NegotiatedSerializer
+	GroupVersion              schema.GroupVersion
+	VersionedAPIPath          string
+	serverRequestTimeoutQuery time.Duration
 
 	Req  *http.Request
 	Resp *http.Response
@@ -85,6 +87,15 @@ func (c *RESTClient) GetRateLimiter() flowcontrol.RateLimiter {
 	return nil
 }
 
+func (c *RESTClient) RequestTimeoutQuery() time.Duration {
+	return c.serverRequestTimeoutQuery
+}
+
+func (c *RESTClient) WithRequestTimeoutQuery(timeout time.Duration) restclient.Interface {
+	c.serverRequestTimeoutQuery = timeout
+	return c
+}
+
 func (c *RESTClient) request(verb string) *restclient.Request {
 	config := restclient.ContentConfig{
 		ContentType:          runtime.ContentTypeJSON,
@@ -107,7 +118,11 @@ func (c *RESTClient) request(verb string) *restclient.Request {
 		serializers.StreamingSerializer = info.StreamSerializer.Serializer
 		serializers.Framer = info.StreamSerializer.Framer
 	}
-	return restclient.NewRequest(c, verb, &url.URL{Host: "localhost"}, c.VersionedAPIPath, config, serializers, nil, nil)
+	request := restclient.NewRequest(c, verb, &url.URL{Host: "localhost"}, c.VersionedAPIPath, config, serializers, nil, nil)
+	if c.serverRequestTimeoutQuery > 0 {
+		request.Timeout(c.serverRequestTimeoutQuery)
+	}
+	return request
 }
 
 func (c *RESTClient) Do(req *http.Request) (*http.Response, error) {
