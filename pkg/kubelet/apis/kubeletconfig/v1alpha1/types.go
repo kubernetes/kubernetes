@@ -89,8 +89,6 @@ type KubeletConfiguration struct {
 	Authentication KubeletAuthentication `json:"authentication"`
 	// authorization specifies how requests to the Kubelet's server are authorized
 	Authorization KubeletAuthorization `json:"authorization"`
-	// seccompProfileRoot is the directory path for seccomp profiles.
-	SeccompProfileRoot string `json:"seccompProfileRoot"`
 	// allowPrivileged enables containers to request privileged mode.
 	// Defaults to false.
 	AllowPrivileged *bool `json:"allowPrivileged"`
