@@ -156,3 +156,36 @@ func TestValidateVersion(t *testing.T) {
 		}
 	}
 }
+
+func TestResolveFeatureGateDependencies(t *testing.T) {
+
+	var tests = []struct {
+		inputFeatures    map[string]bool
+		expectedFeatures map[string]bool
+	}{
+		{ // no flags
+			inputFeatures:    map[string]bool{},
+			expectedFeatures: map[string]bool{},
+		},
+		{ // others flags
+			inputFeatures:    map[string]bool{"SupportIPVSProxyMode": true},
+			expectedFeatures: map[string]bool{"SupportIPVSProxyMode": true},
+		},
+		{ // just StoreCertsInSecrets flags
+			inputFeatures:    map[string]bool{"StoreCertsInSecrets": true},
+			expectedFeatures: map[string]bool{"StoreCertsInSecrets": true, "SelfHosting": true},
+		},
+		{ // just HighAvailability flags
+			inputFeatures:    map[string]bool{"HighAvailability": true},
+			expectedFeatures: map[string]bool{"HighAvailability": true, "StoreCertsInSecrets": true, "SelfHosting": true},
+		},
+	}
+
+	for _, test := range tests {
+		ResolveFeatureGateDependencies(test.inputFeatures)
+		if !reflect.DeepEqual(test.inputFeatures, test.expectedFeatures) {
+			t.Errorf("ResolveFeatureGateDependencies failed, expected: %v, got: %v", test.inputFeatures, test.expectedFeatures)
+
+		}
+	}
+}
