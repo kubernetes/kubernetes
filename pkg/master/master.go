@@ -107,6 +107,7 @@ type ExtraConfig struct {
 	// Used to start and monitor tunneling
 	Tunneler          tunneler.Tunneler
 	EnableUISupport   bool
+	UIRedirectURL     string
 	EnableLogsSupport bool
 	ProxyTransport    http.RoundTripper
 
@@ -302,7 +303,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	if c.ExtraConfig.EnableUISupport {
-		routes.UIRedirect{}.Install(s.Handler.NonGoRestfulMux)
+		routes.NewUIRedirect(c.ExtraConfig.UIRedirectURL).Install(s.Handler.NonGoRestfulMux)
 	}
 	if c.ExtraConfig.EnableLogsSupport {
 		routes.Logs{}.Install(s.Handler.GoRestfulContainer)

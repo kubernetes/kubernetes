@@ -71,6 +71,8 @@ type ServerRunOptions struct {
 
 	MasterCount            int
 	EndpointReconcilerType string
+
+	UIRedirectURL string
 }
 
 // NewServerRunOptions creates a new ServerRunOptions object with default parameters
@@ -112,6 +114,7 @@ func NewServerRunOptions() *ServerRunOptions {
 			HTTPTimeout: time.Duration(5) * time.Second,
 		},
 		ServiceNodePortRange: kubeoptions.DefaultServiceNodePortRange,
+		UIRedirectURL:        "/api/v1/namespaces/kube-system/services/kubernetes-dashboard/proxy",
 	}
 	// Overwrite the default for storage data format.
 	s.Etcd.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
@@ -188,6 +191,9 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"A port range to reserve for services with NodePort visibility. "+
 		"Example: '30000-32767'. Inclusive at both ends of the range.")
 
+	fs.StringVar(&s.UIRedirectURL, "ui-redirect-url", s.UIRedirectURL, ""+
+		"URL of the application serving the UI for the cluster.")
+
 	// Kubelet related flags:
 	fs.BoolVar(&s.KubeletConfig.EnableHttps, "kubelet-https", s.KubeletConfig.EnableHttps,
 		"Use https for kubelet connections.")
@@ -235,5 +241,4 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.BoolVar(&s.EnableAggregatorRouting, "enable-aggregator-routing", s.EnableAggregatorRouting,
 		"Turns on aggregator routing requests to endoints IP rather than cluster IP.")
-
 }
