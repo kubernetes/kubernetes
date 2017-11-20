@@ -581,17 +581,13 @@ func findLBRuleForPort(lbRules []network.LoadBalancingRule, port int32) (network
 func TestServiceDefaultsToNoSessionPersistence(t *testing.T) {
 	az := getTestCloud()
 	svc := getTestService("service-sa-omitted", v1.ProtocolTCP, 7170)
-	configProperties := getTestPublicFipConfigurationProperties()
-	lb := getTestLoadBalancer()
-	nodes := []*v1.Node{}
+	clusterResources := getClusterResources(az, 1, 1)
 
-	lb, _, err := az.reconcileLoadBalancer(lb, &configProperties, testClusterName, &svc, nodes)
+	lb, err := az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, true /* wantLb */)
 	if err != nil {
 		t.Errorf("Unexpected error reconciling svc1: %q", err)
 	}
-
 	validateLoadBalancer(t, lb, svc)
-
 	lbRule, err := findLBRuleForPort(*lb.LoadBalancingRules, 7170)
 	if err != nil {
 		t.Error(err)
@@ -606,11 +602,9 @@ func TestServiceRespectsNoSessionAffinity(t *testing.T) {
 	az := getTestCloud()
 	svc := getTestService("service-sa-none", v1.ProtocolTCP, 7170)
 	svc.Spec.SessionAffinity = v1.ServiceAffinityNone
-	configProperties := getTestPublicFipConfigurationProperties()
-	lb := getTestLoadBalancer()
-	nodes := []*v1.Node{}
+	clusterResources := getClusterResources(az, 1, 1)
 
-	lb, _, err := az.reconcileLoadBalancer(lb, &configProperties, testClusterName, &svc, nodes)
+	lb, err := az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, true /* wantLb */)
 	if err != nil {
 		t.Errorf("Unexpected error reconciling svc1: %q", err)
 	}
@@ -631,11 +625,9 @@ func TestServiceRespectsClientIPSessionAffinity(t *testing.T) {
 	az := getTestCloud()
 	svc := getTestService("service-sa-clientip", v1.ProtocolTCP, 7170)
 	svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
-	configProperties := getTestPublicFipConfigurationProperties()
-	lb := getTestLoadBalancer()
-	nodes := []*v1.Node{}
+	clusterResources := getClusterResources(az, 1, 1)
 
-	lb, _, err := az.reconcileLoadBalancer(lb, &configProperties, testClusterName, &svc, nodes)
+	lb, err := az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, true /* wantLb */)
 	if err != nil {
 		t.Errorf("Unexpected error reconciling svc1: %q", err)
 	}
