@@ -228,7 +228,8 @@ func setup(t *testing.T, workerCount int) *testContext {
 	}
 	// CreateNewCustomResourceDefinition wants to use this namespace for verifying
 	// namespace-scoped CRD creation.
-	createNamespaceOrDie("aval", clientSet, t)
+	ns := createNamespaceOrDie("aval", clientSet, t)
+	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
 
 	discoveryClient := cacheddiscovery.NewMemCacheClient(clientSet.Discovery())
 	restMapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.InterfacesForUnstructured)
@@ -815,6 +816,7 @@ func TestCustomResourceCascadingDeletion(t *testing.T) {
 	clientSet, apiExtensionClient, clientPool := ctx.clientSet, ctx.apiExtensionClient, ctx.clientPool
 
 	ns := createNamespaceOrDie("crd-cascading", clientSet, t)
+	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
 
 	definition, resourceClient := createRandomCustomResourceDefinition(t, apiExtensionClient, clientPool, ns.Name)
 
@@ -875,6 +877,7 @@ func TestMixedRelationships(t *testing.T) {
 	clientSet, apiExtensionClient, clientPool := ctx.clientSet, ctx.apiExtensionClient, ctx.clientPool
 
 	ns := createNamespaceOrDie("crd-mixed", clientSet, t)
+	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
 
 	configMapClient := clientSet.CoreV1().ConfigMaps(ns.Name)
 
@@ -973,6 +976,7 @@ func TestCRDDeletionCascading(t *testing.T) {
 	clientSet, apiExtensionClient, clientPool := ctx.clientSet, ctx.apiExtensionClient, ctx.clientPool
 
 	ns := createNamespaceOrDie("crd-mixed", clientSet, t)
+	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
 
 	configMapClient := clientSet.CoreV1().ConfigMaps(ns.Name)
 
