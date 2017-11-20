@@ -135,7 +135,7 @@ func doRoundTrip(t *testing.T, item interface{}) {
 		return
 	}
 	unmarshalledObj := reflect.New(reflect.TypeOf(item).Elem()).Interface()
-	err = json.Unmarshal(data, &unmarshalledObj)
+	err = json.Unmarshal(data, unmarshalledObj)
 	if err != nil {
 		t.Errorf("Error when unmarshaling to object: %v", err)
 		return
@@ -169,6 +169,38 @@ func TestRoundTrip(t *testing.T) {
 	testCases := []struct {
 		obj interface{}
 	}{
+		{
+			obj: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"kind": "List",
+				},
+				// Not testing a list with nil Items because items is a non-optional field and hence
+				// is always marshaled into an empty array which is not equal to nil when unmarshalled and will fail.
+				// That is expected.
+				Items: []unstructured.Unstructured{},
+			},
+		},
+		{
+			obj: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"kind": "List",
+				},
+				Items: []unstructured.Unstructured{
+					{
+						Object: map[string]interface{}{
+							"kind": "Pod",
+						},
+					},
+				},
+			},
+		},
+		{
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind": "Pod",
+				},
+			},
+		},
 		{
 			obj: &unstructured.Unstructured{
 				Object: map[string]interface{}{
@@ -260,7 +292,7 @@ func TestRoundTrip(t *testing.T) {
 // produces the same object.
 func doUnrecognized(t *testing.T, jsonData string, item interface{}, expectedErr error) {
 	unmarshalledObj := reflect.New(reflect.TypeOf(item).Elem()).Interface()
-	err := json.Unmarshal([]byte(jsonData), &unmarshalledObj)
+	err := json.Unmarshal([]byte(jsonData), unmarshalledObj)
 	if (err != nil) != (expectedErr != nil) {
 		t.Errorf("Unexpected error when unmarshaling to object: %v, expected: %v", err, expectedErr)
 		return
@@ -465,11 +497,10 @@ func TestUnrecognized(t *testing.T) {
 		},
 	}
 
-	for i := range testCases {
-		doUnrecognized(t, testCases[i].data, testCases[i].obj, testCases[i].err)
-		if t.Failed() {
-			break
-		}
+	for _, tc := range testCases {
+		t.Run(tc.data, func(t *testing.T) {
+			doUnrecognized(t, tc.data, tc.obj, tc.err)
+		})
 	}
 }
 

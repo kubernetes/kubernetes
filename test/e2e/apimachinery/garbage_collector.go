@@ -919,8 +919,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 				"kind":       definition.Spec.Names.Kind,
 				"metadata": map[string]interface{}{
 					"name": dependentName,
-					"ownerReferences": []map[string]string{
-						{
+					"ownerReferences": []interface{}{
+						map[string]interface{}{
 							"uid":        string(persistedOwner.GetUID()),
 							"apiVersion": apiVersion,
 							"kind":       definition.Spec.Names.Kind,
