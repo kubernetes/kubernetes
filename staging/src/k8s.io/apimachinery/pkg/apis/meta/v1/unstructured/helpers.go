@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"strconv"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,6 +30,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
+)
+
+const (
+	invalidTypeDetectionEnvVarName = "UNSTRUCTURED_INVALID_TYPE_DETECTOR"
+)
+
+var (
+	invalidTypeDetectionEnabled, _ = strconv.ParseBool(os.Getenv(invalidTypeDetectionEnvVarName))
 )
 
 // NestedFieldCopy returns a deep copy of the value of a nested field.
@@ -43,14 +53,18 @@ func NestedFieldCopy(obj map[string]interface{}, fields ...string) (interface{},
 
 func nestedFieldNoCopy(obj map[string]interface{}, fields ...string) (interface{}, bool) {
 	var val interface{} = obj
+	f := ""
 	for _, field := range fields {
 		if m, ok := val.(map[string]interface{}); ok {
 			val, ok = m[field]
 			if !ok {
 				return nil, false
 			}
+			f = field
 		} else {
-			// Expected map[string]interface{}, got something else
+			if invalidTypeDetectionEnabled {
+				panic(fmt.Errorf("unexpected nested field type - cannot get (%q in %q). Expected map[string]interface{}, got %T", f, fields, val))
+			}
 			return nil, false
 		}
 	}
@@ -65,6 +79,9 @@ func NestedString(obj map[string]interface{}, fields ...string) (string, bool) {
 		return "", false
 	}
 	s, ok := val.(string)
+	if !ok && invalidTypeDetectionEnabled {
+		panic(fmt.Errorf("unexpected nested field type while getting %q. Expected string, got %T", fields, val))
+	}
 	return s, ok
 }
 
@@ -76,6 +93,9 @@ func NestedBool(obj map[string]interface{}, fields ...string) (bool, bool) {
 		return false, false
 	}
 	b, ok := val.(bool)
+	if !ok && invalidTypeDetectionEnabled {
+		panic(fmt.Errorf("unexpected nested field type while getting %q. Expected bool, got %T", fields, val))
+	}
 	return b, ok
 }
 
@@ -87,6 +107,9 @@ func NestedFloat64(obj map[string]interface{}, fields ...string) (float64, bool)
 		return 0, false
 	}
 	f, ok := val.(float64)
+	if !ok && invalidTypeDetectionEnabled {
+		panic(fmt.Errorf("unexpected nested field type while getting %q. Expected float64, got %T", fields, val))
+	}
 	return f, ok
 }
 
@@ -98,6 +121,9 @@ func NestedInt64(obj map[string]interface{}, fields ...string) (int64, bool) {
 		return 0, false
 	}
 	i, ok := val.(int64)
+	if !ok && invalidTypeDetectionEnabled {
+		panic(fmt.Errorf("unexpected nested field type while getting %q. Expected int64, got %T", fields, val))
+	}
 	return i, ok
 }
 
@@ -114,10 +140,16 @@ func NestedStringSlice(obj map[string]interface{}, fields ...string) ([]string, 
 			if str, ok := v.(string); ok {
 				strSlice = append(strSlice, str)
 			} else {
+				if invalidTypeDetectionEnabled {
+					panic(fmt.Errorf("unexpected slice element type while getting %q. Expected string, got %T", fields, v))
+				}
 				return nil, false
 			}
 		}
 		return strSlice, true
+	}
+	if invalidTypeDetectionEnabled {
+		panic(fmt.Errorf("unexpected nested field type while getting %q. Expected []interface{}, got %T", fields, val))
 	}
 	return nil, false
 }
@@ -132,39 +164,55 @@ func NestedSlice(obj map[string]interface{}, fields ...string) ([]interface{}, b
 	if _, ok := val.([]interface{}); ok {
 		return runtime.DeepCopyJSONValue(val).([]interface{}), true
 	}
+	if invalidTypeDetectionEnabled {
+		panic(fmt.Errorf("unexpected nested field type while getting %q. Expected []interface{}, got %T", fields, val))
+	}
 	return nil, false
 }
 
 // NestedStringMap returns a copy of map[string]string value of a nested field.
 // Returns false if value is not found, is not a map[string]interface{} or contains non-string values in the map.
 func NestedStringMap(obj map[string]interface{}, fields ...string) (map[string]string, bool) {
-	val, ok := nestedFieldNoCopy(obj, fields...)
+	m, ok := nestedMapNoCopy(obj, fields...)
 	if !ok {
 		return nil, false
 	}
-	if m, ok := val.(map[string]interface{}); ok {
-		strMap := make(map[string]string, len(m))
-		for k, v := range m {
-			if str, ok := v.(string); ok {
-				strMap[k] = str
-			} else {
-				return nil, false
+	strMap := make(map[string]string, len(m))
+	for k, v := range m {
+		if str, ok := v.(string); ok {
+			strMap[k] = str
+		} else {
+			if invalidTypeDetectionEnabled {
+				panic(fmt.Errorf("unexpected map value type while getting %q. Expected string, got %T", fields, v))
 			}
+			return nil, false
 		}
-		return strMap, true
 	}
-	return nil, false
+	return strMap, true
 }
 
 // NestedMap returns a deep copy of map[string]interface{} value of a nested field.
 // Returns false if value is not found or is not a map[string]interface{}.
 func NestedMap(obj map[string]interface{}, fields ...string) (map[string]interface{}, bool) {
+	m, ok := nestedMapNoCopy(obj, fields...)
+	if !ok {
+		return nil, false
+	}
+	return runtime.DeepCopyJSON(m), true
+}
+
+// nestedMapNoCopy returns a map[string]interface{} value of a nested field.
+// Returns false if value is not found or is not a map[string]interface{}.
+func nestedMapNoCopy(obj map[string]interface{}, fields ...string) (map[string]interface{}, bool) {
 	val, ok := nestedFieldNoCopy(obj, fields...)
 	if !ok {
 		return nil, false
 	}
 	if m, ok := val.(map[string]interface{}); ok {
-		return runtime.DeepCopyJSON(m), true
+		return m, true
+	}
+	if invalidTypeDetectionEnabled {
+		panic(fmt.Errorf("unexpected nested field type while getting %q. Expected map[string]interface{}, got %T", fields, val))
 	}
 	return nil, false
 }
@@ -182,6 +230,9 @@ func setNestedFieldNoCopy(obj map[string]interface{}, value interface{}, fields 
 			if valMap, ok := val.(map[string]interface{}); ok {
 				m = valMap
 			} else {
+				if invalidTypeDetectionEnabled {
+					panic(fmt.Errorf("unexpected nested field type - cannot set (%q in %q). Expected map[string]interface{}, got %T", field, fields, val))
+				}
 				return false
 			}
 		} else {
@@ -230,9 +281,16 @@ func SetNestedMap(obj map[string]interface{}, value map[string]interface{}, fiel
 func RemoveNestedField(obj map[string]interface{}, fields ...string) {
 	m := obj
 	for _, field := range fields[:len(fields)-1] {
-		if x, ok := m[field].(map[string]interface{}); ok {
+		val, ok := m[field]
+		if !ok {
+			return
+		}
+		if x, ok := val.(map[string]interface{}); ok {
 			m = x
 		} else {
+			if invalidTypeDetectionEnabled {
+				panic(fmt.Errorf("unexpected nested field type - cannot remove (%q in %q). Expected map[string]interface{}, got %T", field, fields, val))
+			}
 			return
 		}
 	}
@@ -444,7 +502,7 @@ func (UnstructuredObjectConverter) Convert(in, out, context interface{}) error {
 
 	// maybe deep copy the map? It is documented in the
 	// ObjectConverter interface that this function is not
-	// guaranteeed to not mutate the input. Or maybe set the input
+	// guaranteed to not mutate the input. Or maybe set the input
 	// object to nil.
 	unstructOut.Object = unstructIn.Object
 	return nil
