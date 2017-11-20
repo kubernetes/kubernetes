@@ -3139,7 +3139,7 @@ func buildListener(port v1.ServicePort, annotations map[string]string, sslPorts 
 	listener.InstancePort = &instancePort
 	listener.LoadBalancerPort = &loadBalancerPort
 	certID := annotations[ServiceAnnotationLoadBalancerCertificate]
-	if certID != "" && (sslPorts == nil || sslPorts.numbers.Has(loadBalancerPort) || sslPorts.names.Has(portName)) {
+	if certID != "" && (sslPorts == nil || sslPorts.numbers.Has(loadBalancerPort) || sslPorts.names.Has(portName) || len(sslPorts.numbers) > 0) {
 		instanceProtocol = annotations[ServiceAnnotationLoadBalancerBEProtocol]
 		if instanceProtocol == "" {
 			protocol = "ssl"
