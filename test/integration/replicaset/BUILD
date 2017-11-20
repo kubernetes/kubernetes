@@ -18,6 +18,7 @@ go_test(
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/controller/replicaset:go_default_library",
         "//test/integration/framework:go_default_library",
+        "//test/utils:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
-	extensionsclient "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
@@ -87,10 +86,6 @@ var _ = SIGDescribe("Deployment", func() {
 	It("deployment should support rollback", func() {
 		testRollbackDeployment(f)
 	})
-	It("scaled rollout deployment should not block on annotation check", func() {
-		testScaledRolloutDeployment(f)
-	})
-
 	It("iterative rollouts should eventually progress", func() {
 		testIterativeDeployments(f)
 	})
@@ -621,159 +616,6 @@ func testRollbackDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func testScaledRolloutDeployment(f *framework.Framework) {
-	ns := f.Namespace.Name
-	c := f.ClientSet
-
-	podLabels := map[string]string{"name": NginxImageName}
-	replicas := int32(10)
-
-	// Create a nginx deployment.
-	deploymentName := "nginx"
-	d := framework.NewDeployment(deploymentName, replicas, podLabels, NginxImageName, NginxImage, extensions.RollingUpdateDeploymentStrategyType)
-	d.Spec.Strategy.RollingUpdate = new(extensions.RollingUpdateDeployment)
-	d.Spec.Strategy.RollingUpdate.MaxSurge = intOrStrP(3)
-	d.Spec.Strategy.RollingUpdate.MaxUnavailable = intOrStrP(2)
-
-	framework.Logf("Creating deployment %q", deploymentName)
-	deployment, err := c.ExtensionsV1beta1().Deployments(ns).Create(d)
-	Expect(err).NotTo(HaveOccurred())
-
-	framework.Logf("Waiting for observed generation %d", deployment.Generation)
-	Expect(framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)).NotTo(HaveOccurred())
-
-	// Verify that the required pods have come up.
-	framework.Logf("Waiting for all required pods to come up")
-	err = framework.VerifyPodsRunning(f.ClientSet, ns, NginxImageName, false, *(deployment.Spec.Replicas))
-	Expect(err).NotTo(HaveOccurred(), "error in waiting for pods to come up: %v", err)
-
-	framework.Logf("Waiting for deployment %q to complete", deployment.Name)
-	Expect(framework.WaitForDeploymentComplete(c, deployment)).NotTo(HaveOccurred())
-
-	first, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
-	Expect(err).NotTo(HaveOccurred())
-
-	// Update the deployment with a non-existent image so that the new replica set will be blocked.
-	framework.Logf("Updating deployment %q with a non-existent image", deploymentName)
-	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, d.Name, func(update *extensions.Deployment) {
-		update.Spec.Template.Spec.Containers[0].Image = "nginx:404"
-	})
-	Expect(err).NotTo(HaveOccurred())
-
-	framework.Logf("Waiting for observed generation %d", deployment.Generation)
-	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
-	Expect(err).NotTo(HaveOccurred())
-
-	deployment, err = c.ExtensionsV1beta1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-
-	if deployment.Status.AvailableReplicas < deploymentutil.MinAvailable(deployment) {
-		Expect(fmt.Errorf("Observed %d available replicas, less than min required %d", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment))).NotTo(HaveOccurred())
-	}
-
-	framework.Logf("Checking that the replica sets for %q are synced", deploymentName)
-	second, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
-	Expect(err).NotTo(HaveOccurred())
-
-	first, err = c.ExtensionsV1beta1().ReplicaSets(first.Namespace).Get(first.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-
-	firstCond := replicaSetHasDesiredReplicas(c.ExtensionsV1beta1(), first)
-	err = wait.PollImmediate(10*time.Millisecond, 1*time.Minute, firstCond)
-	Expect(err).NotTo(HaveOccurred())
-
-	secondCond := replicaSetHasDesiredReplicas(c.ExtensionsV1beta1(), second)
-	err = wait.PollImmediate(10*time.Millisecond, 1*time.Minute, secondCond)
-	Expect(err).NotTo(HaveOccurred())
-
-	framework.Logf("Updating the size (up) and template at the same time for deployment %q", deploymentName)
-	newReplicas := int32(20)
-	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *extensions.Deployment) {
-		update.Spec.Replicas = &newReplicas
-		update.Spec.Template.Spec.Containers[0].Image = NautilusImage
-	})
-	Expect(err).NotTo(HaveOccurred())
-
-	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
-	Expect(err).NotTo(HaveOccurred())
-
-	framework.Logf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment))
-	Expect(framework.WaitForDeploymentComplete(c, deployment)).NotTo(HaveOccurred())
-
-	oldRSs, _, rs, err := deploymentutil.GetAllReplicaSets(deployment, c.ExtensionsV1beta1())
-	Expect(err).NotTo(HaveOccurred())
-
-	for _, rs := range append(oldRSs, rs) {
-		framework.Logf("Ensuring replica set %q has the correct desiredReplicas annotation", rs.Name)
-		desired, ok := deploymentutil.GetDesiredReplicasAnnotation(rs)
-		if !ok || desired == *(deployment.Spec.Replicas) {
-			continue
-		}
-		err = fmt.Errorf("unexpected desiredReplicas annotation %d for replica set %q", desired, rs.Name)
-		Expect(err).NotTo(HaveOccurred())
-	}
-
-	// Update the deployment with a non-existent image so that the new replica set will be blocked.
-	framework.Logf("Updating deployment %q with a non-existent image", deploymentName)
-	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, d.Name, func(update *extensions.Deployment) {
-		update.Spec.Template.Spec.Containers[0].Image = "nginx:404"
-	})
-	Expect(err).NotTo(HaveOccurred())
-
-	framework.Logf("Waiting for observed generation %d", deployment.Generation)
-	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
-	Expect(err).NotTo(HaveOccurred())
-
-	deployment, err = c.ExtensionsV1beta1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-
-	if deployment.Status.AvailableReplicas < deploymentutil.MinAvailable(deployment) {
-		Expect(fmt.Errorf("Observed %d available replicas, less than min required %d", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment))).NotTo(HaveOccurred())
-	}
-
-	framework.Logf("Checking that the replica sets for %q are synced", deploymentName)
-	oldRs, err := c.ExtensionsV1beta1().ReplicaSets(rs.Namespace).Get(rs.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-
-	newRs, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
-	Expect(err).NotTo(HaveOccurred())
-
-	oldCond := replicaSetHasDesiredReplicas(c.ExtensionsV1beta1(), oldRs)
-	err = wait.PollImmediate(10*time.Millisecond, 1*time.Minute, oldCond)
-	Expect(err).NotTo(HaveOccurred())
-
-	newCond := replicaSetHasDesiredReplicas(c.ExtensionsV1beta1(), newRs)
-	err = wait.PollImmediate(10*time.Millisecond, 1*time.Minute, newCond)
-	Expect(err).NotTo(HaveOccurred())
-
-	framework.Logf("Updating the size (down) and template at the same time for deployment %q", deploymentName)
-	newReplicas = int32(5)
-	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *extensions.Deployment) {
-		update.Spec.Replicas = &newReplicas
-		update.Spec.Template.Spec.Containers[0].Image = KittenImage
-	})
-	Expect(err).NotTo(HaveOccurred())
-
-	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
-	Expect(err).NotTo(HaveOccurred())
-
-	framework.Logf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment))
-	Expect(framework.WaitForDeploymentComplete(c, deployment)).NotTo(HaveOccurred())
-
-	oldRSs, _, rs, err = deploymentutil.GetAllReplicaSets(deployment, c.ExtensionsV1beta1())
-	Expect(err).NotTo(HaveOccurred())
-
-	for _, rs := range append(oldRSs, rs) {
-		framework.Logf("Ensuring replica set %q has the correct desiredReplicas annotation", rs.Name)
-		desired, ok := deploymentutil.GetDesiredReplicasAnnotation(rs)
-		if !ok || desired == *(deployment.Spec.Replicas) {
-			continue
-		}
-		err = fmt.Errorf("unexpected desiredReplicas annotation %d for replica set %q", desired, rs.Name)
-		Expect(err).NotTo(HaveOccurred())
-	}
-}
-
 func randomScale(d *extensions.Deployment, i int) {
 	switch r := rand.Float32(); {
 	case r < 0.3:
@@ -904,17 +746,6 @@ func testIterativeDeployments(f *framework.Framework) {
 	Expect(framework.WaitForDeploymentWithCondition(c, ns, deploymentName, deploymentutil.NewRSAvailableReason, extensions.DeploymentProgressing)).NotTo(HaveOccurred())
 }
 
-func replicaSetHasDesiredReplicas(rsClient extensionsclient.ReplicaSetsGetter, replicaSet *extensions.ReplicaSet) wait.ConditionFunc {
-	desiredGeneration := replicaSet.Generation
-	return func() (bool, error) {
-		rs, err := rsClient.ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		return rs.Status.ObservedGeneration >= desiredGeneration && rs.Status.Replicas == *(rs.Spec.Replicas), nil
-	}
-}
-
 func testDeploymentsControllerRef(f *framework.Framework) {
 	ns := f.Namespace.Name
 	c := f.ClientSet
@@ -952,16 +783,6 @@ func testDeploymentsControllerRef(f *framework.Framework) {
 	framework.Logf("Waiting for the ReplicaSet to have the right controllerRef")
 	err = checkDeploymentReplicaSetsControllerRef(c, ns, deploy.UID, podLabels)
 	Expect(err).NotTo(HaveOccurred())
-}
-
-func waitDeploymentReplicaSetsControllerRef(c clientset.Interface, ns string, uid types.UID, label map[string]string) func() (bool, error) {
-	return func() (bool, error) {
-		err := checkDeploymentReplicaSetsControllerRef(c, ns, uid, label)
-		if err != nil {
-			return false, nil
-		}
-		return true, nil
-	}
 }
 
 func checkDeploymentReplicaSetsControllerRef(c clientset.Interface, ns string, uid types.UID, label map[string]string) error {

@@ -876,3 +876,195 @@ func TestOverlappingDeployments(t *testing.T) {
 		}
 	}
 }
+
+// Deployment should not block rollout when updating spec replica number and template at the same time.
+func TestScaledRolloutDeployment(t *testing.T) {
+	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	defer closeFn()
+	name := "test-scaled-rollout-deployment"
+	ns := framework.CreateTestingNamespace(name, s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+	go rm.Run(5, stopCh)
+	go dc.Run(5, stopCh)
+
+	// Create a deployment with rolling update strategy, max surge = 3, and max unavailable = 2
+	var err error
+	replicas := int32(10)
+	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
+	tester.deployment.Spec.Strategy.RollingUpdate.MaxSurge = intOrStrP(3)
+	tester.deployment.Spec.Strategy.RollingUpdate.MaxUnavailable = intOrStrP(2)
+	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	if err != nil {
+		t.Fatalf("failed to create deployment %q: %v", name, err)
+	}
+	if err = tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
+		t.Fatal(err)
+	}
+	if err = tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
+		t.Fatalf("deployment %q failed to complete: %v", name, err)
+	}
+
+	// Record current replicaset before starting new rollout
+	firstRS, err := tester.expectNewReplicaSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Update the deployment with another new image but do not mark the pods as ready to block new replicaset
+	fakeImage2 := "fakeimage2"
+	tester.deployment, err = tester.updateDeployment(func(update *v1beta1.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Image = fakeImage2
+	})
+	if err != nil {
+		t.Fatalf("failed updating deployment %q: %v", name, err)
+	}
+	if err = tester.waitForDeploymentRevisionAndImage("2", fakeImage2); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify the deployment has minimum available replicas after 2nd rollout
+	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Get(name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get deployment %q: %v", name, err)
+	}
+	minAvailableReplicas := deploymentutil.MinAvailable(tester.deployment)
+	if tester.deployment.Status.AvailableReplicas < minAvailableReplicas {
+		t.Fatalf("deployment %q does not have minimum number of available replicas after 2nd rollout", name)
+	}
+
+	// Wait for old replicaset of 1st rollout to have desired replicas
+	firstRS, err = c.ExtensionsV1beta1().ReplicaSets(ns.Name).Get(firstRS.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get replicaset %q: %v", firstRS.Name, err)
+	}
+	if err = tester.waitRSStable(firstRS); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for new replicaset of 2nd rollout to have desired replicas
+	secondRS, err := tester.expectNewReplicaSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = tester.waitRSStable(secondRS); err != nil {
+		t.Fatal(err)
+	}
+
+	// Scale up the deployment and update its image to another new image simultaneously (this time marks all pods as ready)
+	newReplicas := int32(20)
+	fakeImage3 := "fakeimage3"
+	tester.deployment, err = tester.updateDeployment(func(update *v1beta1.Deployment) {
+		update.Spec.Replicas = &newReplicas
+		update.Spec.Template.Spec.Containers[0].Image = fakeImage3
+	})
+	if err != nil {
+		t.Fatalf("failed updating deployment %q: %v", name, err)
+	}
+	if err = tester.waitForDeploymentRevisionAndImage("3", fakeImage3); err != nil {
+		t.Fatal(err)
+	}
+	if err = tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
+		t.Fatalf("deployment %q failed to complete: %v", name, err)
+	}
+
+	// Verify every replicaset has correct desiredReplicas annotation after 3rd rollout
+	thirdRS, err := deploymentutil.GetNewReplicaSet(tester.deployment, c.ExtensionsV1beta1())
+	if err != nil {
+		t.Fatalf("failed getting new revision 3 replicaset for deployment %q: %v", name, err)
+	}
+	rss := []*v1beta1.ReplicaSet{firstRS, secondRS, thirdRS}
+	for _, curRS := range rss {
+		curRS, err = c.ExtensionsV1beta1().ReplicaSets(ns.Name).Get(curRS.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("failed to get replicaset when checking desired replicas annotation: %v", err)
+		}
+		desired, ok := deploymentutil.GetDesiredReplicasAnnotation(curRS)
+		if !ok {
+			t.Fatalf("failed to retrieve desiredReplicas annotation for replicaset %q", curRS.Name)
+		}
+		if desired != *(tester.deployment.Spec.Replicas) {
+			t.Fatalf("unexpected desiredReplicas annotation for replicaset %q: expected %d, got %d", curRS.Name, *(tester.deployment.Spec.Replicas), desired)
+		}
+	}
+
+	// Update the deployment with another new image but do not mark the pods as ready to block new replicaset
+	fakeImage4 := "fakeimage4"
+	tester.deployment, err = tester.updateDeployment(func(update *v1beta1.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Image = fakeImage4
+	})
+	if err != nil {
+		t.Fatalf("failed updating deployment %q: %v", name, err)
+	}
+	if err = tester.waitForDeploymentRevisionAndImage("4", fakeImage4); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify the deployment has minimum available replicas after 4th rollout
+	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Get(name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get deployment %q: %v", name, err)
+	}
+	minAvailableReplicas = deploymentutil.MinAvailable(tester.deployment)
+	if tester.deployment.Status.AvailableReplicas < minAvailableReplicas {
+		t.Fatalf("deployment %q does not have minimum number of available replicas after 4th rollout", name)
+	}
+
+	// Wait for old replicaset of 3rd rollout to have desired replicas
+	thirdRS, err = c.ExtensionsV1beta1().ReplicaSets(ns.Name).Get(thirdRS.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get replicaset %q: %v", thirdRS.Name, err)
+	}
+	if err = tester.waitRSStable(thirdRS); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for new replicaset of 4th rollout to have desired replicas
+	fourthRS, err := tester.expectNewReplicaSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = tester.waitRSStable(fourthRS); err != nil {
+		t.Fatal(err)
+	}
+
+	// Scale down the deployment and update its image to another new image simultaneously (this time marks all pods as ready)
+	newReplicas = int32(5)
+	fakeImage5 := "fakeimage5"
+	tester.deployment, err = tester.updateDeployment(func(update *v1beta1.Deployment) {
+		update.Spec.Replicas = &newReplicas
+		update.Spec.Template.Spec.Containers[0].Image = fakeImage5
+	})
+	if err != nil {
+		t.Fatalf("failed updating deployment %q: %v", name, err)
+	}
+	if err = tester.waitForDeploymentRevisionAndImage("5", fakeImage5); err != nil {
+		t.Fatal(err)
+	}
+	if err = tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
+		t.Fatalf("deployment %q failed to complete: %v", name, err)
+	}
+
+	// Verify every replicaset has correct desiredReplicas annotation after 5th rollout
+	fifthRS, err := deploymentutil.GetNewReplicaSet(tester.deployment, c.ExtensionsV1beta1())
+	if err != nil {
+		t.Fatalf("failed getting new revision 5 replicaset for deployment %q: %v", name, err)
+	}
+	rss = []*v1beta1.ReplicaSet{thirdRS, fourthRS, fifthRS}
+	for _, curRS := range rss {
+		curRS, err = c.ExtensionsV1beta1().ReplicaSets(ns.Name).Get(curRS.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("failed to get replicaset when checking desired replicas annotation: %v", err)
+		}
+		desired, ok := deploymentutil.GetDesiredReplicasAnnotation(curRS)
+		if !ok {
+			t.Fatalf("failed to retrieve desiredReplicas annotation for replicaset %q", curRS.Name)
+		}
+		if desired != *(tester.deployment.Spec.Replicas) {
+			t.Fatalf("unexpected desiredReplicas annotation for replicaset %q: expected %d, got %d", curRS.Name, *(tester.deployment.Spec.Replicas), desired)
+		}
+	}
+}
