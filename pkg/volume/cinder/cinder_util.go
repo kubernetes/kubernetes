@@ -228,12 +228,11 @@ func probeAttachedVolume() error {
 	// udevadm settle waits for udevd to process the device creation
 	// events for all hardware devices, thus ensuring that any device
 	// nodes have been created successfully before proceeding.
-	argsSettle := []string{"settle", "--timeout=1"}
+	argsSettle := []string{"settle"}
 	cmdSettle := executor.Command("udevadm", argsSettle...)
 	_, errSettle := cmdSettle.CombinedOutput()
 	if errSettle != nil {
 		glog.Errorf("error running udevadm settle %v\n", errSettle)
-		return errSettle
 	}
 
 	args := []string{"trigger"}
