@@ -59,11 +59,11 @@ if [ $? -eq 0 ]; then
      echo "Do not find nsenter. Install it."
      NSENTER_BUILD_DIR=$(mktemp -d /tmp/nsenter-build-XXXXXX)
      cd $NSENTER_BUILD_DIR
-     curl https://www.kernel.org/pub/linux/utils/util-linux/v2.24/util-linux-2.24.tar.gz | tar -zxf-
+     curl https://www.kernel.org/pub/linux/utils/util-linux/v2.31/util-linux-2.31.tar.gz | tar -zxf-
      sudo apt-get update
      sudo apt-get --yes install make
      sudo apt-get --yes install gcc
-     cd util-linux-2.24
+     cd util-linux-2.31
      ./configure --without-ncurses
      make nsenter
      sudo cp nsenter /usr/local/bin
