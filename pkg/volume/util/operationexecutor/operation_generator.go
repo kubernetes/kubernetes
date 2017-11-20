@@ -454,8 +454,9 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 			glog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.WaitForAttach succeeded", fmt.Sprintf("DevicePath %q", devicePath)))
 
-			mounter := og.volumePluginMgr.Host.GetMounter(volumePlugin.GetPluginName())
-			resizeError := og.resizeFileSystem(volumeToMount, devicePath, mounter)
+			// resizeFileSystem will resize the file system if user has requested a resize of
+			// underlying persistent volume and is allowed to do so.
+			resizeError := og.resizeFileSystem(volumeToMount, devicePath, volumePlugin.GetPluginName())
 
 			if resizeError != nil {
 				return volumeToMount.GenerateErrorDetailed("MountVolume.Resize failed", resizeError)
@@ -538,12 +539,12 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	}, volumePlugin.GetPluginName(), nil
 }
 
-func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, devicePath string, mounter mount.Interface) error {
+func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, devicePath string, pluginName string) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
 		glog.V(6).Infof("Resizing is not enabled for this volume %s", volumeToMount.VolumeName)
 		return nil
 	}
-
+	mounter := og.volumePluginMgr.Host.GetMounter(pluginName)
 	// Get expander, if possible
 	expandableVolumePlugin, _ :=
 		og.volumePluginMgr.FindExpandablePluginBySpec(volumeToMount.VolumeSpec)

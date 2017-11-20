@@ -897,6 +897,19 @@ func (manager *FakeServiceManager) GetRegionalDiskFromCloudProvider(
 	}, nil
 }
 
+func (manager *FakeServiceManager) ResizeDiskOnCloudProvider(
+	disk *GCEDisk,
+	size int64,
+	zone string) (gceObject, error) {
+	panic("Not implmented")
+}
+
+func (manager *FakeServiceManager) RegionalResizeDiskOnCloudProvider(
+	disk *GCEDisk,
+	size int64) (gceObject, error) {
+	panic("Not implemented")
+}
+
 /**
  * Disk info is removed from the FakeServiceManager.
  */
