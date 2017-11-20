@@ -93,34 +93,34 @@ type genericScheduler struct {
 }
 
 // Schedule tries to schedule the given pod to one of node in the node list.
-// If it succeeds, it will return the name of the node.
+// If it succeeds, it will return the v1.Node object of the node.
 // If it fails, it will return a Fiterror error with reasons.
-func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister) (string, error) {
+func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister) (*v1.Node, error) {
 	trace := utiltrace.New(fmt.Sprintf("Scheduling %s/%s", pod.Namespace, pod.Name))
 	defer trace.LogIfLong(100 * time.Millisecond)
 
 	nodes, err := nodeLister.List()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if len(nodes) == 0 {
-		return "", ErrNoNodesAvailable
+		return nil, ErrNoNodesAvailable
 	}
 
 	// Used for all fit and priority funcs.
 	err = g.cache.UpdateNodeNameToInfoMap(g.cachedNodeInfoMap)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	trace.Step("Computing predicates")
 	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, g.cachedNodeInfoMap, nodes, g.predicates, g.extenders, g.predicateMetaProducer, g.equivalenceCache)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if len(filteredNodes) == 0 {
-		return "", &FitError{
+		return nil, &FitError{
 			Pod:              pod,
 			NumAllNodes:      len(nodes),
 			FailedPredicates: failedPredicateMap,
@@ -131,13 +131,13 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 
 	// When only one node after predicate, just use it.
 	if len(filteredNodes) == 1 {
-		return filteredNodes[0].Name, nil
+		return filteredNodes[0], nil
 	}
 
 	metaPrioritiesInterface := g.priorityMetaProducer(pod, g.cachedNodeInfoMap)
 	priorityList, err := PrioritizeNodes(pod, g.cachedNodeInfoMap, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extenders)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	trace.Step("Selecting host")
@@ -158,9 +158,9 @@ func (g *genericScheduler) Predicates() map[string]algorithm.FitPredicate {
 
 // selectHost takes a prioritized list of nodes and then picks one
 // in a round-robin manner from the nodes that had the highest score.
-func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList) (string, error) {
+func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList) (*v1.Node, error) {
 	if len(priorityList) == 0 {
-		return "", fmt.Errorf("empty priorityList")
+		return nil, fmt.Errorf("empty priorityList")
 	}
 
 	sort.Sort(sort.Reverse(priorityList))
@@ -450,7 +450,7 @@ func PrioritizeNodes(
 	result := make(schedulerapi.HostPriorityList, 0, len(nodes))
 
 	for i := range nodes {
-		result = append(result, schedulerapi.HostPriority{Host: nodes[i].Name, Score: 0})
+		result = append(result, schedulerapi.HostPriority{Host: nodes[i], Score: 0})
 		for j := range priorityConfigs {
 			result[i].Score += results[j][i].Score * priorityConfigs[j].Weight
 		}
@@ -470,7 +470,7 @@ func PrioritizeNodes(
 				mu.Lock()
 				for i := range *prioritizedList {
 					host, score := (*prioritizedList)[i].Host, (*prioritizedList)[i].Score
-					combinedScores[host] += score * weight
+					combinedScores[host.Name] += score * weight
 				}
 				mu.Unlock()
 			}(extender)
@@ -478,13 +478,13 @@ func PrioritizeNodes(
 		// wait for all go routines to finish
 		wg.Wait()
 		for i := range result {
-			result[i].Score += combinedScores[result[i].Host]
+			result[i].Score += combinedScores[result[i].Host.Name]
 		}
 	}
 
 	if glog.V(10) {
 		for i := range result {
-			glog.V(10).Infof("Host %s => Score %d", result[i].Host, result[i].Score)
+			glog.V(10).Infof("Host %s => Score %d", result[i].Host.Name, result[i].Score)
 		}
 	}
 	return result, nil
@@ -497,7 +497,7 @@ func EqualPriorityMap(_ *v1.Pod, _ interface{}, nodeInfo *schedulercache.NodeInf
 		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
 	}
 	return schedulerapi.HostPriority{
-		Host:  node.Name,
+		Host:  node,
 		Score: 1,
 	}, nil
 }

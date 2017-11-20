@@ -204,7 +204,7 @@ type ExtenderBindingResult struct {
 // HostPriority represents the priority of scheduling to a particular host, higher priority is better.
 type HostPriority struct {
 	// Name of the host
-	Host string
+	Host *v1.Node
 	// Score associated with the host
 	Score int
 }
@@ -217,7 +217,7 @@ func (h HostPriorityList) Len() int {
 
 func (h HostPriorityList) Less(i, j int) bool {
 	if h[i].Score == h[j].Score {
-		return h[i].Host < h[j].Host
+		return h[i].Host.Name < h[j].Host.Name
 	}
 	return h[i].Score < h[j].Score
 }

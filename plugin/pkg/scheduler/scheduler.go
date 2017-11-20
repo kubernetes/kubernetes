@@ -172,7 +172,7 @@ func (sched *Scheduler) Config() *Config {
 }
 
 // schedule implements the scheduling algorithm and returns the suggested host.
-func (sched *Scheduler) schedule(pod *v1.Pod) (string, error) {
+func (sched *Scheduler) schedule(pod *v1.Pod) (*v1.Node, error) {
 	host, err := sched.config.Algorithm.Schedule(pod, sched.config.NodeLister)
 	if err != nil {
 		glog.V(1).Infof("Failed to schedule pod: %v/%v", pod.Namespace, pod.Name)
@@ -185,7 +185,7 @@ func (sched *Scheduler) schedule(pod *v1.Pod) (string, error) {
 			Reason:  v1.PodReasonUnschedulable,
 			Message: err.Error(),
 		})
-		return "", err
+		return nil, err
 	}
 	return host, err
 }
@@ -324,7 +324,7 @@ func (sched *Scheduler) scheduleOne() {
 	// This allows us to keep scheduling without waiting on binding to occur.
 	assumedPod := *pod
 	// assume modifies `assumedPod` by setting NodeName=suggestedHost
-	err = sched.assume(&assumedPod, suggestedHost)
+	err = sched.assume(&assumedPod, suggestedHost.Name)
 	if err != nil {
 		return
 	}
@@ -333,8 +333,9 @@ func (sched *Scheduler) scheduleOne() {
 		err := sched.bind(&assumedPod, &v1.Binding{
 			ObjectMeta: metav1.ObjectMeta{Namespace: assumedPod.Namespace, Name: assumedPod.Name, UID: assumedPod.UID},
 			Target: v1.ObjectReference{
-				Kind: "Node",
-				Name: suggestedHost,
+				Kind:            "Node",
+				Name:            suggestedHost.Name,
+				ResourceVersion: suggestedHost.ResourceVersion,
 			},
 		})
 		metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))

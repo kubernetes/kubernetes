@@ -88,7 +88,7 @@ func calculateUsedPriority(pod *v1.Pod, podRequests *schedulercache.Resource, no
 	}
 
 	return schedulerapi.HostPriority{
-		Host:  node.Name,
+		Host:  node,
 		Score: int((cpuScore + memoryScore) / 2),
 	}, nil
 }
