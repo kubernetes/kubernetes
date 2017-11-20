@@ -24,15 +24,31 @@ import (
 	apps "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 )
 
 // healthCheck is a helper struct for easily performing healthchecks against the cluster and printing the output
 type healthCheck struct {
-	description, okMessage, failMessage string
-	// f is invoked with a k8s client passed to it. Should return an optional warning and/or an error
+	name   string
+	client clientset.Interface
+	// f is invoked with a k8s client passed to it. Should return an optional error
 	f func(clientset.Interface) error
+}
+
+// Check is part of the preflight.Checker interface
+func (c *healthCheck) Check() (warnings, errors []error) {
+	if err := c.f(c.client); err != nil {
+		return nil, []error{err}
+	}
+	return nil, nil
+}
+
+// Name is part of the preflight.Checker interface
+func (c *healthCheck) Name() string {
+	return c.name
 }
 
 // CheckClusterHealth makes sure:
@@ -40,57 +56,39 @@ type healthCheck struct {
 // - all Nodes are Ready
 // - (if self-hosted) that there are DaemonSets with at least one Pod for all control plane components
 // - (if static pod-hosted) that all required Static Pod manifests exist on disk
-func CheckClusterHealth(client clientset.Interface) error {
+func CheckClusterHealth(client clientset.Interface, ignoreChecksErrors sets.String) error {
 	fmt.Println("[upgrade] Making sure the cluster is healthy:")
 
-	healthChecks := []healthCheck{
-		{
-			description: "API Server health",
-			okMessage:   "Healthy",
-			failMessage: "Unhealthy",
-			f:           apiServerHealthy,
+	healthChecks := []preflight.Checker{
+		&healthCheck{
+			name:   "APIServerHealth",
+			client: client,
+			f:      apiServerHealthy,
 		},
-		{
-			description: "Node health",
-			okMessage:   "All Nodes are healthy",
-			failMessage: "More than one Node unhealthy",
-			f:           nodesHealthy,
+		&healthCheck{
+			name:   "NodeHealth",
+			client: client,
+			f:      nodesHealthy,
 		},
 		// TODO: Add a check for ComponentStatuses here?
 	}
 
 	// Run slightly different health checks depending on control plane hosting type
 	if IsControlPlaneSelfHosted(client) {
-		healthChecks = append(healthChecks, healthCheck{
-			description: "Control plane DaemonSet health",
-			okMessage:   "All control plane DaemonSets are healthy",
-			failMessage: "More than one control plane DaemonSet unhealthy",
-			f:           controlPlaneHealth,
+		healthChecks = append(healthChecks, &healthCheck{
+			name:   "ControlPlaneHealth",
+			client: client,
+			f:      controlPlaneHealth,
 		})
 	} else {
-		healthChecks = append(healthChecks, healthCheck{
-			description: "Static Pod manifests exists on disk",
-			okMessage:   "All manifests exist on disk",
-			failMessage: "Some manifests don't exist on disk",
-			f:           staticPodManifestHealth,
+		healthChecks = append(healthChecks, &healthCheck{
+			name:   "StaticPodManifest",
+			client: client,
+			f:      staticPodManifestHealth,
 		})
 	}
 
-	return runHealthChecks(client, healthChecks)
-}
-
-// runHealthChecks runs a set of health checks against the cluster
-func runHealthChecks(client clientset.Interface, healthChecks []healthCheck) error {
-	for _, check := range healthChecks {
-
-		err := check.f(client)
-		if err != nil {
-			fmt.Printf("[upgrade/health] Checking %s: %s\n", check.description, check.failMessage)
-			return fmt.Errorf("The cluster is not in an upgradeable state due to: %v", err)
-		}
-		fmt.Printf("[upgrade/health] Checking %s: %s\n", check.description, check.okMessage)
-	}
-	return nil
+	return preflight.RunChecks(healthChecks, os.Stderr, ignoreChecksErrors)
 }
 
 // apiServerHealthy checks whether the API server's /healthz endpoint is healthy
