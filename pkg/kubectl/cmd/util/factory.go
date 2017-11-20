@@ -189,9 +189,6 @@ type ClientAccessFactory interface {
 type ObjectMappingFactory interface {
 	// Returns interfaces for dealing with arbitrary runtime.Objects.
 	Object() (meta.RESTMapper, runtime.ObjectTyper)
-	// Returns interfaces for dealing with arbitrary
-	// runtime.Unstructured. This performs API calls to discover types.
-	UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error)
 	// Returns interface for expanding categories like `all`.
 	CategoryExpander() categories.CategoryExpander
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
@@ -251,10 +248,9 @@ type BuilderFactory interface {
 	PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, out io.Writer) error
 	// PrintSuccess prints message after finishing mutating operations
 	PrintSuccess(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
-	// One stop shopping for a structured Builder
+	// NewBuilder returns an object that assists in loading objects from both disk and the server
+	// and which implements the common patterns for CLI interactions with generic resources.
 	NewBuilder() *resource.Builder
-	// One stop shopping for a unstructured Builder
-	NewUnstructuredBuilder() *resource.Builder
 	// PluginLoader provides the implementation to be used to load cli plugins.
 	PluginLoader() plugins.PluginLoader
 	// PluginRunner provides the implementation to be used to run cli plugins.

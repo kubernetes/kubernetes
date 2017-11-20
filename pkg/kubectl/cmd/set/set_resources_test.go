@@ -442,57 +442,59 @@ func TestSetResourcesRemote(t *testing.T) {
 			args: []string{"replicationcontroller", "nginx"},
 		},
 	}
-	for _, input := range inputs {
-		groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
-		testapi.Default = testapi.Groups[input.testAPIGroup]
-		f, tf, _, ns := cmdtesting.NewAPIFactory()
-		codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
-		mapper, typer := f.Object()
-		tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{testapi.Default.Codec()}, Typer: typer, Mapper: mapper}
-		tf.Namespace = "test"
-		tf.CategoryExpander = categories.LegacyCategoryExpander
-		tf.Client = &fake.RESTClient{
-			GroupVersion:         groupVersion,
-			NegotiatedSerializer: ns,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", tf.Namespace, input.args[1])
-				switch p, m := req.URL.Path, req.Method; {
-				case p == resourcePath && m == http.MethodGet:
-					return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, input.object)}, nil
-				case p == resourcePath && m == http.MethodPatch:
-					stream, err := req.GetBody()
-					if err != nil {
-						return nil, err
+	for i, input := range inputs {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
+			testapi.Default = testapi.Groups[input.testAPIGroup]
+			f, tf, _, ns := cmdtesting.NewAPIFactory()
+			codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
+			mapper, typer := f.Object()
+			tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{testapi.Default.Codec()}, Typer: typer, Mapper: mapper}
+			tf.Namespace = "test"
+			tf.CategoryExpander = categories.LegacyCategoryExpander
+			tf.Client = &fake.RESTClient{
+				GroupVersion:         groupVersion,
+				NegotiatedSerializer: ns,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", tf.Namespace, input.args[1])
+					switch p, m := req.URL.Path, req.Method; {
+					case p == resourcePath && m == http.MethodGet:
+						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, input.object)}, nil
+					case p == resourcePath && m == http.MethodPatch:
+						stream, err := req.GetBody()
+						if err != nil {
+							return nil, err
+						}
+						bytes, err := ioutil.ReadAll(stream)
+						if err != nil {
+							return nil, err
+						}
+						assert.Contains(t, string(bytes), "200m", fmt.Sprintf("resources not updated for %#v", input.object))
+						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, input.object)}, nil
+					default:
+						t.Errorf("%s: unexpected request: %s %#v\n%#v", "resources", req.Method, req.URL, req)
+						return nil, fmt.Errorf("unexpected request")
 					}
-					bytes, err := ioutil.ReadAll(stream)
-					if err != nil {
-						return nil, err
-					}
-					assert.Contains(t, string(bytes), "200m", fmt.Sprintf("resources not updated for %#v", input.object))
-					return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, input.object)}, nil
-				default:
-					t.Errorf("%s: unexpected request: %s %#v\n%#v", "resources", req.Method, req.URL, req)
-					return nil, fmt.Errorf("unexpected request")
-				}
-			}),
-			VersionedAPIPath: path.Join(input.apiPrefix, testapi.Default.GroupVersion().String()),
-		}
-		buf := new(bytes.Buffer)
-		cmd := NewCmdResources(f, buf, buf)
-		cmd.SetOutput(buf)
-		cmd.Flags().Set("output", "yaml")
-		opts := ResourcesOptions{
-			Out:               buf,
-			Local:             true,
-			Limits:            "cpu=200m,memory=512Mi",
-			ContainerSelector: "*"}
-		err := opts.Complete(f, cmd, input.args)
-		if err == nil {
-			err = opts.Validate()
-		}
-		if err == nil {
-			err = opts.Run()
-		}
-		assert.NoError(t, err)
+				}),
+				VersionedAPIPath: path.Join(input.apiPrefix, testapi.Default.GroupVersion().String()),
+			}
+			buf := new(bytes.Buffer)
+			cmd := NewCmdResources(f, buf, buf)
+			cmd.SetOutput(buf)
+			cmd.Flags().Set("output", "yaml")
+			opts := ResourcesOptions{
+				Out:               buf,
+				Local:             true,
+				Limits:            "cpu=200m,memory=512Mi",
+				ContainerSelector: "*"}
+			err := opts.Complete(f, cmd, input.args)
+			if err == nil {
+				err = opts.Validate()
+			}
+			if err == nil {
+				err = opts.Run()
+			}
+			assert.NoError(t, err)
+		})
 	}
 }

@@ -92,13 +92,15 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 		resourceVersion, _ := accessor.ResourceVersion(list)
 		nextContinueToken, _ := accessor.Continue(list)
 		info := &Info{
-			Client:    r.Client,
-			Mapping:   r.Mapping,
-			Namespace: r.Namespace,
+			Client:  r.Client,
+			Mapping: r.Mapping,
 
-			Object:          list,
+			Namespace:       r.Namespace,
 			ResourceVersion: resourceVersion,
+
+			Object: list,
 		}
+
 		if err := fn(info, nil); err != nil {
 			return err
 		}

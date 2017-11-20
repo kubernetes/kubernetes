@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
@@ -51,17 +50,9 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, options printers.PrintOptions) (printers.ResourcePrinter, error) {
 	var mapper meta.RESTMapper
 	var typer runtime.ObjectTyper
-	var err error
 
-	if isLocal {
-		mapper = legacyscheme.Registry.RESTMapper()
-		typer = legacyscheme.Scheme
-	} else {
-		mapper, typer, err = f.objectMappingFactory.UnstructuredObject()
-		if err != nil {
-			return nil, err
-		}
-	}
+	mapper, typer = f.objectMappingFactory.Object()
+
 	// TODO: used by the custom column implementation and the name implementation, break this dependency
 	decoders := []runtime.Decoder{f.clientAccessFactory.Decoder(true), unstructured.UnstructuredJSONScheme}
 	encoder := f.clientAccessFactory.JSONEncoder()
@@ -135,16 +126,6 @@ func (f *ring2Factory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta
 	_, typer := f.objectMappingFactory.Object()
 	gvks, _, err := typer.ObjectKinds(obj)
 
-	// fall back to an unstructured object if we get something unregistered
-	if runtime.IsNotRegisteredError(err) {
-		_, typer, unstructuredErr := f.objectMappingFactory.UnstructuredObject()
-		if unstructuredErr != nil {
-			// if we can't get an unstructured typer, return the original error
-			return err
-		}
-		gvks, _, err = typer.ObjectKinds(obj)
-	}
-
 	if err != nil {
 		return err
 	}
@@ -183,23 +164,27 @@ func (f *ring2Factory) PrintResourceInfoForCommand(cmd *cobra.Command, info *res
 // NewBuilder returns a new resource builder for structured api objects.
 func (f *ring2Factory) NewBuilder() *resource.Builder {
 	clientMapperFunc := resource.ClientMapperFunc(f.objectMappingFactory.ClientForMapping)
-
 	mapper, typer := f.objectMappingFactory.Object()
+
+	unstructuredClientMapperFunc := resource.ClientMapperFunc(f.objectMappingFactory.UnstructuredClientForMapping)
+
 	categoryExpander := f.objectMappingFactory.CategoryExpander()
 
-	return resource.NewBuilder(mapper, categoryExpander, typer, clientMapperFunc, f.clientAccessFactory.Decoder(true))
-}
-
-// NewUnstructuredBuilder returns a new resource builder for unstructured api objects.
-func (f *ring2Factory) NewUnstructuredBuilder() *resource.Builder {
-	clientMapperFunc := resource.ClientMapperFunc(f.objectMappingFactory.UnstructuredClientForMapping)
-	mapper, typer, err := f.objectMappingFactory.UnstructuredObject()
-	if err != nil {
-		CheckErr(err)
-	}
-	categoryExpander := f.objectMappingFactory.CategoryExpander()
-
-	return resource.NewBuilder(mapper, categoryExpander, typer, clientMapperFunc, unstructured.UnstructuredJSONScheme)
+	return resource.NewBuilder(
+		&resource.Mapper{
+			RESTMapper:   mapper,
+			ObjectTyper:  typer,
+			ClientMapper: clientMapperFunc,
+			Decoder:      f.clientAccessFactory.Decoder(true),
+		},
+		&resource.Mapper{
+			RESTMapper:   mapper,
+			ObjectTyper:  typer,
+			ClientMapper: unstructuredClientMapperFunc,
+			Decoder:      unstructured.UnstructuredJSONScheme,
+		},
+		categoryExpander,
+	)
 }
 
 // PluginLoader loads plugins from a path set by the KUBECTL_PLUGINS_PATH env var.

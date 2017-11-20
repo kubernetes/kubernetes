@@ -232,7 +232,8 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 		return options.watch(f, cmd, args)
 	}
 
-	r := f.NewUnstructuredBuilder().
+	r := f.NewBuilder().
+		Unstructured().
 		NamespaceParam(options.Namespace).DefaultNamespace().AllNamespaces(options.AllNamespaces).
 		FilenameParam(options.ExplicitNamespace, &options.FilenameOptions).
 		LabelSelectorParam(options.LabelSelector).
@@ -309,13 +310,15 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 	for ix := range objs {
 		var mapping *meta.RESTMapping
 		var original runtime.Object
-
+		var info *resource.Info
 		if sorter != nil {
-			mapping = infos[sorter.OriginalPosition(ix)].Mapping
-			original = infos[sorter.OriginalPosition(ix)].Object
+			info = infos[sorter.OriginalPosition(ix)]
+			mapping = info.Mapping
+			original = info.Object
 		} else {
-			mapping = infos[ix].Mapping
-			original = infos[ix].Object
+			info = infos[ix]
+			mapping = info.Mapping
+			original = info.Object
 		}
 		if shouldGetNewPrinterForMapping(printer, lastMapping, mapping) {
 			if printer != nil {
@@ -354,11 +357,10 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 			lastMapping = mapping
 		}
 
-		// try to convert before apply filter func
-		decodedObj, _ := kubectl.DecodeUnknownObject(original)
+		typedObj := info.AsInternal()
 
 		// filter objects if filter has been defined for current object
-		if isFiltered, err := filterFuncs.Filter(decodedObj, filterOpts); isFiltered {
+		if isFiltered, err := filterFuncs.Filter(typedObj, filterOpts); isFiltered {
 			if err == nil {
 				filteredResourceCount++
 				continue
@@ -388,7 +390,7 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 				resourcePrinter.EnsurePrintWithKind(resourceName)
 			}
 
-			if err := printer.PrintObj(decodedObj, w); err != nil {
+			if err := printer.PrintObj(typedObj, w); err != nil {
 				if !errs.Has(err.Error()) {
 					errs.Insert(err.Error())
 					allErrs = append(allErrs, err)
@@ -396,7 +398,7 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 			}
 			continue
 		}
-		objToPrint := decodedObj
+		objToPrint := typedObj
 		if printer.IsGeneric() {
 			// use raw object as recieved from the builder when using generic
 			// printer instead of decodedObj
@@ -444,7 +446,8 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 	// unless explicitly set --include-uninitialized=false
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, len(args) == 2)
 
-	r := f.NewUnstructuredBuilder().
+	r := f.NewBuilder().
+		Unstructured().
 		NamespaceParam(options.Namespace).DefaultNamespace().AllNamespaces(options.AllNamespaces).
 		FilenameParam(options.ExplicitNamespace, &options.FilenameOptions).
 		LabelSelectorParam(options.LabelSelector).
@@ -456,8 +459,7 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 		SingleResourceType().
 		Latest().
 		Do()
-	err := r.Err()
-	if err != nil {
+	if err := r.Err(); err != nil {
 		return err
 	}
 	infos, err := r.Infos()
