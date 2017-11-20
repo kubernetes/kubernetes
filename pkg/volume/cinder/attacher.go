@@ -241,8 +241,7 @@ func (attacher *cinderDiskAttacher) waitProbeVolume(devicePath, volumeID string)
 		if exists && err == nil {
 			glog.Infof("Successfully found attached Cinder disk %q at %v.", volumeID, devicePath)
 			return devicePath, nil
-		}
-		else {
+		} else {
 			// Log an error, and continue checking periodically
 			glog.Errorf("Error: could not find attached Cinder disk %q (path: %q): %v", volumeID, devicePath, err)
 		}
