@@ -454,25 +454,31 @@ func (nc *Controller) doFixDeprecatedTaintKeyPass(node *v1.Node) error {
 
 	for _, taint := range node.Spec.Taints {
 		if taint.Key == algorithm.DeprecatedTaintNodeNotReady {
-			// delete old taint
 			tDel := taint
 			taintsToDel = append(taintsToDel, &tDel)
 
-			// add right taint
 			tAdd := taint
 			tAdd.Key = algorithm.TaintNodeNotReady
 			taintsToAdd = append(taintsToAdd, &tAdd)
+		}
 
-			glog.Warningf("Detected deprecated taint key: %v on node: %v, will substitute it with %v",
-				algorithm.DeprecatedTaintNodeNotReady, node.GetName(), algorithm.TaintNodeNotReady)
+		if taint.Key == algorithm.DeprecatedTaintNodeUnreachable {
+			tDel := taint
+			taintsToDel = append(taintsToDel, &tDel)
 
-			break
+			tAdd := taint
+			tAdd.Key = algorithm.TaintNodeUnreachable
+			taintsToAdd = append(taintsToAdd, &tAdd)
 		}
 	}
 
 	if len(taintsToAdd) == 0 && len(taintsToDel) == 0 {
 		return nil
 	}
+
+	glog.Warningf("Detected deprecated taint keys: %v on node: %v, will substitute them with %v",
+		taintsToDel, node.GetName(), taintsToAdd)
+
 	if !util.SwapNodeControllerTaint(nc.kubeClient, taintsToAdd, taintsToDel, node) {
 		return fmt.Errorf("failed to swap taints of node %+v", node)
 	}
