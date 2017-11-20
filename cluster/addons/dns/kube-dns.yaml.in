@@ -56,6 +56,19 @@ metadata:
   labels:
     addonmanager.kubernetes.io/mode: EnsureExists
 ---
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      k8s-app: kube-dns
+---
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
