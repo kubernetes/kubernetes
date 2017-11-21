@@ -24,12 +24,12 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -778,7 +778,7 @@ func TestFailedDeployment(t *testing.T) {
 	go rm.Run(5, stopCh)
 	go dc.Run(5, stopCh)
 
-	if err = tester.waitForDeploymentUpdatedReplicasLTE(replicas); err != nil {
+	if err = tester.waitForDeploymentUpdatedReplicasGTE(replicas); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1070,6 +1070,7 @@ func TestScaledRolloutDeployment(t *testing.T) {
 			t.Fatalf("unexpected desiredReplicas annotation for replicaset %q: expected %d, got %d", curRS.Name, *(tester.deployment.Spec.Replicas), desired)
 		}
 	}
+}
 
 func TestSpecReplicasChange(t *testing.T) {
 	s, closeFn, rm, dc, informers, c := dcSetup(t)
@@ -1081,6 +1082,8 @@ func TestSpecReplicasChange(t *testing.T) {
 	deploymentName := "deployment"
 	replicas := int32(1)
 	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(deploymentName, ns.Name, replicas)}
+	tester.deployment.Spec.Strategy.Type = v1beta1.RecreateDeploymentStrategyType
+	tester.deployment.Spec.Strategy.RollingUpdate = nil
 	var err error
 	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
 	if err != nil {
@@ -1151,7 +1154,7 @@ func TestDeploymentAvailableCondition(t *testing.T) {
 	go dc.Run(5, stopCh)
 
 	// Wait for the deployment to be observed by the controller and has at least specified number of updated replicas
-	if err = tester.waitForDeploymentUpdatedReplicasLTE(replicas); err != nil {
+	if err = tester.waitForDeploymentUpdatedReplicasGTE(replicas); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1160,23 +1163,28 @@ func TestDeploymentAvailableCondition(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Mark the pods as ready without waiting for the deployment to complete
-	pods, err := tester.listUpdatedPods()
-	if err != nil {
+	// Verify all replicas fields of DeploymentStatus have desired counts
+	if err = tester.checkDeploymentStatusReplicasFields(10, 10, 0, 0, 10); err != nil {
 		t.Fatal(err)
 	}
-	for i := range pods {
-		pod := pods[i]
-		if podutil.IsPodReady(&pod) {
-			continue
-		}
-		if err = markPodReady(c, ns.Name, &pod); err != nil {
-			t.Fatalf("failed to update Deployment pod %q, will retry later: %v", pod.Name, err)
-		}
+
+	// Mark the pods as ready without waiting for the deployment to complete
+	if err = tester.markUpdatedPodsReadyWithoutComplete(); err != nil {
+		t.Fatal(err)
 	}
 
-	// Wait for the deployment to have MinimumReplicasUnavailable reason within minReadySeconds period
+	// Wait for number of ready replicas to equal number of replicas.
+	if err = tester.waitForReadyReplicas(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for the deployment to still have MinimumReplicasUnavailable reason within minReadySeconds period
 	if err = tester.waitForDeploymentWithCondition(deploymentutil.MinimumReplicasUnavailable, v1beta1.DeploymentAvailable); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify all replicas fields of DeploymentStatus have desired counts
+	if err = tester.checkDeploymentStatusReplicasFields(10, 10, 10, 0, 10); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1195,6 +1203,11 @@ func TestDeploymentAvailableCondition(t *testing.T) {
 
 	// Wait for the deployment to have MinimumReplicasAvailable reason after minReadySeconds period
 	if err = tester.waitForDeploymentWithCondition(deploymentutil.MinimumReplicasAvailable, v1beta1.DeploymentAvailable); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify all replicas fields of DeploymentStatus have desired counts
+	if err = tester.checkDeploymentStatusReplicasFields(10, 10, 10, 10, 0); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -1366,10 +1379,16 @@ func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	}
 
 	// Wait for the deployment to create a new replicaset
+	// This will trigger collision avoidance due to deterministic nature of replicaset name
+	// i.e., the new replicaset will have a name with different hash to preserve name uniqueness
 	var newRS *v1beta1.ReplicaSet
 	if err = wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		newRS, err = deploymentutil.GetNewReplicaSet(tester.deployment, c.ExtensionsV1beta1())
 		if err != nil {
+			if errors.IsNotFound(err) {
+				tester.t.Logf("deployment %q has not yet created new replicaset", deploymentName)
+				return false, nil
+			}
 			return false, fmt.Errorf("failed to get new replicaset of deployment %q after orphaning: %v", deploymentName, err)
 		}
 		return newRS != nil && newRS.UID != rs.UID, nil
@@ -1381,17 +1400,10 @@ func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 
 	// Change the old replicaset's labels to match the deployment's labels
 	rs, err = tester.updateReplicaSet(rs.Name, func(update *v1beta1.ReplicaSet) {
-		update.Spec.Selector = &metav1.LabelSelector{MatchLabels: testLabels()}
-		update.Spec.Template.Labels = testLabels()
 		update.Labels = testLabels()
 	})
 	if err != nil {
 		t.Fatalf("failed to update replicaset %q: %v", rs.Name, err)
-	}
-
-	// Delete the new replicaset so that the deployment can adopt the old replicaset
-	if err = rsClient.Delete(newRS.Name, &metav1.DeleteOptions{}); err != nil {
-		t.Fatalf("Error deleting replicaset %q: %v", newRS.Name, err)
 	}
 
 	// Wait for the deployment to adopt the old replicaset
@@ -1407,6 +1419,7 @@ func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	}
 }
 
+// TestMultipleSameSpecReplicaSetsAdoption tests that deployment adopts all replicasets with same spec.
 func TestMultipleSameSpecReplicaSetsAdoption(t *testing.T) {
 	s, closeFn, rm, dc, informers, c := dcSetup(t)
 	defer closeFn()

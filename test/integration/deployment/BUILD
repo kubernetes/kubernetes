@@ -17,11 +17,11 @@ go_test(
     library = ":go_default_library",
     tags = ["integration"],
     deps = [
-        "//pkg/api/v1/pod:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
