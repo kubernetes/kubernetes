@@ -36,6 +36,11 @@ MASTER_ROOT_DISK_SIZE=${MASTER_ROOT_DISK_SIZE:-$(get-master-root-disk-size)}
 NODE_DISK_TYPE=${NODE_DISK_TYPE:-pd-standard}
 NODE_DISK_SIZE=${NODE_DISK_SIZE:-100GB}
 NODE_LOCAL_SSDS=${NODE_LOCAL_SSDS:-0}
+# An extension to local SSDs allowing users to specify block/fs and SCSI/NVMe devices
+# Format of this variable will be "#,scsi/nvme,block/fs" you can specify multiple
+# configurations by seperating them by a semi-colon ex. "2,scsi,fs;1,nvme,block"
+# is a request for 2 SCSI formatted and mounted SSDs and 1 NVMe block device SSD.
+NODE_LOCAL_SSDS_EXT=${NODE_LOCAL_SSDS_EXT:-}
 # Accelerators to be attached to each node. Format "type=<accelerator-type>,count=<accelerator-count>"
 # More information on available GPUs here - https://cloud.google.com/compute/docs/gpus/
 NODE_ACCELERATORS=${NODE_ACCELERATORS:-""}

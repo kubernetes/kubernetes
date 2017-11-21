@@ -522,6 +522,7 @@ items:
     - authorization.k8s.io
     resources:
     - selfsubjectaccessreviews
+    - selfsubjectrulesreviews
     verbs:
     - create
 - apiVersion: rbac.authorization.k8s.io/v1

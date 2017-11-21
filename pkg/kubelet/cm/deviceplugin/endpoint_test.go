@@ -87,7 +87,7 @@ func TestRun(t *testing.T) {
 }
 
 func TestGetDevices(t *testing.T) {
-	e := endpoint{
+	e := endpointImpl{
 		devices: map[string]pluginapi.Device{
 			"ADeviceId": {ID: "ADeviceId", Health: pluginapi.Healthy},
 		},
@@ -96,19 +96,19 @@ func TestGetDevices(t *testing.T) {
 	require.Len(t, devs, 1)
 }
 
-func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback MonitorCallback) (*Stub, *endpoint) {
+func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback monitorCallback) (*Stub, *endpointImpl) {
 	p := NewDevicePluginStub(devs, socket)
 
 	err := p.Start()
 	require.NoError(t, err)
 
-	e, err := newEndpoint(socket, "mock", make(map[string]pluginapi.Device), func(n string, a, u, r []pluginapi.Device) {})
+	e, err := newEndpointImpl(socket, "mock", make(map[string]pluginapi.Device), func(n string, a, u, r []pluginapi.Device) {})
 	require.NoError(t, err)
 
 	return p, e
 }
 
-func ecleanup(t *testing.T, p *Stub, e *endpoint) {
+func ecleanup(t *testing.T, p *Stub, e *endpointImpl) {
 	p.Stop()
 	e.stop()
 }

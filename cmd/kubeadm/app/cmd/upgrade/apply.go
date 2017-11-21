@@ -202,16 +202,16 @@ func EnforceVersionPolicies(flags *applyFlags, versionGetter upgrade.VersionGett
 	if versionSkewErrs != nil {
 
 		if len(versionSkewErrs.Mandatory) > 0 {
-			return fmt.Errorf("The --version argument is invalid due to these fatal errors: %v", versionSkewErrs.Mandatory)
+			return fmt.Errorf("The --version argument is invalid due to these fatal errors:\n\n%v\nPlease fix the misalignments highlighted above and try upgrading again", kubeadmutil.FormatErrMsg(versionSkewErrs.Mandatory))
 		}
 
 		if len(versionSkewErrs.Skippable) > 0 {
 			// Return the error if the user hasn't specified the --force flag
 			if !flags.force {
-				return fmt.Errorf("The --version argument is invalid due to these errors: %v. Can be bypassed if you pass the --force flag", versionSkewErrs.Skippable)
+				return fmt.Errorf("The --version argument is invalid due to these errors:\n\n%v\nCan be bypassed if you pass the --force flag", kubeadmutil.FormatErrMsg(versionSkewErrs.Skippable))
 			}
 			// Soft errors found, but --force was specified
-			fmt.Printf("[upgrade/version] Found %d potential version compatibility errors but skipping since the --force flag is set: %v\n", len(versionSkewErrs.Skippable), versionSkewErrs.Skippable)
+			fmt.Printf("[upgrade/version] Found %d potential version compatibility errors but skipping since the --force flag is set: \n\n%v", len(versionSkewErrs.Skippable), kubeadmutil.FormatErrMsg(versionSkewErrs.Skippable))
 		}
 	}
 	return nil

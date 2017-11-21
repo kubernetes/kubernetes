@@ -132,7 +132,6 @@ var (
 		"Authentication.X509.ClientCAFile",
 		"TLSCertFile",
 		"TLSPrivateKeyFile",
-		"SeccompProfileRoot",
 		"ResolverConfig",
 	)
 
