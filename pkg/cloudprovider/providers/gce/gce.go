@@ -34,13 +34,16 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/golang/glog"
@@ -99,18 +102,21 @@ type GCECloud struct {
 	// for the cloudprovider to start watching the configmap.
 	ClusterID ClusterID
 
-	service                  *compute.Service
-	serviceBeta              *computebeta.Service
-	serviceAlpha             *computealpha.Service
-	containerService         *container.Service
-	client                   clientset.Interface
-	clientBuilder            controller.ControllerClientBuilder
-	eventBroadcaster         record.EventBroadcaster
-	eventRecorder            record.EventRecorder
-	projectID                string
-	region                   string
-	localZone                string   // The zone in which we are running
-	managedZones             []string // List of zones we are spanning (for multi-AZ clusters, primarily when running on master)
+	service          *compute.Service
+	serviceBeta      *computebeta.Service
+	serviceAlpha     *computealpha.Service
+	containerService *container.Service
+	client           clientset.Interface
+	clientBuilder    controller.ControllerClientBuilder
+	eventBroadcaster record.EventBroadcaster
+	eventRecorder    record.EventRecorder
+	projectID        string
+	region           string
+	localZone        string // The zone in which we are running
+	// managedZones will be set to the 1 zone if running a single zone cluster
+	// it will be set to ALL zones in region for any multi-zone cluster
+	// Use GetAllCurrentZones to get only zones that contain nodes
+	managedZones             []string
 	networkURL               string
 	isLegacyNetwork          bool
 	subnetworkURL            string
@@ -125,6 +131,12 @@ type GCECloud struct {
 	useMetadataServer        bool
 	operationPollRateLimiter flowcontrol.RateLimiter
 	manager                  diskServiceManager
+	// Lock for access to nodeZones
+	nodeZonesLock sync.Mutex
+	// nodeZones is a mapping from Zone to a sets.String of Node's names in the Zone
+	// it is updated by the nodeInformer
+	nodeZones          map[string]sets.String
+	nodeInformerSynced cache.InformerSynced
 	// sharedResourceLock is used to serialize GCE operations that may mutate shared state to
 	// prevent inconsistencies. For example, load balancers manipulation methods will take the
 	// lock to prevent shared resources from being prematurely deleted while the operation is
@@ -470,6 +482,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 		useMetadataServer:        config.UseMetadataServer,
 		operationPollRateLimiter: operationPollRateLimiter,
 		AlphaFeatureGate:         config.AlphaFeatureGate,
+		nodeZones:                map[string]sets.String{},
 	}
 
 	gce.manager = &gceServiceManager{gce}
@@ -580,6 +593,68 @@ func (gce *GCECloud) SubnetworkURL() string {
 
 func (gce *GCECloud) IsLegacyNetwork() bool {
 	return gce.isLegacyNetwork
+}
+
+func (gce *GCECloud) SetInformers(informerFactory informers.SharedInformerFactory) {
+	glog.Infof("Setting up informers for GCECloud")
+	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
+	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			node := obj.(*v1.Node)
+			gce.updateNodeZones(nil, node)
+		},
+		UpdateFunc: func(prev, obj interface{}) {
+			prevNode := prev.(*v1.Node)
+			newNode := obj.(*v1.Node)
+			if newNode.Labels[kubeletapis.LabelZoneFailureDomain] ==
+				prevNode.Labels[kubeletapis.LabelZoneFailureDomain] {
+				return
+			}
+			gce.updateNodeZones(prevNode, newNode)
+		},
+		DeleteFunc: func(obj interface{}) {
+			node, isNode := obj.(*v1.Node)
+			// We can get DeletedFinalStateUnknown instead of *v1.Node here
+			// and we need to handle that correctly.
+			if !isNode {
+				deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
+				if !ok {
+					glog.Errorf("Received unexpected object: %v", obj)
+					return
+				}
+				node, ok = deletedState.Obj.(*v1.Node)
+				if !ok {
+					glog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
+					return
+				}
+			}
+			gce.updateNodeZones(node, nil)
+		},
+	})
+	gce.nodeInformerSynced = nodeInformer.HasSynced
+}
+
+func (gce *GCECloud) updateNodeZones(prevNode, newNode *v1.Node) {
+	gce.nodeZonesLock.Lock()
+	defer gce.nodeZonesLock.Unlock()
+	if prevNode != nil {
+		prevZone, ok := prevNode.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
+		if ok {
+			gce.nodeZones[prevZone].Delete(prevNode.ObjectMeta.Name)
+			if gce.nodeZones[prevZone].Len() == 0 {
+				gce.nodeZones[prevZone] = nil
+			}
+		}
+	}
+	if newNode != nil {
+		newZone, ok := newNode.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
+		if ok {
+			if gce.nodeZones[newZone] == nil {
+				gce.nodeZones[newZone] = sets.NewString()
+			}
+			gce.nodeZones[newZone].Insert(newNode.ObjectMeta.Name)
+		}
+	}
 }
 
 // Known-useless DNS search path.
