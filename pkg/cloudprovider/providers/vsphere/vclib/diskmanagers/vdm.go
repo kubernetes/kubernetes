@@ -70,13 +70,13 @@ func (diskManager virtualDiskManager) Create(ctx context.Context, datastore *vcl
 }
 
 // Delete implements Disk's Delete interface
-func (diskManager virtualDiskManager) Delete(ctx context.Context, datastore *vclib.Datastore) error {
+func (diskManager virtualDiskManager) Delete(ctx context.Context, datacenter *vclib.Datacenter) error {
 	// Create a virtual disk manager
-	virtualDiskManager := object.NewVirtualDiskManager(datastore.Client())
-	diskPath := vclib.RemoveClusterFromVDiskPath(diskManager.diskPath)
+	virtualDiskManager := object.NewVirtualDiskManager(datacenter.Client())
+	diskPath := vclib.RemoveStorageClusterORFolderNameFromVDiskPath(diskManager.diskPath)
 	requestTime := time.Now()
 	// Delete virtual disk
-	task, err := virtualDiskManager.DeleteVirtualDisk(ctx, diskPath, datastore.Datacenter.Datacenter)
+	task, err := virtualDiskManager.DeleteVirtualDisk(ctx, diskPath, datacenter.Datacenter)
 	if err != nil {
 		glog.Errorf("Failed to delete virtual disk. err: %v", err)
 		vclib.RecordvSphereMetric(vclib.APIDeleteVolume, requestTime, err)

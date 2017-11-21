@@ -23,7 +23,6 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -104,7 +103,7 @@ var _ = SIGDescribe("PersistentVolumes [Feature:LabelSelector]", func() {
 func testSetupVSpherePVClabelselector(c clientset.Interface, ns string, ssdlabels map[string]string, vvollabels map[string]string) (volumePath string, pv_ssd *v1.PersistentVolume, pvc_ssd *v1.PersistentVolumeClaim, pvc_vvol *v1.PersistentVolumeClaim, err error) {
 	volumePath = ""
 	By("creating vmdk")
-	vsp, err := vsphere.GetVSphere()
+	vsp, err := getVSphere(c)
 	Expect(err).NotTo(HaveOccurred())
 	volumePath, err = createVSphereVolume(vsp, nil)
 	if err != nil {
@@ -134,7 +133,7 @@ func testSetupVSpherePVClabelselector(c clientset.Interface, ns string, ssdlabel
 func testCleanupVSpherePVClabelselector(c clientset.Interface, ns string, volumePath string, pv_ssd *v1.PersistentVolume, pvc_ssd *v1.PersistentVolumeClaim, pvc_vvol *v1.PersistentVolumeClaim) {
 	By("running testCleanupVSpherePVClabelselector")
 	if len(volumePath) > 0 {
-		vsp, err := vsphere.GetVSphere()
+		vsp, err := getVSphere(c)
 		Expect(err).NotTo(HaveOccurred())
 		vsp.DeleteVolume(volumePath)
 	}

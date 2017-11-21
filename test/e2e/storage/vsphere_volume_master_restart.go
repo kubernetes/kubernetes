@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -79,7 +78,7 @@ var _ = SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disruptive]"
 	})
 
 	It("verify volume remains attached after master kubelet restart", func() {
-		vsp, err := vsphere.GetVSphere()
+		vsp, err := getVSphere(client)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Create pod on each node
@@ -106,7 +105,7 @@ var _ = SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disruptive]"
 
 			nodeName := types.NodeName(pod.Spec.NodeName)
 			By(fmt.Sprintf("Verify volume %s is attached to the pod %v", volumePath, nodeName))
-			isAttached, err := verifyVSphereDiskAttached(vsp, volumePath, types.NodeName(nodeName))
+			isAttached, err := verifyVSphereDiskAttached(client, vsp, volumePath, types.NodeName(nodeName))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(isAttached).To(BeTrue(), fmt.Sprintf("disk: %s is not attached with the node", volumePath))
 
@@ -126,7 +125,7 @@ var _ = SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disruptive]"
 
 			nodeName := types.NodeName(pod.Spec.NodeName)
 			By(fmt.Sprintf("After master restart, verify volume %v is attached to the pod %v", volumePath, nodeName))
-			isAttached, err := verifyVSphereDiskAttached(vsp, volumePaths[i], types.NodeName(nodeName))
+			isAttached, err := verifyVSphereDiskAttached(client, vsp, volumePaths[i], types.NodeName(nodeName))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(isAttached).To(BeTrue(), fmt.Sprintf("disk: %s is not attached with the node", volumePath))
 
@@ -135,7 +134,7 @@ var _ = SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disruptive]"
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("Waiting for volume %s to be detached from the node %v", volumePath, nodeName))
-			err = waitForVSphereDiskToDetach(vsp, volumePath, types.NodeName(nodeName))
+			err = waitForVSphereDiskToDetach(client, vsp, volumePath, types.NodeName(nodeName))
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("Deleting volume %s", volumePath))
