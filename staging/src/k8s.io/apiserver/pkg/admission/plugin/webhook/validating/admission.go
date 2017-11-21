@@ -38,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/configuration"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
+	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/namespace"
@@ -240,7 +241,7 @@ func (a *ValidatingAdmissionWebhook) Validate(attr admission.Attributes) error {
 
 			t := time.Now()
 			err := a.callHook(ctx, hook, versionedAttr)
-			admission.Metrics.ObserveWebhook(time.Since(t), err != nil, hook, attr)
+			admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, attr, "validating", hook.Name)
 			if err == nil {
 				return
 			}

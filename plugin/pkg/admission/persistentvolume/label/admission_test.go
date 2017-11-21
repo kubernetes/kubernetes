@@ -78,7 +78,7 @@ func mockVolumeLabels(labels map[string]string) *mockVolumes {
 // TestAdmission
 func TestAdmission(t *testing.T) {
 	pvHandler := NewPersistentVolumeLabel()
-	handler := admission.NewChainHandler(admission.NewNamedHandler("pv", pvHandler))
+	handler := admission.NewChainHandler(pvHandler)
 	ignoredPV := api.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{Name: "noncloud", Namespace: "myns"},
 		Spec: api.PersistentVolumeSpec{

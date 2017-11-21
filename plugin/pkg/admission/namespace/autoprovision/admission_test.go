@@ -129,15 +129,19 @@ func TestAdmissionNamespaceExists(t *testing.T) {
 
 // TestIgnoreAdmission validates that a request is ignored if its not a create
 func TestIgnoreAdmission(t *testing.T) {
+	namespace := "test"
 	mockClient := newMockClientForTest([]string{})
 	handler, informerFactory, err := newHandlerForTest(mockClient)
 	if err != nil {
 		t.Errorf("unexpected error initializing handler: %v", err)
 	}
 	informerFactory.Start(wait.NeverStop)
+	chainHandler := admission.NewChainHandler(handler)
 
-	if handler.Handles(admission.Update) {
-		t.Errorf("expected not to handle Update")
+	pod := newPod(namespace)
+	err = chainHandler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
+	if err != nil {
+		t.Errorf("unexpected error returned from admission handler")
 	}
 	if hasCreateNamespaceAction(mockClient) {
 		t.Errorf("unexpected create namespace action")
