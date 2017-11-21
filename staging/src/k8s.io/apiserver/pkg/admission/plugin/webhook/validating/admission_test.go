@@ -116,8 +116,8 @@ func (c urlConfigGenerator) ccfgURL(urlPath string) registrationv1alpha1.Webhook
 	}
 }
 
-// TestAdmit tests that ValidatingAdmissionWebhook#Admit works as expected
-func TestAdmit(t *testing.T) {
+// TestValidate tests that ValidatingAdmissionWebhook#Validate works as expected
+func TestValidate(t *testing.T) {
 	scheme := runtime.NewScheme()
 	v1alpha1.AddToScheme(scheme)
 	corev1.AddToScheme(scheme)
@@ -393,7 +393,7 @@ func TestAdmit(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			wh.hookSource = &tt.hookSource
-			err = wh.Admit(admission.NewAttributesRecord(&object, &oldObject, kind, namespace, name, resource, subResource, operation, &userInfo))
+			err = wh.Validate(admission.NewAttributesRecord(&object, &oldObject, kind, namespace, name, resource, subResource, operation, &userInfo))
 			if tt.expectAllow != (err == nil) {
 				t.Errorf("expected allowed=%v, but got err=%v", tt.expectAllow, err)
 			}
@@ -410,8 +410,8 @@ func TestAdmit(t *testing.T) {
 	}
 }
 
-// TestAdmitCachedClient tests that ValidatingAdmissionWebhook#Admit should cache restClient
-func TestAdmitCachedClient(t *testing.T) {
+// TestValidateCachedClient tests that ValidatingAdmissionWebhook#Validate should cache restClient
+func TestValidateCachedClient(t *testing.T) {
 	scheme := runtime.NewScheme()
 	v1alpha1.AddToScheme(scheme)
 	corev1.AddToScheme(scheme)
@@ -560,7 +560,7 @@ func TestAdmitCachedClient(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = wh.Admit(admission.NewAttributesRecord(&object, &oldObject, kind, namespace, testcase.name, resource, subResource, operation, &userInfo))
+			err = wh.Validate(admission.NewAttributesRecord(&object, &oldObject, kind, namespace, testcase.name, resource, subResource, operation, &userInfo))
 			if testcase.expectAllow != (err == nil) {
 				t.Errorf("expected allowed=%v, but got err=%v", testcase.expectAllow, err)
 			}
