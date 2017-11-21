@@ -500,25 +500,32 @@ func NewProxier(ipt utiliptables.Interface,
 	return proxier, nil
 }
 
+type iptablesJumpChain struct {
+	table       utiliptables.Table
+	chain       utiliptables.Chain
+	sourceChain utiliptables.Chain
+	comment     string
+}
+
+var iptablesJumpChains = []iptablesJumpChain{
+	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainInput, "kubernetes service portals"},
+	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals"},
+	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals"},
+	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainPrerouting, "kubernetes service portals"},
+	{utiliptables.TableNAT, kubePostroutingChain, utiliptables.ChainPostrouting, "kubernetes postrouting rules"},
+	{utiliptables.TableFilter, kubeForwardChain, utiliptables.ChainForward, "kubernetes forwarding rules"},
+}
+
 // CleanupLeftovers removes all iptables rules and chains created by the Proxier
 // It returns true if an error was encountered. Errors are logged.
 func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
-	// Unlink the services chain.
-	args := []string{
-		"-m", "comment", "--comment", "kubernetes service portals",
-		"-j", string(kubeServicesChain),
-	}
-	tableChainsWithJumpServices := []struct {
-		table utiliptables.Table
-		chain utiliptables.Chain
-	}{
-		{utiliptables.TableFilter, utiliptables.ChainInput},
-		{utiliptables.TableFilter, utiliptables.ChainOutput},
-		{utiliptables.TableNAT, utiliptables.ChainOutput},
-		{utiliptables.TableNAT, utiliptables.ChainPrerouting},
-	}
-	for _, tc := range tableChainsWithJumpServices {
-		if err := ipt.DeleteRule(tc.table, tc.chain, args...); err != nil {
+	// Unlink our chains
+	for _, chain := range iptablesJumpChains {
+		args := []string{
+			"-m", "comment", "--comment", chain.comment,
+			"-j", string(chain.chain),
+		}
+		if err := ipt.DeleteRule(chain.table, chain.sourceChain, args...); err != nil {
 			if !utiliptables.IsNotFoundError(err) {
 				glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
 				encounteredError = true
@@ -526,31 +533,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		}
 	}
 
-	// Unlink the postrouting chain.
-	args = []string{
-		"-m", "comment", "--comment", "kubernetes postrouting rules",
-		"-j", string(kubePostroutingChain),
-	}
-	if err := ipt.DeleteRule(utiliptables.TableNAT, utiliptables.ChainPostrouting, args...); err != nil {
-		if !utiliptables.IsNotFoundError(err) {
-			glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
-			encounteredError = true
-		}
-	}
-
-	// Unlink the forwarding chain.
-	args = []string{
-		"-m", "comment", "--comment", "kubernetes forwarding rules",
-		"-j", string(kubeForwardChain),
-	}
-	if err := ipt.DeleteRule(utiliptables.TableFilter, utiliptables.ChainForward, args...); err != nil {
-		if !utiliptables.IsNotFoundError(err) {
-			glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
-			encounteredError = true
-		}
-	}
-
-	// Flush and remove all of our chains.
+	// Flush and remove all of our "-t nat" chains.
 	iptablesData := bytes.NewBuffer(nil)
 	if err := ipt.SaveInto(utiliptables.TableNAT, iptablesData); err != nil {
 		glog.Errorf("Failed to execute iptables-save for %s: %v", utiliptables.TableNAT, err)
@@ -586,7 +569,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		}
 	}
 
-	// Flush and remove all of our chains.
+	// Flush and remove all of our "-t filter" chains.
 	iptablesData = bytes.NewBuffer(nil)
 	if err := ipt.SaveInto(utiliptables.TableFilter, iptablesData); err != nil {
 		glog.Errorf("Failed to execute iptables-save for %s: %v", utiliptables.TableFilter, err)
@@ -1004,61 +987,18 @@ func (proxier *Proxier) syncProxyRules() {
 
 	glog.V(3).Infof("Syncing iptables rules")
 
-	// Create and link the kube services chain.
-	{
-		tablesNeedServicesChain := []utiliptables.Table{utiliptables.TableFilter, utiliptables.TableNAT}
-		for _, table := range tablesNeedServicesChain {
-			if _, err := proxier.iptables.EnsureChain(table, kubeServicesChain); err != nil {
-				glog.Errorf("Failed to ensure that %s chain %s exists: %v", table, kubeServicesChain, err)
-				return
-			}
-		}
-
-		tableChainsNeedJumpServices := []struct {
-			table utiliptables.Table
-			chain utiliptables.Chain
-		}{
-			{utiliptables.TableFilter, utiliptables.ChainInput},
-			{utiliptables.TableFilter, utiliptables.ChainOutput},
-			{utiliptables.TableNAT, utiliptables.ChainOutput},
-			{utiliptables.TableNAT, utiliptables.ChainPrerouting},
-		}
-		comment := "kubernetes service portals"
-		args := []string{"-m", "comment", "--comment", comment, "-j", string(kubeServicesChain)}
-		for _, tc := range tableChainsNeedJumpServices {
-			if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, tc.table, tc.chain, args...); err != nil {
-				glog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", tc.table, tc.chain, kubeServicesChain, err)
-				return
-			}
-		}
-	}
-
-	// Create and link the kube postrouting chain.
-	{
-		if _, err := proxier.iptables.EnsureChain(utiliptables.TableNAT, kubePostroutingChain); err != nil {
-			glog.Errorf("Failed to ensure that %s chain %s exists: %v", utiliptables.TableNAT, kubePostroutingChain, err)
+	// Create and link the kube chains.
+	for _, chain := range iptablesJumpChains {
+		if _, err := proxier.iptables.EnsureChain(chain.table, chain.chain); err != nil {
+			glog.Errorf("Failed to ensure that %s chain %s exists: %v", chain.table, kubeServicesChain, err)
 			return
 		}
-
-		comment := "kubernetes postrouting rules"
-		args := []string{"-m", "comment", "--comment", comment, "-j", string(kubePostroutingChain)}
-		if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, utiliptables.TableNAT, utiliptables.ChainPostrouting, args...); err != nil {
-			glog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", utiliptables.TableNAT, utiliptables.ChainPostrouting, kubePostroutingChain, err)
-			return
+		args := []string{
+			"-m", "comment", "--comment", chain.comment,
+			"-j", string(chain.chain),
 		}
-	}
-
-	// Create and link the kube forward chain.
-	{
-		if _, err := proxier.iptables.EnsureChain(utiliptables.TableFilter, kubeForwardChain); err != nil {
-			glog.Errorf("Failed to ensure that %s chain %s exists: %v", utiliptables.TableFilter, kubeForwardChain, err)
-			return
-		}
-
-		comment := "kubernetes forward rules"
-		args := []string{"-m", "comment", "--comment", comment, "-j", string(kubeForwardChain)}
-		if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, utiliptables.TableFilter, utiliptables.ChainForward, args...); err != nil {
-			glog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", utiliptables.TableFilter, utiliptables.ChainForward, kubeForwardChain, err)
+		if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, chain.table, chain.sourceChain, args...); err != nil {
+			glog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", chain.table, chain.sourceChain, chain.chain, err)
 			return
 		}
 	}
@@ -1100,35 +1040,19 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Make sure we keep stats for the top-level chains, if they existed
 	// (which most should have because we created them above).
-	if chain, ok := existingFilterChains[kubeServicesChain]; ok {
-		writeLine(proxier.filterChains, chain)
-	} else {
-		writeLine(proxier.filterChains, utiliptables.MakeChainLine(kubeServicesChain))
+	for _, chainName := range []utiliptables.Chain{kubeServicesChain, kubeForwardChain} {
+		if chain, ok := existingFilterChains[chainName]; ok {
+			writeLine(proxier.filterChains, chain)
+		} else {
+			writeLine(proxier.filterChains, utiliptables.MakeChainLine(chainName))
+		}
 	}
-	if chain, ok := existingFilterChains[kubeForwardChain]; ok {
-		writeLine(proxier.filterChains, chain)
-	} else {
-		writeLine(proxier.filterChains, utiliptables.MakeChainLine(kubeForwardChain))
-	}
-	if chain, ok := existingNATChains[kubeServicesChain]; ok {
-		writeLine(proxier.natChains, chain)
-	} else {
-		writeLine(proxier.natChains, utiliptables.MakeChainLine(kubeServicesChain))
-	}
-	if chain, ok := existingNATChains[kubeNodePortsChain]; ok {
-		writeLine(proxier.natChains, chain)
-	} else {
-		writeLine(proxier.natChains, utiliptables.MakeChainLine(kubeNodePortsChain))
-	}
-	if chain, ok := existingNATChains[kubePostroutingChain]; ok {
-		writeLine(proxier.natChains, chain)
-	} else {
-		writeLine(proxier.natChains, utiliptables.MakeChainLine(kubePostroutingChain))
-	}
-	if chain, ok := existingNATChains[KubeMarkMasqChain]; ok {
-		writeLine(proxier.natChains, chain)
-	} else {
-		writeLine(proxier.natChains, utiliptables.MakeChainLine(KubeMarkMasqChain))
+	for _, chainName := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain, KubeMarkMasqChain} {
+		if chain, ok := existingNATChains[chainName]; ok {
+			writeLine(proxier.natChains, chain)
+		} else {
+			writeLine(proxier.natChains, utiliptables.MakeChainLine(chainName))
+		}
 	}
 
 	// Install the kubernetes-specific postrouting rules. We use a whole chain for
