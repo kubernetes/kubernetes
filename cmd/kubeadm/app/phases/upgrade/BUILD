@@ -78,6 +78,7 @@ go_test(
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/util/version:go_default_library",
+        "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
     ],
 )
