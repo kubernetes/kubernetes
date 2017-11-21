@@ -22,4 +22,5 @@ RUN clean-install \
     iptables \
     ebtables \
     conntrack \
-    module-init-tools
+    module-init-tools \
+    ipset

@@ -80,10 +80,10 @@ http_file(
 
 docker_pull(
     name = "debian-iptables-amd64",
-    digest = "sha256:efc1d8a37f141869b7e45fa4e153ebea11502ee3d0ac29b25cd94cb02a40a91c",
+    digest = "sha256:a3b936c0fb98a934eecd2cfb91f73658d402b29116084e778ce9ddb68e55383e",
     registry = "gcr.io",
     repository = "google-containers/debian-iptables-amd64",
-    tag = "v9",  # ignored, but kept here for documentation
+    tag = "v10",  # ignored, but kept here for documentation
 )
 
 docker_pull(
