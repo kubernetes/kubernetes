@@ -14,6 +14,7 @@ go_test(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/helper:go_default_library",
+        "//plugin/pkg/admission/defaulttolerationseconds/apis/defaulttolerationseconds:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
     ],
@@ -21,13 +22,24 @@ go_test(
 
 go_library(
     name = "go_default_library",
-    srcs = ["admission.go"],
+    srcs = [
+        "admission.go",
+        "config.go",
+    ],
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/helper:go_default_library",
+        "//plugin/pkg/admission/defaulttolerationseconds/apis/defaulttolerationseconds:go_default_library",
+        "//plugin/pkg/admission/defaulttolerationseconds/apis/defaulttolerationseconds/install:go_default_library",
+        "//plugin/pkg/admission/defaulttolerationseconds/apis/defaulttolerationseconds/v1alpha1:go_default_library",
+        "//plugin/pkg/admission/defaulttolerationseconds/apis/defaulttolerationseconds/validation:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
     ],
 )
@@ -41,6 +53,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//plugin/pkg/admission/defaulttolerationseconds/apis/defaulttolerationseconds:all-srcs",
+    ],
     tags = ["automanaged"],
 )

@@ -398,6 +398,8 @@ pkg/volume/util
 pkg/volume/vsphere_volume
 plugin/cmd/kube-scheduler/app
 plugin/pkg/admission/antiaffinity
+plugin/pkg/admission/defaulttolerationseconds/apis/defaulttolerationseconds
+plugin/pkg/admission/defaulttolerationseconds/apis/defaulttolerationseconds/v1alpha1
 plugin/pkg/admission/eventratelimit/apis/eventratelimit
 plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1
 plugin/pkg/admission/initialresources
