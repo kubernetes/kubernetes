@@ -423,7 +423,7 @@ func testRolloverDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 	framework.Logf("Make sure deployment %q performs scaling operations", deploymentName)
 	// Make sure the deployment starts to scale up and down replica sets by checking if its updated replicas >= 1
-	err = framework.WaitForDeploymentUpdatedReplicasLTE(c, ns, deploymentName, deploymentReplicas, deployment.Generation)
+	err = framework.WaitForDeploymentUpdatedReplicasGTE(c, ns, deploymentName, deploymentReplicas, deployment.Generation)
 	// Check if it's updated to revision 1 correctly
 	framework.Logf("Check revision of new replica set for deployment %q", deploymentName)
 	err = framework.CheckDeploymentRevisionAndImage(c, ns, deploymentName, "1", deploymentImage)

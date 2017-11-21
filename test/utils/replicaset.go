@@ -85,7 +85,7 @@ func UpdateReplicaSetStatusWithRetries(c clientset.Interface, namespace, name st
 		return false, nil
 	})
 	if pollErr == wait.ErrWaitTimeout {
-		pollErr = fmt.Errorf("couldn't apply the provided updated to replicaset %q: %v", name, updateErr)
+		pollErr = fmt.Errorf("couldn't apply the provided update to replicaset %q: %v", name, updateErr)
 	}
 	return rs, pollErr
 }

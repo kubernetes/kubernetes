@@ -127,9 +127,9 @@ func WaitForDeploymentCompleteAndCheckRolling(c clientset.Interface, d *extensio
 	return testutils.WaitForDeploymentCompleteAndCheckRolling(c, d, Logf, Poll, pollLongTimeout)
 }
 
-// WaitForDeploymentUpdatedReplicasLTE waits for given deployment to be observed by the controller and has at least a number of updatedReplicas
-func WaitForDeploymentUpdatedReplicasLTE(c clientset.Interface, ns, deploymentName string, minUpdatedReplicas int32, desiredGeneration int64) error {
-	return testutils.WaitForDeploymentUpdatedReplicasLTE(c, ns, deploymentName, minUpdatedReplicas, desiredGeneration, Poll, pollLongTimeout)
+// WaitForDeploymentUpdatedReplicasGTE waits for given deployment to be observed by the controller and has at least a number of updatedReplicas
+func WaitForDeploymentUpdatedReplicasGTE(c clientset.Interface, ns, deploymentName string, minUpdatedReplicas int32, desiredGeneration int64) error {
+	return testutils.WaitForDeploymentUpdatedReplicasGTE(c, ns, deploymentName, minUpdatedReplicas, desiredGeneration, Poll, pollLongTimeout)
 }
 
 // WaitForDeploymentRollbackCleared waits for given deployment either started rolling back or doesn't need to rollback.
