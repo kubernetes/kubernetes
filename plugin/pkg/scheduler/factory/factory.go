@@ -851,6 +851,8 @@ func (f *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		},
 		Error:          f.MakeDefaultErrorFunc(podBackoff, f.podQueue),
 		StopEverything: f.StopEverything,
+		Predicates:     predicateFuncs,
+		Prioritizers:   priorityConfigs,
 	}, nil
 }
 

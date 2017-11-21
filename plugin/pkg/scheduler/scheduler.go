@@ -128,6 +128,12 @@ type Config struct {
 
 	// Close this to shut down the scheduler.
 	StopEverything chan struct{}
+
+	// Predicates is a map of predicate functions, exposed mainly for testing.
+	Predicates map[string]algorithm.FitPredicate
+
+	// Prioritizers is a slice of priority config, exposed mainly for testing.
+	Prioritizers []algorithm.PriorityConfig
 }
 
 // NewFromConfigurator returns a new scheduler that is created entirely by the Configurator.  Assumes Create() is implemented.
