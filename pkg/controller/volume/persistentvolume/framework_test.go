@@ -680,6 +680,22 @@ func withLabelSelector(labels map[string]string, claims []*v1.PersistentVolumeCl
 	return claims
 }
 
+// withVolumeVolumeMode applies the given VolumeMode to the first volume in the array and
+// returns the array.  Meant to be used to compose volumes specified inline in
+// a test.
+func withVolumeVolumeMode(mode *v1.PersistentVolumeMode, volumes []*v1.PersistentVolume) []*v1.PersistentVolume {
+	volumes[0].Spec.VolumeMode = mode
+	return volumes
+}
+
+// withClaimVolumeMode applies the given VolumeMode to the first claim in the array and
+// returns the array.  Meant to be used to compose volumes specified inline in
+// a test.
+func withClaimVolumeMode(mode *v1.PersistentVolumeMode, claims []*v1.PersistentVolumeClaim) []*v1.PersistentVolumeClaim {
+	claims[0].Spec.VolumeMode = mode
+	return claims
+}
+
 // withExpectedCapacity sets the claim.Spec.Capacity of the first claim in the
 // array to given value and returns the array.  Meant to be used to compose
 // claims specified inline in a test.

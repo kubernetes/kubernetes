@@ -231,6 +231,10 @@ func (ctrl *PersistentVolumeController) syncClaim(claim *v1.PersistentVolumeClai
 func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVolumeClaim) error {
 	requestedQty := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestedSize := requestedQty.Value()
+	isMisMatch, err := checkVolumeModeMisMatches(&claim.Spec, &volume.Spec)
+	if err != nil {
+		return fmt.Errorf("error checking if volumeMode was a mismatch: %v", err)
+	}
 
 	volumeQty := volume.Spec.Capacity[v1.ResourceStorage]
 	volumeSize := volumeQty.Value()
@@ -241,6 +245,10 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 	requestedClass := v1helper.GetPersistentVolumeClaimClass(claim)
 	if v1helper.GetPersistentVolumeClass(volume) != requestedClass {
 		return fmt.Errorf("Class of volume[%s] is not the same as claim[%v]", volume.Name, claimToClaimKey(claim))
+	}
+
+	if isMisMatch {
+		return fmt.Errorf("VolumeMode[%v] of volume[%s] is incompatible with VolumeMode[%v] of claim[%v]", volume.Spec.VolumeMode, volume.Name, claim.Spec.VolumeMode, claim.Name)
 	}
 
 	return nil
