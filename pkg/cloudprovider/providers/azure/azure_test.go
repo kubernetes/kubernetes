@@ -398,7 +398,7 @@ func TestReconcileSecurityGroupFromAnyDestinationAddressPrefixToLoadBalancerIP(t
 	svc1.Spec.LoadBalancerIP = "192.168.0.0"
 	sg := getTestSecurityGroup(az)
 	// Simulate a pre-Kubernetes 1.8 NSG, where we do not specify the destination address prefix
-	sg,err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(""), true)
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(""), true)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
