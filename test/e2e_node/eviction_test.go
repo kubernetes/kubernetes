@@ -119,42 +119,6 @@ var _ = framework.KubeDescribe("MemoryAllocatableEviction [Slow] [Serial] [Disru
 	})
 })
 
-// LocalStorageAllocatableEviction tests that the node responds to node disk pressure by evicting only responsible pods.
-// Node disk pressure is only encountered because we reserve the majority of the node's capacity via kube-reserved.
-var _ = framework.KubeDescribe("LocalStorageAllocatableEviction [Slow] [Serial] [Disruptive] [Flaky]", func() {
-	f := framework.NewDefaultFramework("localstorageallocatable-eviction-test")
-	pressureTimeout := 10 * time.Minute
-	expectedNodeCondition := v1.NodeDiskPressure
-	Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
-		// Set up --kube-reserved for scratch storage
-		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-			diskConsumed := uint64(200000000) // At least 200 Mb for pods to consume
-			summary := eventuallyGetSummary()
-			availableBytes := *(summary.Node.Fs.AvailableBytes)
-			initialConfig.KubeReserved = map[string]string{
-				string(v1.ResourceEphemeralStorage): fmt.Sprintf("%d", availableBytes-diskConsumed),
-			}
-			initialConfig.EnforceNodeAllocatable = []string{cm.NodeAllocatableEnforcementKey}
-			initialConfig.CgroupsPerQOS = true
-			initialConfig.FeatureGates[string(features.LocalStorageCapacityIsolation)] = true
-			// set evictionHard to be very small, so that only the allocatable eviction threshold triggers
-			initialConfig.EvictionHard = map[string]string{"nodefs.available": "1"}
-			initialConfig.EvictionMinimumReclaim = map[string]string{}
-			framework.Logf("KubeReserved: %+v", initialConfig.KubeReserved)
-		})
-		runEvictionTest(f, pressureTimeout, expectedNodeCondition, logDiskMetrics, []podEvictSpec{
-			{
-				evictionPriority: 1,
-				pod:              diskConsumingPod("container-disk-hog", 10000, nil, v1.ResourceRequirements{}),
-			},
-			{
-				evictionPriority: 0,
-				pod:              innocentPod(),
-			},
-		})
-	})
-})
-
 // LocalStorageEviction tests that the node responds to node disk pressure by evicting only responsible pods
 // Disk pressure is induced by running pods which consume disk space.
 var _ = framework.KubeDescribe("LocalStorageEviction [Slow] [Serial] [Disruptive] [Flaky]", func() {
