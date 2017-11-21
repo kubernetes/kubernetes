@@ -116,6 +116,20 @@ func TestLogsForObject(t *testing.T) {
 			},
 		},
 		{
+			name: "daemonset logs",
+			obj: &extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "hello", Namespace: "test"},
+				Spec: extensions.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+				},
+			},
+			pods: []runtime.Object{testPod()},
+			actions: []testclient.Action{
+				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
+				getLogsAction("test", nil),
+			},
+		},
+		{
 			name: "job logs",
 			obj: &batch.Job{
 				ObjectMeta: metav1.ObjectMeta{Name: "hello", Namespace: "test"},
