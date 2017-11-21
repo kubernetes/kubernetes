@@ -207,6 +207,7 @@ func autoConvert_audit_ObjectReference_To_v1alpha1_ObjectReference(in *audit.Obj
 func autoConvert_v1alpha1_Policy_To_audit_Policy(in *Policy, out *audit.Policy, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Rules = *(*[]audit.PolicyRule)(unsafe.Pointer(&in.Rules))
+	out.OmitStages = *(*[]audit.Stage)(unsafe.Pointer(&in.OmitStages))
 	return nil
 }
 
@@ -218,6 +219,7 @@ func Convert_v1alpha1_Policy_To_audit_Policy(in *Policy, out *audit.Policy, s co
 func autoConvert_audit_Policy_To_v1alpha1_Policy(in *audit.Policy, out *Policy, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Rules = *(*[]PolicyRule)(unsafe.Pointer(&in.Rules))
+	out.OmitStages = *(*[]Stage)(unsafe.Pointer(&in.OmitStages))
 	return nil
 }
 
