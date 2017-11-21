@@ -22,17 +22,24 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	defaulttolerationsecondsapi "k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds/apis/defaulttolerationseconds"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 func TestForgivenessAdmission(t *testing.T) {
-	var defaultTolerationSeconds int64 = 300
-
 	genTolerationSeconds := func(s int64) *int64 {
 		return &s
 	}
 
-	handler := NewDefaultTolerationSeconds()
+	defaultTolerationSeconds := genTolerationSeconds(400)
+	config := &defaulttolerationsecondsapi.Configuration{
+		DefaultTolerationSecondsConfig: defaulttolerationsecondsapi.DefaultTolerationSecondsConfig{
+			DefaultNotReadyTolerationSeconds:    defaultTolerationSeconds,
+			DefaultUnreachableTolerationSeconds: defaultTolerationSeconds,
+		},
+	}
+
+	handler := NewDefaultTolerationSeconds(config)
 	// NOTE: for anyone who want to modify this test, the order of tolerations matters!
 	tests := []struct {
 		description  string
@@ -51,13 +58,13 @@ func TestForgivenessAdmission(t *testing.T) {
 							Key:               algorithm.TaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: defaultTolerationSeconds,
 						},
 						{
 							Key:               algorithm.TaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: defaultTolerationSeconds,
 						},
 					},
 				},
@@ -73,13 +80,13 @@ func TestForgivenessAdmission(t *testing.T) {
 							Key:               algorithm.DeprecatedTaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: defaultTolerationSeconds,
 						},
 						{
 							Key:               algorithm.DeprecatedTaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: defaultTolerationSeconds,
 						},
 					},
 				},
@@ -91,25 +98,25 @@ func TestForgivenessAdmission(t *testing.T) {
 							Key:               algorithm.DeprecatedTaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: defaultTolerationSeconds,
 						},
 						{
 							Key:               algorithm.DeprecatedTaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: defaultTolerationSeconds,
 						},
 						{
 							Key:               algorithm.TaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: defaultTolerationSeconds,
 						},
 						{
 							Key:               algorithm.TaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: defaultTolerationSeconds,
 						},
 					},
 				},
@@ -125,7 +132,7 @@ func TestForgivenessAdmission(t *testing.T) {
 							Key:               algorithm.DeprecatedTaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: defaultTolerationSeconds,
 						},
 					},
 				},
@@ -137,19 +144,19 @@ func TestForgivenessAdmission(t *testing.T) {
 							Key:               algorithm.DeprecatedTaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: defaultTolerationSeconds,
 						},
 						{
 							Key:               algorithm.TaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: defaultTolerationSeconds,
 						},
 						{
 							Key:               algorithm.TaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: defaultTolerationSeconds,
 						},
 					},
 				},
@@ -165,7 +172,7 @@ func TestForgivenessAdmission(t *testing.T) {
 							Key:               algorithm.DeprecatedTaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: defaultTolerationSeconds,
 						},
 					},
 				},
@@ -177,19 +184,19 @@ func TestForgivenessAdmission(t *testing.T) {
 							Key:               algorithm.DeprecatedTaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: defaultTolerationSeconds,
 						},
 						{
 							Key:               algorithm.TaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: defaultTolerationSeconds,
 						},
 						{
 							Key:               algorithm.TaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: defaultTolerationSeconds,
 						},
 					},
 				},
@@ -224,13 +231,13 @@ func TestForgivenessAdmission(t *testing.T) {
 							Key:               algorithm.TaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: defaultTolerationSeconds,
 						},
 						{
 							Key:               algorithm.TaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: defaultTolerationSeconds,
 						},
 					},
 				},
@@ -263,7 +270,7 @@ func TestForgivenessAdmission(t *testing.T) {
 							Key:               algorithm.TaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: defaultTolerationSeconds,
 						},
 					},
 				},
@@ -296,7 +303,7 @@ func TestForgivenessAdmission(t *testing.T) {
 							Key:               algorithm.TaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: defaultTolerationSeconds,
 						},
 					},
 				},
@@ -366,7 +373,7 @@ func TestForgivenessAdmission(t *testing.T) {
 							Key:               algorithm.TaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: genTolerationSeconds(300),
+							TolerationSeconds: defaultTolerationSeconds,
 						},
 					},
 				},
@@ -407,7 +414,8 @@ func TestForgivenessAdmission(t *testing.T) {
 }
 
 func TestHandles(t *testing.T) {
-	handler := NewDefaultTolerationSeconds()
+	config := &defaulttolerationsecondsapi.Configuration{}
+	handler := NewDefaultTolerationSeconds(config)
 	tests := map[admission.Operation]bool{
 		admission.Update:  true,
 		admission.Create:  true,
