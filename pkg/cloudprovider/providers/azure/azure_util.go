@@ -402,6 +402,19 @@ outer:
 }
 
 func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, error) {
+	if az.Config.VMType == vmTypeVMSS {
+		ip, err := az.getIPForVmssMachine(nodeName)
+		if err == cloudprovider.InstanceNotFound || err == ErrorNotVmssInstance {
+			return az.getIPForStandardMachine(nodeName)
+		}
+
+		return ip, err
+	}
+
+	return az.getIPForStandardMachine(nodeName)
+}
+
+func (az *Cloud) getIPForStandardMachine(nodeName types.NodeName) (string, error) {
 	az.operationPollRateLimiter.Accept()
 	machine, exists, err := az.getVirtualMachine(nodeName)
 	if !exists {
