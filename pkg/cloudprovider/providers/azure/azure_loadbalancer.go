@@ -1207,9 +1207,33 @@ func findRule(rules []network.LoadBalancingRule, rule network.LoadBalancingRule)
 
 func findSecurityRule(rules []network.SecurityRule, rule network.SecurityRule) bool {
 	for _, existingRule := range rules {
-		if strings.EqualFold(*existingRule.Name, *rule.Name) {
-			return true
+		if !strings.EqualFold(*existingRule.Name, *rule.Name) {
+			continue
 		}
+		if existingRule.Protocol != rule.Protocol {
+			continue
+		}
+		if !strings.EqualFold(*existingRule.SourcePortRange, *rule.SourcePortRange) {
+			continue
+		}
+		if !strings.EqualFold(*existingRule.DestinationPortRange, *rule.DestinationPortRange) {
+			continue
+		}
+		if !strings.EqualFold(*existingRule.SourceAddressPrefix, *rule.SourceAddressPrefix) {
+			continue
+		}
+		if !allowsConsolidation(existingRule) && !allowsConsolidation(rule) {
+			if !strings.EqualFold(*existingRule.DestinationAddressPrefix, *rule.DestinationAddressPrefix) {
+				continue
+			}
+		}
+		if existingRule.Access != rule.Access {
+			continue
+		}
+		if existingRule.Direction != rule.Direction {
+			continue
+		}
+		return true
 	}
 	return false
 }
