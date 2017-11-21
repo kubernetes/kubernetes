@@ -1,12 +1,8 @@
 
-Install an addon to a Kubernetes cluster.
+Installs required addons for passing Conformance tests
 
 ### Synopsis
 
 
-Install an addon to a Kubernetes cluster.
-
-```
-kubeadm alpha phase addon <addon-name>
-```
+This command is not meant to be run on its own. See list of available subcommands.
 

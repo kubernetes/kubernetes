@@ -3,7 +3,7 @@
 
 .SH NAME
 .PP
-kubeadm alpha phase addon kube\-dns \- Install the kube\-dns addon to a Kubernetes cluster.
+kubeadm alpha phase addon kube\-dns \- Installs the kube\-dns addon to a Kubernetes cluster
 
 
 .SH SYNOPSIS
@@ -13,7 +13,11 @@ kubeadm alpha phase addon kube\-dns \- Install the kube\-dns addon to a Kubernet
 
 .SH DESCRIPTION
 .PP
-Install the kube\-dns addon to a Kubernetes cluster.
+Installs the kube\-dns addon components via the API server.
+Please note that although the DNS server is deployed, it will not be scheduled until CNI is installed.
+
+.PP
+Alpha Disclaimer: this command is currently alpha.
 
 
 .SH OPTIONS
@@ -23,7 +27,7 @@ Install the kube\-dns addon to a Kubernetes cluster.
 
 .PP
 \fB\-\-image\-repository\fP="gcr.io/google\_containers"
-    Choose a container registry to pull control plane images from.
+    Choose a container registry to pull control plane images from
 
 .PP
 \fB\-\-kubeconfig\fP="/etc/kubernetes/admin.conf"
@@ -31,15 +35,15 @@ Install the kube\-dns addon to a Kubernetes cluster.
 
 .PP
 \fB\-\-kubernetes\-version\fP="stable\-1.8"
-    Choose a specific Kubernetes version for the control plane.
+    Choose a specific Kubernetes version for the control plane
 
 .PP
 \fB\-\-service\-cidr\fP="10.96.0.0/12"
-    Use alternative range of IP address for service VIPs
+    The range of IP address used for service VIPs
 
 .PP
 \fB\-\-service\-dns\-domain\fP="cluster.local"
-    Use alternative domain for services, e.g. "myorg.internal.
+    Alternative domain for services
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS

@@ -1,26 +1,38 @@
 
-Install all addons to a Kubernetes cluster.
+Installs all addons to a Kubernetes cluster
 
 ### Synopsis
 
 
-Install all addons to a Kubernetes cluster.
+Installs the kube-dns and the kube-proxys addons components via the API server.
+Please note that although the DNS server is deployed, it will not be scheduled until CNI is installed. 
+
+Alpha Disclaimer: this command is currently alpha.
 
 ```
 kubeadm alpha phase addon all
 ```
 
+### Examples
+
+```
+  # Installs the kube-dns and the kube-proxys addons components via the API server,
+  # functionally equivalent to what installed by kubeadm init.
+  
+  kubeadm alpha phase selfhosting from-staticpods
+```
+
 ### Options
 
 ```
-      --apiserver-advertise-address string   The IP address the API Server will advertise it's listening on. Specify '0.0.0.0' to use the address of the default network interface.
-      --apiserver-bind-port int32            Port for the API Server to bind to. (default 6443)
+      --apiserver-advertise-address string   The IP address or DNS name the API server is accessible on
+      --apiserver-bind-port int32            The port the API server is accessible on (default 6443)
       --config string                        Path to a kubeadm config file. WARNING: Usage of a configuration file is experimental!
-      --image-repository string              Choose a container registry to pull control plane images from. (default "gcr.io/google_containers")
+      --image-repository string              Choose a container registry to pull control plane images from (default "gcr.io/google_containers")
       --kubeconfig string                    The KubeConfig file to use when talking to the cluster (default "/etc/kubernetes/admin.conf")
-      --kubernetes-version string            Choose a specific Kubernetes version for the control plane. (default "stable-1.8")
-      --pod-network-cidr string              Specify range of IP addresses for the pod network. If set, the control plane will automatically allocate CIDRs for every node.
-      --service-cidr string                  Use alternative range of IP address for service VIPs (default "10.96.0.0/12")
-      --service-dns-domain string            Use alternative domain for services, e.g. "myorg.internal. (default "cluster.local")
+      --kubernetes-version string            Choose a specific Kubernetes version for the control plane (default "stable-1.8")
+      --pod-network-cidr string              The range of IP addresses used for the Pod network
+      --service-cidr string                  The range of IP address used for service VIPs (default "10.96.0.0/12")
+      --service-dns-domain string            Alternative domain for services (default "cluster.local")
 ```
 

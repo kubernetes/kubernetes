@@ -3,7 +3,7 @@
 
 .SH NAME
 .PP
-kubeadm alpha phase certs apiserver\-kubelet\-client \- Generate a client certificate for the API Server to connect to the kubelets securely.
+kubeadm alpha phase certs apiserver\-kubelet\-client \- Generates client certificate for the API server to connect to the kubelets securely
 
 
 .SH SYNOPSIS
@@ -13,17 +13,23 @@ kubeadm alpha phase certs apiserver\-kubelet\-client \- Generate a client certif
 
 .SH DESCRIPTION
 .PP
-Generate a client certificate for the API Server to connect to the kubelets securely.
+Generates the client certificate for the API server to connect to the kubelet securely and the respective key, and saves them into apiserver\-kubelet\-client.crt and apiserver\-kubelet\-client.key files.
+
+.PP
+If both files already exist, kubeadm skips the generation step and existing files will be used.
+
+.PP
+Alpha Disclaimer: this command is currently alpha.
 
 
 .SH OPTIONS
 .PP
 \fB\-\-cert\-dir\fP="/etc/kubernetes/pki"
-    The path where to save and store the certificates.
+    The path where to save the certificates
 
 .PP
 \fB\-\-config\fP=""
-    Path to a kubeadm config file. WARNING: Usage of a configuration file is experimental!
+    Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS

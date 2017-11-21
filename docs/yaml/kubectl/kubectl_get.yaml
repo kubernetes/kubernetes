@@ -36,10 +36,6 @@ options:
   default_value: "500"
   usage: |
     Return large lists in chunks rather than all at once. Pass 0 to disable. This flag is beta and may change in the future.
-- name: experimental-use-openapi-print-columns
-  default_value: "false"
-  usage: |
-    If true, use x-kubernetes-print-column metadata (if present) from the OpenAPI schema for displaying a resource.
 - name: export
   default_value: "false"
   usage: |
@@ -111,6 +107,10 @@ options:
 - name: template
   usage: |
     Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
+- name: use-openapi-print-columns
+  default_value: "true"
+  usage: |
+    If true, use x-kubernetes-print-column metadata (if present) from the OpenAPI schema for displaying a resource.
 - name: watch
   shorthand: w
   default_value: "false"

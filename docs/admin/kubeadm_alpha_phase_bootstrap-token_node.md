@@ -1,18 +1,14 @@
 
-Manages node bootstrap tokens.
+Configures the node bootstrap process
 
 ### Synopsis
 
 
-Manages node bootstrap tokens.
-
-```
-kubeadm alpha phase bootstrap-token node
-```
+This command is not meant to be run on its own. See list of available subcommands.
 
 ### Options inherited from parent commands
 
 ```
-      --kubeconfig string   The KubeConfig file to use when talking to the cluster. (default "/etc/kubernetes/admin.conf")
+      --kubeconfig string   The KubeConfig file to use when talking to the cluster (default "/etc/kubernetes/admin.conf")
 ```
 

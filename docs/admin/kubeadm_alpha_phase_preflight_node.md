@@ -6,7 +6,7 @@ Run node pre-flight checks
 
 Run node pre-flight checks, functionally equivalent to what implemented by kubeadm join. 
 
-Alpha Disclaimer: this command is currently alpha but, please try it out and give us feedback!
+Alpha Disclaimer: this command is currently alpha.
 
 ```
 kubeadm alpha phase preflight node

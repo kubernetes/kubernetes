@@ -3,7 +3,7 @@
 
 .SH NAME
 .PP
-kubeadm alpha phase certs front\-proxy\-ca \- Generate front proxy CA certificate and key for a Kubernetes cluster.
+kubeadm alpha phase certs front\-proxy\-ca \- Generates front proxy CA certificate and key for a Kubernetes cluster
 
 
 .SH SYNOPSIS
@@ -13,17 +13,23 @@ kubeadm alpha phase certs front\-proxy\-ca \- Generate front proxy CA certificat
 
 .SH DESCRIPTION
 .PP
-Generate front proxy CA certificate and key for a Kubernetes cluster.
+Generates the front proxy CA certificate and key and saves them into front\-proxy\-ca.crt and front\-proxy\-ca.key files.
+
+.PP
+If both files already exist, kubeadm skips the generation step and existing files will be used.
+
+.PP
+Alpha Disclaimer: this command is currently alpha.
 
 
 .SH OPTIONS
 .PP
 \fB\-\-cert\-dir\fP="/etc/kubernetes/pki"
-    The path where to save and store the certificates.
+    The path where to save the certificates
 
 .PP
 \fB\-\-config\fP=""
-    Path to a kubeadm config file. WARNING: Usage of a configuration file is experimental!
+    Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS

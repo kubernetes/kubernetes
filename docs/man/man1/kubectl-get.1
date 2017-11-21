@@ -116,10 +116,6 @@ Valid resource types include:
     Return large lists in chunks rather than all at once. Pass 0 to disable. This flag is beta and may change in the future.
 
 .PP
-\fB\-\-experimental\-use\-openapi\-print\-columns\fP=false
-    If true, use x\-kubernetes\-print\-column metadata (if present) from the OpenAPI schema for displaying a resource.
-
-.PP
 \fB\-\-export\fP=false
     If true, use 'export' for the resources.  Exported resources are stripped of cluster\-specific information.
 
@@ -196,6 +192,10 @@ Valid resource types include:
 \[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]].
 
 .PP
+\fB\-\-use\-openapi\-print\-columns\fP=true
+    If true, use x\-kubernetes\-print\-column metadata (if present) from the OpenAPI schema for displaying a resource.
+
+.PP
 \fB\-w\fP, \fB\-\-watch\fP=false
     After listing/getting the requested object, watch for changes. Uninitialized objects are excluded if no object name is provided.
 
@@ -250,7 +250,7 @@ Valid resource types include:
     Path to a client key file for TLS
 
 .PP
-\fB\-\-cloud\-provider\-gce\-lb\-src\-cidrs\fP=35.191.0.0/16,209.85.152.0/22,209.85.204.0/22,130.211.0.0/22
+\fB\-\-cloud\-provider\-gce\-lb\-src\-cidrs\fP=209.85.204.0/22,130.211.0.0/22,35.191.0.0/16,209.85.152.0/22
     CIDRs opened in GCE firewall for LB traffic proxy \& health checks
 
 .PP

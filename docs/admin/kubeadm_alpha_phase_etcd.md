@@ -1,12 +1,8 @@
 
-Generate static pod manifest file for etcd.
+Generates static Pod manifest file for etcd.
 
 ### Synopsis
 
 
-Generate static pod manifest file for etcd.
-
-```
-kubeadm alpha phase etcd
-```
+This command is not meant to be run on its own. See list of available subcommands.
 

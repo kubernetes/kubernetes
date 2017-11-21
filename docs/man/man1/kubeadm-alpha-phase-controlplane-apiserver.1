@@ -3,7 +3,7 @@
 
 .SH NAME
 .PP
-kubeadm alpha phase controlplane apiserver \- Generate apiserver static pod manifest.
+kubeadm alpha phase controlplane apiserver \- Generates the API server static Pod manifest.
 
 
 .SH SYNOPSIS
@@ -13,30 +13,34 @@ kubeadm alpha phase controlplane apiserver \- Generate apiserver static pod mani
 
 .SH DESCRIPTION
 .PP
-Generate apiserver static pod manifest.
+Generates the static Pod manifest file for the API server and saves it into /etc/kubernetes/manifests/kube\-apiserver.yaml file.
+
+.PP
+Alpha Disclaimer: this command is currently alpha.
 
 
 .SH OPTIONS
 .PP
 \fB\-\-apiserver\-advertise\-address\fP=""
-    The IP address or DNS name the API Server is accessible on.
+    The IP address or DNS name the API server is accessible on
 
 .PP
 \fB\-\-apiserver\-bind\-port\fP=6443
-    The port the API Server is accessible on.
+    The port the API server is accessible on
 
 .PP
 \fB\-\-cert\-dir\fP="/etc/kubernetes/pki"
-    The path where certificates are stored.
+    The path where certificates are stored
 
 .PP
 \fB\-\-config\fP=""
-    Path to a kubeadm config file. WARNING: Usage of a configuration file is experimental!
+    Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)
 
 .PP
 \fB\-\-feature\-gates\fP=""
     A set of key=value pairs that describe feature gates for various features. Options are:
 CoreDNS=true|false (ALPHA \- default=false)
+DynamicKubeletConfig=true|false (ALPHA \- default=false)
 HighAvailability=true|false (ALPHA \- default=false)
 SelfHosting=true|false (BETA \- default=false)
 StoreCertsInSecrets=true|false (ALPHA \- default=false)
@@ -44,11 +48,11 @@ SupportIPVSProxyMode=true|false (ALPHA \- default=false)
 
 .PP
 \fB\-\-kubernetes\-version\fP="stable\-1.8"
-    Choose a specific Kubernetes version for the control plane.
+    Choose a specific Kubernetes version for the control plane
 
 .PP
 \fB\-\-service\-cidr\fP="10.96.0.0/12"
-    The range of IP address used for service VIPs.
+    The range of IP address used for service VIPs
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS

@@ -3,7 +3,7 @@
 
 .SH NAME
 .PP
-kubeadm alpha phase upload\-config \- Upload the currently used configuration for kubeadm to a ConfigMap in the cluster for future use in reconfiguration and upgrades of the cluster.
+kubeadm alpha phase upload\-config \- Uploads the currently used configuration for kubeadm to a ConfigMap
 
 
 .SH SYNOPSIS
@@ -13,7 +13,13 @@ kubeadm alpha phase upload\-config \- Upload the currently used configuration fo
 
 .SH DESCRIPTION
 .PP
-Upload the currently used configuration for kubeadm to a ConfigMap in the cluster for future use in reconfiguration and upgrades of the cluster.
+Uploads the kubeadm init configuration of your cluster to a ConfigMap called kubeadm\-config in the kube\-system namespace. This enables correct configuration of system components and a seamless user experience when upgrading.
+
+.PP
+Alternatively, you can use kubeadm config.
+
+.PP
+Alpha Disclaimer: this command is currently alpha.
 
 
 .SH OPTIONS
@@ -38,6 +44,18 @@ Upload the currently used configuration for kubeadm to a ConfigMap in the cluste
 .PP
 \fB\-\-version\fP=false
     Print version information and quit
+
+
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+  # uploads the configuration of your cluster
+  kubeadm alpha phase upload\-config \-\-config=myConfig.yaml
+
+.fi
+.RE
 
 
 .SH SEE ALSO

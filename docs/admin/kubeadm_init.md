@@ -22,6 +22,7 @@ kubeadm init
       --dry-run                                 Don't apply any changes; just output what would be done.
       --feature-gates string                    A set of key=value pairs that describe feature gates for various features. Options are:
 CoreDNS=true|false (ALPHA - default=false)
+DynamicKubeletConfig=true|false (ALPHA - default=false)
 HighAvailability=true|false (ALPHA - default=false)
 SelfHosting=true|false (BETA - default=false)
 StoreCertsInSecrets=true|false (ALPHA - default=false)

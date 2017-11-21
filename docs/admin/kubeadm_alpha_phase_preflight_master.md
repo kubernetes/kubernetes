@@ -6,7 +6,7 @@ Run master pre-flight checks
 
 Run master pre-flight checks, functionally equivalent to what implemented by kubeadm init. 
 
-Alpha Disclaimer: this command is currently alpha but, please try it out and give us feedback!
+Alpha Disclaimer: this command is currently alpha.
 
 ```
 kubeadm alpha phase preflight master

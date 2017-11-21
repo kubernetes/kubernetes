@@ -1,12 +1,8 @@
 
-Make a kubeadm cluster self-hosted.
+Makes a kubeadm cluster self-hosted
 
 ### Synopsis
 
 
-Make a kubeadm cluster self-hosted.
-
-```
-kubeadm alpha phase selfhosting
-```
+This command is not meant to be run on its own. See list of available subcommands.
 

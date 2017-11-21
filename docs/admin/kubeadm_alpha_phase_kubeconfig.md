@@ -1,12 +1,8 @@
 
-Generate all kubeconfig files necessary to establish the control plane and the admin kubeconfig file.
+Generates all kubeconfig files necessary to establish the control plane and the admin kubeconfig file
 
 ### Synopsis
 
 
-Generate all kubeconfig files necessary to establish the control plane and the admin kubeconfig file.
-
-```
-kubeadm alpha phase kubeconfig
-```
+This command is not meant to be run on its own. See list of available subcommands.
 

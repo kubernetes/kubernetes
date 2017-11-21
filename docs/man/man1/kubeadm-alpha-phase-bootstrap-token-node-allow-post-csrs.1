@@ -3,7 +3,7 @@
 
 .SH NAME
 .PP
-kubeadm alpha phase bootstrap\-token node allow\-post\-csrs \- Configure RBAC to allow node bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials.
+kubeadm alpha phase bootstrap\-token node allow\-post\-csrs \- Configures RBAC to allow node bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials
 
 
 .SH SYNOPSIS
@@ -13,7 +13,13 @@ kubeadm alpha phase bootstrap\-token node allow\-post\-csrs \- Configure RBAC to
 
 .SH DESCRIPTION
 .PP
-Configure RBAC to allow node bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials.
+Configures RBAC rules to allow node bootstrap tokens to post a certificate signing request, thus enabling nodes joining the cluster to request long term certificate credentials.
+
+.PP
+See online documentation about TLS bootstrapping for more details.
+
+.PP
+Alpha Disclaimer: this command is currently alpha.
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -27,7 +33,7 @@ Configure RBAC to allow node bootstrap tokens to post CSRs in order for nodes to
 
 .PP
 \fB\-\-kubeconfig\fP="/etc/kubernetes/admin.conf"
-    The KubeConfig file to use when talking to the cluster.
+    The KubeConfig file to use when talking to the cluster
 
 .PP
 \fB\-\-version\fP=false

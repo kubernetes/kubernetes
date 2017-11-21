@@ -1,12 +1,8 @@
 
-Generate certificates for a Kubernetes cluster.
+Generates certificates for a Kubernetes cluster
 
 ### Synopsis
 
 
-Generate certificates for a Kubernetes cluster.
-
-```
-kubeadm alpha phase certs
-```
+This command is not meant to be run on its own. See list of available subcommands.
 

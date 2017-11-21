@@ -3,7 +3,7 @@
 
 .SH NAME
 .PP
-kubeadm alpha phase mark\-master \- Mark a node as master.
+kubeadm alpha phase mark\-master \- Mark a node as master
 
 
 .SH SYNOPSIS
@@ -13,13 +13,24 @@ kubeadm alpha phase mark\-master \- Mark a node as master.
 
 .SH DESCRIPTION
 .PP
-Mark a node as master.
+Applies a label that specifies that a node is a master and a taint that forces workloads to be deployed accordingly.
+
+.PP
+Alpha Disclaimer: this command is currently alpha.
 
 
 .SH OPTIONS
 .PP
+\fB\-\-config\fP=""
+    Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)
+
+.PP
 \fB\-\-kubeconfig\fP="/etc/kubernetes/admin.conf"
     The KubeConfig file to use when talking to the cluster
+
+.PP
+\fB\-\-node\-name\fP=""
+    The node name to which label and taints should apply
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -34,6 +45,21 @@ Mark a node as master.
 .PP
 \fB\-\-version\fP=false
     Print version information and quit
+
+
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+  # Applies master label and taint to the current node, functionally equivalent to what executed by kubeadm init.
+  kubeadm alpha phase mark\-master
+  
+  # Applies master label and taint to a specific node
+  kubeadm alpha phase mark\-master \-\-node\-name myNode
+
+.fi
+.RE
 
 
 .SH SEE ALSO

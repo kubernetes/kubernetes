@@ -25,6 +25,7 @@ kubeadm config upload from-flags
       --cert-dir string                         The path where to save and store the certificates. (default "/etc/kubernetes/pki")
       --feature-gates string                    A set of key=value pairs that describe feature gates for various features. Options are:
 CoreDNS=true|false (ALPHA - default=false)
+DynamicKubeletConfig=true|false (ALPHA - default=false)
 HighAvailability=true|false (ALPHA - default=false)
 SelfHosting=true|false (BETA - default=false)
 StoreCertsInSecrets=true|false (ALPHA - default=false)
