@@ -24,6 +24,7 @@ import (
 	apps "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -53,7 +54,7 @@ func (c *healthCheck) Name() string {
 
 // CheckClusterHealth makes sure:
 // - the API /healthz endpoint is healthy
-// - all Nodes are Ready
+// - all master Nodes are Ready
 // - (if self-hosted) that there are DaemonSets with at least one Pod for all control plane components
 // - (if static pod-hosted) that all required Static Pod manifests exist on disk
 func CheckClusterHealth(client clientset.Interface, ignoreChecksErrors sets.String) error {
@@ -66,9 +67,9 @@ func CheckClusterHealth(client clientset.Interface, ignoreChecksErrors sets.Stri
 			f:      apiServerHealthy,
 		},
 		&healthCheck{
-			name:   "NodeHealth",
+			name:   "MasterNodesReady",
 			client: client,
-			f:      nodesHealthy,
+			f:      masterNodesReady,
 		},
 		// TODO: Add a check for ComponentStatuses here?
 	}
@@ -106,16 +107,25 @@ func apiServerHealthy(client clientset.Interface) error {
 	return nil
 }
 
-// nodesHealthy checks whether all Nodes in the cluster are in the Running state
-func nodesHealthy(client clientset.Interface) error {
-	nodes, err := client.CoreV1().Nodes().List(metav1.ListOptions{})
+// masterNodesReady checks whether all master Nodes in the cluster are in the Running state
+func masterNodesReady(client clientset.Interface) error {
+	selector := labels.SelectorFromSet(labels.Set(map[string]string{
+		constants.LabelNodeRoleMaster: "",
+	}))
+	masters, err := client.CoreV1().Nodes().List(metav1.ListOptions{
+		LabelSelector: selector.String(),
+	})
 	if err != nil {
-		return fmt.Errorf("couldn't list all nodes in cluster: %v", err)
+		return fmt.Errorf("couldn't list masters in cluster: %v", err)
 	}
 
-	notReadyNodes := getNotReadyNodes(nodes.Items)
-	if len(notReadyNodes) != 0 {
-		return fmt.Errorf("there are NotReady Nodes in the cluster: %v", notReadyNodes)
+	if len(masters.Items) == 0 {
+		return fmt.Errorf("failed to find any nodes with master role")
+	}
+
+	notReadyMasters := getNotReadyNodes(masters.Items)
+	if len(notReadyMasters) != 0 {
+		return fmt.Errorf("there are NotReady masters in the cluster: %v", notReadyMasters)
 	}
 	return nil
 }
