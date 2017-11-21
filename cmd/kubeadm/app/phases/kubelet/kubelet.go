@@ -20,9 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
-
-	"github.com/ghodss/yaml"
 
 	"k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
@@ -34,8 +33,10 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
@@ -55,6 +56,10 @@ func CreateBaseKubeletConfiguration(cfg *kubeadmapi.MasterConfiguration, client 
 		return err
 	}
 
+	if err := writeInitKubeletConfigToDisk(kubeletBytes); err != nil {
+		return fmt.Errorf("failed to write initial remote configuration of kubelet to disk for node %s: %v", cfg.NodeName, err)
+	}
+
 	if err = apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.KubeletBaseConfigurationConfigMap,
@@ -71,11 +76,30 @@ func CreateBaseKubeletConfiguration(cfg *kubeadmapi.MasterConfiguration, client 
 		return fmt.Errorf("error creating base kubelet configmap RBAC rules: %v", err)
 	}
 
-	return UpdateNodeWithConfigMap(client, cfg.NodeName)
+	return updateNodeWithConfigMap(client, cfg.NodeName)
 }
 
-// UpdateNodeWithConfigMap updates node ConfigSource with KubeletBaseConfigurationConfigMap
-func UpdateNodeWithConfigMap(client clientset.Interface, nodeName string) error {
+// ConsumeBaseKubeletConfiguration consumes base kubelet configuration for dynamic kubelet configuration feature.
+func ConsumeBaseKubeletConfiguration(nodeName string) error {
+	client, err := getTLSBootstrappedClient()
+	if err != nil {
+		return err
+	}
+
+	kubeletCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeletBaseConfigurationConfigMap, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	if err := writeInitKubeletConfigToDisk([]byte(kubeletCfg.Data[kubeadmconstants.KubeletBaseConfigurationConfigMapKey])); err != nil {
+		return fmt.Errorf("failed to write initial remote configuration of kubelet to disk for node %s: %v", nodeName, err)
+	}
+
+	return updateNodeWithConfigMap(client, nodeName)
+}
+
+// updateNodeWithConfigMap updates node ConfigSource with KubeletBaseConfigurationConfigMap
+func updateNodeWithConfigMap(client clientset.Interface, nodeName string) error {
 	fmt.Printf("[kubelet] Using Dynamic Kubelet Config for node %q; config sourced from ConfigMap %q in namespace %s",
 		nodeName, kubeadmconstants.KubeletBaseConfigurationConfigMap, metav1.NamespaceSystem)
 
@@ -94,15 +118,6 @@ func UpdateNodeWithConfigMap(client clientset.Interface, nodeName string) error 
 		kubeletCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeletBaseConfigurationConfigMap, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
-		}
-
-		baseCongfig, err := yaml.Marshal(kubeletCfg.Data[kubeadmconstants.KubeletBaseConfigurationConfigMapKey])
-		if err != nil {
-			return false, err
-		}
-		baseCongfigFile := filepath.Join(kubeadmconstants.KubeletBaseConfigurationDir, kubeadmconstants.KubeletBaseConfigurationFile)
-		if err := ioutil.WriteFile(baseCongfigFile, baseCongfig, 0644); err != nil {
-			return false, fmt.Errorf("failed to write initial remote configuration of kubelet into file %q for node %s: %v", baseCongfigFile, nodeName, err)
 		}
 
 		node.Spec.ConfigSource = &v1.NodeConfigSource{
@@ -149,7 +164,7 @@ func createKubeletBaseConfigMapRBACRules(client clientset.Interface) error {
 		return err
 	}
 
-	return apiclient.CreateOrUpdateRoleBinding(client, &rbac.RoleBinding{
+	if err := apiclient.CreateOrUpdateRoleBinding(client, &rbac.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.KubeletBaseConfigMapRoleName,
 			Namespace: metav1.NamespaceSystem,
@@ -165,5 +180,51 @@ func createKubeletBaseConfigMapRBACRules(client clientset.Interface) error {
 				Name: kubeadmconstants.NodesGroup,
 			},
 		},
+	}); err != nil {
+		return err
+	}
+
+	return apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: tokenphase.NodeKubeletBootstrap,
+		},
+		RoleRef: rbac.RoleRef{
+			APIGroup: rbac.GroupName,
+			Kind:     "ClusterRole",
+			Name:     tokenphase.NodeBootstrapperClusterRoleName,
+		},
+		Subjects: []rbac.Subject{
+			{
+				Kind: rbac.GroupKind,
+				Name: kubeadmconstants.NodeBootstrapTokenAuthGroup,
+			},
+		},
 	})
+}
+
+// getTLSBootstrappedClient waits for the kubelet to perform the TLS bootstrap
+// and then creates a client from config file /etc/kubernetes/kubelet.conf
+func getTLSBootstrappedClient() (clientset.Interface, error) {
+	fmt.Println("[tlsbootstrap] Waiting for the kubelet to perform the TLS Bootstrap...")
+
+	kubeletKubeConfig := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
+
+	// Loop on every falsy return. Return with an error if raised. Exit successfully if true is returned.
+	err := wait.PollImmediateInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {
+		_, err := os.Stat(kubeletKubeConfig)
+		return (err == nil), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return kubeconfigutil.ClientSetFromFile(kubeletKubeConfig)
+}
+
+func writeInitKubeletConfigToDisk(kubeletConfig []byte) error {
+	baseCongfigFile := filepath.Join(kubeadmconstants.KubeletBaseConfigurationDir, kubeadmconstants.KubeletBaseConfigurationFile)
+	if err := ioutil.WriteFile(baseCongfigFile, kubeletConfig, 0644); err != nil {
+		return fmt.Errorf("failed to write initial remote configuration of kubelet into file %q: %v", baseCongfigFile, err)
+	}
+	return nil
 }

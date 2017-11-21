@@ -114,7 +114,7 @@ func TestUpdateNodeWithConfigMap(t *testing.T) {
 		return true, nil, nil
 	})
 
-	if err := UpdateNodeWithConfigMap(client, nodeName); err != nil {
+	if err := updateNodeWithConfigMap(client, nodeName); err != nil {
 		t.Errorf("UpdateNodeWithConfigMap: unexepected error %v", err)
 	}
 }

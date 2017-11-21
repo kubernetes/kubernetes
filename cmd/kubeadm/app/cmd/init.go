@@ -364,7 +364,7 @@ func (i *Init) Run(out io.Writer) error {
 	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
 		// Create base kubelet configuration for dynamic kubelet configuration feature.
 		if err := kubeletphase.CreateBaseKubeletConfiguration(i.cfg, client); err != nil {
-			return fmt.Errorf("error uploading configuration: %v", err)
+			return fmt.Errorf("error creating base kubelet configuration: %v", err)
 		}
 	}
 
