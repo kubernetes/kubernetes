@@ -149,6 +149,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/kubectl/cmd/util/cmdproto:all-srcs",
         "//pkg/kubectl/cmd/util/editor:all-srcs",
         "//pkg/kubectl/cmd/util/env:all-srcs",
         "//pkg/kubectl/cmd/util/jsonmerge:all-srcs",
