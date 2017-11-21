@@ -207,6 +207,7 @@ readonly KUBE_STATIC_LIBRARIES=(
   kube-aggregator
   kubeadm
   kubectl
+  kubefed
 )
 
 # Add any files with those //generate annotations in the array below.
