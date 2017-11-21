@@ -21,7 +21,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/golang/glog"
 )
@@ -74,18 +73,12 @@ func describeRequest(r *request.Request) string {
 
 // Added to the AfterRetry chain; called after any error
 func (c *CrossRequestRetryDelay) AfterRetry(r *request.Request) {
-	if r.Error == nil {
-		return
-	}
-	awsError, ok := r.Error.(awserr.Error)
-	if !ok {
-		return
-	}
-	if awsError.Code() == "RequestLimitExceeded" {
+	if r.IsErrorRetryable() {
 		c.backoff.ReportError()
 		glog.Warningf("Got RequestLimitExceeded error on AWS request (%s)",
 			describeRequest(r))
 	}
+	return
 }
 
 // Backoff manages a backoff that varies based on the recently observed failures
