@@ -222,10 +222,11 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 
 	// calculate final priority score for each node
 	result := make(schedulerapi.HostPriorityList, 0, len(nodes))
+	maxPriorityFloat64 := float64(schedulerapi.MaxPriority)
 	for _, node := range nodes {
 		fScore := float64(0)
 		if (maxCount - minCount) > 0 {
-			fScore = float64(schedulerapi.MaxPriority) * ((pm.counts[node.Name] - minCount) / (maxCount - minCount))
+			fScore = maxPriorityFloat64 * ((pm.counts[node.Name] - minCount) / (maxCount - minCount))
 		}
 		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: int(fScore)})
 		if glog.V(10) {

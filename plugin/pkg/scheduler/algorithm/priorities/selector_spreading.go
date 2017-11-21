@@ -236,13 +236,15 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *v1.Pod, nodeNam
 	}
 	numServicePods := len(nsServicePods)
 	result := []schedulerapi.HostPriority{}
+	maxPriorityFloat64 := float64(schedulerapi.MaxPriority)
+	numServicePodsFloat64 := float64(numServicePods)
 	//score int - scale of 0-maxPriority
 	// 0 being the lowest priority and maxPriority being the highest
 	for node := range labeledNodes {
 		// initializing to the default/max node score of maxPriority
 		fScore := float64(schedulerapi.MaxPriority)
 		if numServicePods > 0 {
-			fScore = float64(schedulerapi.MaxPriority) * (float64(numServicePods-podCounts[labeledNodes[node]]) / float64(numServicePods))
+			fScore = maxPriorityFloat64 * (float64(numServicePods-podCounts[labeledNodes[node]]) / numServicePodsFloat64)
 		}
 		result = append(result, schedulerapi.HostPriority{Host: node, Score: int(fScore)})
 	}
