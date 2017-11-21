@@ -24,6 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
@@ -91,6 +92,12 @@ func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (statu
 	return &v1.LoadBalancerStatus{
 		Ingress: []v1.LoadBalancerIngress{{IP: *lbIP}},
 	}, true, nil
+}
+
+// ListServiceByLoadBalancer list services whose load balancer are created by kubernetes.
+// The key of the map contains service's namespace and service's name, like: namespace/name
+func (az *Cloud) ListServiceByLoadBalancer(clusterName string) (serviceToLoadbalancer map[string]*v1.LoadBalancerStatus, err error) {
+	return serviceToLoadbalancer, cloudprovider.NotImplemented
 }
 
 func (az *Cloud) determinePublicIPName(clusterName string, service *v1.Service) (string, error) {

@@ -149,6 +149,12 @@ func (f *FakeCloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v
 	return status, f.Exists, f.Err
 }
 
+// ListServiceByLoadBalancer list services whose load balancer are created by kubernetes.
+// The key of the map contains service's namespace and service's name, like: namespace/name
+func (f *FakeCloud) ListServiceByLoadBalancer(clusterName string) (serviceToLoadbalancer map[string]*v1.LoadBalancerStatus, err error) {
+	return serviceToLoadbalancer, cloudprovider.NotImplemented
+}
+
 // EnsureLoadBalancer is a test-spy implementation of LoadBalancer.EnsureLoadBalancer.
 // It adds an entry "create" into the internal method call record.
 func (f *FakeCloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {

@@ -3253,6 +3253,12 @@ func (c *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.Lo
 	return status, true, nil
 }
 
+// ListServiceByLoadBalancer list services whose load balancer are created by kubernetes.
+// The key of the map contains service's namespace and service's name, like: namespace/name
+func (c *Cloud) ListServiceByLoadBalancer(clusterName string) (serviceToLoadbalancer map[string]*v1.LoadBalancerStatus, err error) {
+	return serviceToLoadbalancer, cloudprovider.NotImplemented
+}
+
 func toStatus(lb *elb.LoadBalancerDescription) *v1.LoadBalancerStatus {
 	status := &v1.LoadBalancerStatus{}
 

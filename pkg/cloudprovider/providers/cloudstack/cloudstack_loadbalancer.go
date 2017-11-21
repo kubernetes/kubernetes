@@ -62,6 +62,12 @@ func (cs *CSCloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v1
 	return status, true, nil
 }
 
+// ListServiceByLoadBalancer list services whose load balancer are created by kubernetes.
+// The key of the map contains service's namespace and service's name, like: namespace/name
+func (cs *CSCloud) ListServiceByLoadBalancer(clusterName string) (serviceToLoadbalancer map[string]*v1.LoadBalancerStatus, err error) {
+	return serviceToLoadbalancer, cloudprovider.NotImplemented
+}
+
 // EnsureLoadBalancer creates a new load balancer, or updates the existing one. Returns the status of the balancer.
 func (cs *CSCloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) (status *v1.LoadBalancerStatus, err error) {
 	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v)", clusterName, service.Namespace, service.Name, service.Spec.LoadBalancerIP, service.Spec.Ports, nodes)

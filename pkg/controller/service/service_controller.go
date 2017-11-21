@@ -27,6 +27,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -48,6 +49,8 @@ import (
 const (
 	// Interval of synchronizing service status from apiserver
 	serviceSyncPeriod = 30 * time.Second
+	// Interval of synchronizing service status from load balancers
+	LBSyncPeriod = 100 * time.Second
 	// Interval of synchronizing node status from apiserver
 	nodeSyncPeriod = 100 * time.Second
 
@@ -195,6 +198,7 @@ func (s *ServiceController) Run(stopCh <-chan struct{}, workers int) {
 		go wait.Until(s.worker, time.Second, stopCh)
 	}
 
+	go wait.Until(s.LBSyncLoop, LBSyncPeriod, stopCh)
 	go wait.Until(s.nodeSyncLoop, nodeSyncPeriod, stopCh)
 
 	<-stopCh
@@ -633,6 +637,100 @@ func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
 			}
 		}
 		return true
+	}
+}
+
+// LBSyncLoop handles updating the state of service by the status of load balancer
+// whenever the set of load balancers changes.
+// And delete the orphaned load balancers after services are deleted
+func (s *ServiceController) LBSyncLoop() {
+	// get all of services
+	serviceMap := make(map[string]*v1.Service)
+	serviceList, err := s.serviceLister.List(labels.Everything())
+	if err != nil {
+		glog.Errorf("Failed to list services from apiserver: %v", err)
+		return
+	}
+	for _, service := range serviceList {
+		serviceName := fmt.Sprintf("%s/%s", service.Namespace, service.Name)
+		serviceMap[serviceName] = service
+	}
+
+	// get all of load balancers
+	serviceToLoadbalancer, err := s.balancer.ListServiceByLoadBalancer(s.clusterName)
+	if err != nil {
+		glog.Errorf("Failed to list %s cluster's services from cloud provider: %v", s.clusterName, err)
+		return
+	}
+
+	for serviceName, service := range serviceMap {
+		if len(service.Status.LoadBalancer.Ingress) != 0 {
+			status, ok := serviceToLoadbalancer[serviceName]
+			if ok {
+				// update when status is changed
+				if !v1helper.LoadBalancerStatusEqual(&service.Status.LoadBalancer, status) {
+					// Make a copy so we don't mutate the shared informer cache
+					service = service.DeepCopy()
+
+					// Update the status on the copy
+					service.Status.LoadBalancer = *status
+
+					if err := s.persistUpdate(service); err != nil {
+						glog.Errorf("Failed to update the status of service %s(%v -> %v): %v", serviceName, service.Status.LoadBalancer, *status, err)
+					}
+				}
+			} else {
+				s.eventRecorder.Event(service, v1.EventTypeNormal, "MissingLoadBalancer", err.Error())
+
+				glog.V(2).Infof("Ensuring LB for service %s", serviceName)
+				s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuringLoadBalancer", "Ensuring load balancer")
+				previousState := v1helper.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
+				newState, err := s.ensureLoadBalancer(service)
+				if err != nil {
+					glog.Errorf("Failed to create load balancer for service %s: %v", serviceName, err)
+					EmptyState := &v1.LoadBalancerStatus{}
+					// Make a copy so we don't mutate the shared informer cache
+					service = service.DeepCopy()
+
+					// set status to empty
+					service.Status.LoadBalancer = *EmptyState
+					s.eventRecorder.Event(service, v1.EventTypeWarning, "CreatingLoadBalancerFailed", err.Error())
+				} else {
+					// Make a copy so we don't mutate the shared informer cache
+					service = service.DeepCopy()
+
+					// set status
+					service.Status.LoadBalancer = *newState
+					s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuredLoadBalancer", "Ensured load balancer")
+				}
+
+				if err := s.persistUpdate(service); err != nil {
+					glog.Errorf("Failed to update the status of service %s(%v -> %v): %v", serviceName, *previousState, service.Status.LoadBalancer, err)
+				}
+			}
+		} else {
+			status, ok := serviceToLoadbalancer[serviceName]
+			if ok {
+				// Make a copy so we don't mutate the shared informer cache
+				service = service.DeepCopy()
+
+				// set the status
+				service.Status.LoadBalancer = *status
+
+				if err := s.persistUpdate(service); err != nil {
+					glog.Errorf("Failed to update the status of service %s(%v -> %v): %v", serviceName, service.Status.LoadBalancer, *status, err)
+				}
+			} else {
+				// do nothing, let syncService to ensure load balancer
+			}
+		}
+		delete(serviceToLoadbalancer, serviceName)
+	}
+
+	// delete the orphaned load balancers after services are deleted
+	for serviceName := range serviceToLoadbalancer {
+		// TODO(FengyunPan): delete orphaned load balancer
+		glog.Infof("delete orphaned load balancer for service %s", serviceName)
 	}
 }
 

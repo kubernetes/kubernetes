@@ -46,6 +46,10 @@ import (
 // Note: when creating a new Loadbalancer (VM), it can take some time before it is ready for use,
 // this timeout is used for waiting until the Loadbalancer provisioning status goes to ACTIVE state.
 const (
+	// LoadBalancerDescriptionPrefix and LoadBalancerDescriptionSeparator are used to mark cloud load balancer
+	LoadBalancerDescriptionPrefix    = "The load balancer is created for Kubernetes external service"
+	LoadBalancerDescriptionSeparator = ":"
+
 	// loadbalancerActive* is configuration of exponential backoff for
 	// going into ACTIVE loadbalancer provisioning status. Starting with 1
 	// seconds, multiplying by 1.2 with each step and taking 19 steps at maximum
@@ -430,9 +434,11 @@ func createNodeSecurityGroup(client *gophercloud.ServiceClient, nodeSecurityGrou
 }
 
 func (lbaas *LbaasV2) createLoadBalancer(service *v1.Service, name string, internalAnnotation bool) (*loadbalancers.LoadBalancer, error) {
+	serviceName := fmt.Sprintf("%s/%s", service.Namespace, service.Name)
+	LBDescription := LoadBalancerDescriptionPrefix + LoadBalancerDescriptionSeparator + serviceName
 	createOpts := loadbalancers.CreateOpts{
 		Name:        name,
-		Description: fmt.Sprintf("Kubernetes external service %s", name),
+		Description: LBDescription,
 		VipSubnetID: lbaas.opts.SubnetId,
 		Provider:    lbaas.opts.LBProvider,
 	}
@@ -473,6 +479,66 @@ func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *v1.Service) (
 	}
 
 	return status, true, err
+}
+
+func listLoadbalancer(client *gophercloud.ServiceClient) ([]loadbalancers.LoadBalancer, error) {
+	opts := loadbalancers.ListOpts{}
+	pager := loadbalancers.List(client, opts)
+
+	var loadbalancerList []loadbalancers.LoadBalancer
+
+	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+		v, err := loadbalancers.ExtractLoadBalancers(page)
+		if err != nil {
+			return false, err
+		}
+		loadbalancerList = append(loadbalancerList, v...)
+		return true, nil
+	})
+	if err != nil {
+		return []loadbalancers.LoadBalancer{}, err
+	}
+
+	return loadbalancerList, nil
+}
+
+func getServiceNameFromLB(lb *loadbalancers.LoadBalancer) (string, error) {
+	parts := strings.Split(lb.Description, LoadBalancerDescriptionSeparator)
+	if len(parts) == 2 && parts[0] == LoadBalancerDescriptionPrefix {
+		return parts[1], nil
+	}
+
+	return "", fmt.Errorf("The load balancer %s is not created for Kubernetes external service", lb.Name)
+}
+
+// ListServiceByLoadBalancer list services whose load balancer are created by kubernetes.
+// The key of the map contains service's namespace and service's name, like: namespace/name
+func (lbaas *LbaasV2) ListServiceByLoadBalancer(clusterName string) (map[string]*v1.LoadBalancerStatus, error) {
+	serviceToLoadbalancer := make(map[string]*v1.LoadBalancerStatus)
+	loadbalancerList, err := listLoadbalancer(lbaas.network)
+	if err != nil {
+		return serviceToLoadbalancer, err
+	}
+
+	for _, loadbalancer := range loadbalancerList {
+		serviceName, err := getServiceNameFromLB(&loadbalancer)
+		if err == nil {
+			status := &v1.LoadBalancerStatus{}
+			portID := loadbalancer.VipPortID
+			if portID != "" {
+				floatIP, err := getFloatingIPByPortID(lbaas.network, portID)
+				if err != nil {
+					return serviceToLoadbalancer, fmt.Errorf("Error getting load balancer status for service %s: %v", serviceName, err)
+				}
+				status.Ingress = []v1.LoadBalancerIngress{{IP: floatIP.FloatingIP}}
+			} else {
+				status.Ingress = []v1.LoadBalancerIngress{{IP: loadbalancer.VipAddress}}
+			}
+
+			serviceToLoadbalancer[serviceName] = status
+		}
+	}
+	return serviceToLoadbalancer, nil
 }
 
 // The LB needs to be configured with instance addresses on the same
