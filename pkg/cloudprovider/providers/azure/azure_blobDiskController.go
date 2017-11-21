@@ -131,7 +131,7 @@ func (c *BlobDiskController) CreateVolume(name, storageAccount string, storageAc
 // DeleteVolume deletes a VHD blob
 func (c *BlobDiskController) DeleteVolume(diskURI string) error {
 	glog.V(4).Infof("azureDisk - begin to delete volume %s", diskURI)
-	accountName, blob, err := c.common.cloud.getBlobNameAndAccountFromURI(diskURI)
+	accountName, blob, err := getBlobNameAndAccountFromURI(diskURI, c.common.storageEndpointSuffix)
 	if err != nil {
 		return fmt.Errorf("failed to parse vhd URI %v", err)
 	}
@@ -156,19 +156,19 @@ func (c *BlobDiskController) DeleteVolume(diskURI string) error {
 }
 
 // get diskURI https://foo.blob.core.windows.net/vhds/bar.vhd and return foo (account) and bar.vhd (blob name)
-func (c *BlobDiskController) getBlobNameAndAccountFromURI(diskURI string) (string, string, error) {
+func getBlobNameAndAccountFromURI(diskURI, storageEndpointSuffix string) (string, string, error) {
 	scheme := "http"
 	if useHTTPSForBlobBasedDisk {
 		scheme = "https"
 	}
-	host := fmt.Sprintf("%s://(.*).%s.%s", scheme, blobServiceName, c.common.storageEndpointSuffix)
-	reStr := fmt.Sprintf("%s/%s/(.*)", host, vhdContainerName)
+	host := fmt.Sprintf("%s://(.*).%s.%s", scheme, blobServiceName, storageEndpointSuffix)
+	reStr := fmt.Sprintf("%s/(.*)/(.*)", host)
 	re := regexp.MustCompile(reStr)
 	res := re.FindSubmatch([]byte(diskURI))
-	if len(res) < 3 {
+	if len(res) < 4 {
 		return "", "", fmt.Errorf("invalid vhd URI for regex %s: %s", reStr, diskURI)
 	}
-	return string(res[1]), string(res[2]), nil
+	return string(res[1]), string(res[3]), nil
 }
 
 func (c *BlobDiskController) createVHDBlobDisk(blobClient azstorage.BlobStorageClient, accountName, vhdName, containerName string, sizeGB int64) (string, string, error) {
