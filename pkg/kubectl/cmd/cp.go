@@ -86,14 +86,14 @@ type fileSpec struct {
 var (
 	errFileSpecDoesntMatchFormat = errors.New("Filespec must match the canonical format: [[namespace/]pod:]file/path")
 	errFileCannotBeEmpty         = errors.New("Filepath can not be empty")
-	// errTar126					 = errors.New("Tar command invoked but could not execute. Might be a permission problem or command is not an executable")
-	// errTar127 					 = errors.New("Tar command not found, please install tar before using kubectl cp")
+	errTar126					 = errors.New("Tar command invoked but could not execute. Might be a permission problem or command is not an executable")
+	errTar127 					 = errors.New("Tar command not found, please install tar before using kubectl cp")
 )
 
-// const (
-// 	exitCode126 				 = "command terminated with exit code 126"
-// 	exitCode127 				 = "command terminated with exit code 127"
-// )
+const (
+	exitCode126 				 = "command terminated with exit code 126"
+	exitCode127 				 = "command terminated with exit code 127"
+)
 
 func extractFileSpec(arg string) (fileSpec, error) {
 	pieces := strings.Split(arg, ":")
@@ -172,31 +172,30 @@ func checkDestinationIsDir(dest fileSpec, f cmdutil.Factory, cmd *cobra.Command)
 // and determines if the command tar is present in the container.
 // If the command does not exist or permission was denied, an 
 // error will be returned along with the exit code received 
-// func testTar(f cmdutil.Factory, cmd *cobra.Command, dest fileSpec) error {
+func testTar(f cmdutil.Factory, cmd *cobra.Command, dest fileSpec) error {
 
-// 	options := &ExecOptions{
-// 		StreamOptions: StreamOptions{
-// 			Out:   bytes.NewBuffer([]byte{}),
-// 			Err:   bytes.NewBuffer([]byte{}),
+	options := &ExecOptions{
+		StreamOptions: StreamOptions{
+			Out:   bytes.NewBuffer([]byte{}),
+			Err:   bytes.NewBuffer([]byte{}),
 
-// 			Namespace: dest.PodNamespace,
-// 			PodName:   dest.PodName,
-// 		},
+			Namespace: dest.PodNamespace,
+			PodName:   dest.PodName,
+		},
 
-// 		Command:  []string{"tar"},
-// 		Executor: &DefaultRemoteExecutor{},
-// 	}
+		Command:  []string{"tar"},
+		Executor: &DefaultRemoteExecutor{},
+	}
 	
-// 	return execute(f, cmd, options)
+	return execute(f, cmd, options)
 
-// }
+}
 
 func copyToPod(f cmdutil.Factory, cmd *cobra.Command, stdout, stderr io.Writer, src, dest fileSpec) error {
 	if len(src.File) == 0 {
 		return errFileCannotBeEmpty
 	}
-	reader, writer := io.Pipe()
-
+	
 	// strip trailing slash (if any)
 	if strings.HasSuffix(string(dest.File[len(dest.File)-1]), "/") {
 		dest.File = dest.File[:len(dest.File)-1]
@@ -208,16 +207,18 @@ func copyToPod(f cmdutil.Factory, cmd *cobra.Command, stdout, stderr io.Writer, 
 		dest.File = dest.File + "/" + path.Base(src.File)
 	}
 
-	// if err := testTar(f, cmd, dest); err != nil {
+	if err := testTar(f, cmd, dest); err != nil {
 
-	// 	if err.Error() == exitCode126 {
-	// 		return errTar126
-	// 	} else if err.Error() == exitCode127 {
-	// 		return errTar127 
-	// 	} else {
-	// 		return err
-	// 	}
-	// }
+		if err.Error() == exitCode126 {
+			return errTar126
+		} else if err.Error() == exitCode127 {
+			return errTar127 
+		} else {
+			return err
+		}
+	}
+
+	reader, writer := io.Pipe()
 
 	go func() {
 		defer writer.Close()
@@ -253,17 +254,17 @@ func copyFromPod(f cmdutil.Factory, cmd *cobra.Command, cmderr io.Writer, src, d
 		return errFileCannotBeEmpty
 	}
 
-	// // check if tar command exists in the container
-	// if err := testTar(f, cmd, dest); err != nil {
+	// check if tar command exists in the container
+	if err := testTar(f, cmd, dest); err != nil {
 
-	// 	if err.Error() == exitCode126 {
-	// 		return errTar126
-	// 	} else if err.Error() == exitCode127 {
-	// 		return errTar127 
-	// 	} else {
-	// 		return err
-	// 	}
-	// }
+		if err.Error() == exitCode126 {
+			return errTar126
+		} else if err.Error() == exitCode127 {
+			return errTar127 
+		} else {
+			return err
+		}
+	}
 
 	reader, outStream := io.Pipe()
 	options := &ExecOptions{
