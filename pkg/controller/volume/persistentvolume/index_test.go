@@ -839,6 +839,8 @@ func TestAlphaVolumeModeCheck(t *testing.T) {
 		}
 	}
 
+	// make sure feature gate is turned off
+	toggleBlockVolumeFeature(false, t)
 }
 
 func TestAlphaFilteringVolumeModes(t *testing.T) {
@@ -933,6 +935,9 @@ func TestAlphaFilteringVolumeModes(t *testing.T) {
 			t.Errorf("Unexpected failure for scenario: %s - %+v", name, err)
 		}
 	}
+
+	// make sure feature gate is turned off
+	toggleBlockVolumeFeature(false, t)
 }
 
 func TestFindingPreboundVolumes(t *testing.T) {

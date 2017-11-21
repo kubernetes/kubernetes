@@ -720,14 +720,9 @@ func TestSyncAlphaBlockVolume(t *testing.T) {
 		t.Errorf("Failed to enable feature gate for BlockVolume: %v", err)
 		return
 	}
+	defer utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
 
 	runSyncTests(t, tests, []*storage.StorageClass{})
-
-	err1 := utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
-	if err1 != nil {
-		t.Errorf("Failed to disable feature gate for BlockVolume: %v", err)
-		return
-	}
 }
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all
