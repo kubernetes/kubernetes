@@ -38,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/configuration"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
+	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/namespace"
@@ -100,6 +101,8 @@ func NewValidatingAdmissionWebhook(configFile io.Reader) (*ValidatingAdmissionWe
 		clientManager: cm,
 	}, nil
 }
+
+var _ admission.ValidationInterface = &ValidatingAdmissionWebhook{}
 
 // ValidatingAdmissionWebhook is an implementation of admission.Interface.
 type ValidatingAdmissionWebhook struct {
@@ -185,8 +188,8 @@ func (a *ValidatingAdmissionWebhook) loadConfiguration(attr admission.Attributes
 	return hookConfig, nil
 }
 
-// Admit makes an admission decision based on the request attributes.
-func (a *ValidatingAdmissionWebhook) Admit(attr admission.Attributes) error {
+// Validate makes an admission decision based on the request attributes.
+func (a *ValidatingAdmissionWebhook) Validate(attr admission.Attributes) error {
 	hookConfig, err := a.loadConfiguration(attr)
 	if err != nil {
 		return err
@@ -238,7 +241,7 @@ func (a *ValidatingAdmissionWebhook) Admit(attr admission.Attributes) error {
 
 			t := time.Now()
 			err := a.callHook(ctx, hook, versionedAttr)
-			admission.Metrics.ObserveWebhook(time.Since(t), err != nil, hook, attr)
+			admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, attr, "validating", hook.Name)
 			if err == nil {
 				return
 			}

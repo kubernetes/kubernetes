@@ -24,8 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -116,6 +118,16 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 		// - find the smallest matching one if there is no volume pre-bound to
 		//   the claim.
 		for _, volume := range volumes {
+			// check if volumeModes do not match (Alpha and feature gate protected)
+			isMisMatch, err := checkVolumeModeMisMatches(&claim.Spec, &volume.Spec)
+			if err != nil {
+				return nil, fmt.Errorf("error checking if volumeMode was a mismatch: %v", err)
+			}
+			// filter out mismatching volumeModes
+			if isMisMatch {
+				continue
+			}
+
 			if isVolumeBoundToClaim(volume, claim) {
 				// this claim and volume are pre-bound; return
 				// the volume if the size request is satisfied,
@@ -155,6 +167,27 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 		}
 	}
 	return nil, nil
+}
+
+// checkVolumeModeMatches is a convenience method that checks volumeMode for PersistentVolume
+// and PersistentVolumeClaims along with making sure that the Alpha feature gate BlockVolume is
+// enabled.
+// This is Alpha and could change in the future.
+func checkVolumeModeMisMatches(pvcSpec *v1.PersistentVolumeClaimSpec, pvSpec *v1.PersistentVolumeSpec) (bool, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		if pvSpec.VolumeMode != nil && pvcSpec.VolumeMode != nil {
+			requestedVolumeMode := *pvcSpec.VolumeMode
+			pvVolumeMode := *pvSpec.VolumeMode
+			return requestedVolumeMode != pvVolumeMode, nil
+		} else {
+			// This also should retrun an error, this means that
+			// the defaulting has failed.
+			return true, fmt.Errorf("api defaulting for volumeMode failed")
+		}
+	} else {
+		// feature gate is disabled
+		return false, nil
+	}
 }
 
 // findBestMatchForClaim is a convenience method that finds a volume by the claim's AccessModes and requests for Storage

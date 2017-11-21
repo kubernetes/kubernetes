@@ -45,13 +45,7 @@ import (
 //   * If the rotation is using copytruncate, we'll be reading at the original position and get nothing.
 // TODO(random-liu): Support log rotation.
 
-// streamType is the type of the stream.
-type streamType string
-
 const (
-	stderrType streamType = "stderr"
-	stdoutType streamType = "stdout"
-
 	// timeFormat is the time format used in the log.
 	timeFormat = time.RFC3339Nano
 	// blockSize is the block size used in tail.
@@ -66,14 +60,16 @@ const (
 var (
 	// eol is the end-of-line sign in the log.
 	eol = []byte{'\n'}
-	// delimiter is the delimiter for timestamp and streamtype in log line.
+	// delimiter is the delimiter for timestamp and stream type in log line.
 	delimiter = []byte{' '}
+	// tagDelimiter is the delimiter for log tags.
+	tagDelimiter = []byte(runtimeapi.LogTagDelimiter)
 )
 
 // logMessage is the CRI internal log type.
 type logMessage struct {
 	timestamp time.Time
-	stream    streamType
+	stream    runtimeapi.LogStreamType
 	log       []byte
 }
 
@@ -126,8 +122,8 @@ var parseFuncs = []parseFunc{
 }
 
 // parseCRILog parses logs in CRI log format. CRI Log format example:
-//   2016-10-06T00:17:09.669794202Z stdout log content 1
-//   2016-10-06T00:17:09.669794203Z stderr log content 2
+//   2016-10-06T00:17:09.669794202Z stdout P log content 1
+//   2016-10-06T00:17:09.669794203Z stderr F log content 2
 func parseCRILog(log []byte, msg *logMessage) error {
 	var err error
 	// Parse timestamp
@@ -146,9 +142,23 @@ func parseCRILog(log []byte, msg *logMessage) error {
 	if idx < 0 {
 		return fmt.Errorf("stream type is not found")
 	}
-	msg.stream = streamType(log[:idx])
-	if msg.stream != stdoutType && msg.stream != stderrType {
+	msg.stream = runtimeapi.LogStreamType(log[:idx])
+	if msg.stream != runtimeapi.Stdout && msg.stream != runtimeapi.Stderr {
 		return fmt.Errorf("unexpected stream type %q", msg.stream)
+	}
+
+	// Parse log tag
+	log = log[idx+1:]
+	idx = bytes.Index(log, delimiter)
+	if idx < 0 {
+		return fmt.Errorf("log tag is not found")
+	}
+	// Keep this forward compatible.
+	tags := bytes.Split(log[:idx], tagDelimiter)
+	partial := (runtimeapi.LogTag(tags[0]) == runtimeapi.LogTagPartial)
+	// Trim the tailing new line if this is a partial line.
+	if partial && len(log) > 0 && log[len(log)-1] == '\n' {
+		log = log[:len(log)-1]
 	}
 
 	// Get log content
@@ -170,7 +180,7 @@ func parseDockerJSONLog(log []byte, msg *logMessage) error {
 		return fmt.Errorf("failed with %v to unmarshal log %q", err, l)
 	}
 	msg.timestamp = l.Created
-	msg.stream = streamType(l.Stream)
+	msg.stream = runtimeapi.LogStreamType(l.Stream)
 	msg.log = []byte(l.Log)
 	return nil
 }
@@ -230,9 +240,9 @@ func (w *logWriter) write(msg *logMessage) error {
 	// Get the proper stream to write to.
 	var stream io.Writer
 	switch msg.stream {
-	case stdoutType:
+	case runtimeapi.Stdout:
 		stream = w.stdout
-	case stderrType:
+	case runtimeapi.Stderr:
 		stream = w.stderr
 	default:
 		return fmt.Errorf("unexpected stream type %q", msg.stream)
@@ -277,63 +287,47 @@ func ReadLogs(path, containerID string, opts *LogOptions, runtimeService interna
 	// Do not create watcher here because it is not needed if `Follow` is false.
 	var watcher *fsnotify.Watcher
 	var parse parseFunc
+	var stop bool
 	writer := newLogWriter(stdout, stderr, opts)
 	msg := &logMessage{}
 	for {
+		if stop {
+			glog.V(2).Infof("Finish parsing log file %q", path)
+			return nil
+		}
 		l, err := r.ReadBytes(eol[0])
 		if err != nil {
 			if err != io.EOF { // This is an real error
 				return fmt.Errorf("failed to read log file %q: %v", path, err)
 			}
-			if !opts.follow {
-				// Return directly when reading to the end if not follow.
-				if len(l) > 0 {
-					glog.Warningf("Incomplete line in log file %q: %q", path, l)
-					if parse == nil {
-						// Intialize the log parsing function.
-						parse, err = getParseFunc(l)
-						if err != nil {
-							return fmt.Errorf("failed to get parse function: %v", err)
-						}
+			if opts.follow {
+				// Reset seek so that if this is an incomplete line,
+				// it will be read again.
+				if _, err := f.Seek(-int64(len(l)), os.SEEK_CUR); err != nil {
+					return fmt.Errorf("failed to reset seek in log file %q: %v", path, err)
+				}
+				if watcher == nil {
+					// Intialize the watcher if it has not been initialized yet.
+					if watcher, err = fsnotify.NewWatcher(); err != nil {
+						return fmt.Errorf("failed to create fsnotify watcher: %v", err)
 					}
-					// Log a warning and exit if we can't parse the partial line.
-					if err := parse(l, msg); err != nil {
-						glog.Warningf("Failed with err %v when parsing partial line for log file %q: %q", err, path, l)
-						return nil
-					}
-					// Write the log line into the stream.
-					if err := writer.write(msg); err != nil {
-						if err == errMaximumWrite {
-							glog.V(2).Infof("Finish parsing log file %q, hit bytes limit %d(bytes)", path, opts.bytes)
-							return nil
-						}
-						glog.Errorf("Failed with err %v when writing partial log for log file %q: %+v", err, path, msg)
-						return err
+					defer watcher.Close()
+					if err := watcher.Add(f.Name()); err != nil {
+						return fmt.Errorf("failed to watch file %q: %v", f.Name(), err)
 					}
 				}
-				glog.V(2).Infof("Finish parsing log file %q", path)
-				return nil
-			}
-			// Reset seek so that if this is an incomplete line,
-			// it will be read again.
-			if _, err := f.Seek(-int64(len(l)), os.SEEK_CUR); err != nil {
-				return fmt.Errorf("failed to reset seek in log file %q: %v", path, err)
-			}
-			if watcher == nil {
-				// Intialize the watcher if it has not been initialized yet.
-				if watcher, err = fsnotify.NewWatcher(); err != nil {
-					return fmt.Errorf("failed to create fsnotify watcher: %v", err)
+				// Wait until the next log change.
+				if found, err := waitLogs(containerID, watcher, runtimeService); !found {
+					return err
 				}
-				defer watcher.Close()
-				if err := watcher.Add(f.Name()); err != nil {
-					return fmt.Errorf("failed to watch file %q: %v", f.Name(), err)
-				}
+				continue
 			}
-			// Wait until the next log change.
-			if found, err := waitLogs(containerID, watcher, runtimeService); !found {
-				return err
+			// Should stop after writing the remaining content.
+			stop = true
+			if len(l) == 0 {
+				continue
 			}
-			continue
+			glog.Warningf("Incomplete line in log file %q: %q", path, l)
 		}
 		if parse == nil {
 			// Intialize the log parsing function.

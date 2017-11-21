@@ -14,16 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package admission
+package metrics
 
 import (
 	"fmt"
 	"strconv"
 	"time"
 
-	"k8s.io/api/admissionregistration/v1alpha1"
-
 	"github.com/prometheus/client_golang/prometheus"
+
+	"k8s.io/apiserver/pkg/admission"
 )
 
 const (
@@ -39,10 +39,64 @@ var (
 	Metrics = newAdmissionMetrics()
 )
 
-// NamedHandler requires each admission.Interface be named, primarly for metrics tracking purposes.
-type NamedHandler interface {
-	Interface() Interface
-	Name() string
+// ObserverFunc is a func that emits metrics.
+type ObserverFunc func(elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string)
+
+const (
+	stepValidate = "validate"
+	stepAdmit    = "admit"
+)
+
+// WithControllerMetrics is a decorator for named admission handlers.
+func WithControllerMetrics(i admission.Interface, name string) admission.Interface {
+	return WithMetrics(i, Metrics.ObserveAdmissionController, name)
+}
+
+// WithStepMetrics is a decorator for a whole admission phase, i.e. admit or validation.admission step.
+func WithStepMetrics(i admission.Interface) admission.Interface {
+	return WithMetrics(i, Metrics.ObserveAdmissionStep)
+}
+
+// WithMetrics is a decorator for admission handlers with a generic observer func.
+func WithMetrics(i admission.Interface, observer ObserverFunc, extraLabels ...string) admission.Interface {
+	return &pluginHandlerWithMetrics{
+		Interface:   i,
+		observer:    observer,
+		extraLabels: extraLabels,
+	}
+}
+
+// pluginHandlerWithMetrics decorates a admission handler with metrics.
+type pluginHandlerWithMetrics struct {
+	admission.Interface
+	observer    ObserverFunc
+	extraLabels []string
+}
+
+// Admit performs a mutating admission control check and emit metrics.
+func (p pluginHandlerWithMetrics) Admit(a admission.Attributes) error {
+	mutatingHandler, ok := p.Interface.(admission.MutationInterface)
+	if !ok {
+		return nil
+	}
+
+	start := time.Now()
+	err := mutatingHandler.Admit(a)
+	p.observer(time.Since(start), err != nil, a, stepAdmit, p.extraLabels...)
+	return err
+}
+
+// Validate performs a non-mutating admission control check and emits metrics.
+func (p pluginHandlerWithMetrics) Validate(a admission.Attributes) error {
+	validatingHandler, ok := p.Interface.(admission.ValidationInterface)
+	if !ok {
+		return nil
+	}
+
+	start := time.Now()
+	err := validatingHandler.Validate(a)
+	p.observer(time.Since(start), err != nil, a, stepValidate, p.extraLabels...)
+	return err
 }
 
 // AdmissionMetrics instruments admission with prometheus metrics.
@@ -83,22 +137,21 @@ func (m *AdmissionMetrics) reset() {
 }
 
 // ObserveAdmissionStep records admission related metrics for a admission step, identified by step type.
-func (m *AdmissionMetrics) ObserveAdmissionStep(elapsed time.Duration, rejected bool, attr Attributes, stepType string) {
+func (m *AdmissionMetrics) ObserveAdmissionStep(elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string) {
 	gvr := attr.GetResource()
-	m.step.observe(elapsed, stepType, string(attr.GetOperation()), gvr.Group, gvr.Version, gvr.Resource, attr.GetSubresource(), strconv.FormatBool(rejected))
+	m.step.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), gvr.Group, gvr.Version, gvr.Resource, attr.GetSubresource(), strconv.FormatBool(rejected))...)
 }
 
 // ObserveAdmissionController records admission related metrics for a built-in admission controller, identified by it's plugin handler name.
-func (m *AdmissionMetrics) ObserveAdmissionController(elapsed time.Duration, rejected bool, handler NamedHandler, attr Attributes, stepType string) {
+func (m *AdmissionMetrics) ObserveAdmissionController(elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string) {
 	gvr := attr.GetResource()
-	m.controller.observe(elapsed, handler.Name(), stepType, string(attr.GetOperation()), gvr.Group, gvr.Version, gvr.Resource, attr.GetSubresource(), strconv.FormatBool(rejected))
+	m.controller.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), gvr.Group, gvr.Version, gvr.Resource, attr.GetSubresource(), strconv.FormatBool(rejected))...)
 }
 
 // ObserveWebhook records admission related metrics for a admission webhook.
-func (m *AdmissionMetrics) ObserveWebhook(elapsed time.Duration, rejected bool, hook *v1alpha1.Webhook, attr Attributes) {
-	t := "admit" // TODO: pass in type (validate|admit) once mutating webhook functionality has been implemented
+func (m *AdmissionMetrics) ObserveWebhook(elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string) {
 	gvr := attr.GetResource()
-	m.webhook.observe(elapsed, hook.Name, t, string(attr.GetOperation()), gvr.Group, gvr.Version, gvr.Resource, attr.GetSubresource(), strconv.FormatBool(rejected))
+	m.webhook.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), gvr.Group, gvr.Version, gvr.Resource, attr.GetSubresource(), strconv.FormatBool(rejected))...)
 }
 
 type metricSet struct {

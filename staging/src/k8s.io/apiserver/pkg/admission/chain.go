@@ -16,46 +16,23 @@ limitations under the License.
 
 package admission
 
-import "time"
-
 // chainAdmissionHandler is an instance of admission.NamedHandler that performs admission control using
 // a chain of admission handlers
-type chainAdmissionHandler []NamedHandler
+type chainAdmissionHandler []Interface
 
 // NewChainHandler creates a new chain handler from an array of handlers. Used for testing.
-func NewChainHandler(handlers ...NamedHandler) chainAdmissionHandler {
+func NewChainHandler(handlers ...Interface) chainAdmissionHandler {
 	return chainAdmissionHandler(handlers)
 }
 
-func NewNamedHandler(name string, i Interface) NamedHandler {
-	return &pluginHandler{
-		i:    i,
-		name: name,
-	}
-}
-
-const (
-	stepValidate = "validate"
-	stepAdmit    = "admit"
-)
-
 // Admit performs an admission control check using a chain of handlers, and returns immediately on first error
 func (admissionHandler chainAdmissionHandler) Admit(a Attributes) error {
-	start := time.Now()
-	err := admissionHandler.admit(a)
-	Metrics.ObserveAdmissionStep(time.Since(start), err != nil, a, stepAdmit)
-	return err
-}
-
-func (admissionHandler chainAdmissionHandler) admit(a Attributes) error {
 	for _, handler := range admissionHandler {
-		if !handler.Interface().Handles(a.GetOperation()) {
+		if !handler.Handles(a.GetOperation()) {
 			continue
 		}
-		if mutator, ok := handler.Interface().(MutationInterface); ok {
-			t := time.Now()
+		if mutator, ok := handler.(MutationInterface); ok {
 			err := mutator.Admit(a)
-			Metrics.ObserveAdmissionController(time.Since(t), err != nil, handler, a, stepAdmit)
 			if err != nil {
 				return err
 			}
@@ -66,21 +43,12 @@ func (admissionHandler chainAdmissionHandler) admit(a Attributes) error {
 
 // Validate performs an admission control check using a chain of handlers, and returns immediately on first error
 func (admissionHandler chainAdmissionHandler) Validate(a Attributes) error {
-	start := time.Now()
-	err := admissionHandler.validate(a)
-	Metrics.ObserveAdmissionStep(time.Since(start), err != nil, a, stepValidate)
-	return err
-}
-
-func (admissionHandler chainAdmissionHandler) validate(a Attributes) (err error) {
 	for _, handler := range admissionHandler {
-		if !handler.Interface().Handles(a.GetOperation()) {
+		if !handler.Handles(a.GetOperation()) {
 			continue
 		}
-		if validator, ok := handler.Interface().(ValidationInterface); ok {
-			t := time.Now()
+		if validator, ok := handler.(ValidationInterface); ok {
 			err := validator.Validate(a)
-			Metrics.ObserveAdmissionController(time.Since(t), err != nil, handler, a, stepValidate)
 			if err != nil {
 				return err
 			}
@@ -92,7 +60,7 @@ func (admissionHandler chainAdmissionHandler) validate(a Attributes) (err error)
 // Handles will return true if any of the handlers handles the given operation
 func (admissionHandler chainAdmissionHandler) Handles(operation Operation) bool {
 	for _, handler := range admissionHandler {
-		if handler.Interface().Handles(operation) {
+		if handler.Handles(operation) {
 			return true
 		}
 	}

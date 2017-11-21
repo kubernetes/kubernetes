@@ -226,6 +226,30 @@ func TestContains(t *testing.T) {
 	}
 }
 
+func TestContainsPrefix(t *testing.T) {
+	testCases := map[string]struct {
+		a        []string
+		b        api.ResourceName
+		expected bool
+	}{
+		"does-not-contain": {
+			a:        []string{api.ResourceHugePagesPrefix},
+			b:        api.ResourceCPU,
+			expected: false,
+		},
+		"does-contain": {
+			a:        []string{api.ResourceHugePagesPrefix},
+			b:        api.ResourceName(api.ResourceHugePagesPrefix + "2Mi"),
+			expected: true,
+		},
+	}
+	for testName, testCase := range testCases {
+		if actual := ContainsPrefix(testCase.a, testCase.b); actual != testCase.expected {
+			t.Errorf("%s expected: %v, actual: %v", testName, testCase.expected, actual)
+		}
+	}
+}
+
 func TestIsZero(t *testing.T) {
 	testCases := map[string]struct {
 		a        api.ResourceList

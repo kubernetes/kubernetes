@@ -81,7 +81,8 @@ func NewCmdConfigView(out, errOut io.Writer, ConfigAccess clientcmd.ConfigAccess
 				cmd.Flags().Set("output", defaultOutputFormat)
 			}
 
-			printer, err := cmdutil.PrinterForCommand(cmd, nil, meta.NewDefaultRESTMapper(nil, nil), latest.Scheme, nil, []runtime.Decoder{latest.Codec}, printers.PrintOptions{})
+			printOpts := cmdutil.ExtractCmdPrintOptions(cmd, false)
+			printer, err := cmdutil.PrinterForOptions(meta.NewDefaultRESTMapper(nil, nil), latest.Scheme, nil, []runtime.Decoder{latest.Codec}, printOpts)
 			cmdutil.CheckErr(err)
 			printer = printers.NewVersionedPrinter(printer, latest.Scheme, latest.ExternalVersion)
 

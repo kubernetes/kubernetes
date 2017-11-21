@@ -411,24 +411,6 @@ func (f *ring0Factory) BindExternalFlags(flags *pflag.FlagSet) {
 	flags.AddGoFlagSet(flag.CommandLine)
 }
 
-func (f *ring0Factory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions {
-	columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
-	if err != nil {
-		columnLabel = []string{}
-	}
-	opts := &printers.PrintOptions{
-		NoHeaders:          GetFlagBool(cmd, "no-headers"),
-		WithNamespace:      withNamespace,
-		Wide:               GetWideFlag(cmd),
-		ShowAll:            GetFlagBool(cmd, "show-all"),
-		ShowLabels:         GetFlagBool(cmd, "show-labels"),
-		AbsoluteTimestamps: isWatch(cmd),
-		ColumnLabels:       columnLabel,
-	}
-
-	return opts
-}
-
 func (f *ring0Factory) DefaultResourceFilterFunc() kubectl.Filters {
 	return kubectl.NewResourceFilter()
 }
