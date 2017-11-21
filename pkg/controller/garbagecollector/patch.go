@@ -52,3 +52,8 @@ func (n *node) patchToUnblockOwnerReferences() ([]byte, error) {
 	dummy.ObjectMeta.UID = n.identity.UID
 	return json.Marshal(dummy)
 }
+
+func deleteFinalizerPatch(finalizer string, UID types.UID) []byte {
+	patch := fmt.Sprintf(`{"metadata":{"$deleteFromPrimitiveList/finalizers":["%s"],"uid":"%s"}}`, finalizer, UID)
+	return []byte(patch)
+}
