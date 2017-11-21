@@ -46,7 +46,6 @@ var _ volume.AttachableVolumePlugin = &cinderPlugin{}
 const (
 	probeVolumeInitDealy     = 1 * time.Second
 	probeVolumeFactor        = 2.0
-	probeVolumeSteps         = 10
 	operationFinishInitDealy = 1 * time.Second
 	operationFinishFactor    = 1.1
 	operationFinishSteps     = 10
@@ -223,41 +222,6 @@ func (attacher *cinderDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nod
 	return volumesAttachedCheck, nil
 }
 
-func (attacher *cinderDiskAttacher) waitProbeVolume(devicePath, volumeID string) (string, error) {
-	backoff := wait.Backoff{
-		Duration: probeVolumeInitDealy,
-		Factor:   probeVolumeFactor,
-		Steps:    probeVolumeSteps,
-	}
-
-	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		glog.V(5).Infof("Checking Cinder disk %q is attached.", volumeID)
-		probeAttachedVolume()
-		if !attacher.cinderProvider.ShouldTrustDevicePath() {
-			// Using the Cinder volume ID, find the real device path (See Issue #33128)
-			devicePath = attacher.cinderProvider.GetDevicePath(volumeID)
-		}
-		exists, err := volumeutil.PathExists(devicePath)
-		if exists && err == nil {
-			glog.Infof("Successfully found attached Cinder disk %q at %v.", volumeID, devicePath)
-			return true, nil
-		} else {
-			// Log an error, and continue checking periodically
-			glog.Errorf("Error: could not find attached Cinder disk %q (path: %q): %v", volumeID, devicePath, err)
-			return false, nil
-		}
-	})
-
-	if err != nil {
-		if err == wait.ErrWaitTimeout {
-			err = fmt.Errorf("Volume %q failed to be probed within the alloted time", volumeID)
-		}
-		return "", err
-	}
-
-	return devicePath, nil
-}
-
 func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, _ *v1.Pod, timeout time.Duration) (string, error) {
 	// NOTE: devicePath is is path as reported by Cinder, which may be incorrect and should not be used. See Issue #33128
 	volumeSource, _, err := getVolumeSource(spec)
@@ -271,8 +235,37 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 		return "", fmt.Errorf("WaitForAttach failed for Cinder disk %q: devicePath is empty.", volumeID)
 	}
 
-	// Using exponential backoff instead of linear
-	return attacher.waitProbeVolume(devicePath, volumeID)
+	ticker := time.NewTicker(probeVolumeInitDealy)
+	defer ticker.Stop()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	duration := probeVolumeInitDealy
+	for {
+		select {
+		case <-ticker.C:
+			glog.V(5).Infof("Checking Cinder disk %q is attached.", volumeID)
+			probeAttachedVolume()
+			if !attacher.cinderProvider.ShouldTrustDevicePath() {
+				// Using the Cinder volume ID, find the real device path (See Issue #33128)
+				devicePath = attacher.cinderProvider.GetDevicePath(volumeID)
+			}
+			exists, err := volumeutil.PathExists(devicePath)
+			if exists && err == nil {
+				glog.Infof("Successfully found attached Cinder disk %q at %v.", volumeID, devicePath)
+				return devicePath, nil
+			} else {
+				// Log an error, and continue checking periodically
+				glog.Errorf("Error: could not find attached Cinder disk %q (path: %q): %v", volumeID, devicePath, err)
+				// Using exponential backoff instead of linear
+				ticker.Stop()
+				duration = time.Duration(float64(duration) * probeVolumeFactor)
+				ticker = time.NewTicker(duration)
+			}
+		case <-timer.C:
+			return "", fmt.Errorf("Could not find attached Cinder disk %q. Timeout waiting for mount paths to be created.", volumeID)
+		}
+	}
 }
 
 func (attacher *cinderDiskAttacher) GetDeviceMountPath(
