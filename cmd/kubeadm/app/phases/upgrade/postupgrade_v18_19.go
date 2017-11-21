@@ -70,7 +70,7 @@ func rollbackFiles(files map[string]string, originalErr error) error {
 // shouldBackupAPIServerCertAndKey check if the new k8s version is at least 1.9.0
 // and kube-apiserver will be expired in 60 days.
 func shouldBackupAPIServerCertAndKey(newK8sVer *version.Version) (bool, error) {
-	if !newK8sVer.LessThan(v190) {
+	if newK8sVer.LessThan(v190) {
 		return false, nil
 	}
 
@@ -93,7 +93,7 @@ func shouldBackupAPIServerCertAndKey(newK8sVer *version.Version) (bool, error) {
 		return false, fmt.Errorf("no certificate data found")
 	}
 
-	if certs[0].NotAfter.Sub(time.Now()) < 60*24*time.Hour {
+	if time.Now().Sub(certs[0].NotBefore) > 180*24*time.Hour {
 		return true, nil
 	}
 
