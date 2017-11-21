@@ -58,7 +58,7 @@ func TestInterPodAffinity(t *testing.T) {
 
 	cs := context.clientSet
 	podLabel := map[string]string{"service": "securityscan"}
-	podLabel2 := map[string]string{"security": "S1"}
+	// podLabel2 := map[string]string{"security": "S1"}
 
 	tests := []struct {
 		pod       *v1.Pod
@@ -68,7 +68,7 @@ func TestInterPodAffinity(t *testing.T) {
 		errorType string
 		test      string
 	}{
-		{
+		/*{
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
@@ -580,7 +580,7 @@ func TestInterPodAffinity(t *testing.T) {
 			node: nodes[0],
 			fits: false,
 			test: "satisfies the PodAffinity but doesn't satisfies the PodAntiAffinity with the existing pod",
-		},
+		},*/
 		{
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -833,44 +833,37 @@ func TestInterPodAffinity(t *testing.T) {
 			if !(test.errorType == "invalidPod" && errors.IsInvalid(err)) {
 				t.Fatalf("Test Failed: error, %v, while creating pod during test: %v", err, test.test)
 			}
+		}
+
+		if test.fits {
+			err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podScheduled(cs, testPod.Namespace, testPod.Name))
 		} else {
-			waitTime := wait.ForeverTestTimeout
-			if !test.fits {
-				waitTime = 2 * time.Second
-			}
+			err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podUnschedulable(cs, testPod.Namespace, testPod.Name))
+		}
+		if err != nil {
+			t.Errorf("Test Failed: %v, err %v, test.fits %v", test.test, err, test.fits)
+		}
 
-			err = wait.Poll(pollInterval, waitTime, podScheduled(cs, testPod.Namespace, testPod.Name))
-			if test.fits {
-				if err != nil {
-					t.Errorf("Test Failed: %v, err %v, test.fits %v", test.test, err, test.fits)
-				}
+		err = cs.CoreV1().Pods(context.ns.Name).Delete(test.pod.Name, metav1.NewDeleteOptions(0))
+		if err != nil {
+			t.Errorf("Test Failed: error, %v, while deleting pod during test: %v", err, test.test)
+		}
+		err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podDeleted(cs, context.ns.Name, test.pod.Name))
+		if err != nil {
+			t.Errorf("Test Failed: error, %v, while waiting for pod to get deleted, %v", err, test.test)
+		}
+		for _, pod := range test.pods {
+			var nsName string
+			if pod.Namespace != "" {
+				nsName = pod.Namespace
 			} else {
-				if err != wait.ErrWaitTimeout {
-					t.Errorf("Test Failed: error, %v, while waiting for pod to get scheduled, %v", err, test.test)
-				}
+				nsName = context.ns.Name
 			}
-
-			for _, pod := range test.pods {
-				var nsName string
-				if pod.Namespace != "" {
-					nsName = pod.Namespace
-				} else {
-					nsName = context.ns.Name
-				}
-				err = cs.CoreV1().Pods(nsName).Delete(pod.Name, metav1.NewDeleteOptions(0))
-				if err != nil {
-					t.Errorf("Test Failed: error, %v, while deleting pod during test: %v", err, test.test)
-				}
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podDeleted(cs, nsName, pod.Name))
-				if err != nil {
-					t.Errorf("Test Failed: error, %v, while waiting for pod to get deleted, %v", err, test.test)
-				}
-			}
-			err = cs.CoreV1().Pods(context.ns.Name).Delete(test.pod.Name, metav1.NewDeleteOptions(0))
+			err = cs.CoreV1().Pods(nsName).Delete(pod.Name, metav1.NewDeleteOptions(0))
 			if err != nil {
 				t.Errorf("Test Failed: error, %v, while deleting pod during test: %v", err, test.test)
 			}
-			err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podDeleted(cs, context.ns.Name, test.pod.Name))
+			err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podDeleted(cs, nsName, pod.Name))
 			if err != nil {
 				t.Errorf("Test Failed: error, %v, while waiting for pod to get deleted, %v", err, test.test)
 			}

@@ -81,6 +81,7 @@ func (f *FitError) Error() string {
 type genericScheduler struct {
 	cache                 schedulercache.Cache
 	equivalenceCache      *EquivalenceCache
+	schedulingQueue       SchedulingQueue
 	predicates            map[string]algorithm.FitPredicate
 	priorityMetaProducer  algorithm.MetadataProducer
 	predicateMetaProducer algorithm.PredicateMetadataProducer
@@ -114,7 +115,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 	}
 
 	trace.Step("Computing predicates")
-	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, g.cachedNodeInfoMap, nodes, g.predicates, g.extenders, g.predicateMetaProducer, g.equivalenceCache)
+	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, g.cachedNodeInfoMap, nodes, g.predicates, g.extenders, g.predicateMetaProducer, g.equivalenceCache, g.schedulingQueue)
 	if err != nil {
 		return "", err
 	}
@@ -177,53 +178,54 @@ func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList
 
 // preempt finds nodes with pods that can be preempted to make room for "pod" to
 // schedule. It chooses one of the nodes and preempts the pods on the node and
-// returns the node and the list of preempted pods if such a node is found.
-// TODO(bsalamat): Add priority-based scheduling. More info: today one or more
-// pending pods (different from the pod that triggered the preemption(s)) may
-// schedule into some portion of the resources freed up by the preemption(s)
-// before the pod that triggered the preemption(s) has a chance to schedule
-// there, thereby preventing the pod that triggered the preemption(s) from
-// scheduling. Solution is given at:
-// https://github.com/kubernetes/community/blob/master/contributors/design-proposals/scheduling/pod-preemption.md#preemption-mechanics
-func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister, scheduleErr error) (*v1.Node, []*v1.Pod, error) {
+// returns 1) the node, 2) the list of preempted pods if such a node is found,
+// 3) A list of pods whose nominated node name should be cleared, and 4) any
+// possible error.
+func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
 	// Scheduler may return various types of errors. Consider preemption only if
 	// the error is of type FitError.
 	fitError, ok := scheduleErr.(*FitError)
 	if !ok || fitError == nil {
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 	err := g.cache.UpdateNodeNameToInfoMap(g.cachedNodeInfoMap)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if !podEligibleToPreemptOthers(pod, g.cachedNodeInfoMap) {
 		glog.V(5).Infof("Pod %v is not eligible for more preemption.", pod.Name)
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 	allNodes, err := nodeLister.List()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if len(allNodes) == 0 {
-		return nil, nil, ErrNoNodesAvailable
+		return nil, nil, nil, ErrNoNodesAvailable
 	}
 	potentialNodes := nodesWherePreemptionMightHelp(pod, allNodes, fitError.FailedPredicates)
 	if len(potentialNodes) == 0 {
 		glog.V(3).Infof("Preemption will not help schedule pod %v on any node.", pod.Name)
-		return nil, nil, nil
+		// In this case, we should clean-up any existing nominated node name of the pod.
+		return nil, nil, []*v1.Pod{pod}, nil
 	}
-	nodeToPods, err := selectNodesForPreemption(pod, g.cachedNodeInfoMap, potentialNodes, g.predicates, g.predicateMetaProducer)
+	nodeToPods, err := selectNodesForPreemption(pod, g.cachedNodeInfoMap, potentialNodes, g.predicates, g.predicateMetaProducer, g.schedulingQueue)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	for len(nodeToPods) > 0 {
 		node := pickOneNodeForPreemption(nodeToPods)
 		if node == nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		passes, pErr := nodePassesExtendersForPreemption(pod, node.Name, nodeToPods[node], g.cachedNodeInfoMap, g.extenders)
 		if passes && pErr == nil {
-			return node, nodeToPods[node], err
+			// Lower priority pods nominated to run on this node, may no longer fit on
+			// this node. So, we should remove their nomination. Removing their
+			// nomination updates these pods and moves them to the active queue. It
+			// lets scheduler find another place for them.
+			nominatedPods := g.getLowerPriorityNominatedPods(pod, node.Name)
+			return node, nodeToPods[node], nominatedPods, err
 		}
 		if pErr != nil {
 			glog.Errorf("Error occurred while checking extenders for preemption on node %v: %v", node, pErr)
@@ -231,7 +233,30 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 		// Remove the node from the map and try to pick a different node.
 		delete(nodeToPods, node)
 	}
-	return nil, nil, err
+	return nil, nil, nil, err
+}
+
+// GetLowerPriorityNominatedPods returns pods whose priority is smaller than the
+// priority of the given "pod" and are nominated to run on the given node.
+// Note: We could possibly check if the nominated lower priority pods still fit
+// and return those that no longer fit, but that would require lots of
+// manipulation of NodeInfo and PredicateMeta per nominated pod. It may not be
+// worth the complexity, especially because we generally expect to have a very
+// small number of nominated pods per node.
+func (g *genericScheduler) getLowerPriorityNominatedPods(pod *v1.Pod, nodeName string) []*v1.Pod {
+	pods := g.schedulingQueue.WaitingPodsForNode(nodeName)
+	if len(pods) == 0 {
+		return nil
+	}
+
+	var lowerPriorityPods []*v1.Pod
+	podPriority := util.GetPodPriority(pod)
+	for _, p := range pods {
+		if util.GetPodPriority(p) < podPriority {
+			lowerPriorityPods = append(lowerPriorityPods, p)
+		}
+	}
+	return lowerPriorityPods
 }
 
 // Filters the nodes to find the ones that fit based on the given predicate functions
@@ -244,6 +269,7 @@ func findNodesThatFit(
 	extenders []algorithm.SchedulerExtender,
 	metadataProducer algorithm.PredicateMetadataProducer,
 	ecache *EquivalenceCache,
+	schedulingQueue SchedulingQueue,
 ) ([]*v1.Node, FailedPredicateMap, error) {
 	var filtered []*v1.Node
 	failedPredicateMap := FailedPredicateMap{}
@@ -262,7 +288,7 @@ func findNodesThatFit(
 		meta := metadataProducer(pod, nodeNameToInfo)
 		checkNode := func(i int) {
 			nodeName := nodes[i].Name
-			fits, failedPredicates, err := podFitsOnNode(pod, meta, nodeNameToInfo[nodeName], predicateFuncs, ecache)
+			fits, failedPredicates, err := podFitsOnNode(pod, meta, nodeNameToInfo[nodeName], predicateFuncs, ecache, schedulingQueue)
 			if err != nil {
 				predicateResultLock.Lock()
 				errs[err.Error()]++
@@ -306,9 +332,52 @@ func findNodesThatFit(
 	return filtered, failedPredicateMap, nil
 }
 
-// Checks whether node with a given name and NodeInfo satisfies all predicateFuncs.
-func podFitsOnNode(pod *v1.Pod, meta algorithm.PredicateMetadata, info *schedulercache.NodeInfo, predicateFuncs map[string]algorithm.FitPredicate,
-	ecache *EquivalenceCache) (bool, []algorithm.PredicateFailureReason, error) {
+// addNominatedPods adds pods with equal or greater priority which are nominated
+// to run on the node given in nodeInfo to meta and nodeInfo. It returns 1) whether
+// any pod was found, 2) augmented meta data, 3) augmented nodeInfo.
+func addNominatedPods(podPriority int32, meta algorithm.PredicateMetadata,
+	nodeInfo *schedulercache.NodeInfo, queue SchedulingQueue) (bool, algorithm.PredicateMetadata,
+	*schedulercache.NodeInfo) {
+	if queue == nil || nodeInfo == nil || nodeInfo.Node() == nil {
+		// This may happen only in tests.
+		return false, meta, nodeInfo
+	}
+	nominatedPods := queue.WaitingPodsForNode(nodeInfo.Node().Name)
+	if nominatedPods == nil || len(nominatedPods) == 0 {
+		return false, meta, nodeInfo
+	}
+	var metaOut algorithm.PredicateMetadata = nil
+	if meta != nil {
+		metaOut = meta.ShallowCopy()
+	}
+	nodeInfoOut := nodeInfo.Clone()
+	for _, p := range nominatedPods {
+		if util.GetPodPriority(p) >= podPriority {
+			nodeInfoOut.AddPod(p)
+			if metaOut != nil {
+				metaOut.AddPod(p, nodeInfoOut)
+			}
+		}
+	}
+	return true, metaOut, nodeInfoOut
+}
+
+// podFitsOnNode checks whether a node given by NodeInfo satisfies the given predicate functions.
+// This function is called from two different places: Schedule and Preempt.
+// When it is called from Schedule, we want to test whether the pod is schedulable
+// on the node with all the existing pods on the node plus higher and equal priority
+// pods nominated to run on the node.
+// When it is called from Preempt, we should remove the victims of preemption and
+// add the nominated pods. Removal of the victims is done by SelectVictimsOnNode().
+// It removes victims from meta and NodeInfo before calling this function.
+func podFitsOnNode(
+	pod *v1.Pod,
+	meta algorithm.PredicateMetadata,
+	info *schedulercache.NodeInfo,
+	predicateFuncs map[string]algorithm.FitPredicate,
+	ecache *EquivalenceCache,
+	queue SchedulingQueue,
+) (bool, []algorithm.PredicateFailureReason, error) {
 	var (
 		equivalenceHash  uint64
 		failedPredicates []algorithm.PredicateFailureReason
@@ -318,34 +387,85 @@ func podFitsOnNode(pod *v1.Pod, meta algorithm.PredicateMetadata, info *schedule
 		reasons          []algorithm.PredicateFailureReason
 		err              error
 	)
+	predicateResults := make(map[string]HostPredicate)
+
 	if ecache != nil {
 		// getHashEquivalencePod will return immediately if no equivalence pod found
 		equivalenceHash, eCacheAvailable = ecache.getHashEquivalencePod(pod)
 	}
-	for predicateKey, predicate := range predicateFuncs {
-		// If equivalenceCache is available
-		if eCacheAvailable {
-			// PredicateWithECache will returns it's cached predicate results
-			fit, reasons, invalid = ecache.PredicateWithECache(pod.GetName(), info.Node().GetName(), predicateKey, equivalenceHash)
+	podsAdded := false
+	// We run predicates twice in some cases. If the node has greater or equal priority
+	// nominated pods, we run them when those pods are added to meta and nodeInfo.
+	// If all predicates succeed in this pass, we run them again when these
+	// nominated pods are not added. This second pass is necessary because some
+	// predicates such as inter-pod affinity may not pass without the nominated pods.
+	// If there are no nominated pods for the node or if the first run of the
+	// predicates fail, we don't run the second pass.
+	// We consider only equal or higher priority pods in the first pass, because
+	// those are the current "pod" must yield to them and not take a space opened
+	// for running them. It is ok if the current "pod" take resources freed for
+	// lower priority pods.
+	// Requiring that the new pod is schedulable in both circumstances ensures that
+	// we are making a conservative decision: predicates like resources and inter-pod
+	// anti-affinity are more likely to fail when the nominated pods are treated
+	// as running, while predicates like pod affinity are more likely to fail when
+	// the nominated pods are treated as not running. We can't just assume the
+	// nominated pods are running because they are not running right now and in fact,
+	// they may end up getting scheduled to a different node.
+	for i := 0; i < 2; i++ {
+		metaToUse := meta
+		nodeInfoToUse := info
+		if i == 0 {
+			podsAdded, metaToUse, nodeInfoToUse = addNominatedPods(util.GetPodPriority(pod), meta, info, queue)
+		} else if !podsAdded || len(failedPredicates) != 0 {
+			break
 		}
-
-		if !eCacheAvailable || invalid {
-			// we need to execute predicate functions since equivalence cache does not work
-			fit, reasons, err = predicate(pod, meta, info)
-			if err != nil {
-				return false, []algorithm.PredicateFailureReason{}, err
-			}
-
+		// Bypass eCache if node has any nominated pods.
+		// TODO(bsalamat): consider using eCache and adding proper eCache invalidations
+		// when pods are nominated or their nominations change.
+		eCacheAvailable = eCacheAvailable && !podsAdded
+		for predicateKey, predicate := range predicateFuncs {
 			if eCacheAvailable {
-				// update equivalence cache with newly computed fit & reasons
-				// TODO(resouer) should we do this in another thread? any race?
-				ecache.UpdateCachedPredicateItem(pod.GetName(), info.Node().GetName(), predicateKey, fit, reasons, equivalenceHash)
+				// PredicateWithECache will return its cached predicate results.
+				fit, reasons, invalid = ecache.PredicateWithECache(pod.GetName(), info.Node().GetName(), predicateKey, equivalenceHash)
+			}
+
+			// TODO(bsalamat): When one predicate fails and fit is false, why do we continue
+			// checking other predicates?
+			if !eCacheAvailable || invalid {
+				// we need to execute predicate functions since equivalence cache does not work
+				fit, reasons, err = predicate(pod, metaToUse, nodeInfoToUse)
+				if err != nil {
+					return false, []algorithm.PredicateFailureReason{}, err
+				}
+				if eCacheAvailable {
+					// Store data to update eCache after this loop.
+					if res, exists := predicateResults[predicateKey]; exists {
+						res.Fit = res.Fit && fit
+						res.FailReasons = append(res.FailReasons, reasons...)
+						predicateResults[predicateKey] = res
+					} else {
+						predicateResults[predicateKey] = HostPredicate{Fit: fit, FailReasons: reasons}
+					}
+				}
+			}
+			if !fit {
+				// eCache is available and valid, and predicates result is unfit, record the fail reasons
+				failedPredicates = append(failedPredicates, reasons...)
 			}
 		}
+	}
 
-		if !fit {
-			// eCache is available and valid, and predicates result is unfit, record the fail reasons
-			failedPredicates = append(failedPredicates, reasons...)
+	// TODO(bsalamat): This way of updating equiv. cache has a race condition against
+	// cache invalidations invoked in event handlers. This race has existed despite locks
+	// in eCache implementation. If cache is invalidated after a predicate is executed
+	// and before we update the cache, the updates should not be written to the cache.
+	if eCacheAvailable {
+		nodeName := info.Node().GetName()
+		for predKey, result := range predicateResults {
+			// update equivalence cache with newly computed fit & reasons
+			// TODO(resouer) should we do this in another thread? any race?
+			ecache.UpdateCachedPredicateItem(pod.GetName(), nodeName, predKey, result.Fit, result.FailReasons, equivalenceHash)
 		}
 	}
 	return len(failedPredicates) == 0, failedPredicates, nil
@@ -597,6 +717,7 @@ func selectNodesForPreemption(pod *v1.Pod,
 	potentialNodes []*v1.Node,
 	predicates map[string]algorithm.FitPredicate,
 	metadataProducer algorithm.PredicateMetadataProducer,
+	queue SchedulingQueue,
 ) (map[*v1.Node][]*v1.Pod, error) {
 
 	nodeNameToPods := map[*v1.Node][]*v1.Pod{}
@@ -610,7 +731,7 @@ func selectNodesForPreemption(pod *v1.Pod,
 		if meta != nil {
 			metaCopy = meta.ShallowCopy()
 		}
-		pods, fits := selectVictimsOnNode(pod, metaCopy, nodeNameToInfo[nodeName], predicates)
+		pods, fits := selectVictimsOnNode(pod, metaCopy, nodeNameToInfo[nodeName], predicates, queue)
 		if fits {
 			resultLock.Lock()
 			nodeNameToPods[potentialNodes[i]] = pods
@@ -672,7 +793,9 @@ func selectVictimsOnNode(
 	pod *v1.Pod,
 	meta algorithm.PredicateMetadata,
 	nodeInfo *schedulercache.NodeInfo,
-	fitPredicates map[string]algorithm.FitPredicate) ([]*v1.Pod, bool) {
+	fitPredicates map[string]algorithm.FitPredicate,
+	queue SchedulingQueue,
+) ([]*v1.Pod, bool) {
 	potentialVictims := util.SortableList{CompFunc: util.HigherPriorityPod}
 	nodeInfoCopy := nodeInfo.Clone()
 
@@ -703,7 +826,7 @@ func selectVictimsOnNode(
 	// that we should check is if the "pod" is failing to schedule due to pod affinity
 	// failure.
 	// TODO(bsalamat): Consider checking affinity to lower priority pods if feasible with reasonable performance.
-	if fits, _, err := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil); !fits {
+	if fits, _, err := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil, queue); !fits {
 		if err != nil {
 			glog.Warningf("Encountered error while selecting victims on node %v: %v", nodeInfo.Node().Name, err)
 		}
@@ -714,7 +837,7 @@ func selectVictimsOnNode(
 	for _, p := range potentialVictims.Items {
 		lpp := p.(*v1.Pod)
 		addPod(lpp)
-		if fits, _, _ := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil); !fits {
+		if fits, _, _ := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil, queue); !fits {
 			removePod(lpp)
 			victims = append(victims, lpp)
 			glog.V(5).Infof("Pod %v is a potential preemption victim on node %v.", lpp.Name, nodeInfo.Node().Name)
@@ -764,7 +887,6 @@ func nodesWherePreemptionMightHelp(pod *v1.Pod, nodes []*v1.Node, failedPredicat
 // considered for preemption.
 // We look at the node that is nominated for this pod and as long as there are
 // terminating pods on the node, we don't consider this for preempting more pods.
-// TODO(bsalamat): Revisit this algorithm once scheduling by priority is added.
 func podEligibleToPreemptOthers(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) bool {
 	if nodeName, found := pod.Annotations[NominatedNodeAnnotationKey]; found {
 		if nodeInfo, found := nodeNameToInfo[nodeName]; found {
@@ -782,6 +904,7 @@ func podEligibleToPreemptOthers(pod *v1.Pod, nodeNameToInfo map[string]*schedule
 func NewGenericScheduler(
 	cache schedulercache.Cache,
 	eCache *EquivalenceCache,
+	podQueue SchedulingQueue,
 	predicates map[string]algorithm.FitPredicate,
 	predicateMetaProducer algorithm.PredicateMetadataProducer,
 	prioritizers []algorithm.PriorityConfig,
@@ -790,6 +913,7 @@ func NewGenericScheduler(
 	return &genericScheduler{
 		cache:                 cache,
 		equivalenceCache:      eCache,
+		schedulingQueue:       podQueue,
 		predicates:            predicates,
 		predicateMetaProducer: predicateMetaProducer,
 		prioritizers:          prioritizers,

@@ -53,6 +53,7 @@ type PodPreemptor interface {
 	GetUpdatedPod(pod *v1.Pod) (*v1.Pod, error)
 	DeletePod(pod *v1.Pod) error
 	UpdatePodAnnotations(pod *v1.Pod, annots map[string]string) error
+	RemoveNominatedNodeAnnotation(pod *v1.Pod) error
 }
 
 // Scheduler watches for new unscheduled pods. It attempts to find
@@ -203,29 +204,40 @@ func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, e
 		glog.Errorf("Error getting the updated preemptor pod object: %v", err)
 		return "", err
 	}
-	node, victims, err := sched.config.Algorithm.Preempt(preemptor, sched.config.NodeLister, scheduleErr)
+	node, victims, nominatedPodsToClear, err := sched.config.Algorithm.Preempt(preemptor, sched.config.NodeLister, scheduleErr)
 	if err != nil {
 		glog.Errorf("Error preempting victims to make room for %v/%v.", preemptor.Namespace, preemptor.Name)
 		return "", err
 	}
-	if node == nil {
-		return "", err
-	}
-	glog.Infof("Preempting %d pod(s) on node %v to make room for %v/%v.", len(victims), node.Name, preemptor.Namespace, preemptor.Name)
-	annotations := map[string]string{core.NominatedNodeAnnotationKey: node.Name}
-	err = sched.config.PodPreemptor.UpdatePodAnnotations(preemptor, annotations)
-	if err != nil {
-		glog.Errorf("Error in preemption process. Cannot update pod %v annotations: %v", preemptor.Name, err)
-		return "", err
-	}
-	for _, victim := range victims {
-		if err := sched.config.PodPreemptor.DeletePod(victim); err != nil {
-			glog.Errorf("Error preempting pod %v/%v: %v", victim.Namespace, victim.Name, err)
+	var nodeName = ""
+	if node != nil {
+		nodeName = node.Name
+		annotations := map[string]string{core.NominatedNodeAnnotationKey: nodeName}
+		err = sched.config.PodPreemptor.UpdatePodAnnotations(preemptor, annotations)
+		if err != nil {
+			glog.Errorf("Error in preemption process. Cannot update pod %v annotations: %v", preemptor.Name, err)
 			return "", err
 		}
-		sched.config.Recorder.Eventf(victim, v1.EventTypeNormal, "Preempted", "by %v/%v on node %v", preemptor.Namespace, preemptor.Name, node.Name)
+		for _, victim := range victims {
+			if err := sched.config.PodPreemptor.DeletePod(victim); err != nil {
+				glog.Errorf("Error preempting pod %v/%v: %v", victim.Namespace, victim.Name, err)
+				return "", err
+			}
+			sched.config.Recorder.Eventf(victim, v1.EventTypeNormal, "Preempted", "by %v/%v on node %v", preemptor.Namespace, preemptor.Name, nodeName)
+		}
 	}
-	return node.Name, err
+	// Clearing nominated pods should happen outside of "if node != nil". Node could
+	// be nil when a pod with nominated node name is eligible to preempt again,
+	// but preemption logic does not find any node for it. In that case Preempt()
+	// function of generic_scheduler.go returns the pod itself for removal of the annotation.
+	for _, p := range nominatedPodsToClear {
+		rErr := sched.config.PodPreemptor.RemoveNominatedNodeAnnotation(p)
+		if rErr != nil {
+			glog.Errorf("Cannot remove nominated node annotation of pod: %v", rErr)
+			// We do not return as this error is not critical.
+		}
+	}
+	return nodeName, err
 }
 
 // assume signals to the cache that a pod is already in the cache, so that binding can be asynchronous.
