@@ -95,6 +95,6 @@ func (cm *unsupportedContainerManager) InternalContainerLifecycle() InternalCont
 	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager()}
 }
 
-func NewContainerManager(_ mount.Interface, _ cadvisor.Interface, _ NodeConfig, failSwapOn bool, devicePluginEnabled bool, recorder record.EventRecorder) (ContainerManager, error) {
+func NewContainerManager(_ mount.Interface, _ cadvisor.Interface, _ NodeConfig, failSwapOn bool, recorder record.EventRecorder) (ContainerManager, error) {
 	return &unsupportedContainerManager{}, nil
 }

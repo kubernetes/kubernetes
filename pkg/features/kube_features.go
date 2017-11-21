@@ -69,13 +69,6 @@ const (
 	// Works only with Docker Container Runtime.
 	Accelerators utilfeature.Feature = "Accelerators"
 
-	// owner: @jiayingz
-	// alpha: v1.8
-	//
-	// Enables support for Device Plugins
-	// Only Nvidia GPUs are tested as of v1.8.
-	DevicePlugins utilfeature.Feature = "DevicePlugins"
-
 	// owner: @gmarek
 	// alpha: v1.6
 	//
@@ -210,7 +203,6 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: utilfeature.Beta},
 	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha},
 	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha},
-	DevicePlugins:                               {Default: true, PreRelease: utilfeature.Alpha},
 	TaintBasedEvictions:                         {Default: false, PreRelease: utilfeature.Alpha},
 	RotateKubeletServerCertificate:              {Default: false, PreRelease: utilfeature.Alpha},
 	RotateKubeletClientCertificate:              {Default: true, PreRelease: utilfeature.Beta},
