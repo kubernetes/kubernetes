@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,47 +73,38 @@ func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) ObjectMapp
 	return f
 }
 
-// TODO: This method should return an error now that it can fail.  Alternatively, it needs to
-//   return lazy implementations of mapper and typer that don't hit the wire until they are
-//   invoked.
-func (f *ring1Factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
-	mapper := legacyscheme.Registry.RESTMapper()
-	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
-	if err == nil {
-		mapper = meta.FirstHitRESTMapper{
-			MultiRESTMapper: meta.MultiRESTMapper{
-				discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, legacyscheme.Registry.InterfacesFor),
-				legacyscheme.Registry.RESTMapper(), // hardcoded fall back
-			},
-		}
-
-		// wrap with shortcuts, they require a discoveryClient
-		mapper, err = NewShortcutExpander(mapper, discoveryClient)
-		// you only have an error on missing discoveryClient, so this shouldn't fail.  Check anyway.
-		CheckErr(err)
-	}
-
-	return mapper, legacyscheme.Scheme
-}
-
-func (f *ring1Factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error) {
+// objectLoader attempts to perform discovery against the server, and will fall back to
+// the built in mapper if necessary. It supports unstructured objects either way, since
+// the underlying Scheme supports Unstructured. The mapper will return converters that can
+// convert versioned types to unstructured and back.
+func (f *ring1Factory) objectLoader() (meta.RESTMapper, runtime.ObjectTyper, error) {
 	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
 	if err != nil {
-		return nil, nil, err
+		glog.V(3).Infof("Unable to get a discovery client to find server resources, falling back to hardcoded types: %v", err)
+		return legacyscheme.Registry.RESTMapper(), legacyscheme.Scheme, nil
 	}
+
 	groupResources, err := discovery.GetAPIGroupResources(discoveryClient)
 	if err != nil && !discoveryClient.Fresh() {
 		discoveryClient.Invalidate()
 		groupResources, err = discovery.GetAPIGroupResources(discoveryClient)
 	}
 	if err != nil {
-		return nil, nil, err
+		glog.V(3).Infof("Unable to retrieve API resources, falling back to hardcoded types: %v", err)
+		return legacyscheme.Registry.RESTMapper(), legacyscheme.Scheme, nil
 	}
 
-	mapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.InterfacesForUnstructured)
-	typer := discovery.NewUnstructuredObjectTyper(groupResources)
-	expander, err := NewShortcutExpander(mapper, discoveryClient)
+	// allow conversion between typed and unstructured objects
+	interfaces := meta.InterfacesForUnstructuredConversion(legacyscheme.Registry.InterfacesFor)
+	mapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.VersionInterfacesFunc(interfaces))
+	// TODO: should this also indicate it recognizes typed objects?
+	typer := discovery.NewUnstructuredObjectTyper(groupResources, legacyscheme.Scheme)
+	expander := NewShortcutExpander(mapper, discoveryClient)
 	return expander, typer, err
+}
+
+func (f *ring1Factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
+	return meta.NewLazyObjectLoader(f.objectLoader)
 }
 
 func (f *ring1Factory) CategoryExpander() categories.CategoryExpander {
@@ -273,11 +266,7 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout tim
 		}
 
 	default:
-		gvks, _, err := legacyscheme.Scheme.ObjectKinds(object)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("cannot get the logs from %v", gvks[0])
+		return nil, fmt.Errorf("cannot get the logs from %T", object)
 	}
 
 	sortBy := func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) }
@@ -401,11 +390,7 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout tim
 		return t, nil
 
 	default:
-		gvks, _, err := legacyscheme.Scheme.ObjectKinds(object)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("cannot attach to %v: not implemented", gvks[0])
+		return nil, fmt.Errorf("cannot attach to %T: not implemented", object)
 	}
 
 	sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }

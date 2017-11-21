@@ -145,26 +145,27 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
+		Internal().
+		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		IncludeUninitialized(includeUninitialized).
 		Flatten()
 
-	if o.Local {
+	if !o.Local {
+		builder.LabelSelectorParam(o.Selector).
+			ResourceTypeOrNameArgs(o.All, args...).
+			Latest()
+	} else {
 		// if a --local flag was provided, and a resource was specified in the form
 		// <resource>/<name>, fail immediately as --local cannot query the api server
 		// for the specified resource.
+		// TODO: this should be in the builder - if someone specifies tuples, fail when
+		// local is true
 		if len(args) > 0 {
 			return resource.LocalResourceError
 		}
-
-		builder = builder.Local(f.ClientForMapping)
-	} else {
-		builder = builder.
-			LabelSelectorParam(o.Selector).
-			ResourceTypeOrNameArgs(o.All, args...).
-			Latest()
 	}
 
 	o.Infos, err = builder.Do().Infos()
@@ -192,7 +193,8 @@ func (o *ResourcesOptions) Run() error {
 	allErrs := []error{}
 	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
 		transformed := false
-		_, err := o.UpdatePodSpecForObject(info.VersionedObject, func(spec *v1.PodSpec) error {
+		info.Object = info.AsVersioned()
+		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
 			if len(containers) != 0 {
 				for i := range containers {
@@ -217,7 +219,7 @@ func (o *ResourcesOptions) Run() error {
 			return nil
 		})
 		if transformed && err == nil {
-			return runtime.Encode(o.Encoder, info.VersionedObject)
+			return runtime.Encode(o.Encoder, info.Object)
 		}
 		return nil, err
 	})
@@ -236,7 +238,7 @@ func (o *ResourcesOptions) Run() error {
 		}
 
 		if o.Local || cmdutil.GetDryRunFlag(o.Cmd) {
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, patch.Info.VersionedObject, o.Out); err != nil {
+			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, patch.Info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue
@@ -261,11 +263,7 @@ func (o *ResourcesOptions) Run() error {
 
 		shortOutput := o.Output == "name"
 		if len(o.Output) > 0 && !shortOutput {
-			versionedObject, err := patch.Info.Mapping.ConvertToVersion(obj, patch.Info.Mapping.GroupVersionKind.GroupVersion())
-			if err != nil {
-				return err
-			}
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, versionedObject, o.Out); err != nil {
+			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue

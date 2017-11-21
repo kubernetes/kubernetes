@@ -267,10 +267,6 @@
 			"Rev": "5f041e8faa004a95c88a202771f4cc3e991971e6"
 		},
 		{
-			"ImportPath": "github.com/pkg/errors",
-			"Rev": "a22138067af1c4942683050411a841ade67fe1eb"
-		},
-		{
 			"ImportPath": "github.com/prometheus/client_golang/prometheus",
 			"Rev": "e7e903064f5e9eb5da98208bae10b475d4db0f8c"
 		},
@@ -828,6 +824,10 @@
 		},
 		{
 			"ImportPath": "k8s.io/apiserver/pkg/admission/initializer",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/apiserver/pkg/admission/metrics",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{

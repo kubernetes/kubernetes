@@ -57,7 +57,7 @@ var _ = SIGDescribe("Volume Placement", func() {
 			isNodeLabeled = true
 		}
 		By("creating vmdk")
-		vsp, err = vsphere.GetVSphere()
+		vsp, err = getVSphere(c)
 		Expect(err).NotTo(HaveOccurred())
 		volumePath, err := createVSphereVolume(vsp, nil)
 		Expect(err).NotTo(HaveOccurred())
@@ -285,7 +285,7 @@ var _ = SIGDescribe("Volume Placement", func() {
 			framework.ExpectNoError(framework.DeletePodWithWait(f, c, podB), "defer: Failed to delete pod ", podB.Name)
 			By(fmt.Sprintf("wait for volumes to be detached from the node: %v", node1Name))
 			for _, volumePath := range volumePaths {
-				framework.ExpectNoError(waitForVSphereDiskToDetach(vsp, volumePath, types.NodeName(node1Name)))
+				framework.ExpectNoError(waitForVSphereDiskToDetach(c, vsp, volumePath, types.NodeName(node1Name)))
 			}
 		}()
 
@@ -362,7 +362,7 @@ func createPodWithVolumeAndNodeSelector(client clientset.Interface, namespace st
 
 	By(fmt.Sprintf("Verify volume is attached to the node:%v", nodeName))
 	for _, volumePath := range volumePaths {
-		isAttached, err := verifyVSphereDiskAttached(vsp, volumePath, types.NodeName(nodeName))
+		isAttached, err := verifyVSphereDiskAttached(client, vsp, volumePath, types.NodeName(nodeName))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(isAttached).To(BeTrue(), "disk:"+volumePath+" is not attached with the node")
 	}
@@ -385,6 +385,6 @@ func deletePodAndWaitForVolumeToDetach(f *framework.Framework, c clientset.Inter
 
 	By("Waiting for volume to be detached from the node")
 	for _, volumePath := range volumePaths {
-		framework.ExpectNoError(waitForVSphereDiskToDetach(vsp, volumePath, types.NodeName(nodeName)))
+		framework.ExpectNoError(waitForVSphereDiskToDetach(c, vsp, volumePath, types.NodeName(nodeName)))
 	}
 }

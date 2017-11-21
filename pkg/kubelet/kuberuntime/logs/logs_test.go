@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 func TestLogOptions(t *testing.T) {
@@ -78,7 +79,7 @@ func TestParseLog(t *testing.T) {
 			line: `{"log":"docker stdout test log","stream":"stdout","time":"2016-10-20T18:39:20.57606443Z"}` + "\n",
 			msg: &logMessage{
 				timestamp: timestamp,
-				stream:    stdoutType,
+				stream:    runtimeapi.Stdout,
 				log:       []byte("docker stdout test log"),
 			},
 		},
@@ -86,23 +87,23 @@ func TestParseLog(t *testing.T) {
 			line: `{"log":"docker stderr test log","stream":"stderr","time":"2016-10-20T18:39:20.57606443Z"}` + "\n",
 			msg: &logMessage{
 				timestamp: timestamp,
-				stream:    stderrType,
+				stream:    runtimeapi.Stderr,
 				log:       []byte("docker stderr test log"),
 			},
 		},
 		{ // CRI log format stdout
-			line: "2016-10-20T18:39:20.57606443Z stdout cri stdout test log\n",
+			line: "2016-10-20T18:39:20.57606443Z stdout F cri stdout test log\n",
 			msg: &logMessage{
 				timestamp: timestamp,
-				stream:    stdoutType,
+				stream:    runtimeapi.Stdout,
 				log:       []byte("cri stdout test log\n"),
 			},
 		},
 		{ // CRI log format stderr
-			line: "2016-10-20T18:39:20.57606443Z stderr cri stderr test log\n",
+			line: "2016-10-20T18:39:20.57606443Z stderr F cri stderr test log\n",
 			msg: &logMessage{
 				timestamp: timestamp,
-				stream:    stderrType,
+				stream:    runtimeapi.Stderr,
 				log:       []byte("cri stderr test log\n"),
 			},
 		},
@@ -110,6 +111,22 @@ func TestParseLog(t *testing.T) {
 			line: "unsupported log format test log\n",
 			msg:  &logMessage{},
 			err:  true,
+		},
+		{ // Partial CRI log line
+			line: "2016-10-20T18:39:20.57606443Z stdout P cri stdout partial test log\n",
+			msg: &logMessage{
+				timestamp: timestamp,
+				stream:    runtimeapi.Stdout,
+				log:       []byte("cri stdout partial test log"),
+			},
+		},
+		{ // Partial CRI log line with multiple log tags.
+			line: "2016-10-20T18:39:20.57606443Z stdout P:TAG1:TAG2 cri stdout partial test log\n",
+			msg: &logMessage{
+				timestamp: timestamp,
+				stream:    runtimeapi.Stdout,
+				log:       []byte("cri stdout partial test log"),
+			},
 		},
 	} {
 		t.Logf("TestCase #%d: %+v", c, test)
@@ -130,26 +147,26 @@ func TestWriteLogs(t *testing.T) {
 	log := "abcdefg\n"
 
 	for c, test := range []struct {
-		stream       streamType
+		stream       runtimeapi.LogStreamType
 		since        time.Time
 		timestamp    bool
 		expectStdout string
 		expectStderr string
 	}{
 		{ // stderr log
-			stream:       stderrType,
+			stream:       runtimeapi.Stderr,
 			expectStderr: log,
 		},
 		{ // stdout log
-			stream:       stdoutType,
+			stream:       runtimeapi.Stdout,
 			expectStdout: log,
 		},
 		{ // since is after timestamp
-			stream: stdoutType,
+			stream: runtimeapi.Stdout,
 			since:  timestamp.Add(1 * time.Second),
 		},
 		{ // timestamp enabled
-			stream:       stderrType,
+			stream:       runtimeapi.Stderr,
 			timestamp:    true,
 			expectStderr: timestamp.Format(timeFormat) + " " + log,
 		},
@@ -226,13 +243,13 @@ func TestWriteLogsWithBytesLimit(t *testing.T) {
 		stderrBuf := bytes.NewBuffer(nil)
 		w := newLogWriter(stdoutBuf, stderrBuf, &LogOptions{timestamp: test.timestamp, bytes: int64(test.bytes)})
 		for i := 0; i < test.stdoutLines; i++ {
-			msg.stream = stdoutType
+			msg.stream = runtimeapi.Stdout
 			if err := w.write(msg); err != nil {
 				assert.EqualError(t, err, errMaximumWrite.Error())
 			}
 		}
 		for i := 0; i < test.stderrLines; i++ {
-			msg.stream = stderrType
+			msg.stream = runtimeapi.Stderr
 			if err := w.write(msg); err != nil {
 				assert.EqualError(t, err, errMaximumWrite.Error())
 			}

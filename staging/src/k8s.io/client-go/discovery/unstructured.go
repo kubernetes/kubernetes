@@ -17,22 +17,28 @@ limitations under the License.
 package discovery
 
 import (
-	"fmt"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// UnstructuredObjectTyper provides a runtime.ObjectTyper implmentation for
+// UnstructuredObjectTyper provides a runtime.ObjectTyper implementation for
 // runtime.Unstructured object based on discovery information.
 type UnstructuredObjectTyper struct {
 	registered map[schema.GroupVersionKind]bool
+	typers     []runtime.ObjectTyper
 }
 
 // NewUnstructuredObjectTyper returns a runtime.ObjectTyper for
-// unstructred objects based on discovery information.
-func NewUnstructuredObjectTyper(groupResources []*APIGroupResources) *UnstructuredObjectTyper {
-	dot := &UnstructuredObjectTyper{registered: make(map[schema.GroupVersionKind]bool)}
+// unstructured objects based on discovery information. It accepts a list of fallback typers
+// for handling objects that are not runtime.Unstructured. It does not delegate the Recognizes
+// check, only ObjectKinds.
+func NewUnstructuredObjectTyper(groupResources []*APIGroupResources, typers ...runtime.ObjectTyper) *UnstructuredObjectTyper {
+	dot := &UnstructuredObjectTyper{
+		registered: make(map[schema.GroupVersionKind]bool),
+		typers:     typers,
+	}
 	for _, group := range groupResources {
 		for _, discoveryVersion := range group.Group.Versions {
 			resources, ok := group.VersionedResources[discoveryVersion.Version]
@@ -55,17 +61,29 @@ func NewUnstructuredObjectTyper(groupResources []*APIGroupResources) *Unstructur
 // because runtime.Unstructured object should always have group,version,kind
 // information set.
 func (d *UnstructuredObjectTyper) ObjectKinds(obj runtime.Object) (gvks []schema.GroupVersionKind, unversionedType bool, err error) {
-	if _, ok := obj.(runtime.Unstructured); !ok {
-		return nil, false, fmt.Errorf("type %T is invalid for dynamic object typer", obj)
+	if _, ok := obj.(runtime.Unstructured); ok {
+		gvk := obj.GetObjectKind().GroupVersionKind()
+		if len(gvk.Kind) == 0 {
+			return nil, false, runtime.NewMissingKindErr("object has no kind field ")
+		}
+		if len(gvk.Version) == 0 {
+			return nil, false, runtime.NewMissingVersionErr("object has no apiVersion field")
+		}
+		return []schema.GroupVersionKind{gvk}, false, nil
 	}
-	gvk := obj.GetObjectKind().GroupVersionKind()
-	if len(gvk.Kind) == 0 {
-		return nil, false, runtime.NewMissingKindErr("unstructured object has no kind")
+	var lastErr error
+	for _, typer := range d.typers {
+		gvks, unversioned, err := typer.ObjectKinds(obj)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		return gvks, unversioned, nil
 	}
-	if len(gvk.Version) == 0 {
-		return nil, false, runtime.NewMissingVersionErr("unstructured object has no version")
+	if lastErr == nil {
+		lastErr = runtime.NewNotRegisteredErrForType(reflect.TypeOf(obj))
 	}
-	return []schema.GroupVersionKind{gvk}, false, nil
+	return nil, false, lastErr
 }
 
 // Recognizes returns true if the provided group,version,kind was in the

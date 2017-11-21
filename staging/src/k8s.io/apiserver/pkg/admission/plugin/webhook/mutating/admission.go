@@ -39,6 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/configuration"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
+	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/namespace"
@@ -101,6 +102,8 @@ func NewMutatingWebhook(configFile io.Reader) (*MutatingWebhook, error) {
 		clientManager: cm,
 	}, nil
 }
+
+var _ admission.MutationInterface = &MutatingWebhook{}
 
 // MutatingWebhook is an implementation of admission.Interface.
 type MutatingWebhook struct {
@@ -238,7 +241,7 @@ func (a *MutatingWebhook) Admit(attr admission.Attributes) error {
 	for _, hook := range relevantHooks {
 		t := time.Now()
 		err := a.callAttrMutatingHook(ctx, hook, versionedAttr)
-		admission.Metrics.ObserveWebhook(time.Since(t), err != nil, hook, attr)
+		admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, attr, "admit", hook.Name)
 		if err == nil {
 			continue
 		}

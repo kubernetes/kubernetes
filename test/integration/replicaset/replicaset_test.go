@@ -41,6 +41,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/test/integration/framework"
+	testutil "k8s.io/kubernetes/test/utils"
 )
 
 const (
@@ -217,15 +218,8 @@ func createRSsPods(t *testing.T, clientSet clientset.Interface, rss []*v1beta1.R
 
 // Verify .Status.Replicas is equal to .Spec.Replicas
 func waitRSStable(t *testing.T, clientSet clientset.Interface, rs *v1beta1.ReplicaSet) {
-	rsClient := clientSet.Extensions().ReplicaSets(rs.Namespace)
-	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		newRS, err := rsClient.Get(rs.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		return newRS.Status.Replicas == *rs.Spec.Replicas, nil
-	}); err != nil {
-		t.Fatalf("Failed to verify .Status.Replicas is equal to .Spec.Replicas for rs %s: %v", rs.Name, err)
+	if err := testutil.WaitRSStable(t, clientSet, rs, interval, timeout); err != nil {
+		t.Fatal(err)
 	}
 }
 

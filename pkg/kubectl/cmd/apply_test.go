@@ -1014,51 +1014,53 @@ func TestRunApplySetLastApplied(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, tf, codec, _ := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
-		tf.UnstructuredClient = &fake.RESTClient{
-			GroupVersion:         schema.GroupVersion{Version: "v1"},
-			NegotiatedSerializer: unstructuredSerializer,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p, m := req.URL.Path, req.Method; {
-				case p == pathRC && m == "GET":
-					bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-				case p == noAnnotationPath && m == "GET":
-					bodyRC := ioutil.NopCloser(bytes.NewReader(noAnnotationRC))
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-				case p == noExistPath && m == "GET":
-					return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &api.Pod{})}, nil
-				case p == pathRC && m == "PATCH":
-					checkPatchString(t, req)
-					bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-				case p == "/api/v1/namespaces/test" && m == "GET":
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
-			}),
-		}
-		tf.Namespace = "test"
-		tf.ClientConfig = defaultClientConfig()
-		buf, errBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
+		t.Run(test.name, func(t *testing.T) {
+			f, tf, codec, _ := cmdtesting.NewAPIFactory()
+			tf.Printer = &testPrinter{}
+			tf.UnstructuredClient = &fake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Version: "v1"},
+				NegotiatedSerializer: unstructuredSerializer,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case p == pathRC && m == "GET":
+						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+					case p == noAnnotationPath && m == "GET":
+						bodyRC := ioutil.NopCloser(bytes.NewReader(noAnnotationRC))
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+					case p == noExistPath && m == "GET":
+						return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &api.Pod{})}, nil
+					case p == pathRC && m == "PATCH":
+						checkPatchString(t, req)
+						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+					case p == "/api/v1/namespaces/test" && m == "GET":
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
+					default:
+						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+						return nil, nil
+					}
+				}),
+			}
+			tf.Namespace = "test"
+			tf.ClientConfig = defaultClientConfig()
+			buf, errBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
 
-		cmdutil.BehaviorOnFatal(func(str string, code int) {
-			if str != test.expectedErr {
-				t.Errorf("%s: unexpected error: %s\nexpected: %s", test.name, str, test.expectedErr)
+			cmdutil.BehaviorOnFatal(func(str string, code int) {
+				if str != test.expectedErr {
+					t.Errorf("%s: unexpected error: %s\nexpected: %s", test.name, str, test.expectedErr)
+				}
+			})
+
+			cmd := NewCmdApplySetLastApplied(f, buf, errBuf)
+			cmd.Flags().Set("filename", test.filePath)
+			cmd.Flags().Set("output", test.output)
+			cmd.Run(cmd, []string{})
+
+			if buf.String() != test.expectedOut {
+				t.Fatalf("%s: unexpected output: %s\nexpected: %s", test.name, buf.String(), test.expectedOut)
 			}
 		})
-
-		cmd := NewCmdApplySetLastApplied(f, buf, errBuf)
-		cmd.Flags().Set("filename", test.filePath)
-		cmd.Flags().Set("output", test.output)
-		cmd.Run(cmd, []string{})
-
-		if buf.String() != test.expectedOut {
-			t.Fatalf("%s: unexpected output: %s\nexpected: %s", test.name, buf.String(), test.expectedOut)
-		}
 	}
 	cmdutil.BehaviorOnFatal(func(str string, code int) {})
 }

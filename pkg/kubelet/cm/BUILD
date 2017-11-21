@@ -34,6 +34,7 @@ go_library(
         "//pkg/kubelet/apis/cri:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/cm/cpumanager:go_default_library",
+        "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/eviction/api:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",

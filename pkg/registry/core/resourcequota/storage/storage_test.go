@@ -30,7 +30,6 @@ import (
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
@@ -70,7 +69,7 @@ func TestCreate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store)
 	resourcequota := validNewResourceQuota()
 	resourcequota.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -111,7 +110,7 @@ func TestDelete(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme).ReturnDeletedObject()
+	test := genericregistrytest.New(t, storage.Store).ReturnDeletedObject()
 	test.TestDelete(validNewResourceQuota())
 }
 
@@ -119,7 +118,7 @@ func TestGet(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store)
 	test.TestGet(validNewResourceQuota())
 }
 
@@ -127,7 +126,7 @@ func TestList(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store)
 	test.TestList(validNewResourceQuota())
 }
 
@@ -135,7 +134,7 @@ func TestWatch(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.Store)
 	test.TestWatch(
 		validNewResourceQuota(),
 		// matching labels

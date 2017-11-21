@@ -442,6 +442,10 @@ func CreateControllerContext(s *options.CMServer, rootClientBuilder, clientBuild
 		}
 	}
 
+	if informerUserCloud, ok := cloud.(cloudprovider.InformerUser); ok {
+		informerUserCloud.SetInformers(sharedInformers)
+	}
+
 	ctx := ControllerContext{
 		ClientBuilder:      clientBuilder,
 		InformerFactory:    sharedInformers,

@@ -18,6 +18,8 @@
 
 # Use the config file specified in $KUBE_CONFIG_FILE, or default to
 # config-default.sh.
+readonly GCE_MAX_LOCAL_SSD=8
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
@@ -35,6 +37,11 @@ if [[ "${MASTER_OS_DISTRIBUTION}" == "container-linux" || "${MASTER_OS_DISTRIBUT
 else
   echo "Cannot operate on cluster using master os distro: ${MASTER_OS_DISTRIBUTION}" >&2
   exit 1
+fi
+
+if [[ ${NODE_LOCAL_SSDS:-} -ge 1 ]] && [[ ! -z ${NODE_LOCAL_SSDS_EXT:-} ]] ; then
+  echo -e "${color_red}Local SSD: Only one of NODE_LOCAL_SSDS and NODE_LOCAL_SSDS_EXT can be specified at once${color_norm}" >&2
+  exit 2
 fi
 
 if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
@@ -546,6 +553,29 @@ function get-template-name-from-version() {
   echo "${NODE_INSTANCE_PREFIX}-template-${1}" | cut -c 1-63 | sed 's/[\.\+]/-/g;s/-*$//g'
 }
 
+# validates the NODE_LOCAL_SSDS_EXT variable 
+function validate-node-local-ssds-ext(){
+  ssdopts="${1}"
+
+  if [[ -z "${ssdopts[0]}" || -z "${ssdopts[1]}" || -z "${ssdopts[2]}" ]]; then
+	  echo -e "${color_red}Local SSD: NODE_LOCAL_SSDS_EXT is malformed, found ${ssdopts[0]-_},${ssdopts[1]-_},${ssdopts[2]-_} ${color_norm}" >&2
+    exit 2
+  fi
+  if [[ "${ssdopts[1]}" != "scsi" && "${ssdopts[1]}" != "nvme" ]]; then
+    echo -e "${color_red}Local SSD: Interface must be scsi or nvme, found: ${ssdopts[1]} ${color_norm}" >&2
+    exit 2
+  fi
+  if [[ "${ssdopts[2]}" != "fs" && "${ssdopts[2]}" != "block" ]]; then
+    echo -e "${color_red}Local SSD: Filesystem type must be fs or block, found: ${ssdopts[2]} ${color_norm}"  >&2
+    exit 2
+  fi
+  local_ssd_ext_count=$((local_ssd_ext_count+ssdopts[0]))
+  if [[ "${local_ssd_ext_count}" -gt "${GCE_MAX_LOCAL_SSD}" || "${local_ssd_ext_count}" -lt 1 ]]; then
+    echo -e "${color_red}Local SSD: Total number of local ssds must range from 1 to 8, found: ${local_ssd_ext_count} ${color_norm}" >&2
+    exit 2
+  fi
+}
+
 # Robustly try to create an instance template.
 # $1: The name of the instance template.
 # $2: The scopes flag.
@@ -587,6 +617,19 @@ function create-node-template() {
   fi
 
   local local_ssds=""
+  local_ssd_ext_count=0
+  if [[ ! -z ${NODE_LOCAL_SSDS_EXT:-} ]]; then
+    IFS=";" read -r -a ssdgroups <<< "${NODE_LOCAL_SSDS_EXT:-}"
+    for ssdgroup in "${ssdgroups[@]}"
+    do
+      IFS="," read -r -a ssdopts <<< "${ssdgroup}"
+      validate-node-local-ssds-ext "${ssdopts}"
+      for i in $(seq ${ssdopts[0]}); do
+        local_ssds="$local_ssds--local-ssd=interface=${ssdopts[1]} "
+      done
+    done
+  fi
+  
   if [[ ! -z ${NODE_LOCAL_SSDS+x} ]]; then
     # The NODE_LOCAL_SSDS check below fixes issue #49171
     # Some versions of seq will count down from 1 if "seq 0" is specified
@@ -596,6 +639,7 @@ function create-node-template() {
       done
     fi
   fi
+  
 
   local network=$(make-gcloud-network-argument \
     "${NETWORK_PROJECT}" \

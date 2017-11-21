@@ -47,15 +47,13 @@ type Tester struct {
 	generatesName       bool
 	returnDeletedObject bool
 	namer               func(int) string
-	scheme              *runtime.Scheme
 }
 
-func New(t *testing.T, storage rest.Storage, scheme *runtime.Scheme) *Tester {
+func New(t *testing.T, storage rest.Storage) *Tester {
 	return &Tester{
 		T:       t,
 		storage: storage,
 		namer:   defaultNamer,
-		scheme:  scheme,
 	}
 }
 

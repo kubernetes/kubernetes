@@ -94,11 +94,13 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 	}
 
 	r := f.NewBuilder().
+		Internal().
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
 		Flatten().
 		Do()
+
 	if err := r.Err(); err != nil {
 		return err
 	}

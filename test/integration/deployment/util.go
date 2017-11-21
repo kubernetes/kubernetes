@@ -26,6 +26,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -80,7 +81,8 @@ func newDeployment(name, ns string, replicas int32) *v1beta1.Deployment {
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{MatchLabels: testLabels()},
 			Strategy: v1beta1.DeploymentStrategy{
-				Type: v1beta1.RollingUpdateDeploymentStrategyType,
+				Type:          v1beta1.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: new(v1beta1.RollingUpdateDeployment),
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -210,6 +212,11 @@ func markPodReady(c clientset.Interface, ns string, pod *v1.Pod) error {
 	addPodConditionReady(pod, metav1.Now())
 	_, err := c.Core().Pods(ns).UpdateStatus(pod)
 	return err
+}
+
+func intOrStrP(num int) *intstr.IntOrString {
+	intstr := intstr.FromInt(num)
+	return &intstr
 }
 
 // markUpdatedPodsReady manually marks updated Deployment pods status to ready,
@@ -404,4 +411,8 @@ func (d *deploymentTester) listUpdatedPods() ([]v1.Pod, error) {
 		}
 	}
 	return ownedPods, nil
+}
+
+func (d *deploymentTester) waitRSStable(replicaset *v1beta1.ReplicaSet) error {
+	return testutil.WaitRSStable(d.t, d.c, replicaset, pollInterval, pollTimeout)
 }

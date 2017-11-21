@@ -115,7 +115,7 @@ func (a *sarApprover) handle(csr *capi.CertificateSigningRequest) error {
 	}
 
 	if len(tried) != 0 {
-		return fmt.Errorf("recognized csr %q as %v but subject access review was not approved", csr.Name, tried)
+		return certificates.IgnorableError("recognized csr %q as %v but subject access review was not approved", csr.Name, tried)
 	}
 
 	return nil

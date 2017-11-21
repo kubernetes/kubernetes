@@ -354,6 +354,7 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 					return err
 				}
 				r := f.NewBuilder().
+					Internal().
 					ContinueOnError().
 					NamespaceParam(namespace).DefaultNamespace().
 					ResourceNames(obj.Mapping.Resource, name).

@@ -310,11 +310,7 @@ func (f *ring0Factory) MapBasedSelectorForObject(object runtime.Object) (string,
 		}
 		return kubectl.MakeLabels(t.Spec.Selector.MatchLabels), nil
 	default:
-		gvks, _, err := legacyscheme.Scheme.ObjectKinds(object)
-		if err != nil {
-			return "", err
-		}
-		return "", fmt.Errorf("cannot extract pod selector from %v", gvks[0])
+		return "", fmt.Errorf("cannot extract pod selector from %T", object)
 	}
 }
 
@@ -332,11 +328,7 @@ func (f *ring0Factory) PortsForObject(object runtime.Object) ([]string, error) {
 	case *extensions.ReplicaSet:
 		return getPorts(t.Spec.Template.Spec), nil
 	default:
-		gvks, _, err := legacyscheme.Scheme.ObjectKinds(object)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("cannot extract ports from %v", gvks[0])
+		return nil, fmt.Errorf("cannot extract ports from %T", object)
 	}
 }
 
@@ -354,11 +346,7 @@ func (f *ring0Factory) ProtocolsForObject(object runtime.Object) (map[string]str
 	case *extensions.ReplicaSet:
 		return getProtocols(t.Spec.Template.Spec), nil
 	default:
-		gvks, _, err := legacyscheme.Scheme.ObjectKinds(object)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("cannot extract protocols from %v", gvks[0])
+		return nil, fmt.Errorf("cannot extract protocols from %T", object)
 	}
 }
 
@@ -421,24 +409,6 @@ func (f *ring0Factory) BindFlags(flags *pflag.FlagSet) {
 func (f *ring0Factory) BindExternalFlags(flags *pflag.FlagSet) {
 	// any flags defined by external projects (not part of pflags)
 	flags.AddGoFlagSet(flag.CommandLine)
-}
-
-func (f *ring0Factory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions {
-	columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
-	if err != nil {
-		columnLabel = []string{}
-	}
-	opts := &printers.PrintOptions{
-		NoHeaders:          GetFlagBool(cmd, "no-headers"),
-		WithNamespace:      withNamespace,
-		Wide:               GetWideFlag(cmd),
-		ShowAll:            GetFlagBool(cmd, "show-all"),
-		ShowLabels:         GetFlagBool(cmd, "show-labels"),
-		AbsoluteTimestamps: isWatch(cmd),
-		ColumnLabels:       columnLabel,
-	}
-
-	return opts
 }
 
 func (f *ring0Factory) DefaultResourceFilterFunc() kubectl.Filters {

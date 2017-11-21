@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
+	"k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/rest"
 )
@@ -118,8 +119,11 @@ func serveInsecurely(insecureServingInfo *InsecureServingInfo, insecureHandler h
 		MaxHeaderBytes: 1 << 20,
 	}
 	glog.Infof("Serving insecurely on %s", insecureServingInfo.BindAddress)
-	var err error
-	_, err = server.RunServer(insecureServer, insecureServingInfo.BindNetwork, shutDownTimeout, stopCh)
+	ln, _, err := options.CreateListener(insecureServingInfo.BindNetwork, insecureServingInfo.BindAddress)
+	if err != nil {
+		return err
+	}
+	err = server.RunServer(insecureServer, ln, shutDownTimeout, stopCh)
 	return err
 }
 

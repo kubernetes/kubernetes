@@ -21,6 +21,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/configuration:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/initializer:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/admission/metrics:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/config:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/errors:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/namespace:go_default_library",

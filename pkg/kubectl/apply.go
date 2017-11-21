@@ -72,59 +72,33 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.
 	// First serialize the object without the annotation to prevent recursion,
 	// then add that serialization to it as the annotation and serialize it again.
 	var modified []byte
-	if info.VersionedObject != nil {
-		// If an object was read from input, use that version.
-		accessor, err := meta.Accessor(info.VersionedObject)
-		if err != nil {
-			return nil, err
-		}
 
-		// Get the current annotations from the object.
-		annots := accessor.GetAnnotations()
-		if annots == nil {
-			annots = map[string]string{}
-		}
+	// Otherwise, use the server side version of the object.
+	accessor := info.Mapping.MetadataAccessor
+	// Get the current annotations from the object.
+	annots, err := accessor.Annotations(info.Object)
+	if err != nil {
+		return nil, err
+	}
 
-		original := annots[api.LastAppliedConfigAnnotation]
-		delete(annots, api.LastAppliedConfigAnnotation)
-		accessor.SetAnnotations(annots)
-		// TODO: this needs to be abstracted - there should be no assumption that versioned object
-		// can be marshalled to JSON.
-		modified, err = runtime.Encode(codec, info.VersionedObject)
-		if err != nil {
-			return nil, err
-		}
+	if annots == nil {
+		annots = map[string]string{}
+	}
 
-		if annotate {
-			annots[api.LastAppliedConfigAnnotation] = string(modified)
-			accessor.SetAnnotations(annots)
-			// TODO: this needs to be abstracted - there should be no assumption that versioned object
-			// can be marshalled to JSON.
-			modified, err = runtime.Encode(codec, info.VersionedObject)
-			if err != nil {
-				return nil, err
-			}
-		}
+	original := annots[api.LastAppliedConfigAnnotation]
+	delete(annots, api.LastAppliedConfigAnnotation)
+	if err := accessor.SetAnnotations(info.Object, annots); err != nil {
+		return nil, err
+	}
 
-		// Restore the object to its original condition.
-		annots[api.LastAppliedConfigAnnotation] = original
-		accessor.SetAnnotations(annots)
-	} else {
-		// Otherwise, use the server side version of the object.
-		accessor := info.Mapping.MetadataAccessor
-		// Get the current annotations from the object.
-		annots, err := accessor.Annotations(info.Object)
-		if err != nil {
-			return nil, err
-		}
+	modified, err = runtime.Encode(codec, info.Object)
+	if err != nil {
+		return nil, err
+	}
 
-		if annots == nil {
-			annots = map[string]string{}
-		}
-
-		original := annots[api.LastAppliedConfigAnnotation]
-		delete(annots, api.LastAppliedConfigAnnotation)
-		if err := accessor.SetAnnotations(info.Object, annots); err != nil {
+	if annotate {
+		annots[api.LastAppliedConfigAnnotation] = string(modified)
+		if err := info.Mapping.MetadataAccessor.SetAnnotations(info.Object, annots); err != nil {
 			return nil, err
 		}
 
@@ -132,24 +106,12 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.
 		if err != nil {
 			return nil, err
 		}
+	}
 
-		if annotate {
-			annots[api.LastAppliedConfigAnnotation] = string(modified)
-			if err := info.Mapping.MetadataAccessor.SetAnnotations(info.Object, annots); err != nil {
-				return nil, err
-			}
-
-			modified, err = runtime.Encode(codec, info.Object)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		// Restore the object to its original condition.
-		annots[api.LastAppliedConfigAnnotation] = original
-		if err := info.Mapping.MetadataAccessor.SetAnnotations(info.Object, annots); err != nil {
-			return nil, err
-		}
+	// Restore the object to its original condition.
+	annots[api.LastAppliedConfigAnnotation] = original
+	if err := info.Mapping.MetadataAccessor.SetAnnotations(info.Object, annots); err != nil {
+		return nil, err
 	}
 
 	return modified, nil

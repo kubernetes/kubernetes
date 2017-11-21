@@ -169,7 +169,7 @@ func ClusterRoles() []rbac.ClusterRole {
 			ObjectMeta: metav1.ObjectMeta{Name: "system:basic-user"},
 			Rules: []rbac.PolicyRule{
 				// TODO add future selfsubjectrulesreview, project request APIs, project listing APIs
-				rbac.NewRule("create").Groups(authorizationGroup).Resources("selfsubjectaccessreviews").RuleOrDie(),
+				rbac.NewRule("create").Groups(authorizationGroup).Resources("selfsubjectaccessreviews", "selfsubjectrulesreviews").RuleOrDie(),
 			},
 		},
 

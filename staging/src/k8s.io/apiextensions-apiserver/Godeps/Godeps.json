@@ -295,10 +295,6 @@
 			"Rev": "5f041e8faa004a95c88a202771f4cc3e991971e6"
 		},
 		{
-			"ImportPath": "github.com/pkg/errors",
-			"Rev": "a22138067af1c4942683050411a841ade67fe1eb"
-		},
-		{
 			"ImportPath": "github.com/pmezard/go-difflib/difflib",
 			"Rev": "d8ed2627bdf02c080bf22230dbb337003b7aba2d"
 		},
@@ -864,6 +860,10 @@
 		},
 		{
 			"ImportPath": "k8s.io/apiserver/pkg/admission/initializer",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/apiserver/pkg/admission/metrics",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{

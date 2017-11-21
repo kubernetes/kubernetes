@@ -549,7 +549,15 @@ func TestGracefulShutdown(t *testing.T) {
 		Handler: s.Handler,
 	}
 	stopCh := make(chan struct{})
-	serverPort, err := RunServer(insecureServer, "tcp", 10*time.Second, stopCh)
+
+	ln, err := net.Listen("tcp", insecureServer.Addr)
+	if err != nil {
+		t.Errorf("failed to listen on %v: %v", insecureServer.Addr, err)
+	}
+
+	// get port
+	serverPort := ln.Addr().(*net.TCPAddr).Port
+	err = RunServer(insecureServer, ln, 10*time.Second, stopCh)
 	if err != nil {
 		t.Errorf("RunServer err: %v", err)
 	}

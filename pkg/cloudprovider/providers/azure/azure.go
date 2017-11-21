@@ -44,13 +44,14 @@ import (
 
 const (
 	// CloudProviderName is the value used for the --cloud-provider flag
-	CloudProviderName      = "azure"
-	rateLimitQPSDefault    = 1.0
-	rateLimitBucketDefault = 5
-	backoffRetriesDefault  = 6
-	backoffExponentDefault = 1.5
-	backoffDurationDefault = 5 // in seconds
-	backoffJitterDefault   = 1.0
+	CloudProviderName            = "azure"
+	rateLimitQPSDefault          = 1.0
+	rateLimitBucketDefault       = 5
+	backoffRetriesDefault        = 6
+	backoffExponentDefault       = 1.5
+	backoffDurationDefault       = 5 // in seconds
+	backoffJitterDefault         = 1.0
+	maximumLoadBalancerRuleCount = 148 // According to Azure LB rule default limit
 )
 
 // Config holds the configuration parsed from the --cloud-config flag
@@ -113,6 +114,57 @@ type Config struct {
 
 	// Use managed service identity for the virtual machine to access Azure ARM APIs
 	UseManagedIdentityExtension bool `json:"useManagedIdentityExtension"`
+
+	// Maximum allowed LoadBalancer Rule Count is the limit enforced by Azure Load balancer
+	MaximumLoadBalancerRuleCount int `json:"maximumLoadBalancerRuleCount"`
+}
+
+// VirtualMachinesClient defines needed functions for azure network.VirtualMachinesClient
+type VirtualMachinesClient interface {
+	CreateOrUpdate(resourceGroupName string, VMName string, parameters compute.VirtualMachine, cancel <-chan struct{}) (<-chan compute.VirtualMachine, <-chan error)
+	Get(resourceGroupName string, VMName string, expand compute.InstanceViewTypes) (result compute.VirtualMachine, err error)
+	List(resourceGroupName string) (result compute.VirtualMachineListResult, err error)
+	ListNextResults(lastResults compute.VirtualMachineListResult) (result compute.VirtualMachineListResult, err error)
+}
+
+// InterfacesClient defines needed functions for azure network.InterfacesClient
+type InterfacesClient interface {
+	CreateOrUpdate(resourceGroupName string, networkInterfaceName string, parameters network.Interface, cancel <-chan struct{}) (<-chan network.Interface, <-chan error)
+	Get(resourceGroupName string, networkInterfaceName string, expand string) (result network.Interface, err error)
+}
+
+// LoadBalancersClient defines needed functions for azure network.LoadBalancersClient
+type LoadBalancersClient interface {
+	CreateOrUpdate(resourceGroupName string, loadBalancerName string, parameters network.LoadBalancer, cancel <-chan struct{}) (<-chan network.LoadBalancer, <-chan error)
+	Delete(resourceGroupName string, loadBalancerName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
+	Get(resourceGroupName string, loadBalancerName string, expand string) (result network.LoadBalancer, err error)
+	List(resourceGroupName string) (result network.LoadBalancerListResult, err error)
+	ListNextResults(lastResult network.LoadBalancerListResult) (result network.LoadBalancerListResult, err error)
+}
+
+// PublicIPAddressesClient defines needed functions for azure network.PublicIPAddressesClient
+type PublicIPAddressesClient interface {
+	CreateOrUpdate(resourceGroupName string, publicIPAddressName string, parameters network.PublicIPAddress, cancel <-chan struct{}) (<-chan network.PublicIPAddress, <-chan error)
+	Delete(resourceGroupName string, publicIPAddressName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
+	Get(resourceGroupName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error)
+	List(resourceGroupName string) (result network.PublicIPAddressListResult, err error)
+	ListNextResults(lastResults network.PublicIPAddressListResult) (result network.PublicIPAddressListResult, err error)
+}
+
+// SubnetsClient defines needed functions for azure network.SubnetsClient
+type SubnetsClient interface {
+	CreateOrUpdate(resourceGroupName string, virtualNetworkName string, subnetName string, subnetParameters network.Subnet, cancel <-chan struct{}) (<-chan network.Subnet, <-chan error)
+	Delete(resourceGroupName string, virtualNetworkName string, subnetName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
+	Get(resourceGroupName string, virtualNetworkName string, subnetName string, expand string) (result network.Subnet, err error)
+	List(resourceGroupName string, virtualNetworkName string) (result network.SubnetListResult, err error)
+}
+
+// SecurityGroupsClient defines needed functions for azure network.SecurityGroupsClient
+type SecurityGroupsClient interface {
+	CreateOrUpdate(resourceGroupName string, networkSecurityGroupName string, parameters network.SecurityGroup, cancel <-chan struct{}) (<-chan network.SecurityGroup, <-chan error)
+	Delete(resourceGroupName string, networkSecurityGroupName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
+	Get(resourceGroupName string, networkSecurityGroupName string, expand string) (result network.SecurityGroup, err error)
+	List(resourceGroupName string) (result network.SecurityGroupListResult, err error)
 }
 
 // Cloud holds the config and clients
@@ -120,13 +172,13 @@ type Cloud struct {
 	Config
 	Environment              azure.Environment
 	RoutesClient             network.RoutesClient
-	SubnetsClient            network.SubnetsClient
-	InterfacesClient         network.InterfacesClient
+	SubnetsClient            SubnetsClient
+	InterfacesClient         InterfacesClient
 	RouteTablesClient        network.RouteTablesClient
-	LoadBalancerClient       network.LoadBalancersClient
-	PublicIPAddressesClient  network.PublicIPAddressesClient
-	SecurityGroupsClient     network.SecurityGroupsClient
-	VirtualMachinesClient    compute.VirtualMachinesClient
+	LoadBalancerClient       LoadBalancersClient
+	PublicIPAddressesClient  PublicIPAddressesClient
+	SecurityGroupsClient     SecurityGroupsClient
+	VirtualMachinesClient    VirtualMachinesClient
 	StorageAccountClient     storage.AccountsClient
 	DisksClient              disk.DisksClient
 	operationPollRateLimiter flowcontrol.RateLimiter
@@ -221,11 +273,12 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		return nil, err
 	}
 
-	az.SubnetsClient = network.NewSubnetsClient(az.SubscriptionID)
-	az.SubnetsClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.SubnetsClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	az.SubnetsClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&az.SubnetsClient.Client)
+	subnetsClient := network.NewSubnetsClient(az.SubscriptionID)
+	subnetsClient.BaseURI = az.Environment.ResourceManagerEndpoint
+	subnetsClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+	subnetsClient.PollingDelay = 5 * time.Second
+	configureUserAgent(&subnetsClient.Client)
+	az.SubnetsClient = subnetsClient
 
 	az.RouteTablesClient = network.NewRouteTablesClient(az.SubscriptionID)
 	az.RouteTablesClient.BaseURI = az.Environment.ResourceManagerEndpoint
@@ -239,35 +292,40 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	az.RoutesClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&az.RoutesClient.Client)
 
-	az.InterfacesClient = network.NewInterfacesClient(az.SubscriptionID)
-	az.InterfacesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.InterfacesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	az.InterfacesClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&az.InterfacesClient.Client)
+	interfacesClient := network.NewInterfacesClient(az.SubscriptionID)
+	interfacesClient.BaseURI = az.Environment.ResourceManagerEndpoint
+	interfacesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+	interfacesClient.PollingDelay = 5 * time.Second
+	configureUserAgent(&interfacesClient.Client)
+	az.InterfacesClient = interfacesClient
 
-	az.LoadBalancerClient = network.NewLoadBalancersClient(az.SubscriptionID)
-	az.LoadBalancerClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.LoadBalancerClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	az.LoadBalancerClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&az.LoadBalancerClient.Client)
+	loadBalancerClient := network.NewLoadBalancersClient(az.SubscriptionID)
+	loadBalancerClient.BaseURI = az.Environment.ResourceManagerEndpoint
+	loadBalancerClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+	loadBalancerClient.PollingDelay = 5 * time.Second
+	configureUserAgent(&loadBalancerClient.Client)
+	az.LoadBalancerClient = loadBalancerClient
 
-	az.VirtualMachinesClient = compute.NewVirtualMachinesClient(az.SubscriptionID)
-	az.VirtualMachinesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.VirtualMachinesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	az.VirtualMachinesClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&az.VirtualMachinesClient.Client)
+	virtualMachinesClient := compute.NewVirtualMachinesClient(az.SubscriptionID)
+	virtualMachinesClient.BaseURI = az.Environment.ResourceManagerEndpoint
+	virtualMachinesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+	virtualMachinesClient.PollingDelay = 5 * time.Second
+	configureUserAgent(&virtualMachinesClient.Client)
+	az.VirtualMachinesClient = virtualMachinesClient
 
-	az.PublicIPAddressesClient = network.NewPublicIPAddressesClient(az.SubscriptionID)
-	az.PublicIPAddressesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.PublicIPAddressesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	az.PublicIPAddressesClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&az.PublicIPAddressesClient.Client)
+	publicIPAddressClient := network.NewPublicIPAddressesClient(az.SubscriptionID)
+	publicIPAddressClient.BaseURI = az.Environment.ResourceManagerEndpoint
+	publicIPAddressClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+	publicIPAddressClient.PollingDelay = 5 * time.Second
+	configureUserAgent(&publicIPAddressClient.Client)
+	az.PublicIPAddressesClient = publicIPAddressClient
 
-	az.SecurityGroupsClient = network.NewSecurityGroupsClient(az.SubscriptionID)
-	az.SecurityGroupsClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.SecurityGroupsClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	az.SecurityGroupsClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&az.SecurityGroupsClient.Client)
+	securityGroupsClient := network.NewSecurityGroupsClient(az.SubscriptionID)
+	securityGroupsClient.BaseURI = az.Environment.ResourceManagerEndpoint
+	securityGroupsClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+	securityGroupsClient.PollingDelay = 5 * time.Second
+	configureUserAgent(&securityGroupsClient.Client)
+	az.SecurityGroupsClient = securityGroupsClient
 
 	az.StorageAccountClient = storage.NewAccountsClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
 	az.StorageAccountClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
@@ -326,6 +384,10 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	}
 
 	az.metadata = NewInstanceMetadata()
+
+	if az.MaximumLoadBalancerRuleCount == 0 {
+		az.MaximumLoadBalancerRuleCount = maximumLoadBalancerRuleCount
+	}
 
 	if err := initDiskControllers(&az); err != nil {
 		return nil, err

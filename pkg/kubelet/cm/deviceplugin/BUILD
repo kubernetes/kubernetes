@@ -9,11 +9,10 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "device_plugin_handler.go",
-        "device_plugin_handler_stub.go",
         "device_plugin_stub.go",
         "endpoint.go",
         "manager.go",
+        "manager_stub.go",
         "pod_devices.go",
         "types.go",
     ],
@@ -21,6 +20,7 @@ go_library(
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/kubelet/apis/deviceplugin/v1alpha:go_default_library",
+        "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
@@ -49,7 +49,6 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = [
-        "device_plugin_handler_test.go",
         "endpoint_test.go",
         "manager_test.go",
     ],

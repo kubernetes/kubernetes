@@ -153,6 +153,11 @@ type Policy struct {
 	// The default audit level is None, but can be overridden by a catch-all rule at the end of the list.
 	// PolicyRules are strictly ordered.
 	Rules []PolicyRule
+
+	// OmitStages is a list of stages for which no events are created. Note that this can also
+	// be specified per rule in which case the union of both are omitted.
+	// +optional
+	OmitStages []Stage
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -208,8 +213,10 @@ type PolicyRule struct {
 	// +optional
 	NonResourceURLs []string
 
-	// OmitStages specify events generated in which stages will not be emitted to backend.
+	// OmitStages is a list of stages for which no events are created. Note that this can also
+	// be specified policy wide in which case the union of both are omitted.
 	// An empty list means no restrictions will apply.
+	// +optional
 	OmitStages []Stage
 }
 

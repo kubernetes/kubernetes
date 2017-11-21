@@ -38,6 +38,14 @@ import (
 type SecureServingOptions struct {
 	BindAddress net.IP
 	BindPort    int
+	// BindNetwork is the type of network to bind to - defaults to "tcp", accepts "tcp",
+	// "tcp4", and "tcp6".
+	BindNetwork string
+
+	// Listener is the secure server network listener.
+	// either Listener or BindAddress/BindPort/BindNetwork is set,
+	// if Listener is set, use it and omit BindAddress/BindPort/BindNetwork.
+	Listener net.Listener
 
 	// ServerCert is the TLS cert info for serving secure traffic
 	ServerCert GeneratableKeyCert
@@ -147,13 +155,24 @@ func (s *SecureServingOptions) ApplyTo(c *server.Config) error {
 	if s == nil {
 		return nil
 	}
-
 	if s.BindPort <= 0 {
 		return nil
 	}
+
+	if s.Listener == nil {
+		var err error
+		addr := net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.BindPort))
+		s.Listener, s.BindPort, err = CreateListener(s.BindNetwork, addr)
+		if err != nil {
+			return fmt.Errorf("failed to create listener: %v", err)
+		}
+	}
+
 	if err := s.applyServingInfoTo(c); err != nil {
 		return err
 	}
+
+	c.SecureServingInfo.Listener = s.Listener
 
 	// create self-signed cert+key with the fake server.LoopbackClientServerNameOverride and
 	// let the server return it when the loopback client connects.
@@ -184,16 +203,9 @@ func (s *SecureServingOptions) ApplyTo(c *server.Config) error {
 }
 
 func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {
-	if s.BindPort <= 0 {
-		return nil
-	}
-
-	secureServingInfo := &server.SecureServingInfo{
-		BindAddress: net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.BindPort)),
-	}
+	secureServingInfo := &server.SecureServingInfo{}
 
 	serverCertFile, serverKeyFile := s.ServerCert.CertKey.CertFile, s.ServerCert.CertKey.KeyFile
-
 	// load main cert
 	if len(serverCertFile) != 0 || len(serverKeyFile) != 0 {
 		tlsCert, err := tls.LoadX509KeyPair(serverCertFile, serverKeyFile)
@@ -250,7 +262,7 @@ func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress str
 		return nil
 	}
 	keyCert := &s.ServerCert.CertKey
-	if s.BindPort == 0 || len(keyCert.CertFile) != 0 || len(keyCert.KeyFile) != 0 {
+	if len(keyCert.CertFile) != 0 || len(keyCert.KeyFile) != 0 {
 		return nil
 	}
 
@@ -285,4 +297,23 @@ func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress str
 	}
 
 	return nil
+}
+
+func CreateListener(network, addr string) (net.Listener, int, error) {
+	if len(network) == 0 {
+		network = "tcp"
+	}
+	ln, err := net.Listen(network, addr)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to listen on %v: %v", addr, err)
+	}
+
+	// get port
+	tcpAddr, ok := ln.Addr().(*net.TCPAddr)
+	if !ok {
+		ln.Close()
+		return nil, 0, fmt.Errorf("invalid listen address: %q", ln.Addr().String())
+	}
+
+	return ln, tcpAddr.Port, nil
 }

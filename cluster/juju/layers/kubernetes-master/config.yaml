@@ -70,3 +70,9 @@ options:
     description: |
       Comma separated authorization modes. Allowed values are
       "RBAC", "Node", "Webhook", "ABAC", "AlwaysDeny" and "AlwaysAllow".
+  require-manual-upgrade:
+    type: boolean
+    default: true
+    description: |
+      When true, master nodes will not be upgraded until the user triggers
+      it manually by running the upgrade action.

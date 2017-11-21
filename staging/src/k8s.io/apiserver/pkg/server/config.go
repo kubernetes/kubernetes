@@ -203,11 +203,8 @@ type RecommendedConfig struct {
 }
 
 type SecureServingInfo struct {
-	// BindAddress is the ip:port to serve on
-	BindAddress string
-	// BindNetwork is the type of network to bind to - defaults to "tcp", accepts "tcp",
-	// "tcp4", and "tcp6".
-	BindNetwork string
+	// Listener is the secure server network listener.
+	Listener net.Listener
 
 	// Cert is the main server cert which is used if SNI does not match. Cert must be non-nil and is
 	// allowed to be in SNICerts.

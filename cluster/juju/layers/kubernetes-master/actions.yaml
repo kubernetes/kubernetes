@@ -46,3 +46,5 @@ namespace-delete:
       minLength: 2
   required:
     - name
+upgrade:
+    description: Upgrade the kubernetes snaps

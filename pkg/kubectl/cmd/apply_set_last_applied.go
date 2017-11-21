@@ -112,7 +112,7 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 	o.Codec = f.JSONEncoder()
 
 	var err error
-	o.Mapper, o.Typer, err = f.UnstructuredObject()
+	o.Mapper, o.Typer = f.Object()
 	if err != nil {
 		return err
 	}
@@ -122,23 +122,18 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 }
 
 func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) error {
-	r := f.NewUnstructuredBuilder().
+	r := f.NewBuilder().
+		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
-		Latest().
 		Flatten().
 		Do()
-	err := r.Err()
-	if err != nil {
-		return err
-	}
 
-	err = r.Visit(func(info *resource.Info, err error) error {
+	err := r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
-
-		patchBuf, diffBuf, patchType, err := editor.GetApplyPatch(info.VersionedObject, o.Codec)
+		patchBuf, diffBuf, patchType, err := editor.GetApplyPatch(info.Object, o.Codec)
 		if err != nil {
 			return err
 		}
@@ -151,16 +146,16 @@ func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) 
 				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
 			}
 		}
-		oringalBuf, err := kubectl.GetOriginalConfiguration(info.Mapping, info.Object)
+		originalBuf, err := kubectl.GetOriginalConfiguration(info.Mapping, info.Object)
 		if err != nil {
 			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
 		}
-		if oringalBuf == nil && !o.CreateAnnotation {
+		if originalBuf == nil && !o.CreateAnnotation {
 			return cmdutil.UsageErrorf(cmd, "no last-applied-configuration annotation found on resource: %s, to create the annotation, run the command with --create-annotation", info.Name)
 		}
 
 		//only add to PatchBufferList when changed
-		if !bytes.Equal(cmdutil.StripComments(oringalBuf), cmdutil.StripComments(diffBuf)) {
+		if !bytes.Equal(cmdutil.StripComments(originalBuf), cmdutil.StripComments(diffBuf)) {
 			p := PatchBuffer{Patch: patchBuf, PatchType: patchType}
 			o.PatchBufferList = append(o.PatchBufferList, p)
 			o.InfoList = append(o.InfoList, info)
@@ -228,7 +223,7 @@ func (o *SetLastAppliedOptions) getPatch(info *resource.Info) ([]byte, []byte, e
 	objMap := map[string]map[string]map[string]string{}
 	metadataMap := map[string]map[string]string{}
 	annotationsMap := map[string]string{}
-	localFile, err := runtime.Encode(o.Codec, info.VersionedObject)
+	localFile, err := runtime.Encode(o.Codec, info.Object)
 	if err != nil {
 		return nil, localFile, err
 	}

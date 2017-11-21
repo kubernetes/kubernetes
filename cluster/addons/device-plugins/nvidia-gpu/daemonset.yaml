@@ -11,7 +11,10 @@ spec:
     metadata:
       labels:
         k8s-app: nvidia-gpu-device-plugin
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      priorityClassName: system-node-critical
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -34,7 +37,10 @@ spec:
         name: nvidia-gpu-device-plugin
         resources:
           requests:
-            cpu: 10m
+            cpu: 50m
+            memory: 10Mi
+          limits:
+            cpu: 50m
             memory: 10Mi
         securityContext:
           privileged: true
