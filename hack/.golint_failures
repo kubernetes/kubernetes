@@ -436,7 +436,6 @@ pkg/util/term
 pkg/util/threading
 pkg/util/tolerations
 pkg/util/workqueue/prometheus
-pkg/version
 pkg/version/verflag
 pkg/volume/aws_ebs
 pkg/volume/azure_dd
