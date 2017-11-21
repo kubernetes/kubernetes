@@ -593,6 +593,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 	var ignoreNotReady bool
 	badPods := []v1.Pod{}
 	desiredPods := 0
+	notReady := int32(0)
 
 	if wait.PollImmediate(Poll, timeout, func() (bool, error) {
 		// We get the new list of pods, replication controllers, and
@@ -636,7 +637,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 			return false, err
 		}
 		nOk := int32(0)
-		notReady := int32(0)
+		notReady = int32(0)
 		badPods = []v1.Pod{}
 		desiredPods = len(podList.Items)
 		for _, pod := range podList.Items {
@@ -679,7 +680,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 		if !ignoreNotReady {
 			return errors.New(errorBadPodsStates(badPods, desiredPods, ns, "RUNNING and READY", timeout))
 		}
-		Logf("Number of not-ready pods is allowed.")
+		Logf("Number of not-ready pods (%d) is below the allowed threshold (%d).", notReady, allowedNotReadyPods)
 	}
 	return nil
 }
