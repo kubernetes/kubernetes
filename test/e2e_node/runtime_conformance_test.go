@@ -256,154 +256,176 @@ while true; do sleep 1; done
 				Data: map[string][]byte{v1.DockerConfigJsonKey: []byte(auth)},
 				Type: v1.SecretTypeDockerConfigJson,
 			}
-			// The following images are not added into NodeImageWhiteList, because this test is
-			// testing image pulling, these images don't need to be prepulled. The ImagePullPolicy
-			// is v1.PullAlways, so it won't be blocked by framework image white list check.
-			for _, testCase := range []struct {
-				description        string
+
+			type testCase struct {
 				image              string
 				secret             bool
 				credentialProvider bool
 				phase              v1.PodPhase
 				waiting            bool
-			}{
-				{
-					description: "should not be able to pull image from invalid registry",
-					image:       "invalid.com/invalid/alpine:3.1",
-					phase:       v1.PodPending,
-					waiting:     true,
+			}
+
+			// The following images are not added into NodeImageWhiteList, because this test is
+			// testing image pulling, these images don't need to be prepulled. The ImagePullPolicy
+			// is v1.PullAlways, so it won't be blocked by framework image white list check.
+			testCases := map[string]testCase{
+				"should not be able to pull image from invalid registry": {
+					image:   "invalid.com/invalid/alpine:3.1",
+					phase:   v1.PodPending,
+					waiting: true,
 				},
-				{
-					description: "should not be able to pull non-existing image from gcr.io",
-					image:       "gcr.io/google_containers/invalid-image:invalid-tag",
-					phase:       v1.PodPending,
-					waiting:     true,
+				"should not be able to pull non-existing image from gcr.io": {
+					image:   "gcr.io/google_containers/invalid-image:invalid-tag",
+					phase:   v1.PodPending,
+					waiting: true,
 				},
-				{
-					description: "should be able to pull image from gcr.io",
-					image:       "gcr.io/google_containers/alpine-with-bash:1.0",
-					phase:       v1.PodRunning,
-					waiting:     false,
+				"should be able to pull image from gcr.io": {
+					image:   "gcr.io/google_containers/alpine-with-bash:1.0",
+					phase:   v1.PodRunning,
+					waiting: false,
 				},
-				{
-					description: "should be able to pull image from docker hub",
-					image:       "alpine:3.1",
-					phase:       v1.PodRunning,
-					waiting:     false,
+				"should be able to pull image from docker hub": {
+					image:   "alpine:3.1",
+					phase:   v1.PodRunning,
+					waiting: false,
 				},
-				{
-					description: "should not be able to pull from private registry without secret",
-					image:       "gcr.io/authenticated-image-pulling/alpine:3.1",
-					phase:       v1.PodPending,
-					waiting:     true,
+				"should not be able to pull from private registry without secret": {
+					image:   "gcr.io/authenticated-image-pulling/alpine:3.1",
+					phase:   v1.PodPending,
+					waiting: true,
 				},
-				{
-					description: "should be able to pull from private registry with secret",
-					image:       "gcr.io/authenticated-image-pulling/alpine:3.1",
-					secret:      true,
-					phase:       v1.PodRunning,
-					waiting:     false,
+				"should be able to pull from private registry with secret": {
+					image:   "gcr.io/authenticated-image-pulling/alpine:3.1",
+					secret:  true,
+					phase:   v1.PodRunning,
+					waiting: false,
 				},
-				{
-					description:        "should be able to pull from private registry with credential provider",
+				"should be able to pull from private registry with credential provider": {
 					image:              "gcr.io/authenticated-image-pulling/alpine:3.1",
 					credentialProvider: true,
 					phase:              v1.PodRunning,
 					waiting:            false,
 				},
-			} {
-				testCase := testCase
-				It(testCase.description+" [Conformance]", func() {
-					name := "image-pull-test"
-					command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
-					container := ConformanceContainer{
-						PodClient: f.PodClient(),
-						Container: v1.Container{
-							Name:    name,
-							Image:   testCase.image,
-							Command: command,
-							// PullAlways makes sure that the image will always be pulled even if it is present before the test.
-							ImagePullPolicy: v1.PullAlways,
-						},
-						RestartPolicy: v1.RestartPolicyNever,
+			}
+
+			runThisTest := func(f *framework.Framework, test testCase, secret *v1.Secret, auth string) {
+				name := "image-pull-test"
+				command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
+				container := ConformanceContainer{
+					PodClient: f.PodClient(),
+					Container: v1.Container{
+						Name:    name,
+						Image:   test.image,
+						Command: command,
+						// PullAlways makes sure that the image will always be pulled even if it is present before the test.
+						ImagePullPolicy: v1.PullAlways,
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+				}
+				if test.secret {
+					secret.Name = "image-pull-secret-" + string(uuid.NewUUID())
+					By("create image pull secret")
+					_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret)
+					Expect(err).NotTo(HaveOccurred())
+					defer f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(secret.Name, nil)
+					container.ImagePullSecrets = []string{secret.Name}
+				}
+				if test.credentialProvider {
+					configFile := filepath.Join(services.KubeletRootDirectory, "config.json")
+					err := ioutil.WriteFile(configFile, []byte(auth), 0644)
+					Expect(err).NotTo(HaveOccurred())
+					defer os.Remove(configFile)
+				}
+				// checkContainerStatus checks whether the container status matches expectation.
+				checkContainerStatus := func() error {
+					status, err := container.GetStatus()
+					if err != nil {
+						return fmt.Errorf("failed to get container status: %v", err)
 					}
-					if testCase.secret {
-						secret.Name = "image-pull-secret-" + string(uuid.NewUUID())
-						By("create image pull secret")
-						_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret)
-						Expect(err).NotTo(HaveOccurred())
-						defer f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(secret.Name, nil)
-						container.ImagePullSecrets = []string{secret.Name}
+					// We need to check container state first. The default pod status is pending, If we check
+					// pod phase first, and the expected pod phase is Pending, the container status may not
+					// even show up when we check it.
+					// Check container state
+					if !test.waiting {
+						if status.State.Running == nil {
+							return fmt.Errorf("expected container state: Running, got: %q",
+								GetContainerState(status.State))
+						}
 					}
-					if testCase.credentialProvider {
-						configFile := filepath.Join(services.KubeletRootDirectory, "config.json")
-						err := ioutil.WriteFile(configFile, []byte(auth), 0644)
-						Expect(err).NotTo(HaveOccurred())
-						defer os.Remove(configFile)
+					if test.waiting {
+						if status.State.Waiting == nil {
+							return fmt.Errorf("expected container state: Waiting, got: %q",
+								GetContainerState(status.State))
+						}
+						reason := status.State.Waiting.Reason
+						if reason != images.ErrImagePull.Error() &&
+							reason != images.ErrImagePullBackOff.Error() {
+							return fmt.Errorf("unexpected waiting reason: %q", reason)
+						}
 					}
-					// checkContainerStatus checks whether the container status matches expectation.
-					checkContainerStatus := func() error {
-						status, err := container.GetStatus()
-						if err != nil {
-							return fmt.Errorf("failed to get container status: %v", err)
-						}
-						// We need to check container state first. The default pod status is pending, If we check
-						// pod phase first, and the expected pod phase is Pending, the container status may not
-						// even show up when we check it.
-						// Check container state
-						if !testCase.waiting {
-							if status.State.Running == nil {
-								return fmt.Errorf("expected container state: Running, got: %q",
-									GetContainerState(status.State))
-							}
-						}
-						if testCase.waiting {
-							if status.State.Waiting == nil {
-								return fmt.Errorf("expected container state: Waiting, got: %q",
-									GetContainerState(status.State))
-							}
-							reason := status.State.Waiting.Reason
-							if reason != images.ErrImagePull.Error() &&
-								reason != images.ErrImagePullBackOff.Error() {
-								return fmt.Errorf("unexpected waiting reason: %q", reason)
-							}
-						}
-						// Check pod phase
-						phase, err := container.GetPhase()
-						if err != nil {
-							return fmt.Errorf("failed to get pod phase: %v", err)
-						}
-						if phase != testCase.phase {
-							return fmt.Errorf("expected pod phase: %q, got: %q", testCase.phase, phase)
-						}
-						return nil
+					// Check pod phase
+					phase, err := container.GetPhase()
+					if err != nil {
+						return fmt.Errorf("failed to get pod phase: %v", err)
 					}
-					// The image registry is not stable, which sometimes causes the test to fail. Add retry mechanism to make this
-					// less flaky.
-					const flakeRetry = 3
-					for i := 1; i <= flakeRetry; i++ {
-						var err error
-						By("create the container")
-						container.Create()
-						By("check the container status")
-						for start := time.Now(); time.Since(start) < retryTimeout; time.Sleep(pollInterval) {
-							if err = checkContainerStatus(); err == nil {
-								break
-							}
-						}
-						By("delete the container")
-						container.Delete()
-						if err == nil {
+					if phase != test.phase {
+						return fmt.Errorf("expected pod phase: %q, got: %q", test.phase, phase)
+					}
+					return nil
+				}
+				// The image registry is not stable, which sometimes causes the test to fail. Add retry mechanism to make this
+				// less flaky.
+				const flakeRetry = 3
+				for i := 1; i <= flakeRetry; i++ {
+					var err error
+					By("create the container")
+					container.Create()
+					By("check the container status")
+					for start := time.Now(); time.Since(start) < retryTimeout; time.Sleep(pollInterval) {
+						if err = checkContainerStatus(); err == nil {
 							break
 						}
-						if i < flakeRetry {
-							framework.Logf("No.%d attempt failed: %v, retrying...", i, err)
-						} else {
-							framework.Failf("All %d attempts failed: %v", flakeRetry, err)
-						}
 					}
-				})
+					By("delete the container")
+					container.Delete()
+					if err == nil {
+						break
+					}
+					if i < flakeRetry {
+						framework.Logf("No.%d attempt failed: %v, retrying...", i, err)
+					} else {
+						framework.Failf("All %d attempts failed: %v", flakeRetry, err)
+					}
+				}
 			}
+
+			framework.ConformanceIt("should not be able to pull image from invalid registry", func() {
+				runThisTest(f, testCases["should not be able to pull image from invalid registry"], secret, auth)
+			})
+
+			framework.ConformanceIt("should not be able to pull non-existing image from gcr.io", func() {
+				runThisTest(f, testCases["should not be able to pull non-existing image from gcr.io"], secret, auth)
+			})
+
+			framework.ConformanceIt("should be able to pull image from gcr.io", func() {
+				runThisTest(f, testCases["should be able to pull image from gcr.io"], secret, auth)
+			})
+
+			framework.ConformanceIt("should be able to pull image from docker hub", func() {
+				runThisTest(f, testCases["should be able to pull image from docker hub"], secret, auth)
+			})
+
+			framework.ConformanceIt("should not be able to pull from private registry without secret", func() {
+				runThisTest(f, testCases["should not be able to pull from private registry without secret"], secret, auth)
+			})
+
+			framework.ConformanceIt("should be able to pull from private registry with secret", func() {
+				runThisTest(f, testCases["should be able to pull from private registry with secret"], secret, auth)
+			})
+
+			framework.ConformanceIt("should be able to pull from private registry with credential provider", func() {
+				runThisTest(f, testCases["should be able to pull from private registry with credential provider"], secret, auth)
+			})
 		})
 	})
 })
