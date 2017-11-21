@@ -100,6 +100,7 @@ go_library(
         "kubectl.go",
         "namespace.go",
         "pdb.go",
+        "pod_template_printer.go",
         "priorityclass.go",
         "quota.go",
         "resource_filter.go",
@@ -120,7 +121,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/batch:go_default_library",
@@ -147,6 +147,7 @@ go_library(
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/api/apps/v1:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/api/autoscaling/v1:go_default_library",
         "//vendor/k8s.io/api/batch/v1:go_default_library",

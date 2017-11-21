@@ -585,7 +585,7 @@ func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kube
 	groupVersionKind := groupVersionKinds[0]
 
 	if len(overrides) > 0 {
-		codec := runtime.NewCodec(f.JSONEncoder(), f.Decoder(true))
+		codec := runtime.NewCodec(f.JSONEncoder(), f.Decoder(false))
 		obj, err = cmdutil.Merge(codec, obj, overrides)
 		if err != nil {
 			return nil, err
@@ -615,7 +615,6 @@ func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kube
 			ObjectTyper:  typer,
 			RESTMapper:   mapper,
 			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
-			Decoder:      f.Decoder(true),
 		}
 		info, err := resourceMapper.InfoForObject(obj, nil)
 		if err != nil {

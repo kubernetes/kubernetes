@@ -649,7 +649,12 @@ func (f *fakeAPIFactory) JSONEncoder() runtime.Encoder {
 }
 
 func (f *fakeAPIFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
-	fakeClient := f.tf.Client.(*fake.RESTClient)
+	var fakeClient *fake.RESTClient
+	if f.tf.UnstructuredClient != nil {
+		fakeClient = f.tf.UnstructuredClient.(*fake.RESTClient)
+	} else {
+		fakeClient = f.tf.Client.(*fake.RESTClient)
+	}
 	clientset := kubernetes.NewForConfigOrDie(f.tf.ClientConfig)
 
 	clientset.CoreV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
@@ -696,8 +701,13 @@ func (f *fakeAPIFactory) ClientSet() (internalclientset.Interface, error) {
 }
 
 func (f *fakeAPIFactory) RESTClient() (*restclient.RESTClient, error) {
+	var fakeClient *fake.RESTClient
+	if f.tf.UnstructuredClient != nil {
+		fakeClient = f.tf.UnstructuredClient.(*fake.RESTClient)
+	} else {
+		fakeClient = f.tf.Client.(*fake.RESTClient)
+	}
 	// Swap out the HTTP client out of the client with the fake's version.
-	fakeClient := f.tf.Client.(*fake.RESTClient)
 	restClient, err := restclient.RESTClientFor(f.tf.ClientConfig)
 	if err != nil {
 		panic(err)

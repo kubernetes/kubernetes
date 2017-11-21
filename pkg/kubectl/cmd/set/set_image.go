@@ -40,7 +40,6 @@ type ImageOptions struct {
 	Mapper       meta.RESTMapper
 	Infos        []*resource.Info
 	Encoder      runtime.Encoder
-	Decoder      runtime.Decoder
 	Selector     string
 	Out          io.Writer
 	Err          io.Writer
@@ -120,7 +119,6 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	o.PrintSuccess = f.PrintSuccess
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
 	o.Encoder = f.JSONEncoder()
-	o.Decoder = f.Decoder(true)
 	o.ShortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
 	o.Record = cmdutil.GetRecordFlag(cmd)
 	o.ChangeCause = f.Command(cmd, false)
@@ -143,7 +141,7 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
-		Internal().
+		Unstructured().
 		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().

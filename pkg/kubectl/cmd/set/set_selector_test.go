@@ -317,7 +317,7 @@ func TestGetResourcesAndSelector(t *testing.T) {
 
 func TestSelectorTest(t *testing.T) {
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {

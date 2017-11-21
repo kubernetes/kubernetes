@@ -58,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
@@ -222,13 +223,13 @@ func (f *ring0Factory) Decoder(toInternal bool) runtime.Decoder {
 	if toInternal {
 		decoder = legacyscheme.Codecs.UniversalDecoder()
 	} else {
-		decoder = legacyscheme.Codecs.UniversalDeserializer()
+		decoder = scheme.Codecs.UniversalDeserializer()
 	}
 	return decoder
 }
 
 func (f *ring0Factory) JSONEncoder() runtime.Encoder {
-	return legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...)
+	return scheme.Codecs.LegacyCodec(scheme.Registry.EnabledVersions()...)
 }
 
 func (f *ring0Factory) UpdatePodSpecForObject(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error) {
@@ -432,8 +433,30 @@ func (f *ring0Factory) Printer(mapping *meta.RESTMapping, options printers.Print
 }
 
 func (f *ring0Factory) Pauser(info *resource.Info) ([]byte, error) {
+	_, isUnstructured := info.Object.(runtime.Unstructured)
+	if isUnstructured {
+		info.Object = info.AsVersioned()
+	}
 	switch obj := info.Object.(type) {
-	case *extensions.Deployment:
+	case *extensionsv1beta1.Deployment:
+		if obj.Spec.Paused {
+			return nil, errors.New("is already paused")
+		}
+		obj.Spec.Paused = true
+		return runtime.Encode(f.JSONEncoder(), info.Object)
+	case *appsv1.Deployment:
+		if obj.Spec.Paused {
+			return nil, errors.New("is already paused")
+		}
+		obj.Spec.Paused = true
+		return runtime.Encode(f.JSONEncoder(), info.Object)
+	case *appsv1beta1.Deployment:
+		if obj.Spec.Paused {
+			return nil, errors.New("is already paused")
+		}
+		obj.Spec.Paused = true
+		return runtime.Encode(f.JSONEncoder(), info.Object)
+	case *appsv1beta2.Deployment:
 		if obj.Spec.Paused {
 			return nil, errors.New("is already paused")
 		}
@@ -449,8 +472,30 @@ func (f *ring0Factory) ResolveImage(name string) (string, error) {
 }
 
 func (f *ring0Factory) Resumer(info *resource.Info) ([]byte, error) {
+	_, isUnstructured := info.Object.(runtime.Unstructured)
+	if isUnstructured {
+		info.Object = info.AsVersioned()
+	}
 	switch obj := info.Object.(type) {
-	case *extensions.Deployment:
+	case *extensionsv1beta1.Deployment:
+		if !obj.Spec.Paused {
+			return nil, errors.New("is not paused")
+		}
+		obj.Spec.Paused = false
+		return runtime.Encode(f.JSONEncoder(), info.Object)
+	case *appsv1.Deployment:
+		if !obj.Spec.Paused {
+			return nil, errors.New("is not paused")
+		}
+		obj.Spec.Paused = false
+		return runtime.Encode(f.JSONEncoder(), info.Object)
+	case *appsv1beta1.Deployment:
+		if !obj.Spec.Paused {
+			return nil, errors.New("is not paused")
+		}
+		obj.Spec.Paused = false
+		return runtime.Encode(f.JSONEncoder(), info.Object)
+	case *appsv1beta2.Deployment:
 		if !obj.Spec.Paused {
 			return nil, errors.New("is not paused")
 		}

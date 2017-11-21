@@ -69,7 +69,7 @@ func TestSetServiceAccountLocal(t *testing.T) {
 	for i, input := range inputs {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			f, tf, _, _ := cmdtesting.NewAPIFactory()
-			tf.Client = &fake.RESTClient{
+			tf.UnstructuredClient = &fake.RESTClient{
 				GroupVersion: schema.GroupVersion{Version: "v1"},
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
@@ -100,7 +100,7 @@ func TestSetServiceAccountLocal(t *testing.T) {
 func TestSetServiceAccountMultiLocal(t *testing.T) {
 	testapi.Default = testapi.Groups[""]
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -320,7 +320,7 @@ func TestSetServiceAccountRemote(t *testing.T) {
 		tf.Printer = printers.NewVersionedPrinter(&printers.YAMLPrinter{}, testapi.Default.Converter(), *testapi.Default.GroupVersion())
 		tf.Namespace = "test"
 		tf.CategoryExpander = categories.LegacyCategoryExpander
-		tf.Client = &fake.RESTClient{
+		tf.UnstructuredClient = &fake.RESTClient{
 			GroupVersion:         groupVersion,
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -370,7 +370,7 @@ func TestServiceAccountValidation(t *testing.T) {
 	}
 	for _, input := range inputs {
 		f, tf, _, _ := cmdtesting.NewAPIFactory()
-		tf.Client = &fake.RESTClient{
+		tf.UnstructuredClient = &fake.RESTClient{
 			GroupVersion: schema.GroupVersion{Version: "v1"},
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)

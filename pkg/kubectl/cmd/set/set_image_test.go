@@ -47,7 +47,7 @@ import (
 
 func TestImageLocal(t *testing.T) {
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -150,7 +150,7 @@ func TestSetImageValidation(t *testing.T) {
 
 func TestSetMultiResourcesImageLocal(t *testing.T) {
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -505,7 +505,7 @@ func TestSetImageRemote(t *testing.T) {
 		tf.Printer = printers.NewVersionedPrinter(&printers.YAMLPrinter{}, testapi.Default.Converter(), *testapi.Default.GroupVersion())
 		tf.Namespace = "test"
 		tf.CategoryExpander = categories.LegacyCategoryExpander
-		tf.Client = &fake.RESTClient{
+		tf.UnstructuredClient = &fake.RESTClient{
 			GroupVersion:         groupVersion,
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {

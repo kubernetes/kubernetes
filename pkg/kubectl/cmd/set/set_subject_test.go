@@ -20,9 +20,9 @@ import (
 	"reflect"
 	"testing"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
@@ -63,12 +63,12 @@ func TestValidate(t *testing.T) {
 			options: &SubjectOptions{
 				Infos: []*resource.Info{
 					{
-						Object: &rbac.ClusterRoleBinding{
+						Object: &rbacv1.ClusterRoleBinding{
 							ObjectMeta: metav1.ObjectMeta{
 								Name: "clusterrolebinding",
 							},
-							RoleRef: rbac.RoleRef{
-								APIGroup: "rbac.authorization.k8s.io",
+							RoleRef: rbacv1.RoleRef{
+								APIGroup: "rbacv1.authorization.k8s.io",
 								Kind:     "ClusterRole",
 								Name:     "role",
 							},
@@ -85,13 +85,13 @@ func TestValidate(t *testing.T) {
 			options: &SubjectOptions{
 				Infos: []*resource.Info{
 					{
-						Object: &rbac.RoleBinding{
+						Object: &rbacv1.RoleBinding{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      "rolebinding",
 								Namespace: "one",
 							},
-							RoleRef: rbac.RoleRef{
-								APIGroup: "rbac.authorization.k8s.io",
+							RoleRef: rbacv1.RoleRef{
+								APIGroup: "rbacv1.authorization.k8s.io",
 								Kind:     "ClusterRole",
 								Name:     "role",
 							},
@@ -122,13 +122,13 @@ func TestUpdateSubjectForObject(t *testing.T) {
 	tests := []struct {
 		Name     string
 		obj      runtime.Object
-		subjects []rbac.Subject
-		expected []rbac.Subject
+		subjects []rbacv1.Subject
+		expected []rbacv1.Subject
 		wantErr  bool
 	}{
 		{
 			Name: "invalid object type",
-			obj: &rbac.Role{
+			obj: &rbacv1.Role{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "role",
 					Namespace: "one",
@@ -138,39 +138,39 @@ func TestUpdateSubjectForObject(t *testing.T) {
 		},
 		{
 			Name: "add resource with users in rolebinding",
-			obj: &rbac.RoleBinding{
+			obj: &rbacv1.RoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "rolebinding",
 					Namespace: "one",
 				},
-				Subjects: []rbac.Subject{
+				Subjects: []rbacv1.Subject{
 					{
-						APIGroup: "rbac.authorization.k8s.io",
+						APIGroup: "rbacv1.authorization.k8s.io",
 						Kind:     "User",
 						Name:     "a",
 					},
 				},
 			},
-			subjects: []rbac.Subject{
+			subjects: []rbacv1.Subject{
 				{
-					APIGroup: "rbac.authorization.k8s.io",
+					APIGroup: "rbacv1.authorization.k8s.io",
 					Kind:     "User",
 					Name:     "a",
 				},
 				{
-					APIGroup: "rbac.authorization.k8s.io",
+					APIGroup: "rbacv1.authorization.k8s.io",
 					Kind:     "User",
 					Name:     "b",
 				},
 			},
-			expected: []rbac.Subject{
+			expected: []rbacv1.Subject{
 				{
-					APIGroup: "rbac.authorization.k8s.io",
+					APIGroup: "rbacv1.authorization.k8s.io",
 					Kind:     "User",
 					Name:     "a",
 				},
 				{
-					APIGroup: "rbac.authorization.k8s.io",
+					APIGroup: "rbacv1.authorization.k8s.io",
 					Kind:     "User",
 					Name:     "b",
 				},
@@ -179,39 +179,39 @@ func TestUpdateSubjectForObject(t *testing.T) {
 		},
 		{
 			Name: "add resource with groups in rolebinding",
-			obj: &rbac.RoleBinding{
+			obj: &rbacv1.RoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "rolebinding",
 					Namespace: "one",
 				},
-				Subjects: []rbac.Subject{
+				Subjects: []rbacv1.Subject{
 					{
-						APIGroup: "rbac.authorization.k8s.io",
+						APIGroup: "rbacv1.authorization.k8s.io",
 						Kind:     "Group",
 						Name:     "a",
 					},
 				},
 			},
-			subjects: []rbac.Subject{
+			subjects: []rbacv1.Subject{
 				{
-					APIGroup: "rbac.authorization.k8s.io",
+					APIGroup: "rbacv1.authorization.k8s.io",
 					Kind:     "Group",
 					Name:     "a",
 				},
 				{
-					APIGroup: "rbac.authorization.k8s.io",
+					APIGroup: "rbacv1.authorization.k8s.io",
 					Kind:     "Group",
 					Name:     "b",
 				},
 			},
-			expected: []rbac.Subject{
+			expected: []rbacv1.Subject{
 				{
-					APIGroup: "rbac.authorization.k8s.io",
+					APIGroup: "rbacv1.authorization.k8s.io",
 					Kind:     "Group",
 					Name:     "a",
 				},
 				{
-					APIGroup: "rbac.authorization.k8s.io",
+					APIGroup: "rbacv1.authorization.k8s.io",
 					Kind:     "Group",
 					Name:     "b",
 				},
@@ -220,12 +220,12 @@ func TestUpdateSubjectForObject(t *testing.T) {
 		},
 		{
 			Name: "add resource with serviceaccounts in rolebinding",
-			obj: &rbac.RoleBinding{
+			obj: &rbacv1.RoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "rolebinding",
 					Namespace: "one",
 				},
-				Subjects: []rbac.Subject{
+				Subjects: []rbacv1.Subject{
 					{
 						Kind:      "ServiceAccount",
 						Namespace: "one",
@@ -233,7 +233,7 @@ func TestUpdateSubjectForObject(t *testing.T) {
 					},
 				},
 			},
-			subjects: []rbac.Subject{
+			subjects: []rbacv1.Subject{
 				{
 					Kind:      "ServiceAccount",
 					Namespace: "one",
@@ -245,7 +245,7 @@ func TestUpdateSubjectForObject(t *testing.T) {
 					Name:      "b",
 				},
 			},
-			expected: []rbac.Subject{
+			expected: []rbacv1.Subject{
 				{
 					Kind:      "ServiceAccount",
 					Namespace: "one",
@@ -261,38 +261,38 @@ func TestUpdateSubjectForObject(t *testing.T) {
 		},
 		{
 			Name: "add resource with serviceaccounts in clusterrolebinding",
-			obj: &rbac.ClusterRoleBinding{
+			obj: &rbacv1.ClusterRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "clusterrolebinding",
 				},
-				Subjects: []rbac.Subject{
+				Subjects: []rbacv1.Subject{
 					{
-						APIGroup: "rbac.authorization.k8s.io",
+						APIGroup: "rbacv1.authorization.k8s.io",
 						Kind:     "User",
 						Name:     "a",
 					},
 					{
-						APIGroup: "rbac.authorization.k8s.io",
+						APIGroup: "rbacv1.authorization.k8s.io",
 						Kind:     "Group",
 						Name:     "a",
 					},
 				},
 			},
-			subjects: []rbac.Subject{
+			subjects: []rbacv1.Subject{
 				{
 					Kind:      "ServiceAccount",
 					Namespace: "one",
 					Name:      "a",
 				},
 			},
-			expected: []rbac.Subject{
+			expected: []rbacv1.Subject{
 				{
-					APIGroup: "rbac.authorization.k8s.io",
+					APIGroup: "rbacv1.authorization.k8s.io",
 					Kind:     "User",
 					Name:     "a",
 				},
 				{
-					APIGroup: "rbac.authorization.k8s.io",
+					APIGroup: "rbacv1.authorization.k8s.io",
 					Kind:     "Group",
 					Name:     "a",
 				},
@@ -311,11 +311,11 @@ func TestUpdateSubjectForObject(t *testing.T) {
 		}
 
 		want := tt.expected
-		var got []rbac.Subject
+		var got []rbacv1.Subject
 		switch t := tt.obj.(type) {
-		case *rbac.RoleBinding:
+		case *rbacv1.RoleBinding:
 			got = t.Subjects
-		case *rbac.ClusterRoleBinding:
+		case *rbacv1.ClusterRoleBinding:
 			got = t.Subjects
 		}
 		if !reflect.DeepEqual(got, want) {
@@ -329,40 +329,40 @@ func TestUpdateSubjectForObject(t *testing.T) {
 func TestAddSubject(t *testing.T) {
 	tests := []struct {
 		Name       string
-		existing   []rbac.Subject
-		subjects   []rbac.Subject
-		expected   []rbac.Subject
+		existing   []rbacv1.Subject
+		subjects   []rbacv1.Subject
+		expected   []rbacv1.Subject
 		wantChange bool
 	}{
 		{
 			Name: "add resource with users",
-			existing: []rbac.Subject{
+			existing: []rbacv1.Subject{
 				{
-					APIGroup: "rbac.authorization.k8s.io",
+					APIGroup: "rbacv1.authorization.k8s.io",
 					Kind:     "User",
 					Name:     "a",
 				},
 				{
-					APIGroup: "rbac.authorization.k8s.io",
+					APIGroup: "rbacv1.authorization.k8s.io",
 					Kind:     "User",
 					Name:     "b",
 				},
 			},
-			subjects: []rbac.Subject{
+			subjects: []rbacv1.Subject{
 				{
-					APIGroup: "rbac.authorization.k8s.io",
+					APIGroup: "rbacv1.authorization.k8s.io",
 					Kind:     "User",
 					Name:     "a",
 				},
 			},
-			expected: []rbac.Subject{
+			expected: []rbacv1.Subject{
 				{
-					APIGroup: "rbac.authorization.k8s.io",
+					APIGroup: "rbacv1.authorization.k8s.io",
 					Kind:     "User",
 					Name:     "a",
 				},
 				{
-					APIGroup: "rbac.authorization.k8s.io",
+					APIGroup: "rbacv1.authorization.k8s.io",
 					Kind:     "User",
 					Name:     "b",
 				},
@@ -371,7 +371,7 @@ func TestAddSubject(t *testing.T) {
 		},
 		{
 			Name: "add resource with serviceaccounts",
-			existing: []rbac.Subject{
+			existing: []rbacv1.Subject{
 				{
 					Kind:      "ServiceAccount",
 					Namespace: "one",
@@ -383,14 +383,14 @@ func TestAddSubject(t *testing.T) {
 					Name:      "b",
 				},
 			},
-			subjects: []rbac.Subject{
+			subjects: []rbacv1.Subject{
 				{
 					Kind:      "ServiceAccount",
 					Namespace: "two",
 					Name:      "a",
 				},
 			},
-			expected: []rbac.Subject{
+			expected: []rbacv1.Subject{
 				{
 					Kind:      "ServiceAccount",
 					Namespace: "one",
@@ -412,7 +412,7 @@ func TestAddSubject(t *testing.T) {
 	}
 	for _, tt := range tests {
 		changed := false
-		got := []rbac.Subject{}
+		got := []rbacv1.Subject{}
 		if changed, got = addSubjects(tt.existing, tt.subjects); (changed != false) != tt.wantChange {
 			t.Errorf("%q. addSubjects() changed = %v, wantChange = %v", tt.Name, changed, tt.wantChange)
 		}

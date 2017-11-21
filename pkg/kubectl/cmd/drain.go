@@ -237,7 +237,7 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 	}
 
 	builder := o.Factory.NewBuilder().
-		Internal().
+		Unstructured().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		ResourceNames("nodes", args...).
 		SingleResourceType().

@@ -35,12 +35,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	clientappsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
 	clientextv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	kapps "k8s.io/kubernetes/pkg/kubectl/apps"
 	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 const (
@@ -143,7 +140,7 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 		if !ok {
 			return "", fmt.Errorf("unable to find the specified revision")
 		}
-		return printTemplate(template)
+		return printPodTemplate(template)
 	}
 
 	// Sort the revisionToChangeCause map by revision
@@ -165,17 +162,6 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 		}
 		return nil
 	})
-}
-
-func printTemplate(template *v1.PodTemplateSpec) (string, error) {
-	buf := bytes.NewBuffer([]byte{})
-	internalTemplate := &api.PodTemplateSpec{}
-	if err := apiv1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(template, internalTemplate, nil); err != nil {
-		return "", fmt.Errorf("failed to convert podtemplate, %v", err)
-	}
-	w := printersinternal.NewPrefixWriter(buf)
-	printersinternal.DescribePodTemplate(internalTemplate, w)
-	return buf.String(), nil
 }
 
 type DaemonSetHistoryViewer struct {
@@ -208,7 +194,7 @@ func (h *DaemonSetHistoryViewer) ViewHistory(namespace, name string, revision in
 		if err != nil {
 			return "", fmt.Errorf("unable to parse history %s", history.Name)
 		}
-		return printTemplate(&dsOfHistory.Spec.Template)
+		return printPodTemplate(&dsOfHistory.Spec.Template)
 	}
 
 	// Print an overview of all Revisions
