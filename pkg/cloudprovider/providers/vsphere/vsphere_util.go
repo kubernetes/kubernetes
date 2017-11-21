@@ -187,8 +187,13 @@ func getAccessibleDatastores(ctx context.Context, nodeVmDetail *NodeDetails, nod
 
 // Get all datastores accessible for the virtual machine object.
 func getSharedDatastoresInK8SCluster(ctx context.Context, dc *vclib.Datacenter, nodeManager *NodeManager) ([]*vclib.DatastoreInfo, error) {
-	nodeVmDetails := nodeManager.GetNodeDetails()
-	if nodeVmDetails == nil || len(nodeVmDetails) == 0 {
+	nodeVmDetails, err := nodeManager.GetNodeDetails()
+	if err != nil {
+		glog.Errorf("Error while obtaining Kubernetes node nodeVmDetail details. error : %+v", err)
+		return nil, err
+	}
+
+	if len(nodeVmDetails) == 0 {
 		msg := fmt.Sprintf("Kubernetes node nodeVmDetail details is empty. nodeVmDetails : %+v", nodeVmDetails)
 		glog.Error(msg)
 		return nil, fmt.Errorf(msg)
@@ -210,7 +215,7 @@ func getSharedDatastoresInK8SCluster(ctx context.Context, dc *vclib.Datacenter, 
 		}
 	}
 	glog.V(9).Infof("sharedDatastores : %+v", sharedDatastores)
-	sharedDatastores, err := getDatastoresForEndpointVC(ctx, dc, sharedDatastores)
+	sharedDatastores, err = getDatastoresForEndpointVC(ctx, dc, sharedDatastores)
 	if err != nil {
 		glog.Errorf("Failed to get shared datastores from endpoint VC. err: %+v", err)
 		return nil, err
