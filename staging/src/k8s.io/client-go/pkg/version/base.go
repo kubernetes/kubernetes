@@ -43,7 +43,7 @@ var (
 	gitMinor string = "7+" // minor version, numeric possibly followed by "+"
 
 	// semantic version, derived by build scripts (see
-	// https://github.com/kubernetes/kubernetes/blob/master/docs/design/versioning.md
+	// https://github.com/kubernetes/community/blob/master/contributors/design-proposals/release/versioning.md
 	// for a detailed discussion of this field)
 	//
 	// TODO: This field is still called "gitVersion" for legacy
@@ -55,9 +55,9 @@ var (
 	// NOTE: The $Format strings are replaced during 'git archive' thanks to the
 	// companion .gitattributes file containing 'export-subst' in this same
 	// directory.  See also https://git-scm.com/docs/gitattributes
-	gitVersion   string = "v1.7.11-beta.0+$Format:%h$"
-	gitCommit    string = "$Format:%H$" // sha1 from git, output of $(git rev-parse HEAD)
-	gitTreeState string = ""            // state of git tree, either "clean" or "dirty"
+	gitVersion   = "v0.0.0-master+$Format:%h$"
+	gitCommit    = "$Format:%H$" // sha1 from git, output of $(git rev-parse HEAD)
+	gitTreeState = ""            // state of git tree, either "clean" or "dirty"
 
-	buildDate string = "1970-01-01T00:00:00Z" // build date in ISO8601 format, output of $(date -u +'%Y-%m-%dT%H:%M:%SZ')
+	buildDate = "1970-01-01T00:00:00Z" // build date in ISO8601 format, output of $(date -u +'%Y-%m-%dT%H:%M:%SZ')
 )
