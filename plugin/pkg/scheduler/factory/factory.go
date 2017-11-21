@@ -1162,7 +1162,7 @@ func (p *podPreemptor) RemoveNominatedNodeAnnotation(pod *v1.Pod) error {
 	if _, exists := podCopy.Annotations[core.NominatedNodeAnnotationKey]; !exists {
 		return nil
 	}
-	// Note: Deleting the entry from the annotations and passing it Patch() will
+	// Note: Deleting the entry from the annotations and passing it to Patch() will
 	// not remove the annotation. That's why we set it to empty string.
 	podCopy.Annotations[core.NominatedNodeAnnotationKey] = ""
 	ret := &unstructured.Unstructured{}

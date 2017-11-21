@@ -226,6 +226,10 @@ func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, e
 			sched.config.Recorder.Eventf(victim, v1.EventTypeNormal, "Preempted", "by %v/%v on node %v", preemptor.Namespace, preemptor.Name, nodeName)
 		}
 	}
+	// Clearing nominated pods should happen outside of "if node != nil". Node could
+	// be nil when a pod with nominated node name is eligible to preempt again,
+	// but preemption logic does not find any node for it. In that case Preempt()
+	// function of generic_scheduler.go returns the pod itself for removal of the annotation.
 	for _, p := range nominatedPodsToClear {
 		rErr := sched.config.PodPreemptor.RemoveNominatedNodeAnnotation(p)
 		if rErr != nil {

@@ -362,7 +362,14 @@ func addNominatedPods(podPriority int32, meta algorithm.PredicateMetadata,
 	return true, metaOut, nodeInfoOut
 }
 
-// Checks whether node with a given name and NodeInfo satisfies all predicateFuncs.
+// podFitsOnNode checks whether a node given by NodeInfo satisfies the given predicate functions.
+// This function is called from two different places: Schedule and Preempt.
+// When it is called from Schedule, we want to test whether the pod is schedulable
+// on the node with all the existing pods on the node plus higher and equal priority
+// pods nominated to run on the node.
+// When it is called from Preempt, we should remove the victims of preemption and
+// add the nominated pods. Removal of the victims is done by SelectVictimsOnNode().
+// It removes victims from meta and NodeInfo before calling this function.
 func podFitsOnNode(
 	pod *v1.Pod,
 	meta algorithm.PredicateMetadata,
