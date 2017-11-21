@@ -24,8 +24,11 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -493,5 +496,274 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 		return false, err
 	}); err != nil {
 		t.Errorf("The nominated node name of the medium priority pod was not cleared: %v", err)
+	}
+}
+
+func mkMinAvailablePDB(name, namespace string, minAvailable int, matchLabels map[string]string) *policy.PodDisruptionBudget {
+	intMinAvailable := intstr.FromInt(minAvailable)
+	return &policy.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: policy.PodDisruptionBudgetSpec{
+			MinAvailable: &intMinAvailable,
+			Selector:     &metav1.LabelSelector{MatchLabels: matchLabels},
+		},
+	}
+}
+
+// TestPDBInPreemption tests PodDisruptionBudget support in preemption.
+func TestPDBInPreemption(t *testing.T) {
+	// Enable PodPriority feature gate.
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
+	// Initialize scheduler.
+	context := initTest(t, "preemption-pdb")
+	defer cleanupTest(t, context)
+	cs := context.clientSet
+
+	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
+		v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI)},
+	}
+	defaultNodeRes := &v1.ResourceList{
+		v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
+		v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(500, resource.BinarySI),
+	}
+
+	type nodeConfig struct {
+		name string
+		res  *v1.ResourceList
+	}
+
+	tests := []struct {
+		description         string
+		nodes               []*nodeConfig
+		pdbs                []*policy.PodDisruptionBudget
+		existingPods        []*v1.Pod
+		pod                 *v1.Pod
+		preemptedPodIndexes map[int]struct{}
+	}{
+		{
+			description: "A non-PDB violating pod is preempted despite its higher priority",
+			nodes:       []*nodeConfig{{name: "node-1", res: defaultNodeRes}},
+			pdbs: []*policy.PodDisruptionBudget{
+				mkMinAvailablePDB("pdb-1", context.ns.Name, 2, map[string]string{"foo": "bar"}),
+			},
+			existingPods: []*v1.Pod{
+				initPausePod(context.clientSet, &pausePodConfig{
+					Name:      "low-pod1",
+					Namespace: context.ns.Name,
+					Priority:  &lowPriority,
+					Resources: defaultPodRes,
+					Labels:    map[string]string{"foo": "bar"},
+				}),
+				initPausePod(context.clientSet, &pausePodConfig{
+					Name:      "low-pod2",
+					Namespace: context.ns.Name,
+					Priority:  &lowPriority,
+					Resources: defaultPodRes,
+					Labels:    map[string]string{"foo": "bar"},
+				}),
+				initPausePod(context.clientSet, &pausePodConfig{
+					Name:      "mid-pod3",
+					Namespace: context.ns.Name,
+					Priority:  &mediumPriority,
+					Resources: defaultPodRes,
+				}),
+			},
+			pod: initPausePod(cs, &pausePodConfig{
+				Name:      "preemptor-pod",
+				Namespace: context.ns.Name,
+				Priority:  &highPriority,
+				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(200, resource.BinarySI)},
+				},
+			}),
+			preemptedPodIndexes: map[int]struct{}{2: {}},
+		},
+		{
+			description: "A node without any PDB violating pods is preferred for preemption",
+			nodes: []*nodeConfig{
+				{name: "node-1", res: defaultNodeRes},
+				{name: "node-2", res: defaultNodeRes},
+			},
+			pdbs: []*policy.PodDisruptionBudget{
+				mkMinAvailablePDB("pdb-1", context.ns.Name, 2, map[string]string{"foo": "bar"}),
+			},
+			existingPods: []*v1.Pod{
+				initPausePod(context.clientSet, &pausePodConfig{
+					Name:      "low-pod1",
+					Namespace: context.ns.Name,
+					Priority:  &lowPriority,
+					Resources: defaultPodRes,
+					NodeName:  "node-1",
+					Labels:    map[string]string{"foo": "bar"},
+				}),
+				initPausePod(context.clientSet, &pausePodConfig{
+					Name:      "mid-pod2",
+					Namespace: context.ns.Name,
+					Priority:  &mediumPriority,
+					NodeName:  "node-2",
+					Resources: defaultPodRes,
+				}),
+			},
+			pod: initPausePod(cs, &pausePodConfig{
+				Name:      "preemptor-pod",
+				Namespace: context.ns.Name,
+				Priority:  &highPriority,
+				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(200, resource.BinarySI)},
+				},
+			}),
+			preemptedPodIndexes: map[int]struct{}{1: {}},
+		},
+		{
+			description: "A node with fewer PDB violating pods is preferred for preemption",
+			nodes: []*nodeConfig{
+				{name: "node-1", res: defaultNodeRes},
+				{name: "node-2", res: defaultNodeRes},
+				{name: "node-3", res: defaultNodeRes},
+			},
+			pdbs: []*policy.PodDisruptionBudget{
+				mkMinAvailablePDB("pdb-1", context.ns.Name, 2, map[string]string{"foo1": "bar"}),
+				mkMinAvailablePDB("pdb-2", context.ns.Name, 2, map[string]string{"foo2": "bar"}),
+			},
+			existingPods: []*v1.Pod{
+				initPausePod(context.clientSet, &pausePodConfig{
+					Name:      "low-pod1",
+					Namespace: context.ns.Name,
+					Priority:  &lowPriority,
+					Resources: defaultPodRes,
+					NodeName:  "node-1",
+					Labels:    map[string]string{"foo1": "bar"},
+				}),
+				initPausePod(context.clientSet, &pausePodConfig{
+					Name:      "mid-pod1",
+					Namespace: context.ns.Name,
+					Priority:  &mediumPriority,
+					Resources: defaultPodRes,
+					NodeName:  "node-1",
+				}),
+				initPausePod(context.clientSet, &pausePodConfig{
+					Name:      "low-pod2",
+					Namespace: context.ns.Name,
+					Priority:  &lowPriority,
+					Resources: defaultPodRes,
+					NodeName:  "node-2",
+					Labels:    map[string]string{"foo2": "bar"},
+				}),
+				initPausePod(context.clientSet, &pausePodConfig{
+					Name:      "mid-pod2",
+					Namespace: context.ns.Name,
+					Priority:  &mediumPriority,
+					Resources: defaultPodRes,
+					NodeName:  "node-2",
+					Labels:    map[string]string{"foo2": "bar"},
+				}),
+				initPausePod(context.clientSet, &pausePodConfig{
+					Name:      "low-pod4",
+					Namespace: context.ns.Name,
+					Priority:  &lowPriority,
+					Resources: defaultPodRes,
+					NodeName:  "node-3",
+					Labels:    map[string]string{"foo2": "bar"},
+				}),
+				initPausePod(context.clientSet, &pausePodConfig{
+					Name:      "low-pod5",
+					Namespace: context.ns.Name,
+					Priority:  &lowPriority,
+					Resources: defaultPodRes,
+					NodeName:  "node-3",
+					Labels:    map[string]string{"foo2": "bar"},
+				}),
+				initPausePod(context.clientSet, &pausePodConfig{
+					Name:      "low-pod6",
+					Namespace: context.ns.Name,
+					Priority:  &lowPriority,
+					Resources: defaultPodRes,
+					NodeName:  "node-3",
+					Labels:    map[string]string{"foo2": "bar"},
+				}),
+			},
+			pod: initPausePod(cs, &pausePodConfig{
+				Name:      "preemptor-pod",
+				Namespace: context.ns.Name,
+				Priority:  &highPriority,
+				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(200, resource.BinarySI)},
+				},
+			}),
+			preemptedPodIndexes: map[int]struct{}{0: {}, 1: {}},
+		},
+	}
+
+	for _, test := range tests {
+		for _, nodeConf := range test.nodes {
+			_, err := createNode(cs, nodeConf.name, nodeConf.res)
+			if err != nil {
+				t.Fatalf("Error creating node %v: %v", nodeConf.name, err)
+			}
+		}
+		// Create PDBs.
+		for _, pdb := range test.pdbs {
+			_, err := context.clientSet.PolicyV1beta1().PodDisruptionBudgets(context.ns.Name).Create(pdb)
+			if err != nil {
+				t.Fatalf("Failed to create PDB: %v", err)
+			}
+		}
+		// Wait for PDBs to show up in the scheduler's cache.
+		if err := wait.Poll(time.Second, 15*time.Second, func() (bool, error) {
+			cachedPDBs, err := context.scheduler.Config().SchedulerCache.ListPDBs(labels.Everything())
+			if err != nil {
+				t.Errorf("Error while polling for PDB: %v", err)
+				return false, err
+			}
+			return len(cachedPDBs) == len(test.pdbs), err
+		}); err != nil {
+			t.Fatalf("Not all PDBs were added to the cache: %v", err)
+		}
+
+		pods := make([]*v1.Pod, len(test.existingPods))
+		var err error
+		// Create and run existingPods.
+		for i, p := range test.existingPods {
+			if pods[i], err = runPausePod(cs, p); err != nil {
+				t.Fatalf("Test [%v]: Error running pause pod: %v", test.description, err)
+			}
+		}
+		// Create the "pod".
+		preemptor, err := createPausePod(cs, test.pod)
+		if err != nil {
+			t.Errorf("Error while creating high priority pod: %v", err)
+		}
+		// Wait for preemption of pods and make sure the other ones are not preempted.
+		for i, p := range pods {
+			if _, found := test.preemptedPodIndexes[i]; found {
+				if err = wait.Poll(time.Second, wait.ForeverTestTimeout, podIsGettingEvicted(cs, p.Namespace, p.Name)); err != nil {
+					t.Errorf("Test [%v]: Pod %v is not getting evicted.", test.description, p.Name)
+				}
+			} else {
+				if p.DeletionTimestamp != nil {
+					t.Errorf("Test [%v]: Didn't expect pod %v to get preempted.", test.description, p.Name)
+				}
+			}
+		}
+		// Also check that the preemptor pod gets the annotation for nominated node name.
+		if len(test.preemptedPodIndexes) > 0 {
+			if err := waitForNominatedNodeAnnotation(cs, preemptor); err != nil {
+				t.Errorf("Test [%v]: NominatedNodeName annotation was not set for pod %v: %v", test.description, preemptor.Name, err)
+			}
+		}
+
+		// Cleanup
+		pods = append(pods, preemptor)
+		cleanupPods(cs, t, pods)
+		cs.PolicyV1beta1().PodDisruptionBudgets(context.ns.Name).DeleteCollection(nil, metav1.ListOptions{})
+		cs.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 	}
 }
