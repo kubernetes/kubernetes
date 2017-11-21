@@ -357,6 +357,7 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 	if err := s.GenericServerRunOptions.ApplyTo(genericConfig); err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
+
 	insecureServingOptions, err := s.InsecureServing.ApplyTo(genericConfig)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err

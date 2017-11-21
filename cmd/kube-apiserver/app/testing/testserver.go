@@ -74,12 +74,16 @@ func StartTestServer(t *testing.T) (result *restclient.Config, tearDownForCaller
 
 	tmpDir, err = ioutil.TempDir("", "kubernetes-kube-apiserver")
 	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to create temp dir: %v", err)
+		return nil, nil, fmt.Errorf("failed to create temp dir: %v", err)
 	}
 
 	s := options.NewServerRunOptions()
 	s.InsecureServing.BindPort = 0
-	s.SecureServing.BindPort = freePort()
+	s.SecureServing.Listener, s.SecureServing.BindPort, err = createListenerOnFreePort()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create listener: %v", err)
+	}
+
 	s.SecureServing.ServerCert.CertDirectory = tmpDir
 	s.ServiceClusterIPRange.IP = net.IPv4(10, 0, 0, 0)
 	s.ServiceClusterIPRange.Mask = net.CIDRMask(16, 32)
@@ -88,31 +92,23 @@ func StartTestServer(t *testing.T) (result *restclient.Config, tearDownForCaller
 	s.Admission.PluginNames = strings.Split("Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds", ",")
 	s.APIEnablement.RuntimeConfig.Set("api/all=true")
 
-	t.Logf("Starting kube-apiserver...")
-	runErrCh := make(chan error, 1)
+	t.Logf("Starting kube-apiserver on port %d...", s.SecureServing.BindPort)
 	server, err := app.CreateServerChain(s, stopCh)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to create server chain: %v", err)
+		return nil, nil, fmt.Errorf("failed to create server chain: %v", err)
 	}
 	go func(stopCh <-chan struct{}) {
 		if err := server.PrepareRun().Run(stopCh); err != nil {
-			t.Logf("kube-apiserver exited uncleanly: %v", err)
-			runErrCh <- err
+			t.Errorf("kube-apiserver failed run: %v", err)
 		}
 	}(stopCh)
 
 	t.Logf("Waiting for /healthz to be ok...")
 	client, err := kubernetes.NewForConfig(server.LoopbackClientConfig)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to create a client: %v", err)
+		return nil, nil, fmt.Errorf("failed to create a client: %v", err)
 	}
 	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
-		select {
-		case err := <-runErrCh:
-			return false, err
-		default:
-		}
-
 		result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do()
 		status := 0
 		result.StatusCode(&status)
@@ -122,7 +118,7 @@ func StartTestServer(t *testing.T) (result *restclient.Config, tearDownForCaller
 		return false, nil
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to wait for /healthz to return ok: %v", err)
+		return nil, nil, fmt.Errorf("failed to wait for /healthz to return ok: %v", err)
 	}
 
 	// from here the caller must call tearDown
@@ -132,40 +128,27 @@ func StartTestServer(t *testing.T) (result *restclient.Config, tearDownForCaller
 // StartTestServerOrDie calls StartTestServer with up to 5 retries on bind error and dies with
 // t.Fatal if it does not succeed.
 func StartTestServerOrDie(t *testing.T) (*restclient.Config, TearDownFunc) {
-	// retry test because the bind might fail due to a race with another process
-	// binding to the port. We cannot listen to :0 (then the kernel would give us
-	// a port which is free for sure), so we need this workaround.
-
-	var err error
-
-	for retry := 0; retry < 5 && !t.Failed(); retry++ {
-		var config *restclient.Config
-		var td TearDownFunc
-
-		config, td, err = StartTestServer(t)
-		if err == nil {
-			return config, td
-		}
-		if err != nil && !strings.Contains(err.Error(), "bind") {
-			break
-		}
-		t.Logf("Bind error, retrying...")
+	config, td, err := StartTestServer(t)
+	if err == nil {
+		return config, td
 	}
 
 	t.Fatalf("Failed to launch server: %v", err)
 	return nil, nil
 }
 
-func freePort() int {
-	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+func createListenerOnFreePort() (net.Listener, int, error) {
+	ln, err := net.Listen("tcp", ":0")
 	if err != nil {
-		panic(err)
+		return nil, 0, err
 	}
 
-	l, err := net.ListenTCP("tcp", addr)
-	if err != nil {
-		panic(err)
+	// get port
+	tcpAddr, ok := ln.Addr().(*net.TCPAddr)
+	if !ok {
+		ln.Close()
+		return nil, 0, fmt.Errorf("invalid listen address: %q", ln.Addr().String())
 	}
-	defer l.Close()
-	return l.Addr().(*net.TCPAddr).Port
+
+	return ln, tcpAddr.Port, nil
 }
