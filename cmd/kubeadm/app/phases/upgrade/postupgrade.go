@@ -68,8 +68,9 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 		errs = append(errs, err)
 	}
 
+	shouldBackup, err := shouldBackupAPIServerCertAndKey(newK8sVer)
 	// Don't fail the upgrade phase if failing to determine to backup kube-apiserver cert and key.
-	if shouldBackup, err := shouldBackupAPIServerCertAndKey(newK8sVer); err != nil {
+	if err != nil {
 		fmt.Printf("[postupgrade] WARNING: failed to determine to backup kube-apiserver cert and key: %v", err)
 	} else if shouldBackup {
 		// Don't fail the upgrade phase if failing to backup kube-apiserver cert and key.

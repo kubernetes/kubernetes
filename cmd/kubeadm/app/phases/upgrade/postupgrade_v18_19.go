@@ -64,29 +64,35 @@ func rollbackFiles(files map[string]string, originalErr error) error {
 			errs = append(errs, err)
 		}
 	}
-	return fmt.Errorf("couldn't roll back kube-apiserver cert and key! Got errors: %v", errors.NewAggregate(errs))
+	return fmt.Errorf("couldn't move these files: %v. Got errors: %v", files, errors.NewAggregate(errs))
 }
 
 // shouldBackupAPIServerCertAndKey check if the new k8s version is at least 1.9.0
 // and kube-apiserver will be expired in 60 days.
 func shouldBackupAPIServerCertAndKey(newK8sVer *version.Version) (bool, error) {
-	if !newK8sVer.AtLeast(v190) {
+	if !newK8sVer.LessThan(v190) {
 		return false, nil
-
 	}
 
-	data, err := ioutil.ReadFile(filepath.Join(kubeadmapiext.DefaultCertificatesDir, constants.APIServerCertName))
+	apiServerCert := filepath.Join(kubeadmapiext.DefaultCertificatesDir, constants.APIServerCertName)
+	data, err := ioutil.ReadFile(apiServerCert)
 	if err != nil {
 		return false, fmt.Errorf("failed to read kube-apiserver certificate from disk: %v", err)
 	}
+
 	block, _ := pem.Decode(data)
 	if block == nil {
 		return false, fmt.Errorf("expected the kube-apiserver certificate to be PEM encoded")
 	}
+
 	certs, err := x509.ParseCertificates(block.Bytes)
 	if err != nil {
 		return false, fmt.Errorf("unable to parse certificate data: %v", err)
 	}
+	if len(certs) == 0 {
+		return false, fmt.Errorf("no certificate data found")
+	}
+
 	if certs[0].NotAfter.Sub(time.Now()) < 60*24*time.Hour {
 		return true, nil
 	}
