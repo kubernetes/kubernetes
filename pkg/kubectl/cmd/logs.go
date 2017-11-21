@@ -193,6 +193,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 
 	if o.Object == nil {
 		builder := f.NewBuilder().
+			Internal().
 			NamespaceParam(o.Namespace).DefaultNamespace().
 			SingleResourceType()
 		if o.ResourceArg != "" {

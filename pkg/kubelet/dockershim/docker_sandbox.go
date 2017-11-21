@@ -487,20 +487,34 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]
 
 // applySandboxLinuxOptions applies LinuxPodSandboxConfig to dockercontainer.HostConfig and dockercontainer.ContainerCreateConfig.
 func (ds *dockerService) applySandboxLinuxOptions(hc *dockercontainer.HostConfig, lc *runtimeapi.LinuxPodSandboxConfig, createConfig *dockertypes.ContainerCreateConfig, image string, separator rune) error {
-	// Apply Cgroup options.
-	cgroupParent, err := ds.GenerateExpectedCgroupParent(lc.CgroupParent)
-	if err != nil {
-		return err
+	if lc == nil {
+		return nil
 	}
-	hc.CgroupParent = cgroupParent
 	// Apply security context.
-	if err = applySandboxSecurityContext(lc, createConfig.Config, hc, ds.network, separator); err != nil {
+	if err := applySandboxSecurityContext(lc, createConfig.Config, hc, ds.network, separator); err != nil {
 		return err
 	}
 
 	// Set sysctls.
 	hc.Sysctls = lc.Sysctls
+	return nil
+}
 
+func (ds *dockerService) applySandboxResources(hc *dockercontainer.HostConfig, lc *runtimeapi.LinuxPodSandboxConfig) error {
+	hc.Resources = dockercontainer.Resources{
+		MemorySwap: DefaultMemorySwap(),
+		CPUShares:  defaultSandboxCPUshares,
+		// Use docker's default cpu quota/period.
+	}
+
+	if lc != nil {
+		// Apply Cgroup options.
+		cgroupParent, err := ds.GenerateExpectedCgroupParent(lc.CgroupParent)
+		if err != nil {
+			return err
+		}
+		hc.CgroupParent = cgroupParent
+	}
 	return nil
 }
 
@@ -533,10 +547,8 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 	}
 
 	// Apply linux-specific options.
-	if lc := c.GetLinux(); lc != nil {
-		if err := ds.applySandboxLinuxOptions(hc, lc, createConfig, image, securityOptSep); err != nil {
-			return nil, err
-		}
+	if err := ds.applySandboxLinuxOptions(hc, c.GetLinux(), createConfig, image, securityOptSep); err != nil {
+		return nil, err
 	}
 
 	// Set port mappings.
@@ -544,17 +556,12 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 	createConfig.Config.ExposedPorts = exposedPorts
 	hc.PortBindings = portBindings
 
-	// Apply resource options.
-	setSandboxResources(hc)
+	// TODO: Get rid of the dependency on kubelet internal package.
+	hc.OomScoreAdj = qos.PodInfraOOMAdj
 
-	// Apply cgroupsParent derived from the sandbox config.
-	if lc := c.GetLinux(); lc != nil {
-		// Apply Cgroup options.
-		cgroupParent, err := ds.GenerateExpectedCgroupParent(lc.CgroupParent)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate cgroup parent in expected syntax for container %q: %v", c.Metadata.Name, err)
-		}
-		hc.CgroupParent = cgroupParent
+	// Apply resource options.
+	if err := ds.applySandboxResources(hc, c.GetLinux()); err != nil {
+		return nil, err
 	}
 
 	// Set security options.
@@ -591,16 +598,6 @@ func sharesHostIpc(container *dockertypes.ContainerJSON) bool {
 		return string(container.HostConfig.IpcMode) == namespaceModeHost
 	}
 	return false
-}
-
-func setSandboxResources(hc *dockercontainer.HostConfig) {
-	hc.Resources = dockercontainer.Resources{
-		MemorySwap: DefaultMemorySwap(),
-		CPUShares:  defaultSandboxCPUshares,
-		// Use docker's default cpu quota/period.
-	}
-	// TODO: Get rid of the dependency on kubelet internal package.
-	hc.OomScoreAdj = qos.PodInfraOOMAdj
 }
 
 func constructPodSandboxCheckpoint(config *runtimeapi.PodSandboxConfig) *PodSandboxCheckpoint {

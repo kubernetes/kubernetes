@@ -58,7 +58,6 @@ pkg/apis/imagepolicy
 pkg/apis/imagepolicy/v1alpha1
 pkg/apis/networking
 pkg/apis/policy
-pkg/apis/policy/v1alpha1
 pkg/apis/policy/v1beta1
 pkg/apis/policy/validation
 pkg/apis/rbac/v1
@@ -505,7 +504,6 @@ staging/src/k8s.io/apimachinery/pkg/apis/meta/v1alpha1
 staging/src/k8s.io/apimachinery/pkg/apis/testapigroup
 staging/src/k8s.io/apimachinery/pkg/apis/testapigroup/v1
 staging/src/k8s.io/apimachinery/pkg/conversion
-staging/src/k8s.io/apimachinery/pkg/conversion/unstructured
 staging/src/k8s.io/apimachinery/pkg/labels
 staging/src/k8s.io/apimachinery/pkg/runtime/schema
 staging/src/k8s.io/apimachinery/pkg/runtime/serializer
@@ -544,6 +542,8 @@ staging/src/k8s.io/apiserver/pkg/admission/configuration
 staging/src/k8s.io/apiserver/pkg/admission/plugin/initialization
 staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config
+staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/mutating
+staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/validating
 staging/src/k8s.io/apiserver/pkg/apis/apiserver
 staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1

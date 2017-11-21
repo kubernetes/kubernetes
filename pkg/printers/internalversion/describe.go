@@ -856,6 +856,26 @@ func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, w PrefixWriter) {
 		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.ISCSIInterface, iscsi.FSType, iscsi.ReadOnly, iscsi.Portals, iscsi.DiscoveryCHAPAuth, iscsi.SessionCHAPAuth, iscsi.SecretRef, initiator)
 }
 
+func printISCSIPersistentVolumeSource(iscsi *api.ISCSIPersistentVolumeSource, w PrefixWriter) {
+	initiatorName := "<none>"
+	if iscsi.InitiatorName != nil {
+		initiatorName = *iscsi.InitiatorName
+	}
+	w.Write(LEVEL_2, "Type:\tISCSI (an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod)\n"+
+		"    TargetPortal:\t%v\n"+
+		"    IQN:\t%v\n"+
+		"    Lun:\t%v\n"+
+		"    ISCSIInterface\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n"+
+		"    Portals:\t%v\n"+
+		"    DiscoveryCHAPAuth:\t%v\n"+
+		"    SessionCHAPAuth:\t%v\n"+
+		"    SecretRef:\t%v\n"+
+		"    InitiatorName:\t%v\n",
+		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.ISCSIInterface, iscsi.FSType, iscsi.ReadOnly, iscsi.Portals, iscsi.DiscoveryCHAPAuth, iscsi.SessionCHAPAuth, iscsi.SecretRef, initiatorName)
+}
+
 func printGlusterfsVolumeSource(glusterfs *api.GlusterfsVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tGlusterfs (a Glusterfs mount on the host that shares a pod's lifetime)\n"+
 		"    EndpointsName:\t%v\n"+
@@ -1073,6 +1093,14 @@ func printFlockerVolumeSource(flocker *api.FlockerVolumeSource, w PrefixWriter) 
 		flocker.DatasetName, flocker.DatasetUUID)
 }
 
+func printCSIPersistentVolumeSource(csi *api.CSIPersistentVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tCSI (a Container Storage Interface (CSI) volume source)\n"+
+		"    Driver:\t%v\n"+
+		"    VolumeHandle:\t%v\n",
+		"    ReadOnly:\t%v\n",
+		csi.Driver, csi.VolumeHandle, csi.ReadOnly)
+}
+
 type PersistentVolumeDescriber struct {
 	clientset.Interface
 }
@@ -1108,6 +1136,9 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 		}
 		w.Write(LEVEL_0, "Reclaim Policy:\t%v\n", pv.Spec.PersistentVolumeReclaimPolicy)
 		w.Write(LEVEL_0, "Access Modes:\t%s\n", helper.GetAccessModesAsString(pv.Spec.AccessModes))
+		if pv.Spec.VolumeMode != nil {
+			w.Write(LEVEL_0, "VolumeMode:\t%v\n", *pv.Spec.VolumeMode)
+		}
 		storage := pv.Spec.Capacity[api.ResourceStorage]
 		w.Write(LEVEL_0, "Capacity:\t%s\n", storage.String())
 		w.Write(LEVEL_0, "Message:\t%s\n", pv.Status.Message)
@@ -1123,7 +1154,7 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 		case pv.Spec.NFS != nil:
 			printNFSVolumeSource(pv.Spec.NFS, w)
 		case pv.Spec.ISCSI != nil:
-			printISCSIVolumeSource(pv.Spec.ISCSI, w)
+			printISCSIPersistentVolumeSource(pv.Spec.ISCSI, w)
 		case pv.Spec.Glusterfs != nil:
 			printGlusterfsVolumeSource(pv.Spec.Glusterfs, w)
 		case pv.Spec.RBD != nil:
@@ -1156,6 +1187,8 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 			printFlexVolumeSource(pv.Spec.FlexVolume, w)
 		case pv.Spec.Flocker != nil:
 			printFlockerVolumeSource(pv.Spec.Flocker, w)
+		case pv.Spec.CSI != nil:
+			printCSIPersistentVolumeSource(pv.Spec.CSI, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -1205,6 +1238,9 @@ func describePersistentVolumeClaim(pvc *api.PersistentVolumeClaim, events *api.E
 		}
 		w.Write(LEVEL_0, "Capacity:\t%s\n", capacity)
 		w.Write(LEVEL_0, "Access Modes:\t%s\n", accessModes)
+		if pvc.Spec.VolumeMode != nil {
+			w.Write(LEVEL_0, "VolumeMode:\t%v\n", *pvc.Spec.VolumeMode)
+		}
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -1335,6 +1371,7 @@ func describeContainerProbe(container api.Container, w PrefixWriter) {
 }
 
 func describeContainerVolumes(container api.Container, w PrefixWriter) {
+	// Show volumeMounts
 	none := ""
 	if len(container.VolumeMounts) == 0 {
 		none = "\t<none>"
@@ -1352,6 +1389,14 @@ func describeContainerVolumes(container api.Container, w PrefixWriter) {
 			flags = append(flags, fmt.Sprintf("path=%q", mount.SubPath))
 		}
 		w.Write(LEVEL_3, "%s from %s (%s)\n", mount.MountPath, mount.Name, strings.Join(flags, ","))
+	}
+	// Show volumeDevices if exists
+	if len(container.VolumeDevices) > 0 {
+		w.Write(LEVEL_2, "Devices:%s\n", none)
+		sort.Sort(SortableVolumeDevices(container.VolumeDevices))
+		for _, device := range container.VolumeDevices {
+			w.Write(LEVEL_3, "%s from %s\n", device.DevicePath, device.Name)
+		}
 	}
 }
 
@@ -3771,6 +3816,20 @@ func (list SortableVolumeMounts) Swap(i, j int) {
 
 func (list SortableVolumeMounts) Less(i, j int) bool {
 	return list[i].MountPath < list[j].MountPath
+}
+
+type SortableVolumeDevices []api.VolumeDevice
+
+func (list SortableVolumeDevices) Len() int {
+	return len(list)
+}
+
+func (list SortableVolumeDevices) Swap(i, j int) {
+	list[i], list[j] = list[j], list[i]
+}
+
+func (list SortableVolumeDevices) Less(i, j int) bool {
+	return list[i].DevicePath < list[j].DevicePath
 }
 
 // TODO: get rid of this and plumb the caller correctly

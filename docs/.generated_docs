@@ -12,7 +12,9 @@ docs/admin/kubeadm_alpha_phase_addon_all.md
 docs/admin/kubeadm_alpha_phase_addon_kube-dns.md
 docs/admin/kubeadm_alpha_phase_addon_kube-proxy.md
 docs/admin/kubeadm_alpha_phase_bootstrap-token.md
+docs/admin/kubeadm_alpha_phase_bootstrap-token_all.md
 docs/admin/kubeadm_alpha_phase_bootstrap-token_cluster-info.md
+docs/admin/kubeadm_alpha_phase_bootstrap-token_create.md
 docs/admin/kubeadm_alpha_phase_bootstrap-token_node.md
 docs/admin/kubeadm_alpha_phase_bootstrap-token_node_allow-auto-approve.md
 docs/admin/kubeadm_alpha_phase_bootstrap-token_node_allow-post-csrs.md
@@ -73,7 +75,9 @@ docs/man/man1/kubeadm-alpha-phase-addon-all.1
 docs/man/man1/kubeadm-alpha-phase-addon-kube-dns.1
 docs/man/man1/kubeadm-alpha-phase-addon-kube-proxy.1
 docs/man/man1/kubeadm-alpha-phase-addon.1
+docs/man/man1/kubeadm-alpha-phase-bootstrap-token-all.1
 docs/man/man1/kubeadm-alpha-phase-bootstrap-token-cluster-info.1
+docs/man/man1/kubeadm-alpha-phase-bootstrap-token-create.1
 docs/man/man1/kubeadm-alpha-phase-bootstrap-token-node-allow-auto-approve.1
 docs/man/man1/kubeadm-alpha-phase-bootstrap-token-node-allow-post-csrs.1
 docs/man/man1/kubeadm-alpha-phase-bootstrap-token-node.1

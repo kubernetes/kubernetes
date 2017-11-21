@@ -2,7 +2,7 @@
   "swagger": "2.0",
   "info": {
    "title": "Kubernetes",
-   "version": "v1.9.0"
+   "version": "v1.10.0"
   },
   "paths": {
    "/api/": {
@@ -73464,6 +73464,27 @@
      }
     ]
    },
+   "io.k8s.api.core.v1.CSIPersistentVolumeSource": {
+    "description": "Represents storage that is managed by an external CSI volume driver",
+    "required": [
+     "driver",
+     "volumeHandle"
+    ],
+    "properties": {
+     "driver": {
+      "description": "Driver is the name of the driver to use for this volume. Required.",
+      "type": "string"
+     },
+     "readOnly": {
+      "description": "Optional: The value to pass to ControllerPublishVolumeRequest. Defaults to false (read/write).",
+      "type": "boolean"
+     },
+     "volumeHandle": {
+      "description": "VolumeHandle is the unique volume name returned by the CSI volume plugin’s CreateVolume to refer to the volume on all subsequent calls. Required.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.api.core.v1.Capabilities": {
     "description": "Adds and removes POSIX capabilities from running containers.",
     "properties": {
@@ -73914,6 +73935,15 @@
      "tty": {
       "description": "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
       "type": "boolean"
+     },
+     "volumeDevices": {
+      "description": "volumeDevices is the list of block devices to be used by the container. This is an alpha feature and may change in the future.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.VolumeDevice"
+      },
+      "x-kubernetes-patch-merge-key": "devicePath",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "volumeMounts": {
       "description": "Pod volumes to mount into the container's filesystem. Cannot be updated.",
@@ -74738,6 +74768,64 @@
      }
     }
    },
+   "io.k8s.api.core.v1.ISCSIPersistentVolumeSource": {
+    "description": "ISCSIPersistentVolumeSource represents an ISCSI disk. ISCSI volumes can only be mounted as read/write once. ISCSI volumes support ownership management and SELinux relabeling.",
+    "required": [
+     "targetPortal",
+     "iqn",
+     "lun"
+    ],
+    "properties": {
+     "chapAuthDiscovery": {
+      "description": "whether support iSCSI Discovery CHAP authentication",
+      "type": "boolean"
+     },
+     "chapAuthSession": {
+      "description": "whether support iSCSI Session CHAP authentication",
+      "type": "boolean"
+     },
+     "fsType": {
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#iscsi",
+      "type": "string"
+     },
+     "initiatorName": {
+      "description": "Custom iSCSI Initiator Name. If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface \u003ctarget portal\u003e:\u003cvolume name\u003e will be created for the connection.",
+      "type": "string"
+     },
+     "iqn": {
+      "description": "Target iSCSI Qualified Name.",
+      "type": "string"
+     },
+     "iscsiInterface": {
+      "description": "iSCSI Interface Name that uses an iSCSI transport. Defaults to 'default' (tcp).",
+      "type": "string"
+     },
+     "lun": {
+      "description": "iSCSI Target Lun number.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "portals": {
+      "description": "iSCSI Target Portal List. The Portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "readOnly": {
+      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
+      "type": "boolean"
+     },
+     "secretRef": {
+      "description": "CHAP Secret for iSCSI target and initiator authentication",
+      "$ref": "#/definitions/io.k8s.api.core.v1.SecretReference"
+     },
+     "targetPortal": {
+      "description": "iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.api.core.v1.ISCSIVolumeSource": {
     "description": "Represents an ISCSI disk. ISCSI volumes can only be mounted as read/write once. ISCSI volumes support ownership management and SELinux relabeling.",
     "required": [
@@ -74759,7 +74847,7 @@
       "type": "string"
      },
      "initiatorName": {
-      "description": "Custom iSCSI initiator name. If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface \u003ctarget portal\u003e:\u003cvolume name\u003e will be created for the connection.",
+      "description": "Custom iSCSI Initiator Name. If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface \u003ctarget portal\u003e:\u003cvolume name\u003e will be created for the connection.",
       "type": "string"
      },
      "iqn": {
@@ -74767,16 +74855,16 @@
       "type": "string"
      },
      "iscsiInterface": {
-      "description": "Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport.",
+      "description": "iSCSI Interface Name that uses an iSCSI transport. Defaults to 'default' (tcp).",
       "type": "string"
      },
      "lun": {
-      "description": "iSCSI target lun number.",
+      "description": "iSCSI Target Lun number.",
       "type": "integer",
       "format": "int32"
      },
      "portals": {
-      "description": "iSCSI target portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+      "description": "iSCSI Target Portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
       "type": "array",
       "items": {
        "type": "string"
@@ -74787,11 +74875,11 @@
       "type": "boolean"
      },
      "secretRef": {
-      "description": "CHAP secret for iSCSI target and initiator authentication",
+      "description": "CHAP Secret for iSCSI target and initiator authentication",
       "$ref": "#/definitions/io.k8s.api.core.v1.LocalObjectReference"
      },
      "targetPortal": {
-      "description": "iSCSI target portal. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+      "description": "iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
       "type": "string"
      }
     }
@@ -75683,6 +75771,10 @@
       "description": "Name of the StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1",
       "type": "string"
      },
+     "volumeMode": {
+      "description": "volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec. This is an alpha feature and may change in the future.",
+      "type": "string"
+     },
      "volumeName": {
       "description": "VolumeName is the binding reference to the PersistentVolume backing this claim.",
       "type": "string"
@@ -75812,6 +75904,10 @@
       "description": "ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim. Expected to be non-nil when bound. claim.VolumeName is the authoritative bind between PV and PVC. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding",
       "$ref": "#/definitions/io.k8s.api.core.v1.ObjectReference"
      },
+     "csi": {
+      "description": "CSI represents storage that handled by an external CSI driver",
+      "$ref": "#/definitions/io.k8s.api.core.v1.CSIPersistentVolumeSource"
+     },
      "fc": {
       "description": "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
       "$ref": "#/definitions/io.k8s.api.core.v1.FCVolumeSource"
@@ -75838,7 +75934,7 @@
      },
      "iscsi": {
       "description": "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. Provisioned by an admin.",
-      "$ref": "#/definitions/io.k8s.api.core.v1.ISCSIVolumeSource"
+      "$ref": "#/definitions/io.k8s.api.core.v1.ISCSIPersistentVolumeSource"
      },
      "local": {
       "description": "Local represents directly-attached storage with node affinity",
@@ -75886,6 +75982,10 @@
      "storageos": {
       "description": "StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md",
       "$ref": "#/definitions/io.k8s.api.core.v1.StorageOSPersistentVolumeSource"
+     },
+     "volumeMode": {
+      "description": "volumeMode defines if a volume is intended to be used with a formatted filesystem or to remain in raw block state. Value of Filesystem is implied when not included in spec. This is an alpha feature and may change in the future.",
+      "type": "string"
      },
      "vsphereVolume": {
       "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
@@ -77425,7 +77525,7 @@
       }
      },
      "externalName": {
-      "description": "externalName is the external reference that kubedns or equivalent will return as a CNAME record for this service. No proxying will be involved. Must be a valid DNS name and requires Type to be ExternalName.",
+      "description": "externalName is the external reference that kubedns or equivalent will return as a CNAME record for this service. No proxying will be involved. Must be a valid RFC-1123 hostname (https://tools.ietf.org/html/rfc1123) and requires Type to be ExternalName.",
       "type": "string"
      },
      "externalTrafficPolicy": {
@@ -77734,6 +77834,23 @@
      "vsphereVolume": {
       "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
       "$ref": "#/definitions/io.k8s.api.core.v1.VsphereVirtualDiskVolumeSource"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.VolumeDevice": {
+    "description": "volumeDevice describes a mapping of a raw block device within a container.",
+    "required": [
+     "name",
+     "devicePath"
+    ],
+    "properties": {
+     "devicePath": {
+      "description": "devicePath is the path inside of the container that the device will be mapped to.",
+      "type": "string"
+     },
+     "name": {
+      "description": "name must match the name of a persistentVolumeClaim in the pod",
+      "type": "string"
      }
     }
    },

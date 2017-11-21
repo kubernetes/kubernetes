@@ -347,10 +347,10 @@ type PersistentVolumeSource struct {
 	// Quobyte represents a Quobyte mount on the host that shares a pod's lifetime
 	// +optional
 	Quobyte *QuobyteVolumeSource
-	// ISCSIVolumeSource represents an ISCSI resource that is attached to a
+	// ISCSIPersistentVolumeSource represents an ISCSI resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	// +optional
-	ISCSI *ISCSIVolumeSource
+	ISCSI *ISCSIPersistentVolumeSource
 	// FlexVolume represents a generic volume resource that is
 	// provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.
 	// +optional
@@ -391,6 +391,9 @@ type PersistentVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md
 	// +optional
 	StorageOS *StorageOSPersistentVolumeSource
+	// CSI (Container Storage Interface) represents storage that handled by an external CSI driver
+	// +optional
+	CSI *CSIPersistentVolumeSource
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -459,6 +462,11 @@ type PersistentVolumeSpec struct {
 	// simply fail if one is invalid.
 	// +optional
 	MountOptions []string
+	// volumeMode defines if a volume is intended to be used with a formatted filesystem
+	// or to remain in raw block state. Value of Filesystem is implied when not included in spec.
+	// This is an alpha feature and may change in the future.
+	// +optional
+	VolumeMode *PersistentVolumeMode
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes
@@ -474,6 +482,16 @@ const (
 	// PersistentVolumeReclaimRetain means the volume will be left in its current phase (Released) for manual reclamation by the administrator.
 	// The default policy is Retain.
 	PersistentVolumeReclaimRetain PersistentVolumeReclaimPolicy = "Retain"
+)
+
+// PersistentVolumeMode describes how a volume is intended to be consumed, either Block or Filesystem.
+type PersistentVolumeMode string
+
+const (
+	// PersistentVolumeBlock means the volume will not be formatted with a filesystem and will remain a raw block device.
+	PersistentVolumeBlock PersistentVolumeMode = "Block"
+	// PersistentVolumeFilesystem means the volume will be or is formatted with a filesystem.
+	PersistentVolumeFilesystem PersistentVolumeMode = "Filesystem"
 )
 
 type PersistentVolumeStatus struct {
@@ -545,6 +563,11 @@ type PersistentVolumeClaimSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#class-1
 	// +optional
 	StorageClassName *string
+	// volumeMode defines what type of volume is required by the claim.
+	// Value of Filesystem is implied when not included in claim spec.
+	// This is an alpha feature and may change in the future.
+	// +optional
+	VolumeMode *PersistentVolumeMode
 }
 
 type PersistentVolumeClaimConditionType string
@@ -763,6 +786,54 @@ type ISCSIVolumeSource struct {
 	// The secret is used if either DiscoveryCHAPAuth or SessionCHAPAuth is true
 	// +optional
 	SecretRef *LocalObjectReference
+	// Optional: Custom initiator name per volume.
+	// If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface
+	// <target portal>:<volume name> will be created for the connection.
+	// +optional
+	InitiatorName *string
+}
+
+// ISCSIPersistentVolumeSource represents an ISCSI disk.
+// ISCSI volumes can only be mounted as read/write once.
+// ISCSI volumes support ownership management and SELinux relabeling.
+type ISCSIPersistentVolumeSource struct {
+	// Required: iSCSI target portal
+	// the portal is either an IP or ip_addr:port if port is other than default (typically TCP ports 860 and 3260)
+	// +optional
+	TargetPortal string
+	// Required:  target iSCSI Qualified Name
+	// +optional
+	IQN string
+	// Required: iSCSI target lun number
+	// +optional
+	Lun int32
+	// Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport.
+	// +optional
+	ISCSIInterface string
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	// +optional
+	FSType string
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool
+	// Optional: list of iSCSI target portal ips for high availability.
+	// the portal is either an IP or ip_addr:port if port is other than default (typically TCP ports 860 and 3260)
+	// +optional
+	Portals []string
+	// Optional: whether support iSCSI Discovery CHAP authentication
+	// +optional
+	DiscoveryCHAPAuth bool
+	// Optional: whether support iSCSI Session CHAP authentication
+	// +optional
+	SessionCHAPAuth bool
+	// Optional: CHAP secret for iSCSI target and initiator authentication.
+	// The secret is used if either DiscoveryCHAPAuth or SessionCHAPAuth is true
+	// +optional
+	SecretRef *SecretReference
 	// Optional: Custom initiator name per volume.
 	// If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface
 	// <target portal>:<volume name> will be created for the connection.
@@ -1503,6 +1574,23 @@ type LocalVolumeSource struct {
 	Path string
 }
 
+// Represents storage that is managed by an external CSI volume driver
+type CSIPersistentVolumeSource struct {
+	// Driver is the name of the driver to use for this volume.
+	// Required.
+	Driver string
+
+	// VolumeHandle is the unique volume name returned by the CSI volume
+	// plugin’s CreateVolume to refer to the volume on all subsequent calls.
+	// Required.
+	VolumeHandle string
+
+	// Optional: The value to pass to ControllerPublishVolumeRequest.
+	// Defaults to false (read/write).
+	// +optional
+	ReadOnly bool
+}
+
 // ContainerPort represents a network port in a single container
 type ContainerPort struct {
 	// Optional: If specified, this must be an IANA_SVC_NAME  Each named port
@@ -1530,7 +1618,9 @@ type VolumeMount struct {
 	// Optional: Defaults to false (read-write).
 	// +optional
 	ReadOnly bool
-	// Required. Must not contain ':'.
+	// Required. If the path is not an absolute path (e.g. some/path) it
+	// will be prepended with the appropriate root prefix for the operating
+	// system.  On Linux this is '/', on Windows this is 'C:\'.
 	MountPath string
 	// Path within the volume from which the container's volume should be mounted.
 	// Defaults to "" (volume's root).
@@ -1563,6 +1653,14 @@ const (
 	// ("rshared" in Linux terminology).
 	MountPropagationBidirectional MountPropagationMode = "Bidirectional"
 )
+
+// VolumeDevice describes a mapping of a raw block device within a container.
+type VolumeDevice struct {
+	// name must match the name of a persistentVolumeClaim in the pod
+	Name string
+	// devicePath is the path inside of the container that the device will be mapped to.
+	DevicePath string
+}
 
 // EnvVar represents an environment variable present in a Container.
 type EnvVar struct {
@@ -1857,6 +1955,10 @@ type Container struct {
 	Resources ResourceRequirements
 	// +optional
 	VolumeMounts []VolumeMount
+	// volumeDevices is the list of block devices to be used by the container.
+	// This is an alpha feature and may change in the future.
+	// +optional
+	VolumeDevices []VolumeDevice
 	// +optional
 	LivenessProbe *Probe
 	// +optional
@@ -2916,7 +3018,8 @@ type ServiceSpec struct {
 
 	// ExternalName is the external reference that kubedns or equivalent will
 	// return as a CNAME record for this service. No proxying will be involved.
-	// Must be a valid DNS name and requires Type to be ExternalName.
+	// Must be a valid RFC-1123 hostname (https://tools.ietf.org/html/rfc1123)
+	// and requires Type to be ExternalName.
 	ExternalName string
 
 	// ExternalIPs are used by external load balancers, or can be set by
@@ -3966,6 +4069,13 @@ const (
 	ResourceLimitsMemory ResourceName = "limits.memory"
 	// Local ephemeral storage limit, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	ResourceLimitsEphemeralStorage ResourceName = "limits.ephemeral-storage"
+)
+
+// The following identify resource prefix for Kubernetes object types
+const (
+	// HugePages request, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	// As burst is not supported for HugePages, we would only quota its request, and ignore the limit.
+	ResourceRequestsHugePagesPrefix = "requests.hugepages-"
 )
 
 // A ResourceQuotaScope defines a filter that must match each object tracked by a quota

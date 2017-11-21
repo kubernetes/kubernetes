@@ -38,7 +38,6 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/registry/settings/podpreset/storage",
     library = ":go_default_library",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/settings:go_default_library",
         "//pkg/registry/registrytest:go_default_library",

@@ -21,6 +21,7 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/admission"
 )
 
@@ -42,28 +43,29 @@ func CreateAdmissionReview(attr admission.Attributes) admissionv1alpha1.Admissio
 	}
 
 	return admissionv1alpha1.AdmissionReview{
-		Spec: admissionv1alpha1.AdmissionReviewSpec{
-			Name:      attr.GetName(),
-			Namespace: attr.GetNamespace(),
+		Request: &admissionv1alpha1.AdmissionRequest{
+			UID: uuid.NewUUID(),
+			Kind: metav1.GroupVersionKind{
+				Group:   gvk.Group,
+				Kind:    gvk.Kind,
+				Version: gvk.Version,
+			},
 			Resource: metav1.GroupVersionResource{
 				Group:    gvr.Group,
 				Resource: gvr.Resource,
 				Version:  gvr.Version,
 			},
 			SubResource: attr.GetSubresource(),
+			Name:        attr.GetName(),
+			Namespace:   attr.GetNamespace(),
 			Operation:   admissionv1alpha1.Operation(attr.GetOperation()),
+			UserInfo:    userInfo,
 			Object: runtime.RawExtension{
 				Object: attr.GetObject(),
 			},
 			OldObject: runtime.RawExtension{
 				Object: attr.GetOldObject(),
 			},
-			Kind: metav1.GroupVersionKind{
-				Group:   gvk.Group,
-				Kind:    gvk.Kind,
-				Version: gvk.Version,
-			},
-			UserInfo: userInfo,
 		},
 	}
 }

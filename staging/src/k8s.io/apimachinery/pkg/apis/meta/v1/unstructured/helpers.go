@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,7 +38,7 @@ func NestedFieldCopy(obj map[string]interface{}, fields ...string) (interface{},
 	if !ok {
 		return nil, false
 	}
-	return unstructured.DeepCopyJSONValue(val), true
+	return runtime.DeepCopyJSONValue(val), true
 }
 
 func nestedFieldNoCopy(obj map[string]interface{}, fields ...string) (interface{}, bool) {
@@ -131,7 +130,7 @@ func NestedSlice(obj map[string]interface{}, fields ...string) ([]interface{}, b
 		return nil, false
 	}
 	if _, ok := val.([]interface{}); ok {
-		return unstructured.DeepCopyJSONValue(val).([]interface{}), true
+		return runtime.DeepCopyJSONValue(val).([]interface{}), true
 	}
 	return nil, false
 }
@@ -139,41 +138,46 @@ func NestedSlice(obj map[string]interface{}, fields ...string) ([]interface{}, b
 // NestedStringMap returns a copy of map[string]string value of a nested field.
 // Returns false if value is not found, is not a map[string]interface{} or contains non-string values in the map.
 func NestedStringMap(obj map[string]interface{}, fields ...string) (map[string]string, bool) {
-	val, ok := nestedFieldNoCopy(obj, fields...)
+	m, ok := nestedMapNoCopy(obj, fields...)
 	if !ok {
 		return nil, false
 	}
-	if m, ok := val.(map[string]interface{}); ok {
-		strMap := make(map[string]string, len(m))
-		for k, v := range m {
-			if str, ok := v.(string); ok {
-				strMap[k] = str
-			} else {
-				return nil, false
-			}
+	strMap := make(map[string]string, len(m))
+	for k, v := range m {
+		if str, ok := v.(string); ok {
+			strMap[k] = str
+		} else {
+			return nil, false
 		}
-		return strMap, true
 	}
-	return nil, false
+	return strMap, true
 }
 
 // NestedMap returns a deep copy of map[string]interface{} value of a nested field.
 // Returns false if value is not found or is not a map[string]interface{}.
 func NestedMap(obj map[string]interface{}, fields ...string) (map[string]interface{}, bool) {
+	m, ok := nestedMapNoCopy(obj, fields...)
+	if !ok {
+		return nil, false
+	}
+	return runtime.DeepCopyJSON(m), true
+}
+
+// nestedMapNoCopy returns a map[string]interface{} value of a nested field.
+// Returns false if value is not found or is not a map[string]interface{}.
+func nestedMapNoCopy(obj map[string]interface{}, fields ...string) (map[string]interface{}, bool) {
 	val, ok := nestedFieldNoCopy(obj, fields...)
 	if !ok {
 		return nil, false
 	}
-	if m, ok := val.(map[string]interface{}); ok {
-		return unstructured.DeepCopyJSON(m), true
-	}
-	return nil, false
+	m, ok := val.(map[string]interface{})
+	return m, ok
 }
 
 // SetNestedField sets the value of a nested field to a deep copy of the value provided.
 // Returns false if value cannot be set because one of the nesting levels is not a map[string]interface{}.
 func SetNestedField(obj map[string]interface{}, value interface{}, fields ...string) bool {
-	return setNestedFieldNoCopy(obj, unstructured.DeepCopyJSONValue(value), fields...)
+	return setNestedFieldNoCopy(obj, runtime.DeepCopyJSONValue(value), fields...)
 }
 
 func setNestedFieldNoCopy(obj map[string]interface{}, value interface{}, fields ...string) bool {
@@ -268,27 +272,6 @@ func extractOwnerReference(v map[string]interface{}) metav1.OwnerReference {
 		BlockOwnerDeletion: blockOwnerDeletionPtr,
 	}
 }
-
-func setOwnerReference(src metav1.OwnerReference) map[string]interface{} {
-	ret := map[string]interface{}{
-		"kind":       src.Kind,
-		"name":       src.Name,
-		"apiVersion": src.APIVersion,
-		"uid":        string(src.UID),
-	}
-	// json.Unmarshal() extracts boolean json fields as bool, not as *bool and hence extractOwnerReference()
-	// expects bool or a missing field, not *bool. So if pointer is nil, fields are omitted from the ret object.
-	// If pointer is non-nil, they are set to the referenced value.
-	if src.Controller != nil {
-		ret["controller"] = *src.Controller
-	}
-	if src.BlockOwnerDeletion != nil {
-		ret["blockOwnerDeletion"] = *src.BlockOwnerDeletion
-	}
-	return ret
-}
-
-var converter = unstructured.NewConverter(false)
 
 // UnstructuredJSONScheme is capable of converting JSON data into the Unstructured
 // type, which can be used for generic access to objects without a predefined scheme.
@@ -447,7 +430,7 @@ func (UnstructuredObjectConverter) Convert(in, out, context interface{}) error {
 
 	// maybe deep copy the map? It is documented in the
 	// ObjectConverter interface that this function is not
-	// guaranteeed to not mutate the input. Or maybe set the input
+	// guaranteed to not mutate the input. Or maybe set the input
 	// object to nil.
 	unstructOut.Object = unstructIn.Object
 	return nil

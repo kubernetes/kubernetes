@@ -21,8 +21,24 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// InterfacesForUnstructuredConversion returns VersionInterfaces suitable for
+// dealing with unstructured.Unstructured objects and supports conversion
+// from typed objects (provided by parent) to untyped objects.
+func InterfacesForUnstructuredConversion(parent VersionInterfacesFunc) VersionInterfacesFunc {
+	return func(version schema.GroupVersion) (*VersionInterfaces, error) {
+		if i, err := parent(version); err == nil {
+			return &VersionInterfaces{
+				ObjectConvertor:  i.ObjectConvertor,
+				MetadataAccessor: NewAccessor(),
+			}, nil
+		}
+		return InterfacesForUnstructured(version)
+	}
+}
+
 // InterfacesForUnstructured returns VersionInterfaces suitable for
-// dealing with unstructured.Unstructured objects.
+// dealing with unstructured.Unstructured objects. It will return errors for
+// other conversions.
 func InterfacesForUnstructured(schema.GroupVersion) (*VersionInterfaces, error) {
 	return &VersionInterfaces{
 		ObjectConvertor:  &unstructured.UnstructuredObjectConverter{},

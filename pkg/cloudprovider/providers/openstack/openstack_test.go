@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -498,6 +499,8 @@ func TestZones(t *testing.T) {
 	}
 }
 
+var diskPathRegexp = regexp.MustCompile("/dev/disk/(?:by-id|by-path)/")
+
 func TestVolumes(t *testing.T) {
 	cfg, ok := configFromEnv()
 	if !ok {
@@ -534,7 +537,7 @@ func TestVolumes(t *testing.T) {
 	WaitForVolumeStatus(t, os, vol, volumeInUseStatus)
 
 	devicePath := os.GetDevicePath(diskId)
-	if !strings.HasPrefix(devicePath, "/dev/disk/by-id/") {
+	if diskPathRegexp.FindString(devicePath) == "" {
 		t.Fatalf("GetDevicePath returned and unexpected path for Cinder volume %s, returned %s", vol, devicePath)
 	}
 	t.Logf("Volume (%s) found at path: %s\n", vol, devicePath)

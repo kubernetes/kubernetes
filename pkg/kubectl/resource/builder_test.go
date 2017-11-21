@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -262,8 +263,25 @@ var aRC string = `
 }
 `
 
+func newDefaultBuilder() *Builder {
+	return newDefaultBuilderWith(fakeClient())
+}
+
+func newDefaultBuilderWith(client ClientMapper) *Builder {
+	return NewBuilder(
+		&Mapper{
+			RESTMapper:   restmapper,
+			ObjectTyper:  scheme.Scheme,
+			ClientMapper: client,
+			Decoder:      corev1Codec,
+		},
+		nil,
+		categories.LegacyCategoryExpander,
+	).Internal()
+}
+
 func TestPathBuilderAndVersionedObjectNotDefaulted(t *testing.T) {
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
+	b := newDefaultBuilder().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../test/fixtures/pkg/kubectl/builder/kitten-rc.yaml"}})
 
 	test := &testVisitor{}
@@ -278,10 +296,11 @@ func TestPathBuilderAndVersionedObjectNotDefaulted(t *testing.T) {
 	if info.Name != "update-demo-kitten" || info.Namespace != "" || info.Object == nil {
 		t.Errorf("unexpected info: %#v", info)
 	}
-	version, ok := info.VersionedObject.(*v1.ReplicationController)
+	obj := info.AsVersioned()
+	version, ok := obj.(*v1.ReplicationController)
 	// versioned object does not have defaulting applied
-	if info.VersionedObject == nil || !ok || version.Spec.Replicas != nil {
-		t.Errorf("unexpected versioned object: %#v", info.VersionedObject)
+	if obj == nil || !ok || version.Spec.Replicas != nil {
+		t.Errorf("unexpected versioned object: %#v", obj)
 	}
 }
 
@@ -302,8 +321,7 @@ func TestNodeBuilder(t *testing.T) {
 		w.Write([]byte(runtime.EncodeOrDie(corev1Codec, node)))
 	}()
 
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
-		NamespaceParam("test").Stream(r, "STDIN")
+	b := newDefaultBuilder().NamespaceParam("test").Stream(r, "STDIN")
 
 	test := &testVisitor{}
 
@@ -366,7 +384,7 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
+		b := newDefaultBuilder().
 			FilenameParam(false, &FilenameOptions{Recursive: test.recursive, Filenames: []string{test.directory}}).
 			NamespaceParam("test").DefaultNamespace()
 
@@ -425,7 +443,7 @@ func TestPathBuilderWithMultipleInvalid(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
+		b := newDefaultBuilder().
 			FilenameParam(false, &FilenameOptions{Recursive: test.recursive, Filenames: []string{test.directory}}).
 			NamespaceParam("test").DefaultNamespace()
 
@@ -440,7 +458,7 @@ func TestPathBuilderWithMultipleInvalid(t *testing.T) {
 }
 
 func TestDirectoryBuilder(t *testing.T) {
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
+	b := newDefaultBuilder().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../examples/guestbook/legacy"}}).
 		NamespaceParam("test").DefaultNamespace()
 
@@ -471,7 +489,7 @@ func TestNamespaceOverride(t *testing.T) {
 	}))
 	defer s.Close()
 
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
+	b := newDefaultBuilder().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{s.URL}}).
 		NamespaceParam("test")
 
@@ -482,7 +500,7 @@ func TestNamespaceOverride(t *testing.T) {
 		t.Fatalf("unexpected response: %v %#v", err, test.Infos)
 	}
 
-	b = NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
+	b = newDefaultBuilder().
 		FilenameParam(true, &FilenameOptions{Recursive: false, Filenames: []string{s.URL}}).
 		NamespaceParam("test")
 
@@ -502,7 +520,7 @@ func TestURLBuilder(t *testing.T) {
 	}))
 	defer s.Close()
 
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
+	b := newDefaultBuilder().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{s.URL}}).
 		NamespaceParam("foo")
 
@@ -531,7 +549,7 @@ func TestURLBuilderRequireNamespace(t *testing.T) {
 	}))
 	defer s.Close()
 
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
+	b := newDefaultBuilder().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{s.URL}}).
 		NamespaceParam("test").RequireNamespace()
 
@@ -546,10 +564,9 @@ func TestURLBuilderRequireNamespace(t *testing.T) {
 
 func TestResourceByName(t *testing.T) {
 	pods, _ := testData()
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClientWith("", t, map[string]string{
+	b := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods/foo": runtime.EncodeOrDie(corev1Codec, &pods.Items[0]),
-	}), corev1Codec).
-		NamespaceParam("test")
+	})).NamespaceParam("test")
 
 	test := &testVisitor{}
 	singleItemImplied := false
@@ -579,12 +596,12 @@ func TestResourceByName(t *testing.T) {
 
 func TestMultipleResourceByTheSameName(t *testing.T) {
 	pods, svcs := testData()
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClientWith("", t, map[string]string{
+	b := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods/foo":     runtime.EncodeOrDie(corev1Codec, &pods.Items[0]),
 		"/namespaces/test/pods/baz":     runtime.EncodeOrDie(corev1Codec, &pods.Items[1]),
 		"/namespaces/test/services/foo": runtime.EncodeOrDie(corev1Codec, &svcs.Items[0]),
 		"/namespaces/test/services/baz": runtime.EncodeOrDie(corev1Codec, &svcs.Items[0]),
-	}), corev1Codec).
+	})).
 		NamespaceParam("test")
 
 	test := &testVisitor{}
@@ -609,13 +626,32 @@ func TestMultipleResourceByTheSameName(t *testing.T) {
 	}
 }
 
+func TestRequestModifier(t *testing.T) {
+	var got *rest.Request
+	b := newDefaultBuilderWith(fakeClientWith("test", t, nil)).
+		NamespaceParam("foo").
+		TransformRequests(func(req *rest.Request) {
+			got = req
+		}).
+		ResourceNames("", "services/baz").
+		RequireObject(false)
+
+	i, err := b.Do().Infos()
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := i[0].Client.Get()
+	if got != req {
+		t.Fatalf("request was not received by modifier: %#v", req)
+	}
+}
+
 func TestResourceNames(t *testing.T) {
 	pods, svc := testData()
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClientWith("", t, map[string]string{
+	b := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods/foo":     runtime.EncodeOrDie(corev1Codec, &pods.Items[0]),
 		"/namespaces/test/services/baz": runtime.EncodeOrDie(corev1Codec, &svc.Items[0]),
-	}), corev1Codec).
-		NamespaceParam("test")
+	})).NamespaceParam("test")
 
 	test := &testVisitor{}
 
@@ -639,11 +675,10 @@ func TestResourceNames(t *testing.T) {
 
 func TestResourceNamesWithoutResource(t *testing.T) {
 	pods, svc := testData()
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClientWith("", t, map[string]string{
+	b := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods/foo":     runtime.EncodeOrDie(corev1Codec, &pods.Items[0]),
 		"/namespaces/test/services/baz": runtime.EncodeOrDie(corev1Codec, &svc.Items[0]),
-	}), corev1Codec).
-		NamespaceParam("test")
+	})).NamespaceParam("test")
 
 	test := &testVisitor{}
 
@@ -660,8 +695,7 @@ func TestResourceNamesWithoutResource(t *testing.T) {
 }
 
 func TestResourceByNameWithoutRequireObject(t *testing.T) {
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClientWith("", t, map[string]string{}), corev1Codec).
-		NamespaceParam("test")
+	b := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{})).NamespaceParam("test")
 
 	test := &testVisitor{}
 	singleItemImplied := false
@@ -694,9 +728,9 @@ func TestResourceByNameWithoutRequireObject(t *testing.T) {
 
 func TestResourceByNameAndEmptySelector(t *testing.T) {
 	pods, _ := testData()
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClientWith("", t, map[string]string{
+	b := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods/foo": runtime.EncodeOrDie(corev1Codec, &pods.Items[0]),
-	}), corev1Codec).
+	})).
 		NamespaceParam("test").
 		LabelSelectorParam("").
 		ResourceTypeOrNameArgs(true, "pods", "foo")
@@ -722,10 +756,10 @@ func TestResourceByNameAndEmptySelector(t *testing.T) {
 func TestLabelSelector(t *testing.T) {
 	pods, svc := testData()
 	labelKey := metav1.LabelSelectorQueryParam(corev1GV.String())
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClientWith("", t, map[string]string{
+	b := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db":     runtime.EncodeOrDie(corev1Codec, pods),
 		"/namespaces/test/services?" + labelKey + "=a%3Db": runtime.EncodeOrDie(corev1Codec, svc),
-	}), corev1Codec).
+	})).
 		LabelSelectorParam("a=b").
 		NamespaceParam("test").
 		Flatten()
@@ -753,7 +787,7 @@ func TestLabelSelector(t *testing.T) {
 }
 
 func TestLabelSelectorRequiresKnownTypes(t *testing.T) {
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
+	b := newDefaultBuilder().
 		LabelSelectorParam("a=b").
 		NamespaceParam("test").
 		ResourceTypes("unknown")
@@ -766,10 +800,10 @@ func TestLabelSelectorRequiresKnownTypes(t *testing.T) {
 func TestFieldSelector(t *testing.T) {
 	pods, svc := testData()
 	fieldKey := metav1.FieldSelectorQueryParam(corev1GV.String())
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClientWith("", t, map[string]string{
+	b := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + fieldKey + "=a%3Db":     runtime.EncodeOrDie(corev1Codec, pods),
 		"/namespaces/test/services?" + fieldKey + "=a%3Db": runtime.EncodeOrDie(corev1Codec, svc),
-	}), corev1Codec).
+	})).
 		FieldSelectorParam("a=b").
 		NamespaceParam("test").
 		Flatten()
@@ -797,7 +831,7 @@ func TestFieldSelector(t *testing.T) {
 }
 
 func TestFieldSelectorRequiresKnownTypes(t *testing.T) {
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
+	b := newDefaultBuilder().
 		FieldSelectorParam("a=b").
 		NamespaceParam("test").
 		ResourceTypes("unknown")
@@ -808,7 +842,7 @@ func TestFieldSelectorRequiresKnownTypes(t *testing.T) {
 }
 
 func TestSingleResourceType(t *testing.T) {
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
+	b := newDefaultBuilder().
 		LabelSelectorParam("a=b").
 		SingleResourceType().
 		ResourceTypeOrNameArgs(true, "pods,services")
@@ -877,8 +911,7 @@ func TestResourceTuple(t *testing.T) {
 					"/nodes/foo":                runtime.EncodeOrDie(corev1Codec, &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}),
 				}
 			}
-
-			b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClientWith(k, t, expectedRequests), corev1Codec).
+			b := newDefaultBuilderWith(fakeClientWith(k, t, expectedRequests)).
 				NamespaceParam("test").DefaultNamespace().
 				ResourceTypeOrNameArgs(true, testCase.args...).RequireObject(requireObject)
 
@@ -909,7 +942,7 @@ func TestResourceTuple(t *testing.T) {
 
 func TestStream(t *testing.T) {
 	r, pods, rc := streamTestData()
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
+	b := newDefaultBuilder().
 		NamespaceParam("test").Stream(r, "STDIN").Flatten()
 
 	test := &testVisitor{}
@@ -926,7 +959,7 @@ func TestStream(t *testing.T) {
 
 func TestYAMLStream(t *testing.T) {
 	r, pods, rc := streamYAMLTestData()
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
+	b := newDefaultBuilder().
 		NamespaceParam("test").Stream(r, "STDIN").Flatten()
 
 	test := &testVisitor{}
@@ -943,7 +976,7 @@ func TestYAMLStream(t *testing.T) {
 
 func TestMultipleObject(t *testing.T) {
 	r, pods, svc := streamTestData()
-	obj, err := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
+	obj, err := newDefaultBuilder().
 		NamespaceParam("test").Stream(r, "STDIN").Flatten().
 		Do().Object()
 
@@ -965,7 +998,7 @@ func TestMultipleObject(t *testing.T) {
 
 func TestContinueOnErrorVisitor(t *testing.T) {
 	r, _, _ := streamTestData()
-	req := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
+	req := newDefaultBuilder().
 		ContinueOnError().
 		NamespaceParam("test").Stream(r, "STDIN").Flatten().
 		Do()
@@ -994,7 +1027,7 @@ func TestContinueOnErrorVisitor(t *testing.T) {
 }
 
 func TestSingleItemImpliedObject(t *testing.T) {
-	obj, err := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
+	obj, err := newDefaultBuilder().
 		NamespaceParam("test").DefaultNamespace().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml"}}).
 		Flatten().
@@ -1014,7 +1047,7 @@ func TestSingleItemImpliedObject(t *testing.T) {
 }
 
 func TestSingleItemImpliedObjectNoExtension(t *testing.T) {
-	obj, err := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
+	obj, err := newDefaultBuilder().
 		NamespaceParam("test").DefaultNamespace().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../examples/pod"}}).
 		Flatten().
@@ -1036,7 +1069,7 @@ func TestSingleItemImpliedObjectNoExtension(t *testing.T) {
 func TestSingleItemImpliedRootScopedObject(t *testing.T) {
 	node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test"}, Spec: v1.NodeSpec{ExternalID: "test"}}
 	r := streamTestObject(node)
-	infos, err := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
+	infos, err := newDefaultBuilder().
 		NamespaceParam("test").DefaultNamespace().
 		Stream(r, "STDIN").
 		Flatten().
@@ -1061,9 +1094,9 @@ func TestSingleItemImpliedRootScopedObject(t *testing.T) {
 func TestListObject(t *testing.T) {
 	pods, _ := testData()
 	labelKey := metav1.LabelSelectorQueryParam(corev1GV.String())
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClientWith("", t, map[string]string{
+	b := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db": runtime.EncodeOrDie(corev1Codec, pods),
-	}), corev1Codec).
+	})).
 		LabelSelectorParam("a=b").
 		NamespaceParam("test").
 		ResourceTypeOrNameArgs(true, "pods").
@@ -1094,10 +1127,10 @@ func TestListObject(t *testing.T) {
 func TestListObjectWithDifferentVersions(t *testing.T) {
 	pods, svc := testData()
 	labelKey := metav1.LabelSelectorQueryParam(corev1GV.String())
-	obj, err := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClientWith("", t, map[string]string{
+	obj, err := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db":     runtime.EncodeOrDie(corev1Codec, pods),
 		"/namespaces/test/services?" + labelKey + "=a%3Db": runtime.EncodeOrDie(corev1Codec, svc),
-	}), corev1Codec).
+	})).
 		LabelSelectorParam("a=b").
 		NamespaceParam("test").
 		ResourceTypeOrNameArgs(true, "pods,services").
@@ -1120,12 +1153,12 @@ func TestListObjectWithDifferentVersions(t *testing.T) {
 
 func TestWatch(t *testing.T) {
 	_, svc := testData()
-	w, err := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClientWith("", t, map[string]string{
+	w, err := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
 		"/namespaces/test/services?fieldSelector=metadata.name%3Dredis-master&resourceVersion=12&watch=true": watchBody(watch.Event{
 			Type:   watch.Added,
 			Object: &svc.Items[0],
 		}),
-	}), corev1Codec).
+	})).
 		NamespaceParam("test").DefaultNamespace().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../examples/guestbook/redis-master-service.yaml"}}).Flatten().
 		Do().Watch("12")
@@ -1152,7 +1185,7 @@ func TestWatch(t *testing.T) {
 }
 
 func TestWatchMultipleError(t *testing.T) {
-	_, err := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
+	_, err := newDefaultBuilder().
 		NamespaceParam("test").DefaultNamespace().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml"}}).Flatten().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml"}}).Flatten().
@@ -1175,11 +1208,11 @@ func TestLatest(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "15"},
 	}
 
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClientWith("", t, map[string]string{
+	b := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods/foo":     runtime.EncodeOrDie(corev1Codec, newPod),
 		"/namespaces/test/pods/bar":     runtime.EncodeOrDie(corev1Codec, newPod2),
 		"/namespaces/test/services/baz": runtime.EncodeOrDie(corev1Codec, newSvc),
-	}), corev1Codec).
+	})).
 		NamespaceParam("other").Stream(r, "STDIN").Flatten().Latest()
 
 	test := &testVisitor{}
@@ -1211,7 +1244,7 @@ func TestReceiveMultipleErrors(t *testing.T) {
 		w2.Write([]byte(runtime.EncodeOrDie(corev1Codec, &svc.Items[0])))
 	}()
 
-	b := NewBuilder(restmapper, categories.LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
+	b := newDefaultBuilder().
 		Stream(r, "1").Stream(r2, "2").
 		ContinueOnError()
 

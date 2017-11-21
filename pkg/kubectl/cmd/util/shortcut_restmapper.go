@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"errors"
 	"strings"
 
 	"github.com/golang/glog"
@@ -37,11 +36,8 @@ type shortcutExpander struct {
 
 var _ meta.RESTMapper = &shortcutExpander{}
 
-func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface) (shortcutExpander, error) {
-	if client == nil {
-		return shortcutExpander{}, errors.New("Please provide discovery client to shortcut expander")
-	}
-	return shortcutExpander{RESTMapper: delegate, discoveryClient: client}, nil
+func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface) shortcutExpander {
+	return shortcutExpander{RESTMapper: delegate, discoveryClient: client}
 }
 
 func (e shortcutExpander) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {

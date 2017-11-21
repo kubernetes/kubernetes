@@ -141,6 +141,9 @@ func BuildDaemonSet(name string, podSpec *v1.PodSpec, mutators map[string][]PodS
 			Labels:    BuildSelfhostedComponentLabels(name),
 		},
 		Spec: apps.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: BuildSelfhostedComponentLabels(name),
+			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: BuildSelfhostedComponentLabels(name),

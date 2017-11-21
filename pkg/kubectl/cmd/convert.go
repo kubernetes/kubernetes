@@ -128,22 +128,22 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.C
 	}
 
 	// build the builder
-	o.builder = f.NewBuilder()
-	if o.local {
-		o.builder = o.builder.Local(f.ClientForMapping)
-	} else {
+	o.builder = f.NewBuilder().
+		Internal().
+		LocalParam(o.local)
+	if !o.local {
 		schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
 		if err != nil {
 			return err
 		}
-		o.builder = o.builder.Schema(schema)
+		o.builder.Schema(schema)
 	}
 
 	cmdNamespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
-	o.builder = o.builder.NamespaceParam(cmdNamespace).
+	o.builder.NamespaceParam(cmdNamespace).
 		ContinueOnError().
 		FilenameParam(false, &o.FilenameOptions).
 		Flatten()
@@ -162,7 +162,7 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.C
 		cmd.Flags().Set("output", outputFormat)
 	}
 	o.encoder = f.JSONEncoder()
-	o.printer, err = f.PrinterForCommand(cmd, o.local, nil, printers.PrintOptions{})
+	o.printer, err = f.PrinterForOptions(cmdutil.ExtractCmdPrintOptions(cmd, false))
 	return err
 }
 

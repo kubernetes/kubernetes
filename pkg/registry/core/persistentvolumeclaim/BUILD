@@ -15,6 +15,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/core/persistentvolumeclaim",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/api/persistentvolumeclaim:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",

@@ -23,6 +23,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
@@ -49,8 +51,11 @@ import (
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
+
+var openapiSchemaPath = filepath.Join("..", "..", "..", "..", "api", "openapi-spec", "swagger.json")
 
 // This init should be removed after switching this command and its tests to user external types.
 func init() {
@@ -204,14 +209,46 @@ func testComponentStatusData() *api.ComponentStatusList {
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestGetUnknownSchemaObject(t *testing.T) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
+	tf.WithCustomScheme()
 	_, _, codec, _ := cmdtesting.NewTestFactory()
 	tf.Printer = &testPrinter{}
+	tf.OpenAPISchemaFunc = openapitesting.CreateOpenAPISchemaFunc(openapiSchemaPath)
+
+	obj := &cmdtesting.ExternalType{
+		Kind:       "Type",
+		APIVersion: "apitest/unlikelyversion",
+		Name:       "foo",
+	}
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", "foo"))},
+		Resp: &http.Response{
+			StatusCode: 200, Header: defaultHeader(),
+			Body: objBody(codec, obj),
+		},
 	}
 	tf.Namespace = "test"
 	tf.ClientConfig = defaultClientConfig()
+
+	mapper, _ := f.Object()
+	m, err := mapper.RESTMapping(schema.GroupKind{Group: "apitest", Kind: "Type"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	convertedObj, err := m.ConvertToVersion(&unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "Type",
+			"apiVersion": "apitest/unlikelyversion",
+			"name":       "foo",
+		},
+	}, schema.GroupVersion{Group: "apitest", Version: "unlikelyversion"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(convertedObj, obj) {
+		t.Fatalf("unexpected conversion of unstructured object to structured: %s", diff.ObjectReflectDiff(convertedObj, obj))
+	}
+
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
@@ -224,6 +261,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	if len(actual) != len(expected) {
 		t.Fatalf("expected: %#v, but actual: %#v", expected, actual)
 	}
+	t.Logf("actual: %#v", actual[0])
 	for i, obj := range actual {
 		expectedJSON := runtime.EncodeOrDie(codec, expected[i])
 		expectedMap := map[string]interface{}{}
@@ -231,7 +269,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		actualJSON := runtime.EncodeOrDie(scheme.Codecs.LegacyCodec(), obj)
+		actualJSON := runtime.EncodeOrDie(codec, obj)
 		actualMap := map[string]interface{}{}
 		if err := encjson.Unmarshal([]byte(actualJSON), &actualMap); err != nil {
 			t.Fatal(err)
@@ -376,30 +414,32 @@ func TestGetObjectsFiltered(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		t.Logf("%d", i)
-		f, tf, codec, _ := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{GenericPrinter: test.genericPrinter}
-		tf.UnstructuredClient = &fake.RESTClient{
-			GroupVersion:         schema.GroupVersion{Version: "v1"},
-			NegotiatedSerializer: unstructuredSerializer,
-			Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.resp)},
-		}
-		tf.Namespace = "test"
-		buf := bytes.NewBuffer([]byte{})
-		errBuf := bytes.NewBuffer([]byte{})
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			f, tf, codec, _ := cmdtesting.NewAPIFactory()
+			tf.WithLegacyScheme()
+			tf.Printer = &testPrinter{GenericPrinter: test.genericPrinter}
+			tf.UnstructuredClient = &fake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Version: "v1"},
+				NegotiatedSerializer: unstructuredSerializer,
+				Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.resp)},
+			}
+			tf.Namespace = "test"
+			buf := bytes.NewBuffer([]byte{})
+			errBuf := bytes.NewBuffer([]byte{})
 
-		cmd := NewCmdGet(f, buf, errBuf)
-		cmd.SetOutput(buf)
-		for k, v := range test.flags {
-			cmd.Flags().Lookup(k).Value.Set(v)
-		}
-		cmd.Run(cmd, test.args)
+			cmd := NewCmdGet(f, buf, errBuf)
+			cmd.SetOutput(buf)
+			for k, v := range test.flags {
+				cmd.Flags().Lookup(k).Value.Set(v)
+			}
+			cmd.Run(cmd, test.args)
 
-		verifyObjects(t, test.expect, tf.Printer.(*testPrinter).Objects)
+			verifyObjects(t, test.expect, tf.Printer.(*testPrinter).Objects)
 
-		if len(buf.String()) == 0 {
-			t.Errorf("%d: unexpected empty output", i)
-		}
+			if len(buf.String()) == 0 {
+				t.Errorf("%d: unexpected empty output", i)
+			}
+		})
 	}
 }
 

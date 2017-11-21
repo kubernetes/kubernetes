@@ -25,12 +25,18 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
+	"unsafe"
 
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"github.com/lxn/win"
 	"k8s.io/apimachinery/pkg/util/wait"
+)
+
+var (
+	modkernel32                            = syscall.NewLazyDLL("kernel32.dll")
+	procGetPhysicallyInstalledSystemMemory = modkernel32.NewProc("GetPhysicallyInstalledSystemMemory")
 )
 
 // NewPerfCounterClient creates a client using perf counters
@@ -158,9 +164,18 @@ func (p *perfCounterNodeStatsClient) convertCPUValue(cpuValue uint64) uint64 {
 func getPhysicallyInstalledSystemMemoryBytes() (uint64, error) {
 	var physicalMemoryKiloBytes uint64
 
-	if ok := win.GetPhysicallyInstalledSystemMemory(&physicalMemoryKiloBytes); !ok {
+	if ok := getPhysicallyInstalledSystemMemory(&physicalMemoryKiloBytes); !ok {
 		return 0, errors.New("unable to read physical memory")
 	}
 
 	return physicalMemoryKiloBytes * 1024, nil // convert kilobytes to bytes
+}
+
+func getPhysicallyInstalledSystemMemory(totalMemoryInKilobytes *uint64) bool {
+	ret, _, _ := syscall.Syscall(procGetPhysicallyInstalledSystemMemory.Addr(), 1,
+		uintptr(unsafe.Pointer(totalMemoryInKilobytes)),
+		0,
+		0)
+
+	return ret != 0
 }

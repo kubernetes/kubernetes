@@ -354,6 +354,7 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 					return err
 				}
 				r := f.NewBuilder().
+					Internal().
 					ContinueOnError().
 					NamespaceParam(namespace).DefaultNamespace().
 					ResourceNames(obj.Mapping.Resource, name).
@@ -404,7 +405,7 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 	if outputFormat != "" || cmdutil.GetDryRunFlag(cmd) {
 		return f.PrintObject(cmd, false, runObject.Mapper, runObject.Object, cmdOut)
 	}
-	cmdutil.PrintSuccess(runObject.Mapper, false, cmdOut, runObject.Mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
+	f.PrintSuccess(runObject.Mapper, false, cmdOut, runObject.Mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
 	return nil
 }
 
@@ -559,7 +560,7 @@ func generateService(f cmdutil.Factory, cmd *cobra.Command, args []string, servi
 		}
 		return runObject, nil
 	}
-	cmdutil.PrintSuccess(runObject.Mapper, false, out, runObject.Mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
+	f.PrintSuccess(runObject.Mapper, false, out, runObject.Mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
 
 	return runObject, nil
 }

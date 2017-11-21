@@ -150,6 +150,7 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Com
 		return cmdutil.UsageErrorf(cmd, err.Error())
 	}
 	o.builder = f.NewBuilder().
+		Internal().
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace()
 	if o.selector != "" {
@@ -278,7 +279,7 @@ func (o TaintOptions) RunTaint() error {
 			return o.f.PrintObject(o.cmd, false, mapper, outputObj, o.out)
 		}
 
-		cmdutil.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, false, operation)
+		o.f.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, false, operation)
 		return nil
 	})
 }

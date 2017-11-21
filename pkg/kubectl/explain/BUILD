@@ -37,6 +37,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = [
+        "explain_test.go",
         "field_lookup_test.go",
         "fields_printer_test.go",
         "formatter_test.go",
@@ -48,7 +49,9 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/kubectl/explain",
     library = ":go_default_library",
     deps = [
+        "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
 )

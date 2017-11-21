@@ -20,9 +20,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"math"
 	"net/url"
-	"os"
 	"regexp"
 	"sync"
 
@@ -64,18 +62,21 @@ type BlobDiskController struct {
 var defaultContainerName = ""
 var storageAccountNamePrefix = ""
 var storageAccountNameMatch = ""
-var initFlag int64
 
 var accountsLock = &sync.Mutex{}
 
 func newBlobDiskController(common *controllerCommon) (*BlobDiskController, error) {
 	c := BlobDiskController{common: common}
-	err := c.init()
+	c.setUniqueStrings()
 
+	// get accounts
+	accounts, err := c.getAllStorageAccounts()
 	if err != nil {
-		return nil, err
+		glog.Errorf("azureDisk - getAllStorageAccounts error: %v", err)
+		c.accounts = make(map[string]*storageAccountState)
+		return &c, nil
 	}
-
+	c.accounts = accounts
 	return &c, nil
 }
 
@@ -314,60 +315,6 @@ func (c *BlobDiskController) DeleteBlobDisk(diskURI string, wasForced bool) erro
 	return err
 }
 
-// Init tries best effort to ensure that 2 accounts standard/premium were created
-// to be used by shared blob disks. This to increase the speed pvc provisioning (in most of cases)
-func (c *BlobDiskController) init() error {
-	if !c.shouldInit() {
-		return nil
-	}
-
-	c.setUniqueStrings()
-
-	// get accounts
-	accounts, err := c.getAllStorageAccounts()
-	if err != nil {
-		return err
-	}
-	c.accounts = accounts
-
-	if len(c.accounts) == 0 {
-		counter := 1
-		for counter <= storageAccountsCountInit {
-
-			accountType := storage.PremiumLRS
-			if n := math.Mod(float64(counter), 2); n == 0 {
-				accountType = storage.StandardLRS
-			}
-
-			// We don't really care if these calls failed
-			// at this stage, we are trying to ensure 2 accounts (Standard/Premium)
-			// are there ready for PVC creation
-
-			// if we failed here, the accounts will be created in the process
-			// of creating PVC
-
-			// nor do we care if they were partially created, as the entire
-			// account creation process is idempotent
-			go func(thisNext int) {
-				newAccountName := getAccountNameForNum(thisNext)
-
-				glog.Infof("azureDisk - BlobDiskController init process  will create new storageAccount:%s type:%s", newAccountName, accountType)
-				err := c.createStorageAccount(newAccountName, accountType, c.common.location, true)
-				// TODO return created and error from
-				if err != nil {
-					glog.Infof("azureDisk - BlobDiskController init: create account %s with error:%s", newAccountName, err.Error())
-
-				} else {
-					glog.Infof("azureDisk - BlobDiskController init: created account %s", newAccountName)
-				}
-			}(counter)
-			counter = counter + 1
-		}
-	}
-
-	return nil
-}
-
 //Sets unique strings to be used as accountnames && || blob containers names
 func (c *BlobDiskController) setUniqueStrings() {
 	uniqueString := c.common.resourceGroup + c.common.location + c.common.subscriptionID
@@ -537,19 +484,6 @@ func (c *BlobDiskController) getDiskCount(SAName string) (int, error) {
 	c.accounts[SAName].diskCount = int32(len(response.Blobs))
 
 	return int(c.accounts[SAName].diskCount), nil
-}
-
-// shouldInit ensures that we only init the plugin once
-// and we only do that in the controller
-
-func (c *BlobDiskController) shouldInit() bool {
-	if os.Args[0] == "kube-controller-manager" || (os.Args[0] == "/hyperkube" && os.Args[1] == "controller-manager") {
-		swapped := atomic.CompareAndSwapInt64(&initFlag, 0, 1)
-		if swapped {
-			return true
-		}
-	}
-	return false
 }
 
 func (c *BlobDiskController) getAllStorageAccounts() (map[string]*storageAccountState, error) {

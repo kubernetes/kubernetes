@@ -402,7 +402,7 @@ type PersistentVolumeSource struct {
 	// ISCSI represents an ISCSI Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod. Provisioned by an admin.
 	// +optional
-	ISCSI *ISCSIVolumeSource `json:"iscsi,omitempty" protobuf:"bytes,7,opt,name=iscsi"`
+	ISCSI *ISCSIPersistentVolumeSource `json:"iscsi,omitempty" protobuf:"bytes,7,opt,name=iscsi"`
 	// Cinder represents a cinder volume attached and mounted on kubelets host machine
 	// More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
 	// +optional
@@ -448,6 +448,9 @@ type PersistentVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md
 	// +optional
 	StorageOS *StorageOSPersistentVolumeSource `json:"storageos,omitempty" protobuf:"bytes,21,opt,name=storageos"`
+	// CSI represents storage that handled by an external CSI driver
+	// +optional
+	CSI *CSIPersistentVolumeSource `json:"csi,omitempty" protobuf:"bytes,22,opt,name=csi"`
 }
 
 const (
@@ -524,6 +527,11 @@ type PersistentVolumeSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options
 	// +optional
 	MountOptions []string `json:"mountOptions,omitempty" protobuf:"bytes,7,opt,name=mountOptions"`
+	// volumeMode defines if a volume is intended to be used with a formatted filesystem
+	// or to remain in raw block state. Value of Filesystem is implied when not included in spec.
+	// This is an alpha feature and may change in the future.
+	// +optional
+	VolumeMode *PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,8,opt,name=volumeMode,casttype=PersistentVolumeMode"`
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes.
@@ -539,6 +547,16 @@ const (
 	// PersistentVolumeReclaimRetain means the volume will be left in its current phase (Released) for manual reclamation by the administrator.
 	// The default policy is Retain.
 	PersistentVolumeReclaimRetain PersistentVolumeReclaimPolicy = "Retain"
+)
+
+// PersistentVolumeMode describes how a volume is intended to be consumed, either Block or Filesystem.
+type PersistentVolumeMode string
+
+const (
+	// PersistentVolumeBlock means the volume will not be formatted with a filesystem and will remain a raw block device.
+	PersistentVolumeBlock PersistentVolumeMode = "Block"
+	// PersistentVolumeFilesystem means the volume will be or is formatted with a filesystem.
+	PersistentVolumeFilesystem PersistentVolumeMode = "Filesystem"
 )
 
 // PersistentVolumeStatus is the current status of a persistent volume.
@@ -628,6 +646,11 @@ type PersistentVolumeClaimSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1
 	// +optional
 	StorageClassName *string `json:"storageClassName,omitempty" protobuf:"bytes,5,opt,name=storageClassName"`
+	// volumeMode defines what type of volume is required by the claim.
+	// Value of Filesystem is implied when not included in claim spec.
+	// This is an alpha feature and may change in the future.
+	// +optional
+	VolumeMode *PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,6,opt,name=volumeMode,casttype=PersistentVolumeMode"`
 }
 
 // PersistentVolumeClaimConditionType is a valid value of PersistentVolumeClaimCondition.Type
@@ -1213,14 +1236,15 @@ type NFSVolumeSource struct {
 // ISCSI volumes can only be mounted as read/write once.
 // ISCSI volumes support ownership management and SELinux relabeling.
 type ISCSIVolumeSource struct {
-	// iSCSI target portal. The portal is either an IP or ip_addr:port if the port
+	// iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port
 	// is other than default (typically TCP ports 860 and 3260).
 	TargetPortal string `json:"targetPortal" protobuf:"bytes,1,opt,name=targetPortal"`
 	// Target iSCSI Qualified Name.
 	IQN string `json:"iqn" protobuf:"bytes,2,opt,name=iqn"`
-	// iSCSI target lun number.
+	// iSCSI Target Lun number.
 	Lun int32 `json:"lun" protobuf:"varint,3,opt,name=lun"`
-	// Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport.
+	// iSCSI Interface Name that uses an iSCSI transport.
+	// Defaults to 'default' (tcp).
 	// +optional
 	ISCSIInterface string `json:"iscsiInterface,omitempty" protobuf:"bytes,4,opt,name=iscsiInterface"`
 	// Filesystem type of the volume that you want to mount.
@@ -1234,7 +1258,7 @@ type ISCSIVolumeSource struct {
 	// Defaults to false.
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,6,opt,name=readOnly"`
-	// iSCSI target portal List. The portal is either an IP or ip_addr:port if the port
+	// iSCSI Target Portal List. The portal is either an IP or ip_addr:port if the port
 	// is other than default (typically TCP ports 860 and 3260).
 	// +optional
 	Portals []string `json:"portals,omitempty" protobuf:"bytes,7,opt,name=portals"`
@@ -1244,10 +1268,56 @@ type ISCSIVolumeSource struct {
 	// whether support iSCSI Session CHAP authentication
 	// +optional
 	SessionCHAPAuth bool `json:"chapAuthSession,omitempty" protobuf:"varint,11,opt,name=chapAuthSession"`
-	// CHAP secret for iSCSI target and initiator authentication
+	// CHAP Secret for iSCSI target and initiator authentication
 	// +optional
 	SecretRef *LocalObjectReference `json:"secretRef,omitempty" protobuf:"bytes,10,opt,name=secretRef"`
-	// Custom iSCSI initiator name.
+	// Custom iSCSI Initiator Name.
+	// If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface
+	// <target portal>:<volume name> will be created for the connection.
+	// +optional
+	InitiatorName *string `json:"initiatorName,omitempty" protobuf:"bytes,12,opt,name=initiatorName"`
+}
+
+// ISCSIPersistentVolumeSource represents an ISCSI disk.
+// ISCSI volumes can only be mounted as read/write once.
+// ISCSI volumes support ownership management and SELinux relabeling.
+type ISCSIPersistentVolumeSource struct {
+	// iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port
+	// is other than default (typically TCP ports 860 and 3260).
+	TargetPortal string `json:"targetPortal" protobuf:"bytes,1,opt,name=targetPortal"`
+	// Target iSCSI Qualified Name.
+	IQN string `json:"iqn" protobuf:"bytes,2,opt,name=iqn"`
+	// iSCSI Target Lun number.
+	Lun int32 `json:"lun" protobuf:"varint,3,opt,name=lun"`
+	// iSCSI Interface Name that uses an iSCSI transport.
+	// Defaults to 'default' (tcp).
+	// +optional
+	ISCSIInterface string `json:"iscsiInterface,omitempty" protobuf:"bytes,4,opt,name=iscsiInterface"`
+	// Filesystem type of the volume that you want to mount.
+	// Tip: Ensure that the filesystem type is supported by the host operating system.
+	// Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#iscsi
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	// +optional
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,5,opt,name=fsType"`
+	// ReadOnly here will force the ReadOnly setting in VolumeMounts.
+	// Defaults to false.
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,6,opt,name=readOnly"`
+	// iSCSI Target Portal List. The Portal is either an IP or ip_addr:port if the port
+	// is other than default (typically TCP ports 860 and 3260).
+	// +optional
+	Portals []string `json:"portals,omitempty" protobuf:"bytes,7,opt,name=portals"`
+	// whether support iSCSI Discovery CHAP authentication
+	// +optional
+	DiscoveryCHAPAuth bool `json:"chapAuthDiscovery,omitempty" protobuf:"varint,8,opt,name=chapAuthDiscovery"`
+	// whether support iSCSI Session CHAP authentication
+	// +optional
+	SessionCHAPAuth bool `json:"chapAuthSession,omitempty" protobuf:"varint,11,opt,name=chapAuthSession"`
+	// CHAP Secret for iSCSI target and initiator authentication
+	// +optional
+	SecretRef *SecretReference `json:"secretRef,omitempty" protobuf:"bytes,10,opt,name=secretRef"`
+	// Custom iSCSI Initiator Name.
 	// If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface
 	// <target portal>:<volume name> will be created for the connection.
 	// +optional
@@ -1621,6 +1691,23 @@ type LocalVolumeSource struct {
 	Path string `json:"path" protobuf:"bytes,1,opt,name=path"`
 }
 
+// Represents storage that is managed by an external CSI volume driver
+type CSIPersistentVolumeSource struct {
+	// Driver is the name of the driver to use for this volume.
+	// Required.
+	Driver string `json:"driver" protobuf:"bytes,1,opt,name=driver"`
+
+	// VolumeHandle is the unique volume name returned by the CSI volume
+	// plugin’s CreateVolume to refer to the volume on all subsequent calls.
+	// Required.
+	VolumeHandle string `json:"volumeHandle" protobuf:"bytes,2,opt,name=volumeHandle"`
+
+	// Optional: The value to pass to ControllerPublishVolumeRequest.
+	// Defaults to false (read/write).
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+}
+
 // ContainerPort represents a network port in a single container.
 type ContainerPort struct {
 	// If specified, this must be an IANA_SVC_NAME and unique within the pod. Each
@@ -1688,6 +1775,14 @@ const (
 	// ("rshared" in Linux terminology).
 	MountPropagationBidirectional MountPropagationMode = "Bidirectional"
 )
+
+// volumeDevice describes a mapping of a raw block device within a container.
+type VolumeDevice struct {
+	// name must match the name of a persistentVolumeClaim in the pod
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// devicePath is the path inside of the container that the device will be mapped to.
+	DevicePath string `json:"devicePath" protobuf:"bytes,2,opt,name=devicePath"`
+}
 
 // EnvVar represents an environment variable present in a Container.
 type EnvVar struct {
@@ -2032,6 +2127,12 @@ type Container struct {
 	// +patchMergeKey=mountPath
 	// +patchStrategy=merge
 	VolumeMounts []VolumeMount `json:"volumeMounts,omitempty" patchStrategy:"merge" patchMergeKey:"mountPath" protobuf:"bytes,9,rep,name=volumeMounts"`
+	// volumeDevices is the list of block devices to be used by the container.
+	// This is an alpha feature and may change in the future.
+	// +patchMergeKey=devicePath
+	// +patchStrategy=merge
+	// +optional
+	VolumeDevices []VolumeDevice `json:"volumeDevices,omitempty" patchStrategy:"merge" patchMergeKey:"devicePath" protobuf:"bytes,21,rep,name=volumeDevices"`
 	// Periodic probe of container liveness.
 	// Container will be restarted if the probe fails.
 	// Cannot be updated.
@@ -3285,7 +3386,8 @@ type ServiceSpec struct {
 
 	// externalName is the external reference that kubedns or equivalent will
 	// return as a CNAME record for this service. No proxying will be involved.
-	// Must be a valid DNS name and requires Type to be ExternalName.
+	// Must be a valid RFC-1123 hostname (https://tools.ietf.org/html/rfc1123)
+	// and requires Type to be ExternalName.
 	// +optional
 	ExternalName string `json:"externalName,omitempty" protobuf:"bytes,10,opt,name=externalName"`
 
@@ -4494,6 +4596,13 @@ const (
 	ResourceLimitsMemory ResourceName = "limits.memory"
 	// Local ephemeral storage limit, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	ResourceLimitsEphemeralStorage ResourceName = "limits.ephemeral-storage"
+)
+
+// The following identify resource prefix for Kubernetes object types
+const (
+	// HugePages request, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	// As burst is not supported for HugePages, we would only quota its request, and ignore the limit.
+	ResourceRequestsHugePagesPrefix = "requests.hugepages-"
 )
 
 // A ResourceQuotaScope defines a filter that must match each object tracked by a quota

@@ -71,10 +71,7 @@ func TestReplaceAliases(t *testing.T) {
 	}
 
 	ds := &fakeDiscoveryClient{}
-	mapper, err := NewShortcutExpander(testapi.Default.RESTMapper(), ds)
-	if err != nil {
-		t.Fatalf("Unable to create shortcut expander, err %s", err.Error())
-	}
+	mapper := NewShortcutExpander(testapi.Default.RESTMapper(), ds)
 
 	for _, test := range tests {
 		ds.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {
@@ -126,10 +123,7 @@ func TestKindFor(t *testing.T) {
 	}
 
 	ds := &fakeDiscoveryClient{}
-	mapper, err := NewShortcutExpander(testapi.Default.RESTMapper(), ds)
-	if err != nil {
-		t.Fatalf("Unable to create shortcut expander, err %s", err.Error())
-	}
+	mapper := NewShortcutExpander(testapi.Default.RESTMapper(), ds)
 
 	for i, test := range tests {
 		ds.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {

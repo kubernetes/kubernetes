@@ -113,7 +113,7 @@ type containerManagerImpl struct {
 	qosContainers    QOSContainersInfo
 	// Tasks that are run periodically
 	periodicTasks []func()
-	// holds all the mounted cgroup subsystems
+	// Holds all the mounted cgroup subsystems
 	subsystems *CgroupSubsystems
 	nodeInfo   *v1.Node
 	// Interface for cgroup management
@@ -128,7 +128,7 @@ type containerManagerImpl struct {
 	// Interface for QoS cgroup management
 	qosContainerManager QOSContainerManager
 	// Interface for exporting and allocating devices reported by device plugins.
-	devicePluginHandler deviceplugin.Handler
+	devicePluginManager deviceplugin.Manager
 	// Interface for CPU affinity management.
 	cpuManager cpumanager.Manager
 }
@@ -245,7 +245,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	}
 	glog.Infof("Creating Container Manager object based on Node Config: %+v", nodeConfig)
 
-	qosContainerManager, err := NewQOSContainerManager(subsystems, cgroupRoot, nodeConfig)
+	qosContainerManager, err := NewQOSContainerManager(subsystems, cgroupRoot, nodeConfig, cgroupManager)
 	if err != nil {
 		return nil, err
 	}
@@ -274,11 +274,11 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		}
 	}
 
-	glog.Infof("Creating device plugin handler: %t", devicePluginEnabled)
+	glog.Infof("Creating device plugin manager: %t", devicePluginEnabled)
 	if devicePluginEnabled {
-		cm.devicePluginHandler, err = deviceplugin.NewHandlerImpl(updateDeviceCapacityFunc)
+		cm.devicePluginManager, err = deviceplugin.NewManagerImpl(updateDeviceCapacityFunc)
 	} else {
-		cm.devicePluginHandler, err = deviceplugin.NewHandlerStub()
+		cm.devicePluginManager, err = deviceplugin.NewManagerStub()
 	}
 	if err != nil {
 		return nil, err
@@ -597,7 +597,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	}, time.Second, stopChan)
 
 	// Starts device plugin manager.
-	if err := cm.devicePluginHandler.Start(deviceplugin.ActivePodsFunc(activePods)); err != nil {
+	if err := cm.devicePluginManager.Start(deviceplugin.ActivePodsFunc(activePods)); err != nil {
 		return err
 	}
 	return nil
@@ -622,7 +622,7 @@ func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Containe
 	opts := &kubecontainer.RunContainerOptions{}
 	// Allocate should already be called during predicateAdmitHandler.Admit(),
 	// just try to fetch device runtime information from cached state here
-	devOpts := cm.devicePluginHandler.GetDeviceRunContainerOptions(pod, container)
+	devOpts := cm.devicePluginManager.GetDeviceRunContainerOptions(pod, container)
 	if devOpts == nil {
 		return opts, nil
 	}
@@ -633,7 +633,7 @@ func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Containe
 }
 
 func (cm *containerManagerImpl) UpdatePluginResources(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
-	return cm.devicePluginHandler.Allocate(node, attrs)
+	return cm.devicePluginManager.Allocate(node, attrs)
 }
 
 func (cm *containerManagerImpl) SystemCgroupsLimit() v1.ResourceList {

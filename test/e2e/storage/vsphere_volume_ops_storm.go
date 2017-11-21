@@ -75,7 +75,7 @@ var _ = SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 			volume_ops_scale = DEFAULT_VOLUME_OPS_SCALE
 		}
 		pvclaims = make([]*v1.PersistentVolumeClaim, volume_ops_scale)
-		vsp, err = vsphere.GetVSphere()
+		vsp, err = getVSphere(client)
 		Expect(err).NotTo(HaveOccurred())
 	})
 	AfterEach(func() {
@@ -113,14 +113,14 @@ var _ = SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Verify all volumes are accessible and available in the pod")
-		verifyVSphereVolumesAccessible(pod, persistentvolumes, vsp)
+		verifyVSphereVolumesAccessible(client, pod, persistentvolumes, vsp)
 
 		By("Deleting pod")
 		framework.ExpectNoError(framework.DeletePodWithWait(f, client, pod))
 
 		By("Waiting for volumes to be detached from the node")
 		for _, pv := range persistentvolumes {
-			waitForVSphereDiskToDetach(vsp, pv.Spec.VsphereVolume.VolumePath, k8stype.NodeName(pod.Spec.NodeName))
+			waitForVSphereDiskToDetach(client, vsp, pv.Spec.VsphereVolume.VolumePath, k8stype.NodeName(pod.Spec.NodeName))
 		}
 	})
 })

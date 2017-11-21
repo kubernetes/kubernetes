@@ -66,32 +66,34 @@ func TestSetServiceAccountLocal(t *testing.T) {
 		{yaml: "../../../../test/fixtures/doc-yaml/user-guide/deployment.yaml", apiGroup: "extensions"},
 	}
 
-	f, tf, _, _ := cmdtesting.NewAPIFactory()
-	tf.Client = &fake.RESTClient{
-		GroupVersion: schema.GroupVersion{Version: "v1"},
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
-			return nil, nil
-		}),
-	}
-	tf.Namespace = "test"
-	out := new(bytes.Buffer)
-	cmd := NewCmdServiceAccount(f, out, out)
-	cmd.SetOutput(out)
-	cmd.Flags().Set("output", "yaml")
-	cmd.Flags().Set("local", "true")
-	for _, input := range inputs {
-		testapi.Default = testapi.Groups[input.apiGroup]
-		tf.Printer = printers.NewVersionedPrinter(&printers.YAMLPrinter{}, testapi.Default.Converter(), *testapi.Default.GroupVersion())
-		saConfig := serviceAccountConfig{fileNameOptions: resource.FilenameOptions{
-			Filenames: []string{input.yaml}},
-			out:   out,
-			local: true}
-		err := saConfig.Complete(f, cmd, []string{serviceAccount})
-		assert.NoError(t, err)
-		err = saConfig.Run()
-		assert.NoError(t, err)
-		assert.Contains(t, out.String(), "serviceAccountName: "+serviceAccount, fmt.Sprintf("serviceaccount not updated for %s", input.yaml))
+	for i, input := range inputs {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			f, tf, _, _ := cmdtesting.NewAPIFactory()
+			tf.Client = &fake.RESTClient{
+				GroupVersion: schema.GroupVersion{Version: "v1"},
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+					return nil, nil
+				}),
+			}
+			tf.Namespace = "test"
+			out := new(bytes.Buffer)
+			cmd := NewCmdServiceAccount(f, out, out)
+			cmd.SetOutput(out)
+			cmd.Flags().Set("output", "yaml")
+			cmd.Flags().Set("local", "true")
+			testapi.Default = testapi.Groups[input.apiGroup]
+			tf.Printer = printers.NewVersionedPrinter(&printers.YAMLPrinter{}, testapi.Default.Converter(), *testapi.Default.GroupVersion())
+			saConfig := serviceAccountConfig{fileNameOptions: resource.FilenameOptions{
+				Filenames: []string{input.yaml}},
+				out:   out,
+				local: true}
+			err := saConfig.Complete(f, cmd, []string{serviceAccount})
+			assert.NoError(t, err)
+			err = saConfig.Run()
+			assert.NoError(t, err)
+			assert.Contains(t, out.String(), "serviceAccountName: "+serviceAccount, fmt.Sprintf("serviceaccount not updated for %s", input.yaml))
+		})
 	}
 }
 

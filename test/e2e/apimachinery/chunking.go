@@ -72,6 +72,11 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 				list, err := client.List(opts)
 				Expect(err).ToNot(HaveOccurred())
 				framework.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, list.Continue)
+				// TODO: kops PR job is still using etcd2, which prevents this feature from working. Remove this check when kops is upgraded to etcd3
+				if len(list.Items) > int(opts.Limit) {
+					framework.Skipf("ERROR: This cluster does not support chunking, which means it is running etcd2 and not supported.")
+				}
+				Expect(len(list.Items)).To(BeNumerically("<=", opts.Limit))
 
 				if len(lastRV) == 0 {
 					lastRV = list.ResourceVersion

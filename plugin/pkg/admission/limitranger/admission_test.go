@@ -760,7 +760,7 @@ func newHandlerForTest(c clientset.Interface) (*LimitRanger, informers.SharedInf
 	if err != nil {
 		return nil, f, err
 	}
-	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil, nil, nil)
+	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil)
 	pluginInitializer.Initialize(handler)
 	err = admission.ValidateInitialization(handler)
 	return handler, f, err

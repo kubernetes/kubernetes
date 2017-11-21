@@ -429,12 +429,14 @@ func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]al
 		}
 		if factory.Function != nil {
 			configs = append(configs, algorithm.PriorityConfig{
+				Name:     name,
 				Function: factory.Function(args),
 				Weight:   factory.Weight,
 			})
 		} else {
 			mapFunction, reduceFunction := factory.MapReduceFunction(args)
 			configs = append(configs, algorithm.PriorityConfig{
+				Name:   name,
 				Map:    mapFunction,
 				Reduce: reduceFunction,
 				Weight: factory.Weight,

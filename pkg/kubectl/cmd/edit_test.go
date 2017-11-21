@@ -193,94 +193,94 @@ func TestEdit(t *testing.T) {
 	}
 
 	for _, testcaseName := range testcases.List() {
-		t.Logf("Running testcase: %s", testcaseName)
-		i = 0
-		name = testcaseName
-		testcase = EditTestCase{}
-		testcaseDir := filepath.Join("testdata", "edit", "testcase-"+name)
-		testcaseData, err := ioutil.ReadFile(filepath.Join(testcaseDir, "test.yaml"))
-		if err != nil {
-			t.Fatalf("%s: %v", name, err)
-		}
-		if err := yaml.Unmarshal(testcaseData, &testcase); err != nil {
-			t.Fatalf("%s: %v", name, err)
-		}
-
-		f, tf, _, _ := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
-		tf.UnstructuredClientForMappingFunc = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-			versionedAPIPath := ""
-			if mapping.GroupVersionKind.Group == "" {
-				versionedAPIPath = "/api/" + mapping.GroupVersionKind.Version
-			} else {
-				versionedAPIPath = "/apis/" + mapping.GroupVersionKind.Group + "/" + mapping.GroupVersionKind.Version
+		t.Run(testcaseName, func(t *testing.T) {
+			i = 0
+			name = testcaseName
+			testcase = EditTestCase{}
+			testcaseDir := filepath.Join("testdata", "edit", "testcase-"+name)
+			testcaseData, err := ioutil.ReadFile(filepath.Join(testcaseDir, "test.yaml"))
+			if err != nil {
+				t.Fatalf("%s: %v", name, err)
 			}
-			return &fake.RESTClient{
-				VersionedAPIPath:     versionedAPIPath,
-				NegotiatedSerializer: unstructuredSerializer,
-				Client:               fake.CreateHTTPClient(reqResp),
-			}, nil
-		}
+			if err := yaml.Unmarshal(testcaseData, &testcase); err != nil {
+				t.Fatalf("%s: %v", name, err)
+			}
 
-		if len(testcase.Namespace) > 0 {
-			tf.Namespace = testcase.Namespace
-		}
-		tf.ClientConfig = defaultClientConfig()
-		tf.Command = "edit test cmd invocation"
-		buf := bytes.NewBuffer([]byte{})
-		errBuf := bytes.NewBuffer([]byte{})
+			f, tf, _, _ := cmdtesting.NewAPIFactory()
+			tf.Printer = &testPrinter{}
+			tf.UnstructuredClientForMappingFunc = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+				versionedAPIPath := ""
+				if mapping.GroupVersionKind.Group == "" {
+					versionedAPIPath = "/api/" + mapping.GroupVersionKind.Version
+				} else {
+					versionedAPIPath = "/apis/" + mapping.GroupVersionKind.Group + "/" + mapping.GroupVersionKind.Version
+				}
+				return &fake.RESTClient{
+					VersionedAPIPath:     versionedAPIPath,
+					NegotiatedSerializer: unstructuredSerializer,
+					Client:               fake.CreateHTTPClient(reqResp),
+				}, nil
+			}
 
-		var cmd *cobra.Command
-		switch testcase.Mode {
-		case "edit":
-			cmd = NewCmdEdit(f, buf, errBuf)
-		case "create":
-			cmd = NewCmdCreate(f, buf, errBuf)
-			cmd.Flags().Set("edit", "true")
-		case "edit-last-applied":
-			cmd = NewCmdApplyEditLastApplied(f, buf, errBuf)
-		default:
-			t.Errorf("%s: unexpected mode %s", name, testcase.Mode)
-			continue
-		}
-		if len(testcase.Filename) > 0 {
-			cmd.Flags().Set("filename", filepath.Join(testcaseDir, testcase.Filename))
-		}
-		if len(testcase.Output) > 0 {
-			cmd.Flags().Set("output", testcase.Output)
-		}
-		if len(testcase.OutputPatch) > 0 {
-			cmd.Flags().Set("output-patch", testcase.OutputPatch)
-		}
-		if len(testcase.SaveConfig) > 0 {
-			cmd.Flags().Set("save-config", testcase.SaveConfig)
-		}
+			if len(testcase.Namespace) > 0 {
+				tf.Namespace = testcase.Namespace
+			}
+			tf.ClientConfig = defaultClientConfig()
+			tf.Command = "edit test cmd invocation"
+			buf := bytes.NewBuffer([]byte{})
+			errBuf := bytes.NewBuffer([]byte{})
 
-		cmdutil.BehaviorOnFatal(func(str string, code int) {
-			errBuf.WriteString(str)
-			if testcase.ExpectedExitCode != code {
-				t.Errorf("%s: expected exit code %d, got %d: %s", name, testcase.ExpectedExitCode, code, str)
+			var cmd *cobra.Command
+			switch testcase.Mode {
+			case "edit":
+				cmd = NewCmdEdit(f, buf, errBuf)
+			case "create":
+				cmd = NewCmdCreate(f, buf, errBuf)
+				cmd.Flags().Set("edit", "true")
+			case "edit-last-applied":
+				cmd = NewCmdApplyEditLastApplied(f, buf, errBuf)
+			default:
+				t.Fatalf("%s: unexpected mode %s", name, testcase.Mode)
+			}
+			if len(testcase.Filename) > 0 {
+				cmd.Flags().Set("filename", filepath.Join(testcaseDir, testcase.Filename))
+			}
+			if len(testcase.Output) > 0 {
+				cmd.Flags().Set("output", testcase.Output)
+			}
+			if len(testcase.OutputPatch) > 0 {
+				cmd.Flags().Set("output-patch", testcase.OutputPatch)
+			}
+			if len(testcase.SaveConfig) > 0 {
+				cmd.Flags().Set("save-config", testcase.SaveConfig)
+			}
+
+			cmdutil.BehaviorOnFatal(func(str string, code int) {
+				errBuf.WriteString(str)
+				if testcase.ExpectedExitCode != code {
+					t.Errorf("%s: expected exit code %d, got %d: %s", name, testcase.ExpectedExitCode, code, str)
+				}
+			})
+
+			cmd.Run(cmd, testcase.Args)
+
+			stdout := buf.String()
+			stderr := errBuf.String()
+
+			for _, s := range testcase.ExpectedStdout {
+				if !strings.Contains(stdout, s) {
+					t.Errorf("%s: expected to see '%s' in stdout\n\nstdout:\n%s\n\nstderr:\n%s", name, s, stdout, stderr)
+				}
+			}
+			for _, s := range testcase.ExpectedStderr {
+				if !strings.Contains(stderr, s) {
+					t.Errorf("%s: expected to see '%s' in stderr\n\nstdout:\n%s\n\nstderr:\n%s", name, s, stdout, stderr)
+				}
+			}
+			if i < len(testcase.Steps) {
+				t.Errorf("%s: saw %d steps, testcase included %d additional steps that were not exercised", name, i, len(testcase.Steps)-i)
 			}
 		})
-
-		cmd.Run(cmd, testcase.Args)
-
-		stdout := buf.String()
-		stderr := errBuf.String()
-
-		for _, s := range testcase.ExpectedStdout {
-			if !strings.Contains(stdout, s) {
-				t.Errorf("%s: expected to see '%s' in stdout\n\nstdout:\n%s\n\nstderr:\n%s", name, s, stdout, stderr)
-			}
-		}
-		for _, s := range testcase.ExpectedStderr {
-			if !strings.Contains(stderr, s) {
-				t.Errorf("%s: expected to see '%s' in stderr\n\nstdout:\n%s\n\nstderr:\n%s", name, s, stdout, stderr)
-			}
-		}
-		if i < len(testcase.Steps) {
-			t.Errorf("%s: saw %d steps, testcase included %d additional steps that were not exercised", name, i, len(testcase.Steps)-i)
-		}
 	}
 }
 

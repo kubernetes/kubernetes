@@ -28,13 +28,30 @@ import (
 // slice of strings associated with that key. Items in the list associated with a given
 // key will appear in the order provided.
 // For example: `a:hello,b:again,c:world,b:beautiful` results in `{"a": ["hello"], "b": ["again", "beautiful"], "c": ["world"]}`
-type ColonSeparatedMultimapStringString map[string][]string
+// The first call to Set will clear the map before adding entries; subsequent calls will simply append to the map.
+// This makes it possible to override default values with a command-line option rather than appending to defaults,
+// while still allowing the distribution of key-value pairs across multiple flag invocations.
+// For example: `--flag "a:hello" --flag "b:again" --flag "b:beautiful" --flag "c:world"` results in `{"a": ["hello"], "b": ["again", "beautiful"], "c": ["world"]}`
+type ColonSeparatedMultimapStringString struct {
+	Multimap    *map[string][]string
+	initialized bool // set to true after the first Set call
+}
+
+// NewColonSeparatedMultimapStringString takes a pointer to a map[string][]string and returns the
+// ColonSeparatedMultimapStringString flag parsing shim for that map.
+func NewColonSeparatedMultimapStringString(m *map[string][]string) *ColonSeparatedMultimapStringString {
+	return &ColonSeparatedMultimapStringString{Multimap: m}
+}
 
 // Set implements github.com/spf13/pflag.Value
-func (m ColonSeparatedMultimapStringString) Set(value string) error {
-	// clear old values
-	for k := range m {
-		delete(m, k)
+func (m *ColonSeparatedMultimapStringString) Set(value string) error {
+	if m.Multimap == nil {
+		return fmt.Errorf("no target (nil pointer to map[string][]string)")
+	}
+	if !m.initialized || *m.Multimap == nil {
+		// clear default values, or allocate if no existing map
+		*m.Multimap = make(map[string][]string)
+		m.initialized = true
 	}
 	for _, pair := range strings.Split(value, ",") {
 		if len(pair) == 0 {
@@ -46,19 +63,19 @@ func (m ColonSeparatedMultimapStringString) Set(value string) error {
 		}
 		k := strings.TrimSpace(kv[0])
 		v := strings.TrimSpace(kv[1])
-		m[k] = append(m[k], v)
+		(*m.Multimap)[k] = append((*m.Multimap)[k], v)
 	}
 	return nil
 }
 
 // String implements github.com/spf13/pflag.Value
-func (m ColonSeparatedMultimapStringString) String() string {
+func (m *ColonSeparatedMultimapStringString) String() string {
 	type kv struct {
 		k string
 		v string
 	}
-	kvs := make([]kv, 0, len(m))
-	for k, vs := range m {
+	kvs := make([]kv, 0, len(*m.Multimap))
+	for k, vs := range *m.Multimap {
 		for i := range vs {
 			kvs = append(kvs, kv{k: k, v: vs[i]})
 		}
@@ -75,6 +92,11 @@ func (m ColonSeparatedMultimapStringString) String() string {
 }
 
 // Type implements github.com/spf13/pflag.Value
-func (m ColonSeparatedMultimapStringString) Type() string {
+func (m *ColonSeparatedMultimapStringString) Type() string {
 	return "colonSeparatedMultimapStringString"
+}
+
+// Empty implements OmitEmpty
+func (m *ColonSeparatedMultimapStringString) Empty() bool {
+	return len(*m.Multimap) == 0
 }

@@ -197,6 +197,7 @@ go_test(
     ],
     data = [
         "testdata",
+        "//api/openapi-spec:swagger-spec",
         "//examples:config",
         "//test/fixtures",
     ],

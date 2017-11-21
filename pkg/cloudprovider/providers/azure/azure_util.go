@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"hash/crc32"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -31,6 +32,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (
@@ -44,6 +46,12 @@ const (
 	loadBalancerRuleIDTemplate  = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/loadBalancers/%s/loadBalancingRules/%s"
 	loadBalancerProbeIDTemplate = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/loadBalancers/%s/probes/%s"
 	securityRuleIDTemplate      = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/networkSecurityGroups/%s/securityRules/%s"
+
+	// InternalLoadBalancerNameSuffix is load balancer posfix
+	InternalLoadBalancerNameSuffix = "-internal"
+
+	// nodeLabelRole specifies the role of a node
+	nodeLabelRole = "kubernetes.io/role"
 )
 
 var providerIDRE = regexp.MustCompile(`^` + CloudProviderName + `://(?:.*)/Microsoft.Compute/virtualMachines/(.+)$`)
@@ -116,6 +124,143 @@ func (az *Cloud) getSecurityRuleID(securityRuleName string) string {
 		securityRuleName)
 }
 
+// returns the full identifier of a publicIPAddress.
+func (az *Cloud) getpublicIPAddressID(pipName string) string {
+	return fmt.Sprintf(
+		publicIPAddressIDTemplate,
+		az.SubscriptionID,
+		az.ResourceGroup,
+		pipName)
+}
+
+// getLoadBalancerAvailabilitySetNames selects all possible availability sets for
+// service load balancer, if the service has no loadbalancer mode annotaion returns the
+// primary availability set if service annotation for loadbalancer availability set
+// exists then return the eligible a availability set
+func (az *Cloud) getLoadBalancerAvailabilitySetNames(service *v1.Service, nodes []*v1.Node) (availabilitySetNames *[]string, err error) {
+	hasMode, isAuto, serviceAvailabilitySetNames := getServiceLoadBalancerMode(service)
+	if !hasMode {
+		// no mode specified in service annotation default to PrimaryAvailabilitySetName
+		availabilitySetNames = &[]string{az.Config.PrimaryAvailabilitySetName}
+		return availabilitySetNames, nil
+	}
+	availabilitySetNames, err = az.getAgentPoolAvailabiliySets(nodes)
+	if err != nil {
+		glog.Errorf("az.getLoadBalancerAvailabilitySetNames - getAgentPoolAvailabiliySets failed err=(%v)", err)
+		return nil, err
+	}
+	if len(*availabilitySetNames) == 0 {
+		glog.Errorf("az.getLoadBalancerAvailabilitySetNames - No availability sets found for nodes in the cluster, node count(%d)", len(nodes))
+		return nil, fmt.Errorf("No availability sets found for nodes, node count(%d)", len(nodes))
+	}
+	// sort the list to have deterministic selection
+	sort.Strings(*availabilitySetNames)
+	if !isAuto {
+		if serviceAvailabilitySetNames == nil || len(serviceAvailabilitySetNames) == 0 {
+			return nil, fmt.Errorf("service annotation for LoadBalancerMode is empty, it should have __auto__ or availability sets value")
+		}
+		// validate availability set exists
+		var found bool
+		for sasx := range serviceAvailabilitySetNames {
+			for asx := range *availabilitySetNames {
+				if strings.EqualFold((*availabilitySetNames)[asx], serviceAvailabilitySetNames[sasx]) {
+					found = true
+					serviceAvailabilitySetNames[sasx] = (*availabilitySetNames)[asx]
+					break
+				}
+			}
+			if !found {
+				glog.Errorf("az.getLoadBalancerAvailabilitySetNames - Availability set (%s) in service annotation not found", serviceAvailabilitySetNames[sasx])
+				return nil, fmt.Errorf("availability set (%s) - not found", serviceAvailabilitySetNames[sasx])
+			}
+		}
+		availabilitySetNames = &serviceAvailabilitySetNames
+	}
+
+	return availabilitySetNames, nil
+}
+
+// lists the virtual machines for for the resource group and then builds
+// a list of availability sets that match the nodes available to k8s
+func (az *Cloud) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentPoolAvailabilitySets *[]string, err error) {
+	vms, err := az.VirtualMachineClientListWithRetry()
+	if err != nil {
+		glog.Errorf("az.getNodeAvailabilitySet - VirtualMachineClientListWithRetry failed, err=%v", err)
+		return nil, err
+	}
+	vmNameToAvailabilitySetID := make(map[string]string, len(vms))
+	for vmx := range vms {
+		vm := vms[vmx]
+		if vm.AvailabilitySet != nil {
+			vmNameToAvailabilitySetID[*vm.Name] = *vm.AvailabilitySet.ID
+		}
+	}
+	availabilitySetIDs := sets.NewString()
+	agentPoolAvailabilitySets = &[]string{}
+	for nx := range nodes {
+		nodeName := (*nodes[nx]).Name
+		if isMasterNode(nodes[nx]) {
+			continue
+		}
+		asID, ok := vmNameToAvailabilitySetID[nodeName]
+		if !ok {
+			glog.Errorf("az.getNodeAvailabilitySet - Node(%s) has no availability sets", nodeName)
+			return nil, fmt.Errorf("Node (%s) - has no availability sets", nodeName)
+		}
+		if availabilitySetIDs.Has(asID) {
+			// already added in the list
+			continue
+		}
+		asName, err := getLastSegment(asID)
+		if err != nil {
+			glog.Errorf("az.getNodeAvailabilitySet - Node (%s)- getLastSegment(%s), err=%v", nodeName, asID, err)
+			return nil, err
+		}
+		// AvailabilitySet ID is currently upper cased in a indeterministic way
+		// We want to keep it lower case, before the ID get fixed
+		asName = strings.ToLower(asName)
+
+		*agentPoolAvailabilitySets = append(*agentPoolAvailabilitySets, asName)
+	}
+
+	return agentPoolAvailabilitySets, nil
+}
+
+func (az *Cloud) mapLoadBalancerNameToAvailabilitySet(lbName string, clusterName string) (availabilitySetName string) {
+	availabilitySetName = strings.TrimSuffix(lbName, InternalLoadBalancerNameSuffix)
+	if strings.EqualFold(clusterName, lbName) {
+		availabilitySetName = az.Config.PrimaryAvailabilitySetName
+	}
+
+	return availabilitySetName
+}
+
+// For a load balancer, all frontend ip should reference either a subnet or publicIpAddress.
+// Thus Azure do not allow mixed type (public and internal) load balancer.
+// So we'd have a separate name for internal load balancer.
+// This would be the name for Azure LoadBalancer resource.
+func (az *Cloud) getLoadBalancerName(clusterName string, availabilitySetName string, isInternal bool) string {
+	lbNamePrefix := availabilitySetName
+	if strings.EqualFold(availabilitySetName, az.Config.PrimaryAvailabilitySetName) {
+		lbNamePrefix = clusterName
+	}
+	if isInternal {
+		return fmt.Sprintf("%s%s", lbNamePrefix, InternalLoadBalancerNameSuffix)
+	}
+	return lbNamePrefix
+}
+
+// isMasterNode returns returns true is the node has a master role label.
+// The master role is determined by looking for:
+// * a kubernetes.io/role="master" label
+func isMasterNode(node *v1.Node) bool {
+	if val, ok := node.Labels[nodeLabelRole]; ok && val == "master" {
+		return true
+	}
+
+	return false
+}
+
 // returns the deepest child's identifier from a full identifier string.
 func getLastSegment(ID string) (string, error) {
 	parts := strings.Split(ID, "/")
@@ -179,16 +324,8 @@ func getPrimaryIPConfig(nic network.Interface) (*network.InterfaceIPConfiguratio
 	return nil, fmt.Errorf("failed to determine the determine primary ipconfig. nicname=%q", *nic.Name)
 }
 
-// For a load balancer, all frontend ip should reference either a subnet or publicIpAddress.
-// Thus Azure do not allow mixed type (public and internal) load balancer.
-// So we'd have a separate name for internal load balancer.
-// This would be the name for Azure LoadBalancer resource.
-func getLoadBalancerName(clusterName string, isInternal bool) string {
-	if isInternal {
-		return fmt.Sprintf("%s-internal", clusterName)
-	}
-
-	return clusterName
+func isInternalLoadBalancer(lb *network.LoadBalancer) bool {
+	return strings.HasSuffix(*lb.Name, InternalLoadBalancerNameSuffix)
 }
 
 func getBackendPoolName(clusterName string) string {
@@ -203,6 +340,10 @@ func getLoadBalancerRuleName(service *v1.Service, port v1.ServicePort, subnetNam
 }
 
 func getSecurityRuleName(service *v1.Service, port v1.ServicePort, sourceAddrPrefix string) string {
+	if useSharedSecurityRule(service) {
+		safePrefix := strings.Replace(sourceAddrPrefix, "/", "_", -1)
+		return fmt.Sprintf("shared-%s-%d-%s", port.Protocol, port.Port, safePrefix)
+	}
 	safePrefix := strings.Replace(sourceAddrPrefix, "/", "_", -1)
 	return fmt.Sprintf("%s-%s-%d-%s", getRulePrefix(service), port.Protocol, port.Port, safePrefix)
 }

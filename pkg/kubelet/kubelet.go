@@ -24,7 +24,6 @@ import (
 	"net/url"
 	"os"
 	"path"
-	goruntime "runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -218,7 +217,8 @@ type Builder func(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	registerSchedulable bool,
 	nonMasqueradeCIDR string,
 	keepTerminatedPodVolumes bool,
-	nodeLabels map[string]string) (Bootstrap, error)
+	nodeLabels map[string]string,
+	seccompProfileRoot string) (Bootstrap, error)
 
 // Dependencies is a bin for things we might consider "injected dependencies" -- objects constructed
 // at runtime that are necessary for running the Kubelet. This is a temporary solution for grouping
@@ -344,7 +344,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	registerSchedulable bool,
 	nonMasqueradeCIDR string,
 	keepTerminatedPodVolumes bool,
-	nodeLabels map[string]string) (*Kubelet, error) {
+	nodeLabels map[string]string,
+	seccompProfileRoot string) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -658,7 +659,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 			kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 			klet.livenessManager,
-			kubeCfg.SeccompProfileRoot,
+			seccompProfileRoot,
 			containerRefManager,
 			machineInfo,
 			klet,
@@ -681,14 +682,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.containerRuntime = runtime
 		klet.runner = runtime
 
-		// CRI integrations should get container metrics via CRI. Docker
-		// uses the built-in cadvisor to gather such metrics on Linux for
-		// historical reasons.
-		// cri-o relies on cadvisor as a temporary workaround. The code should
-		// be removed. Related issue:
-		// https://github.com/kubernetes/kubernetes/issues/51798
-		if (containerRuntime == kubetypes.DockerContainerRuntime &&
-			goruntime.GOOS == "linux") || remoteRuntimeEndpoint == "/var/run/crio.sock" {
+		if cadvisor.UsingLegacyCadvisorStats(containerRuntime, remoteRuntimeEndpoint) {
 			klet.StatsProvider = stats.NewCadvisorStatsProvider(
 				klet.cadvisor,
 				klet.resourceAnalyzer,

@@ -24,8 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
+	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
 	"k8s.io/apiserver/pkg/admission/plugin/initialization"
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
+	mutatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
 	validatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/validating"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/informers"
@@ -56,8 +58,8 @@ func NewAdmissionOptions() *AdmissionOptions {
 	options := &AdmissionOptions{
 		Plugins:                &admission.Plugins{},
 		PluginNames:            []string{},
-		RecommendedPluginOrder: []string{lifecycle.PluginName, initialization.PluginName, validatingwebhook.PluginName},
-		DefaultOffPlugins:      []string{initialization.PluginName, validatingwebhook.PluginName},
+		RecommendedPluginOrder: []string{mutatingwebhook.PluginName, lifecycle.PluginName, initialization.PluginName, validatingwebhook.PluginName},
+		DefaultOffPlugins:      []string{mutatingwebhook.PluginName, initialization.PluginName, validatingwebhook.PluginName},
 	}
 	server.RegisterAllAdmissionPlugins(options.Plugins)
 	return options
@@ -66,7 +68,11 @@ func NewAdmissionOptions() *AdmissionOptions {
 // AddFlags adds flags related to admission for a specific APIServer to the specified FlagSet
 func (a *AdmissionOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&a.PluginNames, "admission-control", a.PluginNames, ""+
-		"Ordered list of plug-ins to do admission control of resources into cluster. "+
+		"Admission is divided into two phases. "+
+		"In the first phase, only mutating admission plugins run. "+
+		"In the second phase, only validating admission plugins run. "+
+		"The names in the below list may represent a validating plugin, a mutating plugin, or both. "+
+		"Within each phase, the plugins will run in the order in which they are passed to this flag. "+
 		"Comma-delimited list of: "+strings.Join(a.Plugins.Registered(), ", ")+".")
 
 	fs.StringVar(&a.ConfigFile, "admission-control-config-file", a.ConfigFile,
@@ -104,12 +110,12 @@ func (a *AdmissionOptions) ApplyTo(
 	pluginInitializers = append(pluginInitializers, genericInitializer)
 	initializersChain = append(initializersChain, pluginInitializers...)
 
-	admissionChain, err := a.Plugins.NewFromPlugins(pluginNames, pluginsConfigProvider, initializersChain)
+	admissionChain, err := a.Plugins.NewFromPlugins(pluginNames, pluginsConfigProvider, initializersChain, admissionmetrics.WithControllerMetrics)
 	if err != nil {
 		return err
 	}
 
-	c.AdmissionControl = admissionChain
+	c.AdmissionControl = admissionmetrics.WithStepMetrics(admissionChain)
 	return nil
 }
 

@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"path/filepath"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,14 +36,14 @@ const (
 	// More details here: https://github.com/kubernetes/kubernetes/issues/50986
 	AutoDetectCloudProvider = "auto-detect"
 
-	defaultIPTablesMasqueradeBit = 14
-	defaultIPTablesDropBit       = 15
+	DefaultIPTablesMasqueradeBit = 14
+	DefaultIPTablesDropBit       = 15
 )
 
 var (
 	zeroDuration = metav1.Duration{}
 	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
-	defaultNodeAllocatableEnforcement = []string{"pods"}
+	DefaultNodeAllocatableEnforcement = []string{"pods"}
 )
 
 func addDefaultingFuncs(scheme *kruntime.Scheme) error {
@@ -177,9 +176,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.SerializeImagePulls == nil {
 		obj.SerializeImagePulls = boolVar(true)
 	}
-	if obj.SeccompProfileRoot == "" {
-		obj.SeccompProfileRoot = filepath.Join(DefaultRootDir, "seccomp")
-	}
 	if obj.StreamingConnectionIdleTimeout == zeroDuration {
 		obj.StreamingConnectionIdleTimeout = metav1.Duration{Duration: 4 * time.Hour}
 	}
@@ -200,27 +196,25 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.HairpinMode = PromiscuousBridge
 	}
 	if obj.EvictionHard == nil {
-		temp := "memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%,imagefs.available<15%"
-		obj.EvictionHard = &temp
+		obj.EvictionHard = map[string]string{
+			"memory.available":  "100Mi",
+			"nodefs.available":  "10%",
+			"nodefs.inodesFree": "5%",
+			"imagefs.available": "15%",
+		}
 	}
 	if obj.EvictionPressureTransitionPeriod == zeroDuration {
 		obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}
-	}
-	if obj.SystemReserved == nil {
-		obj.SystemReserved = make(map[string]string)
-	}
-	if obj.KubeReserved == nil {
-		obj.KubeReserved = make(map[string]string)
 	}
 	if obj.MakeIPTablesUtilChains == nil {
 		obj.MakeIPTablesUtilChains = boolVar(true)
 	}
 	if obj.IPTablesMasqueradeBit == nil {
-		temp := int32(defaultIPTablesMasqueradeBit)
+		temp := int32(DefaultIPTablesMasqueradeBit)
 		obj.IPTablesMasqueradeBit = &temp
 	}
 	if obj.IPTablesDropBit == nil {
-		temp := int32(defaultIPTablesDropBit)
+		temp := int32(DefaultIPTablesDropBit)
 		obj.IPTablesDropBit = &temp
 	}
 	if obj.CgroupsPerQOS == nil {
@@ -231,13 +225,7 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.CgroupDriver = "cgroupfs"
 	}
 	if obj.EnforceNodeAllocatable == nil {
-		obj.EnforceNodeAllocatable = defaultNodeAllocatableEnforcement
-	}
-	if obj.FeatureGates == nil {
-		obj.FeatureGates = make(map[string]bool)
-	}
-	if obj.ManifestURLHeader == nil {
-		obj.ManifestURLHeader = make(map[string][]string)
+		obj.EnforceNodeAllocatable = DefaultNodeAllocatableEnforcement
 	}
 }
 

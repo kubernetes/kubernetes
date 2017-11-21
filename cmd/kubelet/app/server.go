@@ -414,7 +414,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 
 	if kubeDeps.CAdvisorInterface == nil {
 		imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(s.ContainerRuntime, s.RemoteRuntimeEndpoint)
-		kubeDeps.CAdvisorInterface, err = cadvisor.New(s.Address, uint(s.CAdvisorPort), imageFsInfoProvider, s.RootDirectory)
+		kubeDeps.CAdvisorInterface, err = cadvisor.New(s.Address, uint(s.CAdvisorPort), imageFsInfoProvider, s.RootDirectory, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint))
 		if err != nil {
 			return err
 		}
@@ -439,7 +439,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		var hardEvictionThresholds []evictionapi.Threshold
 		// If the user requested to ignore eviction thresholds, then do not set valid values for hardEvictionThresholds here.
 		if !s.ExperimentalNodeAllocatableIgnoreEvictionThreshold {
-			hardEvictionThresholds, err = eviction.ParseThresholdConfig([]string{}, s.EvictionHard, "", "", "")
+			hardEvictionThresholds, err = eviction.ParseThresholdConfig([]string{}, s.EvictionHard, nil, nil, nil)
 			if err != nil {
 				return err
 			}
@@ -728,7 +728,8 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		kubeFlags.RegisterSchedulable,
 		kubeFlags.NonMasqueradeCIDR,
 		kubeFlags.KeepTerminatedPodVolumes,
-		kubeFlags.NodeLabels)
+		kubeFlags.NodeLabels,
+		kubeFlags.SeccompProfileRoot)
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %v", err)
 	}
@@ -800,7 +801,8 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	registerSchedulable bool,
 	nonMasqueradeCIDR string,
 	keepTerminatedPodVolumes bool,
-	nodeLabels map[string]string) (k kubelet.Bootstrap, err error) {
+	nodeLabels map[string]string,
+	seccompProfileRoot string) (k kubelet.Bootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
@@ -832,7 +834,8 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		registerSchedulable,
 		nonMasqueradeCIDR,
 		keepTerminatedPodVolumes,
-		nodeLabels)
+		nodeLabels,
+		seccompProfileRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -846,7 +849,7 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 // parseResourceList parses the given configuration map into an API
 // ResourceList or returns an error.
-func parseResourceList(m kubeletconfiginternal.ConfigurationMap) (v1.ResourceList, error) {
+func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 	if len(m) == 0 {
 		return nil, nil
 	}

@@ -23,7 +23,7 @@ import (
 var (
 	// AlphaDisclaimer to be places at the end of description of commands in alpha release
 	AlphaDisclaimer = `
-		Alpha Disclaimer: this command is currently alpha but, please try it out and give us feedback!
+		Alpha Disclaimer: this command is currently alpha.
 	`
 
 	// MacroCommandLongDescription provide a standard description for "macro" commands

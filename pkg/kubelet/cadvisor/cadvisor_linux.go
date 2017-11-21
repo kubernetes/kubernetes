@@ -105,11 +105,16 @@ func containerLabels(c *cadvisorapi.ContainerInfo) map[string]string {
 }
 
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(address string, port uint, imageFsInfoProvider ImageFsInfoProvider, rootPath string) (Interface, error) {
+func New(address string, port uint, imageFsInfoProvider ImageFsInfoProvider, rootPath string, usingLegacyStats bool) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
 
+	ignoreMetrics := cadvisormetrics.MetricSet{cadvisormetrics.NetworkTcpUsageMetrics: struct{}{}, cadvisormetrics.NetworkUdpUsageMetrics: struct{}{}}
+	if !usingLegacyStats {
+		ignoreMetrics[cadvisormetrics.DiskUsageMetrics] = struct{}{}
+	}
+
 	// Create and start the cAdvisor container manager.
-	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, cadvisormetrics.MetricSet{cadvisormetrics.NetworkTcpUsageMetrics: struct{}{}, cadvisormetrics.NetworkUdpUsageMetrics: struct{}{}}, http.DefaultClient)
+	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, ignoreMetrics, http.DefaultClient)
 	if err != nil {
 		return nil, err
 	}

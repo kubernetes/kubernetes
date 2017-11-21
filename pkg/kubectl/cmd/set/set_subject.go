@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -127,6 +126,8 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
+		Internal().
+		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
@@ -140,8 +141,6 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		if len(args) > 0 {
 			return resource.LocalResourceError
 		}
-
-		builder = builder.Local(f.ClientForMapping)
 	} else {
 		builder = builder.
 			LabelSelectorParam(o.Selector).
@@ -219,9 +218,8 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 
 		transformed, err := updateSubjectForObject(info.Object, subjects, fn)
 		if transformed && err == nil {
-			// TODO: switch UpdatePodSpecForObject to work on v1.PodSpec, use info.VersionedObject, and avoid conversion completely
-			versionedEncoder := legacyscheme.Codecs.EncoderForVersion(o.Encoder, info.Mapping.GroupVersionKind.GroupVersion())
-			return runtime.Encode(versionedEncoder, info.Object)
+			// TODO: switch UpdatePodSpecForObject to work on v1.PodSpec
+			return runtime.Encode(o.Encoder, info.AsVersioned())
 		}
 		return nil, err
 	})
@@ -256,9 +254,9 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 
 		shortOutput := o.Output == "name"
 		if len(o.Output) > 0 && !shortOutput {
-			return o.PrintObject(o.Mapper, info.Object, o.Out)
+			return o.PrintObject(o.Mapper, info.AsVersioned(), o.Out)
 		}
-		cmdutil.PrintSuccess(o.Mapper, shortOutput, o.Out, info.Mapping.Resource, info.Name, false, "subjects updated")
+		f.PrintSuccess(o.Mapper, shortOutput, o.Out, info.Mapping.Resource, info.Name, false, "subjects updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

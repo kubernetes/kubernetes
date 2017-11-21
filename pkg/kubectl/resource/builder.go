@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -44,8 +43,12 @@ const defaultHttpGetAttempts int = 3
 // from the command line and converting them to a list of resources to iterate
 // over using the Visitor interface.
 type Builder struct {
-	mapper           *Mapper
 	categoryExpander categories.CategoryExpander
+
+	// mapper is set explicitly by resource builders
+	mapper       *Mapper
+	internal     *Mapper
+	unstructured *Mapper
 
 	errs []error
 
@@ -58,6 +61,7 @@ type Builder struct {
 	selectAll            bool
 	includeUninitialized bool
 	limitChunks          int64
+	requestTransforms    []RequestTransform
 
 	resources []string
 
@@ -115,10 +119,13 @@ type resourceTuple struct {
 	Name     string
 }
 
-// NewBuilder creates a builder that operates on generic objects.
-func NewBuilder(mapper meta.RESTMapper, categoryExpander categories.CategoryExpander, typer runtime.ObjectTyper, clientMapper ClientMapper, decoder runtime.Decoder) *Builder {
+// NewBuilder creates a builder that operates on generic objects. At least one of
+// internal or unstructured must be specified.
+// TODO: Add versioned client (although versioned is still lossy)
+func NewBuilder(internal, unstructured *Mapper, categoryExpander categories.CategoryExpander) *Builder {
 	return &Builder{
-		mapper:           &Mapper{typer, mapper, clientMapper, decoder},
+		internal:         internal,
+		unstructured:     unstructured,
 		categoryExpander: categoryExpander,
 		requireObject:    true,
 	}
@@ -164,10 +171,62 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 	return b
 }
 
-// Local wraps the builder's clientMapper in a DisabledClientMapperForMapping
-func (b *Builder) Local(mapperFunc ClientMapperFunc) *Builder {
-	b.mapper.ClientMapper = DisabledClientForMapping{ClientMapper: ClientMapperFunc(mapperFunc)}
+// Unstructured updates the builder so that it will request and send unstructured
+// objects. Unstructured objects preserve all fields sent by the server in a map format
+// based on the object's JSON structure which means no data is lost when the client
+// reads and then writes an object. Use this mode in preference to Internal unless you
+// are working with Go types directly.
+func (b *Builder) Unstructured() *Builder {
+	if b.unstructured == nil {
+		b.errs = append(b.errs, fmt.Errorf("no unstructured mapper provided"))
+		return b
+	}
+	if b.mapper != nil {
+		b.errs = append(b.errs, fmt.Errorf("another mapper was already selected, cannot use unstructured types"))
+		return b
+	}
+	b.mapper = b.unstructured
 	return b
+}
+
+// Internal updates the builder so that it will convert objects off the wire
+// into the internal form if necessary. Using internal types is lossy - fields added
+// to the server will not be seen by the client code and may result in failure. Only
+// use this mode when working offline, or when generating patches to send to the server.
+// Use Unstructured if you are reading an object and performing a POST or PUT.
+func (b *Builder) Internal() *Builder {
+	if b.internal == nil {
+		b.errs = append(b.errs, fmt.Errorf("no internal mapper provided"))
+		return b
+	}
+	if b.mapper != nil {
+		b.errs = append(b.errs, fmt.Errorf("another mapper was already selected, cannot use internal types"))
+		return b
+	}
+	b.mapper = b.internal
+	return b
+}
+
+// LocalParam calls Local() if local is true.
+func (b *Builder) LocalParam(local bool) *Builder {
+	if local {
+		b.Local()
+	}
+	return b
+}
+
+// Local will avoid asking the server for results.
+func (b *Builder) Local() *Builder {
+	mapper := *b.mapper
+	mapper.ClientMapper = DisabledClientForMapping{ClientMapper: mapper.ClientMapper}
+	b.mapper = &mapper
+	return b
+}
+
+// Mapper returns a copy of the current mapper.
+func (b *Builder) Mapper() *Mapper {
+	mapper := *b.mapper
+	return &mapper
 }
 
 // URL accepts a number of URLs directly.
@@ -351,6 +410,13 @@ func (b *Builder) RequireNamespace() *Builder {
 // no chunking.
 func (b *Builder) RequestChunksOf(chunkSize int64) *Builder {
 	b.limitChunks = chunkSize
+	return b
+}
+
+// TransformRequests alters API calls made by clients requested from this builder. Pass
+// an empty list to clear modifiers.
+func (b *Builder) TransformRequests(opts ...RequestTransform) *Builder {
+	b.requestTransforms = opts
 	return b
 }
 
@@ -656,6 +722,7 @@ func (b *Builder) visitBySelector() *Result {
 			result.err = err
 			return result
 		}
+		client = NewClientWithOptions(client, b.requestTransforms...)
 		selectorNamespace := b.namespace
 		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 			selectorNamespace = ""
@@ -705,6 +772,7 @@ func (b *Builder) visitByResource() *Result {
 			result.err = err
 			return result
 		}
+		client = NewClientWithOptions(client, b.requestTransforms...)
 		clients[s] = client
 	}
 
@@ -733,7 +801,13 @@ func (b *Builder) visitByResource() *Result {
 			}
 		}
 
-		info := NewInfo(client, mapping, selectorNamespace, tuple.Name, b.export)
+		info := &Info{
+			Client:    client,
+			Mapping:   mapping,
+			Namespace: selectorNamespace,
+			Name:      tuple.Name,
+			Export:    b.export,
+		}
 		items = append(items, info)
 	}
 
@@ -792,7 +866,13 @@ func (b *Builder) visitByName() *Result {
 
 	visitors := []Visitor{}
 	for _, name := range b.names {
-		info := NewInfo(client, mapping, selectorNamespace, name, b.export)
+		info := &Info{
+			Client:    client,
+			Mapping:   mapping,
+			Namespace: selectorNamespace,
+			Name:      name,
+			Export:    b.export,
+		}
 		visitors = append(visitors, info)
 	}
 	result.visitor = VisitorList(visitors)
@@ -853,6 +933,7 @@ func (b *Builder) visitByPaths() *Result {
 // for further iteration.
 func (b *Builder) Do() *Result {
 	r := b.visitorResult()
+	r.mapper = b.Mapper()
 	if r.err != nil {
 		return r
 	}

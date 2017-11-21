@@ -184,12 +184,8 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 		return err
 	}
 
-	mapper, _, err := f.UnstructuredObject()
-	if err != nil {
-		return err
-	}
-
-	r := f.NewUnstructuredBuilder().
+	r := f.NewBuilder().
+		Unstructured().
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -204,6 +200,7 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 
 	dryRun := cmdutil.GetFlagBool(cmd, "dry-run")
 	output := cmdutil.GetFlagString(cmd, "output")
+	mapper := r.Mapper().RESTMapper
 
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
@@ -236,7 +233,7 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 			f.PrintObjectSpecificMessage(info.Object, out)
 		}
 
-		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
+		f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
 		return nil
 	})
 	if err != nil {
@@ -348,7 +345,7 @@ func RunCreateSubcommand(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, o
 	}
 
 	if useShortOutput := options.OutputFormat == "name"; useShortOutput || len(options.OutputFormat) == 0 {
-		cmdutil.PrintSuccess(mapper, useShortOutput, out, mapping.Resource, info.Name, options.DryRun, "created")
+		f.PrintSuccess(mapper, useShortOutput, out, mapping.Resource, info.Name, options.DryRun, "created")
 		return nil
 	}
 

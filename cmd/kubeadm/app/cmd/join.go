@@ -20,19 +20,25 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -103,6 +109,7 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 	var skipPreFlight bool
 	var cfgPath string
 	var criSocket string
+	var featureGatesString string
 
 	cmd := &cobra.Command{
 		Use:   "join [flags]",
@@ -110,6 +117,11 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		Long:  joinLongDescription,
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg.DiscoveryTokenAPIServers = args
+
+			var err error
+			if cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
+				kubeadmutil.CheckErr(err)
+			}
 
 			legacyscheme.Scheme.Default(cfg)
 			internalcfg := &kubeadmapi.NodeConfiguration{}
@@ -122,14 +134,14 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		},
 	}
 
-	AddJoinConfigFlags(cmd.PersistentFlags(), cfg)
+	AddJoinConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
 	AddJoinOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &criSocket)
 
 	return cmd
 }
 
 // AddJoinConfigFlags adds join flags bound to the config to the specified flagset
-func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.NodeConfiguration) {
+func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.NodeConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.DiscoveryFile, "discovery-file", "",
 		"A file or url from which to load cluster information.")
@@ -151,6 +163,10 @@ func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.NodeConfigurat
 	flagSet.StringVar(
 		&cfg.Token, "token", "",
 		"Use this token for both discovery-token and tls-bootstrap-token.")
+	flagSet.StringVar(
+		featureGatesString, "feature-gates", *featureGatesString,
+		"A set of key=value pairs that describe feature gates for various features. "+
+			"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
 }
 
 // AddJoinOtherFlags adds join flags that are not bound to a configuration file to the given flagset
@@ -228,7 +244,7 @@ func (j *Join) Run(out io.Writer) error {
 
 	// Write the bootstrap kubelet config file or the TLS-Boostrapped kubelet config file down to disk
 	if err := kubeconfigutil.WriteToDisk(kubeconfigFile, cfg); err != nil {
-		return err
+		return fmt.Errorf("couldn't save bootstrap-kubelet.conf to disk: %v", err)
 	}
 
 	// Write the ca certificate to disk so kubelet can use it for authentication
@@ -238,6 +254,38 @@ func (j *Join) Run(out io.Writer) error {
 		return fmt.Errorf("couldn't save the CA certificate to disk: %v", err)
 	}
 
+	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+	if features.Enabled(j.cfg.FeatureGates, features.DynamicKubeletConfig) {
+		client, err := getTLSBootstrappedClient()
+		if err != nil {
+			return err
+		}
+
+		// Update the node with remote base kubelet configuration
+		if err := kubeletphase.UpdateNodeWithConfigMap(client, j.cfg.NodeName); err != nil {
+			return err
+		}
+	}
+
 	fmt.Fprintf(out, joinDoneMsgf)
 	return nil
+}
+
+// getTLSBootstrappedClient waits for the kubelet to perform the TLS bootstrap
+// and then creates a client from config file /etc/kubernetes/kubelet.conf
+func getTLSBootstrappedClient() (clientset.Interface, error) {
+	fmt.Println("[tlsbootstrap] Waiting for the kubelet to perform the TLS Bootstrap...")
+
+	kubeletKubeConfig := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
+
+	// Loop on every falsy return. Return with an error if raised. Exit successfully if true is returned.
+	err := wait.PollImmediateInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {
+		_, err := os.Stat(kubeletKubeConfig)
+		return (err == nil), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return kubeconfigutil.ClientSetFromFile(kubeletKubeConfig)
 }

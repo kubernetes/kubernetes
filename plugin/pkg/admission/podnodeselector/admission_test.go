@@ -253,7 +253,7 @@ func TestIgnoreUpdatingInitializedPod(t *testing.T) {
 func newHandlerForTest(c clientset.Interface) (*podNodeSelector, informers.SharedInformerFactory, error) {
 	f := informers.NewSharedInformerFactory(c, 5*time.Minute)
 	handler := NewPodNodeSelector(nil)
-	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil, nil, nil)
+	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil)
 	pluginInitializer.Initialize(handler)
 	err := admission.ValidateInitialization(handler)
 	return handler, f, err

@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/deny"
 	"k8s.io/kubernetes/plugin/pkg/admission/eventratelimit"
 	"k8s.io/kubernetes/plugin/pkg/admission/exec"
+	"k8s.io/kubernetes/plugin/pkg/admission/extendedresourcetoleration"
 	"k8s.io/kubernetes/plugin/pkg/admission/gc"
 	"k8s.io/kubernetes/plugin/pkg/admission/imagepolicy"
 	"k8s.io/kubernetes/plugin/pkg/admission/initialresources"
@@ -61,6 +62,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	deny.Register(plugins)
 	eventratelimit.Register(plugins)
 	exec.Register(plugins)
+	extendedresourcetoleration.Register(plugins)
 	gc.Register(plugins)
 	imagepolicy.Register(plugins)
 	initialresources.Register(plugins)

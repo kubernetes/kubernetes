@@ -116,6 +116,11 @@ func (pdev podDevices) toCheckpointData() checkpointData {
 		for conName, resources := range containerDevices {
 			for resource, devices := range resources {
 				devIds := devices.deviceIds.UnsortedList()
+				if devices.allocResp == nil {
+					glog.Errorf("Can't marshal allocResp for %v %v %v: allocation response is missing", podUID, conName, resource)
+					continue
+				}
+
 				allocResp, err := devices.allocResp.Marshal()
 				if err != nil {
 					glog.Errorf("Can't marshal allocResp for %v %v %v: %v", podUID, conName, resource, err)

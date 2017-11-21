@@ -32,6 +32,7 @@ go_test(
     name = "go_default_test",
     srcs = ["get_test.go"],
     data = [
+        "//api/openapi-spec:swagger-spec",
         "//examples:config",
         "//test/fixtures",
     ],
@@ -45,6 +46,7 @@ go_test(
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
+        "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
@@ -54,6 +56,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer/streaming:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/dynamic:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",

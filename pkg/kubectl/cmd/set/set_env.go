@@ -39,7 +39,8 @@ import (
 )
 
 var (
-	envResources = `
+	validEnvNameRegexp = regexp.MustCompile("[^a-zA-Z0-9_]")
+	envResources       = `
   	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), job, replicaset (rs)`
 
 	envLong = templates.LongDesc(`
@@ -172,7 +173,6 @@ func validateNoOverwrites(existing []v1.EnvVar, env []v1.EnvVar) error {
 }
 
 func keyToEnvName(key string) string {
-	validEnvNameRegexp := regexp.MustCompile("[^a-zA-Z0-9_]")
 	return strings.ToUpper(validEnvNameRegexp.ReplaceAllString(key, "_"))
 }
 
@@ -236,14 +236,14 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 
 	if len(o.From) != 0 {
 		b := f.NewBuilder().
+			Internal().
+			LocalParam(o.Local).
 			ContinueOnError().
 			NamespaceParam(cmdNamespace).DefaultNamespace().
 			FilenameParam(enforceNamespace, &o.FilenameOptions).
 			Flatten()
 
-		if o.Local {
-			b = b.Local(f.ClientForMapping)
-		} else {
+		if !o.Local {
 			b = b.
 				LabelSelectorParam(o.Selector).
 				ResourceTypeOrNameArgs(o.All, o.From).
@@ -304,16 +304,15 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 	}
 
 	b := f.NewBuilder().
+		Internal().
+		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		Flatten()
 
-	if o.Local {
-		b = b.Local(f.ClientForMapping)
-	} else {
-		b = b.
-			LabelSelectorParam(o.Selector).
+	if !o.Local {
+		b.LabelSelectorParam(o.Selector).
 			ResourceTypeOrNameArgs(o.All, o.Resources...).
 			Latest()
 	}
@@ -323,7 +322,8 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		return err
 	}
 	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
-		_, err := o.UpdatePodSpecForObject(info.VersionedObject, func(spec *v1.PodSpec) error {
+		info.Object = info.AsVersioned()
+		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
 			resolutionErrorsEncountered := false
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
 			if len(containers) == 0 {
@@ -389,7 +389,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		})
 
 		if err == nil {
-			return runtime.Encode(o.Encoder, info.VersionedObject)
+			return runtime.Encode(o.Encoder, info.Object)
 		}
 		return nil, err
 	})
@@ -413,7 +413,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		}
 
 		if o.PrintObject != nil && (o.Local || o.DryRun) {
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, patch.Info.VersionedObject, o.Out); err != nil {
+			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, patch.Info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue
@@ -433,17 +433,13 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		}
 
 		if len(o.Output) > 0 {
-			versionedObject, err := patch.Info.Mapping.ConvertToVersion(obj, patch.Info.Mapping.GroupVersionKind.GroupVersion())
-			if err != nil {
-				return err
-			}
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, versionedObject, o.Out); err != nil {
+			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue
 		}
 
-		cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, false, "env updated")
+		f.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, false, "env updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

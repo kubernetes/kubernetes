@@ -163,7 +163,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 	if err := Convert_v1alpha1_KubeletAuthorization_To_kubeletconfig_KubeletAuthorization(&in.Authorization, &out.Authorization, s); err != nil {
 		return err
 	}
-	out.SeccompProfileRoot = in.SeccompProfileRoot
 	if err := v1.Convert_Pointer_bool_To_bool(&in.AllowPrivileged, &out.AllowPrivileged, s); err != nil {
 		return err
 	}
@@ -230,14 +229,12 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 	if err := v1.Convert_Pointer_bool_To_bool(&in.SerializeImagePulls, &out.SerializeImagePulls, s); err != nil {
 		return err
 	}
-	if err := v1.Convert_Pointer_string_To_string(&in.EvictionHard, &out.EvictionHard, s); err != nil {
-		return err
-	}
-	out.EvictionSoft = in.EvictionSoft
-	out.EvictionSoftGracePeriod = in.EvictionSoftGracePeriod
+	out.EvictionHard = *(*map[string]string)(unsafe.Pointer(&in.EvictionHard))
+	out.EvictionSoft = *(*map[string]string)(unsafe.Pointer(&in.EvictionSoft))
+	out.EvictionSoftGracePeriod = *(*map[string]string)(unsafe.Pointer(&in.EvictionSoftGracePeriod))
 	out.EvictionPressureTransitionPeriod = in.EvictionPressureTransitionPeriod
 	out.EvictionMaxPodGracePeriod = in.EvictionMaxPodGracePeriod
-	out.EvictionMinimumReclaim = in.EvictionMinimumReclaim
+	out.EvictionMinimumReclaim = *(*map[string]string)(unsafe.Pointer(&in.EvictionMinimumReclaim))
 	out.PodsPerCore = in.PodsPerCore
 	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach, s); err != nil {
 		return err
@@ -254,8 +251,8 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 	}
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.FailSwapOn = in.FailSwapOn
-	out.SystemReserved = *(*kubeletconfig.ConfigurationMap)(unsafe.Pointer(&in.SystemReserved))
-	out.KubeReserved = *(*kubeletconfig.ConfigurationMap)(unsafe.Pointer(&in.KubeReserved))
+	out.SystemReserved = *(*map[string]string)(unsafe.Pointer(&in.SystemReserved))
+	out.KubeReserved = *(*map[string]string)(unsafe.Pointer(&in.KubeReserved))
 	out.SystemReservedCgroup = in.SystemReservedCgroup
 	out.KubeReservedCgroup = in.KubeReservedCgroup
 	out.EnforceNodeAllocatable = *(*[]string)(unsafe.Pointer(&in.EnforceNodeAllocatable))
@@ -291,7 +288,6 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 	if err := Convert_kubeletconfig_KubeletAuthorization_To_v1alpha1_KubeletAuthorization(&in.Authorization, &out.Authorization, s); err != nil {
 		return err
 	}
-	out.SeccompProfileRoot = in.SeccompProfileRoot
 	if err := v1.Convert_bool_To_Pointer_bool(&in.AllowPrivileged, &out.AllowPrivileged, s); err != nil {
 		return err
 	}
@@ -358,14 +354,12 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 	if err := v1.Convert_bool_To_Pointer_bool(&in.SerializeImagePulls, &out.SerializeImagePulls, s); err != nil {
 		return err
 	}
-	if err := v1.Convert_string_To_Pointer_string(&in.EvictionHard, &out.EvictionHard, s); err != nil {
-		return err
-	}
-	out.EvictionSoft = in.EvictionSoft
-	out.EvictionSoftGracePeriod = in.EvictionSoftGracePeriod
+	out.EvictionHard = *(*map[string]string)(unsafe.Pointer(&in.EvictionHard))
+	out.EvictionSoft = *(*map[string]string)(unsafe.Pointer(&in.EvictionSoft))
+	out.EvictionSoftGracePeriod = *(*map[string]string)(unsafe.Pointer(&in.EvictionSoftGracePeriod))
 	out.EvictionPressureTransitionPeriod = in.EvictionPressureTransitionPeriod
 	out.EvictionMaxPodGracePeriod = in.EvictionMaxPodGracePeriod
-	out.EvictionMinimumReclaim = in.EvictionMinimumReclaim
+	out.EvictionMinimumReclaim = *(*map[string]string)(unsafe.Pointer(&in.EvictionMinimumReclaim))
 	out.PodsPerCore = in.PodsPerCore
 	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach, s); err != nil {
 		return err

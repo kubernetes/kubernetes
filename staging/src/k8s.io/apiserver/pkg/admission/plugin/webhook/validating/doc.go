@@ -14,5 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package validating checks a non-mutating webhook for configured operation admission
+// Package validating makes calls to validating (i.e., non-mutating) webhooks
+// during the admission process.
 package validating // import "k8s.io/apiserver/pkg/admission/plugin/webhook/validating"

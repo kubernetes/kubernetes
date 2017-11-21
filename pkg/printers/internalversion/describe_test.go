@@ -634,6 +634,50 @@ func TestDescribeContainers(t *testing.T) {
 			},
 			expectedElements: []string{"cpu", "1k", "memory", "4G", "storage", "20G"},
 		},
+		// volumeMounts read/write
+		{
+			container: api.Container{
+				Name:  "test",
+				Image: "image",
+				VolumeMounts: []api.VolumeMount{
+					{
+						Name:      "mounted-volume",
+						MountPath: "/opt/",
+					},
+				},
+			},
+			expectedElements: []string{"mounted-volume", "/opt/", "(rw)"},
+		},
+		// volumeMounts readonly
+		{
+			container: api.Container{
+				Name:  "test",
+				Image: "image",
+				VolumeMounts: []api.VolumeMount{
+					{
+						Name:      "mounted-volume",
+						MountPath: "/opt/",
+						ReadOnly:  true,
+					},
+				},
+			},
+			expectedElements: []string{"Mounts", "mounted-volume", "/opt/", "(ro)"},
+		},
+
+		// volumeDevices
+		{
+			container: api.Container{
+				Name:  "test",
+				Image: "image",
+				VolumeDevices: []api.VolumeDevice{
+					{
+						Name:       "volume-device",
+						DevicePath: "/dev/xvda",
+					},
+				},
+			},
+			expectedElements: []string{"Devices", "volume-device", "/dev/xvda"},
+		},
 	}
 
 	for i, testCase := range testCases {
@@ -815,99 +859,237 @@ func TestGetPodsTotalRequests(t *testing.T) {
 }
 
 func TestPersistentVolumeDescriber(t *testing.T) {
-	tests := map[string]*api.PersistentVolume{
-
-		"hostpath": {
-			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
-			Spec: api.PersistentVolumeSpec{
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Type: new(api.HostPathType)},
+	block := api.PersistentVolumeBlock
+	file := api.PersistentVolumeFilesystem
+	testCases := []struct {
+		plugin             string
+		pv                 *api.PersistentVolume
+		expectedElements   []string
+		unexpectedElements []string
+	}{
+		{
+			plugin: "hostpath",
+			pv: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						HostPath: &api.HostPathVolumeSource{Type: new(api.HostPathType)},
+					},
 				},
 			},
+			unexpectedElements: []string{"VolumeMode", "Filesystem"},
 		},
-		"gce": {
-			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
-			Spec: api.PersistentVolumeSpec{
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+		{
+			plugin: "gce",
+			pv: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+					},
+					VolumeMode: &file,
 				},
 			},
+			expectedElements: []string{"VolumeMode", "Filesystem"},
 		},
-		"ebs": {
-			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
-			Spec: api.PersistentVolumeSpec{
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{},
+		{
+			plugin: "ebs",
+			pv: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{},
+					},
 				},
 			},
+			unexpectedElements: []string{"VolumeMode", "Filesystem"},
 		},
-		"nfs": {
-			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
-			Spec: api.PersistentVolumeSpec{
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					NFS: &api.NFSVolumeSource{},
+		{
+			plugin: "nfs",
+			pv: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						NFS: &api.NFSVolumeSource{},
+					},
 				},
 			},
+			unexpectedElements: []string{"VolumeMode", "Filesystem"},
 		},
-		"iscsi": {
-			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
-			Spec: api.PersistentVolumeSpec{
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					ISCSI: &api.ISCSIVolumeSource{},
+		{
+			plugin: "iscsi",
+			pv: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						ISCSI: &api.ISCSIPersistentVolumeSource{},
+					},
+					VolumeMode: &block,
 				},
 			},
+			expectedElements: []string{"VolumeMode", "Block"},
 		},
-		"gluster": {
-			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
-			Spec: api.PersistentVolumeSpec{
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					Glusterfs: &api.GlusterfsVolumeSource{},
+		{
+			plugin: "gluster",
+			pv: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Glusterfs: &api.GlusterfsVolumeSource{},
+					},
 				},
 			},
+			unexpectedElements: []string{"VolumeMode", "Filesystem"},
 		},
-		"rbd": {
-			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
-			Spec: api.PersistentVolumeSpec{
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					RBD: &api.RBDPersistentVolumeSource{},
+		{
+			plugin: "rbd",
+			pv: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						RBD: &api.RBDPersistentVolumeSource{},
+					},
 				},
 			},
+			unexpectedElements: []string{"VolumeMode", "Filesystem"},
 		},
-		"quobyte": {
-			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
-			Spec: api.PersistentVolumeSpec{
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					Quobyte: &api.QuobyteVolumeSource{},
+		{
+			plugin: "quobyte",
+			pv: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Quobyte: &api.QuobyteVolumeSource{},
+					},
 				},
 			},
+			unexpectedElements: []string{"VolumeMode", "Filesystem"},
 		},
-		"cinder": {
-			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
-			Spec: api.PersistentVolumeSpec{
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					Cinder: &api.CinderVolumeSource{},
+		{
+			plugin: "cinder",
+			pv: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Cinder: &api.CinderVolumeSource{},
+					},
 				},
 			},
+			unexpectedElements: []string{"VolumeMode", "Filesystem"},
 		},
-		"fc": {
-			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
-			Spec: api.PersistentVolumeSpec{
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					FC: &api.FCVolumeSource{},
+		{
+			plugin: "fc",
+			pv: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						FC: &api.FCVolumeSource{},
+					},
+					VolumeMode: &block,
 				},
 			},
+			expectedElements: []string{"VolumeMode", "Block"},
 		},
 	}
 
-	for name, pv := range tests {
-		fake := fake.NewSimpleClientset(pv)
+	for _, test := range testCases {
+		fake := fake.NewSimpleClientset(test.pv)
 		c := PersistentVolumeDescriber{fake}
 		str, err := c.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
 		if err != nil {
-			t.Errorf("Unexpected error for test %s: %v", name, err)
+			t.Errorf("Unexpected error for test %s: %v", test.plugin, err)
 		}
 		if str == "" {
-			t.Errorf("Unexpected empty string for test %s.  Expected PV Describer output", name)
+			t.Errorf("Unexpected empty string for test %s.  Expected PV Describer output", test.plugin)
+		}
+		for _, expected := range test.expectedElements {
+			if !strings.Contains(str, expected) {
+				t.Errorf("expected to find %q in output: %q", expected, str)
+			}
+		}
+		for _, unexpected := range test.unexpectedElements {
+			if strings.Contains(str, unexpected) {
+				t.Errorf("unexpected to find %q in output: %q", unexpected, str)
+			}
+		}
+	}
+}
+
+func TestPersistentVolumeClaimDescriber(t *testing.T) {
+	block := api.PersistentVolumeBlock
+	file := api.PersistentVolumeFilesystem
+	goldClassName := "gold"
+	testCases := []struct {
+		name               string
+		pvc                *api.PersistentVolumeClaim
+		expectedElements   []string
+		unexpectedElements []string
+	}{
+		{
+			name: "default",
+			pvc: &api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeName:       "volume1",
+					StorageClassName: &goldClassName,
+				},
+				Status: api.PersistentVolumeClaimStatus{
+					Phase: api.ClaimBound,
+				},
+			},
+			unexpectedElements: []string{"VolumeMode", "Filesystem"},
+		},
+		{
+			name: "filesystem",
+			pvc: &api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeName:       "volume2",
+					StorageClassName: &goldClassName,
+					VolumeMode:       &file,
+				},
+				Status: api.PersistentVolumeClaimStatus{
+					Phase: api.ClaimBound,
+				},
+			},
+			expectedElements: []string{"VolumeMode", "Filesystem"},
+		},
+		{
+			name: "block",
+			pvc: &api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeName:       "volume3",
+					StorageClassName: &goldClassName,
+					VolumeMode:       &block,
+				},
+				Status: api.PersistentVolumeClaimStatus{
+					Phase: api.ClaimBound,
+				},
+			},
+			expectedElements: []string{"VolumeMode", "Block"},
+		},
+	}
+
+	for _, test := range testCases {
+		fake := fake.NewSimpleClientset(test.pvc)
+		c := PersistentVolumeClaimDescriber{fake}
+		str, err := c.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
+		if err != nil {
+			t.Errorf("Unexpected error for test %s: %v", test.name, err)
+		}
+		if str == "" {
+			t.Errorf("Unexpected empty string for test %s.  Expected PVC Describer output", test.name)
+		}
+		for _, expected := range test.expectedElements {
+			if !strings.Contains(str, expected) {
+				t.Errorf("expected to find %q in output: %q", expected, str)
+			}
+		}
+		for _, unexpected := range test.unexpectedElements {
+			if strings.Contains(str, unexpected) {
+				t.Errorf("unexpected to find %q in output: %q", unexpected, str)
+			}
 		}
 	}
 }

@@ -240,7 +240,6 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 	defer timer.Stop()
 
 	for {
-		probeAttachedVolume()
 		select {
 		case <-ticker.C:
 			glog.V(5).Infof("Checking Cinder disk %q is attached.", volumeID)

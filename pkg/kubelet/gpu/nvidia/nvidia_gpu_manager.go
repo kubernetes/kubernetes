@@ -44,8 +44,11 @@ const (
 	// Optional device.
 	nvidiaUVMToolsDevice string = "/dev/nvidia-uvm-tools"
 	devDirectory                = "/dev"
-	nvidiaDeviceRE              = `^nvidia[0-9]*$`
-	nvidiaFullpathRE            = `^/dev/nvidia[0-9]*$`
+)
+
+var (
+	nvidiaDeviceRE   = regexp.MustCompile(`^nvidia[0-9]*$`)
+	nvidiaFullpathRE = regexp.MustCompile(`^/dev/nvidia[0-9]*$`)
 )
 
 type activePodsLister interface {
@@ -194,7 +197,6 @@ func (ngm *nvidiaGPUManager) updateAllocatedGPUs() {
 // we want more features, features like schedule containers according to GPU family
 // name.
 func (ngm *nvidiaGPUManager) discoverGPUs() error {
-	reg := regexp.MustCompile(nvidiaDeviceRE)
 	files, err := ioutil.ReadDir(devDirectory)
 	if err != nil {
 		return err
@@ -203,7 +205,7 @@ func (ngm *nvidiaGPUManager) discoverGPUs() error {
 		if f.IsDir() {
 			continue
 		}
-		if reg.MatchString(f.Name()) {
+		if nvidiaDeviceRE.MatchString(f.Name()) {
 			glog.V(2).Infof("Found Nvidia GPU %q", f.Name())
 			ngm.allGPUs.Insert(path.Join(devDirectory, f.Name()))
 		}
@@ -274,5 +276,5 @@ func (ngm *nvidiaGPUManager) gpusInUse() *podGPUs {
 }
 
 func isValidPath(path string) bool {
-	return regexp.MustCompile(nvidiaFullpathRE).MatchString(path)
+	return nvidiaFullpathRE.MatchString(path)
 }

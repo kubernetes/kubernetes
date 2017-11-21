@@ -9,6 +9,7 @@ reviewers:
   - zmerlynn
   - sttts
   - gmarek
+  - vishh
 approvers:
   - cblecker
   - deads2k
@@ -25,3 +26,4 @@ approvers:
   - zmerlynn
   - sttts
   - gmarek
+  - vishh

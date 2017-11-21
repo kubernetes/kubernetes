@@ -192,7 +192,7 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 	var keepOldName bool
 	var replicasDefaulted bool
 
-	mapper, typer := f.Object()
+	mapper, _ := f.Object()
 
 	if len(filename) != 0 {
 		schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
@@ -201,41 +201,35 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 		}
 
 		request := f.NewBuilder().
+			Unstructured().
 			Schema(schema).
 			NamespaceParam(cmdNamespace).DefaultNamespace().
 			FilenameParam(enforceNamespace, &resource.FilenameOptions{Recursive: false, Filenames: []string{filename}}).
+			Flatten().
 			Do()
-		obj, err := request.Object()
+		infos, err := request.Infos()
 		if err != nil {
 			return err
 		}
-		var ok bool
-		// Handle filename input from stdin. The resource builder always returns an api.List
-		// when creating resource(s) from a stream.
-		if list, ok := obj.(*v1.List); ok {
-			if len(list.Items) > 1 {
-				return cmdutil.UsageErrorf(cmd, "%s specifies multiple items", filename)
-			}
-			if len(list.Items) == 0 {
-				return cmdutil.UsageErrorf(cmd, "please make sure %s exists and is not empty", filename)
-			}
-			obj = list.Items[0].Object
+		// Handle filename input from stdin.
+		if len(infos) > 1 {
+			return cmdutil.UsageErrorf(cmd, "%s specifies multiple items", filename)
 		}
-		newRc, ok = obj.(*api.ReplicationController)
-		if !ok {
-			if gvks, _, err := typer.ObjectKinds(obj); err == nil {
-				return cmdutil.UsageErrorf(cmd, "%s contains a %v not a ReplicationController", filename, gvks[0])
-			}
-			glog.V(4).Infof("Object %#v is not a ReplicationController", obj)
-			return cmdutil.UsageErrorf(cmd, "%s does not specify a valid ReplicationController", filename)
+		if len(infos) == 0 {
+			return cmdutil.UsageErrorf(cmd, "please make sure %s exists and is not empty", filename)
 		}
-		infos, err := request.Infos()
-		if err != nil || len(infos) != 1 {
-			glog.V(2).Infof("was not able to recover adequate information to discover if .spec.replicas was defaulted")
-		} else {
-			replicasDefaulted = isReplicasDefaulted(infos[0])
+
+		switch t := infos[0].AsVersioned().(type) {
+		case *v1.ReplicationController:
+			replicasDefaulted = t.Spec.Replicas == nil
+			newRc, _ = infos[0].AsInternal().(*api.ReplicationController)
+		}
+		if newRc == nil {
+			glog.V(4).Infof("Object %T is not a ReplicationController", infos[0].Object)
+			return cmdutil.UsageErrorf(cmd, "%s contains a %v not a ReplicationController", filename, infos[0].Object.GetObjectKind().GroupVersionKind())
 		}
 	}
+
 	// If the --image option is specified, we need to create a new rc with at least one different selector
 	// than the old rc. This selector is the hash of the rc, with a suffix to provide uniqueness for
 	// same-image updates.
@@ -379,7 +373,7 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 	if outputFormat != "" {
 		return f.PrintObject(cmd, false, mapper, newRc, out)
 	}
-	cmdutil.PrintSuccess(mapper, false, out, "replicationcontrollers", oldName, dryrun, message)
+	f.PrintSuccess(mapper, false, out, "replicationcontrollers", oldName, dryrun, message)
 	return nil
 }
 
@@ -392,16 +386,4 @@ func findNewName(args []string, oldRc *api.ReplicationController) string {
 		return newName
 	}
 	return ""
-}
-
-func isReplicasDefaulted(info *resource.Info) bool {
-	if info == nil || info.VersionedObject == nil {
-		// was unable to recover versioned info
-		return false
-	}
-	switch t := info.VersionedObject.(type) {
-	case *v1.ReplicationController:
-		return t.Spec.Replicas == nil
-	}
-	return false
 }

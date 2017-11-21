@@ -25,6 +25,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+readonly UUID_MNT_PREFIX="/mnt/disks/by-uuid/google-local-ssds"
+readonly UUID_BLOCK_PREFIX="/dev/disk/by-uuid/google-local-ssds"
+
 function setup-os-params {
   # Reset core_pattern. On GCI, the default core_pattern pipes the core dumps to
   # /sbin/crash_reporter which is more restrictive in saving crash dumps. So for
@@ -41,38 +44,38 @@ function config-ip-firewall {
 
   # The GCI image has host firewall which drop most inbound/forwarded packets.
   # We need to add rules to accept all TCP/UDP/ICMP packets.
-  if iptables -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
+  if iptables -w -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
     echo "Add rules to accept all inbound TCP/UDP/ICMP packets"
     iptables -A INPUT -w -p TCP -j ACCEPT
     iptables -A INPUT -w -p UDP -j ACCEPT
     iptables -A INPUT -w -p ICMP -j ACCEPT
   fi
-  if iptables -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
+  if iptables -w -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
     echo "Add rules to accept all forwarded TCP/UDP/ICMP packets"
     iptables -A FORWARD -w -p TCP -j ACCEPT
     iptables -A FORWARD -w -p UDP -j ACCEPT
     iptables -A FORWARD -w -p ICMP -j ACCEPT
   fi
 
-  iptables -N KUBE-METADATA-SERVER
-  iptables -I FORWARD -p tcp -d 169.254.169.254 --dport 80 -j KUBE-METADATA-SERVER
+  iptables -w -N KUBE-METADATA-SERVER
+  iptables -w -I FORWARD -p tcp -d 169.254.169.254 --dport 80 -j KUBE-METADATA-SERVER
 
   if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]]; then
-    iptables -A KUBE-METADATA-SERVER -j DROP
+    iptables -w -A KUBE-METADATA-SERVER -j DROP
   fi
 
   # Flush iptables nat table
-  iptables -t nat -F || true
+  iptables -w -t nat -F || true
 
   echo "Add rules for ip masquerade"
   if [[ "${NON_MASQUERADE_CIDR:-}" == "0.0.0.0/0" ]]; then
-    iptables -t nat -N IP-MASQ
-    iptables -t nat -A POSTROUTING -m comment --comment "ip-masq: ensure nat POSTROUTING directs all non-LOCAL destination traffic to our custom IP-MASQ chain" -m addrtype ! --dst-type LOCAL -j IP-MASQ
-    iptables -t nat -A IP-MASQ -d 169.254.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
-    iptables -t nat -A IP-MASQ -d 10.0.0.0/8 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
-    iptables -t nat -A IP-MASQ -d 172.16.0.0/12 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
-    iptables -t nat -A IP-MASQ -d 192.168.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
-    iptables -t nat -A IP-MASQ -m comment --comment "ip-masq: outbound traffic is subject to MASQUERADE (must be last in chain)" -j MASQUERADE
+    iptables -w -t nat -N IP-MASQ
+    iptables -w -t nat -A POSTROUTING -m comment --comment "ip-masq: ensure nat POSTROUTING directs all non-LOCAL destination traffic to our custom IP-MASQ chain" -m addrtype ! --dst-type LOCAL -j IP-MASQ
+    iptables -w -t nat -A IP-MASQ -d 169.254.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 10.0.0.0/8 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 172.16.0.0/12 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 192.168.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -m comment --comment "ip-masq: outbound traffic is subject to MASQUERADE (must be last in chain)" -j MASQUERADE
   fi
 }
 
@@ -85,11 +88,85 @@ function create-dirs {
   fi
 }
 
-# Formats the given device ($1) if needed and mounts it at given mount point
+# Gets the total number of $(1) and $(2) type disks specified
+# by the user in ${NODE_LOCAL_SSDS_EXT}
+function get-local-disk-num() {
+  local interface="${1}"
+  local format="${2}"
+
+  localdisknum=0
+  if [[ ! -z "${NODE_LOCAL_SSDS_EXT:-}" ]]; then
+    IFS=";" read -r -a ssdgroups <<< "${NODE_LOCAL_SSDS_EXT:-}"
+    for ssdgroup in "${ssdgroups[@]}"; do
+      IFS="," read -r -a ssdopts <<< "${ssdgroup}"
+      local opnum="${ssdopts[0]}"
+      local opinterface="${ssdopts[1]}"
+      local opformat="${ssdopts[2]}"
+
+      if [[ "${opformat,,}" == "${format,,}" && "${opinterface,,}" == "${interface,,}" ]]; then
+        localdisknum=$((localdisknum+opnum))
+      fi
+    done
+  fi
+}
+
+# Creates a symlink for a ($1) so that it may be used as block storage
+function safe-block-symlink(){
+  local device="${1}"
+  local symdir="${2}"
+  
+  mkdir -p "${symdir}"
+
+  get-or-generate-uuid "${device}"
+  local myuuid="${retuuid}"
+
+  local sym="${symdir}/local-ssd-${myuuid}"
+  # Do not "mkdir -p ${sym}" as that will cause unintended symlink behavior
+  ln -s "${device}" "${sym}"
+  echo "Created a symlink for SSD $ssd at ${sym}"
+  chmod a+w "${sym}"
+}
+
+# Gets a pregenerated UUID from ${ssdmap} if it exists, otherwise generates a new
+# UUID and places it inside ${ssdmap}
+function get-or-generate-uuid(){
+  local device="${1}"
+
+  local ssdmap="/home/kubernetes/localssdmap.txt"
+  echo "Generating or getting UUID from ${ssdmap}"
+
+  if [[ ! -e "${ssdmap}" ]]; then
+    touch "${ssdmap}"
+    chmod +w "${ssdmap}"
+  fi
+
+  # each line of the ssdmap looks like "${device} persistent-uuid"
+  if [[ ! -z $(grep ${device} ${ssdmap}) ]]; then
+    #create symlink based on saved uuid
+    local myuuid=$(grep ${device} ${ssdmap} | cut -d ' ' -f 2)
+  else
+    # generate new uuid and add it to the map
+    local myuuid=$(uuidgen)
+    if [[ ! ${?} -eq 0 ]]; then
+      echo "Failed to generate valid UUID with uuidgen" >&2
+      exit 2
+    fi
+    echo "${device} ${myuuid}" >> "${ssdmap}"
+  fi
+
+  if [[ -z "${myuuid}" ]]; then
+    echo "Failed to get a uuid for device ${device} when symlinking." >&2
+    exit 2
+  fi
+
+  retuuid="${myuuid}"
+}
+
+#Formats the given device ($1) if needed and mounts it at given mount point
 # ($2).
 function safe-format-and-mount() {
-  device=$1
-  mountpoint=$2
+  local device="${1}"
+  local mountpoint="${2}"
 
   # Format only if the disk is not already formatted.
   if ! tune2fs -l "${device}" ; then
@@ -102,18 +179,135 @@ function safe-format-and-mount() {
   mount -o discard,defaults "${device}" "${mountpoint}"
 }
 
-# Local ssds, if present, are mounted at /mnt/disks/ssdN.
+# Gets a devices UUID and bind mounts the device to mount location in
+# /mnt/disks/by-id/
+function unique-uuid-bind-mount(){
+  local mountpoint="${1}"
+  local actual_device="${2}"
+
+  # Trigger udev refresh so that newly formatted devices are propagated in by-uuid
+  udevadm control --reload-rules
+  udevadm trigger
+  udevadm settle 
+
+  # grep the exact match of actual device, prevents substring matching
+  local myuuid=$(ls -l /dev/disk/by-uuid/ | grep "/${actual_device}$" | tr -s ' ' | cut -d ' ' -f 9)
+  # myuuid should be the uuid of the device as found in /dev/disk/by-uuid/ 
+  if [[ -z "${myuuid}" ]]; then
+    echo "Failed to get a uuid for device ${actual_device} when mounting." >&2
+    exit 2
+  fi
+
+  # bindpoint should be the full path of the to-be-bound device
+  local bindpoint="${UUID_MNT_PREFIX}-${interface}-fs/local-ssd-${myuuid}"
+
+  safe-bind-mount "${mountpoint}" "${bindpoint}"
+}
+
+# Bind mounts device at mountpoint to bindpoint
+function safe-bind-mount(){
+  local mountpoint="${1}"
+  local bindpoint="${2}"
+
+  # Mount device to the mountpoint
+  mkdir -p "${bindpoint}"
+  echo "Binding '${mountpoint}' at '${bindpoint}'"
+  mount --bind "${mountpoint}" "${bindpoint}"
+  chmod a+w "${bindpoint}"
+}
+
+
+# Mounts, bindmounts, or symlinks depending on the interface and format
+# of the incoming device
+function mount-ext(){
+  local ssd="${1}"
+  local devicenum="${2}"
+  local interface="${3}"
+  local format="${4}"
+  
+
+  if [[ -z "${devicenum}" ]]; then
+    echo "Failed to get the local disk number for device ${ssd}" >&2
+    exit 2
+  fi
+
+  # TODO: Handle partitioned disks. Right now this code just ignores partitions
+  if [[ "${format}" == "fs" ]]; then
+    if [[ "${interface}" == "scsi" ]]; then
+      local actual_device=$(readlink -f "${ssd}" | cut -d '/' -f 3)
+      # Error checking
+      if [[ "${actual_device}" != sd* ]]; then
+        echo "'actual_device' is not of the correct format. It must be the kernel name of the device, got ${actual_device} instead" >&2
+        exit 1
+      fi
+      local mountpoint="/mnt/disks/ssd${devicenum}"
+    else
+      # This path is required because the existing Google images do not
+      # expose NVMe devices in /dev/disk/by-id so we are using the /dev/nvme instead
+      local actual_device=$(echo ${ssd} | cut -d '/' -f 3)
+      # Error checking
+      if [[ "${actual_device}" != nvme* ]]; then
+        echo "'actual_device' is not of the correct format. It must be the kernel name of the device, got ${actual_device} instead" >&2
+        exit 1
+      fi
+      local mountpoint="/mnt/disks/ssd-nvme${devicenum}"
+    fi
+
+    safe-format-and-mount "${ssd}" "${mountpoint}"
+    # We only do the bindmount if users are using the new local ssd request method
+    # see https://github.com/kubernetes/kubernetes/pull/53466#discussion_r146431894
+    if [[ ! -z "${NODE_LOCAL_SSDS_EXT:-}" ]]; then
+      unique-uuid-bind-mount "${mountpoint}" "${actual_device}"
+    fi
+  elif [[ "${format}" == "block" ]]; then
+    local symdir="${UUID_BLOCK_PREFIX}-${interface}-block"
+    safe-block-symlink "${ssd}" "${symdir}"
+  else
+    echo "Disk format must be either fs or block, got ${format}"
+  fi
+}
+
+# Local ssds, if present, are mounted or symlinked to their appropriate
+# locations
 function ensure-local-ssds() {
+  get-local-disk-num "scsi" "block"
+  local scsiblocknum="${localdisknum}"
+  local i=0
   for ssd in /dev/disk/by-id/google-local-ssd-*; do
     if [ -e "${ssd}" ]; then
-      ssdnum=`echo ${ssd} | sed -e 's/\/dev\/disk\/by-id\/google-local-ssd-\([0-9]*\)/\1/'`
-      ssdmount="/mnt/disks/ssd${ssdnum}/"
-      mkdir -p ${ssdmount}
-      safe-format-and-mount "${ssd}" ${ssdmount}
-      echo "Mounted local SSD $ssd at ${ssdmount}"
-      chmod a+w ${ssdmount}
+      local devicenum=`echo ${ssd} | sed -e 's/\/dev\/disk\/by-id\/google-local-ssd-\([0-9]*\)/\1/'`
+      if [[ "${i}" -lt "${scsiblocknum}" ]]; then
+        mount-ext "${ssd}" "${devicenum}" "scsi" "block"
+      else
+        # GKE does not set NODE_LOCAL_SSDS so all non-block devices
+        # are assumed to be filesystem devices
+        mount-ext "${ssd}" "${devicenum}" "scsi" "fs"
+      fi
+      i=$((i+1))
     else
-      echo "No local SSD disks found."
+      echo "No local SCSI SSD disks found."
+    fi
+  done
+
+  # The following mounts or symlinks NVMe devices
+  get-local-disk-num "nvme" "block"
+  local nvmeblocknum="${localdisknum}"
+  local i=0
+  for ssd in /dev/nvme*; do
+    if [ -e "${ssd}" ]; then
+      # This workaround to find if the NVMe device is a disk is required because
+      # the existing Google images does not expose NVMe devices in /dev/disk/by-id
+      if [[ `udevadm info --query=property --name=${ssd} | grep DEVTYPE | sed "s/DEVTYPE=//"` == "disk" ]]; then
+        local devicenum=`echo ${ssd} | sed -e 's/\/dev\/nvme0n\([0-9]*\)/\1/'`
+        if [[ "${i}" -lt "${nvmeblocknum}" ]]; then
+          mount-ext "${ssd}" "${devicenum}" "nvme" "block"
+        else
+          mount-ext "${ssd}" "${devicenum}" "nvme" "fs"
+        fi
+        i=$((i+1))
+      fi
+    else
+      echo "No local NVMe SSD disks found."
     fi
   done
 }

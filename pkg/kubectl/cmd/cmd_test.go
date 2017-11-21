@@ -75,17 +75,6 @@ func defaultClientConfig() *restclient.Config {
 	}
 }
 
-func defaultClientConfigForVersion(version *schema.GroupVersion) *restclient.Config {
-	return &restclient.Config{
-		APIPath: "/api",
-		ContentConfig: restclient.ContentConfig{
-			NegotiatedSerializer: scheme.Codecs,
-			ContentType:          runtime.ContentTypeJSON,
-			GroupVersion:         version,
-		},
-	}
-}
-
 func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList) {
 	pods := &api.PodList{
 		ListMeta: metav1.ListMeta{
@@ -559,7 +548,7 @@ func Example_printPodHideTerminated() {
 	podList := newAllPhasePodList()
 	// filter pods
 	filterFuncs := f.DefaultResourceFilterFunc()
-	filterOpts := f.DefaultResourceFilterOptions(cmd, false)
+	filterOpts := cmdutil.ExtractCmdPrintOptions(cmd, false)
 	_, filteredPodList, errs := cmdutil.FilterResourceList(podList, filterFuncs, filterOpts)
 	if errs != nil {
 		fmt.Printf("Unexpected filter error: %v\n", errs)

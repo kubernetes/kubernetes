@@ -34,6 +34,7 @@ go_library(
         "firsthit_restmapper.go",
         "help.go",
         "interfaces.go",
+        "lazy.go",
         "meta.go",
         "multirestmapper.go",
         "priority.go",

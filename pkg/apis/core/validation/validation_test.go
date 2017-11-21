@@ -26,14 +26,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/core"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -82,6 +80,7 @@ func testVolumeWithNodeAffinity(t *testing.T, name string, namespace string, aff
 }
 
 func TestValidatePersistentVolumes(t *testing.T) {
+	validMode := core.PersistentVolumeFilesystem
 	scenarios := map[string]struct {
 		isExpectedFailure bool
 		volume            *core.PersistentVolume
@@ -352,6 +351,25 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				StorageClassName: "-invalid-",
 			}),
 		},
+		// VolumeMode alpha feature disabled
+		// TODO: remove when no longer alpha
+		"alpha disabled valid volume mode": {
+			isExpectedFailure: true,
+			volume: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+				StorageClassName: "valid",
+				VolumeMode:       &validMode,
+			}),
+		},
 		// LocalVolume alpha feature disabled
 		// TODO: remove when no longer alpha
 		"alpha disabled valid local volume": {
@@ -434,38 +452,38 @@ func TestValidatePersistentVolumes(t *testing.T) {
 }
 
 func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
-	validVolume := testVolume("foo", "", api.PersistentVolumeSpec{
-		Capacity: api.ResourceList{
-			api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+	validVolume := testVolume("foo", "", core.PersistentVolumeSpec{
+		Capacity: core.ResourceList{
+			core.ResourceName(core.ResourceStorage): resource.MustParse("1G"),
 		},
-		AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-		PersistentVolumeSource: api.PersistentVolumeSource{
-			HostPath: &api.HostPathVolumeSource{
+		AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+		PersistentVolumeSource: core.PersistentVolumeSource{
+			HostPath: &core.HostPathVolumeSource{
 				Path: "/foo",
-				Type: newHostPathType(string(api.HostPathDirectory)),
+				Type: newHostPathType(string(core.HostPathDirectory)),
 			},
 		},
 		StorageClassName: "valid",
 	})
 	validPvSourceNoUpdate := validVolume.DeepCopy()
 	invalidPvSourceUpdateType := validVolume.DeepCopy()
-	invalidPvSourceUpdateType.Spec.PersistentVolumeSource = api.PersistentVolumeSource{
-		FlexVolume: &api.FlexVolumeSource{
+	invalidPvSourceUpdateType.Spec.PersistentVolumeSource = core.PersistentVolumeSource{
+		FlexVolume: &core.FlexVolumeSource{
 			Driver: "kubernetes.io/blue",
 			FSType: "ext4",
 		},
 	}
 	invalidPvSourceUpdateDeep := validVolume.DeepCopy()
-	invalidPvSourceUpdateDeep.Spec.PersistentVolumeSource = api.PersistentVolumeSource{
-		HostPath: &api.HostPathVolumeSource{
+	invalidPvSourceUpdateDeep.Spec.PersistentVolumeSource = core.PersistentVolumeSource{
+		HostPath: &core.HostPathVolumeSource{
 			Path: "/updated",
-			Type: newHostPathType(string(api.HostPathDirectory)),
+			Type: newHostPathType(string(core.HostPathDirectory)),
 		},
 	}
 	scenarios := map[string]struct {
 		isExpectedFailure bool
-		oldVolume         *api.PersistentVolume
-		newVolume         *api.PersistentVolume
+		oldVolume         *core.PersistentVolume
+		newVolume         *core.PersistentVolume
 	}{
 		"condition-no-update": {
 			isExpectedFailure: false,
@@ -720,6 +738,7 @@ func testVolumeClaimAnnotation(name string, namespace string, ann string, annval
 func TestValidatePersistentVolumeClaim(t *testing.T) {
 	invalidClassName := "-invalid-"
 	validClassName := "valid"
+	validMode := core.PersistentVolumeFilesystem
 	scenarios := map[string]struct {
 		isExpectedFailure bool
 		claim             *core.PersistentVolumeClaim
@@ -888,7 +907,7 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 				},
 				Resources: core.ResourceRequirements{
 					Requests: core.ResourceList{
-						core.ResourceName(api.ResourceStorage): resource.MustParse("0G"),
+						core.ResourceName(core.ResourceStorage): resource.MustParse("0G"),
 					},
 				},
 			}),
@@ -916,6 +935,32 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 				StorageClassName: &invalidClassName,
 			}),
 		},
+		// VolumeMode alpha feature disabled
+		// TODO: remove when no longer alpha
+		"disabled alpha valid volume mode": {
+			isExpectedFailure: true,
+			claim: testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
+				Selector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "key2",
+							Operator: "Exists",
+						},
+					},
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{
+					core.ReadWriteOnce,
+					core.ReadOnlyMany,
+				},
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+					},
+				},
+				StorageClassName: &validClassName,
+				VolumeMode:       &validMode,
+			}),
+		},
 	}
 
 	for name, scenario := range scenarios {
@@ -929,7 +974,101 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 	}
 }
 
+func TestAlphaPVVolumeModeUpdate(t *testing.T) {
+	block := core.PersistentVolumeBlock
+	file := core.PersistentVolumeFilesystem
+
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		oldPV             *core.PersistentVolume
+		newPV             *core.PersistentVolume
+		enableBlock       bool
+	}{
+		"valid-update-volume-mode-block-to-block": {
+			isExpectedFailure: false,
+			oldPV:             createTestVolModePV(&block),
+			newPV:             createTestVolModePV(&block),
+			enableBlock:       true,
+		},
+		"valid-update-volume-mode-file-to-file": {
+			isExpectedFailure: false,
+			oldPV:             createTestVolModePV(&file),
+			newPV:             createTestVolModePV(&file),
+			enableBlock:       true,
+		},
+		"invalid-update-volume-mode-to-block": {
+			isExpectedFailure: true,
+			oldPV:             createTestVolModePV(&file),
+			newPV:             createTestVolModePV(&block),
+			enableBlock:       true,
+		},
+		"invalid-update-volume-mode-to-file": {
+			isExpectedFailure: true,
+			oldPV:             createTestVolModePV(&block),
+			newPV:             createTestVolModePV(&file),
+			enableBlock:       true,
+		},
+		"invalid-update-blocksupport-disabled": {
+			isExpectedFailure: true,
+			oldPV:             createTestVolModePV(&block),
+			newPV:             createTestVolModePV(&block),
+			enableBlock:       false,
+		},
+		"invalid-update-volume-mode-nil-to-file": {
+			isExpectedFailure: true,
+			oldPV:             createTestVolModePV(nil),
+			newPV:             createTestVolModePV(&file),
+			enableBlock:       true,
+		},
+		"invalid-update-volume-mode-nil-to-block": {
+			isExpectedFailure: true,
+			oldPV:             createTestVolModePV(nil),
+			newPV:             createTestVolModePV(&block),
+			enableBlock:       true,
+		},
+		"invalid-update-volume-mode-file-to-nil": {
+			isExpectedFailure: true,
+			oldPV:             createTestVolModePV(&file),
+			newPV:             createTestVolModePV(nil),
+			enableBlock:       true,
+		},
+		"invalid-update-volume-mode-block-to-nil": {
+			isExpectedFailure: true,
+			oldPV:             createTestVolModePV(&block),
+			newPV:             createTestVolModePV(nil),
+			enableBlock:       true,
+		},
+		"invalid-update-volume-mode-nil-to-nil": {
+			isExpectedFailure: false,
+			oldPV:             createTestVolModePV(nil),
+			newPV:             createTestVolModePV(nil),
+			enableBlock:       true,
+		},
+		"invalid-update-volume-mode-empty-to-mode": {
+			isExpectedFailure: true,
+			oldPV:             createTestPV(),
+			newPV:             createTestVolModePV(&block),
+			enableBlock:       true,
+		},
+	}
+
+	for name, scenario := range scenarios {
+		// ensure we have a resource version specified for updates
+		toggleBlockVolumeFeature(scenario.enableBlock, t)
+		errs := ValidatePersistentVolumeUpdate(scenario.newPV, scenario.oldPV)
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
+}
+
 func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
+	block := core.PersistentVolumeBlock
+	file := core.PersistentVolumeFilesystem
+
 	validClaim := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
@@ -992,6 +1131,42 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
 		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+		VolumeName: "volume",
+	})
+	validClaimVolumeModeFile := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+		VolumeMode: &file,
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+		VolumeName: "volume",
+	})
+	validClaimVolumeModeBlock := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+		VolumeMode: &block,
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+		VolumeName: "volume",
+	})
+	invalidClaimVolumeModeNil := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+		VolumeMode: nil,
 		Resources: core.ResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
@@ -1080,78 +1255,168 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		oldClaim          *core.PersistentVolumeClaim
 		newClaim          *core.PersistentVolumeClaim
 		enableResize      bool
+		enableBlock       bool
 	}{
 		"valid-update-volumeName-only": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validUpdateClaim,
 			enableResize:      false,
+			enableBlock:       false,
 		},
 		"valid-no-op-update": {
 			isExpectedFailure: false,
 			oldClaim:          validUpdateClaim,
 			newClaim:          validUpdateClaim,
 			enableResize:      false,
+			enableBlock:       false,
 		},
 		"invalid-update-change-resources-on-bound-claim": {
 			isExpectedFailure: true,
 			oldClaim:          validUpdateClaim,
 			newClaim:          invalidUpdateClaimResources,
 			enableResize:      false,
+			enableBlock:       false,
 		},
 		"invalid-update-change-access-modes-on-bound-claim": {
 			isExpectedFailure: true,
 			oldClaim:          validUpdateClaim,
 			newClaim:          invalidUpdateClaimAccessModes,
 			enableResize:      false,
+			enableBlock:       false,
+		},
+		"valid-update-volume-mode-block-to-block": {
+			isExpectedFailure: false,
+			oldClaim:          validClaimVolumeModeBlock,
+			newClaim:          validClaimVolumeModeBlock,
+			enableResize:      false,
+			enableBlock:       true,
+		},
+		"valid-update-volume-mode-file-to-file": {
+			isExpectedFailure: false,
+			oldClaim:          validClaimVolumeModeFile,
+			newClaim:          validClaimVolumeModeFile,
+			enableResize:      false,
+			enableBlock:       true,
+		},
+		"invalid-update-volume-mode-to-block": {
+			isExpectedFailure: true,
+			oldClaim:          validClaimVolumeModeFile,
+			newClaim:          validClaimVolumeModeBlock,
+			enableResize:      false,
+			enableBlock:       true,
+		},
+		"invalid-update-volume-mode-to-file": {
+			isExpectedFailure: true,
+			oldClaim:          validClaimVolumeModeBlock,
+			newClaim:          validClaimVolumeModeFile,
+			enableResize:      false,
+			enableBlock:       true,
+		},
+		"invalid-update-volume-mode-nil-to-file": {
+			isExpectedFailure: true,
+			oldClaim:          invalidClaimVolumeModeNil,
+			newClaim:          validClaimVolumeModeFile,
+			enableResize:      false,
+			enableBlock:       true,
+		},
+		"invalid-update-volume-mode-nil-to-block": {
+			isExpectedFailure: true,
+			oldClaim:          invalidClaimVolumeModeNil,
+			newClaim:          validClaimVolumeModeBlock,
+			enableResize:      false,
+			enableBlock:       true,
+		},
+		"invalid-update-volume-mode-block-to-nil": {
+			isExpectedFailure: true,
+			oldClaim:          validClaimVolumeModeBlock,
+			newClaim:          invalidClaimVolumeModeNil,
+			enableResize:      false,
+			enableBlock:       true,
+		},
+		"invalid-update-volume-mode-file-to-nil": {
+			isExpectedFailure: true,
+			oldClaim:          validClaimVolumeModeFile,
+			newClaim:          invalidClaimVolumeModeNil,
+			enableResize:      false,
+			enableBlock:       true,
+		},
+		"invalid-update-volume-mode-empty-to-mode": {
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          validClaimVolumeModeBlock,
+			enableResize:      false,
+			enableBlock:       true,
+		},
+		"invalid-update-volume-mode-mode-to-empty": {
+			isExpectedFailure: true,
+			oldClaim:          validClaimVolumeModeBlock,
+			newClaim:          validClaim,
+			enableResize:      false,
+			enableBlock:       true,
+		},
+		"invalid-update-blocksupport-disabled": {
+			isExpectedFailure: true,
+			oldClaim:          validClaimVolumeModeFile,
+			newClaim:          validClaimVolumeModeFile,
+			enableResize:      false,
+			enableBlock:       false,
 		},
 		"invalid-update-change-storage-class-annotation-after-creation": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          invalidUpdateClaimStorageClass,
 			enableResize:      false,
+			enableBlock:       false,
 		},
 		"valid-update-mutable-annotation": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimAnnotation,
 			newClaim:          validUpdateClaimMutableAnnotation,
 			enableResize:      false,
+			enableBlock:       false,
 		},
 		"valid-update-add-annotation": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validAddClaimAnnotation,
 			enableResize:      false,
+			enableBlock:       false,
 		},
 		"valid-size-update-resize-disabled": {
 			isExpectedFailure: true,
 			oldClaim:          validClaim,
 			newClaim:          validSizeUpdate,
 			enableResize:      false,
+			enableBlock:       false,
 		},
 		"valid-size-update-resize-enabled": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validSizeUpdate,
 			enableResize:      true,
+			enableBlock:       false,
 		},
 		"invalid-size-update-resize-enabled": {
 			isExpectedFailure: true,
 			oldClaim:          validClaim,
 			newClaim:          invalidSizeUpdate,
 			enableResize:      true,
+			enableBlock:       false,
 		},
 		"unbound-size-update-resize-enabled": {
 			isExpectedFailure: true,
 			oldClaim:          validClaim,
 			newClaim:          unboundSizeUpdate,
 			enableResize:      true,
+			enableBlock:       false,
 		},
 	}
 
 	for name, scenario := range scenarios {
 		// ensure we have a resource version specified for updates
 		togglePVExpandFeature(scenario.enableResize, t)
+		toggleBlockVolumeFeature(scenario.enableBlock, t)
 		scenario.oldClaim.ResourceVersion = "1"
 		scenario.newClaim.ResourceVersion = "1"
 		errs := ValidatePersistentVolumeClaimUpdate(scenario.newClaim, scenario.oldClaim)
@@ -1160,6 +1425,23 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		}
 		if len(errs) > 0 && !scenario.isExpectedFailure {
 			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
+}
+
+func toggleBlockVolumeFeature(toggleFlag bool, t *testing.T) {
+	if toggleFlag {
+		// Enable alpha feature BlockVolume
+		err := utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
+		if err != nil {
+			t.Errorf("Failed to enable feature gate for BlockVolume: %v", err)
+			return
+		}
+	} else {
+		err := utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
+		if err != nil {
+			t.Errorf("Failed to disable feature gate for BlockVolume: %v", err)
+			return
 		}
 	}
 }
@@ -1351,6 +1633,64 @@ func TestValidateGlusterfs(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestValidateCSIVolumeSource(t *testing.T) {
+	testCases := []struct {
+		name     string
+		csi      *core.CSIPersistentVolumeSource
+		errtype  field.ErrorType
+		errfield string
+	}{
+		{
+			name: "all required fields ok",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "test-driver", VolumeHandle: "test-123", ReadOnly: true},
+		},
+		{
+			name: "with default values ok",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "test-driver", VolumeHandle: "test-123"},
+		},
+		{
+			name:     "missing driver name",
+			csi:      &core.CSIPersistentVolumeSource{VolumeHandle: "test-123"},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "driver",
+		},
+		{
+			name:     "missing volume handle",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "my-driver"},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "volumeHandle",
+		},
+	}
+
+	err := utilfeature.DefaultFeatureGate.Set("CSIPersistentVolume=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for CSIPersistentVolumes: %v", err)
+		return
+	}
+
+	for i, tc := range testCases {
+		errs := validateCSIPersistentVolumeSource(tc.csi, field.NewPath("field"))
+
+		if len(errs) > 0 && tc.errtype == "" {
+			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
+		} else if len(errs) == 0 && tc.errtype != "" {
+			t.Errorf("[%d: %q] expected error type %v", i, tc.name, tc.errtype)
+		} else if len(errs) >= 1 {
+			if errs[0].Type != tc.errtype {
+				t.Errorf("[%d: %q] expected error type %v, got %v", i, tc.name, tc.errtype, errs[0].Type)
+			} else if !strings.HasSuffix(errs[0].Field, "."+tc.errfield) {
+				t.Errorf("[%d: %q] expected error on field %q, got %q", i, tc.name, tc.errfield, errs[0].Field)
+			}
+		}
+	}
+	err = utilfeature.DefaultFeatureGate.Set("CSIPersistentVolume=false")
+	if err != nil {
+		t.Errorf("Failed to disable feature gate for CSIPersistentVolumes: %v", err)
+		return
+	}
+
 }
 
 // helper
@@ -2930,7 +3270,7 @@ func TestValidateVolumes(t *testing.T) {
 				t.Errorf("[%d: %q] expected error detail %q, got %q", i, tc.name, tc.errdetail, errs[0].Detail)
 			}
 		} else {
-			if len(names) != 1 || !names.Has(tc.vol.Name) {
+			if len(names) != 1 || !IsMatchedVolume(tc.vol.Name, names) {
 				t.Errorf("[%d: %q] wrong names result: %v", i, tc.name, names)
 			}
 		}
@@ -3070,6 +3410,153 @@ func TestAlphaHugePagesIsolation(t *testing.T) {
 			t.Errorf("Expected error for case[%d], pod: %v", i, pod.Name)
 		}
 	}
+}
+
+func TestAlphaPVCVolumeMode(t *testing.T) {
+	// Enable alpha feature BlockVolume for PVC
+	err := utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for BlockVolume: %v", err)
+		return
+	}
+
+	block := core.PersistentVolumeBlock
+	file := core.PersistentVolumeFilesystem
+	fake := core.PersistentVolumeMode("fake")
+	empty := core.PersistentVolumeMode("")
+
+	// Success Cases
+	successCasesPVC := map[string]*core.PersistentVolumeClaim{
+		"valid block value":      createTestVolModePVC(&block),
+		"valid filesystem value": createTestVolModePVC(&file),
+		"valid nil value":        createTestVolModePVC(nil),
+	}
+	for k, v := range successCasesPVC {
+		if errs := ValidatePersistentVolumeClaim(v); len(errs) != 0 {
+			t.Errorf("expected success for %s", k)
+		}
+	}
+
+	// Error Cases
+	errorCasesPVC := map[string]*core.PersistentVolumeClaim{
+		"invalid value": createTestVolModePVC(&fake),
+		"empty value":   createTestVolModePVC(&empty),
+	}
+	for k, v := range errorCasesPVC {
+		if errs := ValidatePersistentVolumeClaim(v); len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		}
+	}
+}
+
+func TestAlphaPVVolumeMode(t *testing.T) {
+	// Enable alpha feature BlockVolume for PV
+	err := utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for BlockVolume: %v", err)
+		return
+	}
+
+	block := core.PersistentVolumeBlock
+	file := core.PersistentVolumeFilesystem
+	fake := core.PersistentVolumeMode("fake")
+	empty := core.PersistentVolumeMode("")
+
+	// Success Cases
+	successCasesPV := map[string]*core.PersistentVolume{
+		"valid block value":      createTestVolModePV(&block),
+		"valid filesystem value": createTestVolModePV(&file),
+		"valid nil value":        createTestVolModePV(nil),
+	}
+	for k, v := range successCasesPV {
+		if errs := ValidatePersistentVolume(v); len(errs) != 0 {
+			t.Errorf("expected success for %s", k)
+		}
+	}
+
+	// Error Cases
+	errorCasesPV := map[string]*core.PersistentVolume{
+		"invalid value": createTestVolModePV(&fake),
+		"empty value":   createTestVolModePV(&empty),
+	}
+	for k, v := range errorCasesPV {
+		if errs := ValidatePersistentVolume(v); len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		}
+	}
+}
+
+func createTestVolModePVC(vmode *core.PersistentVolumeMode) *core.PersistentVolumeClaim {
+	validName := "valid-storage-class"
+
+	pvc := core.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "default",
+		},
+		Spec: core.PersistentVolumeClaimSpec{
+			Resources: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+			},
+			AccessModes:      []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+			StorageClassName: &validName,
+			VolumeMode:       vmode,
+		},
+	}
+	return &pvc
+}
+
+func createTestVolModePV(vmode *core.PersistentVolumeMode) *core.PersistentVolume {
+
+	// PersistentVolume with VolumeMode set (valid and invalid)
+	pv := core.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "",
+		},
+		Spec: core.PersistentVolumeSpec{
+			Capacity: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+			AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+			PersistentVolumeSource: core.PersistentVolumeSource{
+				HostPath: &core.HostPathVolumeSource{
+					Path: "/foo",
+					Type: newHostPathType(string(core.HostPathDirectory)),
+				},
+			},
+			StorageClassName: "test-storage-class",
+			VolumeMode:       vmode,
+		},
+	}
+	return &pv
+}
+
+func createTestPV() *core.PersistentVolume {
+
+	// PersistentVolume with VolumeMode set (valid and invalid)
+	pv := core.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "",
+		},
+		Spec: core.PersistentVolumeSpec{
+			Capacity: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+			AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+			PersistentVolumeSource: core.PersistentVolumeSource{
+				HostPath: &core.HostPathVolumeSource{
+					Path: "/foo",
+					Type: newHostPathType(string(core.HostPathDirectory)),
+				},
+			},
+			StorageClassName: "test-storage-class",
+		},
+	}
+	return &pv
 }
 
 func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
@@ -3823,7 +4310,16 @@ func TestValidateEnvFrom(t *testing.T) {
 }
 
 func TestValidateVolumeMounts(t *testing.T) {
-	volumes := sets.NewString("abc", "123", "abc-123")
+	volumes := []core.Volume{
+		{Name: "abc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},
+		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
+		{Name: "123", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
+	}
+	vols, v1err := ValidateVolumes(volumes, field.NewPath("field"))
+	if len(v1err) > 0 {
+		t.Errorf("Invalid test volume - expected success %v", v1err)
+		return
+	}
 	container := core.Container{
 		SecurityContext: nil,
 	}
@@ -3841,7 +4337,11 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "abc-123", MountPath: "/bac", SubPath: ".baz"},
 		{Name: "abc-123", MountPath: "/bad", SubPath: "..baz"},
 	}
-	if errs := ValidateVolumeMounts(successCase, volumes, &container, field.NewPath("field")); len(errs) != 0 {
+	goodVolumeDevices := []core.VolumeDevice{
+		{Name: "xyz", DevicePath: "/foofoo"},
+		{Name: "uvw", DevicePath: "/foofoo/share/test"},
+	}
+	if errs := ValidateVolumeMounts(successCase, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -3849,17 +4349,22 @@ func TestValidateVolumeMounts(t *testing.T) {
 		"empty name":                             {{Name: "", MountPath: "/foo"}},
 		"name not found":                         {{Name: "", MountPath: "/foo"}},
 		"empty mountpath":                        {{Name: "abc", MountPath: ""}},
-		"relative mountpath":                     {{Name: "abc", MountPath: "bar"}},
 		"mountpath collision":                    {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
 		"absolute subpath":                       {{Name: "abc", MountPath: "/bar", SubPath: "/baz"}},
-		"windows absolute subpath":               {{Name: "abc", MountPath: "D", SubPath: ""}},
 		"subpath in ..":                          {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},
 		"subpath contains ..":                    {{Name: "abc", MountPath: "/bar", SubPath: "baz/../bat"}},
 		"subpath ends in ..":                     {{Name: "abc", MountPath: "/bar", SubPath: "./.."}},
 		"disabled MountPropagation feature gate": {{Name: "abc", MountPath: "/bar", MountPropagation: &propagation}},
+		"name exists in volumeDevice":            {{Name: "xyz", MountPath: "/bar"}},
+		"mountpath exists in volumeDevice":       {{Name: "uvw", MountPath: "/mnt/exists"}},
+		"both exist in volumeDevice":             {{Name: "xyz", MountPath: "/mnt/exists"}},
 	}
+	badVolumeDevice := []core.VolumeDevice{
+		{Name: "xyz", DevicePath: "/mnt/exists"},
+	}
+
 	for k, v := range errorCases {
-		if errs := ValidateVolumeMounts(v, volumes, &container, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidateVolumeMounts(v, GetVolumeDeviceMap(badVolumeDevice), vols, &container, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -3977,9 +4482,16 @@ func TestValidateMountPropagation(t *testing.T) {
 		return
 	}
 
+	volumes := []core.Volume{
+		{Name: "foo", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
+	}
+	vols2, v2err := ValidateVolumes(volumes, field.NewPath("field"))
+	if len(v2err) > 0 {
+		t.Errorf("Invalid test volume - expected success %v", v2err)
+		return
+	}
 	for i, test := range tests {
-		volumes := sets.NewString("foo")
-		errs := ValidateVolumeMounts([]core.VolumeMount{test.mount}, volumes, test.container, field.NewPath("field"))
+		errs := ValidateVolumeMounts([]core.VolumeMount{test.mount}, nil, vols2, test.container, field.NewPath("field"))
 		if test.expectError && len(errs) == 0 {
 			t.Errorf("test %d expected error, got none", i)
 		}
@@ -3987,7 +4499,81 @@ func TestValidateMountPropagation(t *testing.T) {
 			t.Errorf("test %d expected success, got error: %v", i, errs)
 		}
 	}
+}
 
+func TestAlphaValidateVolumeDevices(t *testing.T) {
+	volumes := []core.Volume{
+		{Name: "abc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},
+		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
+		{Name: "def", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
+	}
+
+	vols, v1err := ValidateVolumes(volumes, field.NewPath("field"))
+	if len(v1err) > 0 {
+		t.Errorf("Invalid test volumes - expected success %v", v1err)
+		return
+	}
+
+	disabledAlphaVolDevice := []core.VolumeDevice{
+		{Name: "abc", DevicePath: "/foo"},
+	}
+
+	successCase := []core.VolumeDevice{
+		{Name: "abc", DevicePath: "/foo"},
+		{Name: "abc-123", DevicePath: "/usr/share/test"},
+	}
+	goodVolumeMounts := []core.VolumeMount{
+		{Name: "xyz", MountPath: "/foofoo"},
+		{Name: "ghi", MountPath: "/foo/usr/share/test"},
+	}
+
+	errorCases := map[string][]core.VolumeDevice{
+		"empty name":                    {{Name: "", DevicePath: "/foo"}},
+		"duplicate name":                {{Name: "abc", DevicePath: "/foo"}, {Name: "abc", DevicePath: "/foo/bar"}},
+		"name not found":                {{Name: "not-found", DevicePath: "/usr/share/test"}},
+		"name found but invalid source": {{Name: "def", DevicePath: "/usr/share/test"}},
+		"empty devicepath":              {{Name: "abc", DevicePath: ""}},
+		"relative devicepath":           {{Name: "abc-123", DevicePath: "baz"}},
+		"duplicate devicepath":          {{Name: "abc", DevicePath: "/foo"}, {Name: "abc-123", DevicePath: "/foo"}},
+		"no backsteps":                  {{Name: "def", DevicePath: "/baz/../"}},
+		"name exists in volumemounts":   {{Name: "abc", DevicePath: "/baz/../"}},
+		"path exists in volumemounts":   {{Name: "xyz", DevicePath: "/this/path/exists"}},
+		"both exist in volumemounts":    {{Name: "abc", DevicePath: "/this/path/exists"}},
+	}
+	badVolumeMounts := []core.VolumeMount{
+		{Name: "abc", MountPath: "/foo"},
+		{Name: "abc-123", MountPath: "/this/path/exists"},
+	}
+
+	// enable Alpha BlockVolume
+	err1 := utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
+	if err1 != nil {
+		t.Errorf("Failed to enable feature gate for BlockVolume: %v", err1)
+		return
+	}
+	// Success Cases:
+	// Validate normal success cases - only PVC volumeSource
+	if errs := ValidateVolumeDevices(successCase, GetVolumeMountMap(goodVolumeMounts), vols, field.NewPath("field")); len(errs) != 0 {
+		t.Errorf("expected success: %v", errs)
+	}
+
+	// Error Cases:
+	// Validate normal error cases - only PVC volumeSource
+	for k, v := range errorCases {
+		if errs := ValidateVolumeDevices(v, GetVolumeMountMap(badVolumeMounts), vols, field.NewPath("field")); len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		}
+	}
+
+	// disable Alpha BlockVolume
+	err2 := utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
+	if err2 != nil {
+		t.Errorf("Failed to disable feature gate for BlockVolume: %v", err2)
+		return
+	}
+	if errs := ValidateVolumeDevices(disabledAlphaVolDevice, GetVolumeMountMap(goodVolumeMounts), vols, field.NewPath("field")); len(errs) == 0 {
+		t.Errorf("expected failure: %v", errs)
+	}
 }
 
 func TestValidateProbe(t *testing.T) {
@@ -4102,7 +4688,7 @@ func getResourceLimits(cpu, memory string) core.ResourceList {
 }
 
 func TestValidateContainers(t *testing.T) {
-	volumes := sets.String{}
+	volumeDevices := make(map[string]core.VolumeSource)
 	capabilities.SetForTests(capabilities.Capabilities{
 		AllowPrivileged: true,
 	})
@@ -4272,7 +4858,7 @@ func TestValidateContainers(t *testing.T) {
 		},
 		{Name: "abc-1234", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", SecurityContext: fakeValidSecurityContext(true)},
 	}
-	if errs := validateContainers(successCase, volumes, field.NewPath("field")); len(errs) != 0 {
+	if errs := validateContainers(successCase, volumeDevices, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -4534,7 +5120,7 @@ func TestValidateContainers(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		if errs := validateContainers(v, volumes, field.NewPath("field")); len(errs) == 0 {
+		if errs := validateContainers(v, volumeDevices, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}

@@ -53,7 +53,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -507,7 +506,11 @@ var _ = SIGDescribe("Volumes", func() {
 				Prefix:    "vsphere",
 			}
 			By("creating a test vsphere volume")
-			vsp, err := vsphere.GetVSphere()
+			c, err := framework.LoadClientset()
+			if err != nil {
+				return
+			}
+			vsp, err := getVSphere(c)
 			Expect(err).NotTo(HaveOccurred())
 
 			volumePath, err = createVSphereVolume(vsp, nil)

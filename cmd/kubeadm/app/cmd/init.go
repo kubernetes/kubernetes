@@ -47,6 +47,7 @@ import (
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
+	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
 	selfhostingphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
 	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
@@ -217,7 +218,6 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, sk
 
 // NewInit validates given arguments and instantiates Init struct with provided information.
 func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight, skipTokenPrint, dryRun bool, criSocket string) (*Init, error) {
-
 	fmt.Println("[kubeadm] WARNING: kubeadm is currently in beta")
 
 	if cfgPath != "" {
@@ -352,6 +352,14 @@ func (i *Init) Run(out io.Writer) error {
 		kubeletFailTempl.Execute(out, ctx)
 
 		return fmt.Errorf("couldn't initialize a Kubernetes cluster")
+	}
+
+	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
+		// Create base kubelet configuration for dynamic kubelet configuration feature.
+		if err := kubeletphase.CreateBaseKubeletConfiguration(i.cfg, client); err != nil {
+			return fmt.Errorf("error uploading configuration: %v", err)
+		}
 	}
 
 	// Upload currently used configuration to the cluster

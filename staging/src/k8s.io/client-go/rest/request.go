@@ -179,6 +179,24 @@ func (r *Request) Resource(resource string) *Request {
 	return r
 }
 
+// BackOff sets the request's backoff manager to the one specified,
+// or defaults to the stub implementation if nil is provided
+func (r *Request) BackOff(manager BackoffManager) *Request {
+	if manager == nil {
+		r.backoffMgr = &NoBackoff{}
+		return r
+	}
+
+	r.backoffMgr = manager
+	return r
+}
+
+// Throttle receives a rate-limiter and sets or replaces an existing request limiter
+func (r *Request) Throttle(limiter flowcontrol.RateLimiter) *Request {
+	r.throttle = limiter
+	return r
+}
+
 // SubResource sets a sub-resource path which can be multiple segments segment after the resource
 // name but before the suffix.
 func (r *Request) SubResource(subresources ...string) *Request {

@@ -70,6 +70,7 @@ type serviceAccountConfig struct {
 	local                  bool
 	PrintObject            func(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 	updatePodSpecForObject func(runtime.Object, func(*v1.PodSpec) error) (bool, error)
+	printSuccess           func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
 	infos                  []*resource.Info
 	serviceAccountName     string
 }
@@ -117,6 +118,7 @@ func (saConfig *serviceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 	saConfig.PrintObject = f.PrintObject
 	saConfig.cmd = cmd
 
+	saConfig.printSuccess = f.PrintSuccess
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -127,7 +129,10 @@ func (saConfig *serviceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 	saConfig.serviceAccountName = args[len(args)-1]
 	resources := args[:len(args)-1]
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
-	builder := f.NewBuilder().ContinueOnError().
+	builder := f.NewBuilder().
+		Internal().
+		LocalParam(saConfig.local).
+		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &saConfig.fileNameOptions).
 		IncludeUninitialized(includeUninitialized).
@@ -135,8 +140,6 @@ func (saConfig *serviceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 	if !saConfig.local {
 		builder.ResourceTypeOrNameArgs(saConfig.all, resources...).
 			Latest()
-	} else {
-		builder = builder.Local(f.ClientForMapping)
 	}
 	saConfig.infos, err = builder.Do().Infos()
 	if err != nil {
@@ -149,11 +152,12 @@ func (saConfig *serviceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 func (saConfig *serviceAccountConfig) Run() error {
 	patchErrs := []error{}
 	patchFn := func(info *resource.Info) ([]byte, error) {
-		saConfig.updatePodSpecForObject(info.VersionedObject, func(podSpec *v1.PodSpec) error {
+		info.Object = info.AsVersioned()
+		saConfig.updatePodSpecForObject(info.Object, func(podSpec *v1.PodSpec) error {
 			podSpec.ServiceAccountName = saConfig.serviceAccountName
 			return nil
 		})
-		return runtime.Encode(saConfig.encoder, info.VersionedObject)
+		return runtime.Encode(saConfig.encoder, info.Object)
 	}
 	patches := CalculatePatches(saConfig.infos, saConfig.encoder, patchFn)
 	for _, patch := range patches {
@@ -163,7 +167,7 @@ func (saConfig *serviceAccountConfig) Run() error {
 			continue
 		}
 		if saConfig.local || saConfig.dryRun {
-			if err := saConfig.PrintObject(saConfig.cmd, saConfig.local, saConfig.mapper, patch.Info.VersionedObject, saConfig.out); err != nil {
+			if err := saConfig.PrintObject(saConfig.cmd, saConfig.local, saConfig.mapper, patch.Info.AsVersioned(), saConfig.out); err != nil {
 				return err
 			}
 			continue
@@ -182,16 +186,12 @@ func (saConfig *serviceAccountConfig) Run() error {
 			}
 		}
 		if len(saConfig.output) > 0 {
-			versionedObject, err := patch.Info.Mapping.ConvertToVersion(patched, patch.Info.Mapping.GroupVersionKind.GroupVersion())
-			if err != nil {
-				return err
-			}
-			if err := saConfig.PrintObject(saConfig.cmd, saConfig.local, saConfig.mapper, versionedObject, saConfig.out); err != nil {
+			if err := saConfig.PrintObject(saConfig.cmd, saConfig.local, saConfig.mapper, info.AsVersioned(), saConfig.out); err != nil {
 				return err
 			}
 			continue
 		}
-		cmdutil.PrintSuccess(saConfig.mapper, saConfig.shortOutput, saConfig.out, info.Mapping.Resource, info.Name, saConfig.dryRun, "serviceaccount updated")
+		saConfig.printSuccess(saConfig.mapper, saConfig.shortOutput, saConfig.out, info.Mapping.Resource, info.Name, saConfig.dryRun, "serviceaccount updated")
 	}
 	return utilerrors.NewAggregate(patchErrs)
 }

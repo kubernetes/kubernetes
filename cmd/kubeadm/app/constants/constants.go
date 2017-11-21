@@ -19,11 +19,13 @@ package constants
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -115,12 +117,17 @@ const (
 	// system:nodes group subject is removed if present.
 	NodesClusterRoleBinding = "system:node"
 
+	// KubeletBaseConfigMapRoleName defines the base kubelet configuration ConfigMap.
+	KubeletBaseConfigMapRoleName = "kubeadm:kubelet-base-configmap"
+
 	// APICallRetryInterval defines how long kubeadm should wait before retrying a failed API operation
 	APICallRetryInterval = 500 * time.Millisecond
 	// DiscoveryRetryInterval specifies how long kubeadm should wait before retrying to connect to the master when doing discovery
 	DiscoveryRetryInterval = 5 * time.Second
 	// MarkMasterTimeout specifies how long kubeadm should wait for applying the label and taint on the master before timing out
 	MarkMasterTimeout = 2 * time.Minute
+	// UpdateNodeTimeout specifies how long kubeadm should wait for updating node with the initial remote configuration of kubelet before timing out
+	UpdateNodeTimeout = 2 * time.Minute
 
 	// MinimumAddressesInServiceSubnet defines minimum amount of nodes the Service subnet should allow.
 	// We need at least ten, because the DNS service is always at the tenth cluster clusterIP
@@ -139,6 +146,14 @@ const (
 
 	// MasterConfigurationConfigMapKey specifies in what ConfigMap key the master configuration should be stored
 	MasterConfigurationConfigMapKey = "MasterConfiguration"
+
+	// KubeletBaseConfigurationConfigMap specifies in what ConfigMap in the kube-system namespace the initial remote configuration of kubelet should be stored
+	KubeletBaseConfigurationConfigMap = "kubelet-base-config-1.9"
+
+	// KubeletBaseConfigurationConfigMapKey specifies in what ConfigMap key the initial remote configuration of kubelet should be stored
+	// TODO: Use the constant ("kubelet.config.k8s.io") defined in pkg/kubelet/kubeletconfig/util/keys/keys.go
+	// after https://github.com/kubernetes/kubernetes/pull/53833 being merged.
+	KubeletBaseConfigurationConfigMapKey = "kubelet"
 
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
 	MinExternalEtcdVersion = "3.0.14"
@@ -208,7 +223,31 @@ var (
 
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
 	MinimumKubeletVersion = version.MustParseSemantic("v1.8.0")
+
+	// SupportedEtcdVersion lists officially supported etcd versions with corresponding kubernetes releases
+	SupportedEtcdVersion = map[uint8]string{
+		8: "3.0.17",
+		9: "3.1.10",
+	}
 )
+
+// EtcdSupportedVersion returns officially supported version of etcd for a specific kubernetes release
+// if passed version is not listed, the function returns nil and an error
+func EtcdSupportedVersion(versionString string) (*version.Version, error) {
+	kubernetesVersion, err := version.ParseSemantic(versionString)
+	if err != nil {
+		return nil, err
+	}
+
+	if etcdStringVersion, ok := SupportedEtcdVersion[uint8(kubernetesVersion.Minor())]; ok {
+		etcdVersion, err := version.ParseSemantic(etcdStringVersion)
+		if err != nil {
+			return nil, err
+		}
+		return etcdVersion, nil
+	}
+	return nil, fmt.Errorf("Unsupported or unknown kubernetes version")
+}
 
 // GetStaticPodDirectory returns the location on the disk where the Static Pod should be present
 func GetStaticPodDirectory() string {
@@ -242,4 +281,21 @@ func CreateTempDirForKubeadm(dirName string) (string, error) {
 		return "", fmt.Errorf("couldn't create a temporary directory: %v", err)
 	}
 	return tempDir, nil
+}
+
+// GetDNSIP returns a dnsIP, which is 10th IP in svcSubnet CIDR range
+func GetDNSIP(svcSubnet string) (net.IP, error) {
+	// Get the service subnet CIDR
+	_, svcSubnetCIDR, err := net.ParseCIDR(svcSubnet)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't parse service subnet CIDR %q: %v", svcSubnet, err)
+	}
+
+	// Selects the 10th IP in service subnet CIDR range as dnsIP
+	dnsIP, err := ipallocator.GetIndexedIP(svcSubnetCIDR, 10)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get tenth IP address from service subnet CIDR %s: %v", svcSubnetCIDR.String(), err)
+	}
+
+	return dnsIP, nil
 }

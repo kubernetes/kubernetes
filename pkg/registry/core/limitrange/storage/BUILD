@@ -12,7 +12,6 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/registry/core/limitrange/storage",
     library = ":go_default_library",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",

@@ -45,7 +45,8 @@ type ResumeConfig struct {
 	Encoder runtime.Encoder
 	Infos   []*resource.Info
 
-	Out io.Writer
+	PrintSuccess func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
+	Out          io.Writer
 }
 
 var (
@@ -98,6 +99,7 @@ func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, out
 		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
 	}
 
+	o.PrintSuccess = f.PrintSuccess
 	o.Mapper, o.Typer = f.Object()
 	o.Encoder = f.JSONEncoder()
 
@@ -110,6 +112,7 @@ func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, out
 	}
 
 	r := f.NewBuilder().
+		Internal().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, args...).
@@ -146,7 +149,7 @@ func (o ResumeConfig) RunResume() error {
 		}
 
 		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
-			cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "already resumed")
+			o.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "already resumed")
 			continue
 		}
 
@@ -157,7 +160,7 @@ func (o ResumeConfig) RunResume() error {
 		}
 
 		info.Refresh(obj, true)
-		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "resumed")
+		o.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "resumed")
 	}
 
 	return utilerrors.NewAggregate(allErrs)

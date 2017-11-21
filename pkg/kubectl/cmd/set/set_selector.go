@@ -49,6 +49,7 @@ type SelectorOptions struct {
 	selector  *metav1.LabelSelector
 
 	out              io.Writer
+	PrintSuccess     func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
 	PrintObject      func(obj runtime.Object) error
 	ClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 
@@ -114,6 +115,8 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		return err
 	}
 
+	o.PrintSuccess = f.PrintSuccess
+
 	o.changeCause = f.Command(cmd, false)
 	mapper, _ := f.Object()
 	o.mapper = mapper
@@ -126,25 +129,25 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	o.builder = f.NewBuilder().
+		Internal().
+		LocalParam(o.local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.fileOptions).
 		IncludeUninitialized(includeUninitialized).
 		Flatten()
 
-	if o.local {
+	if !o.local {
+		o.builder.
+			ResourceTypeOrNameArgs(o.all, o.resources...).
+			Latest()
+	} else {
 		// if a --local flag was provided, and a resource was specified in the form
 		// <resource>/<name>, fail immediately as --local cannot query the api server
 		// for the specified resource.
 		if len(o.resources) > 0 {
 			return resource.LocalResourceError
 		}
-
-		o.builder = o.builder.Local(f.ClientForMapping)
-	} else {
-		o.builder = o.builder.
-			ResourceTypeOrNameArgs(o.all, o.resources...).
-			Latest()
 	}
 
 	o.PrintObject = func(obj runtime.Object) error {
@@ -178,15 +181,12 @@ func (o *SelectorOptions) RunSelector() error {
 	return r.Visit(func(info *resource.Info, err error) error {
 		patch := &Patch{Info: info}
 		CalculatePatch(patch, o.encoder, func(info *resource.Info) ([]byte, error) {
-			versioned, err := info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
-			if err != nil {
-				return nil, err
-			}
-			patch.Info.VersionedObject = versioned
-			selectErr := updateSelectorForObject(info.VersionedObject, *o.selector)
+			versioned := info.AsVersioned()
+			patch.Info.Object = versioned
+			selectErr := updateSelectorForObject(info.Object, *o.selector)
 
 			if selectErr == nil {
-				return runtime.Encode(o.encoder, info.VersionedObject)
+				return runtime.Encode(o.encoder, info.Object)
 			}
 			return nil, selectErr
 		})
@@ -195,7 +195,7 @@ func (o *SelectorOptions) RunSelector() error {
 			return patch.Err
 		}
 		if o.local || o.dryrun {
-			return o.PrintObject(info.VersionedObject)
+			return o.PrintObject(info.Object)
 		}
 
 		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
@@ -217,7 +217,7 @@ func (o *SelectorOptions) RunSelector() error {
 		if len(o.output) > 0 && !shortOutput {
 			return o.PrintObject(patched)
 		}
-		cmdutil.PrintSuccess(o.mapper, shortOutput, o.out, info.Mapping.Resource, info.Name, o.dryrun, "selector updated")
+		o.PrintSuccess(o.mapper, shortOutput, o.out, info.Mapping.Resource, info.Name, o.dryrun, "selector updated")
 		return nil
 	})
 }

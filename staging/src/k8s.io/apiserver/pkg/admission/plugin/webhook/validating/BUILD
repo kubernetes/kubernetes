@@ -21,6 +21,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/configuration:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/initializer:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/admission/metrics:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/config:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/errors:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/namespace:go_default_library",
@@ -34,10 +35,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "admission_test.go",
-        "certs_test.go",
-    ],
+    srcs = ["admission_test.go"],
     importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook/validating",
     library = ":go_default_library",
     deps = [
@@ -50,6 +48,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/config:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
     ],

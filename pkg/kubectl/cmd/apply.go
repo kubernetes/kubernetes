@@ -198,22 +198,11 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		return err
 	}
 
-	mapper, _, err := f.UnstructuredObject()
-	if err != nil {
-		return err
-	}
-
-	if options.Prune {
-		options.PruneResources, err = parsePruneResources(mapper, cmdutil.GetFlagStringArray(cmd, "prune-whitelist"))
-		if err != nil {
-			return err
-		}
-	}
-
 	// include the uninitialized objects by default if --prune is true
 	// unless explicitly set --include-uninitialized=false
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, options.Prune)
-	r := f.NewUnstructuredBuilder().
+	r := f.NewBuilder().
+		Unstructured().
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -222,9 +211,15 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		IncludeUninitialized(includeUninitialized).
 		Flatten().
 		Do()
-	err = r.Err()
-	if err != nil {
+	if err := r.Err(); err != nil {
 		return err
+	}
+
+	if options.Prune {
+		options.PruneResources, err = parsePruneResources(r.Mapper().RESTMapper, cmdutil.GetFlagStringArray(cmd, "prune-whitelist"))
+		if err != nil {
+			return err
+		}
 	}
 
 	dryRun := cmdutil.GetFlagBool(cmd, "dry-run")
@@ -233,14 +228,13 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 	encoder := f.JSONEncoder()
 	decoder := f.Decoder(false)
+	mapper := r.Mapper().RESTMapper
 
 	visitedUids := sets.NewString()
 	visitedNamespaces := sets.NewString()
 
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
-		// In this method, info.Object contains the object retrieved from the server
-		// and info.VersionedObject contains the object decoded from the input source.
 		if err != nil {
 			return err
 		}
@@ -251,10 +245,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 		// Add change-cause annotation to resource info if it should be recorded
 		if cmdutil.ShouldRecord(cmd, info) {
-			recordInObj := info.VersionedObject
-			if info.VersionedObject == nil {
-				recordInObj = info.Object
-			}
+			recordInObj := info.Object
 			if err := cmdutil.RecordChangeCause(recordInObj, f.Command(cmd, false)); err != nil {
 				glog.V(4).Infof("error recording current command: %v", err)
 			}
@@ -294,7 +285,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			if len(output) > 0 && !shortOutput {
 				return f.PrintResourceInfoForCommand(cmd, info, out)
 			}
-			cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
+			f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
 			return nil
 		}
 
@@ -338,7 +329,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 			if string(patchBytes) == "{}" {
 				count++
-				cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "unchanged")
+				f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "unchanged")
 				return nil
 			}
 		}
@@ -346,7 +337,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		if len(output) > 0 && !shortOutput {
 			return f.PrintResourceInfoForCommand(cmd, info, out)
 		}
-		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "configured")
+		f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "configured")
 		return nil
 	})
 
@@ -383,13 +374,13 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 	for n := range visitedNamespaces {
 		for _, m := range namespacedRESTMappings {
-			if err := p.prune(n, m, shortOutput, includeUninitialized); err != nil {
+			if err := p.prune(f, n, m, shortOutput, includeUninitialized); err != nil {
 				return fmt.Errorf("error pruning namespaced object %v: %v", m.GroupVersionKind, err)
 			}
 		}
 	}
 	for _, m := range nonNamespacedRESTMappings {
-		if err := p.prune(metav1.NamespaceNone, m, shortOutput, includeUninitialized); err != nil {
+		if err := p.prune(f, metav1.NamespaceNone, m, shortOutput, includeUninitialized); err != nil {
 			return fmt.Errorf("error pruning nonNamespaced object %v: %v", m.GroupVersionKind, err)
 		}
 	}
@@ -463,7 +454,7 @@ type pruner struct {
 	out io.Writer
 }
 
-func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, shortOutput, includeUninitialized bool) error {
+func (p *pruner) prune(f cmdutil.Factory, namespace string, mapping *meta.RESTMapping, shortOutput, includeUninitialized bool) error {
 	c, err := p.clientFunc(mapping)
 	if err != nil {
 		return err
@@ -513,7 +504,7 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, shortOutput,
 				return err
 			}
 		}
-		cmdutil.PrintSuccess(p.mapper, shortOutput, p.out, mapping.Resource, name, p.dryRun, "pruned")
+		f.PrintSuccess(p.mapper, shortOutput, p.out, mapping.Resource, name, p.dryRun, "pruned")
 	}
 	return nil
 }

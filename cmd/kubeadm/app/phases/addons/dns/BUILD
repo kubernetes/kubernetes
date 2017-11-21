@@ -41,7 +41,6 @@ go_library(
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta2:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

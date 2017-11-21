@@ -2185,3 +2185,160 @@ func TestNodeEventGeneration(t *testing.T) {
 		}
 	}
 }
+
+// TestFixDeprecatedTaintKey verifies we have backwards compatibility after upgraded alpha taint key to GA taint key.
+// TODO(resouer): this is introduced in 1.9 and should be removed in the future.
+func TestFixDeprecatedTaintKey(t *testing.T) {
+	fakeNow := metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC)
+	evictionTimeout := 10 * time.Minute
+
+	fakeNodeHandler := &testutil.FakeNodeHandler{
+		Existing: []*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						kubeletapis.LabelZoneRegion:        "region1",
+						kubeletapis.LabelZoneFailureDomain: "zone1",
+					},
+				},
+			},
+		},
+		Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+	}
+
+	nodeController, _ := newNodeControllerFromClient(nil, fakeNodeHandler, evictionTimeout,
+		testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold, testNodeMonitorGracePeriod,
+		testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, true)
+	nodeController.now = func() metav1.Time { return fakeNow }
+	nodeController.recorder = testutil.NewFakeRecorder()
+
+	deprecatedNotReadyTaint := &v1.Taint{
+		Key:    algorithm.DeprecatedTaintNodeNotReady,
+		Effect: v1.TaintEffectNoExecute,
+	}
+
+	nodeNotReadyTaint := &v1.Taint{
+		Key:    algorithm.TaintNodeNotReady,
+		Effect: v1.TaintEffectNoExecute,
+	}
+
+	deprecatedUnreachableTaint := &v1.Taint{
+		Key:    algorithm.DeprecatedTaintNodeUnreachable,
+		Effect: v1.TaintEffectNoExecute,
+	}
+
+	nodeUnreachableTaint := &v1.Taint{
+		Key:    algorithm.TaintNodeUnreachable,
+		Effect: v1.TaintEffectNoExecute,
+	}
+
+	tests := []struct {
+		Name           string
+		Node           *v1.Node
+		ExpectedTaints []*v1.Taint
+	}{
+		{
+			Name: "Node with deprecated not-ready taint key",
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						kubeletapis.LabelZoneRegion:        "region1",
+						kubeletapis.LabelZoneFailureDomain: "zone1",
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						*deprecatedNotReadyTaint,
+					},
+				},
+			},
+			ExpectedTaints: []*v1.Taint{nodeNotReadyTaint},
+		},
+		{
+			Name: "Node with deprecated unreachable taint key",
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						kubeletapis.LabelZoneRegion:        "region1",
+						kubeletapis.LabelZoneFailureDomain: "zone1",
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						*deprecatedUnreachableTaint,
+					},
+				},
+			},
+			ExpectedTaints: []*v1.Taint{nodeUnreachableTaint},
+		},
+		{
+			Name: "Node with not-ready taint key",
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						kubeletapis.LabelZoneRegion:        "region1",
+						kubeletapis.LabelZoneFailureDomain: "zone1",
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						*nodeNotReadyTaint,
+					},
+				},
+			},
+			ExpectedTaints: []*v1.Taint{nodeNotReadyTaint},
+		},
+		{
+			Name: "Node with unreachable taint key",
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						kubeletapis.LabelZoneRegion:        "region1",
+						kubeletapis.LabelZoneFailureDomain: "zone1",
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						*nodeUnreachableTaint,
+					},
+				},
+			},
+			ExpectedTaints: []*v1.Taint{nodeUnreachableTaint},
+		},
+	}
+
+	for _, test := range tests {
+		fakeNodeHandler.Update(test.Node)
+		if err := syncNodeStore(nodeController, fakeNodeHandler); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		nodeController.doFixDeprecatedTaintKeyPass(test.Node)
+		if err := syncNodeStore(nodeController, fakeNodeHandler); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		node, err := nodeController.nodeLister.Get(test.Node.GetName())
+		if err != nil {
+			t.Errorf("Can't get current node...")
+			return
+		}
+		if len(node.Spec.Taints) != len(test.ExpectedTaints) {
+			t.Errorf("%s: Unexpected number of taints: expected %d, got %d",
+				test.Name, len(test.ExpectedTaints), len(node.Spec.Taints))
+		}
+		for _, taint := range test.ExpectedTaints {
+			if !taintutils.TaintExists(node.Spec.Taints, taint) {
+				t.Errorf("%s: Can't find taint %v in %v", test.Name, taint, node.Spec.Taints)
+			}
+		}
+	}
+}

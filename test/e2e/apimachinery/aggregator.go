@@ -35,7 +35,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/discovery"
+	clientset "k8s.io/client-go/kubernetes"
 	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
+	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -47,9 +49,21 @@ import (
 var serverAggregatorVersion = utilversion.MustParseSemantic("v1.7.0")
 
 var _ = SIGDescribe("Aggregator", func() {
+	var ns string
+	var c clientset.Interface
+	var aggrclient *aggregatorclient.Clientset
 	f := framework.NewDefaultFramework("aggregator")
 	framework.AddCleanupAction(func() {
-		cleanTest(f)
+		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
+		if len(ns) > 0 {
+			cleanTest(c, aggrclient, ns)
+		}
+	})
+
+	BeforeEach(func() {
+		c = f.ClientSet
+		ns = f.Namespace.Name
+		aggrclient = f.AggregatorClient
 	})
 
 	It("Should be able to support the 1.7 Sample API Server using the current Aggregator", func() {
@@ -62,13 +76,10 @@ var _ = SIGDescribe("Aggregator", func() {
 	})
 })
 
-func cleanTest(f *framework.Framework) {
+func cleanTest(client clientset.Interface, aggrclient *aggregatorclient.Clientset, namespace string) {
 	// delete the APIService first to avoid causing discovery errors
-	aggrclient := f.AggregatorClient
 	_ = aggrclient.ApiregistrationV1beta1().APIServices().Delete("v1alpha1.wardle.k8s.io", nil)
 
-	namespace := f.Namespace.Name
-	client := f.ClientSet
 	_ = client.ExtensionsV1beta1().Deployments(namespace).Delete("sample-apiserver", nil)
 	_ = client.CoreV1().Secrets(namespace).Delete("sample-apiserver-secret", nil)
 	_ = client.CoreV1().Services(namespace).Delete("sample-api", nil)
@@ -415,7 +426,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 		framework.Failf("failed to get back the correct deleted flunders list %v from the dynamic client", unstructuredList)
 	}
 
-	cleanTest(f)
+	cleanTest(client, aggrclient, namespace)
 }
 
 func validateErrorWithDebugInfo(f *framework.Framework, err error, pods *v1.PodList, msg string, fields ...interface{}) {
