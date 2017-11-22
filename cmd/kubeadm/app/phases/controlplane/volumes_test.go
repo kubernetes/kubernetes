@@ -514,7 +514,7 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 	for _, rt := range tests {
 		mounts := getHostPathVolumesForTheControlPlane(rt.cfg)
 
-                // Avoid unit test errors when the flexvolume is mounted
+		// Avoid unit test errors when the flexvolume is mounted
 		if _, ok := mounts.volumes[kubeadmconstants.KubeControllerManager][flexvolumeDirVolumeName]; ok {
 			delete(mounts.volumes[kubeadmconstants.KubeControllerManager], flexvolumeDirVolumeName)
 		}
