@@ -33,7 +33,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -54,10 +53,6 @@ func CreateBaseKubeletConfiguration(cfg *kubeadmapi.MasterConfiguration, client 
 	kubeletBytes, err := kubeadmutil.MarshalToYamlForCodecs(cfg.KubeletConfiguration.BaseConfig, kubeletconfigv1alpha1.SchemeGroupVersion, *kubeletCodecs)
 	if err != nil {
 		return err
-	}
-
-	if err := writeInitKubeletConfigToDisk(kubeletBytes); err != nil {
-		return fmt.Errorf("failed to write initial remote configuration of kubelet to disk for node %s: %v", cfg.NodeName, err)
 	}
 
 	if err = apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
@@ -81,7 +76,7 @@ func CreateBaseKubeletConfiguration(cfg *kubeadmapi.MasterConfiguration, client 
 
 // ConsumeBaseKubeletConfiguration consumes base kubelet configuration for dynamic kubelet configuration feature.
 func ConsumeBaseKubeletConfiguration(nodeName string) error {
-	client, err := getTLSBootstrappedClient()
+	client, err := getLocalNodeTLSBootstrappedClient()
 	if err != nil {
 		return err
 	}
@@ -164,7 +159,7 @@ func createKubeletBaseConfigMapRBACRules(client clientset.Interface) error {
 		return err
 	}
 
-	if err := apiclient.CreateOrUpdateRoleBinding(client, &rbac.RoleBinding{
+	return apiclient.CreateOrUpdateRoleBinding(client, &rbac.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.KubeletBaseConfigMapRoleName,
 			Namespace: metav1.NamespaceSystem,
@@ -176,24 +171,9 @@ func createKubeletBaseConfigMapRBACRules(client clientset.Interface) error {
 		},
 		Subjects: []rbac.Subject{
 			{
-				Kind: "Group",
+				Kind: rbac.GroupKind,
 				Name: kubeadmconstants.NodesGroup,
 			},
-		},
-	}); err != nil {
-		return err
-	}
-
-	return apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: tokenphase.NodeKubeletBootstrap,
-		},
-		RoleRef: rbac.RoleRef{
-			APIGroup: rbac.GroupName,
-			Kind:     "ClusterRole",
-			Name:     tokenphase.NodeBootstrapperClusterRoleName,
-		},
-		Subjects: []rbac.Subject{
 			{
 				Kind: rbac.GroupKind,
 				Name: kubeadmconstants.NodeBootstrapTokenAuthGroup,
@@ -202,9 +182,9 @@ func createKubeletBaseConfigMapRBACRules(client clientset.Interface) error {
 	})
 }
 
-// getTLSBootstrappedClient waits for the kubelet to perform the TLS bootstrap
+// getLocalNodeTLSBootstrappedClient waits for the kubelet to perform the TLS bootstrap
 // and then creates a client from config file /etc/kubernetes/kubelet.conf
-func getTLSBootstrappedClient() (clientset.Interface, error) {
+func getLocalNodeTLSBootstrappedClient() (clientset.Interface, error) {
 	fmt.Println("[tlsbootstrap] Waiting for the kubelet to perform the TLS Bootstrap...")
 
 	kubeletKubeConfig := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
@@ -219,6 +199,27 @@ func getTLSBootstrappedClient() (clientset.Interface, error) {
 	}
 
 	return kubeconfigutil.ClientSetFromFile(kubeletKubeConfig)
+}
+
+// WriteInitKubeletConfigToDiskOnMaster writes base kubelet configuration to disk on master.
+func WriteInitKubeletConfigToDiskOnMaster(cfg *kubeadmapi.MasterConfiguration) error {
+	fmt.Printf("[kubelet] Writing base configuration of kubelets to disk on master node %s", cfg.NodeName)
+
+	_, kubeletCodecs, err := kubeletconfigscheme.NewSchemeAndCodecs()
+	if err != nil {
+		return err
+	}
+
+	kubeletBytes, err := kubeadmutil.MarshalToYamlForCodecs(cfg.KubeletConfiguration.BaseConfig, kubeletconfigv1alpha1.SchemeGroupVersion, *kubeletCodecs)
+	if err != nil {
+		return err
+	}
+
+	if err := writeInitKubeletConfigToDisk(kubeletBytes); err != nil {
+		return fmt.Errorf("failed to write base configuration of kubelet to disk on master node %s: %v", cfg.NodeName, err)
+	}
+
+	return nil
 }
 
 func writeInitKubeletConfigToDisk(kubeletConfig []byte) error {
