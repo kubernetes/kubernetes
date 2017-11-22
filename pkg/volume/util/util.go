@@ -233,7 +233,7 @@ func LoadPodFromFile(filePath string) (*v1.Pod, error) {
 	}
 	pod := &v1.Pod{}
 
-	codec := legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion)
+	codec := legacyscheme.Codecs.UniversalDecoder()
 	if err := runtime.DecodeInto(codec, podDef, pod); err != nil {
 		return nil, fmt.Errorf("failed decoding file: %v", err)
 	}

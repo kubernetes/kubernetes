@@ -729,7 +729,8 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		kubeFlags.NonMasqueradeCIDR,
 		kubeFlags.KeepTerminatedPodVolumes,
 		kubeFlags.NodeLabels,
-		kubeFlags.SeccompProfileRoot)
+		kubeFlags.SeccompProfileRoot,
+		kubeFlags.BootstrapCheckpointPath)
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %v", err)
 	}
@@ -802,7 +803,8 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	nonMasqueradeCIDR string,
 	keepTerminatedPodVolumes bool,
 	nodeLabels map[string]string,
-	seccompProfileRoot string) (k kubelet.Bootstrap, err error) {
+	seccompProfileRoot string,
+	bootstrapCheckpointPath string) (k kubelet.Bootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
@@ -835,7 +837,8 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		nonMasqueradeCIDR,
 		keepTerminatedPodVolumes,
 		nodeLabels,
-		seccompProfileRoot)
+		seccompProfileRoot,
+		bootstrapCheckpointPath)
 	if err != nil {
 		return nil, err
 	}

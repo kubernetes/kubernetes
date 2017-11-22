@@ -68,6 +68,10 @@ const (
 	// This annotation can be attached to node.
 	ObjectTTLAnnotationKey string = "node.alpha.kubernetes.io/ttl"
 
+	// BootstrapCheckpointAnnotationKey represents a Resource (Pod) that should be checkpointed by
+	// the kubelet prior to running
+	BootstrapCheckpointAnnotationKey string = "node.kubernetes.io/bootstrap-checkpoint"
+
 	// annotation key prefix used to identify non-convertible json paths.
 	NonConvertibleAnnotationPrefix = "non-convertible.kubernetes.io"
 
