@@ -25,7 +25,7 @@ DOCKERIZE_KUBELET=${DOCKERIZE_KUBELET:-""}
 ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
 ALLOW_SECURITY_CONTEXT=${ALLOW_SECURITY_CONTEXT:-""}
 PSP_ADMISSION=${PSP_ADMISSION:-""}
-NODE_ADMISSION=${NODE_ADMISSION:-""}
+NODE_ADMISSION=${NODE_ADMISSION:-true}
 RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
 KUBELET_AUTHORIZATION_WEBHOOK=${KUBELET_AUTHORIZATION_WEBHOOK:-""}
 KUBELET_AUTHENTICATION_WEBHOOK=${KUBELET_AUTHENTICATION_WEBHOOK:-""}
@@ -874,6 +874,12 @@ fi
 # validate that etcd is: not running, in path, and has minimum required version.
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   kube::etcd::validate
+fi
+
+# if $CLOUD_PROVIDER is set and $HOSTNAME_OVERRIDE is not, the kubelet will not work due to
+# node restriction admission controller. see issue #49880
+if [[ -n "${CLOUD_PROVIDER}" ]] && [[ -z "${HOSTNAME_OVERRIDE}" ]]; then
+        echo "WARNING : You should set $HOSTNAME_OVERRIDE if $CLOUD_PROVIDER is set."
 fi
 
 if [ "${CONTAINER_RUNTIME}" == "docker" ] && ! kube::util::ensure_docker_daemon_connectivity; then
