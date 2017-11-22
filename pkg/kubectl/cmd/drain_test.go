@@ -73,12 +73,15 @@ func TestMain(m *testing.M) {
 		Spec: corev1.NodeSpec{
 			ExternalID: "node",
 		},
-		Status: corev1.NodeStatus{},
+		Status: corev1.NodeStatus{
+			Message: "",
+		},
 	}
 
 	// A copy of the same node, but cordoned.
 	cordoned_node = node.DeepCopy()
 	cordoned_node.Spec.Unschedulable = true
+	cordoned_node.Status.Message = "cordoned_node"
 	os.Exit(m.Run())
 }
 
@@ -88,7 +91,7 @@ func TestCordon(t *testing.T) {
 		node        *corev1.Node
 		expected    *corev1.Node
 		cmd         func(cmdutil.Factory, io.Writer) *cobra.Command
-		arg         string
+		args        []string
 		expectFatal bool
 	}{
 		{
@@ -96,7 +99,7 @@ func TestCordon(t *testing.T) {
 			node:        cordoned_node,
 			expected:    node,
 			cmd:         NewCmdUncordon,
-			arg:         "node/node",
+			args:        []string{"node/node"},
 			expectFatal: false,
 		},
 		{
@@ -104,7 +107,7 @@ func TestCordon(t *testing.T) {
 			node:        cordoned_node,
 			expected:    node,
 			cmd:         NewCmdUncordon,
-			arg:         "node",
+			args:        []string{"node"},
 			expectFatal: false,
 		},
 		{
@@ -112,7 +115,7 @@ func TestCordon(t *testing.T) {
 			node:        node,
 			expected:    node,
 			cmd:         NewCmdUncordon,
-			arg:         "node",
+			args:        []string{"node"},
 			expectFatal: false,
 		},
 		{
@@ -120,7 +123,7 @@ func TestCordon(t *testing.T) {
 			node:        cordoned_node,
 			expected:    cordoned_node,
 			cmd:         NewCmdCordon,
-			arg:         "node",
+			args:        []string{"node"},
 			expectFatal: false,
 		},
 		{
@@ -128,7 +131,7 @@ func TestCordon(t *testing.T) {
 			node:        node,
 			expected:    cordoned_node,
 			cmd:         NewCmdCordon,
-			arg:         "node",
+			args:        []string{"node", "--message=cordoned_node"},
 			expectFatal: false,
 		},
 		{
@@ -136,7 +139,7 @@ func TestCordon(t *testing.T) {
 			node:        node,
 			expected:    node,
 			cmd:         NewCmdCordon,
-			arg:         "bar",
+			args:        []string{"bar"},
 			expectFatal: true,
 		},
 		{
@@ -144,7 +147,7 @@ func TestCordon(t *testing.T) {
 			node:        node,
 			expected:    node,
 			cmd:         NewCmdUncordon,
-			arg:         "bar",
+			args:        []string{"bar"},
 			expectFatal: true,
 		},
 	}
@@ -185,6 +188,28 @@ func TestCordon(t *testing.T) {
 					}
 					updated = true
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
+				case m.isFor("PATCH", "/nodes/node/status"):
+					data, err := ioutil.ReadAll(req.Body)
+					if err != nil {
+						t.Fatalf("%s: unexpected error: %v", test.description, err)
+					}
+					defer req.Body.Close()
+					oldJSON, err := runtime.Encode(codec, node)
+					if err != nil {
+						t.Fatalf("%s: unexpected error: %v", test.description, err)
+					}
+					appliedPatch, err := strategicpatch.StrategicMergePatch(oldJSON, data, &corev1.Node{})
+					if err != nil {
+						t.Fatalf("%s: unexpected error: %v", test.description, err)
+					}
+					if err := runtime.DecodeInto(codec, appliedPatch, new_node); err != nil {
+						t.Fatalf("%s: unexpected error: %v", test.description, err)
+					}
+					if !reflect.DeepEqual(test.expected.Status, new_node.Status) {
+						t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, test.expected.Status.Message, new_node.Status.Message)
+					}
+					updated = true
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
 				default:
 					t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
 					return nil, nil
@@ -208,7 +233,7 @@ func TestCordon(t *testing.T) {
 				saw_fatal = true
 				panic(e)
 			})
-			cmd.SetArgs([]string{test.arg})
+			cmd.SetArgs(test.args)
 			cmd.Execute()
 		}()
 
@@ -430,7 +455,7 @@ func TestDrain(t *testing.T) {
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{rc_pod},
 			rcs:          []api.ReplicationController{rc},
-			args:         []string{"node"},
+			args:         []string{"node", "--message=cordoned_node"},
 			expectFatal:  false,
 			expectDelete: true,
 		},
@@ -440,7 +465,7 @@ func TestDrain(t *testing.T) {
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{ds_pod},
 			rcs:          []api.ReplicationController{rc},
-			args:         []string{"node"},
+			args:         []string{"node", "--message=cordoned_node"},
 			expectFatal:  true,
 			expectDelete: false,
 		},
@@ -450,7 +475,7 @@ func TestDrain(t *testing.T) {
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{orphaned_ds_pod},
 			rcs:          []api.ReplicationController{},
-			args:         []string{"node"},
+			args:         []string{"node", "--message=cordoned_node"},
 			expectFatal:  true,
 			expectDelete: false,
 		},
@@ -460,7 +485,7 @@ func TestDrain(t *testing.T) {
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{orphaned_ds_pod},
 			rcs:          []api.ReplicationController{},
-			args:         []string{"node", "--force"},
+			args:         []string{"node", "--force", "--message=cordoned_node"},
 			expectFatal:  false,
 			expectDelete: true,
 		},
@@ -470,7 +495,7 @@ func TestDrain(t *testing.T) {
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{ds_pod},
 			rcs:          []api.ReplicationController{rc},
-			args:         []string{"node", "--ignore-daemonsets"},
+			args:         []string{"node", "--ignore-daemonsets", "--message=cordoned_node"},
 			expectFatal:  false,
 			expectDelete: false,
 		},
@@ -480,7 +505,7 @@ func TestDrain(t *testing.T) {
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{job_pod},
 			rcs:          []api.ReplicationController{rc},
-			args:         []string{"node"},
+			args:         []string{"node", "--message=cordoned_node"},
 			expectFatal:  false,
 			expectDelete: true,
 		},
@@ -490,7 +515,7 @@ func TestDrain(t *testing.T) {
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{rs_pod},
 			replicaSets:  []extensions.ReplicaSet{rs},
-			args:         []string{"node"},
+			args:         []string{"node", "--message=cordoned_node"},
 			expectFatal:  false,
 			expectDelete: true,
 		},
@@ -500,7 +525,7 @@ func TestDrain(t *testing.T) {
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{naked_pod},
 			rcs:          []api.ReplicationController{},
-			args:         []string{"node"},
+			args:         []string{"node", "--message=cordoned_node"},
 			expectFatal:  true,
 			expectDelete: false,
 		},
@@ -510,7 +535,7 @@ func TestDrain(t *testing.T) {
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{naked_pod},
 			rcs:          []api.ReplicationController{},
-			args:         []string{"node", "--force"},
+			args:         []string{"node", "--force", "--message=cordoned_node"},
 			expectFatal:  false,
 			expectDelete: true,
 		},
@@ -519,7 +544,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{emptydir_pod},
-			args:         []string{"node", "--force"},
+			args:         []string{"node", "--force", "--message=cordoned_node"},
 			expectFatal:  true,
 			expectDelete: false,
 		},
@@ -528,7 +553,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{emptydir_pod},
-			args:         []string{"node", "--force", "--delete-local-data=true"},
+			args:         []string{"node", "--force", "--delete-local-data=true", "--message=cordoned_node"},
 			expectFatal:  false,
 			expectDelete: true,
 		},
@@ -538,7 +563,7 @@ func TestDrain(t *testing.T) {
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{},
 			rcs:          []api.ReplicationController{rc},
-			args:         []string{"node"},
+			args:         []string{"node", "--message=cordoned_node"},
 			expectFatal:  false,
 			expectDelete: false,
 		},
@@ -640,6 +665,27 @@ func TestDrain(t *testing.T) {
 						}
 						if !reflect.DeepEqual(test.expected.Spec, new_node.Spec) {
 							t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, test.expected.Spec, new_node.Spec)
+						}
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
+					case m.isFor("PATCH", "/nodes/node/status"):
+						data, err := ioutil.ReadAll(req.Body)
+						if err != nil {
+							t.Fatalf("%s: unexpected error: %v", test.description, err)
+						}
+						defer req.Body.Close()
+						oldJSON, err := runtime.Encode(codec, node)
+						if err != nil {
+							t.Fatalf("%s: unexpected error: %v", test.description, err)
+						}
+						appliedPatch, err := strategicpatch.StrategicMergePatch(oldJSON, data, &corev1.Node{})
+						if err != nil {
+							t.Fatalf("%s: unexpected error: %v", test.description, err)
+						}
+						if err := runtime.DecodeInto(codec, appliedPatch, new_node); err != nil {
+							t.Fatalf("%s: unexpected error: %v", test.description, err)
+						}
+						if !reflect.DeepEqual(test.expected.Status, new_node.Status) {
+							t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, test.expected.Status.Message, new_node.Status.Message)
 						}
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
 					case m.isFor("DELETE", "/namespaces/default/pods/bar"):

@@ -3406,6 +3406,9 @@ type NodeStatus struct {
 	// List of volumes that are attached to the node.
 	// +optional
 	VolumesAttached []AttachedVolume
+	// Message describes reason why node is marked as schedulable/unschedulable/ready/notready. By default, message is empty.
+	// +optional
+	Message string
 }
 
 type UniqueVolumeName string

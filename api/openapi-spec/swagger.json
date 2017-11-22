@@ -76583,6 +76583,10 @@
        "$ref": "#/definitions/io.k8s.api.core.v1.ContainerImage"
       }
      },
+     "message": {
+      "description": "Message describes reason why node is marked as schedulable/unschedulable/ready/notready. By default, message is empty.",
+      "type": "string"
+     },
      "nodeInfo": {
       "description": "Set of ids/uuids to uniquely identify the node. More info: https://kubernetes.io/docs/concepts/nodes/node/#info",
       "$ref": "#/definitions/io.k8s.api.core.v1.NodeSystemInfo"

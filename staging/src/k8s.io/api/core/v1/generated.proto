@@ -1958,6 +1958,10 @@ message NodeStatus {
   // List of volumes that are attached to the node.
   // +optional
   repeated AttachedVolume volumesAttached = 10;
+
+  // Message describes reason why node is marked as schedulable/unschedulable/ready/notready. By default, message is empty.
+  // +optional
+  optional string message = 11;
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
