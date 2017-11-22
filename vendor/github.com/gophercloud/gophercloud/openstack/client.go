@@ -308,8 +308,12 @@ func NewBlockStorageV2(client *gophercloud.ProviderClient, eo gophercloud.Endpoi
 	return initClientOpts(client, eo, "volumev2")
 }
 
-// NewSharedFileSystemV2 creates a ServiceClient that may be used to access the
-// v2 shared file system service.
+// NewBlockStorageV3 creates a ServiceClient that may be used to access the v3 block storage service.
+func NewBlockStorageV3(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	return initClientOpts(client, eo, "volumev3")
+}
+
+// NewSharedFileSystemV2 creates a ServiceClient that may be used to access the v2 shared file system service.
 func NewSharedFileSystemV2(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
 	return initClientOpts(client, eo, "sharev2")
 }
