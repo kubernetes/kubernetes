@@ -22,6 +22,7 @@
 #          source code.
 #    KUBE_GIT_TREE_STATE - "clean" indicates no changes since the git commit id
 #        "dirty" indicates source code changes after the git commit id
+#	 "git-archive" indicates source code was exported through git archive
 #    KUBE_GIT_VERSION - "vX.Y" used to indicate the last release version.
 #    KUBE_GIT_MAJOR - The major part of the version
 #    KUBE_GIT_MINOR - The minor component of the version
@@ -40,8 +41,8 @@ kube::version::get_version_vars() {
   # we likely don't have a git tree, but these magic values may be filled in.
   if [[ '$Format:%%$' == "%" ]]; then
     KUBE_GIT_COMMIT='$Format:%H$'
-    KUBE_GIT_TREE_STATE="git archive"
-    # When a 'git archive' is exported, the '$Format:%D$' below will look
+    KUBE_GIT_TREE_STATE="git-archive"
+    # When a 'git-archive' is exported, the '$Format:%D$' below will look
     # something like 'HEAD -> release-1.8, tag: v1.8.3' where then 'tag: '
     # can be extracted from it.
     if [[ '$Format:%D$' =~ tag:\ (v[^ ]+) ]]; then
