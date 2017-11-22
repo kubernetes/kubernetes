@@ -62,12 +62,15 @@ func (v *SchemaValidation) ValidateBytes(data []byte) error {
 }
 
 func (v *SchemaValidation) validateList(object interface{}) []error {
-	fields := object.(map[string]interface{})
-	if fields == nil {
+	fields, ok := object.(map[string]interface{})
+	if !ok || fields == nil {
 		return []error{errors.New("invalid object to validate")}
 	}
 
 	allErrors := []error{}
+	if _, ok := fields["items"].([]interface{}); !ok {
+		return []error{errors.New("invalid object to validate")}
+	}
 	for _, item := range fields["items"].([]interface{}) {
 		if gvk, errs := getObjectKind(item); errs != nil {
 			allErrors = append(allErrors, errs...)
@@ -102,8 +105,8 @@ func parse(data []byte) (interface{}, error) {
 
 func getObjectKind(object interface{}) (schema.GroupVersionKind, []error) {
 	var listErrors []error
-	fields := object.(map[string]interface{})
-	if fields == nil {
+	fields, ok := object.(map[string]interface{})
+	if !ok || fields == nil {
 		listErrors = append(listErrors, errors.New("invalid object to validate"))
 		return schema.GroupVersionKind{}, listErrors
 	}
