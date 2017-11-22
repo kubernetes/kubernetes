@@ -26,6 +26,7 @@ import (
 const (
 	ControllerRevisionHashLabelKey = "controller-revision-hash"
 	StatefulSetRevisionLabel       = ControllerRevisionHashLabelKey
+	StatefulSetPodNameLabel        = "statefulset.kubernetes.io/pod-name"
 )
 
 // ScaleSpec describes the attributes of a scale subresource

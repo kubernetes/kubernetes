@@ -92,9 +92,9 @@ func TestSearchDisk(t *testing.T) {
 			io:   &fakeIOHandler{},
 		},
 	}
-	disk, dm := searchDisk(fakeMounter)
+	devicePath, error := searchDisk(fakeMounter)
 	// if no disk matches input wwn and lun, exit
-	if disk == "" && dm == "" {
+	if devicePath == "" || error != nil {
 		t.Errorf("no fc disk found")
 	}
 }
@@ -106,9 +106,9 @@ func TestSearchDiskWWID(t *testing.T) {
 			io:    &fakeIOHandler{},
 		},
 	}
-	disk, dm := searchDisk(fakeMounter)
+	devicePath, error := searchDisk(fakeMounter)
 	// if no disk matches input wwid, exit
-	if disk == "" && dm == "" {
+	if devicePath == "" || error != nil {
 		t.Errorf("no fc disk found")
 	}
 }

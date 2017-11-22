@@ -152,63 +152,6 @@ func TestIsOvercommitAllowed(t *testing.T) {
 		})
 	}
 }
-func TestIsOpaqueIntResourceName(t *testing.T) { // resourceName input with the correct OpaqueIntResourceName prefix ("pod.alpha.kubernetes.io/opaque-int-resource-") should pass
-	testCases := []struct {
-		resourceName v1.ResourceName
-		expectVal    bool
-	}{
-		{
-			resourceName: "pod.alpha.kubernetes.io/opaque-int-resource-foo",
-			expectVal:    true, // resourceName should pass because the resourceName has the correct prefix.
-		},
-		{
-			resourceName: "foo",
-			expectVal:    false, // resourceName should fail because the resourceName has the wrong prefix.
-		},
-		{
-			resourceName: "",
-			expectVal:    false, // resourceName should fail, empty resourceName.
-		},
-	}
-
-	for _, tc := range testCases {
-		tc := tc
-		t.Run(fmt.Sprintf("resourceName input=%s, expected value=%v", tc.resourceName, tc.expectVal), func(t *testing.T) {
-			t.Parallel()
-			v := IsOpaqueIntResourceName(tc.resourceName)
-			if v != tc.expectVal {
-				t.Errorf("Got %v but expected %v", v, tc.expectVal)
-			}
-		})
-	}
-}
-
-func TestOpaqueIntResourceName(t *testing.T) { // each output should have the correct appended prefix ("pod.alpha.kubernetes.io/opaque-int-resource-") for opaque counted resources.
-	testCases := []struct {
-		name      string
-		expectVal v1.ResourceName
-	}{
-		{
-			name:      "foo",
-			expectVal: "pod.alpha.kubernetes.io/opaque-int-resource-foo", // append prefix to input string foo
-		},
-		{
-			name:      "",
-			expectVal: "pod.alpha.kubernetes.io/opaque-int-resource-", // append prefix to input empty string
-		},
-	}
-
-	for _, tc := range testCases {
-		tc := tc
-		t.Run(fmt.Sprintf("name input=%s, expected value=%s", tc.name, tc.expectVal), func(t *testing.T) {
-			t.Parallel()
-			v := OpaqueIntResourceName(tc.name)
-			if v != tc.expectVal {
-				t.Errorf("Got %v but expected %v", v, tc.expectVal)
-			}
-		})
-	}
-}
 
 func TestAddToNodeAddresses(t *testing.T) {
 	testCases := []struct {

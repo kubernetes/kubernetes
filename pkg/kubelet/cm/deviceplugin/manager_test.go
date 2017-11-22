@@ -43,8 +43,7 @@ const (
 )
 
 func TestNewManagerImpl(t *testing.T) {
-	verifyCapacityFunc := func(updates v1.ResourceList) {}
-	_, err := newManagerImpl(verifyCapacityFunc, socketName)
+	_, err := newManagerImpl(socketName)
 	require.NoError(t, err)
 }
 
@@ -123,8 +122,7 @@ func TestDevicePluginReRegistration(t *testing.T) {
 }
 
 func setup(t *testing.T, devs []*pluginapi.Device, callback monitorCallback) (Manager, *Stub) {
-	updateCapacity := func(v1.ResourceList) {}
-	m, err := newManagerImpl(updateCapacity, socketName)
+	m, err := newManagerImpl(socketName)
 	require.NoError(t, err)
 
 	m.callback = callback
@@ -132,7 +130,7 @@ func setup(t *testing.T, devs []*pluginapi.Device, callback monitorCallback) (Ma
 	activePods := func() []*v1.Pod {
 		return []*v1.Pod{}
 	}
-	err = m.Start(activePods)
+	err = m.Start(activePods, &sourcesReadyStub{})
 	require.NoError(t, err)
 
 	p := NewDevicePluginStub(devs, pluginSocketName)
@@ -148,12 +146,8 @@ func cleanup(t *testing.T, m Manager, p *Stub) {
 }
 
 func TestUpdateCapacity(t *testing.T) {
-	var expected = v1.ResourceList{}
+	testManager, err := newManagerImpl(socketName)
 	as := assert.New(t)
-	verifyCapacityFunc := func(updates v1.ResourceList) {
-		as.Equal(expected, updates)
-	}
-	testManager, err := newManagerImpl(verifyCapacityFunc, socketName)
 	as.NotNil(testManager)
 	as.Nil(err)
 
@@ -162,23 +156,68 @@ func TestUpdateCapacity(t *testing.T) {
 		{ID: "Device2", Health: pluginapi.Healthy},
 		{ID: "Device3", Health: pluginapi.Unhealthy},
 	}
+	callback := testManager.genericDeviceUpdateCallback
 
-	resourceName := "resource1"
 	// Adds three devices for resource1, two healthy and one unhealthy.
 	// Expects capacity for resource1 to be 2.
-	expected[v1.ResourceName(resourceName)] = *resource.NewQuantity(int64(2), resource.DecimalSI)
-	testManager.callback(resourceName, devs, []pluginapi.Device{}, []pluginapi.Device{})
+	resourceName1 := "domain1.com/resource1"
+	testManager.endpoints[resourceName1] = &endpointImpl{devices: make(map[string]pluginapi.Device)}
+	callback(resourceName1, devs, []pluginapi.Device{}, []pluginapi.Device{})
+	capacity, removedResources := testManager.GetCapacity()
+	resource1Capacity, ok := capacity[v1.ResourceName(resourceName1)]
+	as.True(ok)
+	as.Equal(int64(2), resource1Capacity.Value())
+	as.Equal(0, len(removedResources))
+
 	// Deletes an unhealthy device should NOT change capacity.
-	testManager.callback(resourceName, []pluginapi.Device{}, []pluginapi.Device{}, []pluginapi.Device{devs[2]})
+	callback(resourceName1, []pluginapi.Device{}, []pluginapi.Device{}, []pluginapi.Device{devs[2]})
+	capacity, removedResources = testManager.GetCapacity()
+	resource1Capacity, ok = capacity[v1.ResourceName(resourceName1)]
+	as.True(ok)
+	as.Equal(int64(2), resource1Capacity.Value())
+	as.Equal(0, len(removedResources))
+
 	// Updates a healthy device to unhealthy should reduce capacity by 1.
-	expected[v1.ResourceName(resourceName)] = *resource.NewQuantity(int64(1), resource.DecimalSI)
+	dev2 := devs[1]
+	dev2.Health = pluginapi.Unhealthy
+	callback(resourceName1, []pluginapi.Device{}, []pluginapi.Device{dev2}, []pluginapi.Device{})
+	capacity, removedResources = testManager.GetCapacity()
+	resource1Capacity, ok = capacity[v1.ResourceName(resourceName1)]
+	as.True(ok)
+	as.Equal(int64(1), resource1Capacity.Value())
+	as.Equal(0, len(removedResources))
+
 	// Deletes a healthy device should reduce capacity by 1.
-	expected[v1.ResourceName(resourceName)] = *resource.NewQuantity(int64(0), resource.DecimalSI)
+	callback(resourceName1, []pluginapi.Device{}, []pluginapi.Device{}, []pluginapi.Device{devs[0]})
+	capacity, removedResources = testManager.GetCapacity()
+	resource1Capacity, ok = capacity[v1.ResourceName(resourceName1)]
+	as.True(ok)
+	as.Equal(int64(0), resource1Capacity.Value())
+	as.Equal(0, len(removedResources))
+
 	// Tests adding another resource.
-	delete(expected, v1.ResourceName(resourceName))
 	resourceName2 := "resource2"
-	expected[v1.ResourceName(resourceName2)] = *resource.NewQuantity(int64(2), resource.DecimalSI)
-	testManager.callback(resourceName2, devs, []pluginapi.Device{}, []pluginapi.Device{})
+	testManager.endpoints[resourceName2] = &endpointImpl{devices: make(map[string]pluginapi.Device)}
+	callback(resourceName2, devs, []pluginapi.Device{}, []pluginapi.Device{})
+	capacity, removedResources = testManager.GetCapacity()
+	as.Equal(2, len(capacity))
+	resource2Capacity, ok := capacity[v1.ResourceName(resourceName2)]
+	as.True(ok)
+	as.Equal(int64(2), resource2Capacity.Value())
+	as.Equal(0, len(removedResources))
+
+	// Removes resourceName1 endpoint. Verifies testManager.GetCapacity() reports that resourceName1
+	// is removed from capacity and it no longer exists in allDevices after the call.
+	delete(testManager.endpoints, resourceName1)
+	capacity, removed := testManager.GetCapacity()
+	as.Equal([]string{resourceName1}, removed)
+	_, ok = capacity[v1.ResourceName(resourceName1)]
+	as.False(ok)
+	val, ok := capacity[v1.ResourceName(resourceName2)]
+	as.True(ok)
+	as.Equal(int64(2), val.Value())
+	_, ok = testManager.allDevices[resourceName1]
+	as.False(ok)
 }
 
 type stringPairType struct {
@@ -245,8 +284,19 @@ func TestCheckpoint(t *testing.T) {
 		constructAllocResp(map[string]string{"/dev/r1dev4": "/dev/r1dev4"},
 			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
 
+	testManager.allDevices[resourceName1] = sets.NewString()
+	testManager.allDevices[resourceName1].Insert("dev1")
+	testManager.allDevices[resourceName1].Insert("dev2")
+	testManager.allDevices[resourceName1].Insert("dev3")
+	testManager.allDevices[resourceName1].Insert("dev4")
+	testManager.allDevices[resourceName1].Insert("dev5")
+	testManager.allDevices[resourceName2] = sets.NewString()
+	testManager.allDevices[resourceName2].Insert("dev1")
+	testManager.allDevices[resourceName2].Insert("dev2")
+
 	expectedPodDevices := testManager.podDevices
 	expectedAllocatedDevices := testManager.podDevices.devices()
+	expectedAllDevices := testManager.allDevices
 
 	err := testManager.writeCheckpoint()
 	as := assert.New(t)
@@ -272,6 +322,7 @@ func TestCheckpoint(t *testing.T) {
 		}
 	}
 	as.True(reflect.DeepEqual(expectedAllocatedDevices, testManager.allocatedDevices))
+	as.True(reflect.DeepEqual(expectedAllDevices, testManager.allDevices))
 }
 
 type activePodsStub struct {
@@ -341,6 +392,7 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		endpoints:        make(map[string]endpoint),
 		podDevices:       make(podDevices),
 		activePods:       podsStub.getActivePods,
+		sourcesReady:     &sourcesReadyStub{},
 	}
 
 	testManager.allDevices[resourceName1] = sets.NewString()

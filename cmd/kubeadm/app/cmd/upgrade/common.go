@@ -26,6 +26,7 @@ import (
 
 	"github.com/ghodss/yaml"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
@@ -97,14 +98,9 @@ func printConfiguration(cfg *kubeadmapiext.MasterConfiguration, w io.Writer) {
 }
 
 // runPreflightChecks runs the root preflight check
-func runPreflightChecks(skipPreFlight bool) error {
-	if skipPreFlight {
-		fmt.Println("[preflight] Skipping pre-flight checks.")
-		return nil
-	}
-
+func runPreflightChecks(ignoreChecksErrors sets.String) error {
 	fmt.Println("[preflight] Running pre-flight checks.")
-	return preflight.RunRootCheckOnly()
+	return preflight.RunRootCheckOnly(ignoreChecksErrors)
 }
 
 // getClient gets a real or fake client depending on whether the user is dry-running or not

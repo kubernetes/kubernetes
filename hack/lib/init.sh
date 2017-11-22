@@ -53,7 +53,8 @@ KUBE_OUTPUT_HOSTBIN="${KUBE_OUTPUT_BINPATH}/$(kube::util::host_platform)"
 KUBE_AVAILABLE_GROUP_VERSIONS="${KUBE_AVAILABLE_GROUP_VERSIONS:-\
 v1 \
 admissionregistration.k8s.io/v1alpha1 \
-admission.k8s.io/v1alpha1 \
+admissionregistration.k8s.io/v1beta1 \
+admission.k8s.io/v1beta1 \
 apps/v1beta1 \
 apps/v1beta2 \
 apps/v1 \
@@ -88,7 +89,7 @@ KUBE_NONSERVER_GROUP_VERSIONS="
  abac.authorization.kubernetes.io/v1beta1 \
  componentconfig/v1alpha1 \
  imagepolicy.k8s.io/v1alpha1\
- admission.k8s.io/v1alpha1\
+ admission.k8s.io/v1beta1\
 "
 
 # This emulates "readlink -f" which is not available on MacOS X.

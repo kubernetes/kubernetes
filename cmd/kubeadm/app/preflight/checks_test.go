@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"os"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/utils/exec"
 )
@@ -166,6 +167,10 @@ type preflightCheckTest struct {
 	msg string
 }
 
+func (pfct preflightCheckTest) Name() string {
+	return "preflightCheckTest"
+}
+
 func (pfct preflightCheckTest) Check() (warning, errors []error) {
 	if pfct.msg == "warning" {
 		return []error{fmt.Errorf("warning")}, nil
@@ -218,7 +223,7 @@ func TestRunInitMasterChecks(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := RunInitMasterChecks(exec.New(), rt.cfg, "")
+		actual := RunInitMasterChecks(exec.New(), rt.cfg, "", sets.NewString())
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed RunInitMasterChecks:\n\texpected: %t\n\t  actual: %t\n\t error: %v",
@@ -254,7 +259,7 @@ func TestRunJoinNodeChecks(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := RunJoinNodeChecks(exec.New(), rt.cfg, "")
+		actual := RunJoinNodeChecks(exec.New(), rt.cfg, "", sets.NewString())
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed RunJoinNodeChecks:\n\texpected: %t\n\t  actual: %t",
@@ -272,7 +277,7 @@ func TestRunChecks(t *testing.T) {
 		output   string
 	}{
 		{[]Checker{}, true, ""},
-		{[]Checker{preflightCheckTest{"warning"}}, true, "[preflight] WARNING: warning\n"}, // should just print warning
+		{[]Checker{preflightCheckTest{"warning"}}, true, "\t[WARNING preflightCheckTest]: warning\n"}, // should just print warning
 		{[]Checker{preflightCheckTest{"error"}}, false, ""},
 		{[]Checker{preflightCheckTest{"test"}}, false, ""},
 		{[]Checker{DirAvailableCheck{Path: "/does/not/exist"}}, true, ""},
@@ -281,7 +286,7 @@ func TestRunChecks(t *testing.T) {
 		{[]Checker{FileContentCheck{Path: "/does/not/exist"}}, false, ""},
 		{[]Checker{FileContentCheck{Path: "/"}}, true, ""},
 		{[]Checker{FileContentCheck{Path: "/", Content: []byte("does not exist")}}, false, ""},
-		{[]Checker{InPathCheck{executable: "foobarbaz", exec: exec.New()}}, true, "[preflight] WARNING: foobarbaz not found in system path\n"},
+		{[]Checker{InPathCheck{executable: "foobarbaz", exec: exec.New()}}, true, "\t[WARNING FileExisting-foobarbaz]: foobarbaz not found in system path\n"},
 		{[]Checker{InPathCheck{executable: "foobarbaz", mandatory: true, exec: exec.New()}}, false, ""},
 		{[]Checker{ExtraArgsCheck{
 			APIServerExtraArgs:         map[string]string{"secure-port": "1234"},
@@ -290,14 +295,14 @@ func TestRunChecks(t *testing.T) {
 		}}, true, ""},
 		{[]Checker{ExtraArgsCheck{
 			APIServerExtraArgs: map[string]string{"secure-port": "foo"},
-		}}, true, "[preflight] WARNING: kube-apiserver: failed to parse extra argument --secure-port=foo\n"},
+		}}, true, "\t[WARNING ExtraArgs]: kube-apiserver: failed to parse extra argument --secure-port=foo\n"},
 		{[]Checker{ExtraArgsCheck{
 			APIServerExtraArgs: map[string]string{"invalid-argument": "foo"},
-		}}, true, "[preflight] WARNING: kube-apiserver: failed to parse extra argument --invalid-argument=foo\n"},
+		}}, true, "\t[WARNING ExtraArgs]: kube-apiserver: failed to parse extra argument --invalid-argument=foo\n"},
 	}
 	for _, rt := range tokenTest {
 		buf := new(bytes.Buffer)
-		actual := RunChecks(rt.p, buf)
+		actual := RunChecks(rt.p, buf, sets.NewString())
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed RunChecks:\n\texpected: %t\n\t  actual: %t",

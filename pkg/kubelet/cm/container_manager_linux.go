@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/deviceplugin"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -262,21 +263,9 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		qosContainerManager: qosContainerManager,
 	}
 
-	updateDeviceCapacityFunc := func(updates v1.ResourceList) {
-		cm.Lock()
-		defer cm.Unlock()
-		for k, v := range updates {
-			if v.Value() <= 0 {
-				delete(cm.capacity, k)
-			} else {
-				cm.capacity[k] = v
-			}
-		}
-	}
-
 	glog.Infof("Creating device plugin manager: %t", devicePluginEnabled)
 	if devicePluginEnabled {
-		cm.devicePluginManager, err = deviceplugin.NewManagerImpl(updateDeviceCapacityFunc)
+		cm.devicePluginManager, err = deviceplugin.NewManagerImpl()
 	} else {
 		cm.devicePluginManager, err = deviceplugin.NewManagerStub()
 	}
@@ -530,6 +519,7 @@ func (cm *containerManagerImpl) Status() Status {
 
 func (cm *containerManagerImpl) Start(node *v1.Node,
 	activePods ActivePodsFunc,
+	sourcesReady config.SourcesReady,
 	podStatusProvider status.PodStatusProvider,
 	runtimeService internalapi.RuntimeService) error {
 
@@ -597,7 +587,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	}, time.Second, stopChan)
 
 	// Starts device plugin manager.
-	if err := cm.devicePluginManager.Start(deviceplugin.ActivePodsFunc(activePods)); err != nil {
+	if err := cm.devicePluginManager.Start(deviceplugin.ActivePodsFunc(activePods), sourcesReady); err != nil {
 		return err
 	}
 	return nil
@@ -895,4 +885,8 @@ func (cm *containerManagerImpl) GetCapacity() v1.ResourceList {
 	cm.RLock()
 	defer cm.RUnlock()
 	return cm.capacity
+}
+
+func (cm *containerManagerImpl) GetDevicePluginResourceCapacity() (v1.ResourceList, []string) {
+	return cm.devicePluginManager.GetCapacity()
 }

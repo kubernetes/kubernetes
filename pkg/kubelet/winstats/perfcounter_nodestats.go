@@ -21,9 +21,7 @@ package winstats
 import (
 	"errors"
 	"os"
-	"os/exec"
 	"runtime"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -57,13 +55,16 @@ func (p *perfCounterNodeStatsClient) startMonitoring() error {
 		return err
 	}
 
-	version, err := exec.Command("cmd", "/C", "ver").Output()
+	kernelVersion, err := getKernelVersion()
 	if err != nil {
 		return err
 	}
 
-	osImageVersion := strings.TrimSpace(string(version))
-	kernelVersion := extractVersionNumber(osImageVersion)
+	osImageVersion, err := getOSImageVersion()
+	if err != nil {
+		return err
+	}
+
 	p.nodeInfo = nodeInfo{
 		kernelVersion:               kernelVersion,
 		osImageVersion:              osImageVersion,

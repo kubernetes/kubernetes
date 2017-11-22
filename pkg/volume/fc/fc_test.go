@@ -91,6 +91,11 @@ func (fake *fakeDiskManager) Cleanup() {
 func (fake *fakeDiskManager) MakeGlobalPDName(disk fcDisk) string {
 	return fake.tmpDir
 }
+
+func (fake *fakeDiskManager) MakeGlobalVDPDName(disk fcDisk) string {
+	return fake.tmpDir
+}
+
 func (fake *fakeDiskManager) AttachDisk(b fcDiskMounter) (string, error) {
 	globalPath := b.manager.MakeGlobalPDName(*b.fcDisk)
 	err := os.MkdirAll(globalPath, 0750)
@@ -359,5 +364,42 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 
 	if !mounter.GetAttributes().ReadOnly {
 		t.Errorf("Expected true for mounter.IsReadOnly")
+	}
+}
+
+func Test_getWwnsLun(t *testing.T) {
+	num := int32(0)
+	fc := &v1.FCVolumeSource{
+		TargetWWNs: []string{"500a0981891b8dc5"},
+		FSType:     "ext4",
+		Lun:        &num,
+	}
+	wwn, lun, _, err := getWwnsLunWwids(fc)
+	// if no wwn and lun, exit
+	if (len(wwn) == 0 && lun != "0") || err != nil {
+		t.Errorf("no fc disk found")
+	}
+}
+
+func Test_getWwids(t *testing.T) {
+	fc := &v1.FCVolumeSource{
+		FSType: "ext4",
+		WWIDs:  []string{"3600508b400105e210000900000490000"},
+	}
+	_, _, wwid, err := getWwnsLunWwids(fc)
+	// if no wwn and lun, exit
+	if len(wwid) == 0 || err != nil {
+		t.Errorf("no fc disk found")
+	}
+}
+
+func Test_getWwnsLunWwidsError(t *testing.T) {
+	fc := &v1.FCVolumeSource{
+		FSType: "ext4",
+	}
+	wwn, lun, wwid, err := getWwnsLunWwids(fc)
+	// expected no wwn and lun and wwid
+	if (len(wwn) != 0 && lun != "" && len(wwid) != 0) || err == nil {
+		t.Errorf("unexpected fc disk found")
 	}
 }

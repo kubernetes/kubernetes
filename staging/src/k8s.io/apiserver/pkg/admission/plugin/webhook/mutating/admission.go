@@ -27,8 +27,8 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/golang/glog"
 
-	admissionv1alpha1 "k8s.io/api/admission/v1alpha1"
-	"k8s.io/api/admissionregistration/v1alpha1"
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -70,7 +70,7 @@ func Register(plugins *admission.Plugins) {
 // WebhookSource can list dynamic webhook plugins.
 type WebhookSource interface {
 	Run(stopCh <-chan struct{})
-	Webhooks() (*v1alpha1.MutatingWebhookConfiguration, error)
+	Webhooks() (*v1beta1.MutatingWebhookConfiguration, error)
 }
 
 // NewMutatingWebhook returns a generic admission webhook plugin.
@@ -134,7 +134,7 @@ func (a *MutatingWebhook) SetServiceResolver(sr config.ServiceResolver) {
 func (a *MutatingWebhook) SetScheme(scheme *runtime.Scheme) {
 	if scheme != nil {
 		a.clientManager.SetNegotiatedSerializer(serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{
-			Serializer: serializer.NewCodecFactory(scheme).LegacyCodec(admissionv1alpha1.SchemeGroupVersion),
+			Serializer: serializer.NewCodecFactory(scheme).LegacyCodec(admissionv1beta1.SchemeGroupVersion),
 		}))
 		a.convertor.Scheme = scheme
 		a.jsonSerializer = json.NewSerializer(json.DefaultMetaFactory, scheme, scheme, false)
@@ -144,7 +144,7 @@ func (a *MutatingWebhook) SetScheme(scheme *runtime.Scheme) {
 // WantsExternalKubeClientSet defines a function which sets external ClientSet for admission plugins that need it
 func (a *MutatingWebhook) SetExternalKubeClientSet(client clientset.Interface) {
 	a.namespaceMatcher.Client = client
-	a.hookSource = configuration.NewMutatingWebhookConfigurationManager(client.AdmissionregistrationV1alpha1().MutatingWebhookConfigurations())
+	a.hookSource = configuration.NewMutatingWebhookConfigurationManager(client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations())
 }
 
 // SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
@@ -175,11 +175,11 @@ func (a *MutatingWebhook) ValidateInitialization() error {
 	return nil
 }
 
-func (a *MutatingWebhook) loadConfiguration(attr admission.Attributes) (*v1alpha1.MutatingWebhookConfiguration, error) {
+func (a *MutatingWebhook) loadConfiguration(attr admission.Attributes) (*v1beta1.MutatingWebhookConfiguration, error) {
 	hookConfig, err := a.hookSource.Webhooks()
 	// if Webhook configuration is disabled, fail open
 	if err == configuration.ErrDisabled {
-		return &v1alpha1.MutatingWebhookConfiguration{}, nil
+		return &v1beta1.MutatingWebhookConfiguration{}, nil
 	}
 	if err != nil {
 		e := apierrors.NewServerTimeout(attr.GetResource().GroupResource(), string(attr.GetOperation()), 1)
@@ -203,7 +203,7 @@ func (a *MutatingWebhook) Admit(attr admission.Attributes) error {
 	hooks := hookConfig.Webhooks
 	ctx := context.TODO()
 
-	var relevantHooks []*v1alpha1.Webhook
+	var relevantHooks []*v1beta1.Webhook
 	for i := range hooks {
 		call, err := a.shouldCallHook(&hooks[i], attr)
 		if err != nil {
@@ -246,7 +246,7 @@ func (a *MutatingWebhook) Admit(attr admission.Attributes) error {
 			continue
 		}
 
-		ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1alpha1.Ignore
+		ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
 		if callErr, ok := err.(*webhookerrors.ErrCallingWebhook); ok {
 			if ignoreClientCallFailures {
 				glog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
@@ -263,7 +263,7 @@ func (a *MutatingWebhook) Admit(attr admission.Attributes) error {
 }
 
 // TODO: factor into a common place along with the validating webhook version.
-func (a *MutatingWebhook) shouldCallHook(h *v1alpha1.Webhook, attr admission.Attributes) (bool, *apierrors.StatusError) {
+func (a *MutatingWebhook) shouldCallHook(h *v1beta1.Webhook, attr admission.Attributes) (bool, *apierrors.StatusError) {
 	var matches bool
 	for _, r := range h.Rules {
 		m := rules.Matcher{Rule: r, Attr: attr}
@@ -280,14 +280,14 @@ func (a *MutatingWebhook) shouldCallHook(h *v1alpha1.Webhook, attr admission.Att
 }
 
 // note that callAttrMutatingHook updates attr
-func (a *MutatingWebhook) callAttrMutatingHook(ctx context.Context, h *v1alpha1.Webhook, attr versioned.Attributes) error {
+func (a *MutatingWebhook) callAttrMutatingHook(ctx context.Context, h *v1beta1.Webhook, attr versioned.Attributes) error {
 	// Make the webhook request
 	request := request.CreateAdmissionReview(attr)
 	client, err := a.clientManager.HookClient(h)
 	if err != nil {
 		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
-	response := &admissionv1alpha1.AdmissionReview{}
+	response := &admissionv1beta1.AdmissionReview{}
 	if err := client.Post().Context(ctx).Body(&request).Do().Into(response); err != nil {
 		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}

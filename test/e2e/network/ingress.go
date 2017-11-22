@@ -49,7 +49,6 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 	f := framework.NewDefaultFramework("ingress")
 
 	BeforeEach(func() {
-		f.BeforeEach()
 		jig = framework.NewIngressTestJig(f.ClientSet)
 		ns = f.Namespace.Name
 		cloudConfig = framework.TestContext.CloudConfig

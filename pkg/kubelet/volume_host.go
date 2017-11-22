@@ -86,8 +86,16 @@ type kubeletVolumeHost struct {
 	mountPodManager  mountpod.Manager
 }
 
+func (kvh *kubeletVolumeHost) GetVolumeDevicePluginDir(pluginName string) string {
+	return kvh.kubelet.getVolumeDevicePluginDir(pluginName)
+}
+
 func (kvh *kubeletVolumeHost) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
 	return kvh.kubelet.getPodVolumeDir(podUID, pluginName, volumeName)
+}
+
+func (kvh *kubeletVolumeHost) GetPodVolumeDeviceDir(podUID types.UID, pluginName string) string {
+	return kvh.kubelet.getPodVolumeDeviceDir(podUID, pluginName)
 }
 
 func (kvh *kubeletVolumeHost) GetPodPluginDir(podUID types.UID, pluginName string) string {

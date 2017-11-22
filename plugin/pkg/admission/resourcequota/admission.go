@@ -28,6 +28,7 @@ import (
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/quota"
 	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
+	resourcequotaapiv1alpha1 "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota/v1alpha1"
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota/validation"
 )
 
@@ -48,6 +49,10 @@ func Register(plugins *admission.Plugins) {
 			}
 			return NewResourceQuota(configuration, 5, make(chan struct{}))
 		})
+
+	// add our config types
+	resourcequotaapi.AddToScheme(plugins.ConfigScheme)
+	resourcequotaapiv1alpha1.AddToScheme(plugins.ConfigScheme)
 }
 
 // QuotaAdmission implements an admission controller that can enforce quota constraints

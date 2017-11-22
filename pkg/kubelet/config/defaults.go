@@ -19,6 +19,7 @@ package config
 const (
 	DefaultKubeletPodsDirName             = "pods"
 	DefaultKubeletVolumesDirName          = "volumes"
+	DefaultKubeletVolumeDevicesDirName    = "volumeDevices"
 	DefaultKubeletPluginsDirName          = "plugins"
 	DefaultKubeletContainersDirName       = "containers"
 	DefaultKubeletPluginContainersDirName = "plugin-containers"

@@ -21,8 +21,9 @@ package informers
 import (
 	"fmt"
 	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
+	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/api/apps/v1"
-	v1beta1 "k8s.io/api/apps/v1beta1"
+	apps_v1beta1 "k8s.io/api/apps/v1beta1"
 	v1beta2 "k8s.io/api/apps/v1beta2"
 	autoscaling_v1 "k8s.io/api/autoscaling/v1"
 	v2beta1 "k8s.io/api/autoscaling/v2beta1"
@@ -75,10 +76,12 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	// Group=admissionregistration.k8s.io, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithResource("initializerconfigurations"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Admissionregistration().V1alpha1().InitializerConfigurations().Informer()}, nil
-	case v1alpha1.SchemeGroupVersion.WithResource("mutatingwebhookconfigurations"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Admissionregistration().V1alpha1().MutatingWebhookConfigurations().Informer()}, nil
-	case v1alpha1.SchemeGroupVersion.WithResource("validatingwebhookconfigurations"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Admissionregistration().V1alpha1().ValidatingWebhookConfigurations().Informer()}, nil
+
+		// Group=admissionregistration.k8s.io, Version=v1beta1
+	case v1beta1.SchemeGroupVersion.WithResource("mutatingwebhookconfigurations"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Admissionregistration().V1beta1().MutatingWebhookConfigurations().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("validatingwebhookconfigurations"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Admissionregistration().V1beta1().ValidatingWebhookConfigurations().Informer()}, nil
 
 		// Group=apps, Version=v1
 	case v1.SchemeGroupVersion.WithResource("controllerrevisions"):
@@ -93,11 +96,11 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1().StatefulSets().Informer()}, nil
 
 		// Group=apps, Version=v1beta1
-	case v1beta1.SchemeGroupVersion.WithResource("controllerrevisions"):
+	case apps_v1beta1.SchemeGroupVersion.WithResource("controllerrevisions"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().ControllerRevisions().Informer()}, nil
-	case v1beta1.SchemeGroupVersion.WithResource("deployments"):
+	case apps_v1beta1.SchemeGroupVersion.WithResource("deployments"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().Deployments().Informer()}, nil
-	case v1beta1.SchemeGroupVersion.WithResource("statefulsets"):
+	case apps_v1beta1.SchemeGroupVersion.WithResource("statefulsets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().StatefulSets().Informer()}, nil
 
 		// Group=apps, Version=v1beta2

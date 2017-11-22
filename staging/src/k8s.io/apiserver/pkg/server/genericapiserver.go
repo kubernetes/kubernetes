@@ -100,9 +100,6 @@ type GenericAPIServer struct {
 
 	SecureServingInfo *SecureServingInfo
 
-	// numerical ports, set after listening
-	effectiveSecurePort int
-
 	// ExternalAddress is the address (hostname or IP and port) that should be used in
 	// external (public internet) URLs for this GenericAPIServer.
 	ExternalAddress string
@@ -336,11 +333,6 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 	}
 
 	return nil
-}
-
-// EffectiveSecurePort returns the secure port we bound to.
-func (s *GenericAPIServer) EffectiveSecurePort() int {
-	return s.effectiveSecurePort
 }
 
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource

@@ -30,10 +30,9 @@ import (
 )
 
 // IsExtendedResourceName returns true if the resource name is not in the
-// default namespace, or it has the opaque integer resource prefix.
+// default namespace.
 func IsExtendedResourceName(name v1.ResourceName) bool {
-	// TODO: Remove OIR part following deprecation.
-	return !IsDefaultNamespaceResource(name) || IsOpaqueIntResourceName(name)
+	return !IsDefaultNamespaceResource(name)
 }
 
 // IsDefaultNamespaceResource returns true if the resource name is in the
@@ -67,22 +66,6 @@ func HugePageSizeFromResourceName(name v1.ResourceName) (resource.Quantity, erro
 	}
 	pageSize := strings.TrimPrefix(string(name), v1.ResourceHugePagesPrefix)
 	return resource.ParseQuantity(pageSize)
-}
-
-// IsOpaqueIntResourceName returns true if the resource name has the opaque
-// integer resource prefix.
-func IsOpaqueIntResourceName(name v1.ResourceName) bool {
-	return strings.HasPrefix(string(name), v1.ResourceOpaqueIntPrefix)
-}
-
-// OpaqueIntResourceName returns a ResourceName with the canonical opaque
-// integer prefix prepended. If the argument already has the prefix, it is
-// returned unmodified.
-func OpaqueIntResourceName(name string) v1.ResourceName {
-	if IsOpaqueIntResourceName(v1.ResourceName(name)) {
-		return v1.ResourceName(name)
-	}
-	return v1.ResourceName(fmt.Sprintf("%s%s", v1.ResourceOpaqueIntPrefix, name))
 }
 
 var overcommitBlacklist = sets.NewString(string(v1.ResourceNvidiaGPU))

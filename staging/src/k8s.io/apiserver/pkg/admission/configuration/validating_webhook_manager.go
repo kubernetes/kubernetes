@@ -22,14 +22,14 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type ValidatingWebhookConfigurationLister interface {
-	List(opts metav1.ListOptions) (*v1alpha1.ValidatingWebhookConfigurationList, error)
+	List(opts metav1.ListOptions) (*v1beta1.ValidatingWebhookConfigurationList, error)
 }
 
 // ValidatingWebhookConfigurationManager collects the validating webhook objects so that they can be called.
@@ -56,12 +56,12 @@ func NewValidatingWebhookConfigurationManager(c ValidatingWebhookConfigurationLi
 }
 
 // Webhooks returns the merged ValidatingWebhookConfiguration.
-func (im *ValidatingWebhookConfigurationManager) Webhooks() (*v1alpha1.ValidatingWebhookConfiguration, error) {
+func (im *ValidatingWebhookConfigurationManager) Webhooks() (*v1beta1.ValidatingWebhookConfiguration, error) {
 	configuration, err := im.poller.configuration()
 	if err != nil {
 		return nil, err
 	}
-	validatingWebhookConfiguration, ok := configuration.(*v1alpha1.ValidatingWebhookConfiguration)
+	validatingWebhookConfiguration, ok := configuration.(*v1beta1.ValidatingWebhookConfiguration)
 	if !ok {
 		return nil, fmt.Errorf("expected type %v, got type %v", reflect.TypeOf(validatingWebhookConfiguration), reflect.TypeOf(configuration))
 	}
@@ -73,10 +73,10 @@ func (im *ValidatingWebhookConfigurationManager) Run(stopCh <-chan struct{}) {
 }
 
 func mergeValidatingWebhookConfigurations(
-	list *v1alpha1.ValidatingWebhookConfigurationList,
-) *v1alpha1.ValidatingWebhookConfiguration {
+	list *v1beta1.ValidatingWebhookConfigurationList,
+) *v1beta1.ValidatingWebhookConfiguration {
 	configurations := list.Items
-	var ret v1alpha1.ValidatingWebhookConfiguration
+	var ret v1beta1.ValidatingWebhookConfiguration
 	for _, c := range configurations {
 		ret.Webhooks = append(ret.Webhooks, c.Webhooks...)
 	}

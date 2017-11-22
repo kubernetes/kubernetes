@@ -26,6 +26,7 @@ import (
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -38,7 +39,7 @@ type unsupportedContainerManager struct {
 
 var _ ContainerManager = &unsupportedContainerManager{}
 
-func (unsupportedContainerManager) Start(_ *v1.Node, _ ActivePodsFunc, _ status.PodStatusProvider, _ internalapi.RuntimeService) error {
+func (unsupportedContainerManager) Start(_ *v1.Node, _ ActivePodsFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService) error {
 	return fmt.Errorf("Container Manager is unsupported in this build")
 }
 
@@ -72,6 +73,10 @@ func (cm *unsupportedContainerManager) GetNodeAllocatableReservation() v1.Resour
 
 func (cm *unsupportedContainerManager) GetCapacity() v1.ResourceList {
 	return nil
+}
+
+func (cm *unsupportedContainerManager) GetDevicePluginResourceCapacity() (v1.ResourceList, []string) {
+	return nil, []string{}
 }
 
 func (cm *unsupportedContainerManager) NewPodContainerManager() PodContainerManager {

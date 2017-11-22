@@ -175,7 +175,8 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 		return false, fmt.Errorf("external etcd cannot be upgraded with kubeadm")
 	}
 	// Checking health state of etcd before proceeding with the upgrtade
-	etcdStatus, err := util.GetEtcdClusterStatus()
+	etcdCluster := util.LocalEtcdCluster{}
+	etcdStatus, err := etcdCluster.GetEtcdClusterStatus()
 	if err != nil {
 		return true, fmt.Errorf("etcd cluster is not healthy: %v", err)
 	}
@@ -222,7 +223,7 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 	}
 
 	// Checking health state of etcd after the upgrade
-	etcdStatus, err = util.GetEtcdClusterStatus()
+	etcdStatus, err = etcdCluster.GetEtcdClusterStatus()
 	if err != nil {
 		return true, rollbackEtcdData(cfg, fmt.Errorf("etcd cluster is not healthy after upgrade: %v rolling back", err), pathMgr)
 	}

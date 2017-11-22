@@ -275,6 +275,13 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 			glog.Errorf("Encountered error for creating alpha feature gate: %v", err)
 		}
 		cloudConfig.AlphaFeatureGate = alphaFeatureGate
+	} else {
+		// initialize AlphaFeatureGate when no AlphaFeatures are configured.
+		alphaFeatureGate, err := NewAlphaFeatureGate([]string{})
+		if err != nil {
+			glog.Errorf("Encountered error for initializing alpha feature gate: %v", err)
+		}
+		cloudConfig.AlphaFeatureGate = alphaFeatureGate
 	}
 
 	// retrieve projectID and zone

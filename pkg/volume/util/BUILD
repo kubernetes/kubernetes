@@ -18,6 +18,7 @@ go_library(
         "io_util.go",
         "metrics.go",
         "util.go",
+        "util_unsupported.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:darwin_amd64": [
             "fs.go",
@@ -25,6 +26,7 @@ go_library(
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "device_util_linux.go",
             "fs.go",
+            "util_linux.go",
         ],
         "//conditions:default": [],
     }),

@@ -295,7 +295,9 @@ data:
         errors
         log stdout
         health
-        kubernetes {{ .DNSDomain }} {{ .ServiceCIDR }}
+        kubernetes {{ .DNSDomain }} {{ .ServiceCIDR }} {
+           pods insecure
+        }
         prometheus
         proxy . /etc/resolv.conf
         cache 30
