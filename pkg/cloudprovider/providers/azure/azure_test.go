@@ -392,6 +392,36 @@ func TestReconcileLoadBalancerAddServiceOnInternalSubnet(t *testing.T) {
 	validateLoadBalancer(t, lb, svc)
 }
 
+func TestReconcileSecurityGroupFromAnyDestinationAddressPrefixToLoadBalancerIP(t *testing.T) {
+	az := getTestCloud()
+	svc1 := getTestService("serviceea", v1.ProtocolTCP, 80)
+	svc1.Spec.LoadBalancerIP = "192.168.0.0"
+	sg := getTestSecurityGroup(az)
+	// Simulate a pre-Kubernetes 1.8 NSG, where we do not specify the destination address prefix
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(""), true)
+	if err != nil {
+		t.Errorf("Unexpected error: %q", err)
+	}
+	sg, err = az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
+	if err != nil {
+		t.Errorf("Unexpected error: %q", err)
+	}
+	validateSecurityGroup(t, sg, svc1)
+}
+
+func TestReconcileSecurityGroupDynamicLoadBalancerIP(t *testing.T) {
+	az := getTestCloud()
+	svc1 := getTestService("servicea", v1.ProtocolTCP, 80)
+	svc1.Spec.LoadBalancerIP = ""
+	sg := getTestSecurityGroup(az)
+	dynamicallyAssignedIP := "192.168.0.0"
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(dynamicallyAssignedIP), true)
+	if err != nil {
+		t.Errorf("unexpected error: %q", err)
+	}
+	validateSecurityGroup(t, sg, svc1)
+}
+
 // Test addition of services on an internal LB using both default and explicit subnets.
 func TestReconcileLoadBalancerAddServicesOnMultipleSubnets(t *testing.T) {
 	az := getTestCloud()

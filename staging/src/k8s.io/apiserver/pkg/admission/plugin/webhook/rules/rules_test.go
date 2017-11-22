@@ -19,7 +19,7 @@ package rules
 import (
 	"testing"
 
-	adreg "k8s.io/api/admissionregistration/v1alpha1"
+	adreg "k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 )

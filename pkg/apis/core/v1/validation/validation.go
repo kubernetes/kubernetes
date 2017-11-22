@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/golang/glog"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -105,12 +103,6 @@ func ValidateNonnegativeQuantity(value resource.Quantity, fldPath *field.Path) f
 // Validate compute resource typename.
 // Refer to docs/design/resources.md for more details.
 func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
-	// Opaque integer resources (OIR) deprecation began in v1.8
-	// TODO: Remove warning after OIR deprecation cycle.
-	if v1helper.IsOpaqueIntResourceName(v1.ResourceName(value)) {
-		glog.Errorf("DEPRECATION WARNING! Opaque integer resources are deprecated starting with v1.8: %s", value)
-	}
-
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsQualifiedName(value) {
 		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))

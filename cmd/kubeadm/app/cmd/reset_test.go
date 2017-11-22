@@ -195,6 +195,10 @@ func (c *fakeDockerChecker) Check() (warnings, errors []error) {
 	return c.warnings, c.errors
 }
 
+func (c *fakeDockerChecker) Name() string {
+	return "FakeDocker"
+}
+
 func newFakeDockerChecker(warnings, errors []error) preflight.Checker {
 	return &fakeDockerChecker{warnings: warnings, errors: errors}
 }

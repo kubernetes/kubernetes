@@ -40,13 +40,19 @@ type genFakeForGroup struct {
 	// types in this group
 	types   []*types.Type
 	imports namer.ImportTracker
+	// If the genGroup has been called. This generator should only execute once.
+	called bool
 }
 
 var _ generator.Generator = &genFakeForGroup{}
 
 // We only want to call GenerateType() once per group.
 func (g *genFakeForGroup) Filter(c *generator.Context, t *types.Type) bool {
-	return len(g.types) == 0 || t == g.types[0]
+	if !g.called {
+		g.called = true
+		return true
+	}
+	return false
 }
 
 func (g *genFakeForGroup) Namers(c *generator.Context) namer.NameSystems {
@@ -56,7 +62,10 @@ func (g *genFakeForGroup) Namers(c *generator.Context) namer.NameSystems {
 }
 
 func (g *genFakeForGroup) Imports(c *generator.Context) (imports []string) {
-	imports = append(g.imports.ImportLines(), strings.ToLower(fmt.Sprintf("%s \"%s\"", filepath.Base(g.realClientPackage), g.realClientPackage)))
+	imports = g.imports.ImportLines()
+	if len(g.types) != 0 {
+		imports = append(imports, strings.ToLower(fmt.Sprintf("%s \"%s\"", filepath.Base(g.realClientPackage), g.realClientPackage)))
+	}
 	return imports
 }
 

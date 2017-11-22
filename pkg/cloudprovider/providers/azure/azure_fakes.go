@@ -339,6 +339,10 @@ func (fIC fakeAzureInterfacesClient) Get(resourceGroupName string, networkInterf
 	}
 }
 
+func (fIC fakeAzureInterfacesClient) GetVirtualMachineScaleSetNetworkInterface(resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, expand string) (result network.Interface, err error) {
+	return result, nil
+}
+
 type fakeAzureVirtualMachinesClient struct {
 	mutex     *sync.Mutex
 	FakeStore map[string]map[string]compute.VirtualMachine

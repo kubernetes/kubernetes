@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -581,6 +582,10 @@ func (testcase *testcase) GetDevicePath(volumeID string) string {
 
 func (testcase *testcase) InstanceID() (string, error) {
 	return testcase.instanceID, nil
+}
+
+func (testcase *testcase) ExpandVolume(volumeID string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error) {
+	return resource.Quantity{}, nil
 }
 
 func (testcase *testcase) DeleteVolume(volumeID string) error {

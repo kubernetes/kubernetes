@@ -27,6 +27,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
+	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 )
 
 func TestRemoveTerminatedContainerInfo(t *testing.T) {
@@ -79,17 +80,21 @@ func TestCadvisorListPodStats(t *testing.T) {
 		namespace2 = "test2"
 	)
 	const (
-		seedRoot           = 0
-		seedRuntime        = 100
-		seedKubelet        = 200
-		seedMisc           = 300
-		seedPod0Infra      = 1000
-		seedPod0Container0 = 2000
-		seedPod0Container1 = 2001
-		seedPod1Infra      = 3000
-		seedPod1Container  = 4000
-		seedPod2Infra      = 5000
-		seedPod2Container  = 6000
+		seedRoot              = 0
+		seedRuntime           = 100
+		seedKubelet           = 200
+		seedMisc              = 300
+		seedPod0Infra         = 1000
+		seedPod0Container0    = 2000
+		seedPod0Container1    = 2001
+		seedPod1Infra         = 3000
+		seedPod1Container     = 4000
+		seedPod2Infra         = 5000
+		seedPod2Container     = 6000
+		seedEphemeralVolume1  = 10000
+		seedEphemeralVolume2  = 10001
+		seedPersistentVolume1 = 20000
+		seedPersistentVolume2 = 20001
 	)
 	const (
 		pName0 = "pod0"
@@ -181,7 +186,16 @@ func TestCadvisorListPodStats(t *testing.T) {
 	mockRuntime.
 		On("ImageStats").Return(&kubecontainer.ImageStats{TotalStorageBytes: 123}, nil)
 
-	resourceAnalyzer := &fakeResourceAnalyzer{}
+	ephemeralVolumes := []statsapi.VolumeStats{getPodVolumeStats(seedEphemeralVolume1, "ephemeralVolume1"),
+		getPodVolumeStats(seedEphemeralVolume2, "ephemeralVolume2")}
+	persistentVolumes := []statsapi.VolumeStats{getPodVolumeStats(seedPersistentVolume1, "persistentVolume1"),
+		getPodVolumeStats(seedPersistentVolume2, "persistentVolume2")}
+	volumeStats := serverstats.PodVolumeStats{
+		EphemeralVolumes:  ephemeralVolumes,
+		PersistentVolumes: persistentVolumes,
+	}
+
+	resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: volumeStats}
 
 	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, nil, mockRuntime)
 	pods, err := p.ListPodStats()
@@ -213,6 +227,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 
 	assert.EqualValues(t, testTime(creationTime, seedPod0Infra).Unix(), ps.StartTime.Time.Unix())
 	checkNetworkStats(t, "Pod0", seedPod0Infra, ps.Network)
+	checkEphemeralStats(t, "Pod0", []int{seedPod0Container0, seedPod0Container1}, []int{seedEphemeralVolume1, seedEphemeralVolume2}, ps.EphemeralStorage)
 
 	// Validate Pod1 Results
 	ps, found = indexPods[prf1]

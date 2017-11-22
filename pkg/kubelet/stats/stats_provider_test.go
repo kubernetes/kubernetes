@@ -59,6 +59,7 @@ const (
 	offsetFsTotalUsageBytes
 	offsetFsBaseUsageBytes
 	offsetFsInodeUsage
+	offsetVolume
 )
 
 var (
@@ -456,6 +457,28 @@ func getTestFsInfo(seed int) cadvisorapiv2.FsInfo {
 	}
 }
 
+func getPodVolumeStats(seed int, volumeName string) statsapi.VolumeStats {
+	availableBytes := uint64(seed + offsetFsAvailable)
+	capacityBytes := uint64(seed + offsetFsCapacity)
+	usedBytes := uint64(seed + offsetFsUsage)
+	inodes := uint64(seed + offsetFsInodes)
+	inodesFree := uint64(seed + offsetFsInodesFree)
+	inodesUsed := uint64(seed + offsetFsInodeUsage)
+	fsStats := statsapi.FsStats{
+		Time:           metav1.NewTime(time.Now()),
+		AvailableBytes: &availableBytes,
+		CapacityBytes:  &capacityBytes,
+		UsedBytes:      &usedBytes,
+		Inodes:         &inodes,
+		InodesFree:     &inodesFree,
+		InodesUsed:     &inodesUsed,
+	}
+	return statsapi.VolumeStats{
+		FsStats: fsStats,
+		Name:    volumeName,
+	}
+}
+
 func generateCustomMetricSpec() []cadvisorapiv1.MetricSpec {
 	f := fuzz.New().NilChance(0).Funcs(
 		func(e *cadvisorapiv1.MetricSpec, c fuzz.Continue) {
@@ -540,6 +563,20 @@ func checkFsStats(t *testing.T, label string, seed int, stats *statsapi.FsStats)
 	assert.EqualValues(t, seed+offsetFsAvailable, *stats.AvailableBytes, label+".AvailableBytes")
 	assert.EqualValues(t, seed+offsetFsInodes, *stats.Inodes, label+".Inodes")
 	assert.EqualValues(t, seed+offsetFsInodesFree, *stats.InodesFree, label+".InodesFree")
+}
+
+func checkEphemeralStats(t *testing.T, label string, containerSeeds []int, volumeSeeds []int, stats *statsapi.FsStats) {
+	var usedBytes, inodeUsage int
+	for _, cseed := range containerSeeds {
+		usedBytes = usedBytes + cseed + offsetFsTotalUsageBytes
+		inodeUsage += cseed + offsetFsInodeUsage
+	}
+	for _, vseed := range volumeSeeds {
+		usedBytes = usedBytes + vseed + offsetFsUsage
+		inodeUsage += vseed + offsetFsInodeUsage
+	}
+	assert.EqualValues(t, usedBytes, int(*stats.UsedBytes), label+".UsedBytes")
+	assert.EqualValues(t, inodeUsage, int(*stats.InodesUsed), label+".InodesUsed")
 }
 
 type fakeResourceAnalyzer struct {

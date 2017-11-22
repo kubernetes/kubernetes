@@ -19,7 +19,7 @@ package namespace
 import (
 	"fmt"
 
-	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -86,7 +86,7 @@ func (m *Matcher) GetNamespaceLabels(attr admission.Attributes) (map[string]stri
 
 // MatchNamespaceSelector decideds whether the request matches the
 // namespaceSelctor of the webhook. Only when they match, the webhook is called.
-func (m *Matcher) MatchNamespaceSelector(h *v1alpha1.Webhook, attr admission.Attributes) (bool, *apierrors.StatusError) {
+func (m *Matcher) MatchNamespaceSelector(h *v1beta1.Webhook, attr admission.Attributes) (bool, *apierrors.StatusError) {
 	namespaceName := attr.GetNamespace()
 	if len(namespaceName) == 0 && attr.GetResource().Resource != "namespaces" {
 		// If the request is about a cluster scoped resource, and it is not a

@@ -22,7 +22,7 @@ limitations under the License.
 // pods that are already tried and are determined to be unschedulable. The latter
 // is called unschedulableQ.
 // FIFO is here for flag-gating purposes and allows us to use the traditional
-// scheduling queue when Pod Priority flag is false.
+// scheduling queue when util.PodPriorityEnabled() returns false.
 
 package core
 
@@ -34,6 +34,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/util"
@@ -217,6 +218,11 @@ func (p *PriorityQueue) AddIfNotPresent(pod *v1.Pod) error {
 	return err
 }
 
+func isPodUnschedulable(pod *v1.Pod) bool {
+	_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
+	return cond != nil && cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonUnschedulable
+}
+
 // AddUnschedulableIfNotPresent does nothing if the pod is present in either
 // queue. Otherwise it adds the pod to the unschedulable queue if
 // p.receivedMoveRequest is false, and to the activeQ if p.receivedMoveRequest is true.
@@ -229,11 +235,15 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pod *v1.Pod) error {
 	if _, exists, _ := p.activeQ.Get(pod); exists {
 		return fmt.Errorf("pod is already present in the activeQ")
 	}
-	if p.receivedMoveRequest {
-		return p.activeQ.Add(pod)
+	if !p.receivedMoveRequest && isPodUnschedulable(pod) {
+		p.unschedulableQ.Add(pod)
+		return nil
 	}
-	p.unschedulableQ.Add(pod)
-	return nil
+	err := p.activeQ.Add(pod)
+	if err == nil {
+		p.cond.Broadcast()
+	}
+	return err
 }
 
 // Pop removes the head of the active queue and returns it. It blocks if the
@@ -259,6 +269,7 @@ func isPodUpdated(oldPod, newPod *v1.Pod) bool {
 	strip := func(pod *v1.Pod) *v1.Pod {
 		p := pod.DeepCopy()
 		p.ResourceVersion = ""
+		p.Generation = 0
 		p.Status = v1.PodStatus{}
 		return p
 	}
@@ -274,15 +285,12 @@ func (p *PriorityQueue) Update(pod *v1.Pod) error {
 	// If the pod is already in the active queue, just update it there.
 	if _, exists, _ := p.activeQ.Get(pod); exists {
 		err := p.activeQ.Update(pod)
-		if err == nil {
-			p.cond.Broadcast()
-		}
 		return err
 	}
 	// If the pod is in the unschedulable queue, updating it may make it schedulable.
 	if oldPod := p.unschedulableQ.Get(pod); oldPod != nil {
 		if isPodUpdated(oldPod, pod) {
-			p.unschedulableQ.Delete(pod)
+			p.unschedulableQ.Delete(oldPod)
 			err := p.activeQ.Add(pod)
 			if err == nil {
 				p.cond.Broadcast()
@@ -386,7 +394,18 @@ func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *v1.Pod
 // but they are waiting for other pods to be removed from the node before they
 // can be actually scheduled.
 func (p *PriorityQueue) WaitingPodsForNode(nodeName string) []*v1.Pod {
-	return p.unschedulableQ.GetPodsWaitingForNode(nodeName)
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	pods := p.unschedulableQ.GetPodsWaitingForNode(nodeName)
+	for _, obj := range p.activeQ.List() {
+		pod := obj.(*v1.Pod)
+		if pod.Annotations != nil {
+			if n, ok := pod.Annotations[NominatedNodeAnnotationKey]; ok && n == nodeName {
+				pods = append(pods, pod)
+			}
+		}
+	}
+	return pods
 }
 
 // UnschedulablePodsMap holds pods that cannot be scheduled. This data structure

@@ -17,7 +17,7 @@ limitations under the License.
 package request
 
 import (
-	admissionv1alpha1 "k8s.io/api/admission/v1alpha1"
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,7 +26,7 @@ import (
 )
 
 // CreateAdmissionReview creates an AdmissionReview for the provided admission.Attributes
-func CreateAdmissionReview(attr admission.Attributes) admissionv1alpha1.AdmissionReview {
+func CreateAdmissionReview(attr admission.Attributes) admissionv1beta1.AdmissionReview {
 	gvk := attr.GetKind()
 	gvr := attr.GetResource()
 	aUserInfo := attr.GetUserInfo()
@@ -42,8 +42,8 @@ func CreateAdmissionReview(attr admission.Attributes) admissionv1alpha1.Admissio
 		userInfo.Extra[key] = authenticationv1.ExtraValue(val)
 	}
 
-	return admissionv1alpha1.AdmissionReview{
-		Request: &admissionv1alpha1.AdmissionRequest{
+	return admissionv1beta1.AdmissionReview{
+		Request: &admissionv1beta1.AdmissionRequest{
 			UID: uuid.NewUUID(),
 			Kind: metav1.GroupVersionKind{
 				Group:   gvk.Group,
@@ -58,7 +58,7 @@ func CreateAdmissionReview(attr admission.Attributes) admissionv1alpha1.Admissio
 			SubResource: attr.GetSubresource(),
 			Name:        attr.GetName(),
 			Namespace:   attr.GetNamespace(),
-			Operation:   admissionv1alpha1.Operation(attr.GetOperation()),
+			Operation:   admissionv1beta1.Operation(attr.GetOperation()),
 			UserInfo:    userInfo,
 			Object: runtime.RawExtension{
 				Object: attr.GetObject(),

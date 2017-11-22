@@ -19,6 +19,7 @@ package deviceplugin
 import (
 	"k8s.io/api/core/v1"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -27,7 +28,7 @@ import (
 // Manager manages all the Device Plugins running on a node.
 type Manager interface {
 	// Start starts device plugin registration service.
-	Start(activePods ActivePodsFunc) error
+	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady) error
 
 	// Devices is the map of devices that have registered themselves
 	// against the manager.
@@ -51,6 +52,10 @@ type Manager interface {
 	// for the passed-in <pod, container> and returns its DeviceRunContainerOptions
 	// for the found one. An empty struct is returned in case no cached state is found.
 	GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Container) *DeviceRunContainerOptions
+
+	// GetCapacity returns the amount of available device plugin resource capacity
+	// and inactive device plugin resources previously registered on the node.
+	GetCapacity() (v1.ResourceList, []string)
 }
 
 // DeviceRunContainerOptions contains the combined container runtime settings to consume its allocated devices.

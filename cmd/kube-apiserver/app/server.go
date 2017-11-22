@@ -62,6 +62,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -357,6 +358,7 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 	if err := s.GenericServerRunOptions.ApplyTo(genericConfig); err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
+
 	insecureServingOptions, err := s.InsecureServing.ApplyTo(genericConfig)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
@@ -558,10 +560,13 @@ func BuildStorageFactory(s *options.ServerRunOptions) (*serverstorage.DefaultSto
 	storageFactory, err := kubeapiserver.NewStorageFactory(
 		s.Etcd.StorageConfig, s.Etcd.DefaultStorageMediaType, legacyscheme.Codecs,
 		serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Registry), storageGroupsToEncodingVersion,
+		// The list includes resources that need to be stored in a different
+		// group version than other resources in the groups.
 		// FIXME (soltysh): this GroupVersionResource override should be configurable
 		[]schema.GroupVersionResource{
 			batch.Resource("cronjobs").WithVersion("v1beta1"),
 			storage.Resource("volumeattachments").WithVersion("v1alpha1"),
+			admissionregistration.Resource("initializerconfigurations").WithVersion("v1alpha1"),
 		},
 		master.DefaultAPIResourceConfigSource(), s.APIEnablement.RuntimeConfig)
 	if err != nil {

@@ -131,14 +131,16 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 		// container belongs to.
 		ps, found := sandboxIDToPodStats[podSandboxID]
 		if !found {
-			ps = p.makePodStats(podSandbox)
+			ps = buildPodStats(podSandbox)
 			sandboxIDToPodStats[podSandboxID] = ps
 		}
-		ps.Containers = append(ps.Containers, *p.makeContainerStats(stats, container, &rootFsInfo, uuidToFsInfo))
+		containerStats := p.makeContainerStats(stats, container, &rootFsInfo, uuidToFsInfo)
+		ps.Containers = append(ps.Containers, *containerStats)
 	}
 
 	result := make([]statsapi.PodStats, 0, len(sandboxIDToPodStats))
 	for _, s := range sandboxIDToPodStats {
+		p.makePodStorageStats(s, &rootFsInfo)
 		result = append(result, *s)
 	}
 	return result, nil
@@ -199,8 +201,9 @@ func (p *criStatsProvider) getFsInfo(storageID *runtimeapi.StorageIdentifier) *c
 	return &fsInfo
 }
 
-func (p *criStatsProvider) makePodStats(podSandbox *runtimeapi.PodSandbox) *statsapi.PodStats {
-	s := &statsapi.PodStats{
+// buildPodRef returns a PodStats that identifies the Pod managing cinfo
+func buildPodStats(podSandbox *runtimeapi.PodSandbox) *statsapi.PodStats {
+	return &statsapi.PodStats{
 		PodRef: statsapi.PodReference{
 			Name:      podSandbox.Metadata.Name,
 			UID:       podSandbox.Metadata.Uid,
@@ -210,9 +213,15 @@ func (p *criStatsProvider) makePodStats(podSandbox *runtimeapi.PodSandbox) *stat
 		StartTime: metav1.NewTime(time.Unix(0, podSandbox.CreatedAt)),
 		// Network stats are not supported by CRI.
 	}
+}
+
+func (p *criStatsProvider) makePodStorageStats(s *statsapi.PodStats, rootFsInfo *cadvisorapiv2.FsInfo) *statsapi.PodStats {
 	podUID := types.UID(s.PodRef.UID)
 	if vstats, found := p.resourceAnalyzer.GetPodVolumeStats(podUID); found {
-		s.VolumeStats = vstats.Volumes
+		ephemeralStats := make([]statsapi.VolumeStats, len(vstats.EphemeralVolumes))
+		copy(ephemeralStats, vstats.EphemeralVolumes)
+		s.VolumeStats = append(vstats.EphemeralVolumes, vstats.PersistentVolumes...)
+		s.EphemeralStorage = calcEphemeralStorage(s.Containers, ephemeralStats, rootFsInfo)
 	}
 	return s
 }

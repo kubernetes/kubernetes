@@ -152,6 +152,9 @@ func (pvcr *persistentVolumeClaimResize) checkVolumePlugin(pv *api.PersistentVol
 	if pv.Spec.Glusterfs != nil {
 		return true
 	}
+	if pv.Spec.Cinder != nil {
+		return true
+	}
 	return false
 
 }

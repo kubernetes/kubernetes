@@ -49,8 +49,9 @@ type ScheduleAlgorithm interface {
 	Schedule(*v1.Pod, NodeLister) (selectedMachine string, err error)
 	// Preempt receives scheduling errors for a pod and tries to create room for
 	// the pod by preempting lower priority pods if possible.
-	// It returns the node where preemption happened, a list of preempted pods, and error if any.
-	Preempt(*v1.Pod, NodeLister, error) (selectedNode *v1.Node, preemptedPods []*v1.Pod, err error)
+	// It returns the node where preemption happened, a list of preempted pods, a
+	// list of pods whose nominated node name should be removed, and error if any.
+	Preempt(*v1.Pod, NodeLister, error) (selectedNode *v1.Node, preemptedPods []*v1.Pod, cleanupNominatedPods []*v1.Pod, err error)
 	// Predicates() returns a pointer to a map of predicate functions. This is
 	// exposed for testing.
 	Predicates() map[string]FitPredicate

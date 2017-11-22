@@ -190,7 +190,17 @@ var _ = framework.KubeDescribe("Summary API", func() {
 						}),
 					}),
 				}),
+				"EphemeralStorage": ptrMatchAllFields(gstruct.Fields{
+					"Time":           recent(maxStatsAge),
+					"AvailableBytes": fsCapacityBounds,
+					"CapacityBytes":  fsCapacityBounds,
+					"UsedBytes":      bounded(framework.Kb, 21*framework.Mb),
+					"InodesFree":     bounded(1E4, 1E8),
+					"Inodes":         bounded(1E4, 1E8),
+					"InodesUsed":     bounded(0, 1E8),
+				}),
 			})
+
 			matchExpectations := ptrMatchAllFields(gstruct.Fields{
 				"Node": gstruct.MatchAllFields(gstruct.Fields{
 					"NodeName":         Equal(framework.TestContext.NodeName),

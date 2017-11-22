@@ -25,6 +25,7 @@ import (
 
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
@@ -70,8 +71,12 @@ func NewCmdApply(parentFlags *cmdUpgradeFlags) *cobra.Command {
 		Use:   "apply [version]",
 		Short: "Upgrade your Kubernetes cluster to the specified version.",
 		Run: func(cmd *cobra.Command, args []string) {
+			var err error
+			flags.parent.ignoreChecksErrorsSet, err = validation.ValidateIgnoreChecksErrors(flags.parent.ignoreChecksErrors, flags.parent.skipPreFlight)
+			kubeadmutil.CheckErr(err)
+
 			// Ensure the user is root
-			err := runPreflightChecks(flags.parent.skipPreFlight)
+			err = runPreflightChecks(flags.parent.ignoreChecksErrorsSet)
 			kubeadmutil.CheckErr(err)
 
 			err = cmdutil.ValidateExactArgNumber(args, []string{"version"})
@@ -162,7 +167,7 @@ func RunApply(flags *applyFlags) error {
 	}
 
 	// Upgrade RBAC rules and addons.
-	if err := upgrade.PerformPostUpgradeTasks(upgradeVars.client, internalcfg); err != nil {
+	if err := upgrade.PerformPostUpgradeTasks(upgradeVars.client, internalcfg, flags.newK8sVersion); err != nil {
 		return fmt.Errorf("[upgrade/postupgrade] FATAL post-upgrade error: %v", err)
 	}
 

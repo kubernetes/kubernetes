@@ -52,6 +52,24 @@ func (fc fakePodConditionUpdater) Update(pod *v1.Pod, podCondition *v1.PodCondit
 	return nil
 }
 
+type fakePodPreemptor struct{}
+
+func (fp fakePodPreemptor) GetUpdatedPod(pod *v1.Pod) (*v1.Pod, error) {
+	return pod, nil
+}
+
+func (fp fakePodPreemptor) DeletePod(pod *v1.Pod) error {
+	return nil
+}
+
+func (fp fakePodPreemptor) UpdatePodAnnotations(pod *v1.Pod, annots map[string]string) error {
+	return nil
+}
+
+func (fp fakePodPreemptor) RemoveNominatedNodeAnnotation(pod *v1.Pod) error {
+	return nil
+}
+
 func podWithID(id, desiredHost string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: id, SelfLink: util.Test.SelfLink(string(v1.ResourcePods), id)},
@@ -103,8 +121,8 @@ func (es mockScheduler) Prioritizers() []algorithm.PriorityConfig {
 	return nil
 }
 
-func (es mockScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister, scheduleErr error) (*v1.Node, []*v1.Pod, error) {
-	return nil, nil, nil
+func (es mockScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
+	return nil, nil, nil, nil
 }
 
 func TestScheduler(t *testing.T) {
@@ -505,6 +523,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.
 	algo := core.NewGenericScheduler(
 		scache,
 		nil,
+		nil,
 		predicateMap,
 		algorithm.EmptyPredicateMetadataProducer,
 		[]algorithm.PriorityConfig{},
@@ -529,6 +548,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.
 			},
 			Recorder:            &record.FakeRecorder{},
 			PodConditionUpdater: fakePodConditionUpdater{},
+			PodPreemptor:        fakePodPreemptor{},
 		},
 	}
 
@@ -540,6 +560,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.
 func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache schedulercache.Cache, nodeLister schedulertesting.FakeNodeLister, predicateMap map[string]algorithm.FitPredicate, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
 	algo := core.NewGenericScheduler(
 		scache,
+		nil,
 		nil,
 		predicateMap,
 		algorithm.EmptyPredicateMetadataProducer,
@@ -568,6 +589,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 			},
 			Recorder:            &record.FakeRecorder{},
 			PodConditionUpdater: fakePodConditionUpdater{},
+			PodPreemptor:        fakePodPreemptor{},
 			StopEverything:      stop,
 		},
 	}

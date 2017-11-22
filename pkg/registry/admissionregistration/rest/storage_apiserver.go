@@ -18,6 +18,7 @@ package rest
 
 import (
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
+	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -38,7 +39,8 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(admissionregistrationv1alpha1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[admissionregistrationv1alpha1.SchemeGroupVersion.Version] = p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter)
-		apiGroupInfo.GroupMeta.GroupVersion = admissionregistrationv1alpha1.SchemeGroupVersion
+		apiGroupInfo.VersionedResourcesStorageMap[admissionregistrationv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
+		apiGroupInfo.GroupMeta.GroupVersion = admissionregistrationv1beta1.SchemeGroupVersion
 	}
 	return apiGroupInfo, true
 }
@@ -50,6 +52,12 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 		s := initializerconfigurationstorage.NewREST(restOptionsGetter)
 		storage["initializerconfigurations"] = s
 	}
+	return storage
+}
+
+func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+	version := admissionregistrationv1beta1.SchemeGroupVersion
+	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("validatingwebhookconfigurations")) {
 		s := validatingwebhookconfigurationstorage.NewREST(restOptionsGetter)
 		storage["validatingwebhookconfigurations"] = s

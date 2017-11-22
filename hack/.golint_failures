@@ -23,9 +23,10 @@ pkg/api/v1/resource
 pkg/apis/abac
 pkg/apis/abac/latest
 pkg/apis/admission
-pkg/apis/admission/v1alpha1
+pkg/apis/admission/v1beta1
 pkg/apis/admissionregistration
 pkg/apis/admissionregistration/v1alpha1
+pkg/apis/admissionregistration/v1beta1
 pkg/apis/admissionregistration/validation
 pkg/apis/apps
 pkg/apis/apps/validation
@@ -431,8 +432,9 @@ plugin/pkg/scheduler/metrics
 plugin/pkg/scheduler/schedulercache
 plugin/pkg/scheduler/testing
 plugin/pkg/scheduler/util
-staging/src/k8s.io/api/admission/v1alpha1
+staging/src/k8s.io/api/admission/v1beta1
 staging/src/k8s.io/api/admissionregistration/v1alpha1
+staging/src/k8s.io/api/admissionregistration/v1beta1
 staging/src/k8s.io/api/apps/v1
 staging/src/k8s.io/api/apps/v1beta1
 staging/src/k8s.io/api/apps/v1beta2
@@ -542,6 +544,8 @@ staging/src/k8s.io/apiserver/pkg/admission/configuration
 staging/src/k8s.io/apiserver/pkg/admission/plugin/initialization
 staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config
+staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission
+staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/mutating
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/validating
@@ -625,6 +629,8 @@ staging/src/k8s.io/client-go/kubernetes/fake
 staging/src/k8s.io/client-go/kubernetes/scheme
 staging/src/k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1
 staging/src/k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1/fake
+staging/src/k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1
+staging/src/k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/apps/v1
 staging/src/k8s.io/client-go/kubernetes/typed/apps/v1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/apps/v1beta1
