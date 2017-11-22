@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
@@ -68,13 +69,14 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 		errs = append(errs, err)
 	}
 
-	shouldBackup, err := shouldBackupAPIServerCertAndKey(newK8sVer)
+	certAndKeyDir := kubeadmapiext.DefaultCertificatesDir
+	shouldBackup, err := shouldBackupAPIServerCertAndKey(certAndKeyDir, newK8sVer)
 	// Don't fail the upgrade phase if failing to determine to backup kube-apiserver cert and key.
 	if err != nil {
 		fmt.Printf("[postupgrade] WARNING: failed to determine to backup kube-apiserver cert and key: %v", err)
 	} else if shouldBackup {
 		// Don't fail the upgrade phase if failing to backup kube-apiserver cert and key.
-		if err := backupAPIServerCertAndKey(); err != nil {
+		if err := backupAPIServerCertAndKey(certAndKeyDir); err != nil {
 			fmt.Printf("[postupgrade] WARNING: failed to backup kube-apiserver cert and key: %v", err)
 		}
 		if err := certsphase.CreateAPIServerCertAndKeyFiles(cfg); err != nil {

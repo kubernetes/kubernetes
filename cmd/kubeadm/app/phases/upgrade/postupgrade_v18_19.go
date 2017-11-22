@@ -26,21 +26,24 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/errors"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
 var v190 = version.MustParseSemantic("v1.9.0")
+var expiry = 180 * 24 * time.Hour
 
 // backupAPIServerCertAndKey backups the old cert and key of kube-apiserver to a specified directory.
-func backupAPIServerCertAndKey() error {
-	subDir := "expired"
-	filesToMove := map[string]string{
-		filepath.Join(kubeadmapiext.DefaultCertificatesDir, constants.APIServerCertName): filepath.Join(kubeadmapiext.DefaultCertificatesDir, subDir, constants.APIServerCertName),
-		filepath.Join(kubeadmapiext.DefaultCertificatesDir, constants.APIServerKeyName):  filepath.Join(kubeadmapiext.DefaultCertificatesDir, subDir, constants.APIServerKeyName),
+func backupAPIServerCertAndKey(certAndKeyDir string) error {
+	subDir := filepath.Join(certAndKeyDir, "expired")
+	if err := os.Mkdir(subDir, 0766); err != nil {
+		return fmt.Errorf("failed to created backup directory %s: %v", subDir, err)
 	}
 
+	filesToMove := map[string]string{
+		filepath.Join(certAndKeyDir, constants.APIServerCertName): filepath.Join(subDir, constants.APIServerCertName),
+		filepath.Join(certAndKeyDir, constants.APIServerKeyName):  filepath.Join(subDir, constants.APIServerKeyName),
+	}
 	return moveFiles(filesToMove)
 }
 
@@ -69,12 +72,12 @@ func rollbackFiles(files map[string]string, originalErr error) error {
 
 // shouldBackupAPIServerCertAndKey check if the new k8s version is at least 1.9.0
 // and kube-apiserver will be expired in 60 days.
-func shouldBackupAPIServerCertAndKey(newK8sVer *version.Version) (bool, error) {
+func shouldBackupAPIServerCertAndKey(certAndKeyDir string, newK8sVer *version.Version) (bool, error) {
 	if newK8sVer.LessThan(v190) {
 		return false, nil
 	}
 
-	apiServerCert := filepath.Join(kubeadmapiext.DefaultCertificatesDir, constants.APIServerCertName)
+	apiServerCert := filepath.Join(certAndKeyDir, constants.APIServerCertName)
 	data, err := ioutil.ReadFile(apiServerCert)
 	if err != nil {
 		return false, fmt.Errorf("failed to read kube-apiserver certificate from disk: %v", err)
@@ -93,7 +96,7 @@ func shouldBackupAPIServerCertAndKey(newK8sVer *version.Version) (bool, error) {
 		return false, fmt.Errorf("no certificate data found")
 	}
 
-	if time.Now().Sub(certs[0].NotBefore) > 180*24*time.Hour {
+	if time.Now().Sub(certs[0].NotBefore) > expiry {
 		return true, nil
 	}
 
