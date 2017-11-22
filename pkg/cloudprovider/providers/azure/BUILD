@@ -23,6 +23,7 @@ go_library(
         "azure_storage.go",
         "azure_storageaccount.go",
         "azure_util.go",
+        "azure_util_vmss.go",
         "azure_wrap.go",
         "azure_zones.go",
     ],
@@ -57,7 +58,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["azure_test.go"],
+    srcs = [
+        "azure_test.go",
+        "azure_util_test.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/azure",
     library = ":go_default_library",
     deps = [
@@ -66,6 +70,7 @@ go_test(
         "//vendor/github.com/Azure/azure-sdk-for-go/arm/compute:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/arm/network:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/to:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
