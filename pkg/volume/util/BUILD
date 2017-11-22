@@ -14,6 +14,7 @@ go_library(
         "device_util_unsupported.go",
         "doc.go",
         "error.go",
+        "finalizer.go",
         "fs_unsupported.go",
         "io_util.go",
         "metrics.go",
@@ -61,6 +62,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "finalizer_test.go",
         "util_test.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
