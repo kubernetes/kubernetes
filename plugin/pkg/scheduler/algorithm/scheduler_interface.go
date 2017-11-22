@@ -46,7 +46,7 @@ type SchedulerExtender interface {
 // ScheduleAlgorithm is an interface implemented by things that know how to schedule pods
 // onto machines.
 type ScheduleAlgorithm interface {
-	Schedule(*v1.Pod, NodeLister) (selectedMachine string, err error)
+	Schedule(*v1.Pod, NodeLister) (selectedMachine *v1.Node, err error)
 	// Preempt receives scheduling errors for a pod and tries to create room for
 	// the pod by preempting lower priority pods if possible.
 	// It returns the node where preemption happened, a list of preempted pods, a

@@ -54,7 +54,7 @@ func (n *NodeLabelPrioritizer) CalculateNodeLabelPriorityMap(pod *v1.Pod, meta i
 		score = schedulerapi.MaxPriority
 	}
 	return schedulerapi.HostPriority{
-		Host:  node.Name,
+		Host:  node,
 		Score: score,
 	}, nil
 }

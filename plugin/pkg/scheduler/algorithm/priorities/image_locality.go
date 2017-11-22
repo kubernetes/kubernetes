@@ -38,7 +38,7 @@ func ImageLocalityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *scheduler
 	sumSize := totalImageSize(node, pod.Spec.Containers)
 
 	return schedulerapi.HostPriority{
-		Host:  node.Name,
+		Host:  node,
 		Score: calculateScoreFromSize(sumSize),
 	}, nil
 }

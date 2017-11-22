@@ -86,7 +86,7 @@ func calculateBalancedResourceAllocation(pod *v1.Pod, podRequests *schedulercach
 	}
 
 	return schedulerapi.HostPriority{
-		Host:  node.Name,
+		Host:  node,
 		Score: score,
 	}, nil
 }
