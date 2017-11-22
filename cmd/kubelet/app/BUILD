@@ -77,6 +77,7 @@ go_library(
         "//pkg/volume/cephfs:go_default_library",
         "//pkg/volume/cinder:go_default_library",
         "//pkg/volume/configmap:go_default_library",
+        "//pkg/volume/csi:go_default_library",
         "//pkg/volume/downwardapi:go_default_library",
         "//pkg/volume/empty_dir:go_default_library",
         "//pkg/volume/fc:go_default_library",

@@ -437,6 +437,10 @@
 			"Rev": "8d75e11374a1928608c906fe745b538483e7aeb2"
 		},
 		{
+			"ImportPath": "github.com/container-storage-interface/spec/lib/go/csi",
+			"Rev": "ec298903f94e1d6d954de121b28044a2e1fdbf48"
+		},
+		{
 			"ImportPath": "github.com/containernetworking/cni/libcni",
 			"Comment": "v0.6.0",
 			"Rev": "a7885cb6f8ab03fba07852ded351e4f5e7a112bf"
@@ -2266,6 +2270,7 @@
 		},
 		{
 			"ImportPath": "github.com/pelletier/go-buffruneio",
+			"Comment": "v0.1.0",
 			"Rev": "df1e16fde7fc330a0ca68167c23bf7ed6ac31d6d"
 		},
 		{
@@ -2584,6 +2589,7 @@
 		},
 		{
 			"ImportPath": "github.com/xiang90/probing",
+			"Comment": "0.0.1",
 			"Rev": "07dd2e8dfe18522e9c447ba95f2fe95262f63bb2"
 		},
 		{
