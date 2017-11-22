@@ -2507,14 +2507,79 @@ func validateDNSPolicy(dnsPolicy *core.DNSPolicy, fldPath *field.Path) field.Err
 	allErrors := field.ErrorList{}
 	switch *dnsPolicy {
 	case core.DNSClusterFirstWithHostNet, core.DNSClusterFirst, core.DNSDefault:
-		break
+	case core.DNSNone:
+		if !utilfeature.DefaultFeatureGate.Enabled(features.CustomPodDNS) {
+			allErrors = append(allErrors, field.Invalid(fldPath, dnsPolicy, "DNSPolicy: can not use 'None', custom pod DNS is disabled by feature gate"))
+		}
 	case "":
 		allErrors = append(allErrors, field.Required(fldPath, ""))
 	default:
 		validValues := []string{string(core.DNSClusterFirstWithHostNet), string(core.DNSClusterFirst), string(core.DNSDefault)}
+		if utilfeature.DefaultFeatureGate.Enabled(features.CustomPodDNS) {
+			validValues = append(validValues, string(core.DNSNone))
+		}
 		allErrors = append(allErrors, field.NotSupported(fldPath, dnsPolicy, validValues))
 	}
 	return allErrors
+}
+
+const (
+	// Limits on various DNS parameters. These are derived from
+	// restrictions in Linux libc name resolution handling.
+	// Max number of DNS name servers.
+	MaxDNSNameservers = 3
+	// Max number of domains in search path.
+	MaxDNSSearchPaths = 6
+	// Max number of characters in search path.
+	MaxDNSSearchListChars = 256
+)
+
+func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolicy, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// Validate DNSNone case. Must provide at least one DNS name server.
+	if utilfeature.DefaultFeatureGate.Enabled(features.CustomPodDNS) && dnsPolicy != nil && *dnsPolicy == core.DNSNone {
+		if dnsConfig == nil {
+			return append(allErrs, field.Required(fldPath, fmt.Sprintf("must provide `dnsConfig` when `dnsPolicy` is %s", core.DNSNone)))
+		}
+		if len(dnsConfig.Nameservers) == 0 {
+			return append(allErrs, field.Required(fldPath.Child("nameservers"), fmt.Sprintf("must provide at least one DNS nameserver when `dnsPolicy` is %s", core.DNSNone)))
+		}
+	}
+
+	if dnsConfig != nil {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.CustomPodDNS) {
+			return append(allErrs, field.Forbidden(fldPath, "DNSConfig: custom pod DNS is disabled by feature gate"))
+		}
+
+		// Validate nameservers.
+		if len(dnsConfig.Nameservers) > MaxDNSNameservers {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("nameservers"), dnsConfig.Nameservers, fmt.Sprintf("must not have more than %v nameservers", MaxDNSNameservers)))
+		}
+		for i, ns := range dnsConfig.Nameservers {
+			if ip := net.ParseIP(ns); ip == nil {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("nameservers").Index(i), ns, "must be valid IP address"))
+			}
+		}
+		// Validate searches.
+		if len(dnsConfig.Searches) > MaxDNSSearchPaths {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("searches"), dnsConfig.Searches, fmt.Sprintf("must not have more than %v search paths", MaxDNSSearchPaths)))
+		}
+		// Include the space between search paths.
+		if len(strings.Join(dnsConfig.Searches, " ")) > MaxDNSSearchListChars {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("searches"), dnsConfig.Searches, "must not have more than 256 characters (including spaces) in the search list"))
+		}
+		for i, search := range dnsConfig.Searches {
+			allErrs = append(allErrs, ValidateDNS1123Subdomain(search, fldPath.Child("searches").Index(i))...)
+		}
+		// Validate options.
+		for i, option := range dnsConfig.Options {
+			if len(option.Name) == 0 {
+				allErrs = append(allErrs, field.Required(fldPath.Child("options").Index(i), "must not be empty"))
+			}
+		}
+	}
+	return allErrs
 }
 
 func validateHostNetwork(hostNetwork bool, containers []core.Container, fldPath *field.Path) field.ErrorList {
@@ -2767,6 +2832,7 @@ func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs = append(allErrs, ValidatePodSecurityContext(spec.SecurityContext, spec, fldPath, fldPath.Child("securityContext"))...)
 	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets, fldPath.Child("imagePullSecrets"))...)
 	allErrs = append(allErrs, validateAffinity(spec.Affinity, fldPath.Child("affinity"))...)
+	allErrs = append(allErrs, validatePodDNSConfig(spec.DNSConfig, &spec.DNSPolicy, fldPath.Child("dnsConfig"))...)
 	if len(spec.ServiceAccountName) > 0 {
 		for _, msg := range ValidateServiceAccountName(spec.ServiceAccountName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("serviceAccountName"), spec.ServiceAccountName, msg))
