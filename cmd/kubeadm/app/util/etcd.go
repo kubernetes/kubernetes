@@ -22,8 +22,16 @@ import (
 	"time"
 )
 
+// EtcdCluster is an interface to get etcd cluster related information
+type EtcdCluster interface {
+	GetEtcdClusterStatus() (*clientv3.StatusResponse, error)
+}
+
+// LocalEtcdCluster represents an instance of a local etcd cluster
+type LocalEtcdCluster struct{}
+
 // GetEtcdClusterStatus returns nil for status Up or error for status Down
-func GetEtcdClusterStatus() (*clientv3.StatusResponse, error) {
+func (cluster LocalEtcdCluster) GetEtcdClusterStatus() (*clientv3.StatusResponse, error) {
 	ep := []string{"localhost:2379"}
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   ep,
