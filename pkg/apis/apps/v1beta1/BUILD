@@ -29,7 +29,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
     ],
 )
@@ -52,7 +51,6 @@ go_test(
     srcs = ["defaults_test.go"],
     importpath = "k8s.io/kubernetes/pkg/apis/apps/v1beta1_test",
     deps = [
-        ":go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
         "//pkg/apis/core:go_default_library",

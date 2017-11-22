@@ -37,9 +37,9 @@ func Convert_v1alpha1_Subject_To_rbac_Subject(in *rbacv1alpha1.Subject, out *api
 	case in.Kind == rbacv1alpha1.ServiceAccountKind:
 		out.APIGroup = ""
 	case in.Kind == rbacv1alpha1.UserKind:
-		out.APIGroup = GroupName
+		out.APIGroup = rbacv1alpha1.GroupName
 	case in.Kind == rbacv1alpha1.GroupKind:
-		out.APIGroup = GroupName
+		out.APIGroup = rbacv1alpha1.GroupName
 	default:
 		// For unrecognized kinds, use the group portion of the APIVersion if we can get it
 		if gv, err := schema.ParseGroupVersion(in.APIVersion); err == nil {
@@ -50,7 +50,7 @@ func Convert_v1alpha1_Subject_To_rbac_Subject(in *rbacv1alpha1.Subject, out *api
 	// User * in v1alpha1 will only match all authenticated users
 	// This is only for compatibility with old RBAC bindings
 	// Special treatment for * should not be included in v1beta1
-	if out.Kind == rbacv1alpha1.UserKind && out.APIGroup == GroupName && out.Name == "*" {
+	if out.Kind == rbacv1alpha1.UserKind && out.APIGroup == rbacv1alpha1.GroupName && out.Name == "*" {
 		out.Kind = rbacv1alpha1.GroupKind
 		out.Name = allAuthenticated
 	}
@@ -67,12 +67,12 @@ func Convert_rbac_Subject_To_v1alpha1_Subject(in *api.Subject, out *rbacv1alpha1
 	case in.Kind == rbacv1alpha1.ServiceAccountKind && in.APIGroup == "":
 		// Make service accounts v1
 		out.APIVersion = "v1"
-	case in.Kind == rbacv1alpha1.UserKind && in.APIGroup == GroupName:
+	case in.Kind == rbacv1alpha1.UserKind && in.APIGroup == rbacv1alpha1.GroupName:
 		// users in the rbac API group get v1alpha
-		out.APIVersion = SchemeGroupVersion.String()
-	case in.Kind == rbacv1alpha1.GroupKind && in.APIGroup == GroupName:
+		out.APIVersion = rbacv1alpha1.SchemeGroupVersion.String()
+	case in.Kind == rbacv1alpha1.GroupKind && in.APIGroup == rbacv1alpha1.GroupName:
 		// groups in the rbac API group get v1alpha
-		out.APIVersion = SchemeGroupVersion.String()
+		out.APIVersion = rbacv1alpha1.SchemeGroupVersion.String()
 	default:
 		// otherwise, they get an unspecified version of a group
 		out.APIVersion = schema.GroupVersion{Group: in.APIGroup}.String()

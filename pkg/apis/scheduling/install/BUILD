@@ -13,10 +13,10 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/scheduling:go_default_library",
         "//pkg/apis/scheduling/v1alpha1:go_default_library",
+        "//vendor/k8s.io/api/scheduling/install:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )
 

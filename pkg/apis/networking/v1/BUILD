@@ -24,7 +24,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
     ],
 )
@@ -47,7 +46,6 @@ go_test(
     srcs = ["defaults_test.go"],
     importpath = "k8s.io/kubernetes/pkg/apis/networking/v1_test",
     deps = [
-        ":go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core/install:go_default_library",
         "//pkg/apis/networking/install:go_default_library",

@@ -15,10 +15,10 @@ go_library(
         "//pkg/apis/rbac/v1:go_default_library",
         "//pkg/apis/rbac/v1alpha1:go_default_library",
         "//pkg/apis/rbac/v1beta1:go_default_library",
+        "//vendor/k8s.io/api/rbac/install:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )
 

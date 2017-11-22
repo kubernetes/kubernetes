@@ -19,6 +19,9 @@ package storage
 import (
 	"fmt"
 
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,10 +31,7 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	appsv1beta2 "k8s.io/kubernetes/pkg/apis/apps/v1beta2"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	autoscalingvalidation "k8s.io/kubernetes/pkg/apis/autoscaling/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/printers"

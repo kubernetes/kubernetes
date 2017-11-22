@@ -53,7 +53,7 @@ go_test(
         ":go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/rbac/install:go_default_library",
-        "//pkg/apis/rbac/v1:go_default_library",
+        "//vendor/k8s.io/api/rbac/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
     ],

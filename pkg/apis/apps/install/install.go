@@ -19,14 +19,17 @@ limitations under the License.
 package install
 
 import (
+	externalinstall "k8s.io/api/apps/install"
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/apps/v1"
-	"k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	"k8s.io/kubernetes/pkg/apis/apps/v1beta2"
+	internal "k8s.io/kubernetes/pkg/apis/apps"
+
+	// ensure conversions and defaulting are imported
+	_ "k8s.io/kubernetes/pkg/apis/apps/v1"
+	_ "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	_ "k8s.io/kubernetes/pkg/apis/apps/v1beta2"
 )
 
 func init() {
@@ -35,18 +38,5 @@ func init() {
 
 // Install registers the API group and adds types to a scheme
 func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
-	if err := announced.NewGroupMetaFactory(
-		&announced.GroupMetaFactoryArgs{
-			GroupName:                  apps.GroupName,
-			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version, v1beta2.SchemeGroupVersion.Version, v1.SchemeGroupVersion.Version},
-			AddInternalObjectsToScheme: apps.AddToScheme,
-		},
-		announced.VersionToSchemeFunc{
-			v1beta1.SchemeGroupVersion.Version: v1beta1.AddToScheme,
-			v1beta2.SchemeGroupVersion.Version: v1beta2.AddToScheme,
-			v1.SchemeGroupVersion.Version:      v1.AddToScheme,
-		},
-	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
-		panic(err)
-	}
+	externalinstall.InstallWithInternal(groupFactoryRegistry, registry, scheme, internal.AddToScheme)
 }

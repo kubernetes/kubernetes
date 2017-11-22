@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	. "k8s.io/api/apps/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -29,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
-	. "k8s.io/kubernetes/pkg/apis/apps/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
