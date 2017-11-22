@@ -439,6 +439,18 @@ func ClusterRoles() []rbac.ClusterRole {
 		})
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		// Find the scheduler role
+		for i, role := range roles {
+			if role.Name == "system:kube-scheduler" {
+				pvRule := rbac.NewRule("update").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie()
+				scRule := rbac.NewRule(Read...).Groups(storageGroup).Resources("storageclasses").RuleOrDie()
+				roles[i].Rules = append(role.Rules, pvRule, scRule)
+				break
+			}
+		}
+	}
+
 	addClusterRoleLabel(roles)
 	return roles
 }

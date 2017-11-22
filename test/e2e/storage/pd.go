@@ -215,7 +215,6 @@ var _ = SIGDescribe("Pod Disks", func() {
 	})
 
 	Context("schedule a pod w/ RW PD(s) mounted to 1 or more containers, write to PD, verify content, delete pod, and repeat in rapid succession [Slow]", func() {
-		var diskNames []string
 		type testT struct {
 			numContainers int
 			numPDs        int
@@ -243,6 +242,7 @@ var _ = SIGDescribe("Pod Disks", func() {
 				var host0Pod *v1.Pod
 				var err error
 				fileAndContentToVerify := make(map[string]string)
+				diskNames := make([]string, 0, numPDs)
 
 				By(fmt.Sprintf("creating %d PD(s)", numPDs))
 				for i := 0; i < numPDs; i++ {

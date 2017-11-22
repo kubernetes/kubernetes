@@ -180,6 +180,7 @@ const (
 	// alpha: v1.9
 	//
 	// Extend the default scheduler to be aware of PV topology and handle PV binding
+	// Before moving to beta, resolve Kubernetes issue #56180
 	VolumeScheduling utilfeature.Feature = "VolumeScheduling"
 
 	// owner: @vladimirvivien

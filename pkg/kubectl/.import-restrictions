@@ -120,6 +120,7 @@
                 "k8s.io/kubernetes/pkg/security/apparmor",
                 "k8s.io/kubernetes/pkg/serviceaccount",
                 "k8s.io/kubernetes/pkg/util/file",
+                "k8s.io/kubernetes/pkg/util/goroutinemap",
                 "k8s.io/kubernetes/pkg/util/hash",
                 "k8s.io/kubernetes/pkg/util/interrupt",
                 "k8s.io/kubernetes/pkg/util/io",

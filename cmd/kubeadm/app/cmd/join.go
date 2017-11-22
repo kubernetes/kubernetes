@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -30,8 +29,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
-	clientset "k8s.io/client-go/kubernetes"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
@@ -262,36 +259,11 @@ func (j *Join) Run(out io.Writer) error {
 
 	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
 	if features.Enabled(j.cfg.FeatureGates, features.DynamicKubeletConfig) {
-		client, err := getTLSBootstrappedClient()
-		if err != nil {
-			return err
-		}
-
-		// Update the node with remote base kubelet configuration
-		if err := kubeletphase.UpdateNodeWithConfigMap(client, j.cfg.NodeName); err != nil {
-			return err
+		if err := kubeletphase.ConsumeBaseKubeletConfiguration(j.cfg.NodeName); err != nil {
+			return fmt.Errorf("error consuming base kubelet configuration: %v", err)
 		}
 	}
 
 	fmt.Fprintf(out, joinDoneMsgf)
 	return nil
-}
-
-// getTLSBootstrappedClient waits for the kubelet to perform the TLS bootstrap
-// and then creates a client from config file /etc/kubernetes/kubelet.conf
-func getTLSBootstrappedClient() (clientset.Interface, error) {
-	fmt.Println("[tlsbootstrap] Waiting for the kubelet to perform the TLS Bootstrap...")
-
-	kubeletKubeConfig := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
-
-	// Loop on every falsy return. Return with an error if raised. Exit successfully if true is returned.
-	err := wait.PollImmediateInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {
-		_, err := os.Stat(kubeletKubeConfig)
-		return (err == nil), nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return kubeconfigutil.ClientSetFromFile(kubeletKubeConfig)
 }

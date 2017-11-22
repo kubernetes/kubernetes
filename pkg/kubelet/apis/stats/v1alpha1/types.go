@@ -86,6 +86,12 @@ type PodStats struct {
 	// +patchMergeKey=name
 	// +patchStrategy=merge
 	Containers []ContainerStats `json:"containers" patchStrategy:"merge" patchMergeKey:"name"`
+	// Stats pertaining to CPU resources consumed by pod cgroup (which includes all containers' resource usage and pod overhead).
+	// +optional
+	CPU *CPUStats `json:"cpu,omitempty"`
+	// Stats pertaining to memory (RAM) resources consumed by pod cgroup (which includes all containers' resource usage and pod overhead).
+	// +optional
+	Memory *MemoryStats `json:"memory,omitempty"`
 	// Stats pertaining to network resources.
 	// +optional
 	Network *NetworkStats `json:"network,omitempty"`

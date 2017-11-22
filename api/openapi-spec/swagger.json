@@ -70506,6 +70506,7 @@
    "io.k8s.api.apps.v1beta2.DaemonSetSpec": {
     "description": "DaemonSetSpec is the specification of a daemon set.",
     "required": [
+     "selector",
      "template"
     ],
     "properties": {
@@ -70520,7 +70521,7 @@
       "format": "int32"
      },
      "selector": {
-      "description": "A label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
+      "description": "A label query over pods that are managed by the daemon set. Must match in order to be controlled. It must match the pod template's labels. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
      },
      "template": {
@@ -70713,6 +70714,7 @@
    "io.k8s.api.apps.v1beta2.DeploymentSpec": {
     "description": "DeploymentSpec is the specification of the desired behavior of the Deployment.",
     "required": [
+     "selector",
      "template"
     ],
     "properties": {
@@ -70741,7 +70743,7 @@
       "format": "int32"
      },
      "selector": {
-      "description": "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment.",
+      "description": "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment. It must match the pod template's labels.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
      },
      "strategy": {
@@ -70913,6 +70915,9 @@
    },
    "io.k8s.api.apps.v1beta2.ReplicaSetSpec": {
     "description": "ReplicaSetSpec is the specification of a ReplicaSet.",
+    "required": [
+     "selector"
+    ],
     "properties": {
      "minReadySeconds": {
       "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
@@ -70925,7 +70930,7 @@
       "format": "int32"
      },
      "selector": {
-      "description": "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
+      "description": "Selector is a label query over pods that should match the replica count. Label keys and values that must match in order to be controlled by this replica set. It must match the pod template's labels. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
      },
      "template": {
@@ -71169,6 +71174,7 @@
    "io.k8s.api.apps.v1beta2.StatefulSetSpec": {
     "description": "A StatefulSetSpec is the specification of a StatefulSet.",
     "required": [
+     "selector",
      "template",
      "serviceName"
     ],
@@ -71188,7 +71194,7 @@
       "format": "int32"
      },
      "selector": {
-      "description": "selector is a label query over pods that should match the replica count. If empty, defaulted to labels on the pod template. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
+      "description": "selector is a label query over pods that should match the replica count. It must match the pod template's labels. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
      },
      "serviceName": {

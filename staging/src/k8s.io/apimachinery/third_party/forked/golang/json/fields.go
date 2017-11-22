@@ -26,17 +26,14 @@ const (
 // struct field given the struct type and the JSON name of the field.
 // It returns field type, a slice of patch strategies, merge key and error.
 // TODO: fix the returned errors to be introspectable.
-func LookupPatchMetadata(t reflect.Type, jsonField string) (
+func LookupPatchMetadataForStruct(t reflect.Type, jsonField string) (
 	elemType reflect.Type, patchStrategies []string, patchMergeKey string, e error) {
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
-	if t.Kind() == reflect.Map {
-		elemType = t.Elem()
-		return
-	}
+
 	if t.Kind() != reflect.Struct {
-		e = fmt.Errorf("merging an object in json but data type is not map or struct, instead is: %s",
+		e = fmt.Errorf("merging an object in json but data type is not struct, instead is: %s",
 			t.Kind().String())
 		return
 	}

@@ -338,6 +338,14 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error printing files on dryrun: %v", err)
 	}
 
+	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
+		// Write base kubelet configuration for dynamic kubelet configuration feature.
+		if err := kubeletphase.WriteInitKubeletConfigToDiskOnMaster(i.cfg); err != nil {
+			return fmt.Errorf("error writing base kubelet configuration to disk: %v", err)
+		}
+	}
+
 	// Create a kubernetes client and wait for the API server to be healthy (if not dryrunning)
 	client, err := createClient(i.cfg, i.dryRun)
 	if err != nil {
@@ -364,7 +372,7 @@ func (i *Init) Run(out io.Writer) error {
 	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
 		// Create base kubelet configuration for dynamic kubelet configuration feature.
 		if err := kubeletphase.CreateBaseKubeletConfiguration(i.cfg, client); err != nil {
-			return fmt.Errorf("error uploading configuration: %v", err)
+			return fmt.Errorf("error creating base kubelet configuration: %v", err)
 		}
 	}
 

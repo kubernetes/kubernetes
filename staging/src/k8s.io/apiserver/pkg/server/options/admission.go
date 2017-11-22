@@ -59,10 +59,14 @@ type AdmissionOptions struct {
 //  Servers that do care can overwrite/append that field after creation.
 func NewAdmissionOptions() *AdmissionOptions {
 	options := &AdmissionOptions{
-		Plugins:                admission.NewPlugins(),
-		PluginNames:            []string{},
-		RecommendedPluginOrder: []string{mutatingwebhook.PluginName, lifecycle.PluginName, initialization.PluginName, validatingwebhook.PluginName},
-		DefaultOffPlugins:      []string{mutatingwebhook.PluginName, initialization.PluginName, validatingwebhook.PluginName},
+		Plugins:     admission.NewPlugins(),
+		PluginNames: []string{},
+		// This list is mix of mutating admission plugins and validating
+		// admission plugins. The apiserver always runs the validating ones
+		// after all the mutating ones, so their relative order in this list
+		// doesn't matter.
+		RecommendedPluginOrder: []string{lifecycle.PluginName, initialization.PluginName, mutatingwebhook.PluginName, validatingwebhook.PluginName},
+		DefaultOffPlugins:      []string{initialization.PluginName, mutatingwebhook.PluginName, validatingwebhook.PluginName},
 	}
 	apiserverapi.AddToScheme(options.Plugins.ConfigScheme)
 	apiserverapiv1alpha1.AddToScheme(options.Plugins.ConfigScheme)
