@@ -30,6 +30,7 @@ import (
 	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
+	"github.com/google/cadvisor/container/containerd"
 	"github.com/google/cadvisor/container/crio"
 	"github.com/google/cadvisor/container/docker"
 	"github.com/google/cadvisor/container/raw"
@@ -49,6 +50,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"k8s.io/utils/clock"
 )
 
 var globalHousekeepingInterval = flag.Duration("global_housekeeping_interval", 1*time.Minute, "Interval between global housekeepings")
@@ -277,6 +279,11 @@ func (self *manager) Start() error {
 			return err
 		}
 		self.containerWatchers = append(self.containerWatchers, watcher)
+	}
+
+	err = containerd.Register(self, self.fsInfo, self.ignoreMetrics)
+	if err != nil {
+		glog.Warningf("Registration of the containerd container factory failed: %v", err)
 	}
 
 	err = crio.Register(self, self.fsInfo, self.ignoreMetrics)
@@ -707,6 +714,18 @@ func (self *manager) getRequestedContainers(containerName string, options v2.Req
 	default:
 		return containersMap, fmt.Errorf("invalid request type %q", options.IdType)
 	}
+	if options.MaxAge != nil {
+		// update stats for all containers in containersMap
+		var waitGroup sync.WaitGroup
+		waitGroup.Add(len(containersMap))
+		for _, container := range containersMap {
+			go func(cont *containerData) {
+				cont.OnDemandHousekeeping(*options.MaxAge)
+				waitGroup.Done()
+			}(container)
+		}
+		waitGroup.Wait()
+	}
 	return containersMap, nil
 }
 
@@ -804,6 +823,8 @@ func (m *manager) Exists(containerName string) bool {
 func (m *manager) GetProcessList(containerName string, options v2.RequestOptions) ([]v2.ProcessInfo, error) {
 	// override recursive. Only support single container listing.
 	options.Recursive = false
+	// override MaxAge.  ProcessList does not require updated stats.
+	options.MaxAge = nil
 	conts, err := m.getRequestedContainers(containerName, options)
 	if err != nil {
 		return nil, err
@@ -919,7 +940,7 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 	}
 
 	logUsage := *logCadvisorUsage && containerName == m.cadvisorContainer
-	cont, err := newContainerData(containerName, m.memoryCache, handler, logUsage, collectorManager, m.maxHousekeepingInterval, m.allowDynamicHousekeeping)
+	cont, err := newContainerData(containerName, m.memoryCache, handler, logUsage, collectorManager, m.maxHousekeepingInterval, m.allowDynamicHousekeeping, clock.RealClock{})
 	if err != nil {
 		return err
 	}
