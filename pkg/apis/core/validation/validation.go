@@ -42,10 +42,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	podshelper "k8s.io/kubernetes/pkg/apis/core/pods"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -1964,7 +1964,7 @@ func validateObjectFieldSelector(fs *core.ObjectFieldSelector, expressions *sets
 		return allErrs
 	}
 
-	internalFieldPath, _, err := legacyscheme.Scheme.ConvertFieldLabel(fs.APIVersion, "Pod", fs.FieldPath, "")
+	internalFieldPath, _, err := podshelper.ConvertDownwardAPIFieldLabel(fs.APIVersion, fs.FieldPath, "")
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldPath"), fs.FieldPath, fmt.Sprintf("error converting fieldPath: %v", err)))
 		return allErrs

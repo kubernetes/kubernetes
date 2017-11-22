@@ -159,17 +159,12 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		func(label, value string) (string, string, error) {
 			path, _ := fieldpath.SplitMaybeSubscriptedPath(label)
 			switch path {
-			case "metadata.annotations",
-				"metadata.labels",
-				"metadata.name",
+			case "metadata.name",
 				"metadata.namespace",
-				"metadata.uid",
 				"spec.nodeName",
 				"spec.restartPolicy",
-				"spec.serviceAccountName",
 				"spec.schedulerName",
 				"status.phase",
-				"status.hostIP",
 				"status.podIP":
 				return label, value, nil
 			// This is for backwards compatibility with old v1 clients which send spec.host

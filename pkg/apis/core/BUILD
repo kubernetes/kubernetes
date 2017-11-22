@@ -51,6 +51,7 @@ filegroup(
         "//pkg/apis/core/fuzzer:all-srcs",
         "//pkg/apis/core/helper:all-srcs",
         "//pkg/apis/core/install:all-srcs",
+        "//pkg/apis/core/pods:all-srcs",
         "//pkg/apis/core/v1:all-srcs",
         "//pkg/apis/core/validation:all-srcs",
     ],
