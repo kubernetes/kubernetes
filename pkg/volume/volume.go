@@ -37,6 +37,19 @@ type Volume interface {
 	MetricsProvider
 }
 
+// BlockVolume interface provides methods to generate global map path
+// and pod device map path.
+type BlockVolume interface {
+	// GetGlobalMapPath returns a global map path which contains
+	// symbolic links associated to a block device.
+	// ex. plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{pod uuid}
+	GetGlobalMapPath(spec *Spec) (string, error)
+	// GetPodDeviceMapPath returns a pod device map path
+	// and name of a symbolic link associated to a block device.
+	// ex. pods/{podUid}}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/{volumeName}
+	GetPodDeviceMapPath() (string, string)
+}
+
 // MetricsProvider exposes metrics (e.g. used,available space) related to a
 // Volume.
 type MetricsProvider interface {
@@ -130,6 +143,34 @@ type Unmounter interface {
 	// TearDown unmounts the volume from the specified directory and
 	// removes traces of the SetUp procedure.
 	TearDownAt(dir string) error
+}
+
+// BlockVolumeMapper interface provides methods to set up/map the volume.
+type BlockVolumeMapper interface {
+	BlockVolume
+	// SetUpDevice prepares the volume to a self-determined directory path,
+	// which may or may not exist yet and returns combination of physical
+	// device path of a block volume and error.
+	// If the plugin is non-attachable, it should prepare the device
+	// in /dev/ (or where appropriate) and return unique device path.
+	// Unique device path across kubelet node reboot is required to avoid
+	// unexpected block volume destruction.
+	// If the plugin is attachable, it should not do anything here,
+	// just return empty string for device path.
+	// Instead, attachable plugin have to return unique device path
+	// at attacher.Attach() and attacher.WaitForAttach().
+	// This may be called more than once, so implementations must be idempotent.
+	SetUpDevice() (string, error)
+}
+
+// BlockVolumeUnmapper interface provides methods to cleanup/unmap the volumes.
+type BlockVolumeUnmapper interface {
+	BlockVolume
+	// TearDownDevice removes traces of the SetUpDevice procedure under
+	// a self-determined directory.
+	// If the plugin is non-attachable, this method detaches the volume
+	// from a node.
+	TearDownDevice(mapPath string, devicePath string) error
 }
 
 // Provisioner is an interface that creates templates for PersistentVolumes
