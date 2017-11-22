@@ -539,12 +539,27 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*re
 			continue
 		}
 		if volume.pluginIsAttachable {
-			err = rc.actualStateOfWorld.MarkDeviceAsMounted(volume.volumeName)
+			// Get attacher, if possible
+			attachableVolumePlugin, _ :=
+				rc.volumePluginMgr.FindAttachablePluginBySpec(volume.volumeSpec)
+			var volumeAttacher volumepkg.Attacher
+			if attachableVolumePlugin != nil {
+				volumeAttacher, _ = attachableVolumePlugin.NewAttacher()
+			}
+			if volumeAttacher != nil {
+				volume.devicePath, err = volumeAttacher.WaitForAttach(
+					volume.volumeSpec, volume.devicePath, volume.pod, rc.waitForAttachTimeout)
+				if err != nil {
+					glog.Errorf("Could not complete WaitForAttach call. err: %v", err)
+					continue
+				}
+			}
+			err = rc.actualStateOfWorld.MarkDeviceAsMounted(volume.volumeName, volume.devicePath)
 			if err != nil {
 				glog.Errorf("Could not mark device is mounted to actual state of world: %v", err)
 				continue
 			}
-			glog.Infof("Volume: %v is mounted", volume.volumeName)
+			glog.Infof("Volume: %v is mounted. devicePath: %v", volume.volumeName, volume.devicePath)
 		}
 
 		_, err = rc.desiredStateOfWorld.AddPodToVolume(volume.podName,

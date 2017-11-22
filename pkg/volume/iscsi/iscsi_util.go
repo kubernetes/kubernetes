@@ -183,7 +183,7 @@ func (util *ISCSIUtil) persistISCSI(conf iscsiDisk, mnt string) error {
 	return nil
 }
 
-func (util *ISCSIUtil) loadISCSI(conf *iscsiDisk, mnt string) error {
+func loadISCSI(conf *iscsiDisk, mnt string) error {
 	// NOTE: The iscsi config json is not deleted after logging out from target portals.
 	file := path.Join(mnt, "iscsi.json")
 	fp, err := os.Open(file)
@@ -301,26 +301,6 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 
 	//Make sure we use a valid devicepath to find mpio device.
 	devicePath = devicePaths[0]
-
-	// mount it
-	globalPDPath := b.manager.MakeGlobalPDName(*b.iscsiDisk)
-	notMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
-	if err != nil && !os.IsNotExist(err) {
-		return "", fmt.Errorf("Heuristic determination of mount point failed:%v", err)
-	}
-	if !notMnt {
-		glog.Infof("iscsi: %s already mounted", globalPDPath)
-		return "", nil
-	}
-
-	if err := os.MkdirAll(globalPDPath, 0750); err != nil {
-		glog.Errorf("iscsi: failed to mkdir %s, error", globalPDPath)
-		return "", err
-	}
-
-	// Persist iscsi disk config to json file for DetachDisk path
-	util.persistISCSI(*(b.iscsiDisk), globalPDPath)
-
 	for _, path := range devicePaths {
 		// There shouldnt be any empty device paths. However adding this check
 		// for safer side to avoid the possibility of an empty entry.
@@ -333,6 +313,26 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 			break
 		}
 	}
+
+	// mount it
+	globalPDPath := b.manager.MakeGlobalPDName(*b.iscsiDisk)
+	notMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
+	if err != nil && !os.IsNotExist(err) {
+		return "", fmt.Errorf("Heuristic determination of mount point failed:%v", err)
+	}
+	if !notMnt {
+		glog.Infof("iscsi: %s already mounted", globalPDPath)
+		return devicePath, nil
+	}
+
+	if err := os.MkdirAll(globalPDPath, 0750); err != nil {
+		glog.Errorf("iscsi: failed to mkdir %s, error", globalPDPath)
+		return "", err
+	}
+
+	// Persist iscsi disk config to json file for DetachDisk path
+	util.persistISCSI(*(b.iscsiDisk), globalPDPath)
+
 	err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil)
 	if err != nil {
 		glog.Errorf("iscsi: failed to mount iscsi volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
@@ -376,7 +376,7 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 	found := true
 
 	// load iscsi disk config from json file
-	if err := util.loadISCSI(c.iscsiDisk, mntPath); err == nil {
+	if err := loadISCSI(c.iscsiDisk, mntPath); err == nil {
 		bkpPortal, iqn, iface, volName = c.iscsiDisk.Portals, c.iscsiDisk.Iqn, c.iscsiDisk.Iface, c.iscsiDisk.VolName
 		initiatorName = c.iscsiDisk.InitiatorName
 	} else {
