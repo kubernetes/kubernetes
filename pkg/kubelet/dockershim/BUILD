@@ -99,8 +99,6 @@ go_test(
         "//conditions:default": [],
     }),
     data = [
-        "fixtures/seccomp/sub/subtest",
-        "fixtures/seccomp/test",
     ],
     library = ":go_default_library",
     deps = [
