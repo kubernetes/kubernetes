@@ -17,15 +17,15 @@ package common
 import (
 	"sync"
 
-	"github.com/fsnotify/fsnotify"
+	"golang.org/x/exp/inotify"
 )
 
-// Watcher for container-related fsnotify events in the cgroup hierarchy.
+// Watcher for container-related inotify events in the cgroup hierarchy.
 //
 // Implementation is thread-safe.
 type InotifyWatcher struct {
-	// Underlying fsnotify watcher.
-	watcher *fsnotify.Watcher
+	// Underlying inotify watcher.
+	watcher *inotify.Watcher
 
 	// Map of containers being watched to cgroup paths watched for that container.
 	containersWatched map[string]map[string]bool
@@ -35,7 +35,7 @@ type InotifyWatcher struct {
 }
 
 func NewInotifyWatcher() (*InotifyWatcher, error) {
-	w, err := fsnotify.NewWatcher()
+	w, err := inotify.NewWatcher()
 	if err != nil {
 		return nil, err
 	}
@@ -53,9 +53,9 @@ func (iw *InotifyWatcher) AddWatch(containerName, dir string) (bool, error) {
 
 	cgroupsWatched, alreadyWatched := iw.containersWatched[containerName]
 
-	// Register an fsnotify notification.
+	// Register an inotify notification.
 	if !cgroupsWatched[dir] {
-		err := iw.watcher.Add(dir)
+		err := iw.watcher.AddWatch(dir, inotify.IN_CREATE|inotify.IN_DELETE|inotify.IN_MOVE)
 		if err != nil {
 			return alreadyWatched, err
 		}
@@ -84,9 +84,9 @@ func (iw *InotifyWatcher) RemoveWatch(containerName, dir string) (bool, error) {
 		return false, nil
 	}
 
-	// Remove the fsnotify watch if it exists.
+	// Remove the inotify watch if it exists.
 	if cgroupsWatched[dir] {
-		err := iw.watcher.Remove(dir)
+		err := iw.watcher.RemoveWatch(dir)
 		if err != nil {
 			return false, nil
 		}
@@ -104,15 +104,15 @@ func (iw *InotifyWatcher) RemoveWatch(containerName, dir string) (bool, error) {
 
 // Errors are returned on this channel.
 func (iw *InotifyWatcher) Error() chan error {
-	return iw.watcher.Errors
+	return iw.watcher.Error
 }
 
 // Events are returned on this channel.
-func (iw *InotifyWatcher) Event() chan fsnotify.Event {
-	return iw.watcher.Events
+func (iw *InotifyWatcher) Event() chan *inotify.Event {
+	return iw.watcher.Event
 }
 
-// Closes the fsnotify watcher.
+// Closes the inotify watcher.
 func (iw *InotifyWatcher) Close() error {
 	return iw.watcher.Close()
 }

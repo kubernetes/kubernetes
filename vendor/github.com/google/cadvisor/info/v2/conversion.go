@@ -206,9 +206,6 @@ func InstCpuStats(last, cur *v1.ContainerStats) (*CpuInstStats, error) {
 		return nil, fmt.Errorf("different number of cpus")
 	}
 	timeDelta := cur.Timestamp.Sub(last.Timestamp)
-	if timeDelta <= 100*time.Millisecond {
-		return nil, fmt.Errorf("time delta unexpectedly small")
-	}
 	// Nanoseconds to gain precision and avoid having zero seconds if the
 	// difference between the timestamps is just under a second
 	timeDeltaNs := uint64(timeDelta.Nanoseconds())

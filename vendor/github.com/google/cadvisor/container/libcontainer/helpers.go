@@ -55,19 +55,36 @@ func GetCgroupSubsystems() (CgroupSubsystems, error) {
 	if err != nil {
 		return CgroupSubsystems{}, err
 	}
+
+	return getCgroupSubsystemsHelper(allCgroups)
+}
+
+func getCgroupSubsystemsHelper(allCgroups []cgroups.Mount) (CgroupSubsystems, error) {
 	if len(allCgroups) == 0 {
 		return CgroupSubsystems{}, fmt.Errorf("failed to find cgroup mounts")
 	}
 
 	// Trim the mounts to only the subsystems we care about.
 	supportedCgroups := make([]cgroups.Mount, 0, len(allCgroups))
+	recordedMountpoints := make(map[string]struct{}, len(allCgroups))
 	mountPoints := make(map[string]string, len(allCgroups))
 	for _, mount := range allCgroups {
 		for _, subsystem := range mount.Subsystems {
-			if _, ok := supportedSubsystems[subsystem]; ok {
-				supportedCgroups = append(supportedCgroups, mount)
-				mountPoints[subsystem] = mount.Mountpoint
+			if _, ok := supportedSubsystems[subsystem]; !ok {
+				// Unsupported subsystem
+				continue
 			}
+			if _, ok := mountPoints[subsystem]; ok {
+				// duplicate mount for this subsystem; use the first one we saw
+				glog.V(5).Infof("skipping %s, already using mount at %s", mount.Mountpoint, mountPoints[subsystem])
+				continue
+			}
+			if _, ok := recordedMountpoints[mount.Mountpoint]; !ok {
+				// avoid appending the same mount twice in e.g. `cpu,cpuacct` case
+				supportedCgroups = append(supportedCgroups, mount)
+				recordedMountpoints[mount.Mountpoint] = struct{}{}
+			}
+			mountPoints[subsystem] = mount.Mountpoint
 		}
 	}
 
