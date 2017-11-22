@@ -40,6 +40,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
@@ -625,6 +626,11 @@ func (s *SchedulerServer) Run(stop chan struct{}) error {
 // SchedulerConfig creates the scheduler configuration. This is exposed for use
 // by tests.
 func (s *SchedulerServer) SchedulerConfig() (*scheduler.Config, error) {
+	var storageClassInformer storageinformers.StorageClassInformer
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		storageClassInformer = s.InformerFactory.Storage().V1().StorageClasses()
+	}
+
 	// Set up the configurator which can create schedulers from configs.
 	configurator := factory.NewConfigFactory(
 		s.SchedulerName,
@@ -638,6 +644,7 @@ func (s *SchedulerServer) SchedulerConfig() (*scheduler.Config, error) {
 		s.InformerFactory.Apps().V1beta1().StatefulSets(),
 		s.InformerFactory.Core().V1().Services(),
 		s.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		storageClassInformer,
 		s.HardPodAffinitySymmetricWeight,
 		utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
 	)

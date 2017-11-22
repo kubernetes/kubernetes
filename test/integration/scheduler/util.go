@@ -78,6 +78,7 @@ func initTest(t *testing.T, nsPrefix string) *TestContext {
 		context.informerFactory.Apps().V1beta1().StatefulSets(),
 		context.informerFactory.Core().V1().Services(),
 		context.informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		context.informerFactory.Storage().V1().StorageClasses(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		true,
 	)
