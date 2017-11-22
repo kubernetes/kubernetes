@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
@@ -36,6 +37,7 @@ import (
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
@@ -265,6 +267,7 @@ func (m *ManagerImpl) Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.P
 // Register registers a device plugin.
 func (m *ManagerImpl) Register(ctx context.Context, r *pluginapi.RegisterRequest) (*pluginapi.Empty, error) {
 	glog.Infof("Got registration request from device plugin with resource name %q", r.ResourceName)
+	metrics.DevicePluginRegistrationCount.WithLabelValues(r.ResourceName).Inc()
 	if r.Version != pluginapi.Version {
 		errorString := fmt.Sprintf(errUnsuportedVersion, r.Version, pluginapi.Version)
 		glog.Infof("Bad registration request from device plugin with resource name %q: %v", r.ResourceName, errorString)
@@ -548,6 +551,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		if allocDevices == nil || len(allocDevices) <= 0 {
 			continue
 		}
+		startRPCTime := time.Now()
 		// devicePluginManager.Allocate involves RPC calls to device plugin, which
 		// could be heavy-weight. Therefore we want to perform this operation outside
 		// mutex lock. Note if Allocate call fails, we may leave container resources
@@ -573,6 +577,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		devs := allocDevices.UnsortedList()
 		glog.V(3).Infof("Making allocation request for devices %v for device plugin %s", devs, resource)
 		resp, err := e.allocate(devs)
+		metrics.DevicePluginAllocationLatency.WithLabelValues(resource).Observe(metrics.SinceInMicroseconds(startRPCTime))
 		if err != nil {
 			// In case of allocation failure, we want to restore m.allocatedDevices
 			// to the actual allocated state from m.podDevices.
