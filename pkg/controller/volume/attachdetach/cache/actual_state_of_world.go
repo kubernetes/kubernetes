@@ -125,6 +125,10 @@ type ActualStateOfWorld interface {
 
 	// GetNodesToUpdateStatusFor returns the map of nodeNames to nodeToUpdateStatusFor
 	GetNodesToUpdateStatusFor() map[types.NodeName]nodeToUpdateStatusFor
+
+	// AddNodeIntoUpdateStatusFor add node to nodesToUpdateStatusFor when
+	// the specified node does not exists in the nodesToUpdateStatusFor list.
+	AddNodeIntoUpdateStatusFor(nodeName types.NodeName)
 }
 
 // AttachedVolume represents a volume that is attached to a node.
@@ -490,6 +494,30 @@ func (asw *actualStateOfWorld) SetNodeStatusUpdateNeeded(nodeName types.NodeName
 	if err := asw.updateNodeStatusUpdateNeeded(nodeName, true); err != nil {
 		glog.Errorf("Failed to update statusUpdateNeeded field in actual state of world: %v", err)
 	}
+}
+
+// AddNodeIntoUpdateStatusFor add node to nodesToUpdateStatusFor when
+// the specified node does not exists in the nodesToUpdateStatusFor list.
+func (asw *actualStateOfWorld) AddNodeIntoUpdateStatusFor(nodeName types.NodeName) {
+	asw.Lock()
+	defer asw.Unlock()
+	nodeToUpdate, nodeToUpdateExists := asw.nodesToUpdateStatusFor[nodeName]
+	if nodeToUpdateExists {
+		glog.V(4).Infof("The node %q already exists in nodesToUpdateStatusFor", nodeName)
+		// Update the actual status
+		nodeToUpdate.statusUpdateNeeded = true
+		asw.nodesToUpdateStatusFor[nodeName] = nodeToUpdate
+		return
+	}
+
+	// Add new node, no need to update the actual status
+	nodeToUpdate = nodeToUpdateStatusFor{
+		nodeName:                  nodeName,
+		statusUpdateNeeded:        false,
+		volumesToReportAsAttached: make(map[v1.UniqueVolumeName]v1.UniqueVolumeName),
+	}
+	asw.nodesToUpdateStatusFor[nodeName] = nodeToUpdate
+	glog.V(4).Infof("Add new node %q to nodesToUpdateStatusFor", nodeName)
 }
 
 func (asw *actualStateOfWorld) DeleteVolumeNode(

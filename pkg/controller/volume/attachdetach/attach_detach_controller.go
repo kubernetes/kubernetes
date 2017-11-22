@@ -454,7 +454,7 @@ func (adc *attachDetachController) nodeAdd(obj interface{}) {
 	// This is to workaround the case when a node add causes to wipe out
 	// the attached volumes field. This function ensures that we sync with
 	// the actual status.
-	adc.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
+	adc.actualStateOfWorld.AddNodeIntoUpdateStatusFor(nodeName)
 }
 
 func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
