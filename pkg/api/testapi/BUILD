@@ -30,6 +30,8 @@ go_library(
         "//pkg/apis/componentconfig/install:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/install:go_default_library",
+        "//pkg/apis/events:go_default_library",
+        "//pkg/apis/events/install:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/install:go_default_library",
         "//pkg/apis/imagepolicy:go_default_library",

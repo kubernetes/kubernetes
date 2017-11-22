@@ -176,7 +176,7 @@ func (f *sharedInformerFactory) Core() core.Interface {
 }
 
 func (f *sharedInformerFactory) Events() events.Interface {
-	return events.New(f)
+	return events.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Extensions() extensions.Interface {
