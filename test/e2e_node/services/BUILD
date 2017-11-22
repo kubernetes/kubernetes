@@ -3,7 +3,6 @@ package(default_visibility = ["//visibility:public"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
-    "go_test",
 )
 
 go_library(
@@ -23,13 +22,9 @@ go_library(
     deps = [
         "//cmd/kube-apiserver/app:go_default_library",
         "//cmd/kube-apiserver/app/options:go_default_library",
-        "//cmd/kubelet/app/options:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/controller/namespace:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
-        "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",
-        "//pkg/kubelet/apis/kubeletconfig/v1alpha1:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e_node/builder:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver:go_default_library",
@@ -38,9 +33,7 @@ go_library(
         "//vendor/github.com/coreos/etcd/pkg/types:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/kardianos/osext:go_default_library",
-        "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/dynamic:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
@@ -60,12 +53,4 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["kubelet_test.go"],
-    importpath = "k8s.io/kubernetes/test/e2e_node/services",
-    library = ":go_default_library",
-    deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
 )
