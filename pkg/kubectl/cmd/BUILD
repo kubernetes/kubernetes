@@ -47,6 +47,7 @@ go_library(
         "expose.go",
         "help.go",
         "label.go",
+        "login.go",
         "logs.go",
         "options.go",
         "patch.go",

@@ -30,8 +30,8 @@ type AuthProvider interface {
 	// WrapTransport allows the plugin to create a modified RoundTripper that
 	// attaches authorization headers (or other info) to requests.
 	WrapTransport(http.RoundTripper) http.RoundTripper
-	// Login allows the plugin to initialize its configuration. It must not
-	// require direct user interaction.
+	// Login allows the plugin to initialize its configuration. It may involve
+	// user interaction.
 	Login() error
 }
 

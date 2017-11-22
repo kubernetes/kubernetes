@@ -747,6 +747,10 @@
 			"Rev": "0520cb9304cb2385f7e72b8bc02d6e4d3257158a"
 		},
 		{
+			"ImportPath": "github.com/coreos/go-oidc",
+			"Rev": "a4973d9a4225417aecf5d450a9522f00c1f7130f"
+		},
+		{
 			"ImportPath": "github.com/coreos/go-oidc/http",
 			"Rev": "a4973d9a4225417aecf5d450a9522f00c1f7130f"
 		},
@@ -2292,6 +2296,14 @@
 			"Rev": "d8ed2627bdf02c080bf22230dbb337003b7aba2d"
 		},
 		{
+			"ImportPath": "github.com/pquerna/cachecontrol",
+			"Rev": "0dec1b30a0215bb68605dfc568e8855066c9202d"
+		},
+		{
+			"ImportPath": "github.com/pquerna/cachecontrol/cacheobject",
+			"Rev": "0dec1b30a0215bb68605dfc568e8855066c9202d"
+		},
+		{
 			"ImportPath": "github.com/prometheus/client_golang/prometheus",
 			"Comment": "v0.8.0-83-ge7e9030",
 			"Rev": "e7e903064f5e9eb5da98208bae10b475d4db0f8c"
@@ -2371,6 +2383,10 @@
 			"ImportPath": "github.com/sirupsen/logrus",
 			"Comment": "v1.0.3-11-g89742ae",
 			"Rev": "89742aefa4b206dcf400792f3bd35b542998eb3b"
+		},
+		{
+			"ImportPath": "github.com/skratchdot/open-golang/open",
+			"Rev": "75fb7ed4208cf72d323d7d02fd1a5964a7a9073c"
 		},
 		{
 			"ImportPath": "github.com/spf13/afero",
@@ -2946,6 +2962,21 @@
 			"ImportPath": "gopkg.in/natefinch/lumberjack.v2",
 			"Comment": "v1.0-16-g20b71e5",
 			"Rev": "20b71e5b60d756d3d2f80def009790325acc2b23"
+		},
+		{
+			"ImportPath": "gopkg.in/square/go-jose.v2",
+			"Comment": "v2.1.3",
+			"Rev": "f8f38de21b4dcd69d0413faf231983f5fd6634b1"
+		},
+		{
+			"ImportPath": "gopkg.in/square/go-jose.v2/cipher",
+			"Comment": "v2.1.3",
+			"Rev": "f8f38de21b4dcd69d0413faf231983f5fd6634b1"
+		},
+		{
+			"ImportPath": "gopkg.in/square/go-jose.v2/json",
+			"Comment": "v2.1.3",
+			"Rev": "f8f38de21b4dcd69d0413faf231983f5fd6634b1"
 		},
 		{
 			"ImportPath": "gopkg.in/warnings.v0",

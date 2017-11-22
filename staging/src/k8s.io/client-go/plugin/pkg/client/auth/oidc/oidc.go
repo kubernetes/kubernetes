@@ -43,8 +43,15 @@ const (
 	cfgIDToken                  = "id-token"
 	cfgRefreshToken             = "refresh-token"
 
-	// Unused. Scopes aren't sent during refreshing.
+	// customize callback URI, http://localhost:PORT/PATH
+	cfgCallbackPath = "callback-path"
+	cfgCallbackPort = "callback-port"
+
+	// comma-separated scopes for login
 	cfgExtraScopes = "extra-scopes"
+	// additional options for auth request, semi-comma separated
+	// e.g. prompt=consent;login_hint=name@domain.com
+	cfgAuthOptions = "auth-options"
 )
 
 func init() {
@@ -123,11 +130,6 @@ func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.A
 		return provider, nil
 	}
 
-	if len(cfg[cfgExtraScopes]) > 0 {
-		glog.V(2).Infof("%s auth provider field depricated, refresh request don't send scopes",
-			cfgExtraScopes)
-	}
-
 	var certAuthData []byte
 	var err error
 	if cfg[cfgCertificateAuthorityData] != "" {
@@ -179,10 +181,6 @@ func (p *oidcAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper
 		wrapped:  rt,
 		provider: p,
 	}
-}
-
-func (p *oidcAuthProvider) Login() error {
-	return errors.New("not yet implemented")
 }
 
 type roundTripper struct {
