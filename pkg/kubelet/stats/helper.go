@@ -30,21 +30,15 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 )
 
-// cadvisorInfoToContainerStats returns the statsapi.ContainerStats converted
-// from the container and filesystem info.
-func cadvisorInfoToContainerStats(name string, info *cadvisorapiv2.ContainerInfo, rootFs, imageFs *cadvisorapiv2.FsInfo) *statsapi.ContainerStats {
-	result := &statsapi.ContainerStats{
-		StartTime: metav1.NewTime(info.Spec.CreationTime),
-		Name:      name,
-	}
-
+func cadvisorInfoToCPUandMemoryStats(info *cadvisorapiv2.ContainerInfo) (*statsapi.CPUStats, *statsapi.MemoryStats) {
 	cstat, found := latestContainerStats(info)
 	if !found {
-		return result
+		return nil, nil
 	}
-
+	var cpuStats *statsapi.CPUStats
+	var memoryStats *statsapi.MemoryStats
 	if info.Spec.HasCpu {
-		cpuStats := statsapi.CPUStats{
+		cpuStats = &statsapi.CPUStats{
 			Time: metav1.NewTime(cstat.Timestamp),
 		}
 		if cstat.CpuInst != nil {
@@ -53,13 +47,11 @@ func cadvisorInfoToContainerStats(name string, info *cadvisorapiv2.ContainerInfo
 		if cstat.Cpu != nil {
 			cpuStats.UsageCoreNanoSeconds = &cstat.Cpu.Usage.Total
 		}
-		result.CPU = &cpuStats
 	}
-
 	if info.Spec.HasMemory {
 		pageFaults := cstat.Memory.ContainerData.Pgfault
 		majorPageFaults := cstat.Memory.ContainerData.Pgmajfault
-		result.Memory = &statsapi.MemoryStats{
+		memoryStats = &statsapi.MemoryStats{
 			Time:            metav1.NewTime(cstat.Timestamp),
 			UsageBytes:      &cstat.Memory.Usage,
 			WorkingSetBytes: &cstat.Memory.WorkingSet,
@@ -70,9 +62,27 @@ func cadvisorInfoToContainerStats(name string, info *cadvisorapiv2.ContainerInfo
 		// availableBytes = memory limit (if known) - workingset
 		if !isMemoryUnlimited(info.Spec.Memory.Limit) {
 			availableBytes := info.Spec.Memory.Limit - cstat.Memory.WorkingSet
-			result.Memory.AvailableBytes = &availableBytes
+			memoryStats.AvailableBytes = &availableBytes
 		}
 	}
+	return cpuStats, memoryStats
+}
+
+// cadvisorInfoToContainerStats returns the statsapi.ContainerStats converted
+// from the container and filesystem info.
+func cadvisorInfoToContainerStats(name string, info *cadvisorapiv2.ContainerInfo, rootFs, imageFs *cadvisorapiv2.FsInfo) *statsapi.ContainerStats {
+	result := &statsapi.ContainerStats{
+		StartTime: metav1.NewTime(info.Spec.CreationTime),
+		Name:      name,
+	}
+	cstat, found := latestContainerStats(info)
+	if !found {
+		return result
+	}
+
+	cpu, memory := cadvisorInfoToCPUandMemoryStats(info)
+	result.CPU = cpu
+	result.Memory = memory
 
 	if rootFs != nil {
 		// The container logs live on the node rootfs device

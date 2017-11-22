@@ -104,7 +104,7 @@ func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (CgroupName, 
 	case v1.PodQOSBestEffort:
 		parentContainer = m.qosContainersInfo.BestEffort
 	}
-	podContainer := podCgroupNamePrefix + string(pod.UID)
+	podContainer := GetPodCgroupNameSuffix(pod.UID)
 
 	// Get the absolute path of the cgroup
 	cgroupName := (CgroupName)(path.Join(parentContainer, podContainer))

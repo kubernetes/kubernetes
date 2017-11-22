@@ -18,6 +18,7 @@ package stats
 
 import (
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -89,9 +91,9 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 			return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
 		}
 	}
-
+	// removeTerminatedContainerInfo will also remove pod level cgroups, so save the infos into allInfos first
+	allInfos := infos
 	infos = removeTerminatedContainerInfo(infos)
-
 	// Map each container to a pod and update the PodStats with container data.
 	podToStats := map[statsapi.PodReference]*statsapi.PodStats{}
 	for key, cinfo := range infos {
@@ -141,6 +143,13 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 			podStats.VolumeStats = append(vstats.EphemeralVolumes, vstats.PersistentVolumes...)
 		}
 		podStats.EphemeralStorage = calcEphemeralStorage(podStats.Containers, ephemeralStats, &rootFsInfo)
+		// Lookup the pod-level cgroup's CPU and memory stats
+		podInfo := getcadvisorPodInfoFromPodUID(podUID, allInfos)
+		if podInfo != nil {
+			cpu, memory := cadvisorInfoToCPUandMemoryStats(podInfo)
+			podStats.CPU = cpu
+			podStats.Memory = memory
+		}
 		result = append(result, *podStats)
 	}
 
@@ -241,6 +250,19 @@ func isPodManagedContainer(cinfo *cadvisorapiv2.ContainerInfo) bool {
 			podName, podNamespace)
 	}
 	return managed
+}
+
+// getcadvisorPodInfoFromPodUID returns a pod cgroup information by matching the podUID with its CgroupName identifier base name
+func getcadvisorPodInfoFromPodUID(podUID types.UID, infos map[string]cadvisorapiv2.ContainerInfo) *cadvisorapiv2.ContainerInfo {
+	for key, info := range infos {
+		if cm.IsSystemdStyleName(key) {
+			key = cm.RevertFromSystemdToCgroupStyleName(key)
+		}
+		if cm.GetPodCgroupNameSuffix(podUID) == path.Base(key) {
+			return &info
+		}
+	}
+	return nil
 }
 
 // removeTerminatedContainerInfo returns the specified containerInfo but with

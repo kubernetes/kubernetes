@@ -134,8 +134,10 @@ func TestCadvisorListPodStats(t *testing.T) {
 		"/pod1-i":  getTestContainerInfo(seedPod1Infra, pName1, namespace0, leaky.PodInfraContainerName),
 		"/pod1-c0": getTestContainerInfo(seedPod1Container, pName1, namespace0, cName10),
 		// Pod2 - Namespace2
-		"/pod2-i":  getTestContainerInfo(seedPod2Infra, pName2, namespace2, leaky.PodInfraContainerName),
-		"/pod2-c0": getTestContainerInfo(seedPod2Container, pName2, namespace2, cName20),
+		"/pod2-i":                        getTestContainerInfo(seedPod2Infra, pName2, namespace2, leaky.PodInfraContainerName),
+		"/pod2-c0":                       getTestContainerInfo(seedPod2Container, pName2, namespace2, cName20),
+		"/kubepods/burstable/podUIDpod0": getTestContainerInfo(seedPod0Infra, pName0, namespace0, leaky.PodInfraContainerName),
+		"/kubepods/podUIDpod1":           getTestContainerInfo(seedPod1Infra, pName1, namespace0, leaky.PodInfraContainerName),
 	}
 
 	freeRootfsInodes := rootfsInodesFree
@@ -228,6 +230,8 @@ func TestCadvisorListPodStats(t *testing.T) {
 	assert.EqualValues(t, testTime(creationTime, seedPod0Infra).Unix(), ps.StartTime.Time.Unix())
 	checkNetworkStats(t, "Pod0", seedPod0Infra, ps.Network)
 	checkEphemeralStats(t, "Pod0", []int{seedPod0Container0, seedPod0Container1}, []int{seedEphemeralVolume1, seedEphemeralVolume2}, ps.EphemeralStorage)
+	checkCPUStats(t, "Pod0", seedPod0Infra, ps.CPU)
+	checkMemoryStats(t, "Pod0", seedPod0Infra, infos["/pod0-i"], ps.Memory)
 
 	// Validate Pod1 Results
 	ps, found = indexPods[prf1]
