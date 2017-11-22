@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	gcfg "gopkg.in/gcfg.v1"
+	"gopkg.in/gcfg.v1"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -208,8 +208,8 @@ const (
 // The major consequence is that it is then not considered for AWS zone discovery for dynamic volume creation.
 var awsTagNameMasterRoles = sets.NewString("kubernetes.io/role/master", "k8s.io/role/master")
 
-// Maps from backend protocol to ELB protocol
-var backendProtocolMapping = map[string]string{
+// Maps from backend protocol to ELB protocol with SSL/HTTPS
+var backendSSLProtocolMapping = map[string]string{
 	"https": "https",
 	"http":  "https",
 	"ssl":   "ssl",
@@ -616,8 +616,11 @@ func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
 		Credentials: p.creds,
 	}
 	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
-
-	service := ec2.New(session.New(awsConfig))
+	newSession, err := session.NewSession(awsConfig)
+	if err != nil {
+		return nil, err
+	}
+	service := ec2.New(newSession)
 
 	p.addHandlers(regionName, &service.Handlers)
 
@@ -633,8 +636,11 @@ func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
 		Credentials: p.creds,
 	}
 	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
-
-	elbClient := elb.New(session.New(awsConfig))
+	newSession, err := session.NewSession(awsConfig)
+	if err != nil {
+		return nil, err
+	}
+	elbClient := elb.New(newSession)
 
 	p.addHandlers(regionName, &elbClient.Handlers)
 
@@ -661,8 +667,11 @@ func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
 		Credentials: p.creds,
 	}
 	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
-
-	client := autoscaling.New(session.New(awsConfig))
+	newSession, err := session.NewSession(awsConfig)
+	if err != nil {
+		return nil, err
+	}
+	client := autoscaling.New(newSession)
 
 	p.addHandlers(regionName, &client.Handlers)
 
@@ -670,7 +679,11 @@ func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
 }
 
 func (p *awsSDKProvider) Metadata() (EC2Metadata, error) {
-	client := ec2metadata.New(session.New(&aws.Config{}))
+	newSession, err := session.NewSession(&aws.Config{})
+	if err != nil {
+		return nil, err
+	}
+	client := ec2metadata.New(newSession)
 	p.addAPILoggingHandlers(&client.Handlers)
 	return client, nil
 }
@@ -681,21 +694,15 @@ func (p *awsSDKProvider) KeyManagement(regionName string) (KMS, error) {
 		Credentials: p.creds,
 	}
 	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
-
-	kmsClient := kms.New(session.New(awsConfig))
+	newSession, err := session.NewSession(awsConfig)
+	if err != nil {
+		return nil, err
+	}
+	kmsClient := kms.New(newSession)
 
 	p.addHandlers(regionName, &kmsClient.Handlers)
 
 	return kmsClient, nil
-}
-
-// stringPointerArray creates a slice of string pointers from a slice of strings
-// Deprecated: consider using aws.StringSlice - but note the slightly different behaviour with a nil input
-func stringPointerArray(orig []string) []*string {
-	if orig == nil {
-		return nil
-	}
-	return aws.StringSlice(orig)
 }
 
 func newEc2Filter(name string, values ...string) *ec2.Filter {
@@ -875,11 +882,15 @@ func (s *awsSdkEC2) DescribeVpcs(request *ec2.DescribeVpcsInput) (*ec2.DescribeV
 func init() {
 	registerMetrics()
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
+		newSession, err := session.NewSession(&aws.Config{})
+		if err != nil {
+			return nil, err
+		}
 		creds := credentials.NewChainCredentials(
 			[]credentials.Provider{
 				&credentials.EnvProvider{},
 				&ec2rolecreds.EC2RoleProvider{
-					Client: ec2metadata.New(session.New(&aws.Config{})),
+					Client: ec2metadata.New(newSession),
 				},
 				&credentials.SharedCredentialsProvider{},
 			})
@@ -3029,7 +3040,7 @@ func buildListener(port v1.ServicePort, annotations map[string]string, sslPorts 
 			protocol = "ssl"
 			instanceProtocol = "tcp"
 		} else {
-			protocol = backendProtocolMapping[instanceProtocol]
+			protocol = backendSSLProtocolMapping[instanceProtocol]
 			if protocol == "" {
 				return nil, fmt.Errorf("Invalid backend protocol %s for %s in %s", instanceProtocol, certID, ServiceAnnotationLoadBalancerBEProtocol)
 			}

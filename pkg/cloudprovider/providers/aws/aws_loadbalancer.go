@@ -858,9 +858,9 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 
 		// We are supposed to specify one subnet per AZ.
 		// TODO: What happens if we have more than one subnet per AZ?
-		createRequest.Subnets = stringPointerArray(subnetIDs)
+		createRequest.Subnets = aws.StringSlice(subnetIDs)
 
-		createRequest.SecurityGroups = stringPointerArray(securityGroupIDs)
+		createRequest.SecurityGroups = aws.StringSlice(securityGroupIDs)
 
 		// Get additional tags set by the user
 		tags := getLoadBalancerAdditionalTags(annotations)
@@ -942,7 +942,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 				// This call just replaces the security groups, unlike e.g. subnets (!)
 				request := &elb.ApplySecurityGroupsToLoadBalancerInput{}
 				request.LoadBalancerName = aws.String(loadBalancerName)
-				request.SecurityGroups = stringPointerArray(securityGroupIDs)
+				request.SecurityGroups = aws.StringSlice(securityGroupIDs)
 				glog.V(2).Info("Applying updated security groups to load balancer")
 				_, err := c.elb.ApplySecurityGroupsToLoadBalancer(request)
 				if err != nil {
@@ -973,10 +973,10 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 					if elbProtocolsAreEqual(actual.InstanceProtocol, expected.InstanceProtocol) {
 						continue
 					}
-					if orZero(actual.InstancePort) != orZero(expected.InstancePort) {
+					if aws.Int64Value(actual.InstancePort) != aws.Int64Value(expected.InstancePort) {
 						continue
 					}
-					if orZero(actual.LoadBalancerPort) != orZero(expected.LoadBalancerPort) {
+					if aws.Int64Value(actual.LoadBalancerPort) != aws.Int64Value(expected.LoadBalancerPort) {
 						continue
 					}
 					if awsArnEquals(actual.SSLCertificateId, expected.SSLCertificateId) {
@@ -1063,7 +1063,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 					foundBackends[instancePort] = true
 					// This is an existing ELB backend so we need to determine
 					// if the state changed
-					setPolicy = (currentState != proxyProtocol)
+					setPolicy = currentState != proxyProtocol
 				}
 
 				if setPolicy {
@@ -1188,10 +1188,10 @@ func (c *Cloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerDesc
 	expectedTarget := protocol + ":" + strconv.FormatInt(int64(port), 10) + path
 
 	if expectedTarget == aws.StringValue(actual.Target) &&
-		expectedHealthyThreshold == orZero(actual.HealthyThreshold) &&
-		expectedUnhealthyThreshold == orZero(actual.UnhealthyThreshold) &&
-		expectedTimeout == orZero(actual.Timeout) &&
-		expectedInterval == orZero(actual.Interval) {
+		expectedHealthyThreshold == aws.Int64Value(actual.HealthyThreshold) &&
+		expectedUnhealthyThreshold == aws.Int64Value(actual.UnhealthyThreshold) &&
+		expectedTimeout == aws.Int64Value(actual.Timeout) &&
+		expectedInterval == aws.Int64Value(actual.Interval) {
 		return nil
 	}
 
