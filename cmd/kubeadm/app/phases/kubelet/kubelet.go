@@ -223,9 +223,12 @@ func WriteInitKubeletConfigToDiskOnMaster(cfg *kubeadmapi.MasterConfiguration) e
 }
 
 func writeInitKubeletConfigToDisk(kubeletConfig []byte) error {
-	baseCongfigFile := filepath.Join(kubeadmconstants.KubeletBaseConfigurationDir, kubeadmconstants.KubeletBaseConfigurationFile)
-	if err := ioutil.WriteFile(baseCongfigFile, kubeletConfig, 0644); err != nil {
-		return fmt.Errorf("failed to write initial remote configuration of kubelet into file %q: %v", baseCongfigFile, err)
+	if err := os.MkdirAll(kubeadmconstants.KubeletBaseConfigurationDir, 0644); err != nil {
+		return fmt.Errorf("failed to create directory %q: %v", kubeadmconstants.KubeletBaseConfigurationDir, err)
+	}
+	baseConfigFile := filepath.Join(kubeadmconstants.KubeletBaseConfigurationDir, kubeadmconstants.KubeletBaseConfigurationFile)
+	if err := ioutil.WriteFile(baseConfigFile, kubeletConfig, 0644); err != nil {
+		return fmt.Errorf("failed to write initial remote configuration of kubelet into file %q: %v", baseConfigFile, err)
 	}
 	return nil
 }
