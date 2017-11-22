@@ -3831,6 +3831,13 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.DeferContainers != nil {
+		in, out := &in.DeferContainers, &out.DeferContainers
+		*out = make([]Container, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.TerminationGracePeriodSeconds != nil {
 		in, out := &in.TerminationGracePeriodSeconds, &out.TerminationGracePeriodSeconds
 		if *in == nil {
@@ -3961,6 +3968,13 @@ func (in *PodStatus) DeepCopyInto(out *PodStatus) {
 	}
 	if in.ContainerStatuses != nil {
 		in, out := &in.ContainerStatuses, &out.ContainerStatuses
+		*out = make([]ContainerStatus, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.DeferContainerStatuses != nil {
+		in, out := &in.DeferContainerStatuses, &out.DeferContainerStatuses
 		*out = make([]ContainerStatus, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])

@@ -264,12 +264,18 @@ func (d *kubeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dock
 func (d *kubeDockerClient) WaitForContainer(id string) error {
 	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
-
-	_, err := d.client.ContainerWait(ctx, id)
+	waitCh, errCh := d.client.ContainerWait(ctx, id, dockercontainer.WaitConditionNextExit)
 	if ctxErr := contextError(ctx); ctxErr != nil {
 		return ctxErr
 	}
-	return err
+	//Wait either for the container to finish its execution.
+	select {
+	case <-waitCh:
+		break
+	case err := <-errCh:
+		return err
+	}
+	return nil
 }
 
 func base64EncodeAuth(auth dockertypes.AuthConfig) (string, error) {

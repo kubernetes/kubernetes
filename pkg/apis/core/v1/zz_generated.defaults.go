@@ -304,6 +304,48 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 			}
 		}
 	}
+	for i := range in.Spec.DeferContainers {
+		a := &in.Spec.DeferContainers[i]
+		SetDefaults_Container(a)
+		for j := range a.Ports {
+			b := &a.Ports[j]
+			SetDefaults_ContainerPort(b)
+		}
+		for j := range a.Env {
+			b := &a.Env[j]
+			if b.ValueFrom != nil {
+				if b.ValueFrom.FieldRef != nil {
+					SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+				}
+			}
+		}
+		SetDefaults_ResourceList(&a.Resources.Limits)
+		SetDefaults_ResourceList(&a.Resources.Requests)
+		if a.LivenessProbe != nil {
+			SetDefaults_Probe(a.LivenessProbe)
+			if a.LivenessProbe.Handler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
+			}
+		}
+		if a.ReadinessProbe != nil {
+			SetDefaults_Probe(a.ReadinessProbe)
+			if a.ReadinessProbe.Handler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
+			}
+		}
+		if a.Lifecycle != nil {
+			if a.Lifecycle.PostStart != nil {
+				if a.Lifecycle.PostStart.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+				}
+			}
+			if a.Lifecycle.PreStop != nil {
+				if a.Lifecycle.PreStop.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				}
+			}
+		}
+	}
 }
 
 func SetObjectDefaults_PodList(in *v1.PodList) {
@@ -407,6 +449,48 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 	}
 	for i := range in.Template.Spec.Containers {
 		a := &in.Template.Spec.Containers[i]
+		SetDefaults_Container(a)
+		for j := range a.Ports {
+			b := &a.Ports[j]
+			SetDefaults_ContainerPort(b)
+		}
+		for j := range a.Env {
+			b := &a.Env[j]
+			if b.ValueFrom != nil {
+				if b.ValueFrom.FieldRef != nil {
+					SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+				}
+			}
+		}
+		SetDefaults_ResourceList(&a.Resources.Limits)
+		SetDefaults_ResourceList(&a.Resources.Requests)
+		if a.LivenessProbe != nil {
+			SetDefaults_Probe(a.LivenessProbe)
+			if a.LivenessProbe.Handler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
+			}
+		}
+		if a.ReadinessProbe != nil {
+			SetDefaults_Probe(a.ReadinessProbe)
+			if a.ReadinessProbe.Handler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
+			}
+		}
+		if a.Lifecycle != nil {
+			if a.Lifecycle.PostStart != nil {
+				if a.Lifecycle.PostStart.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+				}
+			}
+			if a.Lifecycle.PreStop != nil {
+				if a.Lifecycle.PreStop.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				}
+			}
+		}
+	}
+	for i := range in.Template.Spec.DeferContainers {
+		a := &in.Template.Spec.DeferContainers[i]
 		SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
@@ -552,6 +636,48 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 		}
 		for i := range in.Spec.Template.Spec.Containers {
 			a := &in.Spec.Template.Spec.Containers[i]
+			SetDefaults_Container(a)
+			for j := range a.Ports {
+				b := &a.Ports[j]
+				SetDefaults_ContainerPort(b)
+			}
+			for j := range a.Env {
+				b := &a.Env[j]
+				if b.ValueFrom != nil {
+					if b.ValueFrom.FieldRef != nil {
+						SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					}
+				}
+			}
+			SetDefaults_ResourceList(&a.Resources.Limits)
+			SetDefaults_ResourceList(&a.Resources.Requests)
+			if a.LivenessProbe != nil {
+				SetDefaults_Probe(a.LivenessProbe)
+				if a.LivenessProbe.Handler.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
+				}
+			}
+			if a.ReadinessProbe != nil {
+				SetDefaults_Probe(a.ReadinessProbe)
+				if a.ReadinessProbe.Handler.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
+				}
+			}
+			if a.Lifecycle != nil {
+				if a.Lifecycle.PostStart != nil {
+					if a.Lifecycle.PostStart.HTTPGet != nil {
+						SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					}
+				}
+				if a.Lifecycle.PreStop != nil {
+					if a.Lifecycle.PreStop.HTTPGet != nil {
+						SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					}
+				}
+			}
+		}
+		for i := range in.Spec.Template.Spec.DeferContainers {
+			a := &in.Spec.Template.Spec.DeferContainers[i]
 			SetDefaults_Container(a)
 			for j := range a.Ports {
 				b := &a.Ports[j]

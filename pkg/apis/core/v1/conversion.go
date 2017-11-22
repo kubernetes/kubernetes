@@ -134,6 +134,9 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add non-generated conversion functions
 	err := scheme.AddConversionFuncs(
 		Convert_core_Pod_To_v1_Pod,
+		Convert_v1_Pod_To_core_Pod,
+		Convert_core_PodStatusResult_To_v1_PodStatusResult,
+		Convert_v1_PodStatusResult_To_core_PodStatusResult,
 		Convert_core_PodSpec_To_v1_PodSpec,
 		Convert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec,
 		Convert_core_ServiceSpec_To_v1_ServiceSpec,
@@ -538,6 +541,7 @@ func Convert_core_Pod_To_v1_Pod(in *core.Pod, out *v1.Pod, s conversion.Scope) e
 		//Annotation keys
 		delete(out.Annotations, v1.PodDeferContainersAnnotationKey)
 		delete(out.Annotations, v1.PodDeferContainersStatusesKey)
+	}
 
 	// DeferContainers related code
 	if len(out.Spec.DeferContainers) > 0 {
