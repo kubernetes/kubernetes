@@ -32,6 +32,7 @@ go_library(
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes:go_default_library",
+        "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/attachinterfaces:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/servers:go_default_library",
