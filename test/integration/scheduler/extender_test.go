@@ -147,7 +147,10 @@ func (e *Extender) filterUsingNodeCache(args *schedulerapi.ExtenderArgs) (*sched
 		if fits {
 			nodeSlice = append(nodeSlice, nodeName)
 		} else {
-			failedNodesMap[nodeName] = fmt.Sprintf("extender failed: %s", e.name)
+			failedNodesMap[nodeName] = schedulerapi.FailureInfo{
+				FailureMsg:                 fmt.Sprintf("extender failed: %s", e.name),
+				IsUnResolvableByPreemption: false,
+			}
 		}
 	}
 
@@ -185,7 +188,10 @@ func (e *Extender) Filter(args *schedulerapi.ExtenderArgs) (*schedulerapi.Extend
 			if fits {
 				filtered = append(filtered, node)
 			} else {
-				failedNodesMap[node.Name] = fmt.Sprintf("extender failed: %s", e.name)
+				failedNodesMap[node.Name] = schedulerapi.FailureInfo{
+					FailureMsg:                 fmt.Sprintf("extender failed: %s", e.name),
+					IsUnResolvableByPreemption: false,
+				}
 			}
 		}
 

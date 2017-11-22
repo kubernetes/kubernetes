@@ -72,8 +72,12 @@ func EmptyMetadataProducer(pod *v1.Pod, nodeNameToInfo map[string]*schedulercach
 	return nil
 }
 
+// PredicateFailureReason represents a failed predicate with:
+// 1. Failure reason
+// 2. If this failure is unresolvable by preemption.
 type PredicateFailureReason interface {
 	GetReason() string
+	IsUnResolvableByPreemption() bool
 }
 
 type GetEquivalencePodFunc func(pod *v1.Pod) interface{}

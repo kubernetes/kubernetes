@@ -166,8 +166,16 @@ type ExtenderArgs struct {
 	NodeNames *[]string
 }
 
-// FailedNodesMap represents the filtered out nodes, with node names and failure messages
-type FailedNodesMap map[string]string
+// FailureInfo represents a failure from scheduler includes:
+// 1. Failure message
+// 2. If this failure is unresolvable by preemption
+type FailureInfo struct {
+	FailureMsg                 string
+	IsUnResolvableByPreemption bool
+}
+
+// FailedNodesMap represents the filtered out nodes, with node names and failure information
+type FailedNodesMap map[string]FailureInfo
 
 // ExtenderFilterResult represents the results of a filter call to an extender
 type ExtenderFilterResult struct {
@@ -177,7 +185,7 @@ type ExtenderFilterResult struct {
 	// Filtered set of nodes where the pod can be scheduled; to be populated
 	// only if ExtenderConfig.NodeCacheCapable == true
 	NodeNames *[]string
-	// Filtered out nodes where the pod can't be scheduled and the failure messages
+	// Filtered out nodes where the pod can't be scheduled and the failure information
 	FailedNodes FailedNodesMap
 	// Error message indicating failure
 	Error string

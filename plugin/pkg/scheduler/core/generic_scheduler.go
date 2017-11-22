@@ -317,11 +317,12 @@ func findNodesThatFit(
 				return []*v1.Node{}, FailedPredicateMap{}, err
 			}
 
-			for failedNodeName, failedMsg := range failedMap {
+			for failedNodeName, failedInfo := range failedMap {
 				if _, found := failedPredicateMap[failedNodeName]; !found {
 					failedPredicateMap[failedNodeName] = []algorithm.PredicateFailureReason{}
 				}
-				failedPredicateMap[failedNodeName] = append(failedPredicateMap[failedNodeName], predicates.NewFailureReason(failedMsg))
+				failedPredicateMap[failedNodeName] = append(failedPredicateMap[failedNodeName],
+					predicates.NewFailureReason(failedInfo.FailureMsg, failedInfo.IsUnResolvableByPreemption))
 			}
 			filtered = filteredList
 			if len(filtered) == 0 {
@@ -764,7 +765,7 @@ func nodePassesExtendersForPreemption(
 	filteredNodes := []*v1.Node{nodeInfoCopy.Node()}
 	for _, extender := range extenders {
 		var err error
-		var failedNodesMap map[string]string
+		var failedNodesMap schedulerapi.FailedNodesMap
 		filteredNodes, failedNodesMap, err = extender.Filter(pod, filteredNodes, nodeNameToInfo)
 		if err != nil {
 			return false, err
@@ -858,19 +859,9 @@ func nodesWherePreemptionMightHelp(pod *v1.Pod, nodes []*v1.Node, failedPredicat
 		// to rely less on such assumptions in the code when checking does not impose
 		// significant overhead.
 		for _, failedPredicate := range failedPredicates {
-			switch failedPredicate {
-			case
-				predicates.ErrNodeSelectorNotMatch,
-				predicates.ErrPodNotMatchHostName,
-				predicates.ErrTaintsTolerationsNotMatch,
-				predicates.ErrNodeLabelPresenceViolated,
-				predicates.ErrNodeNotReady,
-				predicates.ErrNodeNetworkUnavailable,
-				predicates.ErrNodeUnschedulable,
-				predicates.ErrNodeUnknownCondition:
+			if failedPredicate.IsUnResolvableByPreemption() {
 				unresolvableReasonExist = true
 				break
-				// TODO(bsalamat): Please add affinity failure cases once we have specific affinity failure errors.
 			}
 		}
 		if !found || !unresolvableReasonExist {
