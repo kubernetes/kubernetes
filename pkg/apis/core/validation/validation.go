@@ -965,9 +965,7 @@ var validVolumeDownwardAPIFieldPathExpressions = sets.NewString(
 	"metadata.name",
 	"metadata.namespace",
 	"metadata.labels",
-	"metadata.labels[]", // represents "metadata.labels" with an arbitary subscript
 	"metadata.annotations",
-	"metadata.annotations[]", // represents "metadata.annotations" with an arbitary subscript
 	"metadata.uid")
 
 func validateDownwardAPIVolumeFile(file *core.DownwardAPIVolumeFile, fldPath *field.Path) field.ErrorList {
@@ -1902,8 +1900,6 @@ func ValidateEnv(vars []core.EnvVar, fldPath *field.Path) field.ErrorList {
 }
 
 var validEnvDownwardAPIFieldPathExpressions = sets.NewString(
-	"metadata.annotations[]", // represents "metadata.annotations" with an arbitary subscript
-	"metadata.labels[]",      // represents "metadata.labels" with an arbitary subscript
 	"metadata.name",
 	"metadata.namespace",
 	"metadata.uid",
@@ -1970,20 +1966,22 @@ func validateObjectFieldSelector(fs *core.ObjectFieldSelector, expressions *sets
 		return allErrs
 	}
 
-	path, subscript := fieldpath.SplitMaybeSubscriptedPath(internalFieldPath)
-	if len(subscript) > 0 {
-		// This is to indicate that the internalFieldPath has a subscript, so
-		// that we can compare the path against the allowed path set easily.
-		path += "[]"
-	}
-	if !expressions.Has(path) {
+	if path, subscript, ok := fieldpath.SplitMaybeSubscriptedPath(internalFieldPath); ok {
+		switch path {
+		case "metadata.annotations":
+			for _, msg := range validation.IsQualifiedName(strings.ToLower(subscript)) {
+				allErrs = append(allErrs, field.Invalid(fldPath, subscript, msg))
+			}
+		case "metadata.labels":
+			for _, msg := range validation.IsQualifiedName(subscript) {
+				allErrs = append(allErrs, field.Invalid(fldPath, subscript, msg))
+			}
+		default:
+			allErrs = append(allErrs, field.Invalid(fldPath, path, "does not support subscript"))
+		}
+	} else if !expressions.Has(path) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("fieldPath"), path, expressions.List()))
 		return allErrs
-	}
-	if len(subscript) > 0 {
-		for _, msg := range validation.IsQualifiedName(subscript) {
-			allErrs = append(allErrs, field.Invalid(fldPath, subscript, msg))
-		}
 	}
 
 	return allErrs

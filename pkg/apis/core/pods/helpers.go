@@ -22,13 +22,25 @@ import (
 	"k8s.io/kubernetes/pkg/fieldpath"
 )
 
+// ConvertDownwardAPIFieldLabel converts the specified downward API field label
+// and its value in the pod of the specified version to the internal version,
+// and returns the converted label and value. This function returns an error if
+// the conversion fails.
 func ConvertDownwardAPIFieldLabel(version, label, value string) (string, string, error) {
 	if version != "v1" {
 		return "", "", fmt.Errorf("unsupported pod version: %s", version)
 	}
 
-	path, _ := fieldpath.SplitMaybeSubscriptedPath(label)
-	switch path {
+	if path, _, ok := fieldpath.SplitMaybeSubscriptedPath(label); ok {
+		switch path {
+		case "metadata.annotations", "metadata.labels":
+			return label, value, nil
+		default:
+			return "", "", fmt.Errorf("field label does not support subscript: %s", label)
+		}
+	}
+
+	switch label {
 	case "metadata.annotations",
 		"metadata.labels",
 		"metadata.name",

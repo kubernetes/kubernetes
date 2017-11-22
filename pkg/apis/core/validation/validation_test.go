@@ -2636,6 +2636,13 @@ func TestValidateVolumes(t *testing.T) {
 								},
 							},
 							{
+								Path: "labels with complex subscript",
+								FieldRef: &core.ObjectFieldSelector{
+									APIVersion: "v1",
+									FieldPath:  "metadata.labels['test.example.com/key']",
+								},
+							},
+							{
 								Path: "annotations",
 								FieldRef: &core.ObjectFieldSelector{
 									APIVersion: "v1",
@@ -2647,6 +2654,13 @@ func TestValidateVolumes(t *testing.T) {
 								FieldRef: &core.ObjectFieldSelector{
 									APIVersion: "v1",
 									FieldPath:  "metadata.annotations['key']",
+								},
+							},
+							{
+								Path: "annotations with complex subscript",
+								FieldRef: &core.ObjectFieldSelector{
+									APIVersion: "v1",
+									FieldPath:  "metadata.annotations['TEST.EXAMPLE.COM/key']",
 								},
 							},
 							{
@@ -4137,7 +4151,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.name[]": supported values: "metadata.annotations[]", "metadata.labels[]", "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP"`,
+			expectedError: `[0].valueFrom.fieldRef.fieldPath: Invalid value: "metadata.name['key']": error converting fieldPath: field label does not support subscript`,
 		},
 		{
 			name: "metadata.labels without subscript",
@@ -4150,7 +4164,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: "metadata.annotations[]", "metadata.labels[]", "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP"`,
+			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP"`,
 		},
 		{
 			name: "metadata.annotations without subscript",
@@ -4163,7 +4177,33 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: "metadata.annotations[]", "metadata.labels[]", "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP"`,
+			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP"`,
+		},
+		{
+			name: "metadata.annotations with invalid key",
+			envs: []core.EnvVar{{
+				Name: "abc",
+				ValueFrom: &core.EnvVarSource{
+					FieldRef: &core.ObjectFieldSelector{
+						FieldPath:  "metadata.annotations['invalid~key']",
+						APIVersion: "v1",
+					},
+				},
+			}},
+			expectedError: `field[0].valueFrom.fieldRef: Invalid value: "invalid~key"`,
+		},
+		{
+			name: "metadata.labels with invalid key",
+			envs: []core.EnvVar{{
+				Name: "abc",
+				ValueFrom: &core.EnvVarSource{
+					FieldRef: &core.ObjectFieldSelector{
+						FieldPath:  "metadata.labels['Www.k8s.io/test']",
+						APIVersion: "v1",
+					},
+				},
+			}},
+			expectedError: `field[0].valueFrom.fieldRef: Invalid value: "Www.k8s.io/test"`,
 		},
 		{
 			name: "unsupported fieldPath",
@@ -4176,7 +4216,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: "metadata.annotations[]", "metadata.labels[]", "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP"`,
+			expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP"`,
 		},
 	}
 	for _, tc := range errorCases {

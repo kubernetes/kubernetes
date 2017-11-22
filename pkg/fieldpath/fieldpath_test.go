@@ -36,7 +36,6 @@ func TestExtractFieldPathAsString(t *testing.T) {
 			name:      "not an API object",
 			fieldPath: "metadata.name",
 			obj:       "",
-			expectedMessageFragment: "expected struct",
 		},
 		{
 			name:      "ok - namespace",
@@ -98,7 +97,16 @@ func TestExtractFieldPathAsString(t *testing.T) {
 			},
 			expectedValue: "1",
 		},
-
+		{
+			name:      "ok - annotation",
+			fieldPath: "metadata.annotations['Www.k8s.io/test']",
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"Www.k8s.io/test": "1"},
+				},
+			},
+			expectedValue: "1",
+		},
 		{
 			name:      "invalid expression",
 			fieldPath: "metadata.whoops",
@@ -110,14 +118,24 @@ func TestExtractFieldPathAsString(t *testing.T) {
 			expectedMessageFragment: "unsupported fieldPath",
 		},
 		{
-			name:      "invalid annotation",
-			fieldPath: "metadata.annotations['unknown.key']",
+			name:      "invalid annotation key",
+			fieldPath: "metadata.annotations['invalid~key']",
 			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"foo": "bar"},
 				},
 			},
-			expectedMessageFragment: "unsupported fieldPath",
+			expectedMessageFragment: "invalid key subscript in metadata.annotations",
+		},
+		{
+			name:      "invalid label key",
+			fieldPath: "metadata.labels['Www.k8s.io/test']",
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"foo": "bar"},
+				},
+			},
+			expectedMessageFragment: "invalid key subscript in metadata.labels",
 		},
 	}
 
@@ -131,6 +149,8 @@ func TestExtractFieldPathAsString(t *testing.T) {
 			} else {
 				t.Errorf("%v: unexpected error: %v", tc.name, err)
 			}
+		} else if tc.expectedMessageFragment != "" {
+			t.Errorf("%v: expected error: %v", tc.name, tc.expectedMessageFragment)
 		} else if e := tc.expectedValue; e != "" && e != actual {
 			t.Errorf("%v: unexpected result; got %q, expected %q", tc.name, actual, e)
 		}
@@ -142,72 +162,79 @@ func TestSplitMaybeSubscriptedPath(t *testing.T) {
 		fieldPath         string
 		expectedPath      string
 		expectedSubscript string
+		expectedOK        bool
 	}{
 		{
 			fieldPath:         "metadata.annotations['key']",
 			expectedPath:      "metadata.annotations",
 			expectedSubscript: "key",
+			expectedOK:        true,
 		},
 		{
 			fieldPath:         "metadata.annotations['a[b']c']",
 			expectedPath:      "metadata.annotations",
 			expectedSubscript: "a[b']c",
+			expectedOK:        true,
 		},
 		{
 			fieldPath:         "metadata.labels['['key']",
 			expectedPath:      "metadata.labels",
 			expectedSubscript: "['key",
+			expectedOK:        true,
 		},
 		{
 			fieldPath:         "metadata.labels['key']']",
 			expectedPath:      "metadata.labels",
 			expectedSubscript: "key']",
-		},
-		{
-			fieldPath:         "metadata.labels[ 'key' ]",
-			expectedPath:      "metadata.labels[ 'key' ]",
-			expectedSubscript: "",
+			expectedOK:        true,
 		},
 		{
 			fieldPath:         "metadata.labels['']",
-			expectedPath:      "metadata.labels['']",
+			expectedPath:      "metadata.labels",
 			expectedSubscript: "",
+			expectedOK:        true,
 		},
 		{
 			fieldPath:         "metadata.labels[' ']",
 			expectedPath:      "metadata.labels",
 			expectedSubscript: " ",
+			expectedOK:        true,
 		},
 		{
-			fieldPath:         "metadata.labels[]",
-			expectedPath:      "metadata.labels[]",
-			expectedSubscript: "",
+			fieldPath:  "metadata.labels[ 'key' ]",
+			expectedOK: false,
 		},
 		{
-			fieldPath:         "metadata.labels[']",
-			expectedPath:      "metadata.labels[']",
-			expectedSubscript: "",
+			fieldPath:  "metadata.labels[]",
+			expectedOK: false,
 		},
 		{
-			fieldPath:         "metadata.labels['key']foo",
-			expectedPath:      "metadata.labels['key']foo",
-			expectedSubscript: "",
+			fieldPath:  "metadata.labels[']",
+			expectedOK: false,
 		},
 		{
-			fieldPath:         "['key']",
-			expectedPath:      "['key']",
-			expectedSubscript: "",
+			fieldPath:  "metadata.labels['key']foo",
+			expectedOK: false,
 		},
 		{
-			fieldPath:         "metadata.labels",
-			expectedPath:      "metadata.labels",
-			expectedSubscript: "",
+			fieldPath:  "['key']",
+			expectedOK: false,
+		},
+		{
+			fieldPath:  "metadata.labels",
+			expectedOK: false,
 		},
 	}
 	for _, tc := range cases {
-		path, subscript := SplitMaybeSubscriptedPath(tc.fieldPath)
+		path, subscript, ok := SplitMaybeSubscriptedPath(tc.fieldPath)
+		if !ok {
+			if tc.expectedOK {
+				t.Errorf("SplitMaybeSubscriptedPath(%q) expected to return (_, _, true)", tc.fieldPath)
+			}
+			continue
+		}
 		if path != tc.expectedPath || subscript != tc.expectedSubscript {
-			t.Errorf("SplitMaybeSubscriptedPath(%q) = (%q, %q), expect (%q, %q)",
+			t.Errorf("SplitMaybeSubscriptedPath(%q) = (%q, %q, true), expect (%q, %q, true)",
 				tc.fieldPath, path, subscript, tc.expectedPath, tc.expectedSubscript)
 		}
 	}
