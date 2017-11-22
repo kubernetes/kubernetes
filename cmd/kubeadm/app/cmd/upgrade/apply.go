@@ -72,11 +72,11 @@ func NewCmdApply(parentFlags *cmdUpgradeFlags) *cobra.Command {
 		Short: "Upgrade your Kubernetes cluster to the specified version.",
 		Run: func(cmd *cobra.Command, args []string) {
 			var err error
-			flags.parent.ignoreChecksErrorsSet, err = validation.ValidateIgnoreChecksErrors(flags.parent.ignoreChecksErrors, flags.parent.skipPreFlight)
+			flags.parent.ignorePreflightErrorsSet, err = validation.ValidateIgnorePreflightErrors(flags.parent.ignorePreflightErrors, flags.parent.skipPreFlight)
 			kubeadmutil.CheckErr(err)
 
 			// Ensure the user is root
-			err = runPreflightChecks(flags.parent.ignoreChecksErrorsSet)
+			err = runPreflightChecks(flags.parent.ignorePreflightErrorsSet)
 			kubeadmutil.CheckErr(err)
 
 			err = cmdutil.ValidateExactArgNumber(args, []string{"version"})

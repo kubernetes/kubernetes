@@ -107,9 +107,9 @@ func printConfiguration(cfg *kubeadmapiext.MasterConfiguration, w io.Writer) {
 }
 
 // runPreflightChecks runs the root preflight check
-func runPreflightChecks(ignoreChecksErrors sets.String) error {
+func runPreflightChecks(ignorePreflightErrors sets.String) error {
 	fmt.Println("[preflight] Running pre-flight checks.")
-	return preflight.RunRootCheckOnly(ignoreChecksErrors)
+	return preflight.RunRootCheckOnly(ignorePreflightErrors)
 }
 
 // getClient gets a real or fake client depending on whether the user is dry-running or not

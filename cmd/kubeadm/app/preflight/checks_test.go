@@ -619,3 +619,30 @@ func TestKubeletVersionCheck(t *testing.T) {
 	}
 
 }
+
+func TestSetHasItemOrAll(t *testing.T) {
+	var tests = []struct {
+		ignoreSet      sets.String
+		testString     string
+		expectedResult bool
+	}{
+		{sets.NewString(), "foo", false},
+		{sets.NewString("all"), "foo", true},
+		{sets.NewString("all", "bar"), "foo", true},
+		{sets.NewString("bar"), "foo", false},
+		{sets.NewString("baz", "foo", "bar"), "foo", true},
+		{sets.NewString("baz", "bar", "foo"), "Foo", true},
+	}
+
+	for _, rt := range tests {
+		result := setHasItemOrAll(rt.ignoreSet, rt.testString)
+		if result != rt.expectedResult {
+			t.Errorf(
+				"setHasItemOrAll: expected: %v actual: %v (arguments: %q, %q)",
+				rt.expectedResult, result,
+				rt.ignoreSet,
+				rt.testString,
+			)
+		}
+	}
+}
