@@ -66,6 +66,8 @@ const (
 	JitterFactor = 1.2
 )
 
+var Leader *LeaderElector
+
 // NewLeaderElector creates a LeaderElector from a LeaderElectionConfig
 func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
 	if lec.LeaseDuration <= lec.RenewDeadline {
@@ -141,10 +143,8 @@ func (le *LeaderElector) Run() {
 		le.config.Callbacks.OnStoppedLeading()
 	}()
 	le.acquire()
-	stop := make(chan struct{})
-	go le.config.Callbacks.OnStartedLeading(stop)
+	go le.config.Callbacks.OnStartedLeading(wait.NeverStop)
 	le.renew()
-	close(stop)
 }
 
 // RunOrDie starts a client with the provided config or panics if the config
@@ -154,6 +154,7 @@ func RunOrDie(lec LeaderElectionConfig) {
 	if err != nil {
 		panic(err)
 	}
+	Leader = le
 	le.Run()
 }
 
@@ -161,6 +162,11 @@ func RunOrDie(lec LeaderElectionConfig) {
 // no leader has yet been observed.
 func (le *LeaderElector) GetLeader() string {
 	return le.observedRecord.HolderIdentity
+}
+
+// IsLeader returns true if the last observed leader was this client else returns false.
+func IsLeader() bool {
+	return Leader.IsLeader()
 }
 
 // IsLeader returns true if the last observed leader was this client else returns false.
@@ -188,8 +194,8 @@ func (le *LeaderElector) acquire() {
 
 // renew loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew fails.
 func (le *LeaderElector) renew() {
-	stop := make(chan struct{})
 	wait.Until(func() {
+		beforeIsLeader := le.IsLeader()
 		err := wait.Poll(le.config.RetryPeriod, le.config.RenewDeadline, func() (bool, error) {
 			return le.tryAcquireOrRenew(), nil
 		})
@@ -197,12 +203,15 @@ func (le *LeaderElector) renew() {
 		desc := le.config.Lock.Describe()
 		if err == nil {
 			glog.V(4).Infof("successfully renewed lease %v", desc)
+			if !beforeIsLeader && le.IsLeader() {
+				glog.V(4).Infof("follower become leader, start schedule again")
+				go le.config.Callbacks.OnStartedLeading(wait.NeverStop)
+			}
 			return
 		}
 		le.config.Lock.RecordEvent("stopped leading")
 		glog.Infof("failed to renew lease %v: %v", desc, err)
-		close(stop)
-	}, 0, stop)
+	}, 0, wait.NeverStop)
 }
 
 // tryAcquireOrRenew tries to acquire a leader lease if it is not already acquired,
@@ -271,4 +280,9 @@ func (l *LeaderElector) maybeReportTransition() {
 	if l.config.Callbacks.OnNewLeader != nil {
 		go l.config.Callbacks.OnNewLeader(l.reportedLeader)
 	}
+}
+
+// Set leader election record for test
+func (le *LeaderElector) SetLeaderElectionRecord(record rl.LeaderElectionRecord) {
+	le.observedRecord = record
 }
