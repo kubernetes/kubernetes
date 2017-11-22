@@ -93,7 +93,7 @@ func RollbackerFor(kind schema.GroupKind, c kubernetes.Interface) (Rollbacker, e
 	}
 
 	if visitor.result == nil {
-		return nil, fmt.Errorf("no rollbacker has been implemented for %q", kind.String())
+		return nil, fmt.Errorf("no rollbacker has been implemented for %q", kind)
 	}
 
 	return visitor.result, nil
