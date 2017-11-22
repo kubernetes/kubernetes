@@ -19,6 +19,7 @@ package phases
 import (
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -70,7 +71,7 @@ func NewCmdPreFlightMaster() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg := &kubeadmapi.MasterConfiguration{}
 			criSocket := ""
-			err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, criSocket)
+			err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, criSocket, sets.NewString())
 			kubeadmutil.CheckErr(err)
 		},
 	}
@@ -88,7 +89,7 @@ func NewCmdPreFlightNode() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg := &kubeadmapi.NodeConfiguration{}
 			criSocket := ""
-			err := preflight.RunJoinNodeChecks(utilsexec.New(), cfg, criSocket)
+			err := preflight.RunJoinNodeChecks(utilsexec.New(), cfg, criSocket, sets.NewString())
 			kubeadmutil.CheckErr(err)
 		},
 	}

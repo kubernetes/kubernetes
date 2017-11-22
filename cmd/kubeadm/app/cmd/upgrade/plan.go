@@ -25,6 +25,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
@@ -35,8 +36,11 @@ func NewCmdPlan(parentFlags *cmdUpgradeFlags) *cobra.Command {
 		Use:   "plan",
 		Short: "Check which versions are available to upgrade to and validate whether your current cluster is upgradeable.",
 		Run: func(_ *cobra.Command, _ []string) {
+			var err error
+			parentFlags.ignoreChecksErrorsSet, err = validation.ValidateIgnoreChecksErrors(parentFlags.ignoreChecksErrors, parentFlags.skipPreFlight)
+			kubeadmutil.CheckErr(err)
 			// Ensure the user is root
-			err := runPreflightChecks(parentFlags.skipPreFlight)
+			err = runPreflightChecks(parentFlags.ignoreChecksErrorsSet)
 			kubeadmutil.CheckErr(err)
 
 			err = RunPlan(parentFlags)

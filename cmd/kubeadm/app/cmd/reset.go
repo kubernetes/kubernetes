@@ -26,7 +26,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -45,20 +47,30 @@ func NewCmdReset(out io.Writer) *cobra.Command {
 	var skipPreFlight bool
 	var certsDir string
 	var criSocketPath string
+	var ignoreChecksErrors []string
+
 	cmd := &cobra.Command{
 		Use:   "reset",
 		Short: "Run this to revert any changes made to this host by 'kubeadm init' or 'kubeadm join'.",
 		Run: func(cmd *cobra.Command, args []string) {
-			r, err := NewReset(skipPreFlight, certsDir, criSocketPath)
+			ignoreChecksErrorsSet, err := validation.ValidateIgnoreChecksErrors(ignoreChecksErrors, skipPreFlight)
+			kubeadmutil.CheckErr(err)
+
+			r, err := NewReset(ignoreChecksErrorsSet, certsDir, criSocketPath)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(r.Run(out))
 		},
 	}
 
+	cmd.PersistentFlags().StringSliceVar(
+		&ignoreChecksErrors, "ignore-checks-errors", ignoreChecksErrors,
+		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
+	)
 	cmd.PersistentFlags().BoolVar(
 		&skipPreFlight, "skip-preflight-checks", false,
 		"Skip preflight checks which normally run before modifying the system.",
 	)
+	cmd.PersistentFlags().MarkDeprecated("skip-preflight-checks", "it is now equivalent to --ignore-checks-errors=all")
 
 	cmd.PersistentFlags().StringVar(
 		&certsDir, "cert-dir", kubeadmapiext.DefaultCertificatesDir,
@@ -80,15 +92,11 @@ type Reset struct {
 }
 
 // NewReset instantiate Reset struct
-func NewReset(skipPreFlight bool, certsDir, criSocketPath string) (*Reset, error) {
-	if !skipPreFlight {
-		fmt.Println("[preflight] Running pre-flight checks.")
+func NewReset(ignoreChecksErrors sets.String, certsDir, criSocketPath string) (*Reset, error) {
+	fmt.Println("[preflight] Running pre-flight checks.")
 
-		if err := preflight.RunRootCheckOnly(); err != nil {
-			return nil, err
-		}
-	} else {
-		fmt.Println("[preflight] Skipping pre-flight checks.")
+	if err := preflight.RunRootCheckOnly(ignoreChecksErrors); err != nil {
+		return nil, err
 	}
 
 	return &Reset{
