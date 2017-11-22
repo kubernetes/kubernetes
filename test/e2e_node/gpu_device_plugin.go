@@ -25,8 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -34,8 +32,7 @@ import (
 )
 
 const (
-	devicePluginFeatureGate = "DevicePlugins=true"
-	testPodNamePrefix       = "nvidia-gpu-"
+	testPodNamePrefix = "nvidia-gpu-"
 )
 
 // Serial because the test restarts Kubelet
@@ -43,11 +40,6 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 	f := framework.NewDefaultFramework("device-plugin-gpus-errors")
 
 	Context("DevicePlugin", func() {
-		By("Enabling support for Device Plugin")
-		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates[string(features.DevicePlugins)] = true
-		})
-
 		var devicePluginPod *v1.Pod
 		BeforeEach(func() {
 			By("Ensuring that Nvidia GPUs exists on the node")

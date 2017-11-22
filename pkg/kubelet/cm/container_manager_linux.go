@@ -194,7 +194,7 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, devicePluginEnabled bool, recorder record.EventRecorder) (ContainerManager, error) {
+func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder) (ContainerManager, error) {
 	subsystems, err := GetCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
@@ -263,12 +263,8 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		qosContainerManager: qosContainerManager,
 	}
 
-	glog.Infof("Creating device plugin manager: %t", devicePluginEnabled)
-	if devicePluginEnabled {
-		cm.devicePluginManager, err = deviceplugin.NewManagerImpl()
-	} else {
-		cm.devicePluginManager, err = deviceplugin.NewManagerStub()
-	}
+	glog.Infof("Creating device plugin manager.")
+	cm.devicePluginManager, err = deviceplugin.NewManagerImpl()
 	if err != nil {
 		return nil, err
 	}
