@@ -18,27 +18,45 @@ package config
 
 import (
 	"io"
+	"io/ioutil"
 
-	"k8s.io/apimachinery/pkg/util/yaml"
+	"fmt"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1"
 )
 
-// AdmissionConfig holds config data that is unique to each API server.
-type AdmissionConfig struct {
-	// KubeConfigFile is the path to the kubeconfig file.
-	KubeConfigFile string `json:"kubeConfigFile"`
+var (
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
+)
+
+func init() {
+	webhookadmission.AddToScheme(scheme)
+	v1alpha1.AddToScheme(scheme)
 }
 
 // LoadConfig extract the KubeConfigFile from configFile
 func LoadConfig(configFile io.Reader) (string, error) {
 	var kubeconfigFile string
 	if configFile != nil {
-		// TODO: move this to a versioned configuration file format
-		var config AdmissionConfig
-		d := yaml.NewYAMLOrJSONDecoder(configFile, 4096)
-		err := d.Decode(&config)
+		// we have a config so parse it.
+		data, err := ioutil.ReadAll(configFile)
 		if err != nil {
 			return "", err
 		}
+		decoder := codecs.UniversalDecoder()
+		decodedObj, err := runtime.Decode(decoder, data)
+		if err != nil {
+			return "", err
+		}
+		config, ok := decodedObj.(*webhookadmission.WebhookAdmission)
+		if !ok {
+			return "", fmt.Errorf("unexpected type: %T", decodedObj)
+		}
+
 		kubeconfigFile = config.KubeConfigFile
 	}
 	return kubeconfigFile, nil

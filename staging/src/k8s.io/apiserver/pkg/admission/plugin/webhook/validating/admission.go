@@ -40,6 +40,8 @@ import (
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
+	webhookadmissionapi "k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
+	webhookadmissionapiv1alpha1 "k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1"
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/namespace"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/request"
@@ -64,6 +66,9 @@ func Register(plugins *admission.Plugins) {
 
 		return plugin, nil
 	})
+	// add our config types
+	webhookadmissionapi.AddToScheme(plugins.ConfigScheme)
+	webhookadmissionapiv1alpha1.AddToScheme(plugins.ConfigScheme)
 }
 
 // WebhookSource can list dynamic webhook plugins.
