@@ -250,6 +250,7 @@ AppArmor=true|false (BETA \- default=true)
 BlockVolume=true|false (ALPHA \- default=false)
 CPUManager=true|false (ALPHA \- default=false)
 CSIPersistentVolume=true|false (ALPHA \- default=false)
+CustomPodDNS=true|false (ALPHA \- default=false)
 CustomResourceValidation=true|false (BETA \- default=true)
 DebugContainers=true|false (ALPHA \- default=false)
 DevicePlugins=true|false (ALPHA \- default=false)
@@ -464,7 +465,7 @@ VolumeScheduling=true|false (ALPHA \- default=false)
     DEPRECATED: the version to store the legacy v1 resources with. Defaults to server preferred.
 
 .PP
-\fB\-\-storage\-versions\fP="admission.k8s.io/v1alpha1,admissionregistration.k8s.io/v1alpha1,apps/v1beta1,authentication.k8s.io/v1,authorization.k8s.io/v1,autoscaling/v1,batch/v1,certificates.k8s.io/v1beta1,componentconfig/v1alpha1,extensions/v1beta1,imagepolicy.k8s.io/v1alpha1,kubeadm.k8s.io/v1alpha1,networking.k8s.io/v1,policy/v1beta1,rbac.authorization.k8s.io/v1,scheduling.k8s.io/v1alpha1,settings.k8s.io/v1alpha1,storage.k8s.io/v1,v1"
+\fB\-\-storage\-versions\fP="admission.k8s.io/v1beta1,admissionregistration.k8s.io/v1beta1,apps/v1beta1,authentication.k8s.io/v1,authorization.k8s.io/v1,autoscaling/v1,batch/v1,certificates.k8s.io/v1beta1,componentconfig/v1alpha1,extensions/v1beta1,imagepolicy.k8s.io/v1alpha1,kubeadm.k8s.io/v1alpha1,networking.k8s.io/v1,policy/v1beta1,rbac.authorization.k8s.io/v1,scheduling.k8s.io/v1alpha1,settings.k8s.io/v1alpha1,storage.k8s.io/v1,v1"
     The per\-group version to store resources in. Specified in the format "group1/version1,group2/version2,...". In the case where objects are moved from one group to the other, you may specify the format "group1=group2/v1beta1,group3/v1beta1,...". You only need to pass the groups you wish to change from the defaults. It defaults to a list of preferred versions of all registered groups, which is derived from the KUBE\_API\_VERSIONS environment variable.
 
 .PP

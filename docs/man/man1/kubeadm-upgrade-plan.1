@@ -38,6 +38,10 @@ Check which versions are available to upgrade to and validate whether your curre
     The Google Cloud Platform Service Account JSON Key to use for authentication.
 
 .PP
+\fB\-\-ignore\-checks\-errors\fP=[]
+    A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.
+
+.PP
 \fB\-\-kubeconfig\fP="/etc/kubernetes/admin.conf"
     The KubeConfig file to use when talking to the cluster.
 

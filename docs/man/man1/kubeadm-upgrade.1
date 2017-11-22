@@ -30,6 +30,10 @@ Upgrade your cluster smoothly to a newer version with this command.
     Path to kubeadm config file. WARNING: Usage of a configuration file is experimental!
 
 .PP
+\fB\-\-ignore\-checks\-errors\fP=[]
+    A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.
+
+.PP
 \fB\-\-kubeconfig\fP="/etc/kubernetes/admin.conf"
     The KubeConfig file to use when talking to the cluster.
 

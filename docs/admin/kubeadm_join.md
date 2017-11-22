@@ -67,8 +67,8 @@ HighAvailability=true|false (ALPHA - default=false)
 SelfHosting=true|false (BETA - default=false)
 StoreCertsInSecrets=true|false (ALPHA - default=false)
 SupportIPVSProxyMode=true|false (ALPHA - default=false)
+      --ignore-checks-errors stringSlice              A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.
       --node-name string                              Specify the node name.
-      --skip-preflight-checks                         Skip preflight checks which normally run before modifying the system.
       --tls-bootstrap-token string                    A token used for TLS bootstrapping.
       --token string                                  Use this token for both discovery-token and tls-bootstrap-token.
 ```

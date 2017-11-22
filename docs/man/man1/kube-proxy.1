@@ -40,6 +40,10 @@ with the apiserver API to configure the proxy.
     If true cleanup iptables and ipvs rules and exit.
 
 .PP
+\fB\-\-cleanup\-ipvs\fP=true
+    If true make kube\-proxy cleanup ipvs rules before running.  Default is true
+
+.PP
 \fB\-\-cluster\-cidr\fP=""
     The CIDR range of pods in the cluster. When configured, traffic sent to a Service cluster IP from outside this range will be masqueraded and traffic sent from pods to an external LoadBalancer IP will be directed to the respective cluster IP instead
 
@@ -84,6 +88,7 @@ AppArmor=true|false (BETA \- default=true)
 BlockVolume=true|false (ALPHA \- default=false)
 CPUManager=true|false (ALPHA \- default=false)
 CSIPersistentVolume=true|false (ALPHA \- default=false)
+CustomPodDNS=true|false (ALPHA \- default=false)
 CustomResourceValidation=true|false (BETA \- default=true)
 DebugContainers=true|false (ALPHA \- default=false)
 DevicePlugins=true|false (ALPHA \- default=false)
