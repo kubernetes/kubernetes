@@ -844,14 +844,14 @@ def request_kubelet_and_proxy_credentials(kube_control):
     # The kube-cotrol interface is created to support RBAC.
     # At this point we might as well do the right thing and return the hostname
     # even if it will only be used when we enable RBAC
-    nodeuser = 'system:node:{}'.format(gethostname())
+    nodeuser = 'system:node:{}'.format(gethostname().lower())
     kube_control.set_auth_request(nodeuser)
 
 
 @when('kube-control.connected')
 def catch_change_in_creds(kube_control):
     """Request a service restart in case credential updates were detected."""
-    nodeuser = 'system:node:{}'.format(gethostname())
+    nodeuser = 'system:node:{}'.format(gethostname().lower())
     creds = kube_control.get_auth_credentials(nodeuser)
     if creds \
             and data_changed('kube-control.creds', creds) \
