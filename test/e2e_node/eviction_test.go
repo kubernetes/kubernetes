@@ -50,6 +50,7 @@ const (
 	pressureDelay  = 20 * time.Second
 	testContextFmt = "when we run containers that should cause %s"
 	noPressure     = v1.NodeConditionType("NoPressure")
+	lotsOfDisk     = 10240 // 10 Gb in Mb
 )
 
 // InodeEviction tests that the node responds to node disk pressure by evicting only responsible pods.
@@ -127,16 +128,16 @@ var _ = framework.KubeDescribe("LocalStorageEviction [Slow] [Serial] [Disruptive
 	expectedNodeCondition := v1.NodeDiskPressure
 	Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-			diskConsumed := uint64(100000000) // At least 100 Mb for pods to consume
+			diskConsumed := resource.MustParse("100Mi")
 			summary := eventuallyGetSummary()
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
-			initialConfig.EvictionHard = map[string]string{"nodefs.available": fmt.Sprintf("%d", availableBytes-diskConsumed)}
+			initialConfig.EvictionHard = map[string]string{"nodefs.available": fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, logDiskMetrics, []podEvictSpec{
 			{
 				evictionPriority: 1,
-				pod:              diskConsumingPod("container-disk-hog", 10000, nil, v1.ResourceRequirements{}),
+				pod:              diskConsumingPod("container-disk-hog", lotsOfDisk, nil, v1.ResourceRequirements{}),
 			},
 			{
 				evictionPriority: 0,
@@ -155,10 +156,13 @@ var _ = framework.KubeDescribe("LocalStorageSoftEviction [Slow] [Serial] [Disrup
 	expectedNodeCondition := v1.NodeDiskPressure
 	Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-			diskConsumed := uint64(100000000) // At least 100 Mb for pods to consume
+			diskConsumed := resource.MustParse("100Mi")
 			summary := eventuallyGetSummary()
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
-			initialConfig.EvictionSoft = map[string]string{"nodefs.available": fmt.Sprintf("%d", availableBytes-diskConsumed)}
+			if availableBytes <= uint64(diskConsumed.Value()) {
+				framework.Skipf("Too little disk free on the host for the LocalStorageSoftEviction test to run")
+			}
+			initialConfig.EvictionSoft = map[string]string{"nodefs.available": fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
 			initialConfig.EvictionSoftGracePeriod = map[string]string{"nodefs.available": "1m"}
 			// Defer to the pod default grace period
 			initialConfig.EvictionMaxPodGracePeriod = 30
@@ -169,7 +173,7 @@ var _ = framework.KubeDescribe("LocalStorageSoftEviction [Slow] [Serial] [Disrup
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, logDiskMetrics, []podEvictSpec{
 			{
 				evictionPriority: 1,
-				pod:              diskConsumingPod("container-disk-hog", 10000, nil, v1.ResourceRequirements{}),
+				pod:              diskConsumingPod("container-disk-hog", lotsOfDisk, nil, v1.ResourceRequirements{}),
 			},
 			{
 				evictionPriority: 0,
@@ -189,34 +193,35 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 			initialConfig.EvictionHard = map[string]string{}
 		})
 		sizeLimit := resource.MustParse("100Mi")
-		used := int64(200) // Consume 200 Mb
+		useOverLimit := 101 /* Mb */
+		useUnderLimit := 99 /* Mb */
 		containerLimit := v1.ResourceList{v1.ResourceEphemeralStorage: sizeLimit}
 
 		runEvictionTest(f, evictionTestTimeout, noPressure, logDiskMetrics, []podEvictSpec{
 			{
 				evictionPriority: 1, // This pod should be evicted because emptyDir (default storage type) usage violation
-				pod: diskConsumingPod("emptydir-disk-sizelimit", used, &v1.VolumeSource{
+				pod: diskConsumingPod("emptydir-disk-sizelimit", useOverLimit, &v1.VolumeSource{
 					EmptyDir: &v1.EmptyDirVolumeSource{SizeLimit: &sizeLimit},
 				}, v1.ResourceRequirements{}),
 			},
 			{
 				evictionPriority: 1, // This pod should be evicted because of memory emptyDir usage violation
-				pod: diskConsumingPod("emptydir-memory-sizelimit", used, &v1.VolumeSource{
+				pod: diskConsumingPod("emptydir-memory-sizelimit", useOverLimit, &v1.VolumeSource{
 					EmptyDir: &v1.EmptyDirVolumeSource{Medium: "Memory", SizeLimit: &sizeLimit},
 				}, v1.ResourceRequirements{}),
 			},
 			{
 				evictionPriority: 1, // This pod should cross the container limit by writing to its writable layer.
-				pod:              diskConsumingPod("container-disk-limit", used, nil, v1.ResourceRequirements{Limits: containerLimit}),
+				pod:              diskConsumingPod("container-disk-limit", useOverLimit, nil, v1.ResourceRequirements{Limits: containerLimit}),
 			},
 			{
 				evictionPriority: 1, // This pod should hit the container limit by writing to an emptydir
-				pod: diskConsumingPod("container-emptydir-disk-limit", used, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
+				pod: diskConsumingPod("container-emptydir-disk-limit", useOverLimit, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
 					v1.ResourceRequirements{Limits: containerLimit}),
 			},
 			{
 				evictionPriority: 0, // This pod should not be evicted because it uses less than its limit
-				pod: diskConsumingPod("emptydir-disk-below-sizelimit", int64(50), &v1.VolumeSource{
+				pod: diskConsumingPod("emptydir-disk-below-sizelimit", useUnderLimit, &v1.VolumeSource{
 					EmptyDir: &v1.EmptyDirVolumeSource{SizeLimit: &sizeLimit},
 				}, v1.ResourceRequirements{}),
 			},
@@ -224,11 +229,11 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 	})
 })
 
-// PriorityEvictionOrdering tests that the node responds to node memory pressure by evicting pods.
+// PriorityMemoryEvictionOrdering tests that the node responds to node memory pressure by evicting pods.
 // This test tests that the guaranteed pod is never evicted, and that the lower-priority pod is evicted before
 // the higher priority pod.
-var _ = framework.KubeDescribe("PriorityEvictionOrdering [Slow] [Serial] [Disruptive] [Flaky]", func() {
-	f := framework.NewDefaultFramework("priority-eviction-ordering-test")
+var _ = framework.KubeDescribe("PriorityMemoryEvictionOrdering [Slow] [Serial] [Disruptive] [Flaky]", func() {
+	f := framework.NewDefaultFramework("priority-memory-eviction-ordering-test")
 	expectedNodeCondition := v1.NodeMemoryPressure
 	pressureTimeout := 10 * time.Minute
 	Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
@@ -237,6 +242,9 @@ var _ = framework.KubeDescribe("PriorityEvictionOrdering [Slow] [Serial] [Disrup
 			memoryConsumed := resource.MustParse("600Mi")
 			summary := eventuallyGetSummary()
 			availableBytes := *(summary.Node.Memory.AvailableBytes)
+			if availableBytes <= uint64(memoryConsumed.Value()) {
+				framework.Skipf("Too little memory free on the host for the PriorityMemoryEvictionOrdering test to run")
+			}
 			initialConfig.EvictionHard = map[string]string{"memory.available": fmt.Sprintf("%d", availableBytes-uint64(memoryConsumed.Value()))}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
@@ -264,6 +272,53 @@ var _ = framework.KubeDescribe("PriorityEvictionOrdering [Slow] [Serial] [Disrup
 		systemPriority := int32(2147483647)
 		specs[1].pod.Spec.Priority = &systemPriority
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, logMemoryMetrics, specs)
+	})
+})
+
+// PriorityLocalStorageEvictionOrdering tests that the node responds to node disk pressure by evicting pods.
+// This test tests that the guaranteed pod is never evicted, and that the lower-priority pod is evicted before
+// the higher priority pod.
+var _ = framework.KubeDescribe("PriorityLocalStorageEvictionOrdering [Slow] [Serial] [Disruptive] [Flaky]", func() {
+	f := framework.NewDefaultFramework("priority-disk-eviction-ordering-test")
+	expectedNodeCondition := v1.NodeDiskPressure
+	pressureTimeout := 10 * time.Minute
+	Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.FeatureGates[string(features.PodPriority)] = true
+			initialConfig.FeatureGates[string(features.LocalStorageCapacityIsolation)] = true
+			diskConsumed := resource.MustParse("350Mi")
+			summary := eventuallyGetSummary()
+			availableBytes := *(summary.Node.Fs.AvailableBytes)
+			if availableBytes <= uint64(diskConsumed.Value()) {
+				framework.Skipf("Too little disk free on the host for the PriorityLocalStorageEvictionOrdering test to run")
+			}
+			initialConfig.EvictionHard = map[string]string{"nodefs.available": fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
+			initialConfig.EvictionMinimumReclaim = map[string]string{}
+		})
+		specs := []podEvictSpec{
+			{
+				evictionPriority: 2,
+				pod:              diskConsumingPod("best-effort-disk", lotsOfDisk, nil, v1.ResourceRequirements{}),
+			},
+			{
+				evictionPriority: 1,
+				pod:              diskConsumingPod("high-priority-disk", lotsOfDisk, nil, v1.ResourceRequirements{}),
+			},
+			{
+				evictionPriority: 0,
+				pod: diskConsumingPod("guaranteed-disk", 299 /* Mb */, nil, v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceEphemeralStorage: resource.MustParse("300Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceEphemeralStorage: resource.MustParse("300Mi"),
+					},
+				}),
+			},
+		}
+		systemPriority := int32(2147483647)
+		specs[1].pod.Spec.Priority = &systemPriority
+		runEvictionTest(f, pressureTimeout, expectedNodeCondition, logDiskMetrics, specs)
 	})
 })
 
@@ -571,9 +626,9 @@ func inodeConsumingPod(name string, volumeSource *v1.VolumeSource) *v1.Pod {
 	return podWithCommand(volumeSource, v1.ResourceRequirements{}, name, "i=0; while true; do touch %s${i}.txt; sleep 0.001; i=$((i+=1)); done;")
 }
 
-func diskConsumingPod(name string, diskConsumedMB int64, volumeSource *v1.VolumeSource, resources v1.ResourceRequirements) *v1.Pod {
-	// Each iteration writes 1Mb to the file
-	return podWithCommand(volumeSource, resources, name, fmt.Sprintf("i=0; while [ $i -lt %d ];", diskConsumedMB/100)+" do dd if=/dev/urandom of=%s${i} bs=100 count=1000000; i=$(($i+1)); done; while true; do sleep 5; done")
+func diskConsumingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeSource, resources v1.ResourceRequirements) *v1.Pod {
+	// Each iteration writes 1 Mb, so do diskConsumedMB iterations.
+	return podWithCommand(volumeSource, resources, name, fmt.Sprintf("i=0; while [ $i -lt %d ];", diskConsumedMB)+" do dd if=/dev/urandom of=%s${i} bs=1048576 count=1; i=$(($i+1)); done; while true; do sleep 5; done")
 }
 
 // podWithCommand returns a pod with the provided volumeSource and resourceRequirements.

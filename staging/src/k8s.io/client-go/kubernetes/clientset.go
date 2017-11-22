@@ -20,6 +20,7 @@ import (
 	glog "github.com/golang/glog"
 	discovery "k8s.io/client-go/discovery"
 	admissionregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1"
+	admissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	appsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
 	appsv1beta2 "k8s.io/client-go/kubernetes/typed/apps/v1beta2"
@@ -52,8 +53,9 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	AdmissionregistrationV1alpha1() admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Interface
+	AdmissionregistrationV1beta1() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
-	Admissionregistration() admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Interface
+	Admissionregistration() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface
 	AppsV1beta1() appsv1beta1.AppsV1beta1Interface
 	AppsV1beta2() appsv1beta2.AppsV1beta2Interface
 	AppsV1() appsv1.AppsV1Interface
@@ -114,6 +116,7 @@ type Interface interface {
 type Clientset struct {
 	*discovery.DiscoveryClient
 	admissionregistrationV1alpha1 *admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Client
+	admissionregistrationV1beta1  *admissionregistrationv1beta1.AdmissionregistrationV1beta1Client
 	appsV1beta1                   *appsv1beta1.AppsV1beta1Client
 	appsV1beta2                   *appsv1beta2.AppsV1beta2Client
 	appsV1                        *appsv1.AppsV1Client
@@ -146,10 +149,15 @@ func (c *Clientset) AdmissionregistrationV1alpha1() admissionregistrationv1alpha
 	return c.admissionregistrationV1alpha1
 }
 
+// AdmissionregistrationV1beta1 retrieves the AdmissionregistrationV1beta1Client
+func (c *Clientset) AdmissionregistrationV1beta1() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface {
+	return c.admissionregistrationV1beta1
+}
+
 // Deprecated: Admissionregistration retrieves the default version of AdmissionregistrationClient.
 // Please explicitly pick a version.
-func (c *Clientset) Admissionregistration() admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Interface {
-	return c.admissionregistrationV1alpha1
+func (c *Clientset) Admissionregistration() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface {
+	return c.admissionregistrationV1beta1
 }
 
 // AppsV1beta1 retrieves the AppsV1beta1Client
@@ -381,6 +389,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.admissionregistrationV1beta1, err = admissionregistrationv1beta1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.appsV1beta1, err = appsv1beta1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -495,6 +507,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.admissionregistrationV1alpha1 = admissionregistrationv1alpha1.NewForConfigOrDie(c)
+	cs.admissionregistrationV1beta1 = admissionregistrationv1beta1.NewForConfigOrDie(c)
 	cs.appsV1beta1 = appsv1beta1.NewForConfigOrDie(c)
 	cs.appsV1beta2 = appsv1beta2.NewForConfigOrDie(c)
 	cs.appsV1 = appsv1.NewForConfigOrDie(c)
@@ -529,6 +542,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.admissionregistrationV1alpha1 = admissionregistrationv1alpha1.New(c)
+	cs.admissionregistrationV1beta1 = admissionregistrationv1beta1.New(c)
 	cs.appsV1beta1 = appsv1beta1.New(c)
 	cs.appsV1beta2 = appsv1beta2.New(c)
 	cs.appsV1 = appsv1.New(c)

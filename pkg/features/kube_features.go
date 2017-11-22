@@ -188,6 +188,12 @@ const (
 	// Enable mount/attachment of Container Storage Interface (CSI) backed PVs
 	CSIPersistentVolume utilfeature.Feature = "CSIPersistentVolume"
 
+	// owner @MrHohn
+	// alpha: v1.9
+	//
+	// Support configurable pod DNS parameters.
+	CustomPodDNS utilfeature.Feature = "CustomPodDNS"
+
 	// owner: @screeley44
 	// alpha: v1.9
 	//
@@ -228,6 +234,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	MountContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeScheduling:                            {Default: false, PreRelease: utilfeature.Alpha},
 	CSIPersistentVolume:                         {Default: false, PreRelease: utilfeature.Alpha},
+	CustomPodDNS:                                {Default: false, PreRelease: utilfeature.Alpha},
 	BlockVolume:                                 {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed

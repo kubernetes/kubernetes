@@ -26,14 +26,12 @@ import (
 
 	"k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -44,17 +42,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/features"
 	schedulerapp "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/core"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	"k8s.io/kubernetes/test/integration/framework"
-	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const enableEquivalenceCache = true
@@ -616,254 +611,6 @@ func TestAllocatable(t *testing.T) {
 		t.Errorf("Test allocatable awareness: %s Pod got scheduled unexpectedly, %v", testAllocPod2.Name, err)
 	} else {
 		t.Logf("Test allocatable awareness: %s Pod not scheduled as expected", testAllocPod2.Name)
-	}
-}
-
-// TestPreemption tests a few preemption scenarios.
-func TestPreemption(t *testing.T) {
-	// Enable PodPriority feature gate.
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
-	// Initialize scheduler.
-	context := initTest(t, "preemption")
-	defer cleanupTest(t, context)
-	cs := context.clientSet
-
-	lowPriority, mediumPriority, highPriority := int32(100), int32(200), int32(300)
-	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
-		v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI)},
-	}
-
-	tests := []struct {
-		description         string
-		existingPods        []*v1.Pod
-		pod                 *v1.Pod
-		preemptedPodIndexes map[int]struct{}
-	}{
-		{
-			description: "basic pod preemption",
-			existingPods: []*v1.Pod{
-				initPausePod(context.clientSet, &pausePodConfig{
-					Name:      "victim-pod",
-					Namespace: context.ns.Name,
-					Priority:  &lowPriority,
-					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(200, resource.BinarySI)},
-					},
-				}),
-			},
-			pod: initPausePod(cs, &pausePodConfig{
-				Name:      "preemptor-pod",
-				Namespace: context.ns.Name,
-				Priority:  &highPriority,
-				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(200, resource.BinarySI)},
-				},
-			}),
-			preemptedPodIndexes: map[int]struct{}{0: {}},
-		},
-		{
-			description: "preemption is performed to satisfy anti-affinity",
-			existingPods: []*v1.Pod{
-				initPausePod(cs, &pausePodConfig{
-					Name: "pod-0", Namespace: context.ns.Name,
-					Priority:  &mediumPriority,
-					Labels:    map[string]string{"pod": "p0"},
-					Resources: defaultPodRes,
-				}),
-				initPausePod(cs, &pausePodConfig{
-					Name: "pod-1", Namespace: context.ns.Name,
-					Priority:  &lowPriority,
-					Labels:    map[string]string{"pod": "p1"},
-					Resources: defaultPodRes,
-					Affinity: &v1.Affinity{
-						PodAntiAffinity: &v1.PodAntiAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-								{
-									LabelSelector: &metav1.LabelSelector{
-										MatchExpressions: []metav1.LabelSelectorRequirement{
-											{
-												Key:      "pod",
-												Operator: metav1.LabelSelectorOpIn,
-												Values:   []string{"preemptor"},
-											},
-										},
-									},
-									TopologyKey: "node",
-								},
-							},
-						},
-					},
-				}),
-			},
-			// A higher priority pod with anti-affinity.
-			pod: initPausePod(cs, &pausePodConfig{
-				Name:      "preemptor-pod",
-				Namespace: context.ns.Name,
-				Priority:  &highPriority,
-				Labels:    map[string]string{"pod": "preemptor"},
-				Resources: defaultPodRes,
-				Affinity: &v1.Affinity{
-					PodAntiAffinity: &v1.PodAntiAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchExpressions: []metav1.LabelSelectorRequirement{
-										{
-											Key:      "pod",
-											Operator: metav1.LabelSelectorOpIn,
-											Values:   []string{"p0"},
-										},
-									},
-								},
-								TopologyKey: "node",
-							},
-						},
-					},
-				},
-			}),
-			preemptedPodIndexes: map[int]struct{}{0: {}, 1: {}},
-		},
-		{
-			// This is similar to the previous case only pod-1 is high priority.
-			description: "preemption is not performed when anti-affinity is not satisfied",
-			existingPods: []*v1.Pod{
-				initPausePod(cs, &pausePodConfig{
-					Name: "pod-0", Namespace: context.ns.Name,
-					Priority:  &mediumPriority,
-					Labels:    map[string]string{"pod": "p0"},
-					Resources: defaultPodRes,
-				}),
-				initPausePod(cs, &pausePodConfig{
-					Name: "pod-1", Namespace: context.ns.Name,
-					Priority:  &highPriority,
-					Labels:    map[string]string{"pod": "p1"},
-					Resources: defaultPodRes,
-					Affinity: &v1.Affinity{
-						PodAntiAffinity: &v1.PodAntiAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-								{
-									LabelSelector: &metav1.LabelSelector{
-										MatchExpressions: []metav1.LabelSelectorRequirement{
-											{
-												Key:      "pod",
-												Operator: metav1.LabelSelectorOpIn,
-												Values:   []string{"preemptor"},
-											},
-										},
-									},
-									TopologyKey: "node",
-								},
-							},
-						},
-					},
-				}),
-			},
-			// A higher priority pod with anti-affinity.
-			pod: initPausePod(cs, &pausePodConfig{
-				Name:      "preemptor-pod",
-				Namespace: context.ns.Name,
-				Priority:  &highPriority,
-				Labels:    map[string]string{"pod": "preemptor"},
-				Resources: defaultPodRes,
-				Affinity: &v1.Affinity{
-					PodAntiAffinity: &v1.PodAntiAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchExpressions: []metav1.LabelSelectorRequirement{
-										{
-											Key:      "pod",
-											Operator: metav1.LabelSelectorOpIn,
-											Values:   []string{"p0"},
-										},
-									},
-								},
-								TopologyKey: "node",
-							},
-						},
-					},
-				},
-			}),
-			preemptedPodIndexes: map[int]struct{}{},
-		},
-	}
-
-	// Create a node with some resources and a label.
-	nodeRes := &v1.ResourceList{
-		v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
-		v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(500, resource.BinarySI),
-	}
-	node, err := createNode(context.clientSet, "node1", nodeRes)
-	if err != nil {
-		t.Fatalf("Error creating nodes: %v", err)
-	}
-	nodeLabels := map[string]string{"node": node.Name}
-	if err = testutils.AddLabelsToNode(context.clientSet, node.Name, nodeLabels); err != nil {
-		t.Fatalf("Cannot add labels to node: %v", err)
-	}
-	if err = waitForNodeLabels(context.clientSet, node.Name, nodeLabels); err != nil {
-		t.Fatalf("Adding labels to node didn't succeed: %v", err)
-	}
-
-	for _, test := range tests {
-		pods := make([]*v1.Pod, len(test.existingPods))
-		// Create and run existingPods.
-		for i, p := range test.existingPods {
-			pods[i], err = runPausePod(cs, p)
-			if err != nil {
-				t.Fatalf("Test [%v]: Error running pause pod: %v", test.description, err)
-			}
-		}
-		// Create the "pod".
-		preemptor, err := createPausePod(cs, test.pod)
-		if err != nil {
-			t.Errorf("Error while creating high priority pod: %v", err)
-		}
-		// Wait for preemption of pods and make sure the other ones are not preempted.
-		for i, p := range pods {
-			if _, found := test.preemptedPodIndexes[i]; found {
-				if err = wait.Poll(time.Second, wait.ForeverTestTimeout, podIsGettingEvicted(cs, p.Namespace, p.Name)); err != nil {
-					t.Errorf("Test [%v]: Pod %v is not getting evicted.", test.description, p.Name)
-				}
-			} else {
-				if p.DeletionTimestamp != nil {
-					t.Errorf("Test [%v]: Didn't expect pod %v to get preempted.", test.description, p.Name)
-				}
-			}
-		}
-		// Also check that the preemptor pod gets the annotation for nominated node name.
-		if len(test.preemptedPodIndexes) > 0 {
-			if err = wait.Poll(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-				pod, err := context.clientSet.CoreV1().Pods(context.ns.Name).Get("preemptor-pod", metav1.GetOptions{})
-				if err != nil {
-					t.Errorf("Test [%v]: error getting pod: %v", test.description, err)
-				}
-				annot, found := pod.Annotations[core.NominatedNodeAnnotationKey]
-				if found && len(annot) > 0 {
-					return true, nil
-				}
-				return false, err
-			}); err != nil {
-				t.Errorf("Test [%v]: Pod annotation did not get set.", test.description)
-			}
-		}
-
-		// Cleanup
-		pods = append(pods, preemptor)
-		for _, p := range pods {
-			err = cs.CoreV1().Pods(p.Namespace).Delete(p.Name, metav1.NewDeleteOptions(0))
-			if err != nil && !errors.IsNotFound(err) {
-				t.Errorf("Test [%v]: error, %v, while deleting pod during test.", test.description, err)
-			}
-			err = wait.Poll(time.Second, wait.ForeverTestTimeout, podDeleted(cs, p.Namespace, p.Name))
-			if err != nil {
-				t.Errorf("Test [%v]: error, %v, while waiting for pod to get deleted.", test.description, err)
-			}
-		}
 	}
 }
 

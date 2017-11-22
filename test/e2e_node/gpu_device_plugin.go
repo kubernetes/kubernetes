@@ -19,6 +19,7 @@ package e2e_node
 import (
 	"os/exec"
 	"regexp"
+	"strconv"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -27,10 +28,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/prometheus/common/model"
 )
 
 const (
@@ -121,6 +125,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			Expect(devIdRestart1).To(Equal(devId1))
 			count2, devIdRestart2 = getDeviceId(f, p2.Name, p2.Name, count2+2)
 			Expect(devIdRestart2).To(Equal(devId2))
+			logDevicePluginMetrics()
 
 			// Cleanup
 			f.PodClient().DeleteSync(p1.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
@@ -128,6 +133,34 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 		})
 	})
 })
+
+func logDevicePluginMetrics() {
+	ms, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName + ":10255")
+	framework.ExpectNoError(err)
+	for msKey, samples := range ms {
+		switch msKey {
+		case kubeletmetrics.KubeletSubsystem + "_" + kubeletmetrics.DevicePluginAllocationLatencyKey:
+			for _, sample := range samples {
+				latency := sample.Value
+				resource := string(sample.Metric["resource_name"])
+				var quantile float64
+				if val, ok := sample.Metric[model.QuantileLabel]; ok {
+					var err error
+					if quantile, err = strconv.ParseFloat(string(val), 64); err != nil {
+						continue
+					}
+					framework.Logf("Metric: %v ResourceName: %v Quantile: %v Latency: %v", msKey, resource, quantile, latency)
+				}
+			}
+		case kubeletmetrics.KubeletSubsystem + "_" + kubeletmetrics.DevicePluginRegistrationCountKey:
+			for _, sample := range samples {
+				resource := string(sample.Metric["resource_name"])
+				count := sample.Value
+				framework.Logf("Metric: %v ResourceName: %v Count: %v", msKey, resource, count)
+			}
+		}
+	}
+}
 
 func makeCudaPauseImage() *v1.Pod {
 	podName := testPodNamePrefix + string(uuid.NewUUID())

@@ -26,6 +26,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -290,7 +291,7 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 
 	mixedInvalidFlags := []string{}
 	flag.Visit(func(f *pflag.Flag) {
-		if f.Name == "config" || strings.HasPrefix(f.Name, "skip-") || f.Name == "dry-run" || f.Name == "kubeconfig" {
+		if f.Name == "config" || strings.HasPrefix(f.Name, "ignore-checks-") || strings.HasPrefix(f.Name, "skip-") || f.Name == "dry-run" || f.Name == "kubeconfig" {
 			// "--skip-*" flags or other whitelisted flags can be set with --config
 			return
 		}
@@ -328,4 +329,28 @@ func ValidateAPIEndpoint(c *kubeadm.MasterConfiguration, fldPath *field.Path) fi
 		allErrs = append(allErrs, field.Invalid(fldPath, endpoint, "Invalid API Endpoint"))
 	}
 	return allErrs
+}
+
+// ValidateIgnoreChecksErrors validates duplicates in ignore-checks-errors flag.
+func ValidateIgnoreChecksErrors(ignoreChecksErrors []string, skipPreflightChecks bool) (sets.String, error) {
+	ignoreErrors := sets.NewString()
+	allErrs := field.ErrorList{}
+
+	for _, item := range ignoreChecksErrors {
+		ignoreErrors.Insert(strings.ToLower(item)) // parameters are case insensitive
+	}
+
+	// TODO: remove once deprecated flag --skip-preflight-checks is removed.
+	if skipPreflightChecks {
+		if ignoreErrors.Has("all") {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("ignore-checks-errors"), strings.Join(ignoreErrors.List(), ","), "'all' is used together with deprecated flag --skip-preflight-checks. Remove deprecated flag"))
+		}
+		ignoreErrors.Insert("all")
+	}
+
+	if ignoreErrors.Has("all") && ignoreErrors.Len() > 1 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("ignore-checks-errors"), strings.Join(ignoreErrors.List(), ","), "don't specify individual checks if 'all' is used"))
+	}
+
+	return ignoreErrors, allErrs.ToAggregate()
 }

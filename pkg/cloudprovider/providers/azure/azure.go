@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"strings"
 	"time"
 
 	"k8s.io/client-go/util/flowcontrol"
@@ -52,6 +53,9 @@ const (
 	backoffDurationDefault       = 5 // in seconds
 	backoffJitterDefault         = 1.0
 	maximumLoadBalancerRuleCount = 148 // According to Azure LB rule default limit
+
+	vmTypeVMSS     = "vmss"
+	vmTypeStandard = "standard"
 )
 
 // Config holds the configuration parsed from the --cloud-config flag
@@ -83,6 +87,15 @@ type Config struct {
 	// the cloudprovider will try to add all nodes to a single backend pool which is forbidden.
 	// In other words, if you use multiple agent pools (availability sets), you MUST set this field.
 	PrimaryAvailabilitySetName string `json:"primaryAvailabilitySetName" yaml:"primaryAvailabilitySetName"`
+	// The type of azure nodes. Candidate valudes are: vmss and standard.
+	// If not set, it will be default to standard.
+	VMType string `json:"vmType" yaml:"vmType"`
+	// The name of the scale set that should be used as the load balancer backend.
+	// If this is set, the Azure cloudprovider will only add nodes from that scale set to the load
+	// balancer backend pool. If this is not set, and multiple agent pools (scale sets) are used, then
+	// the cloudprovider will try to add all nodes to a single backend pool which is forbidden.
+	// In other words, if you use multiple agent pools (scale sets), you MUST set this field.
+	PrimaryScaleSetName string `json:"primaryScaleSetName" yaml:"primaryScaleSetName"`
 
 	// The ClientID for an AAD application with RBAC access to talk to Azure RM APIs
 	AADClientID string `json:"aadClientId" yaml:"aadClientId"`
@@ -131,6 +144,7 @@ type VirtualMachinesClient interface {
 type InterfacesClient interface {
 	CreateOrUpdate(resourceGroupName string, networkInterfaceName string, parameters network.Interface, cancel <-chan struct{}) (<-chan network.Interface, <-chan error)
 	Get(resourceGroupName string, networkInterfaceName string, expand string) (result network.Interface, err error)
+	GetVirtualMachineScaleSetNetworkInterface(resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, expand string) (result network.Interface, err error)
 }
 
 // LoadBalancersClient defines needed functions for azure network.LoadBalancersClient
@@ -184,6 +198,10 @@ type Cloud struct {
 	operationPollRateLimiter flowcontrol.RateLimiter
 	resourceRequestBackoff   wait.Backoff
 	metadata                 *InstanceMetadata
+
+	// Clients for vmss.
+	VirtualMachineScaleSetsClient   compute.VirtualMachineScaleSetsClient
+	VirtualMachineScaleSetVMsClient compute.VirtualMachineScaleSetVMsClient
 
 	*BlobDiskController
 	*ManagedDiskController
@@ -327,6 +345,20 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	configureUserAgent(&securityGroupsClient.Client)
 	az.SecurityGroupsClient = securityGroupsClient
 
+	virtualMachineScaleSetVMsClient := compute.NewVirtualMachineScaleSetVMsClient(az.SubscriptionID)
+	az.VirtualMachineScaleSetVMsClient.BaseURI = az.Environment.ResourceManagerEndpoint
+	az.VirtualMachineScaleSetVMsClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+	az.VirtualMachineScaleSetVMsClient.PollingDelay = 5 * time.Second
+	configureUserAgent(&virtualMachineScaleSetVMsClient.Client)
+	az.VirtualMachineScaleSetVMsClient = virtualMachineScaleSetVMsClient
+
+	virtualMachineScaleSetsClient := compute.NewVirtualMachineScaleSetsClient(az.SubscriptionID)
+	az.VirtualMachineScaleSetsClient.BaseURI = az.Environment.ResourceManagerEndpoint
+	az.VirtualMachineScaleSetsClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+	az.VirtualMachineScaleSetsClient.PollingDelay = 5 * time.Second
+	configureUserAgent(&virtualMachineScaleSetsClient.Client)
+	az.VirtualMachineScaleSetsClient = virtualMachineScaleSetsClient
+
 	az.StorageAccountClient = storage.NewAccountsClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
 	az.StorageAccountClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
 	configureUserAgent(&az.StorageAccountClient.Client)
@@ -421,6 +453,11 @@ func ParseConfig(configReader io.Reader) (*Config, *azure.Environment, error) {
 			return nil, nil, err
 		}
 	}
+
+	if config.VMType != "" {
+		config.VMType = strings.ToLower(config.VMType)
+	}
+
 	return &config, &env, nil
 }
 

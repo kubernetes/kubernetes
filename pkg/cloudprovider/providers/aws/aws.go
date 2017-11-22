@@ -38,6 +38,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
+	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -61,6 +62,18 @@ import (
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
+// NLBHealthCheckRuleDescription is the comment used on a security group rule to
+// indicate that it is used for health checks
+const NLBHealthCheckRuleDescription = "kubernetes.io/rule/nlb/health"
+
+// NLBClientRuleDescription is the comment used on a security group rule to
+// indicate that it is used for client traffic
+const NLBClientRuleDescription = "kubernetes.io/rule/nlb/client"
+
+// NLBMtuDiscoveryRuleDescription is the comment used on a security group rule
+// to indicate that it is used for mtu discovery
+const NLBMtuDiscoveryRuleDescription = "kubernetes.io/rule/nlb/mtu"
+
 // ProviderName is the name of this cloud provider.
 const ProviderName = "aws"
 
@@ -75,6 +88,11 @@ const TagNameSubnetInternalELB = "kubernetes.io/role/internal-elb"
 // TagNameSubnetPublicELB is the tag name used on a subnet to designate that
 // it should be used for internet ELBs
 const TagNameSubnetPublicELB = "kubernetes.io/role/elb"
+
+// ServiceAnnotationLoadBalancerType is the annotation used on the service
+// to indicate what type of Load Balancer we want. Right now, the only accepted
+// value is "nlb"
+const ServiceAnnotationLoadBalancerType = "service.beta.kubernetes.io/aws-load-balancer-type"
 
 // ServiceAnnotationLoadBalancerInternal is the annotation used on the service
 // to indicate that we want an internal ELB.
@@ -224,6 +242,7 @@ var _ cloudprovider.PVLabeler = (*Cloud)(nil)
 type Services interface {
 	Compute(region string) (EC2, error)
 	LoadBalancing(region string) (ELB, error)
+	LoadBalancingV2(region string) (ELBV2, error)
 	Autoscaling(region string) (ASG, error)
 	Metadata() (EC2Metadata, error)
 	KeyManagement(region string) (KMS, error)
@@ -264,6 +283,8 @@ type EC2 interface {
 	DeleteRoute(request *ec2.DeleteRouteInput) (*ec2.DeleteRouteOutput, error)
 
 	ModifyInstanceAttribute(request *ec2.ModifyInstanceAttributeInput) (*ec2.ModifyInstanceAttributeOutput, error)
+
+	DescribeVpcs(input *ec2.DescribeVpcsInput) (*ec2.DescribeVpcsOutput, error)
 }
 
 // ELB is a simple pass-through of AWS' ELB client interface, which allows for testing
@@ -291,6 +312,38 @@ type ELB interface {
 
 	DescribeLoadBalancerAttributes(*elb.DescribeLoadBalancerAttributesInput) (*elb.DescribeLoadBalancerAttributesOutput, error)
 	ModifyLoadBalancerAttributes(*elb.ModifyLoadBalancerAttributesInput) (*elb.ModifyLoadBalancerAttributesOutput, error)
+}
+
+// ELBV2 is a simple pass-through of AWS' ELBV2 client interface, which allows for testing
+type ELBV2 interface {
+	AddTags(input *elbv2.AddTagsInput) (*elbv2.AddTagsOutput, error)
+
+	CreateLoadBalancer(*elbv2.CreateLoadBalancerInput) (*elbv2.CreateLoadBalancerOutput, error)
+	DescribeLoadBalancers(*elbv2.DescribeLoadBalancersInput) (*elbv2.DescribeLoadBalancersOutput, error)
+	DeleteLoadBalancer(*elbv2.DeleteLoadBalancerInput) (*elbv2.DeleteLoadBalancerOutput, error)
+
+	ModifyLoadBalancerAttributes(*elbv2.ModifyLoadBalancerAttributesInput) (*elbv2.ModifyLoadBalancerAttributesOutput, error)
+	DescribeLoadBalancerAttributes(*elbv2.DescribeLoadBalancerAttributesInput) (*elbv2.DescribeLoadBalancerAttributesOutput, error)
+
+	CreateTargetGroup(*elbv2.CreateTargetGroupInput) (*elbv2.CreateTargetGroupOutput, error)
+	DescribeTargetGroups(*elbv2.DescribeTargetGroupsInput) (*elbv2.DescribeTargetGroupsOutput, error)
+	ModifyTargetGroup(*elbv2.ModifyTargetGroupInput) (*elbv2.ModifyTargetGroupOutput, error)
+	DeleteTargetGroup(*elbv2.DeleteTargetGroupInput) (*elbv2.DeleteTargetGroupOutput, error)
+
+	DescribeTargetHealth(input *elbv2.DescribeTargetHealthInput) (*elbv2.DescribeTargetHealthOutput, error)
+
+	DescribeTargetGroupAttributes(*elbv2.DescribeTargetGroupAttributesInput) (*elbv2.DescribeTargetGroupAttributesOutput, error)
+	ModifyTargetGroupAttributes(*elbv2.ModifyTargetGroupAttributesInput) (*elbv2.ModifyTargetGroupAttributesOutput, error)
+
+	RegisterTargets(*elbv2.RegisterTargetsInput) (*elbv2.RegisterTargetsOutput, error)
+	DeregisterTargets(*elbv2.DeregisterTargetsInput) (*elbv2.DeregisterTargetsOutput, error)
+
+	CreateListener(*elbv2.CreateListenerInput) (*elbv2.CreateListenerOutput, error)
+	DescribeListeners(*elbv2.DescribeListenersInput) (*elbv2.DescribeListenersOutput, error)
+	DeleteListener(*elbv2.DeleteListenerInput) (*elbv2.DeleteListenerOutput, error)
+	ModifyListener(*elbv2.ModifyListenerInput) (*elbv2.ModifyListenerOutput, error)
+
+	WaitUntilLoadBalancersDeleted(*elbv2.DescribeLoadBalancersInput) error
 }
 
 // ASG is a simple pass-through of the Autoscaling client interface, which
@@ -402,6 +455,7 @@ type InstanceGroupInfo interface {
 type Cloud struct {
 	ec2      EC2
 	elb      ELB
+	elbv2    ELBV2
 	asg      ASG
 	kms      KMS
 	metadata EC2Metadata
@@ -581,6 +635,20 @@ func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
 	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
 
 	elbClient := elb.New(session.New(awsConfig))
+
+	p.addHandlers(regionName, &elbClient.Handlers)
+
+	return elbClient, nil
+}
+
+func (p *awsSDKProvider) LoadBalancingV2(regionName string) (ELBV2, error) {
+	awsConfig := &aws.Config{
+		Region:      &regionName,
+		Credentials: p.creds,
+	}
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
+
+	elbClient := elbv2.New(session.New(awsConfig))
 
 	p.addHandlers(regionName, &elbClient.Handlers)
 
@@ -800,6 +868,10 @@ func (s *awsSdkEC2) ModifyInstanceAttribute(request *ec2.ModifyInstanceAttribute
 	return s.ec2.ModifyInstanceAttribute(request)
 }
 
+func (s *awsSdkEC2) DescribeVpcs(request *ec2.DescribeVpcsInput) (*ec2.DescribeVpcsOutput, error) {
+	return s.ec2.DescribeVpcs(request)
+}
+
 func init() {
 	registerMetrics()
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
@@ -913,6 +985,11 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		return nil, fmt.Errorf("error creating AWS ELB client: %v", err)
 	}
 
+	elbv2, err := awsServices.LoadBalancingV2(regionName)
+	if err != nil {
+		return nil, fmt.Errorf("error creating AWS ELBV2 client: %v", err)
+	}
+
 	asg, err := awsServices.Autoscaling(regionName)
 	if err != nil {
 		return nil, fmt.Errorf("error creating AWS autoscaling client: %v", err)
@@ -926,6 +1003,7 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 	awsCloud := &Cloud{
 		ec2:      ec2,
 		elb:      elb,
+		elbv2:    elbv2,
 		asg:      asg,
 		metadata: metadata,
 		kms:      kms,
@@ -2270,6 +2348,32 @@ func (c *Cloud) addLoadBalancerTags(loadBalancerName string, requested map[strin
 	return nil
 }
 
+// Gets the current load balancer state
+func (c *Cloud) describeLoadBalancerv2(name string) (*elbv2.LoadBalancer, error) {
+	request := &elbv2.DescribeLoadBalancersInput{
+		Names: []*string{aws.String(name)},
+	}
+
+	response, err := c.elbv2.DescribeLoadBalancers(request)
+	if err != nil {
+		if awsError, ok := err.(awserr.Error); ok {
+			if awsError.Code() == elbv2.ErrCodeLoadBalancerNotFoundException {
+				return nil, nil
+			}
+		}
+		return nil, fmt.Errorf("Error describing load balancer: %q", err)
+	}
+
+	// AWS will not return 2 load balancers with the same name _and_ type.
+	for i := range response.LoadBalancers {
+		if aws.StringValue(response.LoadBalancers[i].Type) == elbv2.LoadBalancerTypeEnumNetwork {
+			return response.LoadBalancers[i], nil
+		}
+	}
+
+	return nil, fmt.Errorf("NLB '%s' could not be found", name)
+}
+
 // Retrieves instance's vpc id from metadata
 func (c *Cloud) findVPCID() (string, error) {
 	macs, err := c.metadata.GetMetadata("network/interfaces/macs/")
@@ -2959,6 +3063,8 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 
 	// Figure out what mappings we want on the load balancer
 	listeners := []*elb.Listener{}
+	v2Mappings := []nlbPortMapping{}
+
 	portList := getPortSets(annotations[ServiceAnnotationLoadBalancerSSLPorts])
 	for _, port := range apiService.Spec.Ports {
 		if port.Protocol != v1.ProtocolTCP {
@@ -2967,6 +3073,17 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 		if port.NodePort == 0 {
 			glog.Errorf("Ignoring port without NodePort defined: %v", port)
 			continue
+		}
+
+		if isNLB(annotations) {
+			v2Mappings = append(v2Mappings, nlbPortMapping{
+				FrontendPort: int64(port.Port),
+				TrafficPort:  int64(port.NodePort),
+				// if externalTrafficPolicy == "Local", we'll override the
+				// health check later
+				HealthCheckPort:     int64(port.NodePort),
+				HealthCheckProtocol: elbv2.ProtocolEnumTcp,
+			})
 		}
 		listener, err := buildListener(port, annotations, portList)
 		if err != nil {
@@ -2994,6 +3111,69 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 	internalAnnotation := apiService.Annotations[ServiceAnnotationLoadBalancerInternal]
 	if internalAnnotation != "" {
 		internalELB = true
+	}
+
+	if isNLB(annotations) {
+
+		if path, healthCheckNodePort := service.GetServiceHealthCheckPathPort(apiService); path != "" {
+			for i := range v2Mappings {
+				v2Mappings[i].HealthCheckPort = int64(healthCheckNodePort)
+				v2Mappings[i].HealthCheckPath = path
+				v2Mappings[i].HealthCheckProtocol = elbv2.ProtocolEnumHttp
+			}
+		}
+
+		// Find the subnets that the ELB will live in
+		subnetIDs, err := c.findELBSubnets(internalELB)
+		if err != nil {
+			glog.Errorf("Error listing subnets in VPC: %q", err)
+			return nil, err
+		}
+		// Bail out early if there are no subnets
+		if len(subnetIDs) == 0 {
+			return nil, fmt.Errorf("could not find any suitable subnets for creating the ELB")
+		}
+
+		loadBalancerName := cloudprovider.GetLoadBalancerName(apiService)
+		serviceName := types.NamespacedName{Namespace: apiService.Namespace, Name: apiService.Name}
+
+		instanceIDs := []string{}
+		for id := range instances {
+			instanceIDs = append(instanceIDs, string(id))
+		}
+
+		v2LoadBalancer, err := c.ensureLoadBalancerv2(
+			serviceName,
+			loadBalancerName,
+			v2Mappings,
+			instanceIDs,
+			subnetIDs,
+			internalELB,
+			annotations,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		sourceRangeCidrs := []string{}
+		for cidr := range sourceRanges {
+			sourceRangeCidrs = append(sourceRangeCidrs, cidr)
+		}
+		if len(sourceRangeCidrs) == 0 {
+			sourceRangeCidrs = append(sourceRangeCidrs, "0.0.0.0/0")
+		}
+
+		err = c.updateInstanceSecurityGroupsForNLB(v2Mappings, instances, loadBalancerName, sourceRangeCidrs)
+		if err != nil {
+			glog.Warningf("Error opening ingress rules for the load balancer to the instances: %q", err)
+			return nil, err
+		}
+
+		// We don't have an `ensureLoadBalancerInstances()` function for elbv2
+		// because `ensureLoadBalancerv2()` requires instance Ids
+
+		// TODO: Wait for creation?
+		return v2toStatus(v2LoadBalancer), nil
 	}
 
 	// Determine if we need to set the Proxy protocol policy
@@ -3240,6 +3420,18 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 // GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
 func (c *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+
+	if isNLB(service.Annotations) {
+		lb, err := c.describeLoadBalancerv2(loadBalancerName)
+		if err != nil {
+			return nil, false, err
+		}
+		if lb == nil {
+			return nil, false, nil
+		}
+		return v2toStatus(lb), true, nil
+	}
+
 	lb, err := c.describeLoadBalancer(loadBalancerName)
 	if err != nil {
 		return nil, false, err
@@ -3257,6 +3449,24 @@ func toStatus(lb *elb.LoadBalancerDescription) *v1.LoadBalancerStatus {
 	status := &v1.LoadBalancerStatus{}
 
 	if aws.StringValue(lb.DNSName) != "" {
+		var ingress v1.LoadBalancerIngress
+		ingress.Hostname = aws.StringValue(lb.DNSName)
+		status.Ingress = []v1.LoadBalancerIngress{ingress}
+	}
+
+	return status
+}
+
+func v2toStatus(lb *elbv2.LoadBalancer) *v1.LoadBalancerStatus {
+	status := &v1.LoadBalancerStatus{}
+	if lb == nil {
+		glog.Error("[BUG] v2toStatus got nil input, this is a Kubernetes bug, please report")
+		return status
+	}
+
+	// We check for Active or Provisioning, the only successful statuses
+	if aws.StringValue(lb.DNSName) != "" && (aws.StringValue(lb.State.Code) == elbv2.LoadBalancerStateEnumActive ||
+		aws.StringValue(lb.State.Code) == elbv2.LoadBalancerStateEnumProvisioning) {
 		var ingress v1.LoadBalancerIngress
 		ingress.Hostname = aws.StringValue(lb.DNSName)
 		status.Ingress = []v1.LoadBalancerIngress{ingress}
@@ -3470,6 +3680,139 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 // EnsureLoadBalancerDeleted implements LoadBalancer.EnsureLoadBalancerDeleted.
 func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+
+	if isNLB(service.Annotations) {
+		lb, err := c.describeLoadBalancerv2(loadBalancerName)
+		if err != nil {
+			return err
+		}
+		if lb == nil {
+			glog.Info("Load balancer already deleted: ", loadBalancerName)
+			return nil
+		}
+
+		// Delete the LoadBalancer and target groups
+		//
+		// Deleting a target group while associated with a load balancer will
+		// fail. We delete the loadbalancer first. This does leave the
+		// possibility of zombie target groups if DeleteLoadBalancer() fails
+		//
+		// * Get target groups for NLB
+		// * Delete Load Balancer
+		// * Delete target groups
+		// * Clean up SecurityGroupRules
+		{
+
+			targetGroups, err := c.elbv2.DescribeTargetGroups(
+				&elbv2.DescribeTargetGroupsInput{LoadBalancerArn: lb.LoadBalancerArn},
+			)
+			if err != nil {
+				return fmt.Errorf("Error listing target groups before deleting load balancer: %q", err)
+			}
+
+			_, err = c.elbv2.DeleteLoadBalancer(
+				&elbv2.DeleteLoadBalancerInput{LoadBalancerArn: lb.LoadBalancerArn},
+			)
+			if err != nil {
+				return fmt.Errorf("Error deleting load balancer %q: %v", loadBalancerName, err)
+			}
+
+			for _, group := range targetGroups.TargetGroups {
+				_, err := c.elbv2.DeleteTargetGroup(
+					&elbv2.DeleteTargetGroupInput{TargetGroupArn: group.TargetGroupArn},
+				)
+				if err != nil {
+					return fmt.Errorf("Error deleting target groups after deleting load balancer: %q", err)
+				}
+			}
+		}
+
+		{
+			var matchingGroups []*ec2.SecurityGroup
+			{
+				// Server side filter
+				describeRequest := &ec2.DescribeSecurityGroupsInput{}
+				filters := []*ec2.Filter{
+					newEc2Filter("ip-permission.protocol", "tcp"),
+				}
+				describeRequest.Filters = c.tagging.addFilters(filters)
+				response, err := c.ec2.DescribeSecurityGroups(describeRequest)
+				if err != nil {
+					return fmt.Errorf("Error querying security groups for NLB: %q", err)
+				}
+				for _, sg := range response {
+					if !c.tagging.hasClusterTag(sg.Tags) {
+						continue
+					}
+					matchingGroups = append(matchingGroups, sg)
+				}
+
+				// client-side filter out groups that don't have IP Rules we've
+				// annotated for this service
+				matchingGroups = filterForIPRangeDescription(matchingGroups, loadBalancerName)
+			}
+
+			{
+				clientRule := fmt.Sprintf("%s=%s", NLBClientRuleDescription, loadBalancerName)
+				mtuRule := fmt.Sprintf("%s=%s", NLBMtuDiscoveryRuleDescription, loadBalancerName)
+				healthRule := fmt.Sprintf("%s=%s", NLBHealthCheckRuleDescription, loadBalancerName)
+
+				for i := range matchingGroups {
+					removes := []*ec2.IpPermission{}
+					for j := range matchingGroups[i].IpPermissions {
+
+						v4rangesToRemove := []*ec2.IpRange{}
+						v6rangesToRemove := []*ec2.Ipv6Range{}
+
+						// Find IpPermission that contains k8s description
+						// If we removed the whole IpPermission, it could contain other non-k8s specified ranges
+						for k := range matchingGroups[i].IpPermissions[j].IpRanges {
+							description := aws.StringValue(matchingGroups[i].IpPermissions[j].IpRanges[k].Description)
+							if description == clientRule || description == mtuRule || description == healthRule {
+								v4rangesToRemove = append(v4rangesToRemove, matchingGroups[i].IpPermissions[j].IpRanges[k])
+							}
+						}
+
+						// Find IpPermission that contains k8s description
+						// If we removed the whole IpPermission, it could contain other non-k8s specified rangesk
+						for k := range matchingGroups[i].IpPermissions[j].Ipv6Ranges {
+							description := aws.StringValue(matchingGroups[i].IpPermissions[j].Ipv6Ranges[k].Description)
+							if description == clientRule || description == mtuRule || description == healthRule {
+								v6rangesToRemove = append(v6rangesToRemove, matchingGroups[i].IpPermissions[j].Ipv6Ranges[k])
+							}
+						}
+
+						if len(v4rangesToRemove) > 0 || len(v6rangesToRemove) > 0 {
+							// create a new *IpPermission to not accidentally remove UserIdGroupPairs
+							removedPermission := &ec2.IpPermission{
+								FromPort:   matchingGroups[i].IpPermissions[j].FromPort,
+								IpProtocol: matchingGroups[i].IpPermissions[j].IpProtocol,
+								IpRanges:   v4rangesToRemove,
+								Ipv6Ranges: v6rangesToRemove,
+								ToPort:     matchingGroups[i].IpPermissions[j].ToPort,
+							}
+							removes = append(removes, removedPermission)
+						}
+
+					}
+					if len(removes) > 0 {
+						changed, err := c.removeSecurityGroupIngress(aws.StringValue(matchingGroups[i].GroupId), removes)
+						if err != nil {
+							return err
+						}
+						if !changed {
+							glog.Warning("Revoking ingress was not needed; concurrent change? groupId=", *matchingGroups[i].GroupId)
+						}
+					}
+
+				}
+
+			}
+
+		}
+		return nil
+	}
+
 	lb, err := c.describeLoadBalancer(loadBalancerName)
 	if err != nil {
 		return err
@@ -3575,6 +3918,17 @@ func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, node
 	}
 
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	if isNLB(service.Annotations) {
+		lb, err := c.describeLoadBalancerv2(loadBalancerName)
+		if err != nil {
+			return err
+		}
+		if lb == nil {
+			return fmt.Errorf("Load balancer not found")
+		}
+		_, err = c.EnsureLoadBalancer(clusterName, service, nodes)
+		return err
+	}
 	lb, err := c.describeLoadBalancer(loadBalancerName)
 	if err != nil {
 		return err

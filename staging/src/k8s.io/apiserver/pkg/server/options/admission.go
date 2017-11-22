@@ -29,6 +29,8 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
 	mutatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
 	validatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/validating"
+	apiserverapi "k8s.io/apiserver/pkg/apis/apiserver"
+	apiserverapiv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -43,7 +45,8 @@ type AdmissionOptions struct {
 	DefaultOffPlugins []string
 	PluginNames       []string
 	ConfigFile        string
-	Plugins           *admission.Plugins
+
+	Plugins *admission.Plugins
 }
 
 // NewAdmissionOptions creates a new instance of AdmissionOptions
@@ -56,11 +59,13 @@ type AdmissionOptions struct {
 //  Servers that do care can overwrite/append that field after creation.
 func NewAdmissionOptions() *AdmissionOptions {
 	options := &AdmissionOptions{
-		Plugins:                &admission.Plugins{},
+		Plugins:                admission.NewPlugins(),
 		PluginNames:            []string{},
 		RecommendedPluginOrder: []string{mutatingwebhook.PluginName, lifecycle.PluginName, initialization.PluginName, validatingwebhook.PluginName},
 		DefaultOffPlugins:      []string{mutatingwebhook.PluginName, initialization.PluginName, validatingwebhook.PluginName},
 	}
+	apiserverapi.AddToScheme(options.Plugins.ConfigScheme)
+	apiserverapiv1alpha1.AddToScheme(options.Plugins.ConfigScheme)
 	server.RegisterAllAdmissionPlugins(options.Plugins)
 	return options
 }
@@ -96,7 +101,7 @@ func (a *AdmissionOptions) ApplyTo(
 		pluginNames = a.enabledPluginNames()
 	}
 
-	pluginsConfigProvider, err := admission.ReadAdmissionConfiguration(pluginNames, a.ConfigFile)
+	pluginsConfigProvider, err := admission.ReadAdmissionConfiguration(pluginNames, a.ConfigFile, a.Plugins.ConfigScheme)
 	if err != nil {
 		return fmt.Errorf("failed to read plugin config: %v", err)
 	}

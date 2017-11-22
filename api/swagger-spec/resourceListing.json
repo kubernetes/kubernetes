@@ -170,6 +170,10 @@
     "description": "get information of a group"
    },
    {
+    "path": "/apis/admissionregistration.k8s.io/v1beta1",
+    "description": "API at /apis/admissionregistration.k8s.io/v1beta1"
+   },
+   {
     "path": "/apis/admissionregistration.k8s.io/v1alpha1",
     "description": "API at /apis/admissionregistration.k8s.io/v1alpha1"
    },

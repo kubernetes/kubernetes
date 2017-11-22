@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	schedutil "k8s.io/kubernetes/plugin/pkg/scheduler/util"
 )
@@ -53,9 +52,9 @@ func TestAssumePodScheduled(t *testing.T) {
 		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
 		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
 		makeBasePod(t, nodeName, "test-nonzero", "", "", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
-		makeBasePod(t, nodeName, "test", "100m", "500", "oir-foo:3", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
-		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "oir-foo:5", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
-		makeBasePod(t, nodeName, "test", "100m", "500", "random-invalid-oir-key:100", []v1.ContainerPort{{}}),
+		makeBasePod(t, nodeName, "test", "100m", "500", "example.com/foo:3", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
+		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "example.com/foo:5", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
+		makeBasePod(t, nodeName, "test", "100m", "500", "random-invalid-extended-key:100", []v1.ContainerPort{{}}),
 	}
 
 	tests := []struct {
@@ -113,7 +112,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			requestedResource: &Resource{
 				MilliCPU:        100,
 				Memory:          500,
-				ScalarResources: map[v1.ResourceName]int64{"pod.alpha.kubernetes.io/opaque-int-resource-oir-foo": 3},
+				ScalarResources: map[v1.ResourceName]int64{"example.com/foo": 3},
 			},
 			nonzeroRequest: &Resource{
 				MilliCPU: 100,
@@ -129,7 +128,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			requestedResource: &Resource{
 				MilliCPU:        300,
 				Memory:          1524,
-				ScalarResources: map[v1.ResourceName]int64{"pod.alpha.kubernetes.io/opaque-int-resource-oir-foo": 8},
+				ScalarResources: map[v1.ResourceName]int64{"example.com/foo": 8},
 			},
 			nonzeroRequest: &Resource{
 				MilliCPU: 300,
@@ -689,7 +688,7 @@ func TestNodeOperators(t *testing.T) {
 	mem_100m := resource.MustParse("100m")
 	cpu_half := resource.MustParse("500m")
 	mem_50m := resource.MustParse("50m")
-	resourceFooName := "pod.alpha.kubernetes.io/opaque-int-resource-foo"
+	resourceFooName := "example.com/foo"
 	resourceFoo := resource.MustParse("1")
 
 	tests := []struct {
@@ -896,25 +895,19 @@ type testingMode interface {
 	Fatalf(format string, args ...interface{})
 }
 
-func makeBasePod(t testingMode, nodeName, objName, cpu, mem, oir string, ports []v1.ContainerPort) *v1.Pod {
+func makeBasePod(t testingMode, nodeName, objName, cpu, mem, extended string, ports []v1.ContainerPort) *v1.Pod {
 	req := v1.ResourceList{}
 	if cpu != "" {
 		req = v1.ResourceList{
 			v1.ResourceCPU:    resource.MustParse(cpu),
 			v1.ResourceMemory: resource.MustParse(mem),
 		}
-		if oir != "" {
-			if len(strings.Split(oir, ":")) != 2 {
-				t.Fatalf("Invalid OIR string")
+		if extended != "" {
+			parts := strings.Split(extended, ":")
+			if len(parts) != 2 {
+				t.Fatalf("Invalid extended resource string: \"%s\"", extended)
 			}
-			var name v1.ResourceName
-			if strings.Split(oir, ":")[0] != "random-invalid-oir-key" {
-				name = v1helper.OpaqueIntResourceName(strings.Split(oir, ":")[0])
-			} else {
-				name = v1.ResourceName(strings.Split(oir, ":")[0])
-			}
-			quantity := resource.MustParse(strings.Split(oir, ":")[1])
-			req[name] = quantity
+			req[v1.ResourceName(parts[0])] = resource.MustParse(parts[1])
 		}
 	}
 	return &v1.Pod{

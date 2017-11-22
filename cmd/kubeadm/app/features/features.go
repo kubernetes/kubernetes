@@ -155,5 +155,22 @@ func NewFeatureGate(f *FeatureList, value string) (map[string]bool, error) {
 		featureGate[k] = boolValue
 	}
 
+	ResolveFeatureGateDependencies(featureGate)
+
 	return featureGate, nil
+}
+
+// ResolveFeatureGateDependencies resolve dependencies between feature gates
+func ResolveFeatureGateDependencies(featureGate map[string]bool) {
+
+	// if StoreCertsInSecrets enabled, SelfHosting should enabled
+	if Enabled(featureGate, StoreCertsInSecrets) {
+		featureGate[SelfHosting] = true
+	}
+
+	// if HighAvailability enabled, both StoreCertsInSecrets and SelfHosting should enabled
+	if Enabled(featureGate, HighAvailability) && !Enabled(featureGate, StoreCertsInSecrets) {
+		featureGate[SelfHosting] = true
+		featureGate[StoreCertsInSecrets] = true
+	}
 }
