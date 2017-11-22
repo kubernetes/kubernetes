@@ -17,13 +17,14 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
-
-	"fmt"
+	"path"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1"
 )
@@ -55,6 +56,10 @@ func LoadConfig(configFile io.Reader) (string, error) {
 		config, ok := decodedObj.(*webhookadmission.WebhookAdmission)
 		if !ok {
 			return "", fmt.Errorf("unexpected type: %T", decodedObj)
+		}
+
+		if !path.IsAbs(config.KubeConfigFile) {
+			return "", field.Invalid(field.NewPath("kubeConfigFile"), config.KubeConfigFile, "must be an absolute file path")
 		}
 
 		kubeconfigFile = config.KubeConfigFile
