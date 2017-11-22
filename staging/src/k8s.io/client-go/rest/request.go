@@ -126,7 +126,6 @@ func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPa
 	if baseURL != nil {
 		pathPrefix = path.Join(pathPrefix, baseURL.Path)
 	}
-	var c context.Context
 
 	r := &Request{
 		client:         client,
@@ -137,7 +136,6 @@ func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPa
 		serializers:    serializers,
 		backoffMgr:     backoff,
 		throttle:       throttle,
-		ctx:            c,
 		requestTimeout: timeout,
 	}
 	switch {
@@ -493,21 +491,7 @@ func (r *Request) Watch() (watch.Interface, error) {
 		return nil, err
 	}
 
-	var cancelFunc func()
-	// If request r's context is nil or has no deadline, use the requestTimeout
-	if r.ctx != nil {
-		if _, ok := r.ctx.Deadline(); ok {
-			req = req.WithContext(r.ctx)
-		} else {
-			c, cancel := context.WithTimeout(r.ctx, r.requestTimeout)
-			req = req.WithContext(c)
-			cancelFunc = cancel
-		}
-	} else if r.requestTimeout > 0 {
-		c, cancel := context.WithTimeout(context.Background(), r.requestTimeout)
-		req = req.WithContext(c)
-		cancelFunc = cancel
-	}
+	req, cancelFunc := r.requestWithTimeoutAndCancel(req)
 	defer func() {
 		if cancelFunc != nil {
 			cancelFunc()
@@ -587,6 +571,27 @@ func (r readCloserWithCancelFunc) Close() error {
 	return r.rc.Close()
 }
 
+// requestWithTimeoutAndCancel sets per-request timeout and provides cancel function if
+// needed.
+func (r *Request) requestWithTimeoutAndCancel(req *http.Request) (*http.Request, func()) {
+	var cancelFunc func()
+	// If request r's context is nil or has no deadline, use the requestTimeout
+	if r.ctx != nil {
+		if _, ok := r.ctx.Deadline(); ok {
+			req = req.WithContext(r.ctx)
+		} else {
+			c, cancel := context.WithTimeout(r.ctx, r.requestTimeout)
+			req = req.WithContext(c)
+			cancelFunc = cancel
+		}
+	} else if r.requestTimeout > 0 {
+		c, cancel := context.WithTimeout(context.Background(), r.requestTimeout)
+		req = req.WithContext(c)
+		cancelFunc = cancel
+	}
+	return req, cancelFunc
+}
+
 // Stream formats and executes the request, and offers streaming of the response.
 // Returns io.ReadCloser which could be used for streaming of the response, or an error
 // Any non-2xx http status code causes an error.  If we get a non-2xx code, we try to convert the body into an APIStatus object.
@@ -604,21 +609,7 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		return nil, err
 	}
 
-	var cancelFunc func()
-	// If request r's context is nil or has no deadline, use the requestTimeout
-	if r.ctx != nil {
-		if _, ok := r.ctx.Deadline(); ok {
-			req = req.WithContext(r.ctx)
-		} else {
-			c, cancel := context.WithTimeout(r.ctx, r.requestTimeout)
-			req = req.WithContext(c)
-			cancelFunc = cancel
-		}
-	} else if r.requestTimeout > 0 {
-		c, cancel := context.WithTimeout(context.Background(), r.requestTimeout)
-		req = req.WithContext(c)
-		cancelFunc = cancel
-	}
+	req, cancelFunc := r.requestWithTimeoutAndCancel(req)
 	defer func() {
 		if cancelFunc != nil {
 			cancelFunc()
