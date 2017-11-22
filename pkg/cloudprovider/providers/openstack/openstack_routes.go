@@ -77,15 +77,9 @@ func (r *Routes) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) 
 
 	var routes []*cloudprovider.Route
 	for _, item := range router.Routes {
-		nodeName, ok := nodeNamesByAddr[item.NextHop]
-		if !ok {
-			// Not one of our routes?
-			glog.V(4).Infof("Skipping route with unknown nexthop %v", item.NextHop)
-			continue
-		}
 		route := cloudprovider.Route{
 			Name:            item.DestinationCIDR,
-			TargetNode:      nodeName,
+			TargetNode:      nodeNamesByAddr[item.NextHop], //empty if NextHop is unknown
 			DestinationCIDR: item.DestinationCIDR,
 		}
 		routes = append(routes, &route)
