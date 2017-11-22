@@ -27,8 +27,8 @@ import (
 
 	"github.com/golang/glog"
 
-	admissionv1alpha1 "k8s.io/api/admission/v1alpha1"
-	"k8s.io/api/admissionregistration/v1alpha1"
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -69,7 +69,7 @@ func Register(plugins *admission.Plugins) {
 // WebhookSource can list dynamic webhook plugins.
 type WebhookSource interface {
 	Run(stopCh <-chan struct{})
-	Webhooks() (*v1alpha1.ValidatingWebhookConfiguration, error)
+	Webhooks() (*v1beta1.ValidatingWebhookConfiguration, error)
 }
 
 // NewValidatingAdmissionWebhook returns a generic admission webhook plugin.
@@ -132,7 +132,7 @@ func (a *ValidatingAdmissionWebhook) SetServiceResolver(sr config.ServiceResolve
 func (a *ValidatingAdmissionWebhook) SetScheme(scheme *runtime.Scheme) {
 	if scheme != nil {
 		a.clientManager.SetNegotiatedSerializer(serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{
-			Serializer: serializer.NewCodecFactory(scheme).LegacyCodec(admissionv1alpha1.SchemeGroupVersion),
+			Serializer: serializer.NewCodecFactory(scheme).LegacyCodec(admissionv1beta1.SchemeGroupVersion),
 		}))
 		a.convertor.Scheme = scheme
 	}
@@ -141,7 +141,7 @@ func (a *ValidatingAdmissionWebhook) SetScheme(scheme *runtime.Scheme) {
 // WantsExternalKubeClientSet defines a function which sets external ClientSet for admission plugins that need it
 func (a *ValidatingAdmissionWebhook) SetExternalKubeClientSet(client clientset.Interface) {
 	a.namespaceMatcher.Client = client
-	a.hookSource = configuration.NewValidatingWebhookConfigurationManager(client.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations())
+	a.hookSource = configuration.NewValidatingWebhookConfigurationManager(client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations())
 }
 
 // SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
@@ -169,11 +169,11 @@ func (a *ValidatingAdmissionWebhook) ValidateInitialization() error {
 	return nil
 }
 
-func (a *ValidatingAdmissionWebhook) loadConfiguration(attr admission.Attributes) (*v1alpha1.ValidatingWebhookConfiguration, error) {
+func (a *ValidatingAdmissionWebhook) loadConfiguration(attr admission.Attributes) (*v1beta1.ValidatingWebhookConfiguration, error) {
 	hookConfig, err := a.hookSource.Webhooks()
 	// if Webhook configuration is disabled, fail open
 	if err == configuration.ErrDisabled {
-		return &v1alpha1.ValidatingWebhookConfiguration{}, nil
+		return &v1beta1.ValidatingWebhookConfiguration{}, nil
 	}
 	if err != nil {
 		e := apierrors.NewServerTimeout(attr.GetResource().GroupResource(), string(attr.GetOperation()), 1)
@@ -197,7 +197,7 @@ func (a *ValidatingAdmissionWebhook) Validate(attr admission.Attributes) error {
 	hooks := hookConfig.Webhooks
 	ctx := context.TODO()
 
-	var relevantHooks []*v1alpha1.Webhook
+	var relevantHooks []*v1beta1.Webhook
 	for i := range hooks {
 		call, err := a.shouldCallHook(&hooks[i], attr)
 		if err != nil {
@@ -236,7 +236,7 @@ func (a *ValidatingAdmissionWebhook) Validate(attr admission.Attributes) error {
 	errCh := make(chan error, len(relevantHooks))
 	wg.Add(len(relevantHooks))
 	for i := range relevantHooks {
-		go func(hook *v1alpha1.Webhook) {
+		go func(hook *v1beta1.Webhook) {
 			defer wg.Done()
 
 			t := time.Now()
@@ -246,7 +246,7 @@ func (a *ValidatingAdmissionWebhook) Validate(attr admission.Attributes) error {
 				return
 			}
 
-			ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1alpha1.Ignore
+			ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
 			if callErr, ok := err.(*webhookerrors.ErrCallingWebhook); ok {
 				if ignoreClientCallFailures {
 					glog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
@@ -283,7 +283,7 @@ func (a *ValidatingAdmissionWebhook) Validate(attr admission.Attributes) error {
 }
 
 // TODO: factor into a common place along with the validating webhook version.
-func (a *ValidatingAdmissionWebhook) shouldCallHook(h *v1alpha1.Webhook, attr admission.Attributes) (bool, *apierrors.StatusError) {
+func (a *ValidatingAdmissionWebhook) shouldCallHook(h *v1beta1.Webhook, attr admission.Attributes) (bool, *apierrors.StatusError) {
 	var matches bool
 	for _, r := range h.Rules {
 		m := rules.Matcher{Rule: r, Attr: attr}
@@ -299,14 +299,14 @@ func (a *ValidatingAdmissionWebhook) shouldCallHook(h *v1alpha1.Webhook, attr ad
 	return a.namespaceMatcher.MatchNamespaceSelector(h, attr)
 }
 
-func (a *ValidatingAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.Webhook, attr admission.Attributes) error {
+func (a *ValidatingAdmissionWebhook) callHook(ctx context.Context, h *v1beta1.Webhook, attr admission.Attributes) error {
 	// Make the webhook request
 	request := request.CreateAdmissionReview(attr)
 	client, err := a.clientManager.HookClient(h)
 	if err != nil {
 		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
-	response := &admissionv1alpha1.AdmissionReview{}
+	response := &admissionv1beta1.AdmissionReview{}
 	if err := client.Post().Context(ctx).Body(&request).Do().Into(response); err != nil {
 		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}

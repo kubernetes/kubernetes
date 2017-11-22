@@ -19,7 +19,7 @@ package configuration
 import (
 	"testing"
 
-	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -27,7 +27,7 @@ import (
 
 type disabledMutatingWebhookConfigLister struct{}
 
-func (l *disabledMutatingWebhookConfigLister) List(options metav1.ListOptions) (*v1alpha1.MutatingWebhookConfigurationList, error) {
+func (l *disabledMutatingWebhookConfigLister) List(options metav1.ListOptions) (*v1beta1.MutatingWebhookConfigurationList, error) {
 	return nil, errors.NewNotFound(schema.GroupResource{Group: "admissionregistration", Resource: "MutatingWebhookConfigurations"}, "")
 }
 func TestMutatingWebhookConfigDisabled(t *testing.T) {

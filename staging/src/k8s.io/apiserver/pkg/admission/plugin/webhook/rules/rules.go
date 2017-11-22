@@ -19,13 +19,13 @@ package rules
 import (
 	"strings"
 
-	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apiserver/pkg/admission"
 )
 
 // Matcher determines if the Attr matches the Rule.
 type Matcher struct {
-	Rule v1alpha1.RuleWithOperations
+	Rule v1beta1.RuleWithOperations
 	Attr admission.Attributes
 }
 
@@ -61,12 +61,12 @@ func (r *Matcher) version() bool {
 func (r *Matcher) operation() bool {
 	attrOp := r.Attr.GetOperation()
 	for _, op := range r.Rule.Operations {
-		if op == v1alpha1.OperationAll {
+		if op == v1beta1.OperationAll {
 			return true
 		}
 		// The constants are the same such that this is a valid cast (and this
 		// is tested).
-		if op == v1alpha1.OperationType(attrOp) {
+		if op == v1beta1.OperationType(attrOp) {
 			return true
 		}
 	}

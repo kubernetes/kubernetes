@@ -24,7 +24,7 @@ import (
 	"net/url"
 
 	lru "github.com/hashicorp/golang-lru"
-	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
@@ -101,7 +101,7 @@ func (cm *ClientManager) Validate() error {
 
 // HookClient get a RESTClient from the cache, or constructs one based on the
 // webhook configuration.
-func (cm *ClientManager) HookClient(h *v1alpha1.Webhook) (*rest.RESTClient, error) {
+func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error) {
 	cacheKey, err := json.Marshal(h.ClientConfig)
 	if err != nil {
 		return nil, err

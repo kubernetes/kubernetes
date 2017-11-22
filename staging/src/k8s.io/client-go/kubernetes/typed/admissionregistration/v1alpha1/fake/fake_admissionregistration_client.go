@@ -30,14 +30,6 @@ func (c *FakeAdmissionregistrationV1alpha1) InitializerConfigurations() v1alpha1
 	return &FakeInitializerConfigurations{c}
 }
 
-func (c *FakeAdmissionregistrationV1alpha1) MutatingWebhookConfigurations() v1alpha1.MutatingWebhookConfigurationInterface {
-	return &FakeMutatingWebhookConfigurations{c}
-}
-
-func (c *FakeAdmissionregistrationV1alpha1) ValidatingWebhookConfigurations() v1alpha1.ValidatingWebhookConfigurationInterface {
-	return &FakeValidatingWebhookConfigurations{c}
-}
-
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeAdmissionregistrationV1alpha1) RESTClient() rest.Interface {

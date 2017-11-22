@@ -36,7 +36,7 @@ filegroup(
         ":package-srcs",
         "//pkg/apis/admission/fuzzer:all-srcs",
         "//pkg/apis/admission/install:all-srcs",
-        "//pkg/apis/admission/v1alpha1:all-srcs",
+        "//pkg/apis/admission/v1beta1:all-srcs",
     ],
     tags = ["automanaged"],
 )
