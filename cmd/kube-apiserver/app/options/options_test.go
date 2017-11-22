@@ -104,8 +104,8 @@ func TestAddFlags(t *testing.T) {
 			MinRequestTimeout:           1800,
 		},
 		Admission: &apiserveroptions.AdmissionOptions{
-			RecommendedPluginOrder: []string{"MutatingAdmissionWebhook", "NamespaceLifecycle", "Initializers", "ValidatingAdmissionWebhook"},
-			DefaultOffPlugins:      []string{"MutatingAdmissionWebhook", "Initializers", "ValidatingAdmissionWebhook"},
+			RecommendedPluginOrder: []string{"NamespaceLifecycle", "Initializers", "MutatingAdmissionWebhook", "ValidatingAdmissionWebhook"},
+			DefaultOffPlugins:      []string{"Initializers", "MutatingAdmissionWebhook", "ValidatingAdmissionWebhook"},
 			PluginNames:            []string{"AlwaysDeny"},
 			ConfigFile:             "/admission-control-config",
 			Plugins:                s.Admission.Plugins,
