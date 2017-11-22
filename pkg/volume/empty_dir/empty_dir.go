@@ -262,7 +262,7 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 	}
 
 	glog.V(3).Infof("pod %v: mounting tmpfs for volume %v", ed.pod.UID, ed.volName)
-	return ed.mounter.Mount("tmpfs", dir, "tmpfs", nil /* options */)
+	return ed.mounter.Mount("tmpfs", dir, "tmpfs", []string{"nosuid", "noexec", "nodev"})
 }
 
 // setupHugepages creates a hugepage mount at the specified directory.
