@@ -61,7 +61,7 @@ func ScalerFor(kind schema.GroupKind, c internalclientset.Interface) (Scaler, er
 	case apps.Kind("StatefulSet"):
 		return &StatefulSetScaler{c.Apps()}, nil
 	case extensions.Kind("Deployment"), apps.Kind("Deployment"):
-		return &DeploymentScaler{c.Extensions()}, nil
+		return &DeploymentScaler{c.Extensions(), c.Extensions()}, nil
 	}
 	return nil, fmt.Errorf("no scaler has been implemented for %q", kind)
 }
@@ -447,44 +447,42 @@ func (scaler *JobScaler) Scale(namespace, name string, newSize uint, preconditio
 	return nil
 }
 
-// ValidateDeployment ensures that the preconditions match.  Returns nil if they are valid, an error otherwise.
-func (precondition *ScalePrecondition) ValidateDeployment(deployment *extensions.Deployment) error {
-	if precondition.Size != -1 && int(deployment.Spec.Replicas) != precondition.Size {
-		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(int(deployment.Spec.Replicas))}
+// ValidateScale ensures that the preconditions match.  Returns nil if they are valid, an error otherwise.
+func (precondition *ScalePrecondition) ValidateScale(scale *extensions.Scale) error {
+	if precondition.Size != -1 && int(scale.Spec.Replicas) != precondition.Size {
+		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(int(scale.Spec.Replicas))}
 	}
-	if len(precondition.ResourceVersion) != 0 && deployment.ResourceVersion != precondition.ResourceVersion {
-		return PreconditionError{"resource version", precondition.ResourceVersion, deployment.ResourceVersion}
+	if len(precondition.ResourceVersion) != 0 && scale.ResourceVersion != precondition.ResourceVersion {
+		return PreconditionError{"resource version", precondition.ResourceVersion, scale.ResourceVersion}
 	}
 	return nil
 }
 
 type DeploymentScaler struct {
 	c extensionsclient.DeploymentsGetter
+	d extensionsclient.ScalesGetter
 }
 
 // ScaleSimple is responsible for updating a deployment's desired replicas
 // count. It returns the resourceVersion of the deployment if the update is
 // successful.
 func (scaler *DeploymentScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (string, error) {
-	deployment, err := scaler.c.Deployments(namespace).Get(name, metav1.GetOptions{})
+	scale, err := scaler.d.Scales(namespace).Get("deployment", name)
 	if err != nil {
 		return "", ScaleError{ScaleGetFailure, "", err}
 	}
 	if preconditions != nil {
-		if err := preconditions.ValidateDeployment(deployment); err != nil {
+		if err := preconditions.ValidateScale(scale); err != nil {
 			return "", err
 		}
 	}
-
-	// TODO(madhusudancs): Fix this when Scale group issues are resolved (see issue #18528).
-	// For now I'm falling back to regular Deployment update operation.
-	deployment.Spec.Replicas = int32(newSize)
-	updatedDeployment, err := scaler.c.Deployments(namespace).Update(deployment)
+	scale.Spec.Replicas = int32(newSize)
+	updatedDeployment, err := scaler.d.Scales(namespace).Update("deployment", scale)
 	if err != nil {
 		if errors.IsConflict(err) {
-			return "", ScaleError{ScaleUpdateConflictFailure, deployment.ResourceVersion, err}
+			return "", ScaleError{ScaleUpdateConflictFailure, scale.ResourceVersion, err}
 		}
-		return "", ScaleError{ScaleUpdateFailure, deployment.ResourceVersion, err}
+		return "", ScaleError{ScaleUpdateFailure, scale.ResourceVersion, err}
 	}
 	return updatedDeployment.ObjectMeta.ResourceVersion, nil
 }

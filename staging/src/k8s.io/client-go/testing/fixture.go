@@ -68,6 +68,9 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 	return func(action Action) (bool, runtime.Object, error) {
 		ns := action.GetNamespace()
 		gvr := action.GetResource()
+		if action.GetSubresource() == "scale" {
+			gvr = schema.GroupVersionResource{Group: "extensions", Version: "", Resource: "scales"}
+		}
 
 		// Here and below we need to switch on implementation types,
 		// not on interfaces, as some interfaces are identical
