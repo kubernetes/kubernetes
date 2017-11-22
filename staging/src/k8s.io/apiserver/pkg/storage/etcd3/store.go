@@ -403,7 +403,7 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 	if err != nil || v.Kind() != reflect.Slice {
 		panic("need ptr to slice")
 	}
-	if err := appendListItem(v, data, uint64(getResp.Kvs[0].ModRevision), storage.SimpleFilter(pred), s.codec, s.versioner); err != nil {
+	if err := appendListItem(v, data, uint64(getResp.Kvs[0].ModRevision), pred, s.codec, s.versioner); err != nil {
 		return err
 	}
 	// update version with cluster level revision
@@ -491,8 +491,6 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 		key += "/"
 	}
 	keyPrefix := key
-
-	filter := storage.SimpleFilter(pred)
 
 	// set the appropriate clientv3 options to filter the returned data set
 	var paging bool
@@ -587,7 +585,7 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 				continue
 			}
 
-			if err := appendListItem(v, data, uint64(kv.ModRevision), filter, s.codec, s.versioner); err != nil {
+			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner); err != nil {
 				return err
 			}
 		}
@@ -774,14 +772,14 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 }
 
 // appendListItem decodes and appends the object (if it passes filter) to v, which must be a slice.
-func appendListItem(v reflect.Value, data []byte, rev uint64, filter storage.FilterFunc, codec runtime.Codec, versioner storage.Versioner) error {
+func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.SelectionPredicate, codec runtime.Codec, versioner storage.Versioner) error {
 	obj, _, err := codec.Decode(data, nil, reflect.New(v.Type().Elem()).Interface().(runtime.Object))
 	if err != nil {
 		return err
 	}
 	// being unable to set the version does not prevent the object from being extracted
 	versioner.UpdateObject(obj, rev)
-	if filter(obj) {
+	if matched, err := pred.Matches(obj); err == nil && matched {
 		v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 	}
 	return nil
