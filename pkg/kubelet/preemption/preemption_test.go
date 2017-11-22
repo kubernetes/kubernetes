@@ -437,21 +437,28 @@ func getAdmissionRequirementList(cpu, memory, pods int) admissionRequirementList
 	return admissionRequirementList(reqs)
 }
 
-// this checks if the lists contents contain all of the same elements.
-// this is not correct if there are duplicate pods in the list.
-// for example: podListEqual([a, a, b], [a, b, b]) will return true
+// admissionRequirementListEqual checks if the lists contents contain all of the same elements.
 func admissionRequirementListEqual(list1 admissionRequirementList, list2 admissionRequirementList) bool {
 	if len(list1) != len(list2) {
 		return false
 	}
-	for _, a := range list1 {
-		contains := false
-		for _, b := range list2 {
-			if a.resourceName == b.resourceName && a.quantity == b.quantity {
-				contains = true
-			}
-		}
-		if !contains {
+
+	type rq struct {
+		resourceName v1.ResourceName
+		quantity     int64
+	}
+	m := map[rq]int{}
+
+	for _, val := range list1 {
+		var key rq = rq{val.resourceName, val.quantity}
+		m[key] = m[key] + 1
+	}
+	for _, val := range list2 {
+		var key rq = rq{val.resourceName, val.quantity}
+		m[key] = m[key] - 1
+	}
+	for _, v := range m {
+		if v != 0 {
 			return false
 		}
 	}
