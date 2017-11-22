@@ -797,21 +797,21 @@ func cleanupIptablesLeftovers(ipt utiliptables.Interface) (encounteredError bool
 }
 
 // CleanupLeftovers clean up all ipvs and iptables rules created by ipvs Proxier.
-func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset utilipset.Interface) (encounteredError bool) {
-	// Return immediately when ipvs interface is nil - Probably initialization failed in somewhere.
-	if ipvs == nil {
-		return true
-	}
-	encounteredError = false
-	// Currently we assume only ipvs proxier will create ipvs rules, ipvs proxier will flush all ipvs rules when clean up.
-	// Users do this operation should be with caution.
-	err := ipvs.Flush()
-	if err != nil {
-		encounteredError = true
+func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset utilipset.Interface, cleanupIPVS bool) (encounteredError bool) {
+	if cleanupIPVS {
+		// Return immediately when ipvs interface is nil - Probably initialization failed in somewhere.
+		if ipvs == nil {
+			return true
+		}
+		encounteredError = false
+		err := ipvs.Flush()
+		if err != nil {
+			encounteredError = true
+		}
 	}
 	// Delete dummy interface created by ipvs Proxier.
 	nl := NewNetLinkHandle()
-	err = nl.DeleteDummyDevice(DefaultDummyDevice)
+	err := nl.DeleteDummyDevice(DefaultDummyDevice)
 	if err != nil {
 		encounteredError = true
 	}
