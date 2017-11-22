@@ -120,9 +120,8 @@ message DaemonSetList {
 message DaemonSetSpec {
   // A label query over pods that are managed by the daemon set.
   // Must match in order to be controlled.
-  // If empty, defaulted to labels on Pod template.
+  // It must match the pod template's labels.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
-  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 1;
 
   // An object that describes the pod that will be created.
@@ -274,7 +273,7 @@ message DeploymentSpec {
 
   // Label selector for pods. Existing ReplicaSets whose pods are
   // selected by this will be the ones affected by this deployment.
-  // +optional
+  // It must match the pod template's labels.
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // Template describes the pods that will be created.
@@ -434,10 +433,9 @@ message ReplicaSetSpec {
   optional int32 minReadySeconds = 4;
 
   // Selector is a label query over pods that should match the replica count.
-  // If the selector is empty, it is defaulted to the labels present on the pod template.
   // Label keys and values that must match in order to be controlled by this replica set.
+  // It must match the pod template's labels.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
-  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // Template is the object that describes the pod that will be created if
@@ -636,9 +634,8 @@ message StatefulSetSpec {
   optional int32 replicas = 1;
 
   // selector is a label query over pods that should match the replica count.
-  // If empty, defaulted to labels on the pod template.
+  // It must match the pod template's labels.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
-  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // template is the object that describes the pod that will be created if
