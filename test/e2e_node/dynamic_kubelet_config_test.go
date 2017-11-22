@@ -25,7 +25,6 @@ import (
 
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
 
@@ -47,8 +46,6 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 	f := framework.NewDefaultFramework("dynamic-kubelet-configuration-test")
 	var originalKC *kubeletconfig.KubeletConfiguration
 	var originalConfigMap *apiv1.ConfigMap
-	// local messages/reasons, depending on whether we expect the default or init config
-	var curLocalMessage, lkgLocalMessage, curLocalOKReason string
 
 	// Dummy context to prevent framework's AfterEach from cleaning up before this test's AfterEach can run
 	Context("", func() {
@@ -61,7 +58,6 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 				originalConfigMap, err = f.ClientSet.CoreV1().ConfigMaps("kube-system").Create(originalConfigMap)
 				framework.ExpectNoError(err)
 			}
-
 			// make sure Dynamic Kubelet Configuration feature is enabled on the Kubelet we are about to test
 			enabled, err := isKubeletConfigEnabled(f)
 			framework.ExpectNoError(err)
@@ -69,19 +65,6 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 				framework.ExpectNoError(fmt.Errorf("The Dynamic Kubelet Configuration feature is not enabled.\n" +
 					"Pass --feature-gates=DynamicKubeletConfig=true to the Kubelet to enable this feature.\n" +
 					"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`."))
-			}
-
-			// expect different local messages/reasons depending on how Kuebelet is configured
-			if v, ok := originalKC.FeatureGates[string(features.KubeletConfigFile)]; !ok || !v {
-				// KubeletConfigFile key not found or set to false. It's still an alpha feature, so it is turned off by default.
-				curLocalMessage = status.CurDefaultMessage
-				lkgLocalMessage = status.LkgDefaultMessage
-				curLocalOKReason = status.CurDefaultOKReason
-			} else {
-				// KubeletConfigFile key was found and set to true.
-				curLocalMessage = status.CurInitMessage
-				lkgLocalMessage = status.LkgInitMessage
-				curLocalOKReason = status.CurInitOKReason
 			}
 		})
 
@@ -136,8 +119,8 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 					{desc: "Node.Spec.ConfigSource is nil",
 						configSource: nil,
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionTrue,
-							Message: curLocalMessage,
-							Reason:  curLocalOKReason},
+							Message: status.CurDefaultMessage,
+							Reason:  status.CurDefaultOKReason},
 						expectConfig: nil},
 
 					// Node.Spec.ConfigSource has all nil subfields
@@ -187,7 +170,7 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 							Namespace: failParseConfigMap.Namespace,
 							Name:      failParseConfigMap.Name}},
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionFalse,
-							Message: lkgLocalMessage,
+							Message: status.LkgDefaultMessage,
 							Reason:  fmt.Sprintf(status.CurFailParseReasonFmt, failParseConfigMap.UID)},
 						expectConfig: nil},
 
@@ -198,7 +181,7 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 							Namespace: failValidateConfigMap.Namespace,
 							Name:      failValidateConfigMap.Name}},
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionFalse,
-							Message: lkgLocalMessage,
+							Message: status.LkgDefaultMessage,
 							Reason:  fmt.Sprintf(status.CurFailValidateReasonFmt, failValidateConfigMap.UID)},
 						expectConfig: nil},
 				}
