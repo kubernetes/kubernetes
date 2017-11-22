@@ -360,11 +360,10 @@ func NewNodeController(
 		} else {
 			var err error
 			nc.cidrAllocator, err = ipam.New(
-				kubeClient, cloud, nc.allocatorType, nc.clusterCIDR, nc.serviceCIDR, nodeCIDRMaskSize)
+				kubeClient, cloud, nodeInformer, nc.allocatorType, nc.clusterCIDR, nc.serviceCIDR, nodeCIDRMaskSize)
 			if err != nil {
 				return nil, err
 			}
-			nc.cidrAllocator.Register(nodeInformer)
 		}
 	}
 
@@ -583,6 +582,12 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 		// When we delete pods off a node, if the node was not empty at the time we then
 		// queue an eviction watcher. If we hit an error, retry deletion.
 		go wait.Until(nc.doEvictionPass, scheduler.NodeEvictionPeriod, wait.NeverStop)
+	}
+
+	if nc.allocateNodeCIDRs {
+		if nc.allocatorType != ipam.IPAMFromClusterAllocatorType && nc.allocatorType != ipam.IPAMFromCloudAllocatorType {
+			go nc.cidrAllocator.Run(wait.NeverStop)
+		}
 	}
 
 	<-stopCh
