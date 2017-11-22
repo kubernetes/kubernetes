@@ -6088,20 +6088,20 @@ func TestValidatePod(t *testing.T) {
 			},
 			Spec: validPodSpec(nil),
 		},
-		{ // valid opaque integer resources for init container
-			ObjectMeta: metav1.ObjectMeta{Name: "valid-opaque-int", Namespace: "ns"},
+		{ // valid extended resources for init container
+			ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
 			Spec: core.PodSpec{
 				InitContainers: []core.Container{
 					{
-						Name:            "valid-opaque-int",
+						Name:            "valid-extended",
 						Image:           "image",
 						ImagePullPolicy: "IfNotPresent",
 						Resources: core.ResourceRequirements{
 							Requests: core.ResourceList{
-								helper.OpaqueIntResourceName("A"): resource.MustParse("10"),
+								core.ResourceName("example.com/a"): resource.MustParse("10"),
 							},
 							Limits: core.ResourceList{
-								helper.OpaqueIntResourceName("A"): resource.MustParse("20"),
+								core.ResourceName("example.com/a"): resource.MustParse("10"),
 							},
 						},
 						TerminationMessagePolicy: "File",
@@ -6112,21 +6112,21 @@ func TestValidatePod(t *testing.T) {
 				DNSPolicy:     core.DNSClusterFirst,
 			},
 		},
-		{ // valid opaque integer resources for regular container
-			ObjectMeta: metav1.ObjectMeta{Name: "valid-opaque-int", Namespace: "ns"},
+		{ // valid extended resources for regular container
+			ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
 			Spec: core.PodSpec{
 				InitContainers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 				Containers: []core.Container{
 					{
-						Name:            "valid-opaque-int",
+						Name:            "valid-extended",
 						Image:           "image",
 						ImagePullPolicy: "IfNotPresent",
 						Resources: core.ResourceRequirements{
 							Requests: core.ResourceList{
-								helper.OpaqueIntResourceName("A"): resource.MustParse("10"),
+								core.ResourceName("example.com/a"): resource.MustParse("10"),
 							},
 							Limits: core.ResourceList{
-								helper.OpaqueIntResourceName("A"): resource.MustParse("20"),
+								core.ResourceName("example.com/a"): resource.MustParse("10"),
 							},
 						},
 						TerminationMessagePolicy: "File",
@@ -6738,8 +6738,8 @@ func TestValidatePod(t *testing.T) {
 				Spec: validPodSpec(nil),
 			},
 		},
-		"invalid opaque integer resource requirement: request must be <= limit": {
-			expectedError: "must be less than or equal to pod.alpha.kubernetes.io/opaque-int-resource-A",
+		"invalid extended resource requirement: request must be == limit": {
+			expectedError: "must be equal to example.com/a",
 			spec: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
 				Spec: core.PodSpec{
@@ -6750,10 +6750,10 @@ func TestValidatePod(t *testing.T) {
 							ImagePullPolicy: "IfNotPresent",
 							Resources: core.ResourceRequirements{
 								Requests: core.ResourceList{
-									helper.OpaqueIntResourceName("A"): resource.MustParse("2"),
+									core.ResourceName("example.com/a"): resource.MustParse("2"),
 								},
 								Limits: core.ResourceList{
-									helper.OpaqueIntResourceName("A"): resource.MustParse("1"),
+									core.ResourceName("example.com/a"): resource.MustParse("1"),
 								},
 							},
 						},
@@ -6763,7 +6763,7 @@ func TestValidatePod(t *testing.T) {
 				},
 			},
 		},
-		"invalid fractional opaque integer resource in container request": {
+		"invalid fractional extended resource in container request": {
 			expectedError: "must be an integer",
 			spec: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
@@ -6775,7 +6775,7 @@ func TestValidatePod(t *testing.T) {
 							ImagePullPolicy: "IfNotPresent",
 							Resources: core.ResourceRequirements{
 								Requests: core.ResourceList{
-									helper.OpaqueIntResourceName("A"): resource.MustParse("500m"),
+									core.ResourceName("example.com/a"): resource.MustParse("500m"),
 								},
 							},
 						},
@@ -6785,7 +6785,7 @@ func TestValidatePod(t *testing.T) {
 				},
 			},
 		},
-		"invalid fractional opaque integer resource in init container request": {
+		"invalid fractional extended resource in init container request": {
 			expectedError: "must be an integer",
 			spec: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
@@ -6797,7 +6797,7 @@ func TestValidatePod(t *testing.T) {
 							ImagePullPolicy: "IfNotPresent",
 							Resources: core.ResourceRequirements{
 								Requests: core.ResourceList{
-									helper.OpaqueIntResourceName("A"): resource.MustParse("500m"),
+									core.ResourceName("example.com/a"): resource.MustParse("500m"),
 								},
 							},
 						},
@@ -6808,7 +6808,7 @@ func TestValidatePod(t *testing.T) {
 				},
 			},
 		},
-		"invalid fractional opaque integer resource in container limit": {
+		"invalid fractional extended resource in container limit": {
 			expectedError: "must be an integer",
 			spec: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
@@ -6820,10 +6820,10 @@ func TestValidatePod(t *testing.T) {
 							ImagePullPolicy: "IfNotPresent",
 							Resources: core.ResourceRequirements{
 								Requests: core.ResourceList{
-									helper.OpaqueIntResourceName("A"): resource.MustParse("5"),
+									core.ResourceName("example.com/a"): resource.MustParse("5"),
 								},
 								Limits: core.ResourceList{
-									helper.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
+									core.ResourceName("example.com/a"): resource.MustParse("2.5"),
 								},
 							},
 						},
@@ -6833,7 +6833,7 @@ func TestValidatePod(t *testing.T) {
 				},
 			},
 		},
-		"invalid fractional opaque integer resource in init container limit": {
+		"invalid fractional extended resource in init container limit": {
 			expectedError: "must be an integer",
 			spec: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
@@ -6845,10 +6845,10 @@ func TestValidatePod(t *testing.T) {
 							ImagePullPolicy: "IfNotPresent",
 							Resources: core.ResourceRequirements{
 								Requests: core.ResourceList{
-									helper.OpaqueIntResourceName("A"): resource.MustParse("5"),
+									core.ResourceName("example.com/a"): resource.MustParse("2.5"),
 								},
 								Limits: core.ResourceList{
-									helper.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
+									core.ResourceName("example.com/a"): resource.MustParse("2.5"),
 								},
 							},
 						},
@@ -9611,55 +9611,55 @@ func TestValidateNodeUpdate(t *testing.T) {
 		}, false},
 		{core.Node{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "valid-opaque-int-resources",
+				Name: "valid-extended-resources",
 			},
 		}, core.Node{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "valid-opaque-int-resources",
+				Name: "valid-extended-resources",
 			},
 			Status: core.NodeStatus{
 				Capacity: core.ResourceList{
 					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
 					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-					helper.OpaqueIntResourceName("A"):      resource.MustParse("5"),
-					helper.OpaqueIntResourceName("B"):      resource.MustParse("10"),
+					core.ResourceName("example.com/a"):     resource.MustParse("5"),
+					core.ResourceName("example.com/b"):     resource.MustParse("10"),
 				},
 			},
 		}, true},
 		{core.Node{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "invalid-fractional-opaque-int-capacity",
+				Name: "invalid-fractional-extended-capacity",
 			},
 		}, core.Node{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "invalid-fractional-opaque-int-capacity",
+				Name: "invalid-fractional-extended-capacity",
 			},
 			Status: core.NodeStatus{
 				Capacity: core.ResourceList{
 					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
 					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-					helper.OpaqueIntResourceName("A"):      resource.MustParse("500m"),
+					core.ResourceName("example.com/a"):     resource.MustParse("500m"),
 				},
 			},
 		}, false},
 		{core.Node{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "invalid-fractional-opaque-int-allocatable",
+				Name: "invalid-fractional-extended-allocatable",
 			},
 		}, core.Node{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "invalid-fractional-opaque-int-allocatable",
+				Name: "invalid-fractional-extended-allocatable",
 			},
 			Status: core.NodeStatus{
 				Capacity: core.ResourceList{
 					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
 					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-					helper.OpaqueIntResourceName("A"):      resource.MustParse("5"),
+					core.ResourceName("example.com/a"):     resource.MustParse("5"),
 				},
 				Allocatable: core.ResourceList{
 					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
 					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-					helper.OpaqueIntResourceName("A"):      resource.MustParse("4.5"),
+					core.ResourceName("example.com/a"):     resource.MustParse("4.5"),
 				},
 			},
 		}, false},

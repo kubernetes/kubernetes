@@ -3944,12 +3944,6 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 // Validate compute resource typename.
 // Refer to docs/design/resources.md for more details.
 func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
-	// Opaque integer resources (OIR) deprecation began in v1.8
-	// TODO: Remove warning after OIR deprecation cycle.
-	if helper.IsOpaqueIntResourceName(core.ResourceName(value)) {
-		glog.Errorf("DEPRECATION WARNING! Opaque integer resources are deprecated starting with v1.8: %s", value)
-	}
-
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsQualifiedName(value) {
 		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
