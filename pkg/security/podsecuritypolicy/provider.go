@@ -233,9 +233,24 @@ func (s *simpleProvider) ValidatePodSecurityContext(pod *api.Pod, fldPath *field
 						fmt.Sprintf("is not allowed to be used")))
 				}
 			}
+
+			if fsType == extensions.FlexVolume && len(s.psp.Spec.AllowedFlexVolumes) > 0 {
+				found := false
+				driver := v.FlexVolume.Driver
+				for _, allowedFlexVolume := range s.psp.Spec.AllowedFlexVolumes {
+					if driver == allowedFlexVolume.Driver {
+						found = true
+						break
+					}
+				}
+				if !found {
+					allErrs = append(allErrs,
+						field.Invalid(fldPath.Child("volumes").Index(i).Child("driver"), driver,
+							"Flexvolume driver is not allowed to be used"))
+				}
+			}
 		}
 	}
-
 	return allErrs
 }
 
