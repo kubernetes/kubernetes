@@ -34,6 +34,7 @@ import (
 )
 
 var (
+	// TODO implement general job creation case - erhudy
 	jobLong = templates.LongDesc(i18n.T(`
 		Create a Job to execute immediately from a specified CronJob.`))
 
