@@ -18,7 +18,9 @@ package stats
 
 import (
 	"fmt"
+	"path"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -112,6 +114,11 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 		containerMap[c.Id] = c
 	}
 
+	caInfos, err := getCRICadvisorStats(p.cadvisor)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container info from cadvisor: %v", err)
+	}
+
 	for _, stats := range resp {
 		containerID := stats.Attributes.Id
 		container, found := containerMap[containerID]
@@ -132,10 +139,25 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 		ps, found := sandboxIDToPodStats[podSandboxID]
 		if !found {
 			ps = buildPodStats(podSandbox)
+			// Fill stats from cadvisor is available for full set of required pod stats
+			caPodSandbox, found := caInfos[podSandboxID]
+			if !found {
+				glog.V(4).Info("Unable to find cadvisor stats for sandbox %q", podSandboxID)
+			} else {
+				p.addCadvisorPodStats(ps, &caPodSandbox)
+			}
 			sandboxIDToPodStats[podSandboxID] = ps
 		}
-		containerStats := p.makeContainerStats(stats, container, &rootFsInfo, uuidToFsInfo)
-		ps.Containers = append(ps.Containers, *containerStats)
+		cs := p.makeContainerStats(stats, container, &rootFsInfo, uuidToFsInfo)
+		// If cadvisor stats is available for the container, use it to populate
+		// container stats
+		caStats, caFound := caInfos[containerID]
+		if !caFound {
+			glog.V(4).Info("Unable to find cadvisor stats for %q", containerID)
+		} else {
+			p.addCadvisorContainerStats(cs, &caStats)
+		}
+		ps.Containers = append(ps.Containers, *cs)
 	}
 
 	result := make([]statsapi.PodStats, 0, len(sandboxIDToPodStats))
@@ -201,7 +223,7 @@ func (p *criStatsProvider) getFsInfo(storageID *runtimeapi.StorageIdentifier) *c
 	return &fsInfo
 }
 
-// buildPodRef returns a PodStats that identifies the Pod managing cinfo
+// buildPodStats returns a PodStats that identifies the Pod managing cinfo
 func buildPodStats(podSandbox *runtimeapi.PodSandbox) *statsapi.PodStats {
 	return &statsapi.PodStats{
 		PodRef: statsapi.PodReference{
@@ -211,7 +233,6 @@ func buildPodStats(podSandbox *runtimeapi.PodSandbox) *statsapi.PodStats {
 		},
 		// The StartTime in the summary API is the pod creation time.
 		StartTime: metav1.NewTime(time.Unix(0, podSandbox.CreatedAt)),
-		// Network stats are not supported by CRI.
 	}
 }
 
@@ -224,6 +245,13 @@ func (p *criStatsProvider) makePodStorageStats(s *statsapi.PodStats, rootFsInfo 
 		s.EphemeralStorage = calcEphemeralStorage(s.Containers, ephemeralStats, rootFsInfo)
 	}
 	return s
+}
+
+func (p *criStatsProvider) addCadvisorPodStats(
+	ps *statsapi.PodStats,
+	caPodSandbox *cadvisorapiv2.ContainerInfo,
+) {
+	ps.Network = cadvisorInfoToNetworkStats(ps.PodRef.Name, caPodSandbox)
 }
 
 func (p *criStatsProvider) makeContainerStats(
@@ -335,4 +363,45 @@ func removeTerminatedContainer(containers []*runtimeapi.Container) []*runtimeapi
 		}
 	}
 	return result
+}
+
+func (p *criStatsProvider) addCadvisorContainerStats(
+	cs *statsapi.ContainerStats,
+	caPodStats *cadvisorapiv2.ContainerInfo,
+) {
+	if caPodStats.Spec.HasCustomMetrics {
+		cs.UserDefinedMetrics = cadvisorInfoToUserDefinedMetrics(caPodStats)
+	}
+
+	cpu, memory := cadvisorInfoToCPUandMemoryStats(caPodStats)
+	if cpu != nil {
+		cs.CPU = cpu
+	}
+	if memory != nil {
+		cs.Memory = memory
+	}
+}
+
+func getCRICadvisorStats(ca cadvisor.Interface) (map[string]cadvisorapiv2.ContainerInfo, error) {
+	stats := make(map[string]cadvisorapiv2.ContainerInfo)
+	infos, err := getCadvisorContainerInfo(ca)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch cadvisor stats: %v", err)
+	}
+	infos = removeTerminatedContainerInfo(infos)
+	for key, info := range infos {
+		// On systemd using devicemapper each mount into the container has an
+		// associated cgroup. We ignore them to ensure we do not get duplicate
+		// entries in our summary. For details on .mount units:
+		// http://man7.org/linux/man-pages/man5/systemd.mount.5.html
+		if strings.HasSuffix(key, ".mount") {
+			continue
+		}
+		// Build the Pod key if this container is managed by a Pod
+		if !isPodManagedContainer(&info) {
+			continue
+		}
+		stats[path.Base(key)] = info
+	}
+	return stats, nil
 }
