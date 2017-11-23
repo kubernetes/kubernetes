@@ -42,7 +42,7 @@ type eventStrategy struct {
 // Event objects via the REST API.
 var Strategy = eventStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-func (eventStrategy) DefaultGarbageCollectionPolicy() rest.GarbageCollectionPolicy {
+func (eventStrategy) DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) rest.GarbageCollectionPolicy {
 	return rest.Unsupported
 }
 

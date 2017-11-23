@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -82,7 +83,7 @@ type testOrphanDeleteStrategy struct {
 	*testRESTStrategy
 }
 
-func (t *testOrphanDeleteStrategy) DefaultGarbageCollectionPolicy() rest.GarbageCollectionPolicy {
+func (t *testOrphanDeleteStrategy) DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) rest.GarbageCollectionPolicy {
 	return rest.OrphanDependents
 }
 
@@ -2004,4 +2005,94 @@ func denyCreateValidation(obj runtime.Object) error {
 
 func denyUpdateValidation(obj, old runtime.Object) error {
 	return fmt.Errorf("admission denied")
+}
+
+type fakeStrategy struct {
+	runtime.ObjectTyper
+	names.NameGenerator
+}
+
+func (fakeStrategy) DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) rest.GarbageCollectionPolicy {
+	appsv1beta1 := schema.GroupVersion{Group: "apps", Version: "v1beta1"}
+	appsv1beta2 := schema.GroupVersion{Group: "apps", Version: "v1beta2"}
+	extensionsv1beta1 := schema.GroupVersion{Group: "extensions", Version: "v1beta1"}
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+		switch groupVersion {
+		case appsv1beta1, appsv1beta2, extensionsv1beta1:
+			// for back compatibility
+			return rest.OrphanDependents
+		default:
+			return rest.DeleteDependents
+		}
+	}
+	return rest.OrphanDependents
+}
+
+func TestDeletionFinalizersForGarbageCollection(t *testing.T) {
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+
+	registry.DeleteStrategy = fakeStrategy{}
+	registry.EnableGarbageCollection = true
+
+	tests := []struct {
+		requestInfo       genericapirequest.RequestInfo
+		desiredFinalizers []string
+		isNilRequestInfo  bool
+		changed           bool
+	}{
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "extensions",
+				APIVersion: "v1beta1",
+			},
+			[]string{metav1.FinalizerOrphanDependents},
+			false,
+			true,
+		},
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "apps",
+				APIVersion: "v1beta1",
+			},
+			[]string{metav1.FinalizerOrphanDependents},
+			false,
+			true,
+		},
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "apps",
+				APIVersion: "v1beta2",
+			},
+			[]string{metav1.FinalizerOrphanDependents},
+			false,
+			true,
+		},
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "apps",
+				APIVersion: "v1",
+			},
+			[]string{},
+			false,
+			false,
+		},
+	}
+
+	for _, test := range tests {
+		context := genericapirequest.NewContext()
+		if !test.isNilRequestInfo {
+			context = genericapirequest.WithRequestInfo(context, &test.requestInfo)
+		}
+		changed, finalizers := deletionFinalizersForGarbageCollection(context, registry, &example.ReplicaSet{}, &metav1.DeleteOptions{})
+		if !changed {
+			if test.changed {
+				t.Errorf("%s/%s: no new finalizers are added", test.requestInfo.APIGroup, test.requestInfo.APIVersion)
+			}
+		} else if !reflect.DeepEqual(finalizers, test.desiredFinalizers) {
+			t.Errorf("%s/%s: want %#v, got %#v", test.requestInfo.APIGroup, test.requestInfo.APIVersion,
+				test.desiredFinalizers, finalizers)
+		}
+	}
 }
