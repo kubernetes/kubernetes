@@ -70,3 +70,29 @@ func (h *netlinkHandle) UnbindAddress(address, devName string) error {
 	}
 	return nil
 }
+
+// EnsureDummyDevice is part of interface
+func (h *netlinkHandle) EnsureDummyDevice(devName string) (bool, error) {
+	_, err := h.LinkByName(devName)
+	if err == nil {
+		// found dummy device
+		return true, nil
+	}
+	dummy := &netlink.Dummy{
+		LinkAttrs: netlink.LinkAttrs{Name: devName},
+	}
+	return false, h.LinkAdd(dummy)
+}
+
+// DeleteDummyDevice is part of interface.
+func (h *netlinkHandle) DeleteDummyDevice(devName string) error {
+	link, err := h.LinkByName(devName)
+	if err != nil {
+		return fmt.Errorf("error deleting a non-exist dummy device: %s", devName)
+	}
+	dummy, ok := link.(*netlink.Dummy)
+	if !ok {
+		return fmt.Errorf("expect dummy device, got device type: %s", link.Type())
+	}
+	return h.LinkDel(dummy)
+}

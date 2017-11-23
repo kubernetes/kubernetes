@@ -35,11 +35,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	clientappsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
 	clientextv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/api"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	kapps "k8s.io/kubernetes/pkg/kubectl/apps"
 	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
@@ -53,16 +52,48 @@ type HistoryViewer interface {
 	ViewHistory(namespace, name string, revision int64) (string, error)
 }
 
+type HistoryVisitor struct {
+	clientset kubernetes.Interface
+	result    HistoryViewer
+}
+
+func (v *HistoryVisitor) VisitDeployment(elem kapps.GroupKindElement) {
+	v.result = &DeploymentHistoryViewer{v.clientset}
+}
+
+func (v *HistoryVisitor) VisitStatefulSet(kind kapps.GroupKindElement) {
+	v.result = &StatefulSetHistoryViewer{v.clientset}
+}
+
+func (v *HistoryVisitor) VisitDaemonSet(kind kapps.GroupKindElement) {
+	v.result = &DaemonSetHistoryViewer{v.clientset}
+}
+
+func (v *HistoryVisitor) VisitJob(kind kapps.GroupKindElement)                   {}
+func (v *HistoryVisitor) VisitPod(kind kapps.GroupKindElement)                   {}
+func (v *HistoryVisitor) VisitReplicaSet(kind kapps.GroupKindElement)            {}
+func (v *HistoryVisitor) VisitReplicationController(kind kapps.GroupKindElement) {}
+func (v *HistoryVisitor) VisitCronJob(kind kapps.GroupKindElement)               {}
+
+// HistoryViewerFor returns an implementation of HistoryViewer interface for the given schema kind
 func HistoryViewerFor(kind schema.GroupKind, c kubernetes.Interface) (HistoryViewer, error) {
-	switch kind {
-	case extensions.Kind("Deployment"), apps.Kind("Deployment"):
-		return &DeploymentHistoryViewer{c}, nil
-	case apps.Kind("StatefulSet"):
-		return &StatefulSetHistoryViewer{c}, nil
-	case extensions.Kind("DaemonSet"), apps.Kind("DaemonSet"):
-		return &DaemonSetHistoryViewer{c}, nil
+	elem := kapps.GroupKindElement(kind)
+	visitor := &HistoryVisitor{
+		clientset: c,
 	}
-	return nil, fmt.Errorf("no history viewer has been implemented for %q", kind)
+
+	// Determine which HistoryViewer we need here
+	err := elem.Accept(visitor)
+
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving history for %q, %v", kind.String(), err)
+	}
+
+	if visitor.result == nil {
+		return nil, fmt.Errorf("no history viewer has been implemented for %q", kind.String())
+	}
+
+	return visitor.result, nil
 }
 
 type DeploymentHistoryViewer struct {
@@ -139,7 +170,7 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 func printTemplate(template *v1.PodTemplateSpec) (string, error) {
 	buf := bytes.NewBuffer([]byte{})
 	internalTemplate := &api.PodTemplateSpec{}
-	if err := apiv1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
+	if err := apiv1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(template, internalTemplate, nil); err != nil {
 		return "", fmt.Errorf("failed to convert podtemplate, %v", err)
 	}
 	w := printersinternal.NewPrefixWriter(buf)

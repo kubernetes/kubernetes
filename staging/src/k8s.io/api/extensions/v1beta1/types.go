@@ -475,6 +475,33 @@ type DaemonSetStatus struct {
 	// create the name for the newest ControllerRevision.
 	// +optional
 	CollisionCount *int32 `json:"collisionCount,omitempty" protobuf:"varint,9,opt,name=collisionCount"`
+
+	// Represents the latest available observations of a DaemonSet's current state.
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	Conditions []DaemonSetCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,10,rep,name=conditions"`
+}
+
+type DaemonSetConditionType string
+
+// TODO: Add valid condition types of a DaemonSet.
+
+// DaemonSetCondition describes the state of a DaemonSet at a certain point.
+type DaemonSetCondition struct {
+	// Type of DaemonSet condition.
+	Type DaemonSetConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=DaemonSetConditionType"`
+	// Status of the condition, one of True, False, Unknown.
+	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
+	// Last time the condition transitioned from one status to another.
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,3,opt,name=lastTransitionTime"`
+	// The reason for the condition's last transition.
+	// +optional
+	Reason string `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
+	// A human readable message indicating details about the transition.
+	// +optional
+	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
 }
 
 // +genclient
@@ -855,8 +882,9 @@ type PodSecurityPolicySpec struct {
 	// +optional
 	Privileged bool `json:"privileged,omitempty" protobuf:"varint,1,opt,name=privileged"`
 	// DefaultAddCapabilities is the default set of capabilities that will be added to the container
-	// unless the pod spec specifically drops the capability.  You may not list a capabiility in both
-	// DefaultAddCapabilities and RequiredDropCapabilities.
+	// unless the pod spec specifically drops the capability.  You may not list a capability in both
+	// DefaultAddCapabilities and RequiredDropCapabilities. Capabilities added here are implicitly
+	// allowed, and need not be included in the AllowedCapabilities list.
 	// +optional
 	DefaultAddCapabilities []v1.Capability `json:"defaultAddCapabilities,omitempty" protobuf:"bytes,2,rep,name=defaultAddCapabilities,casttype=k8s.io/api/core/v1.Capability"`
 	// RequiredDropCapabilities are the capabilities that will be dropped from the container.  These
@@ -910,6 +938,11 @@ type PodSecurityPolicySpec struct {
 	// is a white list of allowed host paths. Empty indicates that all host paths may be used.
 	// +optional
 	AllowedHostPaths []AllowedHostPath `json:"allowedHostPaths,omitempty" protobuf:"bytes,17,rep,name=allowedHostPaths"`
+	// AllowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all
+	// Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes
+	// is allowed in the "Volumes" field.
+	// +optional
+	AllowedFlexVolumes []AllowedFlexVolume `json:"allowedFlexVolumes,omitempty" protobuf:"bytes,18,rep,name=allowedFlexVolumes"`
 }
 
 // defines the host volume conditions that will be enabled by a policy
@@ -952,6 +985,12 @@ var (
 	AzureDisk             FSType = "azureDisk"
 	All                   FSType = "*"
 )
+
+// AllowedFlexVolume represents a single Flexvolume that is allowed to be used.
+type AllowedFlexVolume struct {
+	// Driver is the name of the Flexvolume driver.
+	Driver string `json:"driver" protobuf:"bytes,1,opt,name=driver"`
+}
 
 // Host Port Range defines a range of host ports that will be enabled by a policy
 // for pods to use.  It requires both the start and end to be defined.

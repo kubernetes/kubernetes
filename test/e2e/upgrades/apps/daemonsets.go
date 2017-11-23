@@ -72,7 +72,7 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 
 	By("Creating a DaemonSet")
 	var err error
-	if t.daemonSet, err = f.ClientSet.Extensions().DaemonSets(ns.Name).Create(t.daemonSet); err != nil {
+	if t.daemonSet, err = f.ClientSet.ExtensionsV1beta1().DaemonSets(ns.Name).Create(t.daemonSet); err != nil {
 		framework.Failf("unable to create test DaemonSet %s: %v", t.daemonSet.Name, err)
 	}
 

@@ -34,21 +34,21 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
-	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	cloudkms "google.golang.org/api/cloudkms/v1"
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
@@ -102,19 +102,21 @@ type GCECloud struct {
 	// for the cloudprovider to start watching the configmap.
 	ClusterID ClusterID
 
-	service                  *compute.Service
-	serviceBeta              *computebeta.Service
-	serviceAlpha             *computealpha.Service
-	containerService         *container.Service
-	cloudkmsService          *cloudkms.Service
-	client                   clientset.Interface
-	clientBuilder            controller.ControllerClientBuilder
-	eventBroadcaster         record.EventBroadcaster
-	eventRecorder            record.EventRecorder
-	projectID                string
-	region                   string
-	localZone                string   // The zone in which we are running
-	managedZones             []string // List of zones we are spanning (for multi-AZ clusters, primarily when running on master)
+	service          *compute.Service
+	serviceBeta      *computebeta.Service
+	serviceAlpha     *computealpha.Service
+	containerService *container.Service
+	client           clientset.Interface
+	clientBuilder    controller.ControllerClientBuilder
+	eventBroadcaster record.EventBroadcaster
+	eventRecorder    record.EventRecorder
+	projectID        string
+	region           string
+	localZone        string // The zone in which we are running
+	// managedZones will be set to the 1 zone if running a single zone cluster
+	// it will be set to ALL zones in region for any multi-zone cluster
+	// Use GetAllCurrentZones to get only zones that contain nodes
+	managedZones             []string
 	networkURL               string
 	isLegacyNetwork          bool
 	subnetworkURL            string
@@ -129,6 +131,12 @@ type GCECloud struct {
 	useMetadataServer        bool
 	operationPollRateLimiter flowcontrol.RateLimiter
 	manager                  diskServiceManager
+	// Lock for access to nodeZones
+	nodeZonesLock sync.Mutex
+	// nodeZones is a mapping from Zone to a sets.String of Node's names in the Zone
+	// it is updated by the nodeInformer
+	nodeZones          map[string]sets.String
+	nodeInformerSynced cache.InformerSynced
 	// sharedResourceLock is used to serialize GCE operations that may mutate shared state to
 	// prevent inconsistencies. For example, load balancers manipulation methods will take the
 	// lock to prevent shared resources from being prematurely deleted while the operation is
@@ -195,10 +203,6 @@ type CloudConfig struct {
 	AlphaFeatureGate   *AlphaFeatureGate
 }
 
-// kmsPluginRegisterOnce prevents the cloudprovider from registering its KMS plugin
-// more than once in the KMS plugin registry.
-var kmsPluginRegisterOnce sync.Once
-
 func init() {
 	cloudprovider.RegisterCloudProvider(
 		ProviderName,
@@ -210,11 +214,6 @@ func init() {
 // Raw access to the underlying GCE service, probably should only be used for e2e tests
 func (g *GCECloud) GetComputeService() *compute.Service {
 	return g.service
-}
-
-// Raw access to the cloudkmsService of GCE cloud. Required for encryption of etcd using Google KMS.
-func (g *GCECloud) GetKMSService() *cloudkms.Service {
-	return g.cloudkmsService
 }
 
 // newGCECloud creates a new instance of GCECloud.
@@ -253,6 +252,8 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 	cloudConfig.TokenSource = google.ComputeTokenSource("")
 	cloudConfig.UseMetadataServer = true
 
+	featureMap := make(map[string]bool)
+	cloudConfig.AlphaFeatureGate = &AlphaFeatureGate{featureMap}
 	if configFile != nil {
 		if configFile.Global.ApiEndpoint != "" {
 			cloudConfig.ApiEndpoint = configFile.Global.ApiEndpoint
@@ -274,6 +275,13 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 		alphaFeatureGate, err := NewAlphaFeatureGate(configFile.Global.AlphaFeatures)
 		if err != nil {
 			glog.Errorf("Encountered error for creating alpha feature gate: %v", err)
+		}
+		cloudConfig.AlphaFeatureGate = alphaFeatureGate
+	} else {
+		// initialize AlphaFeatureGate when no AlphaFeatures are configured.
+		alphaFeatureGate, err := NewAlphaFeatureGate([]string{})
+		if err != nil {
+			glog.Errorf("Encountered error for initializing alpha feature gate: %v", err)
 		}
 		cloudConfig.AlphaFeatureGate = alphaFeatureGate
 	}
@@ -404,12 +412,6 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	}
 	containerService.UserAgent = userAgent
 
-	cloudkmsService, err := cloudkms.New(client)
-	if err != nil {
-		return nil, err
-	}
-	cloudkmsService.UserAgent = userAgent
-
 	// ProjectID and.NetworkProjectID may be project number or name.
 	projID, netProjID := tryConvertToProjectNames(config.ProjectID, config.NetworkProjectID, service)
 	onXPN := projID != netProjID
@@ -474,7 +476,6 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 		serviceAlpha:             serviceAlpha,
 		serviceBeta:              serviceBeta,
 		containerService:         containerService,
-		cloudkmsService:          cloudkmsService,
 		projectID:                projID,
 		networkProjectID:         netProjID,
 		onXPN:                    onXPN,
@@ -490,17 +491,10 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 		useMetadataServer:        config.UseMetadataServer,
 		operationPollRateLimiter: operationPollRateLimiter,
 		AlphaFeatureGate:         config.AlphaFeatureGate,
+		nodeZones:                map[string]sets.String{},
 	}
 
 	gce.manager = &gceServiceManager{gce}
-
-	// Registering the KMS plugin only the first time.
-	kmsPluginRegisterOnce.Do(func() {
-		// Register the Google Cloud KMS based service in the KMS plugin registry.
-		encryptionconfig.KMSPluginRegistry.Register(KMSServiceName, func(config io.Reader) (envelope.Service, error) {
-			return gce.getGCPCloudKMSService(config)
-		})
-	})
 
 	return gce, nil
 }
@@ -608,6 +602,68 @@ func (gce *GCECloud) SubnetworkURL() string {
 
 func (gce *GCECloud) IsLegacyNetwork() bool {
 	return gce.isLegacyNetwork
+}
+
+func (gce *GCECloud) SetInformers(informerFactory informers.SharedInformerFactory) {
+	glog.Infof("Setting up informers for GCECloud")
+	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
+	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			node := obj.(*v1.Node)
+			gce.updateNodeZones(nil, node)
+		},
+		UpdateFunc: func(prev, obj interface{}) {
+			prevNode := prev.(*v1.Node)
+			newNode := obj.(*v1.Node)
+			if newNode.Labels[kubeletapis.LabelZoneFailureDomain] ==
+				prevNode.Labels[kubeletapis.LabelZoneFailureDomain] {
+				return
+			}
+			gce.updateNodeZones(prevNode, newNode)
+		},
+		DeleteFunc: func(obj interface{}) {
+			node, isNode := obj.(*v1.Node)
+			// We can get DeletedFinalStateUnknown instead of *v1.Node here
+			// and we need to handle that correctly.
+			if !isNode {
+				deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
+				if !ok {
+					glog.Errorf("Received unexpected object: %v", obj)
+					return
+				}
+				node, ok = deletedState.Obj.(*v1.Node)
+				if !ok {
+					glog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
+					return
+				}
+			}
+			gce.updateNodeZones(node, nil)
+		},
+	})
+	gce.nodeInformerSynced = nodeInformer.HasSynced
+}
+
+func (gce *GCECloud) updateNodeZones(prevNode, newNode *v1.Node) {
+	gce.nodeZonesLock.Lock()
+	defer gce.nodeZonesLock.Unlock()
+	if prevNode != nil {
+		prevZone, ok := prevNode.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
+		if ok {
+			gce.nodeZones[prevZone].Delete(prevNode.ObjectMeta.Name)
+			if gce.nodeZones[prevZone].Len() == 0 {
+				gce.nodeZones[prevZone] = nil
+			}
+		}
+	}
+	if newNode != nil {
+		newZone, ok := newNode.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
+		if ok {
+			if gce.nodeZones[newZone] == nil {
+				gce.nodeZones[newZone] = sets.NewString()
+			}
+			gce.nodeZones[newZone].Insert(newNode.ObjectMeta.Name)
+		}
+	}
 }
 
 // Known-useless DNS search path.

@@ -25,6 +25,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+readonly UUID_MNT_PREFIX="/mnt/disks/by-uuid/google-local-ssds"
+readonly UUID_BLOCK_PREFIX="/dev/disk/by-uuid/google-local-ssds"
+
 function setup-os-params {
   # Reset core_pattern. On GCI, the default core_pattern pipes the core dumps to
   # /sbin/crash_reporter which is more restrictive in saving crash dumps. So for
@@ -41,38 +44,38 @@ function config-ip-firewall {
 
   # The GCI image has host firewall which drop most inbound/forwarded packets.
   # We need to add rules to accept all TCP/UDP/ICMP packets.
-  if iptables -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
+  if iptables -w -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
     echo "Add rules to accept all inbound TCP/UDP/ICMP packets"
     iptables -A INPUT -w -p TCP -j ACCEPT
     iptables -A INPUT -w -p UDP -j ACCEPT
     iptables -A INPUT -w -p ICMP -j ACCEPT
   fi
-  if iptables -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
+  if iptables -w -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
     echo "Add rules to accept all forwarded TCP/UDP/ICMP packets"
     iptables -A FORWARD -w -p TCP -j ACCEPT
     iptables -A FORWARD -w -p UDP -j ACCEPT
     iptables -A FORWARD -w -p ICMP -j ACCEPT
   fi
 
-  iptables -N KUBE-METADATA-SERVER
-  iptables -I FORWARD -p tcp -d 169.254.169.254 --dport 80 -j KUBE-METADATA-SERVER
+  iptables -w -N KUBE-METADATA-SERVER
+  iptables -w -I FORWARD -p tcp -d 169.254.169.254 --dport 80 -j KUBE-METADATA-SERVER
 
   if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]]; then
-    iptables -A KUBE-METADATA-SERVER -j DROP
+    iptables -w -A KUBE-METADATA-SERVER -j DROP
   fi
 
   # Flush iptables nat table
-  iptables -t nat -F || true
+  iptables -w -t nat -F || true
 
-  if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" && "${KUBERNETES_MASTER:-}" == false ]]; then
-    echo "Add rules for ip masquerade"
-    iptables -t nat -N IP-MASQ
-    iptables -t nat -A POSTROUTING -m comment --comment "ip-masq: ensure nat POSTROUTING directs all non-LOCAL destination traffic to our custom IP-MASQ chain" -m addrtype ! --dst-type LOCAL -j IP-MASQ
-    iptables -t nat -A IP-MASQ -d 169.254.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
-    iptables -t nat -A IP-MASQ -d 10.0.0.0/8 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
-    iptables -t nat -A IP-MASQ -d 172.16.0.0/12 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
-    iptables -t nat -A IP-MASQ -d 192.168.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
-    iptables -t nat -A IP-MASQ -m comment --comment "ip-masq: outbound traffic is subject to MASQUERADE (must be last in chain)" -j MASQUERADE
+  echo "Add rules for ip masquerade"
+  if [[ "${NON_MASQUERADE_CIDR:-}" == "0.0.0.0/0" ]]; then
+    iptables -w -t nat -N IP-MASQ
+    iptables -w -t nat -A POSTROUTING -m comment --comment "ip-masq: ensure nat POSTROUTING directs all non-LOCAL destination traffic to our custom IP-MASQ chain" -m addrtype ! --dst-type LOCAL -j IP-MASQ
+    iptables -w -t nat -A IP-MASQ -d 169.254.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 10.0.0.0/8 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 172.16.0.0/12 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 192.168.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -m comment --comment "ip-masq: outbound traffic is subject to MASQUERADE (must be last in chain)" -j MASQUERADE
   fi
 }
 
@@ -85,11 +88,85 @@ function create-dirs {
   fi
 }
 
-# Formats the given device ($1) if needed and mounts it at given mount point
+# Gets the total number of $(1) and $(2) type disks specified
+# by the user in ${NODE_LOCAL_SSDS_EXT}
+function get-local-disk-num() {
+  local interface="${1}"
+  local format="${2}"
+
+  localdisknum=0
+  if [[ ! -z "${NODE_LOCAL_SSDS_EXT:-}" ]]; then
+    IFS=";" read -r -a ssdgroups <<< "${NODE_LOCAL_SSDS_EXT:-}"
+    for ssdgroup in "${ssdgroups[@]}"; do
+      IFS="," read -r -a ssdopts <<< "${ssdgroup}"
+      local opnum="${ssdopts[0]}"
+      local opinterface="${ssdopts[1]}"
+      local opformat="${ssdopts[2]}"
+
+      if [[ "${opformat,,}" == "${format,,}" && "${opinterface,,}" == "${interface,,}" ]]; then
+        localdisknum=$((localdisknum+opnum))
+      fi
+    done
+  fi
+}
+
+# Creates a symlink for a ($1) so that it may be used as block storage
+function safe-block-symlink(){
+  local device="${1}"
+  local symdir="${2}"
+  
+  mkdir -p "${symdir}"
+
+  get-or-generate-uuid "${device}"
+  local myuuid="${retuuid}"
+
+  local sym="${symdir}/local-ssd-${myuuid}"
+  # Do not "mkdir -p ${sym}" as that will cause unintended symlink behavior
+  ln -s "${device}" "${sym}"
+  echo "Created a symlink for SSD $ssd at ${sym}"
+  chmod a+w "${sym}"
+}
+
+# Gets a pregenerated UUID from ${ssdmap} if it exists, otherwise generates a new
+# UUID and places it inside ${ssdmap}
+function get-or-generate-uuid(){
+  local device="${1}"
+
+  local ssdmap="/home/kubernetes/localssdmap.txt"
+  echo "Generating or getting UUID from ${ssdmap}"
+
+  if [[ ! -e "${ssdmap}" ]]; then
+    touch "${ssdmap}"
+    chmod +w "${ssdmap}"
+  fi
+
+  # each line of the ssdmap looks like "${device} persistent-uuid"
+  if [[ ! -z $(grep ${device} ${ssdmap}) ]]; then
+    #create symlink based on saved uuid
+    local myuuid=$(grep ${device} ${ssdmap} | cut -d ' ' -f 2)
+  else
+    # generate new uuid and add it to the map
+    local myuuid=$(uuidgen)
+    if [[ ! ${?} -eq 0 ]]; then
+      echo "Failed to generate valid UUID with uuidgen" >&2
+      exit 2
+    fi
+    echo "${device} ${myuuid}" >> "${ssdmap}"
+  fi
+
+  if [[ -z "${myuuid}" ]]; then
+    echo "Failed to get a uuid for device ${device} when symlinking." >&2
+    exit 2
+  fi
+
+  retuuid="${myuuid}"
+}
+
+#Formats the given device ($1) if needed and mounts it at given mount point
 # ($2).
 function safe-format-and-mount() {
-  device=$1
-  mountpoint=$2
+  local device="${1}"
+  local mountpoint="${2}"
 
   # Format only if the disk is not already formatted.
   if ! tune2fs -l "${device}" ; then
@@ -102,18 +179,135 @@ function safe-format-and-mount() {
   mount -o discard,defaults "${device}" "${mountpoint}"
 }
 
-# Local ssds, if present, are mounted at /mnt/disks/ssdN.
+# Gets a devices UUID and bind mounts the device to mount location in
+# /mnt/disks/by-id/
+function unique-uuid-bind-mount(){
+  local mountpoint="${1}"
+  local actual_device="${2}"
+
+  # Trigger udev refresh so that newly formatted devices are propagated in by-uuid
+  udevadm control --reload-rules
+  udevadm trigger
+  udevadm settle 
+
+  # grep the exact match of actual device, prevents substring matching
+  local myuuid=$(ls -l /dev/disk/by-uuid/ | grep "/${actual_device}$" | tr -s ' ' | cut -d ' ' -f 9)
+  # myuuid should be the uuid of the device as found in /dev/disk/by-uuid/ 
+  if [[ -z "${myuuid}" ]]; then
+    echo "Failed to get a uuid for device ${actual_device} when mounting." >&2
+    exit 2
+  fi
+
+  # bindpoint should be the full path of the to-be-bound device
+  local bindpoint="${UUID_MNT_PREFIX}-${interface}-fs/local-ssd-${myuuid}"
+
+  safe-bind-mount "${mountpoint}" "${bindpoint}"
+}
+
+# Bind mounts device at mountpoint to bindpoint
+function safe-bind-mount(){
+  local mountpoint="${1}"
+  local bindpoint="${2}"
+
+  # Mount device to the mountpoint
+  mkdir -p "${bindpoint}"
+  echo "Binding '${mountpoint}' at '${bindpoint}'"
+  mount --bind "${mountpoint}" "${bindpoint}"
+  chmod a+w "${bindpoint}"
+}
+
+
+# Mounts, bindmounts, or symlinks depending on the interface and format
+# of the incoming device
+function mount-ext(){
+  local ssd="${1}"
+  local devicenum="${2}"
+  local interface="${3}"
+  local format="${4}"
+  
+
+  if [[ -z "${devicenum}" ]]; then
+    echo "Failed to get the local disk number for device ${ssd}" >&2
+    exit 2
+  fi
+
+  # TODO: Handle partitioned disks. Right now this code just ignores partitions
+  if [[ "${format}" == "fs" ]]; then
+    if [[ "${interface}" == "scsi" ]]; then
+      local actual_device=$(readlink -f "${ssd}" | cut -d '/' -f 3)
+      # Error checking
+      if [[ "${actual_device}" != sd* ]]; then
+        echo "'actual_device' is not of the correct format. It must be the kernel name of the device, got ${actual_device} instead" >&2
+        exit 1
+      fi
+      local mountpoint="/mnt/disks/ssd${devicenum}"
+    else
+      # This path is required because the existing Google images do not
+      # expose NVMe devices in /dev/disk/by-id so we are using the /dev/nvme instead
+      local actual_device=$(echo ${ssd} | cut -d '/' -f 3)
+      # Error checking
+      if [[ "${actual_device}" != nvme* ]]; then
+        echo "'actual_device' is not of the correct format. It must be the kernel name of the device, got ${actual_device} instead" >&2
+        exit 1
+      fi
+      local mountpoint="/mnt/disks/ssd-nvme${devicenum}"
+    fi
+
+    safe-format-and-mount "${ssd}" "${mountpoint}"
+    # We only do the bindmount if users are using the new local ssd request method
+    # see https://github.com/kubernetes/kubernetes/pull/53466#discussion_r146431894
+    if [[ ! -z "${NODE_LOCAL_SSDS_EXT:-}" ]]; then
+      unique-uuid-bind-mount "${mountpoint}" "${actual_device}"
+    fi
+  elif [[ "${format}" == "block" ]]; then
+    local symdir="${UUID_BLOCK_PREFIX}-${interface}-block"
+    safe-block-symlink "${ssd}" "${symdir}"
+  else
+    echo "Disk format must be either fs or block, got ${format}"
+  fi
+}
+
+# Local ssds, if present, are mounted or symlinked to their appropriate
+# locations
 function ensure-local-ssds() {
+  get-local-disk-num "scsi" "block"
+  local scsiblocknum="${localdisknum}"
+  local i=0
   for ssd in /dev/disk/by-id/google-local-ssd-*; do
     if [ -e "${ssd}" ]; then
-      ssdnum=`echo ${ssd} | sed -e 's/\/dev\/disk\/by-id\/google-local-ssd-\([0-9]*\)/\1/'`
-      ssdmount="/mnt/disks/ssd${ssdnum}/"
-      mkdir -p ${ssdmount}
-      safe-format-and-mount "${ssd}" ${ssdmount}
-      echo "Mounted local SSD $ssd at ${ssdmount}"
-      chmod a+w ${ssdmount}
+      local devicenum=`echo ${ssd} | sed -e 's/\/dev\/disk\/by-id\/google-local-ssd-\([0-9]*\)/\1/'`
+      if [[ "${i}" -lt "${scsiblocknum}" ]]; then
+        mount-ext "${ssd}" "${devicenum}" "scsi" "block"
+      else
+        # GKE does not set NODE_LOCAL_SSDS so all non-block devices
+        # are assumed to be filesystem devices
+        mount-ext "${ssd}" "${devicenum}" "scsi" "fs"
+      fi
+      i=$((i+1))
     else
-      echo "No local SSD disks found."
+      echo "No local SCSI SSD disks found."
+    fi
+  done
+
+  # The following mounts or symlinks NVMe devices
+  get-local-disk-num "nvme" "block"
+  local nvmeblocknum="${localdisknum}"
+  local i=0
+  for ssd in /dev/nvme*; do
+    if [ -e "${ssd}" ]; then
+      # This workaround to find if the NVMe device is a disk is required because
+      # the existing Google images does not expose NVMe devices in /dev/disk/by-id
+      if [[ `udevadm info --query=property --name=${ssd} | grep DEVTYPE | sed "s/DEVTYPE=//"` == "disk" ]]; then
+        local devicenum=`echo ${ssd} | sed -e 's/\/dev\/nvme0n\([0-9]*\)/\1/'`
+        if [[ "${i}" -lt "${nvmeblocknum}" ]]; then
+          mount-ext "${ssd}" "${devicenum}" "nvme" "block"
+        else
+          mount-ext "${ssd}" "${devicenum}" "nvme" "fs"
+        fi
+        i=$((i+1))
+      fi
+    else
+      echo "No local NVMe SSD disks found."
     fi
   done
 }
@@ -244,10 +438,6 @@ function create-node-pki {
     KUBELET_KEY_PATH="${pki_dir}/kubelet.key"
     write-pki-data "${KUBELET_KEY}" "${KUBELET_KEY_PATH}"
   fi
-
-  # TODO(mikedanese): remove this when we don't support downgrading to versions
-  # < 1.6.
-  ln -sf "${CA_CERT_BUNDLE_PATH}" /etc/srv/kubernetes/ca.crt
 }
 
 function create-master-pki {
@@ -297,11 +487,6 @@ function create-master-pki {
 
   SERVICEACCOUNT_KEY_PATH="${pki_dir}/serviceaccount.key"
   write-pki-data "${SERVICEACCOUNT_KEY}" "${SERVICEACCOUNT_KEY_PATH}"
-
-  # TODO(mikedanese): remove this when we don't support downgrading to versions
-  # < 1.6.
-  ln -sf "${APISERVER_SERVER_KEY_PATH}" /etc/srv/kubernetes/server.key
-  ln -sf "${APISERVER_SERVER_CERT_PATH}" /etc/srv/kubernetes/server.cert
 
   if [[ ! -z "${REQUESTHEADER_CA_CERT:-}" ]]; then
     AGGREGATOR_CA_KEY_PATH="${pki_dir}/aggr_ca.key"
@@ -854,6 +1039,12 @@ function assemble-docker-flags {
   docker_opts+=" --log-driver=${DOCKER_LOG_DRIVER:-json-file}"
   docker_opts+=" --log-opt=max-size=${DOCKER_LOG_MAX_SIZE:-10m}"
   docker_opts+=" --log-opt=max-file=${DOCKER_LOG_MAX_FILE:-5}"
+
+  # Disable live-restore if the environment variable is set.
+
+  if [[ "${DISABLE_DOCKER_LIVE_RESTORE:-false}" == "true" ]]; then
+    docker_opts+=" --live-restore=false"
+  fi
 
   echo "DOCKER_OPTS=\"${docker_opts} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
 
@@ -1520,10 +1711,6 @@ function start-kube-apiserver {
 
   if [[ -n "${ENCRYPTION_PROVIDER_CONFIG:-}" ]]; then
     local encryption_provider_config_path="/etc/srv/kubernetes/encryption-provider-config.yml"
-    if [[ -n "${GOOGLE_CLOUD_KMS_CONFIG_FILE_NAME:-}" && -n "${GOOGLE_CLOUD_KMS_CONFIG:-}" ]]; then
-        echo "${GOOGLE_CLOUD_KMS_CONFIG}" | base64 --decode > "${GOOGLE_CLOUD_KMS_CONFIG_FILE_NAME}"
-    fi
-
     echo "${ENCRYPTION_PROVIDER_CONFIG}" | base64 --decode > "${encryption_provider_config_path}"
     params+=" --experimental-encryption-provider-config=${encryption_provider_config_path}"
   fi
@@ -1703,14 +1890,35 @@ function start-cluster-autoscaler {
   fi
 }
 
-# A helper function for copying addon manifests and set dir/files
-# permissions.
+# A helper function for setting up addon manifests.
 #
 # $1: addon category under /etc/kubernetes
 # $2: manifest source dir
+# $3: (optional) auxilary manifest source dir
 function setup-addon-manifests {
-  local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/$2"
+  local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   local -r dst_dir="/etc/kubernetes/$1/$2"
+
+  copy-manifests "${src_dir}/$2" "${dst_dir}"
+
+  # If the PodSecurityPolicy admission controller is enabled,
+  # set up the corresponding addon policies.
+  if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
+    local -r psp_dir="${src_dir}/${3:-$2}/podsecuritypolicies"
+    if [[ -d "${psp_dir}" ]]; then
+      copy-manifests "${psp_dir}" "${dst_dir}"
+    fi
+  fi
+}
+
+# A helper function for copying manifests and setting dir/files
+# permissions.
+#
+# $1: absolute source dir
+# $2: absolute destination dir
+function copy-manifests {
+  local -r src_dir="$1"
+  local -r dst_dir="$2"
   if [[ ! -d "${dst_dir}" ]]; then
     mkdir -p "${dst_dir}"
   fi
@@ -1734,21 +1942,47 @@ function setup-addon-manifests {
 # Fluentd manifest is modified using kubectl, which may not be available at
 # this point. Run this as a background process.
 function wait-for-apiserver-and-update-fluentd {
+  local -r fluentd_gcp_yaml="${1}"
+
+  local modifying_flags=""
+  if [[ -n "${FLUENTD_GCP_MEMORY_LIMIT:-}" ]]; then
+    modifying_flags="${modifying_flags} --limits=memory=${FLUENTD_GCP_MEMORY_LIMIT}"
+  fi
+  local request_resources=""
+  if [[ -n "${FLUENTD_GCP_CPU_REQUEST:-}" ]]; then
+    request_resources="cpu=${FLUENTD_GCP_CPU_REQUEST}"
+  fi
+  if [[ -n "${FLUENTD_GCP_MEMORY_REQUEST:-}" ]]; then
+    if [[ -n "${request_resources}" ]]; then
+      request_resources="${request_resources},"
+    fi
+    request_resources="memory=${FLUENTD_GCP_MEMORY_REQUEST}"
+  fi
+  if [[ -n "${request_resources}" ]]; then
+    modifying_flags="${modifying_flags} --requests=${request_resources}"
+  fi
+
   until kubectl get nodes
   do
     sleep 10
   done
-  kubectl set resources --dry-run --local -f ${fluentd_gcp_yaml} \
-    --limits=memory=${FLUENTD_GCP_MEMORY_LIMIT} \
-    --requests=cpu=${FLUENTD_GCP_CPU_REQUEST},memory=${FLUENTD_GCP_MEMORY_REQUEST} \
-    --containers=fluentd-gcp -o yaml > ${fluentd_gcp_yaml}.tmp
-  mv ${fluentd_gcp_yaml}.tmp ${fluentd_gcp_yaml}
+
+  local -r temp_fluentd_gcp_yaml="${fluentd_gcp_yaml}.tmp"
+  if kubectl set resources --dry-run --local -f ${fluentd_gcp_yaml} ${modifying_flags} \
+      --containers=fluentd-gcp -o yaml > ${temp_fluentd_gcp_yaml}; then
+    mv ${temp_fluentd_gcp_yaml} ${fluentd_gcp_yaml}
+  else
+    (echo "Failed to update fluentd resources. Used manifest:" && cat ${temp_fluentd_gcp_yaml}) >&2
+    rm ${temp_fluentd_gcp_yaml}
+  fi
 }
 
 # Trigger background process that will ultimately update fluentd resource
 # requirements.
 function start-fluentd-resource-update {
-  wait-for-apiserver-and-update-fluentd &
+  local -r fluentd_gcp_yaml="${1}"
+
+  wait-for-apiserver-and-update-fluentd ${fluentd_gcp_yaml} &
 }
 
 # Updates parameters in yaml file for prometheus-to-sd configuration, or
@@ -1772,14 +2006,27 @@ function start-kube-addons {
   local -r dst_dir="/etc/kubernetes/addons"
 
   # prep addition kube-up specific rbac objects
-  setup-addon-manifests "addons" "rbac"
+  setup-addon-manifests "addons" "rbac/kubelet-api-auth"
+  setup-addon-manifests "addons" "rbac/kubelet-cert-rotation"
+  if [[ "${REGISTER_MASTER_KUBELET:-false}" == "true" ]]; then
+    setup-addon-manifests "addons" "rbac/legacy-kubelet-user"
+  else
+    setup-addon-manifests "addons" "rbac/legacy-kubelet-user-disable"
+  fi
 
   if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
-      setup-addon-manifests "addons" "podsecuritypolicies"
+    setup-addon-manifests "addons" "podsecuritypolicies"
   fi
 
   # Set up manifests of other addons.
   if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" ]]; then
+    if [ -n "${CUSTOM_KUBE_PROXY_YAML:-}" ]; then
+      # Replace with custom GKE kube proxy.
+      cat > "$src_dir/kube-proxy/kube-proxy-ds.yaml" <<EOF
+$(echo "$CUSTOM_KUBE_PROXY_YAML")
+EOF
+      update-prometheus-to-sd-parameters "$src_dir/kube-proxy/kube-proxy-ds.yaml"
+    fi
     prepare-kube-proxy-manifest-variables "$src_dir/kube-proxy/kube-proxy-ds.yaml"
     setup-addon-manifests "addons" "kube-proxy"
   fi
@@ -1811,6 +2058,7 @@ function start-kube-addons {
       controller_yaml="${controller_yaml}/heapster-controller.yaml"
     fi
     remove-salt-config-comments "${controller_yaml}"
+
     sed -i -e "s@{{ cluster_name }}@${CLUSTER_NAME}@g" "${controller_yaml}"
     sed -i -e "s@{{ *base_metrics_memory *}}@${base_metrics_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *base_metrics_cpu *}}@${base_metrics_cpu}@g" "${controller_yaml}"
@@ -1820,9 +2068,33 @@ function start-kube-addons {
     sed -i -e "s@{{ *nanny_memory *}}@${nanny_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *metrics_cpu_per_node *}}@${metrics_cpu_per_node}@g" "${controller_yaml}"
     update-prometheus-to-sd-parameters ${controller_yaml}
+
+    if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "stackdriver" ]]; then
+      use_old_resources="${HEAPSTER_USE_OLD_STACKDRIVER_RESOURCES:-true}"
+      use_new_resources="${HEAPSTER_USE_NEW_STACKDRIVER_RESOURCES:-false}"
+      sed -i -e "s@{{ use_old_resources }}@${use_old_resources}@g" "${controller_yaml}"
+      sed -i -e "s@{{ use_new_resources }}@${use_new_resources}@g" "${controller_yaml}"
+    fi
+  fi
+  if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "stackdriver" ]] ||
+     ([[ "${ENABLE_CLUSTER_LOGGING:-}" == "true" ]] &&
+     [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]); then
+    if [[ "${ENABLE_METADATA_AGENT:-}" == "stackdriver" ]] &&
+       [[ "${METADATA_AGENT_VERSION:-}" != "" ]]; then
+      metadata_agent_cpu_request="${METADATA_AGENT_CPU_REQUEST:-40m}"
+      metadata_agent_memory_request="${METADATA_AGENT_MEMORY_REQUEST:-50Mi}"
+      setup-addon-manifests "addons" "metadata-agent/stackdriver"
+      deployment_yaml="${dst_dir}/metadata-agent/stackdriver/metadata-agent.yaml"
+      sed -i -e "s@{{ metadata_agent_version }}@${METADATA_AGENT_VERSION}@g" "${deployment_yaml}"
+      sed -i -e "s@{{ metadata_agent_cpu_request }}@${metadata_agent_cpu_request}@g" "${deployment_yaml}"
+      sed -i -e "s@{{ metadata_agent_memory_request }}@${metadata_agent_memory_request}@g" "${deployment_yaml}"
+    fi
   fi
   if [[ "${ENABLE_METRICS_SERVER:-}" == "true" ]]; then
     setup-addon-manifests "addons" "metrics-server"
+  fi
+  if [[ "${ENABLE_NVIDIA_GPU_DEVICE_PLUGIN:-}" == "true" ]]; then
+    setup-addon-manifests "addons" "device-plugins/nvidia-gpu"
   fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns"
@@ -1867,7 +2139,7 @@ EOF
     local -r fluentd_gcp_yaml="${dst_dir}/fluentd-gcp/fluentd-gcp-ds.yaml"
     update-prometheus-to-sd-parameters ${event_exporter_yaml}
     update-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
-    start-fluentd-resource-update
+    start-fluentd-resource-update ${fluentd_gcp_yaml}
   fi
   if [[ "${ENABLE_CLUSTER_UI:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dashboard"
@@ -1877,7 +2149,7 @@ EOF
   fi
   if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
     # Setup role binding for standalone node problem detector.
-    setup-addon-manifests "addons" "node-problem-detector/standalone"
+    setup-addon-manifests "addons" "node-problem-detector/standalone" "node-problem-detector"
   fi
   if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then
     setup-addon-manifests "admission-controls" "limit-range"
@@ -2044,7 +2316,7 @@ fi
 
 override-kubectl
 # Run the containerized mounter once to pre-cache the container image.
-if [[ "${CONTAINER_RUNTIME:-}" == "docker" ]]; then
+if [[ "${CONTAINER_RUNTIME:-docker}" == "docker" ]]; then
   assemble-docker-flags
 fi
 start-kubelet

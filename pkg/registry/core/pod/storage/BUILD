@@ -12,7 +12,7 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/registry/core/pod/storage",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
         "//pkg/securitycontext:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
@@ -28,6 +28,7 @@ go_test(
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/features:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/registry/generic/testing:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/errors:go_default_library",
@@ -45,9 +46,9 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/registry/core/pod/storage",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/pod:go_default_library",
-        "//pkg/api/validation:go_default_library",
+        "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/validation:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/policy/internalversion:go_default_library",
         "//pkg/kubelet/client:go_default_library",

@@ -15,8 +15,8 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/sysctl",
     deps = [
-        "//pkg/api/v1/helper:go_default_library",
-        "//pkg/api/validation:go_default_library",
+        "//pkg/apis/core/v1/helper:go_default_library",
+        "//pkg/apis/core/validation:go_default_library",
         "//pkg/apis/extensions/validation:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",

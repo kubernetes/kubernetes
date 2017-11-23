@@ -121,3 +121,20 @@ func (f *FakeResources) LookupResource(gvk schema.GroupVersionKind) proto.Schema
 	}
 	return resources.LookupResource(gvk)
 }
+
+// EmptyResources implement a Resources that just doesn't have any resources.
+type EmptyResources struct{}
+
+var _ openapi.Resources = EmptyResources{}
+
+// LookupResource will always return nil. It doesn't have any resources.
+func (f EmptyResources) LookupResource(gvk schema.GroupVersionKind) proto.Schema {
+	return nil
+}
+
+// CreateOpenAPISchemaFunc returns a function useful for the TestFactory.
+func CreateOpenAPISchemaFunc(path string) func() (openapi.Resources, error) {
+	return func() (openapi.Resources, error) {
+		return NewFakeResources(path), nil
+	}
+}

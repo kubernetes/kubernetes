@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -82,7 +83,7 @@ type testOrphanDeleteStrategy struct {
 	*testRESTStrategy
 }
 
-func (t *testOrphanDeleteStrategy) DefaultGarbageCollectionPolicy() rest.GarbageCollectionPolicy {
+func (t *testOrphanDeleteStrategy) DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) rest.GarbageCollectionPolicy {
 	return rest.OrphanDependents
 }
 
@@ -311,8 +312,14 @@ func TestStoreCreate(t *testing.T) {
 	defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
 	registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
 
+	// create the object with denying admission
+	objA, err := registry.Create(testContext, podA, denyCreateValidation, false)
+	if err == nil {
+		t.Errorf("Expected admission error: %v", err)
+	}
+
 	// create the object
-	objA, err := registry.Create(testContext, podA, rest.ValidateAllObjectFunc, false)
+	objA, err = registry.Create(testContext, podA, rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -609,31 +616,53 @@ func TestStoreUpdate(t *testing.T) {
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	defer destroyFunc()
 
-	// Test1 try to update a non-existing node
-	_, _, err := registry.Update(testContext, podA.Name, rest.DefaultUpdatedObjectInfo(podA), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	// try to update a non-existing node with denying admission, should still return NotFound
+	_, _, err := registry.Update(testContext, podA.Name, rest.DefaultUpdatedObjectInfo(podA), denyCreateValidation, denyUpdateValidation)
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	// Test2 createIfNotFound and verify
+	// try to update a non-existing node
+	_, _, err = registry.Update(testContext, podA.Name, rest.DefaultUpdatedObjectInfo(podA), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	if !errors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// allow creation
 	registry.UpdateStrategy.(*testRESTStrategy).allowCreateOnUpdate = true
+
+	// createIfNotFound with denying create admission
+	_, _, err = registry.Update(testContext, podA.Name, rest.DefaultUpdatedObjectInfo(podA), denyCreateValidation, rest.ValidateAllObjectUpdateFunc)
+	if err == nil {
+		t.Errorf("expected admission error on create")
+	}
+
+	// createIfNotFound and verify
 	if !updateAndVerify(t, testContext, registry, podA) {
 		t.Errorf("Unexpected error updating podA")
 	}
+
+	// forbid creation again
 	registry.UpdateStrategy.(*testRESTStrategy).allowCreateOnUpdate = false
 
-	// Test3 outofDate
+	// outofDate
 	_, _, err = registry.Update(testContext, podAWithResourceVersion.Name, rest.DefaultUpdatedObjectInfo(podAWithResourceVersion), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
 	if !errors.IsConflict(err) {
 		t.Errorf("Unexpected error updating podAWithResourceVersion: %v", err)
 	}
 
-	// Test4 normal update and verify
+	// try to update with denying admission
+	_, _, err = registry.Update(testContext, podA.Name, rest.DefaultUpdatedObjectInfo(podA), rest.ValidateAllObjectFunc, denyUpdateValidation)
+	if err == nil {
+		t.Errorf("expected admission error on update")
+	}
+
+	// normal update and verify
 	if !updateAndVerify(t, testContext, registry, podB) {
 		t.Errorf("Unexpected error updating podB")
 	}
 
-	// Test5 unconditional update
+	// unconditional update
 	// NOTE: The logic for unconditional updates doesn't make sense to me, and imho should be removed.
 	// doUnconditionalUpdate := resourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate()
 	// ^^ That condition can *never be true due to the creation of root objects.
@@ -1797,7 +1826,7 @@ func TestStoreWatch(t *testing.T) {
 
 func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheEnabled bool) (factory.DestroyFunc, *Store) {
 	podPrefix := "/pods"
-	server, sc := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, scheme)
+	server, sc := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 	strategy := &testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
 
 	sc.Codec = apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion)
@@ -1967,5 +1996,103 @@ func TestQualifiedResource(t *testing.T) {
 
 	if !isQualifiedResource(err, qualifiedKind, qualifiedGroup) {
 		t.Fatalf("Unexpected error: %#v", err)
+	}
+}
+
+func denyCreateValidation(obj runtime.Object) error {
+	return fmt.Errorf("admission denied")
+}
+
+func denyUpdateValidation(obj, old runtime.Object) error {
+	return fmt.Errorf("admission denied")
+}
+
+type fakeStrategy struct {
+	runtime.ObjectTyper
+	names.NameGenerator
+}
+
+func (fakeStrategy) DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) rest.GarbageCollectionPolicy {
+	appsv1beta1 := schema.GroupVersion{Group: "apps", Version: "v1beta1"}
+	appsv1beta2 := schema.GroupVersion{Group: "apps", Version: "v1beta2"}
+	extensionsv1beta1 := schema.GroupVersion{Group: "extensions", Version: "v1beta1"}
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+		switch groupVersion {
+		case appsv1beta1, appsv1beta2, extensionsv1beta1:
+			// for back compatibility
+			return rest.OrphanDependents
+		default:
+			return rest.DeleteDependents
+		}
+	}
+	return rest.OrphanDependents
+}
+
+func TestDeletionFinalizersForGarbageCollection(t *testing.T) {
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+
+	registry.DeleteStrategy = fakeStrategy{}
+	registry.EnableGarbageCollection = true
+
+	tests := []struct {
+		requestInfo       genericapirequest.RequestInfo
+		desiredFinalizers []string
+		isNilRequestInfo  bool
+		changed           bool
+	}{
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "extensions",
+				APIVersion: "v1beta1",
+			},
+			[]string{metav1.FinalizerOrphanDependents},
+			false,
+			true,
+		},
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "apps",
+				APIVersion: "v1beta1",
+			},
+			[]string{metav1.FinalizerOrphanDependents},
+			false,
+			true,
+		},
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "apps",
+				APIVersion: "v1beta2",
+			},
+			[]string{metav1.FinalizerOrphanDependents},
+			false,
+			true,
+		},
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "apps",
+				APIVersion: "v1",
+			},
+			[]string{},
+			false,
+			false,
+		},
+	}
+
+	for _, test := range tests {
+		context := genericapirequest.NewContext()
+		if !test.isNilRequestInfo {
+			context = genericapirequest.WithRequestInfo(context, &test.requestInfo)
+		}
+		changed, finalizers := deletionFinalizersForGarbageCollection(context, registry, &example.ReplicaSet{}, &metav1.DeleteOptions{})
+		if !changed {
+			if test.changed {
+				t.Errorf("%s/%s: no new finalizers are added", test.requestInfo.APIGroup, test.requestInfo.APIVersion)
+			}
+		} else if !reflect.DeepEqual(finalizers, test.desiredFinalizers) {
+			t.Errorf("%s/%s: want %#v, got %#v", test.requestInfo.APIGroup, test.requestInfo.APIVersion,
+				test.desiredFinalizers, finalizers)
+		}
 	}
 }

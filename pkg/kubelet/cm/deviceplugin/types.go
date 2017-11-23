@@ -17,34 +17,45 @@ limitations under the License.
 package deviceplugin
 
 import (
+	"k8s.io/api/core/v1"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
-
-// MonitorCallback is the function called when a device's health state changes,
-// or new devices are reported, or old devices are deleted.
-// Updated contains the most recent state of the Device.
-type MonitorCallback func(resourceName string, added, updated, deleted []pluginapi.Device)
 
 // Manager manages all the Device Plugins running on a node.
 type Manager interface {
-	// Start starts the gRPC Registration service.
-	Start() error
+	// Start starts device plugin registration service.
+	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady) error
 
 	// Devices is the map of devices that have registered themselves
 	// against the manager.
 	// The map key is the ResourceName of the device plugins.
 	Devices() map[string][]pluginapi.Device
 
-	// Allocate takes resourceName and list of device Ids, and calls the
-	// gRPC Allocate on the device plugin matching the resourceName.
-	Allocate(string, []string) (*pluginapi.AllocateResponse, error)
+	// Allocate configures and assigns devices to pods. The pods are provided
+	// through the pod admission attributes in the attrs argument. From the
+	// requested device resources, Allocate will communicate with the owning
+	// device plugin to allow setup procedures to take place, and for the
+	// device plugin to provide runtime settings to use the device (environment
+	// variables, mount points and device files). The node object is provided
+	// for the device manager to update the node capacity to reflect the
+	// currently available devices.
+	Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error
 
 	// Stop stops the manager.
 	Stop() error
 
-	// Returns checkpoint file path.
-	CheckpointFile() string
+	// GetDeviceRunContainerOptions checks whether we have cached containerDevices
+	// for the passed-in <pod, container> and returns its DeviceRunContainerOptions
+	// for the found one. An empty struct is returned in case no cached state is found.
+	GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Container) *DeviceRunContainerOptions
+
+	// GetCapacity returns the amount of available device plugin resource capacity
+	// and inactive device plugin resources previously registered on the node.
+	GetCapacity() (v1.ResourceList, []string)
 }
 
 // DeviceRunContainerOptions contains the combined container runtime settings to consume its allocated devices.

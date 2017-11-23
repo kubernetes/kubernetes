@@ -67,12 +67,12 @@ type Attributes interface {
 // zero or more calls to methods of the Attributes interface.  It returns nil when an action is
 // authorized, otherwise it returns an error.
 type Authorizer interface {
-	Authorize(a Attributes) (authorized bool, reason string, err error)
+	Authorize(a Attributes) (authorized Decision, reason string, err error)
 }
 
-type AuthorizerFunc func(a Attributes) (bool, string, error)
+type AuthorizerFunc func(a Attributes) (Decision, string, error)
 
-func (f AuthorizerFunc) Authorize(a Attributes) (bool, string, error) {
+func (f AuthorizerFunc) Authorize(a Attributes) (Decision, string, error) {
 	return f(a)
 }
 
@@ -144,3 +144,15 @@ func (a AttributesRecord) IsResourceRequest() bool {
 func (a AttributesRecord) GetPath() string {
 	return a.Path
 }
+
+type Decision int
+
+const (
+	// DecisionDeny means that an authorizer decided to deny the action.
+	DecisionDeny Decision = iota
+	// DecisionAllow means that an authorizer decided to allow the action.
+	DecisionAllow
+	// DecisionNoOpionion means that an authorizer has no opinion on wether
+	// to allow or deny an action.
+	DecisionNoOpinion
+)

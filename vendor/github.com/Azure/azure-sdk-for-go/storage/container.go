@@ -1,5 +1,19 @@
 package storage
 
+// Copyright 2017 Microsoft Corporation
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 import (
 	"encoding/xml"
 	"errors"
@@ -18,10 +32,64 @@ type Container struct {
 	Name       string              `xml:"Name"`
 	Properties ContainerProperties `xml:"Properties"`
 	Metadata   map[string]string
+	sasuri     url.URL
+}
+
+// Client returns the HTTP client used by the Container reference.
+func (c *Container) Client() *Client {
+	return &c.bsc.client
 }
 
 func (c *Container) buildPath() string {
 	return fmt.Sprintf("/%s", c.Name)
+}
+
+// GetURL gets the canonical URL to the container.
+// This method does not create a publicly accessible URL if the container
+// is private and this method does not check if the blob exists.
+func (c *Container) GetURL() string {
+	container := c.Name
+	if container == "" {
+		container = "$root"
+	}
+	return c.bsc.client.getEndpoint(blobServiceName, pathForResource(container, ""), nil)
+}
+
+// ContainerSASOptions are options to construct a container SAS
+// URI.
+// See https://docs.microsoft.com/en-us/rest/api/storageservices/constructing-a-service-sas
+type ContainerSASOptions struct {
+	ContainerSASPermissions
+	OverrideHeaders
+	SASOptions
+}
+
+// ContainerSASPermissions includes the available permissions for
+// a container SAS URI.
+type ContainerSASPermissions struct {
+	BlobServiceSASPermissions
+	List bool
+}
+
+// GetSASURI creates an URL to the container which contains the Shared
+// Access Signature with the specified options.
+//
+// See https://docs.microsoft.com/en-us/rest/api/storageservices/constructing-a-service-sas
+func (c *Container) GetSASURI(options ContainerSASOptions) (string, error) {
+	uri := c.GetURL()
+	signedResource := "c"
+	canonicalizedResource, err := c.bsc.client.buildCanonicalizedResource(uri, c.bsc.auth, true)
+	if err != nil {
+		return "", err
+	}
+
+	// build permissions string
+	permissions := options.BlobServiceSASPermissions.buildString()
+	if options.List {
+		permissions += "l"
+	}
+
+	return c.bsc.client.blobAndFileSASURI(options.SASOptions, uri, permissions, canonicalizedResource, signedResource, options.OverrideHeaders)
 }
 
 // ContainerProperties contains various properties of a container returned from
@@ -224,7 +292,20 @@ func (c *Container) create(options *CreateContainerOptions) (*storageResponse, e
 // Exists returns true if a container with given name exists
 // on the storage account, otherwise returns false.
 func (c *Container) Exists() (bool, error) {
-	uri := c.bsc.client.getEndpoint(blobServiceName, c.buildPath(), url.Values{"restype": {"container"}})
+	q := url.Values{"restype": {"container"}}
+	var uri string
+	if c.bsc.client.isServiceSASClient() {
+		q = mergeParams(q, c.sasuri.Query())
+		newURI := c.sasuri
+		newURI.RawQuery = q.Encode()
+		uri = newURI.String()
+
+	} else {
+		if c.bsc.client.isAccountSASClient() {
+			q = mergeParams(q, c.bsc.client.accountSASToken)
+		}
+		uri = c.bsc.client.getEndpoint(blobServiceName, c.buildPath(), q)
+	}
 	headers := c.bsc.client.getStandardHeaders()
 
 	resp, err := c.bsc.client.exec(http.MethodHead, uri, headers, nil, c.bsc.auth)
@@ -399,9 +480,20 @@ func (c *Container) delete(options *DeleteContainerOptions) (*storageResponse, e
 func (c *Container) ListBlobs(params ListBlobsParameters) (BlobListResponse, error) {
 	q := mergeParams(params.getParameters(), url.Values{
 		"restype": {"container"},
-		"comp":    {"list"}},
-	)
-	uri := c.bsc.client.getEndpoint(blobServiceName, c.buildPath(), q)
+		"comp":    {"list"},
+	})
+	var uri string
+	if c.bsc.client.isServiceSASClient() {
+		q = mergeParams(q, c.sasuri.Query())
+		newURI := c.sasuri
+		newURI.RawQuery = q.Encode()
+		uri = newURI.String()
+	} else {
+		if c.bsc.client.isAccountSASClient() {
+			q = mergeParams(q, c.bsc.client.accountSASToken)
+		}
+		uri = c.bsc.client.getEndpoint(blobServiceName, c.buildPath(), q)
+	}
 
 	headers := c.bsc.client.getStandardHeaders()
 	headers = addToHeaders(headers, "x-ms-client-request-id", params.RequestID)

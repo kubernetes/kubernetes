@@ -17,114 +17,322 @@ limitations under the License.
 package kubectl
 
 import (
+	"reflect"
+	"testing"
+
 	policy "k8s.io/api/policy/v1beta1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"testing"
 )
 
-func TestPodDisruptionBudgetV2Generator(t *testing.T) {
-	minAvailableNumber := intstr.Parse("2")
-	minAvailablePercent := intstr.Parse("50%")
+func TestPodDisruptionBudgetV1Generate(t *testing.T) {
+	name := "foo"
+	minAvailable := "5"
+	minAvailableIS := intstr.Parse(minAvailable)
+	defaultMinAvailableIS := intstr.Parse("1")
+	selector := "app=foo"
+	labelSelector, err := metav1.ParseToLabelSelector(selector)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
 	tests := map[string]struct {
-		params    map[string]interface{}
-		expected  *policy.PodDisruptionBudget
-		expectErr bool
+		params       map[string]interface{}
+		expectErrMsg string
+		expectPDB    *policy.PodDisruptionBudget
 	}{
-		"test valid case with number min-available": {
+		"test-valid-use": {
 			params: map[string]interface{}{
-				"name":          "foo",
-				"selector":      "app=nginx",
-				"min-available": "2",
-				"max-available": "",
+				"name":          name,
+				"min-available": minAvailable,
+				"selector":      selector,
 			},
-			expected: &policy.PodDisruptionBudget{
+			expectPDB: &policy.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
+					Name: name,
 				},
 				Spec: policy.PodDisruptionBudgetSpec{
-					MinAvailable: &minAvailableNumber,
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"app": "nginx",
-						},
-					},
+					MinAvailable: &minAvailableIS,
+					Selector:     labelSelector,
 				},
 			},
-			expectErr: false,
 		},
-		"test valid case with percent min-available": {
+		"test-missing-name-param": {
 			params: map[string]interface{}{
-				"name":          "foo",
-				"selector":      "app=nginx",
-				"min-available": "50%",
-				"max-available": "",
+				"min-available": minAvailable,
+				"selector":      selector,
 			},
-			expected: &policy.PodDisruptionBudget{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: policy.PodDisruptionBudgetSpec{
-					MinAvailable: &minAvailablePercent,
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"app": "nginx",
-						},
-					},
-				},
-			},
-			expectErr: false,
+			expectErrMsg: "Parameter: name is required",
 		},
-		"test missing required param": {
+		"test-blank-name-param": {
 			params: map[string]interface{}{
-				"name":          "foo",
-				"min-available": "2",
-				"max-available": "",
+				"name":          "",
+				"min-available": minAvailable,
+				"selector":      selector,
 			},
-			expectErr: true,
+			expectErrMsg: "Parameter: name is required",
 		},
-		"test with invalid format params": {
+		"test-invalid-name-param": {
 			params: map[string]interface{}{
-				"name":          "foo",
-				"selector":      "app=nginx",
-				"min-available": 2,
-				"max-available": "",
+				"name":          1,
+				"min-available": minAvailable,
+				"selector":      selector,
 			},
-			expectErr: true,
+			expectErrMsg: "expected string, found int for 'name'",
 		},
-		"test min-available/max-available all not be specified": {
+		"test-missing-min-available-param": {
 			params: map[string]interface{}{
-				"name":          "foo",
-				"selector":      "app=nginx",
+				"name":     name,
+				"selector": selector,
+			},
+			expectErrMsg: "expected string, found <nil> for 'min-available'",
+		},
+		"test-blank-min-available-param": {
+			params: map[string]interface{}{
+				"name":          name,
 				"min-available": "",
-				"max-available": "",
+				"selector":      selector,
 			},
-			expectErr: true,
+			expectPDB: &policy.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name,
+				},
+				Spec: policy.PodDisruptionBudgetSpec{
+					MinAvailable: &defaultMinAvailableIS,
+					Selector:     labelSelector,
+				},
+			},
 		},
-		"test min-available and max-unavailable cannot be both specified": {
+		"test-invalid-min-available-param": {
 			params: map[string]interface{}{
-				"name":          "foo",
-				"selector":      "app=nginx",
-				"min-available": "2",
-				"max-available": "5",
+				"name":          name,
+				"min-available": 1,
+				"selector":      selector,
 			},
-			expectErr: true,
+			expectErrMsg: "expected string, found int for 'min-available'",
+		},
+		"test-missing-selector-param": {
+			params: map[string]interface{}{
+				"name":          name,
+				"min-available": minAvailable,
+			},
+			expectErrMsg: "Parameter: selector is required",
+		},
+		"test-blank-selector-param": {
+			params: map[string]interface{}{
+				"name":          name,
+				"min-available": minAvailable,
+				"selector":      "",
+			},
+			expectErrMsg: "Parameter: selector is required",
+		},
+		"test-invalid-selector-param": {
+			params: map[string]interface{}{
+				"name":          name,
+				"min-available": minAvailable,
+				"selector":      1,
+			},
+			expectErrMsg: "expected string, found int for 'selector'",
+		},
+	}
+
+	generator := PodDisruptionBudgetV1Generator{}
+	for name, test := range tests {
+		obj, err := generator.Generate(test.params)
+		switch {
+		case test.expectErrMsg != "" && err != nil:
+			if err.Error() != test.expectErrMsg {
+				t.Errorf("test '%s': expect error '%s', but saw '%s'", name, test.expectErrMsg, err.Error())
+			}
+			continue
+		case test.expectErrMsg != "" && err == nil:
+			t.Errorf("test '%s': expected error '%s' and didn't get one", name, test.expectErrMsg)
+			continue
+		case test.expectErrMsg == "" && err != nil:
+			t.Errorf("test '%s': unexpected error %s", name, err.Error())
+			continue
+		}
+		if !reflect.DeepEqual(obj.(*policy.PodDisruptionBudget), test.expectPDB) {
+			t.Errorf("test '%s': expected:\n%#v\nsaw:\n%#v", name, test.expectPDB, obj.(*policy.PodDisruptionBudget))
+		}
+	}
+}
+
+func TestPodDisruptionBudgetV2Generate(t *testing.T) {
+	name := "foo"
+	minAvailable := "1"
+	minAvailableIS := intstr.Parse(minAvailable)
+	maxUnavailable := "5%"
+	maxUnavailableIS := intstr.Parse(maxUnavailable)
+	selector := "app=foo"
+	labelSelector, err := metav1.ParseToLabelSelector(selector)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	tests := map[string]struct {
+		params       map[string]interface{}
+		expectErrMsg string
+		expectPDB    *policy.PodDisruptionBudget
+	}{
+		"test-valid-min-available": {
+			params: map[string]interface{}{
+				"name":            name,
+				"min-available":   minAvailable,
+				"max-unavailable": "",
+				"selector":        selector,
+			},
+			expectPDB: &policy.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name,
+				},
+				Spec: policy.PodDisruptionBudgetSpec{
+					MinAvailable: &minAvailableIS,
+					Selector:     labelSelector,
+				},
+			},
+		},
+		"test-valid-max-available": {
+			params: map[string]interface{}{
+				"name":            name,
+				"min-available":   "",
+				"max-unavailable": maxUnavailable,
+				"selector":        selector,
+			},
+			expectPDB: &policy.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name,
+				},
+				Spec: policy.PodDisruptionBudgetSpec{
+					MaxUnavailable: &maxUnavailableIS,
+					Selector:       labelSelector,
+				},
+			},
+		},
+		"test-missing-name-param": {
+			params: map[string]interface{}{
+				"min-available":   "",
+				"max-unavailable": "",
+				"selector":        selector,
+			},
+			expectErrMsg: "Parameter: name is required",
+		},
+		"test-blank-name-param": {
+			params: map[string]interface{}{
+				"name":            "",
+				"min-available":   "",
+				"max-unavailable": "",
+				"selector":        selector,
+			},
+			expectErrMsg: "Parameter: name is required",
+		},
+		"test-invalid-name-param": {
+			params: map[string]interface{}{
+				"name":            1,
+				"min-available":   "",
+				"max-unavailable": "",
+				"selector":        selector,
+			},
+			expectErrMsg: "expected string, found int for 'name'",
+		},
+		"test-missing-min-available-param": {
+			params: map[string]interface{}{
+				"name":            name,
+				"max-unavailable": "",
+				"selector":        selector,
+			},
+			expectErrMsg: "expected string, found <nil> for 'min-available'",
+		},
+		"test-invalid-min-available-param": {
+			params: map[string]interface{}{
+				"name":            name,
+				"min-available":   1,
+				"max-unavailable": "",
+				"selector":        selector,
+			},
+			expectErrMsg: "expected string, found int for 'min-available'",
+		},
+		"test-missing-max-available-param": {
+			params: map[string]interface{}{
+				"name":          name,
+				"min-available": "",
+				"selector":      selector,
+			},
+			expectErrMsg: "expected string, found <nil> for 'max-unavailable'",
+		},
+		"test-invalid-max-available-param": {
+			params: map[string]interface{}{
+				"name":            name,
+				"min-available":   "",
+				"max-unavailable": 1,
+				"selector":        selector,
+			},
+			expectErrMsg: "expected string, found int for 'max-unavailable'",
+		},
+		"test-blank-min-available-max-unavailable-param": {
+			params: map[string]interface{}{
+				"name":            name,
+				"min-available":   "",
+				"max-unavailable": "",
+				"selector":        selector,
+			},
+			expectErrMsg: "one of min-available or max-unavailable must be specified",
+		},
+		"test-min-available-max-unavailable-param": {
+			params: map[string]interface{}{
+				"name":            name,
+				"min-available":   minAvailable,
+				"max-unavailable": maxUnavailable,
+				"selector":        selector,
+			},
+			expectErrMsg: "min-available and max-unavailable cannot be both specified",
+		},
+		"test-missing-selector-param": {
+			params: map[string]interface{}{
+				"name":            name,
+				"min-available":   "",
+				"max-unavailable": "",
+			},
+			expectErrMsg: "Parameter: selector is required",
+		},
+		"test-blank-selector-param": {
+			params: map[string]interface{}{
+				"name":            name,
+				"min-available":   "",
+				"max-unavailable": "",
+				"selector":        "",
+			},
+			expectErrMsg: "Parameter: selector is required",
+		},
+		"test-invalid-selector-param": {
+			params: map[string]interface{}{
+				"name":            name,
+				"min-available":   "",
+				"max-unavailable": "",
+				"selector":        1,
+			},
+			expectErrMsg: "expected string, found int for 'selector'",
 		},
 	}
 
 	generator := PodDisruptionBudgetV2Generator{}
 	for name, test := range tests {
 		obj, err := generator.Generate(test.params)
-		if !test.expectErr && err != nil {
-			t.Errorf("%s: unexpected error: %v", name, err)
-		}
-		if test.expectErr && err != nil {
+		switch {
+		case test.expectErrMsg != "" && err != nil:
+			if err.Error() != test.expectErrMsg {
+				t.Errorf("test '%s': expect error '%s', but saw '%s'", name, test.expectErrMsg, err.Error())
+			}
+			continue
+		case test.expectErrMsg != "" && err == nil:
+			t.Errorf("test '%s': expected error '%s' and didn't get one", name, test.expectErrMsg)
+			continue
+		case test.expectErrMsg == "" && err != nil:
+			t.Errorf("test '%s': unexpected error %s", name, err.Error())
 			continue
 		}
-		if !apiequality.Semantic.DeepEqual(obj.(*policy.PodDisruptionBudget), test.expected) {
-			t.Errorf("%s:\nexpected:\n%#v\nsaw:\n%#v", name, test.expected, obj.(*policy.PodDisruptionBudget))
+		if !reflect.DeepEqual(obj.(*policy.PodDisruptionBudget), test.expectPDB) {
+			t.Errorf("test '%s': expected:\n%#v\nsaw:\n%#v", name, test.expectPDB, obj.(*policy.PodDisruptionBudget))
 		}
 	}
 }

@@ -116,6 +116,12 @@ func (w *Waiter) WaitForStaticPodControlPlaneHashes(_ string) (map[string]string
 	}, nil
 }
 
+// WaitForStaticPodSingleHash returns an empty hash
+// but the empty strings there are needed
+func (w *Waiter) WaitForStaticPodSingleHash(_ string, _ string) (string, error) {
+	return "", nil
+}
+
 // WaitForStaticPodControlPlaneHashChange returns a dummy nil error in order for the flow to just continue as we're dryrunning
 func (w *Waiter) WaitForStaticPodControlPlaneHashChange(_, _, _ string) error {
 	return nil

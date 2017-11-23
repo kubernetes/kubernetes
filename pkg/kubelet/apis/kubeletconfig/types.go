@@ -17,12 +17,7 @@ limitations under the License.
 package kubeletconfig
 
 import (
-	"fmt"
-	"sort"
-	"strings"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 // HairpinMode denotes how the kubelet should configure networking to handle
@@ -94,8 +89,6 @@ type KubeletConfiguration struct {
 	Authentication KubeletAuthentication
 	// authorization specifies how requests to the Kubelet's server are authorized
 	Authorization KubeletAuthorization
-	// seccompProfileRoot is the directory path for seccomp profiles.
-	SeccompProfileRoot string
 	// allowPrivileged enables containers to request privileged mode.
 	// Defaults to false.
 	AllowPrivileged bool
@@ -138,8 +131,6 @@ type KubeletConfiguration struct {
 	// oomScoreAdj is The oom-score-adj value for kubelet process. Values
 	// must be within the range [-1000, 1000].
 	OOMScoreAdj int32
-	// registerNode enables automatic registration with the apiserver.
-	RegisterNode bool
 	// clusterDomain is the DNS domain for this cluster. If set, kubelet will
 	// configure all containers to search this domain in addition to the
 	// host's search domains.
@@ -167,9 +158,6 @@ type KubeletConfiguration struct {
 	ImageGCLowThresholdPercent int32
 	// How frequently to calculate and cache volume disk usage for all pods
 	VolumeStatsAggPeriod metav1.Duration
-	// volumePluginDir is the full path of the directory in which to search
-	// for additional third party volume plugins
-	VolumePluginDir string
 	// KubeletCgroups is the absolute name of cgroups to isolate the kubelet in.
 	// +optional
 	KubeletCgroups string
@@ -198,15 +186,6 @@ type KubeletConfiguration struct {
 	// requests - pull, logs, exec and attach.
 	// +optional
 	RuntimeRequestTimeout metav1.Duration
-	// lockFilePath is the path that kubelet will use to as a lock file.
-	// It uses this file as a lock to synchronize with other kubelet processes
-	// that may be running.
-	LockFilePath string
-	// ExitOnLockContention is a flag that signifies to the kubelet that it is running
-	// in "bootstrap" mode. This requires that 'LockFilePath' has been set.
-	// This will cause the kubelet to listen to inotify events on the lock file,
-	// releasing it and exiting when another process tries to open that file.
-	ExitOnLockContention bool
 	// How should the kubelet configure the container bridge for hairpin packets.
 	// Setting this flag allows endpoints in a Service to loadbalance back to
 	// themselves if they should try to access their own Service. Values:
@@ -229,10 +208,6 @@ type KubeletConfiguration struct {
 	CPUCFSQuota bool
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64
-	// registerWithTaints are an array of taints to add to a node object when
-	// the kubelet registers itself. This only takes effect when registerNode
-	// is true and upon the initial registration of the node.
-	RegisterWithTaints []api.Taint
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string
 	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver
@@ -245,26 +220,26 @@ type KubeletConfiguration struct {
 	// run docker daemon with version  < 1.9 or an Aufs storage backend.
 	// Issue #10959 has more details.
 	SerializeImagePulls bool
-	// nodeLabels to add when registering the node in the cluster.
-	NodeLabels map[string]string
-	// Comma-delimited list of hard eviction expressions.  For example, 'memory.available<300Mi'.
+	// Map of signal names to quantities that defines hard eviction thresholds. For example: {"memory.available": "300Mi"}.
 	// +optional
-	EvictionHard string
-	// Comma-delimited list of soft eviction expressions.  For example, 'memory.available<300Mi'.
+	EvictionHard map[string]string
+	// Map of signal names to quantities that defines soft eviction thresholds.  For example: {"memory.available": "300Mi"}.
 	// +optional
-	EvictionSoft string
-	// Comma-delimeted list of grace periods for each soft eviction signal.  For example, 'memory.available=30s'.
+	EvictionSoft map[string]string
+	// Map of signal names to quantities that defines grace periods for each soft eviction signal. For example: {"memory.available": "30s"}.
 	// +optional
-	EvictionSoftGracePeriod string
+	EvictionSoftGracePeriod map[string]string
 	// Duration for which the kubelet has to wait before transitioning out of an eviction pressure condition.
 	// +optional
 	EvictionPressureTransitionPeriod metav1.Duration
 	// Maximum allowed grace period (in seconds) to use when terminating pods in response to a soft eviction threshold being met.
 	// +optional
 	EvictionMaxPodGracePeriod int32
-	// Comma-delimited list of minimum reclaims (e.g. imagefs.available=2Gi) that describes the minimum amount of resource the kubelet will reclaim when performing a pod eviction if that resource is under pressure.
+	// Map of signal names to quantities that defines minimum reclaims, which describe the minimum
+	// amount of a given resource the kubelet will reclaim when performing a pod eviction while
+	// that resource is under pressure. For example: {"imagefs.available": "2Gi"}
 	// +optional
-	EvictionMinimumReclaim string
+	EvictionMinimumReclaim map[string]string
 	// Maximum number of pods per core. Cannot exceed MaxPods
 	PodsPerCore int32
 	// enableControllerAttachDetach enables the Attach/Detach controller to
@@ -296,12 +271,12 @@ type KubeletConfiguration struct {
 	// that describe resources reserved for non-kubernetes components.
 	// Currently only cpu and memory are supported. [default=none]
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
-	SystemReserved ConfigurationMap
+	SystemReserved map[string]string
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
 	// that describe resources reserved for kubernetes system components.
 	// Currently cpu, memory and local ephemeral storage for root file system are supported. [default=none]
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
-	KubeReserved ConfigurationMap
+	KubeReserved map[string]string
 	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `SystemReserved` compute resource reservation for OS system daemons.
 	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
 	SystemReservedCgroup string
@@ -368,34 +343,4 @@ type KubeletAnonymousAuthentication struct {
 	// Requests that are not rejected by another authentication method are treated as anonymous requests.
 	// Anonymous requests have a username of system:anonymous, and a group name of system:unauthenticated.
 	Enabled bool
-}
-
-type ConfigurationMap map[string]string
-
-func (m *ConfigurationMap) String() string {
-	pairs := []string{}
-	for k, v := range *m {
-		pairs = append(pairs, fmt.Sprintf("%s=%s", k, v))
-	}
-	sort.Strings(pairs)
-	return strings.Join(pairs, ",")
-}
-
-func (m *ConfigurationMap) Set(value string) error {
-	for _, s := range strings.Split(value, ",") {
-		if len(s) == 0 {
-			continue
-		}
-		arr := strings.SplitN(s, "=", 2)
-		if len(arr) == 2 {
-			(*m)[strings.TrimSpace(arr[0])] = strings.TrimSpace(arr[1])
-		} else {
-			(*m)[strings.TrimSpace(arr[0])] = ""
-		}
-	}
-	return nil
-}
-
-func (*ConfigurationMap) Type() string {
-	return "mapStringString"
 }

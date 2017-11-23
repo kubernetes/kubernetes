@@ -23,7 +23,6 @@ import (
 // +genclient
 // +genclient:noStatus
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +resource:path=foo
 
 // Foo is a specification for a Foo resource
 type Foo struct {
@@ -46,7 +45,6 @@ type FooStatus struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +resource:path=foos
 
 // FooList is a list of Foo resources
 type FooList struct {

@@ -62,7 +62,12 @@ const (
 	validFor = 365 * 24 * time.Hour
 
 	// Ingress class annotation defined in ingress repository.
-	ingressClass = "kubernetes.io/ingress.class"
+	// TODO: All these annotations should be reused from
+	// ingress-gce/pkg/annotations instead of duplicating them here.
+	IngressClass = "kubernetes.io/ingress.class"
+
+	// Ingress class annotation value for multi cluster ingress.
+	MulticlusterIngressClassValue = "gce-multi-cluster"
 
 	// all cloud resources created by the ingress controller start with this
 	// prefix.
@@ -937,12 +942,12 @@ func (j *IngressTestJig) CreateIngress(manifestPath, ns string, ingAnnotations m
 	j.Ingress, err = manifest.IngressFromManifest(filepath.Join(manifestPath, "ing.yaml"))
 	ExpectNoError(err)
 	j.Ingress.Namespace = ns
-	j.Ingress.Annotations = map[string]string{ingressClass: j.Class}
+	j.Ingress.Annotations = map[string]string{IngressClass: j.Class}
 	for k, v := range ingAnnotations {
 		j.Ingress.Annotations[k] = v
 	}
 	Logf(fmt.Sprintf("creating" + j.Ingress.Name + " ingress"))
-	j.Ingress, err = j.Client.Extensions().Ingresses(ns).Create(j.Ingress)
+	j.Ingress, err = j.Client.ExtensionsV1beta1().Ingresses(ns).Create(j.Ingress)
 	ExpectNoError(err)
 }
 
@@ -951,12 +956,12 @@ func (j *IngressTestJig) Update(update func(ing *extensions.Ingress)) {
 	var err error
 	ns, name := j.Ingress.Namespace, j.Ingress.Name
 	for i := 0; i < 3; i++ {
-		j.Ingress, err = j.Client.Extensions().Ingresses(ns).Get(name, metav1.GetOptions{})
+		j.Ingress, err = j.Client.ExtensionsV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
 			Failf("failed to get ingress %q: %v", name, err)
 		}
 		update(j.Ingress)
-		j.Ingress, err = j.Client.Extensions().Ingresses(ns).Update(j.Ingress)
+		j.Ingress, err = j.Client.ExtensionsV1beta1().Ingresses(ns).Update(j.Ingress)
 		if err == nil {
 			DescribeIng(j.Ingress.Namespace)
 			return
@@ -994,7 +999,7 @@ func (j *IngressTestJig) GetRootCA(secretName string) (rootCA []byte) {
 
 // TryDeleteIngress attempts to delete the ingress resource and logs errors if they occur.
 func (j *IngressTestJig) TryDeleteIngress() {
-	err := j.Client.Extensions().Ingresses(j.Ingress.Namespace).Delete(j.Ingress.Name, nil)
+	err := j.Client.ExtensionsV1beta1().Ingresses(j.Ingress.Namespace).Delete(j.Ingress.Name, nil)
 	if err != nil {
 		Logf("Error while deleting the ingress %v/%v: %v", j.Ingress.Namespace, j.Ingress.Name, err)
 	}

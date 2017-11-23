@@ -232,7 +232,7 @@ func (m *manager) Start() {
 		Duration: 2 * time.Second,
 		Factor:   2,
 		Jitter:   0.1,
-		Steps:    7,
+		Steps:    5,
 	}
 	go wait.Forever(func() {
 		sleepInterval := m.rotationDeadline.Sub(time.Now())
@@ -240,7 +240,7 @@ func (m *manager) Start() {
 		time.Sleep(sleepInterval)
 		if err := wait.ExponentialBackoff(backoff, m.rotateCerts); err != nil {
 			utilruntime.HandleError(fmt.Errorf("Reached backoff limit, still unable to rotate certs: %v", err))
-			wait.PollInfinite(128*time.Second, m.rotateCerts)
+			wait.PollInfinite(32*time.Second, m.rotateCerts)
 		}
 	}, 0)
 }

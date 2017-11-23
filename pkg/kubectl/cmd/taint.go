@@ -58,6 +58,7 @@ var (
 
 		* A taint consists of a key, value, and effect. As an argument here, it is expressed as key=value:effect.
 		* The key must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
+		* Optionally, the key can begin with a DNS subdomain prefix and a single '/', like example.com/my-app
 		* The value must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[2]d characters.
 		* The effect must be NoSchedule, PreferNoSchedule or NoExecute.
 		* Currently taint can only apply to node.`))
@@ -149,10 +150,11 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Com
 		return cmdutil.UsageErrorf(cmd, err.Error())
 	}
 	o.builder = f.NewBuilder().
+		Internal().
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace()
 	if o.selector != "" {
-		o.builder = o.builder.SelectorParam(o.selector).ResourceTypes("node")
+		o.builder = o.builder.LabelSelectorParam(o.selector).ResourceTypes("node")
 	}
 	if o.all {
 		o.builder = o.builder.SelectAllParam(o.all).ResourceTypes("node").Flatten().Latest()
@@ -160,7 +162,7 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Com
 	if !o.all && o.selector == "" && len(o.resources) >= 2 {
 		o.builder = o.builder.ResourceNames("node", o.resources[1:]...)
 	}
-	o.builder = o.builder.SelectorParam(o.selector).
+	o.builder = o.builder.LabelSelectorParam(o.selector).
 		Flatten().
 		Latest()
 	o.f = f
@@ -277,7 +279,7 @@ func (o TaintOptions) RunTaint() error {
 			return o.f.PrintObject(o.cmd, false, mapper, outputObj, o.out)
 		}
 
-		cmdutil.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, false, operation)
+		o.f.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, false, operation)
 		return nil
 	})
 }

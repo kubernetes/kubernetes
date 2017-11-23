@@ -1,15 +1,17 @@
 approvers:
-- errordeveloper
 - jbeda
 - luxas
 - mikedanese
 - krousey
+- timothysc
 reviewers:
 - mikedanese
 - luxas
-- justinsb
-- errordeveloper
-- lukemarsden
 - dmmcquay
 - krousey
 - timothysc
+- fabriziopandini
+- jamiehannaford
+- kad
+- xiangpengzhao
+- mattmoyer

@@ -19,6 +19,7 @@ package rbd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -26,6 +27,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -141,6 +143,10 @@ func (fake *fakeDiskManager) IsLocked(r rbdMounter, nodeName string) (bool, erro
 	return ok && isLocked, nil
 }
 
+func (fake *fakeDiskManager) ExpandImage(rbdExpander *rbdVolumeExpander, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error) {
+	return resource.Quantity{}, fmt.Errorf("not implemented")
+}
+
 // checkMounterLog checks fakeMounter must have expected logs, and the last action msut equal to expectedAction.
 func checkMounterLog(t *testing.T, fakeMounter *mount.FakeMounter, expected int, expectedAction mount.FakeAction) {
 	if len(fakeMounter.Log) != expected {
@@ -149,7 +155,7 @@ func checkMounterLog(t *testing.T, fakeMounter *mount.FakeMounter, expected int,
 	lastIndex := len(fakeMounter.Log) - 1
 	lastAction := fakeMounter.Log[lastIndex]
 	if !reflect.DeepEqual(expectedAction, lastAction) {
-		t.Fatalf("fakeMounter.Log[%d] should be %v, not: %v", lastIndex, expectedAction, lastAction)
+		t.Fatalf("fakeMounter.Log[%d] should be %#v, not: %#v", lastIndex, expectedAction, lastAction)
 	}
 }
 
@@ -276,6 +282,10 @@ func TestPlugin(t *testing.T) {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
+	tmpDir, err = filepath.EvalSymlinks(tmpDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	podUID := uuid.NewUUID()
 	var cases []*testcase

@@ -11,8 +11,8 @@ go_library(
     srcs = ["daemonset_util.go"],
     importpath = "k8s.io/kubernetes/pkg/controller/daemon/util",
     deps = [
-        "//pkg/api/v1/helper:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
+        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/util/labels:go_default_library",

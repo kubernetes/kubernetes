@@ -22,15 +22,25 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/util/filesystem"
 )
 
 func TestFileStore(t *testing.T) {
 	path, err := ioutil.TempDir("", "FileStore")
 	assert.NoError(t, err)
-	store, err := NewFileStore(path, filesystem.NewFakeFs())
+	store, err := NewFileStore(path, filesystem.DefaultFs{})
 	assert.NoError(t, err)
+	testStore(t, store)
+}
 
+func TestFakeFileStore(t *testing.T) {
+	store, err := NewFileStore("/tmp/test-fake-file-store", filesystem.NewFakeFs())
+	assert.NoError(t, err)
+	testStore(t, store)
+}
+
+func testStore(t *testing.T, store Store) {
 	testCases := []struct {
 		key       string
 		data      string
@@ -70,20 +80,20 @@ func TestFileStore(t *testing.T) {
 
 	// Test add data.
 	for _, c := range testCases {
-		_, err = store.Read(c.key)
+		t.Log("test case: ", c)
+		_, err := store.Read(c.key)
 		assert.Error(t, err)
 
 		err = store.Write(c.key, []byte(c.data))
 		if c.expectErr {
 			assert.Error(t, err)
 			continue
-		} else {
-			assert.NoError(t, err)
 		}
 
+		require.NoError(t, err)
 		// Test read data by key.
 		data, err := store.Read(c.key)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, string(data), c.data)
 	}
 
@@ -100,7 +110,7 @@ func TestFileStore(t *testing.T) {
 		}
 
 		err = store.Delete(c.key)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		_, err = store.Read(c.key)
 		assert.EqualValues(t, ErrKeyNotFound, err)
 	}
@@ -111,6 +121,6 @@ func TestFileStore(t *testing.T) {
 
 	// Test list keys.
 	keys, err = store.List()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, len(keys), 0)
 }

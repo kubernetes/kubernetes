@@ -23,7 +23,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // FakeNodes implements NodeInterface
@@ -36,19 +36,19 @@ var nodesResource = schema.GroupVersionResource{Group: "", Version: "", Resource
 var nodesKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "Node"}
 
 // Get takes name of the node, and returns the corresponding node object, and an error if there is any.
-func (c *FakeNodes) Get(name string, options v1.GetOptions) (result *api.Node, err error) {
+func (c *FakeNodes) Get(name string, options v1.GetOptions) (result *core.Node, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(nodesResource, name), &api.Node{})
+		Invokes(testing.NewRootGetAction(nodesResource, name), &core.Node{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*api.Node), err
+	return obj.(*core.Node), err
 }
 
 // List takes label and field selectors, and returns the list of Nodes that match those selectors.
-func (c *FakeNodes) List(opts v1.ListOptions) (result *api.NodeList, err error) {
+func (c *FakeNodes) List(opts v1.ListOptions) (result *core.NodeList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(nodesResource, nodesKind, opts), &api.NodeList{})
+		Invokes(testing.NewRootListAction(nodesResource, nodesKind, opts), &core.NodeList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -57,8 +57,8 @@ func (c *FakeNodes) List(opts v1.ListOptions) (result *api.NodeList, err error) 
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &api.NodeList{}
-	for _, item := range obj.(*api.NodeList).Items {
+	list := &core.NodeList{}
+	for _, item := range obj.(*core.NodeList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -73,40 +73,40 @@ func (c *FakeNodes) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a node and creates it.  Returns the server's representation of the node, and an error, if there is any.
-func (c *FakeNodes) Create(node *api.Node) (result *api.Node, err error) {
+func (c *FakeNodes) Create(node *core.Node) (result *core.Node, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(nodesResource, node), &api.Node{})
+		Invokes(testing.NewRootCreateAction(nodesResource, node), &core.Node{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*api.Node), err
+	return obj.(*core.Node), err
 }
 
 // Update takes the representation of a node and updates it. Returns the server's representation of the node, and an error, if there is any.
-func (c *FakeNodes) Update(node *api.Node) (result *api.Node, err error) {
+func (c *FakeNodes) Update(node *core.Node) (result *core.Node, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(nodesResource, node), &api.Node{})
+		Invokes(testing.NewRootUpdateAction(nodesResource, node), &core.Node{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*api.Node), err
+	return obj.(*core.Node), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeNodes) UpdateStatus(node *api.Node) (*api.Node, error) {
+func (c *FakeNodes) UpdateStatus(node *core.Node) (*core.Node, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(nodesResource, "status", node), &api.Node{})
+		Invokes(testing.NewRootUpdateSubresourceAction(nodesResource, "status", node), &core.Node{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*api.Node), err
+	return obj.(*core.Node), err
 }
 
 // Delete takes name of the node and deletes it. Returns an error if one occurs.
 func (c *FakeNodes) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(nodesResource, name), &api.Node{})
+		Invokes(testing.NewRootDeleteAction(nodesResource, name), &core.Node{})
 	return err
 }
 
@@ -114,16 +114,16 @@ func (c *FakeNodes) Delete(name string, options *v1.DeleteOptions) error {
 func (c *FakeNodes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(nodesResource, listOptions)
 
-	_, err := c.Fake.Invokes(action, &api.NodeList{})
+	_, err := c.Fake.Invokes(action, &core.NodeList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched node.
-func (c *FakeNodes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Node, err error) {
+func (c *FakeNodes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Node, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(nodesResource, name, data, subresources...), &api.Node{})
+		Invokes(testing.NewRootPatchSubresourceAction(nodesResource, name, data, subresources...), &core.Node{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*api.Node), err
+	return obj.(*core.Node), err
 }

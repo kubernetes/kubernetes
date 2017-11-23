@@ -85,6 +85,9 @@ spec:
         - mountPath: /run/xtables.lock
           name: xtables-lock
           readOnly: false
+        - mountPath: /lib/modules
+          name: lib-modules
+          readOnly: true
       hostNetwork: true
       serviceAccountName: kube-proxy
       tolerations:
@@ -101,5 +104,8 @@ spec:
         hostPath:
           path: /run/xtables.lock
           type: FileOrCreate
+      - name: lib-modules
+        hostPath:
+          path: /lib/modules
 `
 )

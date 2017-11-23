@@ -76,6 +76,12 @@ function replicate-master-instance() {
 function create-master-instance-internal() {
   local gcloud="gcloud"
   local retries=5
+  local sleep_sec=10
+  if [[ "${MASTER_SIZE##*-}" -ge 64 ]]; then  # remove everything up to last dash (inclusive)
+    # Workaround for #55777
+    retries=30
+    sleep_sec=60
+  fi
   if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
     gcloud="gcloud beta"
   fi
@@ -130,7 +136,7 @@ function create-master-instance-internal() {
         echo "Failed to create master instance due to non-retryable error" >&2
         return 1
       fi
-      sleep 10
+      sleep $sleep_sec
     fi
   done
 

@@ -30,6 +30,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/volumebinder"
 )
 
 // PluginFactoryArgs are passed to all plugin factory functions.
@@ -43,7 +44,9 @@ type PluginFactoryArgs struct {
 	NodeInfo                       predicates.NodeInfo
 	PVInfo                         predicates.PersistentVolumeInfo
 	PVCInfo                        predicates.PersistentVolumeClaimInfo
-	HardPodAffinitySymmetricWeight int
+	StorageClassInfo               predicates.StorageClassInfo
+	VolumeBinder                   *volumebinder.VolumeBinder
+	HardPodAffinitySymmetricWeight int32
 }
 
 // MetadataProducerFactory produces MetadataProducer from the given args.
@@ -429,12 +432,14 @@ func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]al
 		}
 		if factory.Function != nil {
 			configs = append(configs, algorithm.PriorityConfig{
+				Name:     name,
 				Function: factory.Function(args),
 				Weight:   factory.Weight,
 			})
 		} else {
 			mapFunction, reduceFunction := factory.MapReduceFunction(args)
 			configs = append(configs, algorithm.PriorityConfig{
+				Name:   name,
 				Map:    mapFunction,
 				Reduce: reduceFunction,
 				Weight: factory.Weight,

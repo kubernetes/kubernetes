@@ -69,6 +69,7 @@ func (i *IPerfResults) ToTSV() string {
 
 // NewIPerf parses an IPerf CSV output line into an IPerfResult.
 func NewIPerf(csvLine string) *IPerfResult {
+	csvLine = strings.Trim(csvLine, "\n")
 	slice := StrSlice(strings.Split(csvLine, ","))
 	if len(slice) != 9 {
 		framework.Failf("Incorrect fields in the output: %v (%v out of 9)", slice, len(slice))

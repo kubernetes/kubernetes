@@ -153,7 +153,7 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 			// 000 - neither "zone", "zones", or "replica-zones" specified
 			// Pick a zone randomly selected from all active zones where
 			// Kubernetes cluster has a node.
-			zones, err = cloud.GetAllZones()
+			zones, err = cloud.GetAllCurrentZones()
 			if err != nil {
 				glog.V(2).Infof("error getting zone information from GCE: %v", err)
 				return "", 0, nil, "", err

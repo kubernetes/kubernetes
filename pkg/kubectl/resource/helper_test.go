@@ -385,6 +385,72 @@ func TestHelperList(t *testing.T) {
 	}
 }
 
+func TestHelperListSelectorCombination(t *testing.T) {
+	tests := []struct {
+		Name          string
+		Err           bool
+		ErrMsg        string
+		FieldSelector string
+		LabelSelector string
+	}{
+		{
+			Name: "No selector",
+			Err:  false,
+		},
+		{
+			Name:          "Only Label Selector",
+			Err:           false,
+			LabelSelector: "foo=baz",
+		},
+		{
+			Name:          "Only Field Selector",
+			Err:           false,
+			FieldSelector: "xyz=zyx",
+		},
+		{
+			Name:          "Both Label and Field Selector",
+			Err:           false,
+			LabelSelector: "foo=baz",
+			FieldSelector: "xyz=zyx",
+		},
+	}
+
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     header(),
+		Body: objBody(&corev1.PodList{
+			Items: []corev1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			},
+			},
+		}),
+	}
+	client := &fake.RESTClient{
+		NegotiatedSerializer: scheme.Codecs,
+		Resp:                 resp,
+		Err:                  nil,
+	}
+	modifier := &Helper{
+		RESTClient:      client,
+		NamespaceScoped: true,
+	}
+
+	for _, test := range tests {
+		_, err := modifier.List("bar",
+			corev1GV.String(),
+			false,
+			&metav1.ListOptions{LabelSelector: test.LabelSelector, FieldSelector: test.FieldSelector})
+		if test.Err {
+			if err == nil {
+				t.Errorf("%q expected error: %q", test.Name, test.ErrMsg)
+			}
+			if err != nil && err.Error() != test.ErrMsg {
+				t.Errorf("%q expected error: %q", test.Name, test.ErrMsg)
+			}
+		}
+	}
+}
+
 func TestHelperReplace(t *testing.T) {
 	expectPut := func(path string, req *http.Request) bool {
 		if req.Method != "PUT" {

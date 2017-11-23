@@ -33,8 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api"
-	apivalidation "k8s.io/kubernetes/pkg/api/validation"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
@@ -325,9 +325,7 @@ func ValidateDeploymentStatus(status *extensions.DeploymentStatus, fldPath *fiel
 	if status.AvailableReplicas > status.Replicas {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), status.AvailableReplicas, msg))
 	}
-	// TODO: ReadyReplicas is introduced in 1.6 and this check breaks the Deployment controller when pre-1.6 clusters get upgraded.
-	// 		 Remove the comparison to zero once we stop supporting upgrades from 1.5.
-	if status.ReadyReplicas > 0 && status.AvailableReplicas > status.ReadyReplicas {
+	if status.AvailableReplicas > status.ReadyReplicas {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), status.AvailableReplicas, "cannot be greater than readyReplicas"))
 	}
 	return allErrs
@@ -353,7 +351,7 @@ func ValidateDeploymentStatusUpdate(update, old *extensions.Deployment) field.Er
 	return allErrs
 }
 
-// TODO: Move in "k8s.io/kubernetes/pkg/api/validation"
+// TODO: Move in "k8s.io/kubernetes/pkg/apis/core/validation"
 func isDecremented(update, old *int32) bool {
 	if update == nil && old != nil {
 		return true
@@ -522,17 +520,6 @@ func validateIngressBackend(backend *extensions.IngressBackend, fldPath *field.P
 	return allErrs
 }
 
-func ValidateScale(scale *extensions.Scale) field.ErrorList {
-	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&scale.ObjectMeta, true, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
-
-	if scale.Spec.Replicas < 0 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "replicas"), scale.Spec.Replicas, "must be greater than or equal to 0"))
-	}
-
-	return allErrs
-}
-
 // ValidateReplicaSetName can be used to check whether the given ReplicaSet
 // name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
@@ -668,6 +655,7 @@ func ValidatePodSecurityPolicySpec(spec *extensions.PodSecurityPolicySpec, fldPa
 	allErrs = append(allErrs, validatePSPCapsAgainstDrops(spec.RequiredDropCapabilities, spec.AllowedCapabilities, field.NewPath("allowedCapabilities"))...)
 	allErrs = append(allErrs, validatePSPDefaultAllowPrivilegeEscalation(fldPath.Child("defaultAllowPrivilegeEscalation"), spec.DefaultAllowPrivilegeEscalation, spec.AllowPrivilegeEscalation)...)
 	allErrs = append(allErrs, validatePSPAllowedHostPaths(fldPath.Child("allowedHostPaths"), spec.AllowedHostPaths)...)
+	allErrs = append(allErrs, validatePSPAllowedFlexVolumes(fldPath.Child("allowedFlexVolumes"), spec.AllowedFlexVolumes)...)
 
 	return allErrs
 }
@@ -731,6 +719,20 @@ func validatePSPAllowedHostPaths(fldPath *field.Path, allowedHostPaths []extensi
 		}
 	}
 
+	return allErrs
+}
+
+// validatePSPAllowedFlexVolumes
+func validatePSPAllowedFlexVolumes(fldPath *field.Path, flexVolumes []extensions.AllowedFlexVolume) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(flexVolumes) > 0 {
+		for idx, fv := range flexVolumes {
+			if len(fv.Driver) == 0 {
+				allErrs = append(allErrs, field.Required(fldPath.Child("allowedFlexVolumes").Index(idx).Child("driver"),
+					"must specify a driver"))
+			}
+		}
+	}
 	return allErrs
 }
 
@@ -815,7 +817,6 @@ func validatePodSecurityPolicyVolumes(fldPath *field.Path, volumes []extensions.
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("volumes"), v, allowed.List()))
 		}
 	}
-
 	return allErrs
 }
 

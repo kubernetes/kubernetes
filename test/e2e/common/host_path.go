@@ -40,6 +40,12 @@ var _ = Describe("[sig-storage] HostPath", func() {
 		_ = os.Remove("/tmp/test-file")
 	})
 
+	/*
+		    Testname: volume-hostpath-mode
+		    Description: For a Pod created with a 'HostPath' Volume, ensure the
+			volume is a directory with 0777 unix file permissions and that is has
+			the sticky bit (mode flag t) set.
+	*/
 	framework.ConformanceIt("should give a volume the correct mode", func() {
 		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
@@ -51,7 +57,7 @@ var _ = Describe("[sig-storage] HostPath", func() {
 			fmt.Sprintf("--file_mode=%v", volumePath),
 		}
 		f.TestContainerOutput("hostPath mode", pod, 0, []string{
-			"mode of file \"/test-volume\": dtrwxrwxrwx", // we expect the sticky bit (mode flag t) to be set for the dir
+			"mode of file \"/test-volume\": dtrwxrwx", // we expect the sticky bit (mode flag t) to be set for the dir
 		})
 	})
 

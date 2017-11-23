@@ -33,8 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
@@ -233,10 +233,10 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		},
 	}
 	nodeTaints := make([]v1.Taint, 0)
-	if len(kl.kubeletConfiguration.RegisterWithTaints) > 0 {
-		taints := make([]v1.Taint, len(kl.kubeletConfiguration.RegisterWithTaints))
-		for i := range kl.kubeletConfiguration.RegisterWithTaints {
-			if err := k8s_api_v1.Convert_api_Taint_To_v1_Taint(&kl.kubeletConfiguration.RegisterWithTaints[i], &taints[i], nil); err != nil {
+	if len(kl.registerWithTaints) > 0 {
+		taints := make([]v1.Taint, len(kl.registerWithTaints))
+		for i := range kl.registerWithTaints {
+			if err := k8s_api_v1.Convert_core_Taint_To_v1_Taint(&kl.registerWithTaints[i], &taints[i], nil); err != nil {
 				return nil, err
 			}
 		}
@@ -437,7 +437,7 @@ func (kl *Kubelet) recordNodeStatusEvent(eventType, event string) {
 // Set IP and hostname addresses for the node.
 func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 	if kl.nodeIP != nil {
-		if err := kl.validateNodeIP(); err != nil {
+		if err := validateNodeIP(kl.nodeIP); err != nil {
 			return fmt.Errorf("failed to validate nodeIP: %v", err)
 		}
 		glog.V(2).Infof("Using node IP: %q", kl.nodeIP.String())
@@ -503,7 +503,8 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 
 		// 1) Use nodeIP if set
 		// 2) If the user has specified an IP to HostnameOverride, use it
-		// 3) Lookup the IP from node name by DNS and use the first non-loopback ipv4 address
+		// 3) Lookup the IP from node name by DNS and use the first valid IPv4 address.
+		//    If the node does not have a valid IPv4 address, use the first valid IPv6 address.
 		// 4) Try to get the IP from the network interface used as default gateway
 		if kl.nodeIP != nil {
 			ipAddr = kl.nodeIP
@@ -511,11 +512,16 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 			ipAddr = addr
 		} else {
 			var addrs []net.IP
-			addrs, err = net.LookupIP(node.Name)
+			addrs, _ = net.LookupIP(node.Name)
 			for _, addr := range addrs {
-				if !addr.IsLoopback() && addr.To4() != nil {
-					ipAddr = addr
-					break
+				if err = validateNodeIP(addr); err == nil {
+					if addr.To4() != nil {
+						ipAddr = addr
+						break
+					}
+					if addr.To16() != nil && ipAddr == nil {
+						ipAddr = addr
+					}
 				}
 			}
 
@@ -595,14 +601,16 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 			}
 		}
 
-		currentCapacity := kl.containerManager.GetCapacity()
-		if currentCapacity != nil {
-			for k, v := range currentCapacity {
-				if v1helper.IsExtendedResourceName(k) {
-					glog.V(2).Infof("Update capacity for %s to %d", k, v.Value())
-					node.Status.Capacity[k] = v
-				}
+		devicePluginCapacity, removedDevicePlugins := kl.containerManager.GetDevicePluginResourceCapacity()
+		if devicePluginCapacity != nil {
+			for k, v := range devicePluginCapacity {
+				glog.V(2).Infof("Update capacity for %s to %d", k, v.Value())
+				node.Status.Capacity[k] = v
 			}
+		}
+		for _, removedResource := range removedDevicePlugins {
+			glog.V(2).Infof("Remove capacity for %s", removedResource)
+			delete(node.Status.Capacity, v1.ResourceName(removedResource))
 		}
 	}
 
@@ -991,17 +999,22 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 }
 
 // Validate given node IP belongs to the current host
-func (kl *Kubelet) validateNodeIP() error {
-	if kl.nodeIP == nil {
-		return nil
-	}
-
+func validateNodeIP(nodeIP net.IP) error {
 	// Honor IP limitations set in setNodeStatus()
-	if kl.nodeIP.IsLoopback() {
+	if nodeIP.To4() == nil && nodeIP.To16() == nil {
+		return fmt.Errorf("nodeIP must be a valid IP address")
+	}
+	if nodeIP.IsLoopback() {
 		return fmt.Errorf("nodeIP can't be loopback address")
 	}
-	if kl.nodeIP.To4() == nil {
-		return fmt.Errorf("nodeIP must be IPv4 address")
+	if nodeIP.IsMulticast() {
+		return fmt.Errorf("nodeIP can't be a multicast address")
+	}
+	if nodeIP.IsLinkLocalUnicast() {
+		return fmt.Errorf("nodeIP can't be a link-local unicast address")
+	}
+	if nodeIP.IsUnspecified() {
+		return fmt.Errorf("nodeIP can't be an all zeros address")
 	}
 
 	addrs, err := net.InterfaceAddrs()
@@ -1016,9 +1029,9 @@ func (kl *Kubelet) validateNodeIP() error {
 		case *net.IPAddr:
 			ip = v.IP
 		}
-		if ip != nil && ip.Equal(kl.nodeIP) {
+		if ip != nil && ip.Equal(nodeIP) {
 			return nil
 		}
 	}
-	return fmt.Errorf("Node IP: %q not found in the host's network interfaces", kl.nodeIP.String())
+	return fmt.Errorf("Node IP: %q not found in the host's network interfaces", nodeIP.String())
 }

@@ -18,6 +18,7 @@ package manager
 import (
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"path"
 	"strconv"
@@ -25,9 +26,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/cadvisor/accelerators"
 	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
+	"github.com/google/cadvisor/container/containerd"
 	"github.com/google/cadvisor/container/crio"
 	"github.com/google/cadvisor/container/docker"
 	"github.com/google/cadvisor/container/raw"
@@ -45,10 +48,9 @@ import (
 	"github.com/google/cadvisor/utils/sysfs"
 	"github.com/google/cadvisor/version"
 
-	"net/http"
-
 	"github.com/golang/glog"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"k8s.io/utils/clock"
 )
 
 var globalHousekeepingInterval = flag.Duration("global_housekeeping_interval", 1*time.Minute, "Interval between global housekeepings")
@@ -148,13 +150,19 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingIn
 	}
 	glog.Infof("cAdvisor running in container: %q", selfContainer)
 
-	dockerStatus, err := docker.Status()
-	if err != nil {
+	var (
+		dockerStatus info.DockerStatus
+		rktPath      string
+	)
+	if tempDockerStatus, err := docker.Status(); err != nil {
 		glog.Warningf("Unable to connect to Docker: %v", err)
+	} else {
+		dockerStatus = tempDockerStatus
 	}
-	rktPath, err := rkt.RktPath()
-	if err != nil {
+	if tmpRktPath, err := rkt.RktPath(); err != nil {
 		glog.Warningf("unable to connect to Rkt api service: %v", err)
+	} else {
+		rktPath = tmpRktPath
 	}
 
 	crioClient, err := crio.Client()
@@ -206,6 +214,7 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingIn
 		containerWatchers:        []watcher.ContainerWatcher{},
 		eventsChannel:            eventsChannel,
 		collectorHttpClient:      collectorHttpClient,
+		nvidiaManager:            &accelerators.NvidiaManager{},
 	}
 
 	machineInfo, err := machine.Info(sysfs, fsInfo, inHostNamespace)
@@ -251,6 +260,7 @@ type manager struct {
 	containerWatchers        []watcher.ContainerWatcher
 	eventsChannel            chan watcher.ContainerEvent
 	collectorHttpClient      *http.Client
+	nvidiaManager            accelerators.AcceleratorManager
 }
 
 // Start the container manager.
@@ -269,6 +279,11 @@ func (self *manager) Start() error {
 			return err
 		}
 		self.containerWatchers = append(self.containerWatchers, watcher)
+	}
+
+	err = containerd.Register(self, self.fsInfo, self.ignoreMetrics)
+	if err != nil {
+		glog.Warningf("Registration of the containerd container factory failed: %v", err)
 	}
 
 	err = crio.Register(self, self.fsInfo, self.ignoreMetrics)
@@ -303,6 +318,9 @@ func (self *manager) Start() error {
 		return nil
 	}
 
+	// Setup collection of nvidia GPU metrics if any of them are attached to the machine.
+	self.nvidiaManager.Setup()
+
 	// Create root and then recover all containers.
 	err = self.createContainer("/", watcher.Raw)
 	if err != nil {
@@ -332,6 +350,7 @@ func (self *manager) Start() error {
 }
 
 func (self *manager) Stop() error {
+	defer self.nvidiaManager.Destroy()
 	// Stop and wait on all quit channels.
 	for i, c := range self.quitChannels {
 		// Send the exit signal and wait on the thread to exit (by closing the channel).
@@ -695,6 +714,18 @@ func (self *manager) getRequestedContainers(containerName string, options v2.Req
 	default:
 		return containersMap, fmt.Errorf("invalid request type %q", options.IdType)
 	}
+	if options.MaxAge != nil {
+		// update stats for all containers in containersMap
+		var waitGroup sync.WaitGroup
+		waitGroup.Add(len(containersMap))
+		for _, container := range containersMap {
+			go func(cont *containerData) {
+				cont.OnDemandHousekeeping(*options.MaxAge)
+				waitGroup.Done()
+			}(container)
+		}
+		waitGroup.Wait()
+	}
 	return containersMap, nil
 }
 
@@ -792,6 +823,8 @@ func (m *manager) Exists(containerName string) bool {
 func (m *manager) GetProcessList(containerName string, options v2.RequestOptions) ([]v2.ProcessInfo, error) {
 	// override recursive. Only support single container listing.
 	options.Recursive = false
+	// override MaxAge.  ProcessList does not require updated stats.
+	options.MaxAge = nil
 	conts, err := m.getRequestedContainers(containerName, options)
 	if err != nil {
 		return nil, err
@@ -907,9 +940,18 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 	}
 
 	logUsage := *logCadvisorUsage && containerName == m.cadvisorContainer
-	cont, err := newContainerData(containerName, m.memoryCache, handler, logUsage, collectorManager, m.maxHousekeepingInterval, m.allowDynamicHousekeeping)
+	cont, err := newContainerData(containerName, m.memoryCache, handler, logUsage, collectorManager, m.maxHousekeepingInterval, m.allowDynamicHousekeeping, clock.RealClock{})
 	if err != nil {
 		return err
+	}
+	devicesCgroupPath, err := handler.GetCgroupPath("devices")
+	if err != nil {
+		glog.Infof("Error getting devices cgroup path: %v", err)
+	} else {
+		cont.nvidiaCollector, err = m.nvidiaManager.GetCollector(devicesCgroupPath)
+		if err != nil {
+			glog.Infof("GPU metrics may be unavailable/incomplete for container %q: %v", cont.info.Name, err)
+		}
 	}
 
 	// Add collectors

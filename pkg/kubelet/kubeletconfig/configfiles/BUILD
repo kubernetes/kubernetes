@@ -44,7 +44,6 @@ go_test(
         "//pkg/kubelet/kubeletconfig/util/files:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/test:go_default_library",
         "//pkg/util/filesystem:go_default_library",
-        "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
     ],
 )

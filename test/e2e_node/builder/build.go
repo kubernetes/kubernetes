@@ -34,6 +34,7 @@ var buildTargets = []string{
 	"cmd/kubelet",
 	"test/e2e_node/e2e_node.test",
 	"vendor/github.com/onsi/ginkgo/ginkgo",
+	"cluster/gce/gci/mounter",
 }
 
 func BuildGo() error {

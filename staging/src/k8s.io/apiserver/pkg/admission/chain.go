@@ -16,7 +16,8 @@ limitations under the License.
 
 package admission
 
-// chainAdmissionHandler is an instance of admission.Interface that performs admission control using a chain of admission handlers
+// chainAdmissionHandler is an instance of admission.NamedHandler that performs admission control using
+// a chain of admission handlers
 type chainAdmissionHandler []Interface
 
 // NewChainHandler creates a new chain handler from an array of handlers. Used for testing.

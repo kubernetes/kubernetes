@@ -35,6 +35,7 @@ func TestIPPart(t *testing.T) {
 		{"[2001:db8::2:2]:9999", "2001:db8::2:2", noError},
 		{"1.2.3.4::9999", "", "too many colons"},
 		{"1.2.3.4:[0]", "", "unexpected '[' in address"},
+		{"1.2.3:8080", "", "invalid ip part"},
 	}
 
 	for _, tc := range testCases {

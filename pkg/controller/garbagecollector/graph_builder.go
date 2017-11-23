@@ -230,7 +230,7 @@ func (gb *GraphBuilder) syncMonitors(resources map[schema.GroupVersionResource]s
 	kept := 0
 	added := 0
 	for resource := range resources {
-		if _, ok := ignoredResources[resource.GroupResource()]; ok {
+		if _, ok := gb.ignoredResources[resource.GroupResource()]; ok {
 			continue
 		}
 		if m, ok := toRemove[resource]; ok {
@@ -342,6 +342,9 @@ func (gb *GraphBuilder) Run(stopCh <-chan struct{}) {
 			close(monitor.stopCh)
 		}
 	}
+
+	// reset monitors so that the graph builder can be safely re-run/synced.
+	gb.monitors = nil
 	glog.Infof("stopped %d of %d monitors", stopped, len(monitors))
 }
 

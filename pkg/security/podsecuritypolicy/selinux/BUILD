@@ -16,7 +16,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/security/podsecuritypolicy/selinux",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
@@ -31,7 +31,7 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/security/podsecuritypolicy/selinux",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",
     ],
 )

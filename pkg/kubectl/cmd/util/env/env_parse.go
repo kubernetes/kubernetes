@@ -24,8 +24,8 @@ import (
 	"regexp"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 // Env returns an environment variable if not nil, or a default value.
@@ -83,8 +83,8 @@ func SplitEnvironmentFromResources(args []string) (resources, envArgs []string, 
 
 // parseIntoEnvVar parses the list of key-value pairs into kubernetes EnvVar.
 // envVarType is for making errors more specific to user intentions.
-func parseIntoEnvVar(spec []string, defaultReader io.Reader, envVarType string) ([]api.EnvVar, []string, error) {
-	env := []api.EnvVar{}
+func parseIntoEnvVar(spec []string, defaultReader io.Reader, envVarType string) ([]v1.EnvVar, []string, error) {
+	env := []v1.EnvVar{}
 	exists := sets.NewString()
 	var remove []string
 	for _, envSpec := range spec {
@@ -106,7 +106,7 @@ func parseIntoEnvVar(spec []string, defaultReader io.Reader, envVarType string) 
 				return nil, nil, fmt.Errorf("invalid %s: %v", envVarType, envSpec)
 			}
 			exists.Insert(parts[0])
-			env = append(env, api.EnvVar{
+			env = append(env, v1.EnvVar{
 				Name:  parts[0],
 				Value: parts[1],
 			})
@@ -126,12 +126,12 @@ func parseIntoEnvVar(spec []string, defaultReader io.Reader, envVarType string) 
 
 // ParseEnv parses the elements of the first argument looking for environment variables in key=value form and, if one of those values is "-", it also scans the reader.
 // The same environment variable cannot be both modified and removed in the same command.
-func ParseEnv(spec []string, defaultReader io.Reader) ([]api.EnvVar, []string, error) {
+func ParseEnv(spec []string, defaultReader io.Reader) ([]v1.EnvVar, []string, error) {
 	return parseIntoEnvVar(spec, defaultReader, "environment variable")
 }
 
-func readEnv(r io.Reader, envVarType string) ([]api.EnvVar, error) {
-	env := []api.EnvVar{}
+func readEnv(r io.Reader, envVarType string) ([]v1.EnvVar, error) {
+	env := []v1.EnvVar{}
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		envSpec := scanner.Text()
@@ -143,7 +143,7 @@ func readEnv(r io.Reader, envVarType string) ([]api.EnvVar, error) {
 			if len(parts) != 2 {
 				return nil, fmt.Errorf("invalid %s: %v", envVarType, envSpec)
 			}
-			env = append(env, api.EnvVar{
+			env = append(env, v1.EnvVar{
 				Name:  parts[0],
 				Value: parts[1],
 			})

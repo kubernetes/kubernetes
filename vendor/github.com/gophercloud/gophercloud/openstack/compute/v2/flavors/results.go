@@ -12,6 +12,8 @@ type commonResult struct {
 	gophercloud.Result
 }
 
+// CreateResult is the response of a Get operations. Call its Extract method to
+// interpret it as a Flavor.
 type CreateResult struct {
 	commonResult
 }
@@ -130,4 +132,33 @@ func ExtractFlavors(r pagination.Page) ([]Flavor, error) {
 	}
 	err := (r.(FlavorPage)).ExtractInto(&s)
 	return s.Flavors, err
+}
+
+// AccessPage contains a single page of all FlavorAccess entries for a flavor.
+type AccessPage struct {
+	pagination.SinglePageBase
+}
+
+// IsEmpty indicates whether an AccessPage is empty.
+func (page AccessPage) IsEmpty() (bool, error) {
+	v, err := ExtractAccesses(page)
+	return len(v) == 0, err
+}
+
+// ExtractAccesses interprets a page of results as a slice of FlavorAccess.
+func ExtractAccesses(r pagination.Page) ([]FlavorAccess, error) {
+	var s struct {
+		FlavorAccesses []FlavorAccess `json:"flavor_access"`
+	}
+	err := (r.(AccessPage)).ExtractInto(&s)
+	return s.FlavorAccesses, err
+}
+
+// FlavorAccess represents an ACL of tenant access to a specific Flavor.
+type FlavorAccess struct {
+	// FlavorID is the unique ID of the flavor.
+	FlavorID string `json:"flavor_id"`
+
+	// TenantID is the unique ID of the tenant.
+	TenantID string `json:"tenant_id"`
 }

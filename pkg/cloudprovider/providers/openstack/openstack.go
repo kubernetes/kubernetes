@@ -42,7 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	certutil "k8s.io/client-go/util/cert"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 )
@@ -74,11 +74,13 @@ func (d *MyDuration) UnmarshalText(text []byte) error {
 type LoadBalancer struct {
 	network *gophercloud.ServiceClient
 	compute *gophercloud.ServiceClient
+	lb      *gophercloud.ServiceClient
 	opts    LoadBalancerOpts
 }
 
 type LoadBalancerOpts struct {
 	LBVersion            string     `gcfg:"lb-version"`          // overrides autodetection. Only support v2.
+	UseOctavia           bool       `gcfg:"use-octavia"`         // uses Octavia V2 service catalog endpoint
 	SubnetId             string     `gcfg:"subnet-id"`           // overrides autodetection.
 	FloatingNetworkId    string     `gcfg:"floating-network-id"` // If specified, will create floating ip for loadbalancer, or do not create floating ip.
 	LBMethod             string     `gcfg:"lb-method"`           // default to ROUND_ROBIN.
@@ -507,6 +509,11 @@ func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 		return nil, false
 	}
 
+	lb, err := os.NewLoadBalancerV2()
+	if err != nil {
+		return nil, false
+	}
+
 	// LBaaS v1 is deprecated in the OpenStack Liberty release.
 	// Currently kubernetes OpenStack cloud provider just support LBaaS v2.
 	lbVersion := os.lbOpts.LBVersion
@@ -517,7 +524,7 @@ func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 
 	glog.V(1).Info("Claiming to support LoadBalancer")
 
-	return &LbaasV2{LoadBalancer{network, compute, os.lbOpts}}, true
+	return &LbaasV2{LoadBalancer{network, compute, lb, os.lbOpts}}, true
 }
 
 func isNotFound(err error) bool {

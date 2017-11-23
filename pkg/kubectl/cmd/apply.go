@@ -37,11 +37,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api"
+	oapi "k8s.io/kube-openapi/pkg/util/proto"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -127,6 +129,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cob
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().Bool("all", false, "Select all resources in the namespace of the specified resource types.")
 	cmd.Flags().StringArray("prune-whitelist", []string{}, "Overwrite the default whitelist with <group/version/kind> for --prune")
+	cmd.Flags().Bool("openapi-patch", true, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
@@ -193,39 +196,41 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		return err
 	}
 
+	var openapiSchema openapi.Resources
+	if cmdutil.GetFlagBool(cmd, "openapi-patch") {
+		openapiSchema, err = f.OpenAPISchema()
+		if err != nil {
+			openapiSchema = nil
+		}
+	}
+
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
-	}
-
-	mapper, typer, err := f.UnstructuredObject()
-	if err != nil {
-		return err
-	}
-
-	if options.Prune {
-		options.PruneResources, err = parsePruneResources(mapper, cmdutil.GetFlagStringArray(cmd, "prune-whitelist"))
-		if err != nil {
-			return err
-		}
 	}
 
 	// include the uninitialized objects by default if --prune is true
 	// unless explicitly set --include-uninitialized=false
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, options.Prune)
 	r := f.NewBuilder().
-		Unstructured(f.UnstructuredClientForMapping, mapper, typer).
+		Unstructured().
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
-		SelectorParam(options.Selector).
+		LabelSelectorParam(options.Selector).
 		IncludeUninitialized(includeUninitialized).
 		Flatten().
 		Do()
-	err = r.Err()
-	if err != nil {
+	if err := r.Err(); err != nil {
 		return err
+	}
+
+	if options.Prune {
+		options.PruneResources, err = parsePruneResources(r.Mapper().RESTMapper, cmdutil.GetFlagStringArray(cmd, "prune-whitelist"))
+		if err != nil {
+			return err
+		}
 	}
 
 	dryRun := cmdutil.GetFlagBool(cmd, "dry-run")
@@ -234,14 +239,13 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 	encoder := f.JSONEncoder()
 	decoder := f.Decoder(false)
+	mapper := r.Mapper().RESTMapper
 
 	visitedUids := sets.NewString()
 	visitedNamespaces := sets.NewString()
 
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
-		// In this method, info.Object contains the object retrieved from the server
-		// and info.VersionedObject contains the object decoded from the input source.
 		if err != nil {
 			return err
 		}
@@ -252,10 +256,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 		// Add change-cause annotation to resource info if it should be recorded
 		if cmdutil.ShouldRecord(cmd, info) {
-			recordInObj := info.VersionedObject
-			if info.VersionedObject == nil {
-				recordInObj = info.Object
-			}
+			recordInObj := info.Object
 			if err := cmdutil.RecordChangeCause(recordInObj, f.Command(cmd, false)); err != nil {
 				glog.V(4).Infof("error recording current command: %v", err)
 			}
@@ -293,9 +294,9 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 			count++
 			if len(output) > 0 && !shortOutput {
-				return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
+				return f.PrintResourceInfoForCommand(cmd, info, out)
 			}
-			cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
+			f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
 			return nil
 		}
 
@@ -322,9 +323,10 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 				cascade:       options.Cascade,
 				timeout:       options.Timeout,
 				gracePeriod:   options.GracePeriod,
+				openapiSchema: openapiSchema,
 			}
 
-			patchBytes, patchedObject, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name)
+			patchBytes, patchedObject, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name, errOut)
 			if err != nil {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
 			}
@@ -339,15 +341,15 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 			if string(patchBytes) == "{}" {
 				count++
-				cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "unchanged")
+				f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "unchanged")
 				return nil
 			}
 		}
 		count++
 		if len(output) > 0 && !shortOutput {
-			return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
+			return f.PrintResourceInfoForCommand(cmd, info, out)
 		}
-		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "configured")
+		f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "configured")
 		return nil
 	})
 
@@ -367,8 +369,8 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		clientFunc:    f.UnstructuredClientForMapping,
 		clientsetFunc: f.ClientSet,
 
-		selector:    options.Selector,
-		visitedUids: visitedUids,
+		labelSelector: options.Selector,
+		visitedUids:   visitedUids,
 
 		cascade:     options.Cascade,
 		dryRun:      dryRun,
@@ -384,13 +386,13 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 	for n := range visitedNamespaces {
 		for _, m := range namespacedRESTMappings {
-			if err := p.prune(n, m, shortOutput, includeUninitialized); err != nil {
+			if err := p.prune(f, n, m, shortOutput, includeUninitialized); err != nil {
 				return fmt.Errorf("error pruning namespaced object %v: %v", m.GroupVersionKind, err)
 			}
 		}
 	}
 	for _, m := range nonNamespacedRESTMappings {
-		if err := p.prune(metav1.NamespaceNone, m, shortOutput, includeUninitialized); err != nil {
+		if err := p.prune(f, metav1.NamespaceNone, m, shortOutput, includeUninitialized); err != nil {
 			return fmt.Errorf("error pruning nonNamespaced object %v: %v", m.GroupVersionKind, err)
 		}
 	}
@@ -453,8 +455,9 @@ type pruner struct {
 	clientFunc    resource.ClientMapperFunc
 	clientsetFunc func() (internalclientset.Interface, error)
 
-	visitedUids sets.String
-	selector    string
+	visitedUids   sets.String
+	labelSelector string
+	fieldSelector string
 
 	cascade     bool
 	dryRun      bool
@@ -463,7 +466,7 @@ type pruner struct {
 	out io.Writer
 }
 
-func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, shortOutput, includeUninitialized bool) error {
+func (p *pruner) prune(f cmdutil.Factory, namespace string, mapping *meta.RESTMapping, shortOutput, includeUninitialized bool) error {
 	c, err := p.clientFunc(mapping)
 	if err != nil {
 		return err
@@ -474,7 +477,8 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, shortOutput,
 		mapping.GroupVersionKind.Version,
 		false,
 		&metav1.ListOptions{
-			LabelSelector:        p.selector,
+			LabelSelector:        p.labelSelector,
+			FieldSelector:        p.fieldSelector,
 			IncludeUninitialized: includeUninitialized,
 		},
 	)
@@ -512,7 +516,7 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, shortOutput,
 				return err
 			}
 		}
-		cmdutil.PrintSuccess(p.mapper, shortOutput, p.out, mapping.Resource, name, p.dryRun, "pruned")
+		f.PrintSuccess(p.mapper, shortOutput, p.out, mapping.Resource, name, p.dryRun, "pruned")
 	}
 	return nil
 }
@@ -578,9 +582,11 @@ type patcher struct {
 	cascade     bool
 	timeout     time.Duration
 	gracePeriod int
+
+	openapiSchema openapi.Resources
 }
 
-func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string) ([]byte, runtime.Object, error) {
+func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
 	// Serialize the current configuration of the object from the server.
 	current, err := runtime.Encode(p.encoder, obj)
 	if err != nil {
@@ -593,33 +599,55 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf("retrieving original configuration from:\n%v\nfor:", obj), source, err)
 	}
 
-	// Create the versioned struct from the type defined in the restmapping
-	// (which is the API version we'll be submitting the patch to)
-	versionedObject, err := scheme.Scheme.New(p.mapping.GroupVersionKind)
 	var patchType types.PatchType
 	var patch []byte
+	var lookupPatchMeta strategicpatch.LookupPatchMeta
+	var schema oapi.Schema
 	createPatchErrFormat := "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor:"
-	switch {
-	case runtime.IsNotRegisteredError(err):
-		// fall back to generic JSON merge patch
-		patchType = types.MergePatchType
-		preconditions := []mergepatch.PreconditionFunc{mergepatch.RequireKeyUnchanged("apiVersion"),
-			mergepatch.RequireKeyUnchanged("kind"), mergepatch.RequireMetadataKeyUnchanged("name")}
-		patch, err = jsonmergepatch.CreateThreeWayJSONMergePatch(original, modified, current, preconditions...)
-		if err != nil {
-			if mergepatch.IsPreconditionFailed(err) {
-				return nil, nil, fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed")
+	// Try to use openapi first if the openapi spec is available and can successfully calculate the patch.
+	// Otherwise, fall back to baked-in types.
+	if p.openapiSchema != nil {
+		if schema = p.openapiSchema.LookupResource(p.mapping.GroupVersionKind); schema != nil {
+			lookupPatchMeta = strategicpatch.PatchMetaFromOpenAPI{Schema: schema}
+			if openapiPatch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, lookupPatchMeta, p.overwrite); err != nil {
+				fmt.Fprintf(errOut, "warning: error calculating patch from openapi spec: %v\n", err)
+			} else {
+				patchType = types.StrategicMergePatchType
+				patch = openapiPatch
 			}
-			return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf(createPatchErrFormat, original, modified, current), source, err)
 		}
-	case err != nil:
-		return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf("getting instance of versioned object for %v:", p.mapping.GroupVersionKind), source, err)
-	case err == nil:
-		// Compute a three way strategic merge patch to send to server.
-		patchType = types.StrategicMergePatchType
-		patch, err = strategicpatch.CreateThreeWayMergePatch(original, modified, current, versionedObject, p.overwrite)
-		if err != nil {
-			return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf(createPatchErrFormat, original, modified, current), source, err)
+	}
+
+	if patch == nil {
+		// Create the versioned struct from the type defined in the restmapping
+		// (which is the API version we'll be submitting the patch to)
+		versionedObject, err := scheme.Scheme.New(p.mapping.GroupVersionKind)
+		switch {
+		case runtime.IsNotRegisteredError(err):
+			// fall back to generic JSON merge patch
+			patchType = types.MergePatchType
+			preconditions := []mergepatch.PreconditionFunc{mergepatch.RequireKeyUnchanged("apiVersion"),
+				mergepatch.RequireKeyUnchanged("kind"), mergepatch.RequireMetadataKeyUnchanged("name")}
+			patch, err = jsonmergepatch.CreateThreeWayJSONMergePatch(original, modified, current, preconditions...)
+			if err != nil {
+				if mergepatch.IsPreconditionFailed(err) {
+					return nil, nil, fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed")
+				}
+				return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf(createPatchErrFormat, original, modified, current), source, err)
+			}
+		case err != nil:
+			return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf("getting instance of versioned object for %v:", p.mapping.GroupVersionKind), source, err)
+		case err == nil:
+			// Compute a three way strategic merge patch to send to server.
+			patchType = types.StrategicMergePatchType
+			lookupPatchMeta, err = strategicpatch.NewPatchMetaFromStruct(versionedObject)
+			if err != nil {
+				return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf(createPatchErrFormat, original, modified, current), source, err)
+			}
+			patch, err = strategicpatch.CreateThreeWayMergePatch(original, modified, current, lookupPatchMeta, p.overwrite)
+			if err != nil {
+				return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf(createPatchErrFormat, original, modified, current), source, err)
+			}
 		}
 	}
 
@@ -631,9 +659,9 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 	return patch, patchedObj, err
 }
 
-func (p *patcher) patch(current runtime.Object, modified []byte, source, namespace, name string) ([]byte, runtime.Object, error) {
+func (p *patcher) patch(current runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
 	var getErr error
-	patchBytes, patchObject, err := p.patchSimple(current, modified, source, namespace, name)
+	patchBytes, patchObject, err := p.patchSimple(current, modified, source, namespace, name, errOut)
 	for i := 1; i <= maxPatchRetry && errors.IsConflict(err); i++ {
 		if i > triesBeforeBackOff {
 			p.backOff.Sleep(backOffPeriod)
@@ -642,7 +670,7 @@ func (p *patcher) patch(current runtime.Object, modified []byte, source, namespa
 		if getErr != nil {
 			return nil, nil, getErr
 		}
-		patchBytes, patchObject, err = p.patchSimple(current, modified, source, namespace, name)
+		patchBytes, patchObject, err = p.patchSimple(current, modified, source, namespace, name, errOut)
 	}
 	if err != nil && p.force {
 		patchBytes, patchObject, err = p.deleteAndCreate(modified, namespace, name)

@@ -458,3 +458,32 @@ func TestValidateFeatureGates(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateIgnorePreflightErrors(t *testing.T) {
+	var tests = []struct {
+		ignorePreflightErrors []string
+		skipPreflightChecks   bool
+		expectedLen           int
+		expectedError         bool
+	}{
+		{[]string{}, false, 0, false},                             // empty list, no old skip-preflight-checks
+		{[]string{}, true, 1, false},                              // empty list, old skip-preflight-checks
+		{[]string{"check1", "check2"}, false, 2, false},           // non-duplicate
+		{[]string{"check1", "check2"}, true, 3, true},             // non-duplicate, but skip-preflight-checks
+		{[]string{"check1", "check2", "check1"}, false, 2, false}, // duplicates
+		{[]string{"check1", "check2", "all"}, false, 3, true},     // non-duplicate, but 'all' present together wth individual checks
+		{[]string{"all"}, false, 1, false},                        // skip all checks by using new flag
+		{[]string{"all"}, true, 1, false},                         // skip all checks by using both old and new flags at the same time
+	}
+	for _, rt := range tests {
+		result, err := ValidateIgnorePreflightErrors(rt.ignorePreflightErrors, rt.skipPreflightChecks)
+		switch {
+		case err != nil && !rt.expectedError:
+			t.Errorf("ValidateIgnorePreflightErrors: unexpected error for input (%s, %v), error: %v", rt.ignorePreflightErrors, rt.skipPreflightChecks, err)
+		case err == nil && rt.expectedError:
+			t.Errorf("ValidateIgnorePreflightErrors: expected error for input (%s, %v) but got: %v", rt.ignorePreflightErrors, rt.skipPreflightChecks, result)
+		case result.Len() != rt.expectedLen:
+			t.Errorf("ValidateIgnorePreflightErrors: expected Len = %d for input (%s, %v) but got: %v, %v", rt.expectedLen, rt.ignorePreflightErrors, rt.skipPreflightChecks, result.Len(), result)
+		}
+	}
+}

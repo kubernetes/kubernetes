@@ -39,6 +39,16 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const (
+	// These defaults are deprecated and exported so that we can warn if
+	// they are being used.
+
+	// DefaultClusterSigningCertFile is deprecated. Do not use.
+	DefaultClusterSigningCertFile = "/etc/kubernetes/ca/ca.pem"
+	// DefaultClusterSigningKeyFile is deprecated. Do not use.
+	DefaultClusterSigningKeyFile = "/etc/kubernetes/ca/ca.key"
+)
+
 // CMServer is the main context object for the controller manager.
 type CMServer struct {
 	componentconfig.KubeControllerManagerConfiguration
@@ -111,8 +121,8 @@ func NewCMServer() *CMServer {
 			EnableGarbageCollector:                true,
 			ConcurrentGCSyncs:                     20,
 			GCIgnoredResources:                    gcIgnoredResources,
-			ClusterSigningCertFile:                "/etc/kubernetes/ca/ca.pem",
-			ClusterSigningKeyFile:                 "/etc/kubernetes/ca/ca.key",
+			ClusterSigningCertFile:                DefaultClusterSigningCertFile,
+			ClusterSigningKeyFile:                 DefaultClusterSigningKeyFile,
 			ClusterSigningDuration:                metav1.Duration{Duration: helpers.OneYear},
 			ReconcilerSyncLoopPeriod:              metav1.Duration{Duration: 60 * time.Second},
 			EnableTaintManager:                    true,

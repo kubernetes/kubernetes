@@ -21,12 +21,14 @@ go_library(
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = [
+        "fake_iptables_test.go",
         "hostport_manager_test.go",
         "hostport_syncer_test.go",
         "hostport_test.go",

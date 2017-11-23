@@ -104,6 +104,7 @@ func (a *poller) bootstrapping() {
 	// bootstrapGracePeriod is read-only, so no lock is required
 	timer := time.NewTimer(a.bootstrapGracePeriod)
 	go func() {
+		defer timer.Stop()
 		<-timer.C
 		a.lock.Lock()
 		defer a.lock.Unlock()

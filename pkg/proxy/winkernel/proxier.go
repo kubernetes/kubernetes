@@ -37,9 +37,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
@@ -453,15 +453,6 @@ func NewProxier(
 	recorder record.EventRecorder,
 	healthzServer healthcheck.HealthzUpdater,
 ) (*Proxier, error) {
-	// check valid user input
-	if minSyncPeriod > syncPeriod {
-		return nil, fmt.Errorf("min-sync (%v) must be < sync(%v)", minSyncPeriod, syncPeriod)
-	}
-
-	// Generate the masquerade mark to use for SNAT rules.
-	if masqueradeBit < 0 || masqueradeBit > 31 {
-		return nil, fmt.Errorf("invalid iptables-masquerade-bit %v not in [0, 31]", masqueradeBit)
-	}
 	masqueradeValue := 1 << uint(masqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x/%#08x", masqueradeValue, masqueradeValue)
 
@@ -1043,8 +1034,8 @@ func (proxier *Proxier) syncProxyRules() {
 			false,
 			svcInfo.clusterIP.String(),
 			Enum(svcInfo.protocol),
-			uint16(svcInfo.port),
 			uint16(svcInfo.targetPort),
+			uint16(svcInfo.port),
 		)
 		if err != nil {
 			glog.Errorf("Policy creation failed: %v", err)
@@ -1081,8 +1072,8 @@ func (proxier *Proxier) syncProxyRules() {
 				false,
 				externalIp.ip,
 				Enum(svcInfo.protocol),
-				uint16(svcInfo.port),
 				uint16(svcInfo.targetPort),
+				uint16(svcInfo.port),
 			)
 			if err != nil {
 				glog.Errorf("Policy creation failed: %v", err)
@@ -1099,8 +1090,8 @@ func (proxier *Proxier) syncProxyRules() {
 				false,
 				lbIngressIp.ip,
 				Enum(svcInfo.protocol),
-				uint16(svcInfo.port),
 				uint16(svcInfo.targetPort),
+				uint16(svcInfo.port),
 			)
 			if err != nil {
 				glog.Errorf("Policy creation failed: %v", err)
@@ -1130,7 +1121,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Finish housekeeping.
 	// TODO: these could be made more consistent.
-	for _, svcIP := range staleServices.List() {
+	for _, svcIP := range staleServices.UnsortedList() {
 		// TODO : Check if this is required to cleanup stale services here
 		glog.V(5).Infof("Pending delete stale service IP %s connections", svcIP)
 	}

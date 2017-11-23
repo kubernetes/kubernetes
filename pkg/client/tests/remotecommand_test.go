@@ -38,8 +38,8 @@ import (
 	restclient "k8s.io/client-go/rest"
 	remoteclient "k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/transport/spdy"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 )
 
@@ -256,7 +256,12 @@ func TestStream(t *testing.T) {
 			conf := &restclient.Config{
 				Host: server.URL,
 			}
-			e, err := remoteclient.NewSPDYExecutorForProtocols(conf, "POST", req.URL(), testCase.ClientProtocols...)
+			transport, upgradeTransport, err := spdy.RoundTripperFor(conf)
+			if err != nil {
+				t.Errorf("%s: unexpected error: %v", name, err)
+				continue
+			}
+			e, err := remoteclient.NewSPDYExecutorForProtocols(transport, upgradeTransport, "POST", req.URL(), testCase.ClientProtocols...)
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", name, err)
 				continue

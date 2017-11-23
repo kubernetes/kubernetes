@@ -25,7 +25,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -39,11 +39,6 @@ const (
 	// 100000 is equivalent to 100ms
 	quotaPeriod    = 100 * minQuotaPeriod
 	minQuotaPeriod = 1000
-)
-
-var (
-	// The default dns opt strings
-	defaultDNSOptions = []string{"ndots:5"}
 )
 
 type podsByID []*kubecontainer.Pod
@@ -278,7 +273,7 @@ func (m *kubeGenericRuntimeManager) getSeccompProfileFromAnnotations(annotations
 	if strings.HasPrefix(profile, "localhost/") {
 		name := strings.TrimPrefix(profile, "localhost/")
 		fname := filepath.Join(m.seccompProfileRoot, filepath.FromSlash(name))
-		return fname
+		return "localhost/" + fname
 	}
 
 	return profile

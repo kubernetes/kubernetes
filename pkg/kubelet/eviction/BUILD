@@ -15,7 +15,7 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/kubelet/eviction",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
@@ -49,8 +49,8 @@ go_library(
     }),
     importpath = "k8s.io/kubernetes/pkg/kubelet/eviction",
     deps = [
-        "//pkg/api/v1/helper/qos:go_default_library",
         "//pkg/api/v1/resource:go_default_library",
+        "//pkg/apis/core/v1/helper/qos:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
@@ -67,7 +67,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",

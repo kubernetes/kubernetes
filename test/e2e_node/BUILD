@@ -47,6 +47,7 @@ go_library(
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
+        "//vendor/github.com/prometheus/common/model:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
@@ -114,8 +115,8 @@ go_test(
     library = ":go_default_library",
     tags = ["e2e"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/v1/node:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",

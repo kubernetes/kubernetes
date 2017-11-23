@@ -428,10 +428,6 @@ type RunContainerOptions struct {
 	// this directory will be used to create and mount the log file to
 	// container.TerminationMessagePath
 	PodContainerDir string
-	// The list of DNS servers for the container to use.
-	DNS []string
-	// The list of DNS search domains.
-	DNSSearch []string
 	// The parent cgroup to pass to Docker
 	CgroupParent string
 	// The type of container rootfs
@@ -450,9 +446,14 @@ type RunContainerOptions struct {
 type VolumeInfo struct {
 	// Mounter is the volume's mounter
 	Mounter volume.Mounter
+	// BlockVolumeMapper is the Block volume's mapper
+	BlockVolumeMapper volume.BlockVolumeMapper
 	// SELinuxLabeled indicates whether this volume has had the
 	// pod's SELinux label applied to it or not
 	SELinuxLabeled bool
+	// Whether the volume permission is set to read-only or not
+	// This value is passed from volume.spec
+	ReadOnly bool
 }
 
 type VolumeMap map[string]VolumeInfo

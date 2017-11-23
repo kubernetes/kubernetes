@@ -24,27 +24,22 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// ExternalAdmissionHookConfigurations returns a ExternalAdmissionHookConfigurationInformer.
-	ExternalAdmissionHookConfigurations() ExternalAdmissionHookConfigurationInformer
 	// InitializerConfigurations returns a InitializerConfigurationInformer.
 	InitializerConfigurations() InitializerConfigurationInformer
 }
 
 type version struct {
-	internalinterfaces.SharedInformerFactory
+	factory          internalinterfaces.SharedInformerFactory
+	namespace        string
+	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
 // New returns a new Interface.
-func New(f internalinterfaces.SharedInformerFactory) Interface {
-	return &version{f}
-}
-
-// ExternalAdmissionHookConfigurations returns a ExternalAdmissionHookConfigurationInformer.
-func (v *version) ExternalAdmissionHookConfigurations() ExternalAdmissionHookConfigurationInformer {
-	return &externalAdmissionHookConfigurationInformer{factory: v.SharedInformerFactory}
+func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
+	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
 // InitializerConfigurations returns a InitializerConfigurationInformer.
 func (v *version) InitializerConfigurations() InitializerConfigurationInformer {
-	return &initializerConfigurationInformer{factory: v.SharedInformerFactory}
+	return &initializerConfigurationInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

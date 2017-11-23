@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -373,14 +373,14 @@ func TestValidateDrops(t *testing.T) {
 			containerCaps: &api.Capabilities{
 				Drop: []api.Capability{"bar"},
 			},
-			expectedError: `capabilities.drop: Invalid value: []api.Capability{"bar"}: foo is required to be dropped but was not found`,
+			expectedError: `capabilities.drop: Invalid value: []core.Capability{"bar"}: foo is required to be dropped but was not found`,
 		},
 		"validation is case sensitive": {
 			requiredDropCaps: []api.Capability{"foo"},
 			containerCaps: &api.Capabilities{
 				Drop: []api.Capability{"FOO"},
 			},
-			expectedError: `capabilities.drop: Invalid value: []api.Capability{"FOO"}: foo is required to be dropped but was not found`,
+			expectedError: `capabilities.drop: Invalid value: []core.Capability{"FOO"}: foo is required to be dropped but was not found`,
 		},
 	}
 

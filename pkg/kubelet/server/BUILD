@@ -15,9 +15,9 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/server",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/v1/validation:go_default_library",
+        "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/v1/validation:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/server/portforward:go_default_library",
         "//pkg/kubelet/server/remotecommand:go_default_library",
@@ -59,8 +59,8 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/kubelet/server",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/install:go_default_library",
+        "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/install:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",

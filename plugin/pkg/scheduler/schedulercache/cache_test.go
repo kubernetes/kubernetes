@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	schedutil "k8s.io/kubernetes/plugin/pkg/scheduler/util"
 )
@@ -49,13 +48,13 @@ func deepEqualWithoutGeneration(t *testing.T, testcase int, actual, expected *No
 func TestAssumePodScheduled(t *testing.T) {
 	nodeName := "node"
 	testPods := []*v1.Pod{
-		makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostPort: 80}}),
-		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostPort: 80}}),
-		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "", []v1.ContainerPort{{HostPort: 8080}}),
-		makeBasePod(t, nodeName, "test-nonzero", "", "", "", []v1.ContainerPort{{HostPort: 80}}),
-		makeBasePod(t, nodeName, "test", "100m", "500", "oir-foo:3", []v1.ContainerPort{{HostPort: 80}}),
-		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "oir-foo:5", []v1.ContainerPort{{HostPort: 8080}}),
-		makeBasePod(t, nodeName, "test", "100m", "500", "random-invalid-oir-key:100", []v1.ContainerPort{{}}),
+		makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
+		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
+		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
+		makeBasePod(t, nodeName, "test-nonzero", "", "", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
+		makeBasePod(t, nodeName, "test", "100m", "500", "example.com/foo:3", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
+		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "example.com/foo:5", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
+		makeBasePod(t, nodeName, "test", "100m", "500", "random-invalid-extended-key:100", []v1.ContainerPort{{}}),
 	}
 
 	tests := []struct {
@@ -75,7 +74,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[0]},
-			usedPorts:           map[int]bool{80: true},
+			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true},
 		},
 	}, {
 		pods: []*v1.Pod{testPods[1], testPods[2]},
@@ -90,7 +89,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[1], testPods[2]},
-			usedPorts:           map[int]bool{80: true, 8080: true},
+			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true, "TCP/127.0.0.1/8080": true},
 		},
 	}, { // test non-zero request
 		pods: []*v1.Pod{testPods[3]},
@@ -105,7 +104,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[3]},
-			usedPorts:           map[int]bool{80: true},
+			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true},
 		},
 	}, {
 		pods: []*v1.Pod{testPods[4]},
@@ -113,7 +112,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			requestedResource: &Resource{
 				MilliCPU:        100,
 				Memory:          500,
-				ScalarResources: map[v1.ResourceName]int64{"pod.alpha.kubernetes.io/opaque-int-resource-oir-foo": 3},
+				ScalarResources: map[v1.ResourceName]int64{"example.com/foo": 3},
 			},
 			nonzeroRequest: &Resource{
 				MilliCPU: 100,
@@ -121,7 +120,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[4]},
-			usedPorts:           map[int]bool{80: true},
+			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true},
 		},
 	}, {
 		pods: []*v1.Pod{testPods[4], testPods[5]},
@@ -129,7 +128,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			requestedResource: &Resource{
 				MilliCPU:        300,
 				Memory:          1524,
-				ScalarResources: map[v1.ResourceName]int64{"pod.alpha.kubernetes.io/opaque-int-resource-oir-foo": 8},
+				ScalarResources: map[v1.ResourceName]int64{"example.com/foo": 8},
 			},
 			nonzeroRequest: &Resource{
 				MilliCPU: 300,
@@ -137,7 +136,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[4], testPods[5]},
-			usedPorts:           map[int]bool{80: true, 8080: true},
+			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true, "TCP/127.0.0.1/8080": true},
 		},
 	}, {
 		pods: []*v1.Pod{testPods[6]},
@@ -152,7 +151,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[6]},
-			usedPorts:           map[int]bool{},
+			usedPorts:           map[string]bool{},
 		},
 	},
 	}
@@ -195,8 +194,8 @@ func assumeAndFinishBinding(cache *schedulerCache, pod *v1.Pod, assumedTime time
 func TestExpirePod(t *testing.T) {
 	nodeName := "node"
 	testPods := []*v1.Pod{
-		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostPort: 80}}),
-		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "", []v1.ContainerPort{{HostPort: 8080}}),
+		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
+		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
 	}
 	now := time.Now()
 	ttl := 10 * time.Second
@@ -228,7 +227,7 @@ func TestExpirePod(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[1]},
-			usedPorts:           map[int]bool{8080: true},
+			usedPorts:           map[string]bool{"TCP/127.0.0.1/8080": true},
 		},
 	}}
 
@@ -255,8 +254,8 @@ func TestAddPodWillConfirm(t *testing.T) {
 	ttl := 10 * time.Second
 
 	testPods := []*v1.Pod{
-		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostPort: 80}}),
-		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "", []v1.ContainerPort{{HostPort: 8080}}),
+		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
+		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
 	}
 	tests := []struct {
 		podsToAssume []*v1.Pod
@@ -277,7 +276,7 @@ func TestAddPodWillConfirm(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[0]},
-			usedPorts:           map[int]bool{80: true},
+			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true},
 		},
 	}}
 
@@ -300,11 +299,73 @@ func TestAddPodWillConfirm(t *testing.T) {
 	}
 }
 
+// TestAddPodWillReplaceAssumed tests that a pod being Add()ed will replace any assumed pod.
+func TestAddPodWillReplaceAssumed(t *testing.T) {
+	now := time.Now()
+	ttl := 10 * time.Second
+
+	assumedPod := makeBasePod(t, "assumed-node-1", "test-1", "100m", "500", "", []v1.ContainerPort{{HostPort: 80}})
+	addedPod := makeBasePod(t, "actual-node", "test-1", "100m", "500", "", []v1.ContainerPort{{HostPort: 80}})
+	updatedPod := makeBasePod(t, "actual-node", "test-1", "200m", "500", "", []v1.ContainerPort{{HostPort: 90}})
+
+	tests := []struct {
+		podsToAssume []*v1.Pod
+		podsToAdd    []*v1.Pod
+		podsToUpdate [][]*v1.Pod
+
+		wNodeInfo map[string]*NodeInfo
+	}{{
+		podsToAssume: []*v1.Pod{assumedPod.DeepCopy()},
+		podsToAdd:    []*v1.Pod{addedPod.DeepCopy()},
+		podsToUpdate: [][]*v1.Pod{{addedPod.DeepCopy(), updatedPod.DeepCopy()}},
+		wNodeInfo: map[string]*NodeInfo{
+			"assumed-node": nil,
+			"actual-node": {
+				requestedResource: &Resource{
+					MilliCPU: 200,
+					Memory:   500,
+				},
+				nonzeroRequest: &Resource{
+					MilliCPU: 200,
+					Memory:   500,
+				},
+				allocatableResource: &Resource{},
+				pods:                []*v1.Pod{updatedPod.DeepCopy()},
+				usedPorts:           map[string]bool{"TCP/0.0.0.0/90": true},
+			},
+		},
+	}}
+
+	for i, tt := range tests {
+		cache := newSchedulerCache(ttl, time.Second, nil)
+		for _, podToAssume := range tt.podsToAssume {
+			if err := assumeAndFinishBinding(cache, podToAssume, now); err != nil {
+				t.Fatalf("assumePod failed: %v", err)
+			}
+		}
+		for _, podToAdd := range tt.podsToAdd {
+			if err := cache.AddPod(podToAdd); err != nil {
+				t.Fatalf("AddPod failed: %v", err)
+			}
+		}
+		for _, podToUpdate := range tt.podsToUpdate {
+			if err := cache.UpdatePod(podToUpdate[0], podToUpdate[1]); err != nil {
+				t.Fatalf("UpdatePod failed: %v", err)
+			}
+		}
+		for nodeName, expected := range tt.wNodeInfo {
+			t.Log(nodeName)
+			n := cache.nodes[nodeName]
+			deepEqualWithoutGeneration(t, i, n, expected)
+		}
+	}
+}
+
 // TestAddPodAfterExpiration tests that a pod being Add()ed will be added back if expired.
 func TestAddPodAfterExpiration(t *testing.T) {
 	nodeName := "node"
 	ttl := 10 * time.Second
-	basePod := makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostPort: 80}})
+	basePod := makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}})
 	tests := []struct {
 		pod *v1.Pod
 
@@ -322,7 +383,7 @@ func TestAddPodAfterExpiration(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{basePod},
-			usedPorts:           map[int]bool{80: true},
+			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true},
 		},
 	}}
 
@@ -352,8 +413,8 @@ func TestUpdatePod(t *testing.T) {
 	nodeName := "node"
 	ttl := 10 * time.Second
 	testPods := []*v1.Pod{
-		makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostPort: 80}}),
-		makeBasePod(t, nodeName, "test", "200m", "1Ki", "", []v1.ContainerPort{{HostPort: 8080}}),
+		makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
+		makeBasePod(t, nodeName, "test", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
 	}
 	tests := []struct {
 		podsToAssume []*v1.Pod
@@ -375,7 +436,7 @@ func TestUpdatePod(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[1]},
-			usedPorts:           map[int]bool{8080: true},
+			usedPorts:           map[string]bool{"TCP/127.0.0.1/8080": true},
 		}, {
 			requestedResource: &Resource{
 				MilliCPU: 100,
@@ -387,7 +448,7 @@ func TestUpdatePod(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[0]},
-			usedPorts:           map[int]bool{80: true},
+			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true},
 		}},
 	}}
 
@@ -418,8 +479,8 @@ func TestExpireAddUpdatePod(t *testing.T) {
 	nodeName := "node"
 	ttl := 10 * time.Second
 	testPods := []*v1.Pod{
-		makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostPort: 80}}),
-		makeBasePod(t, nodeName, "test", "200m", "1Ki", "", []v1.ContainerPort{{HostPort: 8080}}),
+		makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
+		makeBasePod(t, nodeName, "test", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
 	}
 	tests := []struct {
 		podsToAssume []*v1.Pod
@@ -442,7 +503,7 @@ func TestExpireAddUpdatePod(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[1]},
-			usedPorts:           map[int]bool{8080: true},
+			usedPorts:           map[string]bool{"TCP/127.0.0.1/8080": true},
 		}, {
 			requestedResource: &Resource{
 				MilliCPU: 100,
@@ -454,7 +515,7 @@ func TestExpireAddUpdatePod(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[0]},
-			usedPorts:           map[int]bool{80: true},
+			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true},
 		}},
 	}}
 
@@ -491,7 +552,7 @@ func TestExpireAddUpdatePod(t *testing.T) {
 // TestRemovePod tests after added pod is removed, its information should also be subtracted.
 func TestRemovePod(t *testing.T) {
 	nodeName := "node"
-	basePod := makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostPort: 80}})
+	basePod := makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}})
 	tests := []struct {
 		pod       *v1.Pod
 		wNodeInfo *NodeInfo
@@ -508,7 +569,7 @@ func TestRemovePod(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{basePod},
-			usedPorts:           map[int]bool{80: true},
+			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true},
 		},
 	}}
 
@@ -533,7 +594,7 @@ func TestRemovePod(t *testing.T) {
 
 func TestForgetPod(t *testing.T) {
 	nodeName := "node"
-	basePod := makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostPort: 80}})
+	basePod := makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}})
 	tests := []struct {
 		pods []*v1.Pod
 	}{{
@@ -627,7 +688,7 @@ func TestNodeOperators(t *testing.T) {
 	mem_100m := resource.MustParse("100m")
 	cpu_half := resource.MustParse("500m")
 	mem_50m := resource.MustParse("50m")
-	resourceFooName := "pod.alpha.kubernetes.io/opaque-int-resource-foo"
+	resourceFooName := "example.com/foo"
 	resourceFoo := resource.MustParse("1")
 
 	tests := []struct {
@@ -834,25 +895,19 @@ type testingMode interface {
 	Fatalf(format string, args ...interface{})
 }
 
-func makeBasePod(t testingMode, nodeName, objName, cpu, mem, oir string, ports []v1.ContainerPort) *v1.Pod {
+func makeBasePod(t testingMode, nodeName, objName, cpu, mem, extended string, ports []v1.ContainerPort) *v1.Pod {
 	req := v1.ResourceList{}
 	if cpu != "" {
 		req = v1.ResourceList{
 			v1.ResourceCPU:    resource.MustParse(cpu),
 			v1.ResourceMemory: resource.MustParse(mem),
 		}
-		if oir != "" {
-			if len(strings.Split(oir, ":")) != 2 {
-				t.Fatalf("Invalid OIR string")
+		if extended != "" {
+			parts := strings.Split(extended, ":")
+			if len(parts) != 2 {
+				t.Fatalf("Invalid extended resource string: \"%s\"", extended)
 			}
-			var name v1.ResourceName
-			if strings.Split(oir, ":")[0] != "random-invalid-oir-key" {
-				name = v1helper.OpaqueIntResourceName(strings.Split(oir, ":")[0])
-			} else {
-				name = v1.ResourceName(strings.Split(oir, ":")[0])
-			}
-			quantity := resource.MustParse(strings.Split(oir, ":")[1])
-			req[name] = quantity
+			req[v1.ResourceName(parts[0])] = resource.MustParse(parts[1])
 		}
 	}
 	return &v1.Pod{

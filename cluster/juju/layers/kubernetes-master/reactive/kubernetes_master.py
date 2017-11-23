@@ -43,7 +43,6 @@ from charms.reactive import when, when_any, when_not, when_all
 from charms.reactive.helpers import data_changed, any_file_changed
 from charms.kubernetes.common import get_version
 from charms.kubernetes.common import retry
-from charms.kubernetes.flagmanager import FlagManager
 
 from charms.layer import tls_client
 
@@ -64,6 +63,22 @@ nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
 
 
+def set_upgrade_needed():
+    set_state('kubernetes-master.upgrade-needed')
+    config = hookenv.config()
+    previous_channel = config.previous('channel')
+    require_manual = config.get('require-manual-upgrade')
+    hookenv.log('set upgrade needed')
+    if previous_channel is None or not require_manual:
+        hookenv.log('forcing upgrade')
+        set_state('kubernetes-master.upgrade-specified')
+
+
+@when('config.changed.channel')
+def channel_changed():
+    set_upgrade_needed()
+
+
 def service_cidr():
     ''' Return the charm's service-cidr config '''
     db = unitdata.kv()
@@ -79,13 +94,20 @@ def freeze_service_cidr():
 
 
 @hook('upgrade-charm')
-def reset_states_for_delivery():
+def check_for_upgrade_needed():
     '''An upgrade charm event was triggered by Juju, react to that here.'''
+    hookenv.status_set('maintenance', 'Checking resources')
+
     migrate_from_pre_snaps()
-    install_snaps()
     add_rbac_roles()
     set_state('reconfigure.authentication.setup')
     remove_state('authentication.setup')
+
+    resources = ['kubectl', 'kube-apiserver', 'kube-controller-manager',
+                 'kube-scheduler', 'cdk-addons']
+    paths = [hookenv.resource_get(resource) for resource in resources]
+    if any_file_changed(paths):
+        set_upgrade_needed()
 
 
 def add_rbac_roles():
@@ -172,10 +194,19 @@ def migrate_from_pre_snaps():
             hookenv.log("Removing file: " + file)
             os.remove(file)
 
-    # clear the flag managers
-    FlagManager('kube-apiserver').destroy_all()
-    FlagManager('kube-controller-manager').destroy_all()
-    FlagManager('kube-scheduler').destroy_all()
+
+@when('kubernetes-master.upgrade-needed')
+@when_not('kubernetes-master.upgrade-specified')
+def upgrade_needed_status():
+    msg = 'Needs manual upgrade, run the upgrade action'
+    hookenv.status_set('blocked', msg)
+
+
+@when('kubernetes-master.upgrade-specified')
+def do_upgrade():
+    install_snaps()
+    remove_state('kubernetes-master.upgrade-needed')
+    remove_state('kubernetes-master.upgrade-specified')
 
 
 def install_snaps():
@@ -193,11 +224,6 @@ def install_snaps():
     snap.install('cdk-addons', channel=channel)
     set_state('kubernetes-master.snaps.installed')
     remove_state('kubernetes-master.components.started')
-
-
-@when('config.changed.channel')
-def channel_changed():
-    install_snaps()
 
 
 @when('config.changed.client_password', 'leadership.is_leader')
@@ -228,15 +254,10 @@ def configure_cni(cni):
 @when_not('authentication.setup')
 def setup_leader_authentication():
     '''Setup basic authentication and token access for the cluster.'''
-    api_opts = FlagManager('kube-apiserver')
-    controller_opts = FlagManager('kube-controller-manager')
-
     service_key = '/root/cdk/serviceaccount.key'
     basic_auth = '/root/cdk/basic_auth.csv'
     known_tokens = '/root/cdk/known_tokens.csv'
 
-    api_opts.add('basic-auth-file', basic_auth)
-    api_opts.add('token-auth-file', known_tokens)
     hookenv.status_set('maintenance', 'Rendering authentication templates.')
 
     keys = [service_key, basic_auth, known_tokens]
@@ -256,9 +277,6 @@ def setup_leader_authentication():
                    '2048']
             check_call(cmd)
         remove_state('reconfigure.authentication.setup')
-
-    api_opts.add('service-account-key-file', service_key)
-    controller_opts.add('service-account-private-key-file', service_key)
 
     # read service account key for syndication
     leader_data = {}
@@ -294,13 +312,6 @@ def setup_non_leader_authentication():
         return
 
     hookenv.status_set('maintenance', 'Rendering authentication templates.')
-    api_opts = FlagManager('kube-apiserver')
-    api_opts.add('basic-auth-file', basic_auth)
-    api_opts.add('token-auth-file', known_tokens)
-    api_opts.add('service-account-key-file', service_key)
-
-    controller_opts = FlagManager('kube-controller-manager')
-    controller_opts.add('service-account-private-key-file', service_key)
 
     remove_state('kubernetes-master.components.started')
     set_state('authentication.setup')
@@ -400,7 +411,7 @@ def start_master(etcd):
     handle_etcd_relation(etcd)
 
     # Add CLI options to all components
-    configure_apiserver()
+    configure_apiserver(etcd)
     configure_controller_manager()
     configure_scheduler()
 
@@ -470,32 +481,6 @@ def create_service_configs(kube_control):
     if should_restart:
         host.service_restart('snap.kube-apiserver.daemon')
         remove_state('authentication.setup')
-
-
-@when('kube-control.departed')
-@when('leadership.is_leader')
-def flush_auth_for_departed(kube_control):
-    ''' Unit has left the cluster and needs to have its authentication
-    tokens removed from the token registry '''
-    token_auth_file = '/root/cdk/known_tokens.csv'
-    departing_unit = kube_control.flush_departed()
-    userid = "kubelet-{}".format(departing_unit.split('/')[1])
-    known_tokens = open(token_auth_file, 'r').readlines()
-    for line in known_tokens[:]:
-        haystack = line.split(',')
-        # skip the entry if we dont have token,user,id,groups format
-        if len(haystack) < 4:
-            continue
-        if haystack[2] == userid:
-            hookenv.log('Found unit {} in token auth. Removing auth'
-                        ' token.'.format(userid))
-            known_tokens.remove(line)
-    # atomically rewrite the file minus any scrubbed units
-    hookenv.log('Rewriting token auth file: {}'.format(token_auth_file))
-    with open(token_auth_file, 'w') as fp:
-        fp.writelines(known_tokens)
-    # Trigger rebroadcast of auth files for followers
-    remove_state('authentication.setup')
 
 
 @when_not('kube-control.connected')
@@ -794,8 +779,21 @@ def on_config_allow_privileged_change():
 
 @when('config.changed.api-extra-args')
 @when('kubernetes-master.components.started')
-def on_config_api_extra_args_change():
-    configure_apiserver()
+@when('etcd.available')
+def on_config_api_extra_args_change(etcd):
+    configure_apiserver(etcd)
+
+
+@when('config.changed.controller-manager-extra-args')
+@when('kubernetes-master.components.started')
+def on_config_controller_manager_extra_args_change():
+    configure_controller_manager()
+
+
+@when('config.changed.scheduler-extra-args')
+@when('kubernetes-master.components.started')
+def on_config_scheduler_extra_args_change():
+    configure_scheduler()
 
 
 @when('kube-control.gpu.available')
@@ -971,9 +969,9 @@ def get_kubernetes_service_ip():
 def handle_etcd_relation(reldata):
     ''' Save the client credentials and set appropriate daemon flags when
     etcd declares itself as available'''
-    connection_string = reldata.get_connection_string()
     # Define where the etcd tls files will be kept.
     etcd_dir = '/root/cdk/etcd'
+
     # Create paths to the etcd client ca, key, and cert file locations.
     ca = os.path.join(etcd_dir, 'client-ca.pem')
     key = os.path.join(etcd_dir, 'client-key.pem')
@@ -982,69 +980,46 @@ def handle_etcd_relation(reldata):
     # Save the client credentials (in relation data) to the paths provided.
     reldata.save_client_credentials(key, cert, ca)
 
-    api_opts = FlagManager('kube-apiserver')
 
-    # Never use stale data, always prefer whats coming in during context
-    # building. if its stale, its because whats in unitdata is stale
-    data = api_opts.data
-    if data.get('etcd-servers-strict') or data.get('etcd-servers'):
-        api_opts.destroy('etcd-cafile')
-        api_opts.destroy('etcd-keyfile')
-        api_opts.destroy('etcd-certfile')
-        api_opts.destroy('etcd-servers', strict=True)
-        api_opts.destroy('etcd-servers')
+def parse_extra_args(config_key):
+    elements = hookenv.config().get(config_key, '').split()
+    args = {}
 
-    # Set the apiserver flags in the options manager
-    api_opts.add('etcd-cafile', ca)
-    api_opts.add('etcd-keyfile', key)
-    api_opts.add('etcd-certfile', cert)
-    api_opts.add('etcd-servers', connection_string, strict=True)
-
-
-def get_config_args():
-    db = unitdata.kv()
-    old_config_args = db.get('api-extra-args', [])
-    # We have to convert them to tuples becuase we use sets
-    old_config_args = [tuple(i) for i in old_config_args]
-    new_config_args = []
-    new_config_arg_names = []
-    for arg in hookenv.config().get('api-extra-args', '').split():
-        new_config_arg_names.append(arg.split('=', 1)[0])
-        if len(arg.split('=', 1)) == 1:  # handle flags ie. --profiling
-            new_config_args.append(tuple([arg, 'true']))
+    for element in elements:
+        if '=' in element:
+            key, _, value = element.partition('=')
+            args[key] = value
         else:
-            new_config_args.append(tuple(arg.split('=', 1)))
+            args[element] = 'true'
 
-    hookenv.log('Handling "api-extra-args" option.')
-    hookenv.log('Old arguments: {}'.format(old_config_args))
-    hookenv.log('New arguments: {}'.format(new_config_args))
-    if set(new_config_args) == set(old_config_args):
-        return (new_config_args, [])
-    # Store new args
-    db.set('api-extra-args', new_config_args)
-    to_add = set(new_config_args)
-    to_remove = set(old_config_args) - set(new_config_args)
-    # Extract option names only
-    to_remove = [i[0] for i in to_remove if i[0] not in new_config_arg_names]
-    return (to_add, to_remove)
+    return args
 
 
-def configure_apiserver():
-    # TODO: investigate if it's possible to use config file to store args
-    # https://github.com/juju-solutions/bundle-canonical-kubernetes/issues/315
-    # Handle api-extra-args config option
-    to_add, to_remove = get_config_args()
+def configure_kubernetes_service(service, base_args, extra_args_key):
+    db = unitdata.kv()
 
-    api_opts = FlagManager('kube-apiserver')
+    prev_args_key = 'kubernetes-master.prev_args.' + service
+    prev_args = db.get(prev_args_key) or {}
 
-    # Remove arguments that are no longer provided as config option
-    # this allows them to be reverted to charm defaults
-    for arg in to_remove:
-        hookenv.log('Removing option: {}'.format(arg))
-        api_opts.destroy(arg)
-        # We need to "unset" options by settig their value to "null" string
-        cmd = ['snap', 'set', 'kube-apiserver', '{}=null'.format(arg)]
-        check_call(cmd)
+    extra_args = parse_extra_args(extra_args_key)
+
+    args = {}
+    for arg in prev_args:
+        # remove previous args by setting to null
+        args[arg] = 'null'
+    for k, v in base_args.items():
+        args[k] = v
+    for k, v in extra_args.items():
+        args[k] = v
+
+    cmd = ['snap', 'set', service] + ['%s=%s' % item for item in args.items()]
+    check_call(cmd)
+
+    db.set(prev_args_key, args)
+
+
+def configure_apiserver(etcd):
+    api_opts = {}
 
     # Get the tls paths from the layer data.
     layer_options = layer.options('tls-client')
@@ -1055,25 +1030,39 @@ def configure_apiserver():
     server_key_path = layer_options.get('server_key_path')
 
     if is_privileged():
-        api_opts.add('allow-privileged', 'true', strict=True)
+        api_opts['allow-privileged'] = 'true'
         set_state('kubernetes-master.privileged')
     else:
-        api_opts.add('allow-privileged', 'false', strict=True)
+        api_opts['allow-privileged'] = 'false'
         remove_state('kubernetes-master.privileged')
 
     # Handle static options for now
-    api_opts.add('service-cluster-ip-range', service_cidr())
-    api_opts.add('min-request-timeout', '300')
-    api_opts.add('v', '4')
-    api_opts.add('tls-cert-file', server_cert_path)
-    api_opts.add('tls-private-key-file', server_key_path)
-    api_opts.add('kubelet-certificate-authority', ca_cert_path)
-    api_opts.add('kubelet-client-certificate', client_cert_path)
-    api_opts.add('kubelet-client-key', client_key_path)
-    api_opts.add('logtostderr', 'true')
-    api_opts.add('insecure-bind-address', '127.0.0.1')
-    api_opts.add('insecure-port', '8080')
-    api_opts.add('storage-backend', 'etcd2')  # FIXME: add etcd3 support
+    api_opts['service-cluster-ip-range'] = service_cidr()
+    api_opts['min-request-timeout'] = '300'
+    api_opts['v'] = '4'
+    api_opts['tls-cert-file'] = server_cert_path
+    api_opts['tls-private-key-file'] = server_key_path
+    api_opts['kubelet-certificate-authority'] = ca_cert_path
+    api_opts['kubelet-client-certificate'] = client_cert_path
+    api_opts['kubelet-client-key'] = client_key_path
+    api_opts['logtostderr'] = 'true'
+    api_opts['insecure-bind-address'] = '127.0.0.1'
+    api_opts['insecure-port'] = '8080'
+    api_opts['storage-backend'] = 'etcd2'  # FIXME: add etcd3 support
+
+    api_opts['basic-auth-file'] = '/root/cdk/basic_auth.csv'
+    api_opts['token-auth-file'] = '/root/cdk/known_tokens.csv'
+    api_opts['service-account-key-file'] = '/root/cdk/serviceaccount.key'
+
+    etcd_dir = '/root/cdk/etcd'
+    etcd_ca = os.path.join(etcd_dir, 'client-ca.pem')
+    etcd_key = os.path.join(etcd_dir, 'client-key.pem')
+    etcd_cert = os.path.join(etcd_dir, 'client-cert.pem')
+
+    api_opts['etcd-cafile'] = etcd_ca
+    api_opts['etcd-keyfile'] = etcd_key
+    api_opts['etcd-certfile'] = etcd_cert
+    api_opts['etcd-servers'] = etcd.get_connection_string()
 
     admission_control = [
         'Initializers',
@@ -1088,7 +1077,7 @@ def configure_apiserver():
     if 'Node' in auth_mode:
         admission_control.append('NodeRestriction')
 
-    api_opts.add('authorization-mode', auth_mode, strict=True)
+    api_opts['authorization-mode'] = auth_mode
 
     if get_version('kube-apiserver') < (1, 6):
         hookenv.log('Removing DefaultTolerationSeconds from admission-control')
@@ -1096,52 +1085,46 @@ def configure_apiserver():
     if get_version('kube-apiserver') < (1, 7):
         hookenv.log('Removing Initializers from admission-control')
         admission_control.remove('Initializers')
-    api_opts.add('admission-control', ','.join(admission_control), strict=True)
+    api_opts['admission-control'] = ','.join(admission_control)
 
-    # Add operator-provided arguments, this allows operators
-    # to override defaults
-    for arg in to_add:
-        hookenv.log('Adding option: {} {}'.format(arg[0], arg[1]))
-        # Make sure old value is gone
-        api_opts.destroy(arg[0])
-        api_opts.add(arg[0], arg[1])
+    configure_kubernetes_service('kube-apiserver', api_opts, 'api-extra-args')
 
-    cmd = ['snap', 'set', 'kube-apiserver'] + api_opts.to_s().split(' ')
-    check_call(cmd)
     set_state('kube-apiserver.do-restart')
 
 
 def configure_controller_manager():
-    controller_opts = FlagManager('kube-controller-manager')
+    controller_opts = {}
 
     # Get the tls paths from the layer data.
     layer_options = layer.options('tls-client')
     ca_cert_path = layer_options.get('ca_certificate_path')
 
     # Default to 3 minute resync. TODO: Make this configureable?
-    controller_opts.add('min-resync-period', '3m')
-    controller_opts.add('v', '2')
-    controller_opts.add('root-ca-file', ca_cert_path)
-    controller_opts.add('logtostderr', 'true')
-    controller_opts.add('master', 'http://127.0.0.1:8080')
+    controller_opts['min-resync-period'] = '3m'
+    controller_opts['v'] = '2'
+    controller_opts['root-ca-file'] = ca_cert_path
+    controller_opts['logtostderr'] = 'true'
+    controller_opts['master'] = 'http://127.0.0.1:8080'
 
-    cmd = (
-        ['snap', 'set', 'kube-controller-manager'] +
-        controller_opts.to_s().split(' ')
-    )
-    check_call(cmd)
+    controller_opts['service-account-private-key-file'] = \
+        '/root/cdk/serviceaccount.key'
+
+    configure_kubernetes_service('kube-controller-manager', controller_opts,
+                                 'controller-manager-extra-args')
+
     set_state('kube-controller-manager.do-restart')
 
 
 def configure_scheduler():
-    scheduler_opts = FlagManager('kube-scheduler')
+    scheduler_opts = {}
 
-    scheduler_opts.add('v', '2')
-    scheduler_opts.add('logtostderr', 'true')
-    scheduler_opts.add('master', 'http://127.0.0.1:8080')
+    scheduler_opts['v'] = '2'
+    scheduler_opts['logtostderr'] = 'true'
+    scheduler_opts['master'] = 'http://127.0.0.1:8080'
 
-    cmd = ['snap', 'set', 'kube-scheduler'] + scheduler_opts.to_s().split(' ')
-    check_call(cmd)
+    configure_kubernetes_service('kube-scheduler', scheduler_opts,
+                                 'scheduler-extra-args')
+
     set_state('kube-scheduler.do-restart')
 
 

@@ -75,15 +75,12 @@ func (m *Helper) List(namespace, apiVersion string, export bool, options *metav1
 	return req.Do().Get()
 }
 
-func (m *Helper) Watch(namespace, resourceVersion, apiVersion string, labelSelector string) (watch.Interface, error) {
+func (m *Helper) Watch(namespace, apiVersion string, options *metav1.ListOptions) (watch.Interface, error) {
+	options.Watch = true
 	return m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
-		VersionedParams(&metav1.ListOptions{
-			ResourceVersion: resourceVersion,
-			Watch:           true,
-			LabelSelector:   labelSelector,
-		}, metav1.ParameterCodec).
+		VersionedParams(options, metav1.ParameterCodec).
 		Watch()
 }
 

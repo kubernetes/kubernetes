@@ -19,6 +19,7 @@ package autoscaling
 import (
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -65,7 +66,8 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 		})
 	})
 
-	SIGDescribe("ReplicationController light", func() {
+	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #54637 is fixed.
+	SIGDescribe("[DisabledForLargeClusters] ReplicationController light", func() {
 		It("Should scale from 1 pod to 2 pods", func() {
 			scaleTest := &HPAScaleTest{
 				initPods:                    1,
@@ -113,7 +115,7 @@ type HPAScaleTest struct {
 // The first state change is due to the CPU being consumed initially, which HPA responds to by changing pod counts.
 // The second state change (optional) is due to the CPU burst parameter, which HPA again responds to.
 // TODO The use of 3 states is arbitrary, we could eventually make this test handle "n" states once this test stabilizes.
-func (scaleTest *HPAScaleTest) run(name, kind string, rc *common.ResourceConsumer, f *framework.Framework) {
+func (scaleTest *HPAScaleTest) run(name string, kind schema.GroupVersionKind, rc *common.ResourceConsumer, f *framework.Framework) {
 	const timeToWait = 15 * time.Minute
 	rc = common.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, int(scaleTest.initPods), int(scaleTest.totalInitialCPUUsage), 0, 0, scaleTest.perPodCPURequest, 200, f.ClientSet, f.InternalClientset)
 	defer rc.CleanUp()
@@ -129,7 +131,7 @@ func (scaleTest *HPAScaleTest) run(name, kind string, rc *common.ResourceConsume
 	}
 }
 
-func scaleUp(name, kind string, checkStability bool, rc *common.ResourceConsumer, f *framework.Framework) {
+func scaleUp(name string, kind schema.GroupVersionKind, checkStability bool, rc *common.ResourceConsumer, f *framework.Framework) {
 	stasis := 0 * time.Minute
 	if checkStability {
 		stasis = 10 * time.Minute
@@ -149,7 +151,7 @@ func scaleUp(name, kind string, checkStability bool, rc *common.ResourceConsumer
 	scaleTest.run(name, kind, rc, f)
 }
 
-func scaleDown(name, kind string, checkStability bool, rc *common.ResourceConsumer, f *framework.Framework) {
+func scaleDown(name string, kind schema.GroupVersionKind, checkStability bool, rc *common.ResourceConsumer, f *framework.Framework) {
 	stasis := 0 * time.Minute
 	if checkStability {
 		stasis = 10 * time.Minute

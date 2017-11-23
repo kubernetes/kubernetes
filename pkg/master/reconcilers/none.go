@@ -18,9 +18,8 @@ limitations under the License.
 package reconcilers
 
 import (
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"net"
-
-	"k8s.io/kubernetes/pkg/api"
 )
 
 // NoneEndpointReconciler allows for the endpoint reconciler to be disabled

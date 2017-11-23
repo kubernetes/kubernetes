@@ -47,7 +47,7 @@ var Strategy = jobStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // DefaultGarbageCollectionPolicy returns Orphan because that was the default
 // behavior before the server-side garbage collection was implemented.
-func (jobStrategy) DefaultGarbageCollectionPolicy() rest.GarbageCollectionPolicy {
+func (jobStrategy) DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) rest.GarbageCollectionPolicy {
 	return rest.OrphanDependents
 }
 

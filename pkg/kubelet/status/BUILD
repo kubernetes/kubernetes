@@ -40,8 +40,8 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/kubelet/status",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/kubelet/configmap:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/pod:go_default_library",

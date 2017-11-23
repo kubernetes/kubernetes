@@ -21,12 +21,14 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/initialization"
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook"
+	mutatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
+	validatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/validating"
 )
 
 // RegisterAllAdmissionPlugins registers all admission plugins
 func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	lifecycle.Register(plugins)
 	initialization.Register(plugins)
-	webhook.Register(plugins)
+	validatingwebhook.Register(plugins)
+	mutatingwebhook.Register(plugins)
 }

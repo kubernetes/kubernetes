@@ -20,12 +20,16 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/helper"
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
 func role(rules []rbac.PolicyRule, labels map[string]string, annotations map[string]string) *rbac.ClusterRole {
-	return &rbac.ClusterRole{Rules: rules, ObjectMeta: metav1.ObjectMeta{Labels: labels, Annotations: annotations}}
+	return &rbac.ClusterRole{
+		Rules:      rules,
+		ObjectMeta: metav1.ObjectMeta{Labels: labels, Annotations: annotations},
+	}
 }
 
 func rules(resources ...string) []rbac.PolicyRule {
@@ -38,7 +42,7 @@ func rules(resources ...string) []rbac.PolicyRule {
 
 type ss map[string]string
 
-func TestComputeReconciledRole(t *testing.T) {
+func TestComputeReconciledRoleRules(t *testing.T) {
 	tests := map[string]struct {
 		expectedRole           *rbac.ClusterRole
 		actualRole             *rbac.ClusterRole
@@ -270,6 +274,99 @@ func TestComputeReconciledRole(t *testing.T) {
 		}
 		if reconciliationNeeded && !helper.Semantic.DeepEqual(result.Role.(ClusterRoleRuleOwner).ClusterRole, tc.expectedReconciledRole) {
 			t.Errorf("%s: Expected\n\t%#v\ngot\n\t%#v", k, tc.expectedReconciledRole, result.Role)
+		}
+	}
+}
+
+func aggregatedRole(aggregationRule *rbac.AggregationRule) *rbac.ClusterRole {
+	return &rbac.ClusterRole{
+		AggregationRule: aggregationRule,
+	}
+}
+
+func aggregationrule(selectors []map[string]string) *rbac.AggregationRule {
+	ret := &rbac.AggregationRule{}
+	for _, selector := range selectors {
+		ret.ClusterRoleSelectors = append(ret.ClusterRoleSelectors,
+			metav1.LabelSelector{MatchLabels: selector})
+	}
+	return ret
+}
+
+func TestComputeReconciledRoleAggregationRules(t *testing.T) {
+	tests := map[string]struct {
+		expectedRole           *rbac.ClusterRole
+		actualRole             *rbac.ClusterRole
+		removeExtraPermissions bool
+
+		expectedReconciledRole       *rbac.ClusterRole
+		expectedReconciliationNeeded bool
+	}{
+		"empty": {
+			expectedRole:           aggregatedRole(&rbac.AggregationRule{}),
+			actualRole:             aggregatedRole(nil),
+			removeExtraPermissions: true,
+
+			expectedReconciledRole:       nil,
+			expectedReconciliationNeeded: false,
+		},
+		"empty-2": {
+			expectedRole:           aggregatedRole(&rbac.AggregationRule{}),
+			actualRole:             aggregatedRole(&rbac.AggregationRule{}),
+			removeExtraPermissions: true,
+
+			expectedReconciledRole:       nil,
+			expectedReconciliationNeeded: false,
+		},
+		"match without union": {
+			expectedRole:           aggregatedRole(aggregationrule([]map[string]string{{"foo": "bar"}})),
+			actualRole:             aggregatedRole(aggregationrule([]map[string]string{{"foo": "bar"}})),
+			removeExtraPermissions: true,
+
+			expectedReconciledRole:       nil,
+			expectedReconciliationNeeded: false,
+		},
+		"match with union": {
+			expectedRole:           aggregatedRole(aggregationrule([]map[string]string{{"foo": "bar"}})),
+			actualRole:             aggregatedRole(aggregationrule([]map[string]string{{"foo": "bar"}})),
+			removeExtraPermissions: false,
+
+			expectedReconciledRole:       nil,
+			expectedReconciliationNeeded: false,
+		},
+		"different rules without union": {
+			expectedRole:           aggregatedRole(aggregationrule([]map[string]string{{"foo": "bar"}})),
+			actualRole:             aggregatedRole(aggregationrule([]map[string]string{{"alpha": "bravo"}})),
+			removeExtraPermissions: true,
+
+			expectedReconciledRole:       aggregatedRole(aggregationrule([]map[string]string{{"foo": "bar"}})),
+			expectedReconciliationNeeded: true,
+		},
+		"different rules with union": {
+			expectedRole:           aggregatedRole(aggregationrule([]map[string]string{{"foo": "bar"}})),
+			actualRole:             aggregatedRole(aggregationrule([]map[string]string{{"alpha": "bravo"}})),
+			removeExtraPermissions: false,
+
+			expectedReconciledRole:       aggregatedRole(aggregationrule([]map[string]string{{"alpha": "bravo"}, {"foo": "bar"}})),
+			expectedReconciliationNeeded: true,
+		},
+	}
+
+	for k, tc := range tests {
+		actualRole := ClusterRoleRuleOwner{ClusterRole: tc.actualRole}
+		expectedRole := ClusterRoleRuleOwner{ClusterRole: tc.expectedRole}
+		result, err := computeReconciledRole(actualRole, expectedRole, tc.removeExtraPermissions)
+		if err != nil {
+			t.Errorf("%s: %v", k, err)
+			continue
+		}
+		reconciliationNeeded := result.Operation != ReconcileNone
+		if reconciliationNeeded != tc.expectedReconciliationNeeded {
+			t.Errorf("%s: Expected\n\t%v\ngot\n\t%v", k, tc.expectedReconciliationNeeded, reconciliationNeeded)
+			continue
+		}
+		if reconciliationNeeded && !helper.Semantic.DeepEqual(result.Role.(ClusterRoleRuleOwner).ClusterRole, tc.expectedReconciledRole) {
+			t.Errorf("%s: %v", k, diff.ObjectDiff(tc.expectedReconciledRole, result.Role.(ClusterRoleRuleOwner).ClusterRole))
 		}
 	}
 }

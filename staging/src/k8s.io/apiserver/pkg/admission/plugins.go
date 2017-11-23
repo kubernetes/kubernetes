@@ -25,6 +25,8 @@ import (
 	"sort"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/golang/glog"
 )
 
@@ -37,6 +39,16 @@ type Factory func(config io.Reader) (Interface, error)
 type Plugins struct {
 	lock     sync.Mutex
 	registry map[string]Factory
+
+	// ConfigScheme is used to parse the admission plugin config file.
+	// It is exposed to act as a hook for extending server providing their own config.
+	ConfigScheme *runtime.Scheme
+}
+
+func NewPlugins() *Plugins {
+	return &Plugins{
+		ConfigScheme: runtime.NewScheme(),
+	}
 }
 
 // All registered admission options.
@@ -118,10 +130,12 @@ func splitStream(config io.Reader) (io.Reader, io.Reader, error) {
 	return bytes.NewBuffer(configBytes), bytes.NewBuffer(configBytes), nil
 }
 
+type Decorator func(handler Interface, name string) Interface
+
 // NewFromPlugins returns an admission.Interface that will enforce admission control decisions of all
 // the given plugins.
-func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigProvider, pluginInitializer PluginInitializer) (Interface, error) {
-	plugins := []Interface{}
+func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigProvider, pluginInitializer PluginInitializer, decorator Decorator) (Interface, error) {
+	handlers := []Interface{}
 	for _, pluginName := range pluginNames {
 		pluginConfig, err := configProvider.ConfigFor(pluginName)
 		if err != nil {
@@ -133,10 +147,14 @@ func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigPro
 			return nil, err
 		}
 		if plugin != nil {
-			plugins = append(plugins, plugin)
+			if decorator != nil {
+				handlers = append(handlers, decorator(plugin, pluginName))
+			} else {
+				handlers = append(handlers, plugin)
+			}
 		}
 	}
-	return chainAdmissionHandler(plugins), nil
+	return chainAdmissionHandler(handlers), nil
 }
 
 // InitPlugin creates an instance of the named interface.

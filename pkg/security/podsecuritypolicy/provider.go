@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -233,9 +233,24 @@ func (s *simpleProvider) ValidatePodSecurityContext(pod *api.Pod, fldPath *field
 						fmt.Sprintf("is not allowed to be used")))
 				}
 			}
+
+			if fsType == extensions.FlexVolume && len(s.psp.Spec.AllowedFlexVolumes) > 0 {
+				found := false
+				driver := v.FlexVolume.Driver
+				for _, allowedFlexVolume := range s.psp.Spec.AllowedFlexVolumes {
+					if driver == allowedFlexVolume.Driver {
+						found = true
+						break
+					}
+				}
+				if !found {
+					allErrs = append(allErrs,
+						field.Invalid(fldPath.Child("volumes").Index(i).Child("driver"), driver,
+							"Flexvolume driver is not allowed to be used"))
+				}
+			}
 		}
 	}
-
 	return allErrs
 }
 
@@ -307,7 +322,7 @@ func (s *simpleProvider) ValidateContainerSecurityContext(pod *api.Pod, containe
 func (s *simpleProvider) hasInvalidHostPort(container *api.Container, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, cp := range container.Ports {
-		if cp.HostPort > 0 && !s.isValidHostPort(int(cp.HostPort)) {
+		if cp.HostPort > 0 && !s.isValidHostPort(cp.HostPort) {
 			detail := fmt.Sprintf("Host port %d is not allowed to be used. Allowed ports: [%s]", cp.HostPort, hostPortRangesToString(s.psp.Spec.HostPorts))
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("hostPort"), cp.HostPort, detail))
 		}
@@ -316,7 +331,7 @@ func (s *simpleProvider) hasInvalidHostPort(container *api.Container, fldPath *f
 }
 
 // isValidHostPort returns true if the port falls in any range allowed by the PSP.
-func (s *simpleProvider) isValidHostPort(port int) bool {
+func (s *simpleProvider) isValidHostPort(port int32) bool {
 	for _, hostPortRange := range s.psp.Spec.HostPorts {
 		if port >= hostPortRange.Min && port <= hostPortRange.Max {
 			return true

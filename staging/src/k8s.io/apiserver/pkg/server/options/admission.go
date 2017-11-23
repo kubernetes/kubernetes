@@ -24,9 +24,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
+	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
 	"k8s.io/apiserver/pkg/admission/plugin/initialization"
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook"
+	mutatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
+	validatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/validating"
+	apiserverapi "k8s.io/apiserver/pkg/apis/apiserver"
+	apiserverapiv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -41,7 +45,8 @@ type AdmissionOptions struct {
 	DefaultOffPlugins []string
 	PluginNames       []string
 	ConfigFile        string
-	Plugins           *admission.Plugins
+
+	Plugins *admission.Plugins
 }
 
 // NewAdmissionOptions creates a new instance of AdmissionOptions
@@ -54,11 +59,17 @@ type AdmissionOptions struct {
 //  Servers that do care can overwrite/append that field after creation.
 func NewAdmissionOptions() *AdmissionOptions {
 	options := &AdmissionOptions{
-		Plugins:                &admission.Plugins{},
-		PluginNames:            []string{},
-		RecommendedPluginOrder: []string{lifecycle.PluginName, initialization.PluginName, webhook.PluginName},
-		DefaultOffPlugins:      []string{initialization.PluginName, webhook.PluginName},
+		Plugins:     admission.NewPlugins(),
+		PluginNames: []string{},
+		// This list is mix of mutating admission plugins and validating
+		// admission plugins. The apiserver always runs the validating ones
+		// after all the mutating ones, so their relative order in this list
+		// doesn't matter.
+		RecommendedPluginOrder: []string{lifecycle.PluginName, initialization.PluginName, mutatingwebhook.PluginName, validatingwebhook.PluginName},
+		DefaultOffPlugins:      []string{initialization.PluginName, mutatingwebhook.PluginName, validatingwebhook.PluginName},
 	}
+	apiserverapi.AddToScheme(options.Plugins.ConfigScheme)
+	apiserverapiv1alpha1.AddToScheme(options.Plugins.ConfigScheme)
 	server.RegisterAllAdmissionPlugins(options.Plugins)
 	return options
 }
@@ -66,7 +77,11 @@ func NewAdmissionOptions() *AdmissionOptions {
 // AddFlags adds flags related to admission for a specific APIServer to the specified FlagSet
 func (a *AdmissionOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&a.PluginNames, "admission-control", a.PluginNames, ""+
-		"Ordered list of plug-ins to do admission control of resources into cluster. "+
+		"Admission is divided into two phases. "+
+		"In the first phase, only mutating admission plugins run. "+
+		"In the second phase, only validating admission plugins run. "+
+		"The names in the below list may represent a validating plugin, a mutating plugin, or both. "+
+		"Within each phase, the plugins will run in the order in which they are passed to this flag. "+
 		"Comma-delimited list of: "+strings.Join(a.Plugins.Registered(), ", ")+".")
 
 	fs.StringVar(&a.ConfigFile, "admission-control-config-file", a.ConfigFile,
@@ -90,7 +105,7 @@ func (a *AdmissionOptions) ApplyTo(
 		pluginNames = a.enabledPluginNames()
 	}
 
-	pluginsConfigProvider, err := admission.ReadAdmissionConfiguration(pluginNames, a.ConfigFile)
+	pluginsConfigProvider, err := admission.ReadAdmissionConfiguration(pluginNames, a.ConfigFile, a.Plugins.ConfigScheme)
 	if err != nil {
 		return fmt.Errorf("failed to read plugin config: %v", err)
 	}
@@ -99,20 +114,17 @@ func (a *AdmissionOptions) ApplyTo(
 	if err != nil {
 		return err
 	}
-	genericInitializer, err := initializer.New(clientset, informers, c.Authorizer, scheme)
-	if err != nil {
-		return err
-	}
+	genericInitializer := initializer.New(clientset, informers, c.Authorizer, scheme)
 	initializersChain := admission.PluginInitializers{}
 	pluginInitializers = append(pluginInitializers, genericInitializer)
 	initializersChain = append(initializersChain, pluginInitializers...)
 
-	admissionChain, err := a.Plugins.NewFromPlugins(pluginNames, pluginsConfigProvider, initializersChain)
+	admissionChain, err := a.Plugins.NewFromPlugins(pluginNames, pluginsConfigProvider, initializersChain, admissionmetrics.WithControllerMetrics)
 	if err != nil {
 		return err
 	}
 
-	c.AdmissionControl = admissionChain
+	c.AdmissionControl = admissionmetrics.WithStepMetrics(admissionChain)
 	return nil
 }
 

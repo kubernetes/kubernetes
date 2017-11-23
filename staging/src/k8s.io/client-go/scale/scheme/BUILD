@@ -13,7 +13,6 @@ go_library(
     deps = [
         "//vendor/k8s.io/api/autoscaling/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
@@ -30,6 +29,9 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/client-go/scale/scheme/appsint:all-srcs",
+        "//staging/src/k8s.io/client-go/scale/scheme/appsv1beta1:all-srcs",
+        "//staging/src/k8s.io/client-go/scale/scheme/appsv1beta2:all-srcs",
         "//staging/src/k8s.io/client-go/scale/scheme/autoscalingv1:all-srcs",
         "//staging/src/k8s.io/client-go/scale/scheme/extensionsint:all-srcs",
         "//staging/src/k8s.io/client-go/scale/scheme/extensionsv1beta1:all-srcs",

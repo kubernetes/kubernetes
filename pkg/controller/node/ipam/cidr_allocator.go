@@ -80,12 +80,12 @@ type CIDRAllocator interface {
 	AllocateOrOccupyCIDR(node *v1.Node) error
 	// ReleaseCIDR releases the CIDR of the removed node
 	ReleaseCIDR(node *v1.Node) error
-	// Register allocator with the nodeInformer for updates.
-	Register(nodeInformer informers.NodeInformer)
+	// Run starts all the working logic of the allocator.
+	Run(stopCh <-chan struct{})
 }
 
 // New creates a new CIDR range allocator.
-func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, allocatorType CIDRAllocatorType, clusterCIDR, serviceCIDR *net.IPNet, nodeCIDRMaskSize int) (CIDRAllocator, error) {
+func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer, allocatorType CIDRAllocatorType, clusterCIDR, serviceCIDR *net.IPNet, nodeCIDRMaskSize int) (CIDRAllocator, error) {
 	nodeList, err := listNodes(kubeClient)
 	if err != nil {
 		return nil, err
@@ -93,9 +93,9 @@ func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, allocato
 
 	switch allocatorType {
 	case RangeAllocatorType:
-		return NewCIDRRangeAllocator(kubeClient, clusterCIDR, serviceCIDR, nodeCIDRMaskSize, nodeList)
+		return NewCIDRRangeAllocator(kubeClient, nodeInformer, clusterCIDR, serviceCIDR, nodeCIDRMaskSize, nodeList)
 	case CloudAllocatorType:
-		return NewCloudCIDRAllocator(kubeClient, cloud)
+		return NewCloudCIDRAllocator(kubeClient, cloud, nodeInformer)
 	default:
 		return nil, fmt.Errorf("Invalid CIDR allocator type: %v", allocatorType)
 	}

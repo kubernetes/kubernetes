@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 const (
@@ -41,44 +41,6 @@ const (
 	// names or sysctl patterns (which end in *). The string "*" matches all sysctls.
 	SysctlsPodSecurityPolicyAnnotationKey string = "security.alpha.kubernetes.io/sysctls"
 )
-
-// describes the attributes of a scale subresource
-type ScaleSpec struct {
-	// desired number of instances for the scaled object.
-	// +optional
-	Replicas int32
-}
-
-// represents the current status of a scale subresource.
-type ScaleStatus struct {
-	// actual number of observed instances of the scaled object.
-	Replicas int32
-
-	// label query over pods that should match the replicas count.
-	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
-	// +optional
-	Selector *metav1.LabelSelector
-}
-
-// +genclient
-// +genclient:noVerbs
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// represents a scaling request for a resource.
-type Scale struct {
-	metav1.TypeMeta
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
-	// +optional
-	metav1.ObjectMeta
-
-	// defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
-	// +optional
-	Spec ScaleSpec
-
-	// current status of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status. Read-only.
-	// +optional
-	Status ScaleStatus
-}
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -111,8 +73,8 @@ type CustomMetricCurrentStatusList struct {
 }
 
 // +genclient
-// +genclient:method=GetScale,verb=get,subresource=scale,result=Scale
-// +genclient:method=UpdateScale,verb=update,subresource=scale,input=Scale,result=Scale
+// +genclient:method=GetScale,verb=get,subresource=scale,result=k8s.io/kubernetes/pkg/apis/autoscaling.Scale
+// +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/kubernetes/pkg/apis/autoscaling.Scale,result=k8s.io/kubernetes/pkg/apis/autoscaling.Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Deployment struct {
@@ -469,6 +431,27 @@ type DaemonSetStatus struct {
 	// create the name for the newest ControllerRevision.
 	// +optional
 	CollisionCount *int32
+
+	// Represents the latest available observations of a DaemonSet's current state.
+	Conditions []DaemonSetCondition
+}
+
+type DaemonSetConditionType string
+
+// TODO: Add valid condition types of a DaemonSet.
+
+// DaemonSetCondition describes the state of a DaemonSet at a certain point.
+type DaemonSetCondition struct {
+	// Type of DaemonSet condition.
+	Type DaemonSetConditionType
+	// Status of the condition, one of True, False, Unknown.
+	Status api.ConditionStatus
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime metav1.Time
+	// The reason for the condition's last transition.
+	Reason string
+	// A human readable message indicating details about the transition.
+	Message string
 }
 
 // +genclient
@@ -688,8 +671,8 @@ type IngressBackend struct {
 }
 
 // +genclient
-// +genclient:method=GetScale,verb=get,subresource=scale,result=Scale
-// +genclient:method=UpdateScale,verb=update,subresource=scale,input=Scale,result=Scale
+// +genclient:method=GetScale,verb=get,subresource=scale,result=k8s.io/kubernetes/pkg/apis/autoscaling.Scale
+// +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/kubernetes/pkg/apis/autoscaling.Scale,result=k8s.io/kubernetes/pkg/apis/autoscaling.Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ReplicaSet ensures that a specified number of pod replicas are running at any given time.
@@ -821,7 +804,8 @@ type PodSecurityPolicySpec struct {
 	Privileged bool
 	// DefaultAddCapabilities is the default set of capabilities that will be added to the container
 	// unless the pod spec specifically drops the capability.  You may not list a capability in both
-	// DefaultAddCapabilities and RequiredDropCapabilities.
+	// DefaultAddCapabilities and RequiredDropCapabilities. Capabilities added here are implicitly
+	// allowed, and need not be included in the AllowedCapabilities list.
 	// +optional
 	DefaultAddCapabilities []api.Capability
 	// RequiredDropCapabilities are the capabilities that will be dropped from the container.  These
@@ -876,6 +860,11 @@ type PodSecurityPolicySpec struct {
 	// AllowedHostPaths is a white list of allowed host paths. Empty indicates that all host paths may be used.
 	// +optional
 	AllowedHostPaths []AllowedHostPath
+	// AllowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all
+	// Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes
+	// is allowed in the "Volumes" field.
+	// +optional
+	AllowedFlexVolumes []AllowedFlexVolume
 }
 
 // AllowedHostPath defines the host volume conditions that will be enabled by a policy
@@ -895,9 +884,9 @@ type AllowedHostPath struct {
 // for pods to use.  It requires both the start and end to be defined.
 type HostPortRange struct {
 	// Min is the start of the range, inclusive.
-	Min int
+	Min int32
 	// Max is the end of the range, inclusive.
-	Max int
+	Max int32
 }
 
 // AllowAllCapabilities can be used as a value for the PodSecurityPolicy.AllowAllCapabilities
@@ -935,8 +924,15 @@ var (
 	Projected             FSType = "projected"
 	PortworxVolume        FSType = "portworxVolume"
 	ScaleIO               FSType = "scaleIO"
+	CSI                   FSType = "csi"
 	All                   FSType = "*"
 )
+
+// AllowedFlexVolume represents a single Flexvolume that is allowed to be used.
+type AllowedFlexVolume struct {
+	// Driver is the name of the Flexvolume driver.
+	Driver string
+}
 
 // SELinuxStrategyOptions defines the strategy type and any options used to create the strategy.
 type SELinuxStrategyOptions struct {

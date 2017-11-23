@@ -19,10 +19,14 @@ package aws
 import (
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 )
+
+// awsVolumeRegMatch represents Regex Match for AWS volume.
+var awsVolumeRegMatch = regexp.MustCompile("^vol-[^/]*$")
 
 // awsVolumeID represents the ID of the volume in the AWS API, e.g. vol-12345678
 // The "traditional" format is "vol-12345678"
@@ -75,8 +79,7 @@ func (name KubernetesVolumeID) mapToAWSVolumeID() (awsVolumeID, error) {
 
 	// We sanity check the resulting volume; the two known formats are
 	// vol-12345678 and vol-12345678abcdef01
-	// TODO: Regex match?
-	if strings.Contains(awsID, "/") || !strings.HasPrefix(awsID, "vol-") {
+	if !awsVolumeRegMatch.MatchString(awsID) {
 		return "", fmt.Errorf("Invalid format for AWS volume (%s)", name)
 	}
 
