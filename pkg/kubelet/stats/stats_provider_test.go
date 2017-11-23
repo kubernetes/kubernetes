@@ -558,6 +558,12 @@ func checkMemoryStats(t *testing.T, label string, seed int, info cadvisorapiv2.C
 	}
 }
 
+func checkEphemeralStorageStats(t *testing.T, label string, seed int, stats *statsapi.FsStats) {
+	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".EphemeralStorage.Time")
+	assert.EqualValues(t, seed+offsetFsTotalUsageBytes, *stats.UsedBytes)
+	assert.EqualValues(t, seed+offsetFsInodeUsage, *stats.InodesUsed)
+}
+
 func checkFsStats(t *testing.T, label string, seed int, stats *statsapi.FsStats) {
 	assert.EqualValues(t, seed+offsetFsCapacity, *stats.CapacityBytes, label+".CapacityBytes")
 	assert.EqualValues(t, seed+offsetFsAvailable, *stats.AvailableBytes, label+".AvailableBytes")

@@ -221,11 +221,13 @@ func TestCadvisorListPodStats(t *testing.T) {
 	assert.EqualValues(t, testTime(creationTime, seedPod0Container0).Unix(), con.StartTime.Time.Unix())
 	checkCPUStats(t, "Pod0Container0", seedPod0Container0, con.CPU)
 	checkMemoryStats(t, "Pod0Conainer0", seedPod0Container0, infos["/pod0-c0"], con.Memory)
+	checkEphemeralStorageStats(t, "Pod0Container0", seedPod0Container0, con.EphemeralStorage)
 
 	con = indexCon[cName01]
 	assert.EqualValues(t, testTime(creationTime, seedPod0Container1).Unix(), con.StartTime.Time.Unix())
 	checkCPUStats(t, "Pod0Container1", seedPod0Container1, con.CPU)
 	checkMemoryStats(t, "Pod0Container1", seedPod0Container1, infos["/pod0-c1"], con.Memory)
+	checkEphemeralStorageStats(t, "Pod0Container1", seedPod0Container1, con.EphemeralStorage)
 
 	assert.EqualValues(t, testTime(creationTime, seedPod0Infra).Unix(), ps.StartTime.Time.Unix())
 	checkNetworkStats(t, "Pod0", seedPod0Infra, ps.Network)
@@ -242,6 +244,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 	checkCPUStats(t, "Pod1Container0", seedPod1Container, con.CPU)
 	checkMemoryStats(t, "Pod1Container0", seedPod1Container, infos["/pod1-c0"], con.Memory)
 	checkNetworkStats(t, "Pod1", seedPod1Infra, ps.Network)
+	checkEphemeralStorageStats(t, "Pod1Container0", seedPod1Container, con.EphemeralStorage)
 
 	// Validate Pod2 Results
 	ps, found = indexPods[prf2]
@@ -252,6 +255,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 	checkCPUStats(t, "Pod2Container0", seedPod2Container, con.CPU)
 	checkMemoryStats(t, "Pod2Container0", seedPod2Container, infos["/pod2-c0"], con.Memory)
 	checkNetworkStats(t, "Pod2", seedPod2Infra, ps.Network)
+	checkEphemeralStorageStats(t, "Pod2Container0", seedPod2Container, con.EphemeralStorage)
 }
 
 func TestCadvisorImagesFsStats(t *testing.T) {

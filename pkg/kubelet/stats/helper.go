@@ -94,9 +94,18 @@ func cadvisorInfoToContainerStats(name string, info *cadvisorapiv2.ContainerInfo
 			Inodes:         rootFs.Inodes,
 		}
 
+		result.EphemeralStorage = &statsapi.FsStats{
+			Time:           metav1.NewTime(cstat.Timestamp),
+			AvailableBytes: &rootFs.Available,
+			CapacityBytes:  &rootFs.Capacity,
+			InodesFree:     rootFs.InodesFree,
+			Inodes:         rootFs.Inodes,
+		}
+
 		if rootFs.Inodes != nil && rootFs.InodesFree != nil {
 			logsInodesUsed := *rootFs.Inodes - *rootFs.InodesFree
 			result.Logs.InodesUsed = &logsInodesUsed
+			result.EphemeralStorage.InodesUsed = &logsInodesUsed
 		}
 	}
 
@@ -121,12 +130,16 @@ func cadvisorInfoToContainerStats(name string, info *cadvisorapiv2.ContainerInfo
 			if cfs.TotalUsageBytes != nil && result.Logs != nil {
 				logsUsage := *cfs.TotalUsageBytes - *cfs.BaseUsageBytes
 				result.Logs.UsedBytes = &logsUsage
+				totalUsage := *cfs.TotalUsageBytes
+				result.EphemeralStorage.UsedBytes = &totalUsage
 			}
 		}
 		if cfs.InodeUsage != nil && result.Rootfs != nil {
 			rootInodes := *cfs.InodeUsage
 			result.Rootfs.InodesUsed = &rootInodes
+			result.EphemeralStorage.InodesUsed = &rootInodes
 		}
+
 	}
 
 	for _, acc := range cstat.Accelerators {

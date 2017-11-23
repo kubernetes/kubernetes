@@ -128,6 +128,10 @@ type ContainerStats struct {
 	// Logs.UsedBytes is the number of bytes used for the container logs.
 	// +optional
 	Logs *FsStats `json:"logs,omitempty"`
+	// Stats pertaining to container usage of ephemeral-storage of root filesystem resources.
+	// EphemeralStorage.UsedBytes is the number of bytes used for ephemeral-storage in root filesystem.
+	// +optional
+	EphemeralStorage *FsStats `json:"ephemeral-storage,omitempty"`
 	// User defined metrics that are exposed by containers in the pod. Typically, we expect only one container in the pod to be exposing user defined metrics. In the event of multiple containers exposing metrics, they will be combined here.
 	// +patchMergeKey=name
 	// +patchStrategy=merge
