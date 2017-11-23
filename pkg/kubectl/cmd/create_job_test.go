@@ -63,7 +63,7 @@ func TestCreateJobFromCronJob(t *testing.T) {
 		},
 	}
 
-	cjmiObject := &batch.CronJobManualInstantiation{
+	cjmiObject := &batch.CronJobManualRequest{
 		CreatedJob: batch.Job{
 			ObjectMeta: v1.ObjectMeta{
 				Name: "test-cronjob-manual-1234567890",

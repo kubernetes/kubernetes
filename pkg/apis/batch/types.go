@@ -203,7 +203,7 @@ type JobCondition struct {
 }
 
 // +genclient
-// +genclient:method=Instantiate,verb=create,subresource=instantiate,input=k8s.io/api/batch/v1beta1.CronJobManualInstantiation,result=k8s.io/api/batch/v1beta1.CronJobManualInstantiation
+// +genclient:method=Instantiate,verb=create,subresource=instantiate,input=k8s.io/api/batch/v1beta1.CronJobManualRequest,result=k8s.io/api/batch/v1beta1.CronJobManualRequest
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CronJob represents the configuration of a single cron job.
@@ -241,8 +241,8 @@ type CronJobList struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// CronJobManualInstantiation represents a manual triggering of a CronJob.
-type CronJobManualInstantiation struct {
+// CronJobManualRequest represents a manual triggering of a CronJob.
+type CronJobManualRequest struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata

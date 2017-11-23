@@ -985,7 +985,7 @@
     "description": "API at /apis/batch/v2alpha1",
     "operations": [
      {
-      "type": "v2alpha1.CronJobManualInstantiation",
+      "type": "v2alpha1.CronJobManualRequest",
       "method": "POST",
       "summary": "create instantiate of a CronJob",
       "nickname": "createNamespacedCronJobInstantiate",
@@ -999,7 +999,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v2alpha1.CronJobManualInstantiation",
+        "type": "v2alpha1.CronJobManualRequest",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1018,7 +1018,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the CronJobManualInstantiation",
+        "description": "name of the CronJobManualRequest",
         "required": true,
         "allowMultiple": false
        }
@@ -1027,17 +1027,17 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v2alpha1.CronJobManualInstantiation"
+        "responseModel": "v2alpha1.CronJobManualRequest"
        },
        {
         "code": 201,
         "message": "Created",
-        "responseModel": "v2alpha1.CronJobManualInstantiation"
+        "responseModel": "v2alpha1.CronJobManualRequest"
        },
        {
         "code": 202,
         "message": "Accepted",
-        "responseModel": "v2alpha1.CronJobManualInstantiation"
+        "responseModel": "v2alpha1.CronJobManualRequest"
        }
       ],
       "produces": [
@@ -3871,9 +3871,9 @@
     "id": "v1.DeletionPropagation",
     "properties": {}
    },
-   "v2alpha1.CronJobManualInstantiation": {
-    "id": "v2alpha1.CronJobManualInstantiation",
-    "description": "CronJobManualInstantiation represents a manual triggering of a CronJob.",
+   "v2alpha1.CronJobManualRequest": {
+    "id": "v2alpha1.CronJobManualRequest",
+    "description": "CronJobManualRequest represents a manual triggering of a CronJob.",
     "properties": {
      "kind": {
       "type": "string",

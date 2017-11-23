@@ -116,7 +116,7 @@ func (c *CreateJobOptions) Validate() error {
 
 func (c *CreateJobOptions) RunCreateJob() (err error) {
 	// the passed-in CJMI is not used for anything but client-gen's code requires it
-	result, err := c.Client.CronJobs(c.Namespace).Instantiate(c.FromCronJob, &v1beta1.CronJobManualInstantiation{})
+	result, err := c.Client.CronJobs(c.Namespace).Instantiate(c.FromCronJob, &v1beta1.CronJobManualRequest{})
 	if err != nil {
 		return err
 	}

@@ -27,7 +27,7 @@ limitations under the License.
 	It has these top-level messages:
 		CronJob
 		CronJobList
-		CronJobManualInstantiation
+		CronJobManualRequest
 		CronJobSpec
 		CronJobStatus
 		JobTemplate
@@ -66,9 +66,9 @@ func (m *CronJobList) Reset()                    { *m = CronJobList{} }
 func (*CronJobList) ProtoMessage()               {}
 func (*CronJobList) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{1} }
 
-func (m *CronJobManualInstantiation) Reset()      { *m = CronJobManualInstantiation{} }
-func (*CronJobManualInstantiation) ProtoMessage() {}
-func (*CronJobManualInstantiation) Descriptor() ([]byte, []int) {
+func (m *CronJobManualRequest) Reset()      { *m = CronJobManualRequest{} }
+func (*CronJobManualRequest) ProtoMessage() {}
+func (*CronJobManualRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptorGenerated, []int{2}
 }
 
@@ -91,7 +91,7 @@ func (*JobTemplateSpec) Descriptor() ([]byte, []int) { return fileDescriptorGene
 func init() {
 	proto.RegisterType((*CronJob)(nil), "k8s.io.api.batch.v1beta1.CronJob")
 	proto.RegisterType((*CronJobList)(nil), "k8s.io.api.batch.v1beta1.CronJobList")
-	proto.RegisterType((*CronJobManualInstantiation)(nil), "k8s.io.api.batch.v1beta1.CronJobManualInstantiation")
+	proto.RegisterType((*CronJobManualRequest)(nil), "k8s.io.api.batch.v1beta1.CronJobManualRequest")
 	proto.RegisterType((*CronJobSpec)(nil), "k8s.io.api.batch.v1beta1.CronJobSpec")
 	proto.RegisterType((*CronJobStatus)(nil), "k8s.io.api.batch.v1beta1.CronJobStatus")
 	proto.RegisterType((*JobTemplate)(nil), "k8s.io.api.batch.v1beta1.JobTemplate")
@@ -177,7 +177,7 @@ func (m *CronJobList) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *CronJobManualInstantiation) Marshal() (dAtA []byte, err error) {
+func (m *CronJobManualRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -187,7 +187,7 @@ func (m *CronJobManualInstantiation) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *CronJobManualInstantiation) MarshalTo(dAtA []byte) (int, error) {
+func (m *CronJobManualRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -431,7 +431,7 @@ func (m *CronJobList) Size() (n int) {
 	return n
 }
 
-func (m *CronJobManualInstantiation) Size() (n int) {
+func (m *CronJobManualRequest) Size() (n int) {
 	var l int
 	_ = l
 	l = m.ObjectMeta.Size()
@@ -537,11 +537,11 @@ func (this *CronJobList) String() string {
 	}, "")
 	return s
 }
-func (this *CronJobManualInstantiation) String() string {
+func (this *CronJobManualRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&CronJobManualInstantiation{`,
+	s := strings.Join([]string{`&CronJobManualRequest{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(this.ObjectMeta.String(), "ObjectMeta", "k8s_io_apimachinery_pkg_apis_meta_v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`CreatedJob:` + strings.Replace(strings.Replace(this.CreatedJob.String(), "Job", "k8s_io_api_batch_v1.Job", 1), `&`, ``, 1) + `,`,
 		`}`,
@@ -856,7 +856,7 @@ func (m *CronJobList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *CronJobManualInstantiation) Unmarshal(dAtA []byte) error {
+func (m *CronJobManualRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -879,10 +879,10 @@ func (m *CronJobManualInstantiation) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: CronJobManualInstantiation: wiretype end group for non-group")
+			return fmt.Errorf("proto: CronJobManualRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: CronJobManualInstantiation: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: CronJobManualRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:

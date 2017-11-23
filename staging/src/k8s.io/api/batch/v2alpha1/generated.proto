@@ -60,8 +60,8 @@ message CronJobList {
   repeated CronJob items = 2;
 }
 
-// CronJobManualInstantiation represents a manual triggering of a CronJob.
-message CronJobManualInstantiation {
+// CronJobManualRequest represents a manual triggering of a CronJob.
+message CronJobManualRequest {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional

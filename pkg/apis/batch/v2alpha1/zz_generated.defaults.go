@@ -33,8 +33,8 @@ import (
 func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v2alpha1.CronJob{}, func(obj interface{}) { SetObjectDefaults_CronJob(obj.(*v2alpha1.CronJob)) })
 	scheme.AddTypeDefaultingFunc(&v2alpha1.CronJobList{}, func(obj interface{}) { SetObjectDefaults_CronJobList(obj.(*v2alpha1.CronJobList)) })
-	scheme.AddTypeDefaultingFunc(&v2alpha1.CronJobManualInstantiation{}, func(obj interface{}) {
-		SetObjectDefaults_CronJobManualInstantiation(obj.(*v2alpha1.CronJobManualInstantiation))
+	scheme.AddTypeDefaultingFunc(&v2alpha1.CronJobManualRequest{}, func(obj interface{}) {
+		SetObjectDefaults_CronJobManualRequest(obj.(*v2alpha1.CronJobManualRequest))
 	})
 	scheme.AddTypeDefaultingFunc(&v2alpha1.JobTemplate{}, func(obj interface{}) { SetObjectDefaults_JobTemplate(obj.(*v2alpha1.JobTemplate)) })
 	return nil
@@ -184,7 +184,7 @@ func SetObjectDefaults_CronJobList(in *v2alpha1.CronJobList) {
 	}
 }
 
-func SetObjectDefaults_CronJobManualInstantiation(in *v2alpha1.CronJobManualInstantiation) {
+func SetObjectDefaults_CronJobManualRequest(in *v2alpha1.CronJobManualRequest) {
 	batch_v1.SetDefaults_Job(&in.CreatedJob)
 	v1.SetDefaults_PodSpec(&in.CreatedJob.Spec.Template.Spec)
 	for i := range in.CreatedJob.Spec.Template.Spec.Volumes {

@@ -36813,7 +36813,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJobManualInstantiation"
+        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJobManualRequest"
        }
       }
      ],
@@ -36821,19 +36821,19 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJobManualInstantiation"
+        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJobManualRequest"
        }
       },
       "201": {
        "description": "Created",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJobManualInstantiation"
+        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJobManualRequest"
        }
       },
       "202": {
        "description": "Accepted",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJobManualInstantiation"
+        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJobManualRequest"
        }
       },
       "401": {
@@ -36843,7 +36843,7 @@
      "x-kubernetes-action": "post",
      "x-kubernetes-group-version-kind": {
       "group": "batch",
-      "kind": "CronJobManualInstantiation",
+      "kind": "CronJobManualRequest",
       "version": "v1beta1"
      }
     },
@@ -36851,7 +36851,7 @@
      {
       "uniqueItems": true,
       "type": "string",
-      "description": "name of the CronJobManualInstantiation",
+      "description": "name of the CronJobManualRequest",
       "name": "name",
       "in": "path",
       "required": true
@@ -37957,7 +37957,7 @@
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJobManualInstantiation"
+        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJobManualRequest"
        }
       }
      ],
@@ -37965,19 +37965,19 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJobManualInstantiation"
+        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJobManualRequest"
        }
       },
       "201": {
        "description": "Created",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJobManualInstantiation"
+        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJobManualRequest"
        }
       },
       "202": {
        "description": "Accepted",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJobManualInstantiation"
+        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJobManualRequest"
        }
       },
       "401": {
@@ -37987,7 +37987,7 @@
      "x-kubernetes-action": "post",
      "x-kubernetes-group-version-kind": {
       "group": "batch",
-      "kind": "CronJobManualInstantiation",
+      "kind": "CronJobManualRequest",
       "version": "v2alpha1"
      }
     },
@@ -37995,7 +37995,7 @@
      {
       "uniqueItems": true,
       "type": "string",
-      "description": "name of the CronJobManualInstantiation",
+      "description": "name of the CronJobManualRequest",
       "name": "name",
       "in": "path",
       "required": true
@@ -74428,8 +74428,8 @@
      }
     ]
    },
-   "io.k8s.api.batch.v1beta1.CronJobManualInstantiation": {
-    "description": "CronJobManualInstantiation represents a manual triggering of a CronJob.",
+   "io.k8s.api.batch.v1beta1.CronJobManualRequest": {
+    "description": "CronJobManualRequest represents a manual triggering of a CronJob.",
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -74451,7 +74451,7 @@
     "x-kubernetes-group-version-kind": [
      {
       "group": "batch",
-      "kind": "CronJobManualInstantiation",
+      "kind": "CronJobManualRequest",
       "version": "v1beta1"
      }
     ]
@@ -74591,8 +74591,8 @@
      }
     ]
    },
-   "io.k8s.api.batch.v2alpha1.CronJobManualInstantiation": {
-    "description": "CronJobManualInstantiation represents a manual triggering of a CronJob.",
+   "io.k8s.api.batch.v2alpha1.CronJobManualRequest": {
+    "description": "CronJobManualRequest represents a manual triggering of a CronJob.",
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -74614,7 +74614,7 @@
     "x-kubernetes-group-version-kind": [
      {
       "group": "batch",
-      "kind": "CronJobManualInstantiation",
+      "kind": "CronJobManualRequest",
       "version": "v2alpha1"
      }
     ]

@@ -90,8 +90,8 @@ type CronJobList struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// CronJobManualInstantiation represents a manual triggering of a CronJob.
-type CronJobManualInstantiation struct {
+// CronJobManualRequest represents a manual triggering of a CronJob.
+type CronJobManualRequest struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// Standard object's metadata.

@@ -111,7 +111,7 @@ type InstantiateREST struct {
 var _ = rest.NamedCreater(&InstantiateREST{})
 
 func (r *InstantiateREST) New() runtime.Object {
-	return &batch.CronJobManualInstantiation{}
+	return &batch.CronJobManualRequest{}
 }
 
 func (r *InstantiateREST) Create(ctx genericapirequest.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (out runtime.Object, err error) {
@@ -152,5 +152,5 @@ func (r *InstantiateREST) Create(ctx genericapirequest.Context, name string, obj
 		return nil, fmt.Errorf("got object of type %T, expected *batch.Job", createdJobObj)
 	}
 
-	return &batch.CronJobManualInstantiation{CreatedJob: *createdJob}, nil
+	return &batch.CronJobManualRequest{CreatedJob: *createdJob}, nil
 }

@@ -43,7 +43,7 @@ type CronJobInterface interface {
 	List(opts v1.ListOptions) (*batch.CronJobList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *batch.CronJob, err error)
-	Instantiate(cronJobName string, cronJobManualInstantiation *v1beta1.CronJobManualInstantiation) (*v1beta1.CronJobManualInstantiation, error)
+	Instantiate(cronJobName string, CronJobManualRequest *v1beta1.CronJobManualRequest) (*v1beta1.CronJobManualRequest, error)
 
 	CronJobExpansion
 }
@@ -174,15 +174,15 @@ func (c *cronJobs) Patch(name string, pt types.PatchType, data []byte, subresour
 	return
 }
 
-// Instantiate takes the representation of a cronJobManualInstantiation and creates it.  Returns the server's representation of the cronJobManualInstantiation, and an error, if there is any.
-func (c *cronJobs) Instantiate(cronJobName string, cronJobManualInstantiation *v1beta1.CronJobManualInstantiation) (result *v1beta1.CronJobManualInstantiation, err error) {
-	result = &v1beta1.CronJobManualInstantiation{}
+// Instantiate takes the representation of a CronJobManualRequest and creates it.  Returns the server's representation of the CronJobManualRequest, and an error, if there is any.
+func (c *cronJobs) Instantiate(cronJobName string, CronJobManualRequest *v1beta1.CronJobManualRequest) (result *v1beta1.CronJobManualRequest, err error) {
+	result = &v1beta1.CronJobManualRequest{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(cronJobName).
 		SubResource("instantiate").
-		Body(cronJobManualInstantiation).
+		Body(CronJobManualRequest).
 		Do().
 		Into(result)
 	return
