@@ -39,12 +39,22 @@ func (az *Cloud) createFileShare(accountName, accountKey, name string, sizeGB in
 	// receives error "The metadata specified is invalid. It has characters that are not permitted."
 	// As a result,breaking into two API calls: create share and set quota
 	share := fileClient.GetShareReference(name)
-	if err = share.Create(nil); err != nil {
+
+	mc := newMetricContext("file_share", "create", az.ResourceGroup, az.SubscriptionID)
+	err = share.Create(nil)
+	err = mc.Observe(err)
+	if err != nil {
 		return fmt.Errorf("failed to create file share, err: %v", err)
 	}
 	share.Properties.Quota = sizeGB
-	if err = share.SetProperties(nil); err != nil {
-		if err := share.Delete(nil); err != nil {
+	mc = newMetricContext("file_share", "set_properties", az.ResourceGroup, az.SubscriptionID)
+	err = share.SetProperties(nil)
+	err = mc.Observe(err)
+	if err != nil {
+		mc = newMetricContext("file_share", "delete", az.ResourceGroup, az.SubscriptionID)
+		err := share.Delete(nil)
+		mc.Observe(err)
+		if err != nil {
 			glog.Errorf("Error deleting share: %v", err)
 		}
 		return fmt.Errorf("failed to set quota on file share %s, err: %v", name, err)
@@ -57,7 +67,8 @@ func (az *Cloud) deleteFileShare(accountName, accountKey, name string) error {
 	fileClient, err := az.getFileSvcClient(accountName, accountKey)
 	if err == nil {
 		share := fileClient.GetShareReference(name)
-		return share.Delete(nil)
+		mc := newMetricContext("file_share", "delete", az.ResourceGroup, az.SubscriptionID)
+		return mc.Observe(share.Delete(nil))
 	}
 	return nil
 }

@@ -99,7 +99,9 @@ func (az *Cloud) getVirtualMachine(nodeName types.NodeName) (vm compute.VirtualM
 			// Consider adding separate parameter for controlling 'InstanceView' once node update issue #56276 is fixed
 			az.operationPollRateLimiter.Accept()
 			glog.V(10).Infof("VirtualMachinesClient.Get(%s): start", vmName)
+			mc := newMetricContext("vm", "get", az.ResourceGroup, az.SubscriptionID)
 			vm, err = az.VirtualMachinesClient.Get(az.ResourceGroup, vmName, compute.InstanceView)
+			err = mc.Observe(err)
 			glog.V(10).Infof("VirtualMachinesClient.Get(%s): end", vmName)
 
 			exists, realErr = checkResourceExistsFromError(err)
@@ -125,7 +127,9 @@ func (az *Cloud) getRouteTable() (routeTable network.RouteTable, exists bool, er
 
 	az.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("RouteTablesClient.Get(%s): start", az.RouteTableName)
+	mc := newMetricContext("route_tables", "get", az.ResourceGroup, az.SubscriptionID)
 	routeTable, err = az.RouteTablesClient.Get(az.ResourceGroup, az.RouteTableName, "")
+	err = mc.Observe(err)
 	glog.V(10).Infof("RouteTablesClient.Get(%s): end", az.RouteTableName)
 
 	exists, realErr = checkResourceExistsFromError(err)
@@ -145,7 +149,9 @@ func (az *Cloud) getSecurityGroup() (sg network.SecurityGroup, exists bool, err 
 
 	az.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("SecurityGroupsClient.Get(%s): start", az.SecurityGroupName)
+	mc := newMetricContext("security_groups", "get", az.ResourceGroup, az.SubscriptionID)
 	sg, err = az.SecurityGroupsClient.Get(az.ResourceGroup, az.SecurityGroupName, "")
+	err = mc.Observe(err)
 	glog.V(10).Infof("SecurityGroupsClient.Get(%s): end", az.SecurityGroupName)
 
 	exists, realErr = checkResourceExistsFromError(err)
@@ -164,7 +170,9 @@ func (az *Cloud) getAzureLoadBalancer(name string) (lb network.LoadBalancer, exi
 	var realErr error
 	az.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("LoadBalancerClient.Get(%s): start", name)
+	mc := newMetricContext("load_balancer", "get", az.ResourceGroup, az.SubscriptionID)
 	lb, err = az.LoadBalancerClient.Get(az.ResourceGroup, name, "")
+	err = mc.Observe(err)
 	glog.V(10).Infof("LoadBalancerClient.Get(%s): end", name)
 
 	exists, realErr = checkResourceExistsFromError(err)
@@ -184,7 +192,9 @@ func (az *Cloud) listLoadBalancers() (lbListResult network.LoadBalancerListResul
 
 	az.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("LoadBalancerClient.List(%s): start", az.ResourceGroup)
+	mc := newMetricContext("load_balancer", "list", az.ResourceGroup, az.SubscriptionID)
 	lbListResult, err = az.LoadBalancerClient.List(az.ResourceGroup)
+	err = mc.Observe(err)
 	glog.V(10).Infof("LoadBalancerClient.List(%s): end", az.ResourceGroup)
 	exists, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {
@@ -207,7 +217,9 @@ func (az *Cloud) getPublicIPAddress(pipResourceGroup string, pipName string) (pi
 	var realErr error
 	az.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("PublicIPAddressesClient.Get(%s, %s): start", resourceGroup, pipName)
+	mc := newMetricContext("plubic_ip_addresses", "get", az.ResourceGroup, az.SubscriptionID)
 	pip, err = az.PublicIPAddressesClient.Get(resourceGroup, pipName, "")
+	err = mc.Observe(err)
 	glog.V(10).Infof("PublicIPAddressesClient.Get(%s, %s): end", resourceGroup, pipName)
 
 	exists, realErr = checkResourceExistsFromError(err)
@@ -234,7 +246,9 @@ func (az *Cloud) getSubnet(virtualNetworkName string, subnetName string) (subnet
 
 	az.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("SubnetsClient.Get(%s): start", subnetName)
+	mc := newMetricContext("subnets", "get", az.ResourceGroup, az.SubscriptionID)
 	subnet, err = az.SubnetsClient.Get(rg, virtualNetworkName, subnetName, "")
+	err = mc.Observe(err)
 	glog.V(10).Infof("SubnetsClient.Get(%s): end", subnetName)
 
 	exists, realErr = checkResourceExistsFromError(err)
