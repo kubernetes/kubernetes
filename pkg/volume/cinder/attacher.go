@@ -44,15 +44,15 @@ var _ volume.Attacher = &cinderDiskAttacher{}
 var _ volume.AttachableVolumePlugin = &cinderPlugin{}
 
 const (
-	probeVolumeInitDealy     = 1 * time.Second
+	probeVolumeInitDelay     = 1 * time.Second
 	probeVolumeFactor        = 2.0
-	operationFinishInitDealy = 1 * time.Second
+	operationFinishInitDelay = 1 * time.Second
 	operationFinishFactor    = 1.1
 	operationFinishSteps     = 10
-	diskAttachInitDealy      = 1 * time.Second
+	diskAttachInitDelay      = 1 * time.Second
 	diskAttachFactor         = 1.2
 	diskAttachSteps          = 15
-	diskDetachInitDealy      = 1 * time.Second
+	diskDetachInitDelay      = 1 * time.Second
 	diskDetachFactor         = 1.2
 	diskDetachSteps          = 13
 )
@@ -75,7 +75,7 @@ func (plugin *cinderPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string
 
 func (attacher *cinderDiskAttacher) waitOperationFinished(volumeID string) error {
 	backoff := wait.Backoff{
-		Duration: operationFinishInitDealy,
+		Duration: operationFinishInitDelay,
 		Factor:   operationFinishFactor,
 		Steps:    operationFinishSteps,
 	}
@@ -100,7 +100,7 @@ func (attacher *cinderDiskAttacher) waitOperationFinished(volumeID string) error
 
 func (attacher *cinderDiskAttacher) waitDiskAttached(instanceID, volumeID string) error {
 	backoff := wait.Backoff{
-		Duration: diskAttachInitDealy,
+		Duration: diskAttachInitDelay,
 		Factor:   diskAttachFactor,
 		Steps:    diskAttachSteps,
 	}
@@ -235,12 +235,12 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 		return "", fmt.Errorf("WaitForAttach failed for Cinder disk %q: devicePath is empty.", volumeID)
 	}
 
-	ticker := time.NewTicker(probeVolumeInitDealy)
+	ticker := time.NewTicker(probeVolumeInitDelay)
 	defer ticker.Stop()
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 
-	duration := probeVolumeInitDealy
+	duration := probeVolumeInitDelay
 	for {
 		select {
 		case <-ticker.C:
@@ -334,7 +334,7 @@ func (plugin *cinderPlugin) NewDetacher() (volume.Detacher, error) {
 
 func (detacher *cinderDiskDetacher) waitOperationFinished(volumeID string) error {
 	backoff := wait.Backoff{
-		Duration: operationFinishInitDealy,
+		Duration: operationFinishInitDelay,
 		Factor:   operationFinishFactor,
 		Steps:    operationFinishSteps,
 	}
@@ -359,7 +359,7 @@ func (detacher *cinderDiskDetacher) waitOperationFinished(volumeID string) error
 
 func (detacher *cinderDiskDetacher) waitDiskDetached(instanceID, volumeID string) error {
 	backoff := wait.Backoff{
-		Duration: diskDetachInitDealy,
+		Duration: diskDetachInitDelay,
 		Factor:   diskDetachFactor,
 		Steps:    diskDetachSteps,
 	}
