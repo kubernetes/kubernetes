@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/errors"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
@@ -98,10 +99,10 @@ type genericScheduler struct {
 	extenders             []algorithm.SchedulerExtender
 	lastNodeIndexLock     sync.Mutex
 	lastNodeIndex         uint64
-	pvcLister             algorithm.PersistentVolumeClaimLister
 
 	cachedNodeInfoMap map[string]*schedulercache.NodeInfo
 	volumeBinder      *volumebinder.VolumeBinder
+	pvcLister         corelisters.PersistentVolumeClaimLister
 }
 
 // Schedule tries to schedule the given pod to one of node in the node list.
@@ -1001,7 +1002,7 @@ func podEligibleToPreemptOthers(pod *v1.Pod, nodeNameToInfo map[string]*schedule
 }
 
 // podPassesBasicChecks makes sanity checks on the pod if it can be scheduled.
-func podPassesBasicChecks(pod *v1.Pod, pvcLister algorithm.PersistentVolumeClaimLister) error {
+func podPassesBasicChecks(pod *v1.Pod, pvcLister corelisters.PersistentVolumeClaimLister) error {
 	// Check PVCs used by the pod
 	namespace := pod.Namespace
 	manifest := &(pod.Spec)
@@ -1012,7 +1013,7 @@ func podPassesBasicChecks(pod *v1.Pod, pvcLister algorithm.PersistentVolumeClaim
 			continue
 		}
 		pvcName := volume.PersistentVolumeClaim.ClaimName
-		pvc, err := pvcLister.Get(namespace, pvcName)
+		pvc, err := pvcLister.PersistentVolumeClaims(namespace).Get(pvcName)
 		if err != nil {
 			// The error has already enough context ("persistentvolumeclaim "myclaim" not found")
 			return err
@@ -1036,7 +1037,7 @@ func NewGenericScheduler(
 	priorityMetaProducer algorithm.MetadataProducer,
 	extenders []algorithm.SchedulerExtender,
 	volumeBinder *volumebinder.VolumeBinder,
-	pvcLister algorithm.PersistentVolumeClaimLister) algorithm.ScheduleAlgorithm {
+	pvcLister corelisters.PersistentVolumeClaimLister) algorithm.ScheduleAlgorithm {
 	return &genericScheduler{
 		cache:                 cache,
 		equivalenceCache:      eCache,
