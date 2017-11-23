@@ -8,7 +8,10 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["server_test.go"],
+    srcs = [
+        "openapi_test.go",
+        "server_test.go",
+    ],
     importpath = "k8s.io/kubernetes/cmd/kube-apiserver/app/testing",
     library = ":go_default_library",
     deps = [
@@ -16,6 +19,7 @@ go_test(
         "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/networking/v1:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -28,6 +32,7 @@ go_test(
         "//vendor/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
         "//vendor/k8s.io/client-go/dynamic:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/kube-aggregator/pkg/apis/apiregistration:go_default_library",
     ],
 )
 
