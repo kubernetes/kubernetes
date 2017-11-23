@@ -430,7 +430,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 						KubeVersion:    "v1.10.0-alpha.2",
 						KubeadmVersion: "v1.10.0-alpha.2",
 						DNSVersion:     "1.14.7",
-						EtcdVersion:    "3.1.11",
+						EtcdVersion:    "3.1.10",
 					},
 				},
 			},

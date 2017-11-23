@@ -236,7 +236,7 @@ var (
 	SupportedEtcdVersion = map[uint8]string{
 		8:  "3.0.17",
 		9:  "3.1.10",
-		10: "3.1.11",
+		10: "3.1.10",
 	}
 )
 
