@@ -97,7 +97,7 @@ func (c *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	}
 	c.PrintSuccess = f.PrintSuccess
 
-	clientSet, err := f.ClientSetForVersion(&schema.GroupVersion{Group: "batch", Version: "v2alpha1"})
+	clientSet, err := f.ClientSetForVersion(&schema.GroupVersion{Group: "batch", Version: "v1beta1"})
 	if err != nil {
 		return err
 	}
