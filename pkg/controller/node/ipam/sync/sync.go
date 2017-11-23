@@ -244,7 +244,7 @@ func (op *updateOp) validateRange(ctx context.Context, sync *NodeSync, node *v1.
 // alias.
 func (op *updateOp) updateNodeFromAlias(ctx context.Context, sync *NodeSync, node *v1.Node, aliasRange *net.IPNet) error {
 	if sync.mode != SyncFromCloud {
-		glog.Warningf("Detect mode %q while expect to sync from cloud", sync.mode
+		glog.Warningf("Detect mode %q while expect to sync from cloud", sync.mode)
 	}
 
 	glog.V(2).Infof("Updating node spec with alias range, node.PodCIDR = %v", aliasRange)
