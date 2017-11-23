@@ -133,6 +133,7 @@ filegroup(
         "//pkg/controller/volume/events:all-srcs",
         "//pkg/controller/volume/expand:all-srcs",
         "//pkg/controller/volume/persistentvolume:all-srcs",
+        "//pkg/controller/volume/pvcprotection:all-srcs",
     ],
     tags = ["automanaged"],
 )
