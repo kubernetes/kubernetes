@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/events"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/imagepolicy"
 	"k8s.io/kubernetes/pkg/apis/networking"
@@ -62,6 +63,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/certificates/install"
 	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	_ "k8s.io/kubernetes/pkg/apis/events/install"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
 	_ "k8s.io/kubernetes/pkg/apis/networking/install"
@@ -79,6 +81,7 @@ var (
 	Autoscaling   TestGroup
 	Batch         TestGroup
 	Extensions    TestGroup
+	Events        TestGroup
 	Apps          TestGroup
 	Policy        TestGroup
 	Rbac          TestGroup
@@ -314,6 +317,15 @@ func init() {
 			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
 		}
 	}
+	if _, ok := Groups[events.GroupName]; !ok {
+		externalGroupVersion := schema.GroupVersion{Group: events.GroupName, Version: legacyscheme.Registry.GroupOrDie(events.GroupName).GroupVersion.Version}
+		Groups[events.GroupName] = TestGroup{
+			externalGroupVersion: externalGroupVersion,
+			internalGroupVersion: events.SchemeGroupVersion,
+			internalTypes:        legacyscheme.Scheme.KnownTypes(events.SchemeGroupVersion),
+			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
+		}
+	}
 
 	Default = Groups[api.GroupName]
 	Autoscaling = Groups[autoscaling.GroupName]
@@ -322,6 +334,7 @@ func init() {
 	Policy = Groups[policy.GroupName]
 	Certificates = Groups[certificates.GroupName]
 	Extensions = Groups[extensions.GroupName]
+	Events = Groups[events.GroupName]
 	Rbac = Groups[rbac.GroupName]
 	Scheduling = Groups[scheduling.GroupName]
 	Settings = Groups[settings.GroupName]

@@ -1942,21 +1942,47 @@ function copy-manifests {
 # Fluentd manifest is modified using kubectl, which may not be available at
 # this point. Run this as a background process.
 function wait-for-apiserver-and-update-fluentd {
+  local -r fluentd_gcp_yaml="${1}"
+
+  local modifying_flags=""
+  if [[ -n "${FLUENTD_GCP_MEMORY_LIMIT:-}" ]]; then
+    modifying_flags="${modifying_flags} --limits=memory=${FLUENTD_GCP_MEMORY_LIMIT}"
+  fi
+  local request_resources=""
+  if [[ -n "${FLUENTD_GCP_CPU_REQUEST:-}" ]]; then
+    request_resources="cpu=${FLUENTD_GCP_CPU_REQUEST}"
+  fi
+  if [[ -n "${FLUENTD_GCP_MEMORY_REQUEST:-}" ]]; then
+    if [[ -n "${request_resources}" ]]; then
+      request_resources="${request_resources},"
+    fi
+    request_resources="memory=${FLUENTD_GCP_MEMORY_REQUEST}"
+  fi
+  if [[ -n "${request_resources}" ]]; then
+    modifying_flags="${modifying_flags} --requests=${request_resources}"
+  fi
+
   until kubectl get nodes
   do
     sleep 10
   done
-  kubectl set resources --dry-run --local -f ${fluentd_gcp_yaml} \
-    --limits=memory=${FLUENTD_GCP_MEMORY_LIMIT} \
-    --requests=cpu=${FLUENTD_GCP_CPU_REQUEST},memory=${FLUENTD_GCP_MEMORY_REQUEST} \
-    --containers=fluentd-gcp -o yaml > ${fluentd_gcp_yaml}.tmp
-  mv ${fluentd_gcp_yaml}.tmp ${fluentd_gcp_yaml}
+
+  local -r temp_fluentd_gcp_yaml="${fluentd_gcp_yaml}.tmp"
+  if kubectl set resources --dry-run --local -f ${fluentd_gcp_yaml} ${modifying_flags} \
+      --containers=fluentd-gcp -o yaml > ${temp_fluentd_gcp_yaml}; then
+    mv ${temp_fluentd_gcp_yaml} ${fluentd_gcp_yaml}
+  else
+    (echo "Failed to update fluentd resources. Used manifest:" && cat ${temp_fluentd_gcp_yaml}) >&2
+    rm ${temp_fluentd_gcp_yaml}
+  fi
 }
 
 # Trigger background process that will ultimately update fluentd resource
 # requirements.
 function start-fluentd-resource-update {
-  wait-for-apiserver-and-update-fluentd &
+  local -r fluentd_gcp_yaml="${1}"
+
+  wait-for-apiserver-and-update-fluentd ${fluentd_gcp_yaml} &
 }
 
 # Updates parameters in yaml file for prometheus-to-sd configuration, or
@@ -2032,6 +2058,7 @@ EOF
       controller_yaml="${controller_yaml}/heapster-controller.yaml"
     fi
     remove-salt-config-comments "${controller_yaml}"
+
     sed -i -e "s@{{ cluster_name }}@${CLUSTER_NAME}@g" "${controller_yaml}"
     sed -i -e "s@{{ *base_metrics_memory *}}@${base_metrics_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *base_metrics_cpu *}}@${base_metrics_cpu}@g" "${controller_yaml}"
@@ -2041,6 +2068,27 @@ EOF
     sed -i -e "s@{{ *nanny_memory *}}@${nanny_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *metrics_cpu_per_node *}}@${metrics_cpu_per_node}@g" "${controller_yaml}"
     update-prometheus-to-sd-parameters ${controller_yaml}
+
+    if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "stackdriver" ]]; then
+      use_old_resources="${HEAPSTER_USE_OLD_STACKDRIVER_RESOURCES:-true}"
+      use_new_resources="${HEAPSTER_USE_NEW_STACKDRIVER_RESOURCES:-false}"
+      sed -i -e "s@{{ use_old_resources }}@${use_old_resources}@g" "${controller_yaml}"
+      sed -i -e "s@{{ use_new_resources }}@${use_new_resources}@g" "${controller_yaml}"
+    fi
+  fi
+  if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "stackdriver" ]] ||
+     ([[ "${ENABLE_CLUSTER_LOGGING:-}" == "true" ]] &&
+     [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]); then
+    if [[ "${ENABLE_METADATA_AGENT:-}" == "stackdriver" ]] &&
+       [[ "${METADATA_AGENT_VERSION:-}" != "" ]]; then
+      metadata_agent_cpu_request="${METADATA_AGENT_CPU_REQUEST:-40m}"
+      metadata_agent_memory_request="${METADATA_AGENT_MEMORY_REQUEST:-50Mi}"
+      setup-addon-manifests "addons" "metadata-agent/stackdriver"
+      deployment_yaml="${dst_dir}/metadata-agent/stackdriver/metadata-agent.yaml"
+      sed -i -e "s@{{ metadata_agent_version }}@${METADATA_AGENT_VERSION}@g" "${deployment_yaml}"
+      sed -i -e "s@{{ metadata_agent_cpu_request }}@${metadata_agent_cpu_request}@g" "${deployment_yaml}"
+      sed -i -e "s@{{ metadata_agent_memory_request }}@${metadata_agent_memory_request}@g" "${deployment_yaml}"
+    fi
   fi
   if [[ "${ENABLE_METRICS_SERVER:-}" == "true" ]]; then
     setup-addon-manifests "addons" "metrics-server"
@@ -2091,7 +2139,7 @@ EOF
     local -r fluentd_gcp_yaml="${dst_dir}/fluentd-gcp/fluentd-gcp-ds.yaml"
     update-prometheus-to-sd-parameters ${event_exporter_yaml}
     update-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
-    start-fluentd-resource-update
+    start-fluentd-resource-update ${fluentd_gcp_yaml}
   fi
   if [[ "${ENABLE_CLUSTER_UI:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dashboard"

@@ -19,6 +19,7 @@ package service
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -27,6 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
@@ -174,23 +177,45 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 	}
 }
 
+// newLoadBalancerNode returns a node that passes the predicate check for a
+// node to receive load balancer traffic.
+func newLoadBalancerNode(name string) *v1.Node {
+	return &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.NodeSpec{
+			Unschedulable: false,
+		},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{Type: v1.NodeReady, Status: v1.ConditionTrue},
+			},
+		},
+	}
+}
+
+func sortNodesByName(nodes []*v1.Node) {
+	sort.Slice(nodes, func(i, j int) bool {
+		return nodes[i].Name < nodes[j].Name
+	})
+}
+
 // TODO: Finish converting and update comments
 func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
+
 	nodes := []*v1.Node{
-		{ObjectMeta: metav1.ObjectMeta{Name: "node0"}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "node1"}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "node73"}},
+		newLoadBalancerNode("node0"),
+		newLoadBalancerNode("node1"),
+		newLoadBalancerNode("node73"),
 	}
-	table := []struct {
+	sortNodesByName(nodes)
+
+	table := map[string]struct {
 		services            []*v1.Service
 		expectedUpdateCalls []fakecloud.FakeUpdateBalancerCall
 	}{
-		{
-			// No services present: no calls should be made.
-			services:            []*v1.Service{},
-			expectedUpdateCalls: nil,
-		},
-		{
+		"update no load balancer": {
 			// Services do not have external load balancers: no calls should be made.
 			services: []*v1.Service{
 				newService("s0", "111", v1.ServiceTypeClusterIP),
@@ -198,7 +223,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 			},
 			expectedUpdateCalls: nil,
 		},
-		{
+		"update 1 load balancer": {
 			// Services does have an external load balancer: one call should be made.
 			services: []*v1.Service{
 				newService("s0", "333", v1.ServiceTypeLoadBalancer),
@@ -207,7 +232,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				{Service: newService("s0", "333", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
 		},
-		{
+		"update 3 load balancers": {
 			// Three services have an external load balancer: three calls.
 			services: []*v1.Service{
 				newService("s0", "444", v1.ServiceTypeLoadBalancer),
@@ -220,7 +245,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				{Service: newService("s2", "666", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
 		},
-		{
+		"update 2 load balancers": {
 			// Two services have an external load balancer and two don't: two calls.
 			services: []*v1.Service{
 				newService("s0", "777", v1.ServiceTypeNodePort),
@@ -233,30 +258,44 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				{Service: newService("s3", "999", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
 		},
-		{
-			// One service has an external load balancer and one is nil: one call.
-			services: []*v1.Service{
-				newService("s0", "234", v1.ServiceTypeLoadBalancer),
-				nil,
-			},
-			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
-				{Service: newService("s0", "234", v1.ServiceTypeLoadBalancer), Hosts: nodes},
-			},
-		},
 	}
-	for _, item := range table {
-		controller, cloud, _ := newController()
 
-		var services []*v1.Service
-		for _, service := range item.services {
-			services = append(services, service)
-		}
-		if err := controller.updateLoadBalancerHosts(services, nodes); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if !reflect.DeepEqual(item.expectedUpdateCalls, cloud.UpdateCalls) {
-			t.Errorf("expected update calls mismatch, expected %+v, got %+v", item.expectedUpdateCalls, cloud.UpdateCalls)
-		}
+	for name, item := range table {
+		t.Run(name, func(t *testing.T) {
+			controller, cloud, _ := newController()
+
+			var services []*v1.Service
+			for _, service := range item.services {
+				services = append(services, service)
+			}
+			nodeIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+			for _, node := range nodes {
+				nodeIndexer.Add(node)
+			}
+			controller.nodeLister = corelisters.NewNodeLister(nodeIndexer)
+
+			for _, service := range services {
+				if err := controller.updateLoadBalancerHosts(service); err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+
+			if len(item.expectedUpdateCalls) != len(cloud.UpdateCalls) {
+				t.Errorf("expected %d update calls but only got %d", len(item.expectedUpdateCalls), len(cloud.UpdateCalls))
+			}
+
+			for i, expectedCall := range item.expectedUpdateCalls {
+				actualCall := cloud.UpdateCalls[i]
+				if !reflect.DeepEqual(expectedCall.Service, actualCall.Service) {
+					t.Errorf("expected update call to contain service %+v, got %+v", expectedCall.Service, actualCall.Service)
+				}
+
+				sortNodesByName(actualCall.Hosts)
+				if !reflect.DeepEqual(expectedCall.Hosts, actualCall.Hosts) {
+					t.Errorf("expected update call to contain hosts %+v, got %+v", expectedCall.Hosts, actualCall.Hosts)
+				}
+			}
+		})
 	}
 }
 
@@ -311,6 +350,13 @@ func TestProcessServiceUpdate(t *testing.T) {
 	var controller *ServiceController
 	var cloud *fakecloud.FakeCloud
 
+	nodes := []*v1.Node{
+		newLoadBalancerNode("node0"),
+		newLoadBalancerNode("node1"),
+		newLoadBalancerNode("node73"),
+	}
+	sortNodesByName(nodes)
+
 	//A pair of old and new loadbalancer IP address
 	oldLBIP := "192.168.1.1"
 	newLBIP := "192.168.1.11"
@@ -341,6 +387,51 @@ func TestProcessServiceUpdate(t *testing.T) {
 				if retryDuration != doNotRetry {
 					return fmt.Errorf("retryDuration Expected=%v Obtained=%v", doNotRetry, retryDuration)
 				}
+				return nil
+			},
+		},
+		{
+			testName: "If updating hosts only",
+			key:      "default/sync-test-name",
+			svc:      newService("sync-test-name", types.UID("sync-test-uid"), v1.ServiceTypeLoadBalancer),
+			updateFn: func(svc *v1.Service) *v1.Service {
+				keyExpected := svc.GetObjectMeta().GetNamespace() + "/" + svc.GetObjectMeta().GetName()
+				cachedServiceTest := controller.cache.getOrCreate(keyExpected)
+				cachedServiceTest.state = svc
+				controller.cache.set(keyExpected, cachedServiceTest)
+
+				// Set the nodes for the cloud's UpdateLoadBalancer call to use.
+				nodeIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+				for _, node := range nodes {
+					nodeIndexer.Add(node)
+				}
+				controller.nodeLister = corelisters.NewNodeLister(nodeIndexer)
+
+				// This should trigger the needsUpdate false check since the service equals the cached service
+				return svc
+			},
+			expectedFn: func(svc *v1.Service, err error, retryDuration time.Duration) error {
+				if err != nil {
+					return err
+				}
+				if retryDuration != doNotRetry {
+					return fmt.Errorf("retryDuration Expected=%v Obtained=%v", doNotRetry, retryDuration)
+				}
+
+				if len(cloud.UpdateCalls) != 1 {
+					return fmt.Errorf("expected one update host call but only got %+v", cloud.UpdateCalls)
+				}
+
+				actualCall := cloud.UpdateCalls[0]
+				if !reflect.DeepEqual(svc, actualCall.Service) {
+					return fmt.Errorf("expected update call to contain service %+v, got %+v", svc, actualCall.Service)
+				}
+
+				sortNodesByName(actualCall.Hosts)
+				if !reflect.DeepEqual(nodes, actualCall.Hosts) {
+					return fmt.Errorf("expected update call to contain hosts %+v, got %+v", nodes, actualCall.Hosts)
+				}
+
 				return nil
 			},
 		},

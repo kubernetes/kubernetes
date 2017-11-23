@@ -35,6 +35,7 @@ import (
 	batchv2alpha1 "k8s.io/client-go/kubernetes/typed/batch/v2alpha1"
 	certificatesv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	eventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
 	extensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
@@ -84,6 +85,9 @@ type Interface interface {
 	CoreV1() corev1.CoreV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Core() corev1.CoreV1Interface
+	EventsV1beta1() eventsv1beta1.EventsV1beta1Interface
+	// Deprecated: please explicitly pick a version if possible.
+	Events() eventsv1beta1.EventsV1beta1Interface
 	ExtensionsV1beta1() extensionsv1beta1.ExtensionsV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Extensions() extensionsv1beta1.ExtensionsV1beta1Interface
@@ -104,11 +108,11 @@ type Interface interface {
 	SettingsV1alpha1() settingsv1alpha1.SettingsV1alpha1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Settings() settingsv1alpha1.SettingsV1alpha1Interface
-	StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface
 	StorageV1beta1() storagev1beta1.StorageV1beta1Interface
 	StorageV1() storagev1.StorageV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Storage() storagev1.StorageV1Interface
+	StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -131,6 +135,7 @@ type Clientset struct {
 	batchV2alpha1                 *batchv2alpha1.BatchV2alpha1Client
 	certificatesV1beta1           *certificatesv1beta1.CertificatesV1beta1Client
 	coreV1                        *corev1.CoreV1Client
+	eventsV1beta1                 *eventsv1beta1.EventsV1beta1Client
 	extensionsV1beta1             *extensionsv1beta1.ExtensionsV1beta1Client
 	networkingV1                  *networkingv1.NetworkingV1Client
 	policyV1beta1                 *policyv1beta1.PolicyV1beta1Client
@@ -139,9 +144,9 @@ type Clientset struct {
 	rbacV1alpha1                  *rbacv1alpha1.RbacV1alpha1Client
 	schedulingV1alpha1            *schedulingv1alpha1.SchedulingV1alpha1Client
 	settingsV1alpha1              *settingsv1alpha1.SettingsV1alpha1Client
-	storageV1alpha1               *storagev1alpha1.StorageV1alpha1Client
 	storageV1beta1                *storagev1beta1.StorageV1beta1Client
 	storageV1                     *storagev1.StorageV1Client
+	storageV1alpha1               *storagev1alpha1.StorageV1alpha1Client
 }
 
 // AdmissionregistrationV1alpha1 retrieves the AdmissionregistrationV1alpha1Client
@@ -272,6 +277,17 @@ func (c *Clientset) Core() corev1.CoreV1Interface {
 	return c.coreV1
 }
 
+// EventsV1beta1 retrieves the EventsV1beta1Client
+func (c *Clientset) EventsV1beta1() eventsv1beta1.EventsV1beta1Interface {
+	return c.eventsV1beta1
+}
+
+// Deprecated: Events retrieves the default version of EventsClient.
+// Please explicitly pick a version.
+func (c *Clientset) Events() eventsv1beta1.EventsV1beta1Interface {
+	return c.eventsV1beta1
+}
+
 // ExtensionsV1beta1 retrieves the ExtensionsV1beta1Client
 func (c *Clientset) ExtensionsV1beta1() extensionsv1beta1.ExtensionsV1beta1Interface {
 	return c.extensionsV1beta1
@@ -348,11 +364,6 @@ func (c *Clientset) Settings() settingsv1alpha1.SettingsV1alpha1Interface {
 	return c.settingsV1alpha1
 }
 
-// StorageV1alpha1 retrieves the StorageV1alpha1Client
-func (c *Clientset) StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface {
-	return c.storageV1alpha1
-}
-
 // StorageV1beta1 retrieves the StorageV1beta1Client
 func (c *Clientset) StorageV1beta1() storagev1beta1.StorageV1beta1Interface {
 	return c.storageV1beta1
@@ -367,6 +378,11 @@ func (c *Clientset) StorageV1() storagev1.StorageV1Interface {
 // Please explicitly pick a version.
 func (c *Clientset) Storage() storagev1.StorageV1Interface {
 	return c.storageV1
+}
+
+// StorageV1alpha1 retrieves the StorageV1alpha1Client
+func (c *Clientset) StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface {
+	return c.storageV1alpha1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -449,6 +465,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.eventsV1beta1, err = eventsv1beta1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.extensionsV1beta1, err = extensionsv1beta1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -481,15 +501,15 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	cs.storageV1alpha1, err = storagev1alpha1.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
 	cs.storageV1beta1, err = storagev1beta1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
 	cs.storageV1, err = storagev1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	cs.storageV1alpha1, err = storagev1alpha1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -522,6 +542,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.batchV2alpha1 = batchv2alpha1.NewForConfigOrDie(c)
 	cs.certificatesV1beta1 = certificatesv1beta1.NewForConfigOrDie(c)
 	cs.coreV1 = corev1.NewForConfigOrDie(c)
+	cs.eventsV1beta1 = eventsv1beta1.NewForConfigOrDie(c)
 	cs.extensionsV1beta1 = extensionsv1beta1.NewForConfigOrDie(c)
 	cs.networkingV1 = networkingv1.NewForConfigOrDie(c)
 	cs.policyV1beta1 = policyv1beta1.NewForConfigOrDie(c)
@@ -530,9 +551,9 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.rbacV1alpha1 = rbacv1alpha1.NewForConfigOrDie(c)
 	cs.schedulingV1alpha1 = schedulingv1alpha1.NewForConfigOrDie(c)
 	cs.settingsV1alpha1 = settingsv1alpha1.NewForConfigOrDie(c)
-	cs.storageV1alpha1 = storagev1alpha1.NewForConfigOrDie(c)
 	cs.storageV1beta1 = storagev1beta1.NewForConfigOrDie(c)
 	cs.storageV1 = storagev1.NewForConfigOrDie(c)
+	cs.storageV1alpha1 = storagev1alpha1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -557,6 +578,7 @@ func New(c rest.Interface) *Clientset {
 	cs.batchV2alpha1 = batchv2alpha1.New(c)
 	cs.certificatesV1beta1 = certificatesv1beta1.New(c)
 	cs.coreV1 = corev1.New(c)
+	cs.eventsV1beta1 = eventsv1beta1.New(c)
 	cs.extensionsV1beta1 = extensionsv1beta1.New(c)
 	cs.networkingV1 = networkingv1.New(c)
 	cs.policyV1beta1 = policyv1beta1.New(c)
@@ -565,9 +587,9 @@ func New(c rest.Interface) *Clientset {
 	cs.rbacV1alpha1 = rbacv1alpha1.New(c)
 	cs.schedulingV1alpha1 = schedulingv1alpha1.New(c)
 	cs.settingsV1alpha1 = settingsv1alpha1.New(c)
-	cs.storageV1alpha1 = storagev1alpha1.New(c)
 	cs.storageV1beta1 = storagev1beta1.New(c)
 	cs.storageV1 = storagev1.New(c)
+	cs.storageV1alpha1 = storagev1alpha1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

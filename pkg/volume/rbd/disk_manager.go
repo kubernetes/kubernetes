@@ -28,6 +28,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -46,6 +47,8 @@ type diskManager interface {
 	CreateImage(provisioner *rbdVolumeProvisioner) (r *v1.RBDPersistentVolumeSource, volumeSizeGB int, err error)
 	// Deletes a rbd image.
 	DeleteImage(deleter *rbdVolumeDeleter) error
+	// Expands a rbd image
+	ExpandImage(expander *rbdVolumeExpander, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error)
 }
 
 // utility to mount a disk based filesystem

@@ -17,19 +17,28 @@ limitations under the License.
 package upgrade
 
 import (
+	"fmt"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptoken "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
+	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"k8s.io/kubernetes/pkg/util/version"
 )
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
 // Note that the markmaster phase is left out, not needed, and no token is created as that doesn't belong to the upgrade
-func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration) error {
+func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration, newK8sVer *version.Version) error {
 	errs := []error{}
 
 	// Upload currently used configuration to the cluster
@@ -64,12 +73,52 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 		errs = append(errs, err)
 	}
 
+	certAndKeyDir := kubeadmapiext.DefaultCertificatesDir
+	shouldBackup, err := shouldBackupAPIServerCertAndKey(certAndKeyDir, newK8sVer)
+	// Don't fail the upgrade phase if failing to determine to backup kube-apiserver cert and key.
+	if err != nil {
+		fmt.Printf("[postupgrade] WARNING: failed to determine to backup kube-apiserver cert and key: %v", err)
+	} else if shouldBackup {
+		// Don't fail the upgrade phase if failing to backup kube-apiserver cert and key.
+		if err := backupAPIServerCertAndKey(certAndKeyDir); err != nil {
+			fmt.Printf("[postupgrade] WARNING: failed to backup kube-apiserver cert and key: %v", err)
+		}
+		if err := certsphase.CreateAPIServerCertAndKeyFiles(cfg); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
 	// Upgrade kube-dns and kube-proxy
 	if err := dns.EnsureDNSAddon(cfg, client); err != nil {
 		errs = append(errs, err)
 	}
+
+	if err := coreDNSDeployment(cfg, client); err != nil {
+		errs = append(errs, err)
+	}
+
 	if err := proxy.EnsureProxyAddon(cfg, client); err != nil {
 		errs = append(errs, err)
 	}
 	return errors.NewAggregate(errs)
+}
+
+func coreDNSDeployment(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
+	if features.Enabled(cfg.FeatureGates, features.CoreDNS) {
+		return apiclient.TryRunCommand(func() error {
+			getCoreDNS, err := client.AppsV1beta2().Deployments(metav1.NamespaceSystem).Get(kubeadmconstants.CoreDNS, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if getCoreDNS.Status.ReadyReplicas == 0 {
+				return fmt.Errorf("the CodeDNS deployment isn't ready yet")
+			}
+			err = client.AppsV1beta2().Deployments(metav1.NamespaceSystem).Delete(kubeadmconstants.KubeDNS, nil)
+			if err != nil {
+				return err
+			}
+			return nil
+		}, 5)
+	}
+	return nil
 }

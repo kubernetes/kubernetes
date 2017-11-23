@@ -91,7 +91,7 @@ func addClusterRoleBindingLabel(rolebindings []rbac.ClusterRoleBinding) {
 }
 
 func NodeRules() []rbac.PolicyRule {
-	return []rbac.PolicyRule{
+	nodePolicyRules := []rbac.PolicyRule{
 		// Needed to check API access.  These creates are non-mutating
 		rbac.NewRule("create").Groups(authenticationGroup).Resources("tokenreviews").RuleOrDie(),
 		rbac.NewRule("create").Groups(authorizationGroup).Resources("subjectaccessreviews", "localsubjectaccessreviews").RuleOrDie(),
@@ -123,11 +123,12 @@ func NodeRules() []rbac.PolicyRule {
 
 		// Needed for imagepullsecrets, rbd/ceph and secret volumes, and secrets in envs
 		// Needed for configmap volume and envs
-		// Use the NodeRestriction admission plugin to limit a node to get secrets/configmaps referenced by pods bound to itself.
+		// Use the Node authorization mode to limit a node to get secrets/configmaps referenced by pods bound to itself.
 		rbac.NewRule("get").Groups(legacyGroup).Resources("secrets", "configmaps").RuleOrDie(),
 		// Needed for persistent volumes
-		// Use the NodeRestriction admission plugin to limit a node to get pv/pvc objects referenced by pods bound to itself.
+		// Use the Node authorization mode to limit a node to get pv/pvc objects referenced by pods bound to itself.
 		rbac.NewRule("get").Groups(legacyGroup).Resources("persistentvolumeclaims", "persistentvolumes").RuleOrDie(),
+
 		// TODO: add to the Node authorizer and restrict to endpoints referenced by pods or PVs bound to the node
 		// Needed for glusterfs volumes
 		rbac.NewRule("get").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
@@ -135,6 +136,14 @@ func NodeRules() []rbac.PolicyRule {
 		// for it to be signed. This allows the kubelet to rotate it's own certificate.
 		rbac.NewRule("create", "get", "list", "watch").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+		// Use the Node authorization mode to limit a node to update status of pvc objects referenced by pods bound to itself.
+		// Use the NodeRestriction admission plugin to limit a node to just update the status stanza.
+		pvcStatusPolicyRule := rbac.NewRule("get", "update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims/status").RuleOrDie()
+		nodePolicyRules = append(nodePolicyRules, pvcStatusPolicyRule)
+	}
+	return nodePolicyRules
 }
 
 // ClusterRoles returns the cluster roles to bootstrap an API server with
@@ -437,6 +446,18 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule("create").Groups(certificatesGroup).Resources("certificatesigningrequests/selfnodeserver").RuleOrDie(),
 			},
 		})
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		// Find the scheduler role
+		for i, role := range roles {
+			if role.Name == "system:kube-scheduler" {
+				pvRule := rbac.NewRule("update").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie()
+				scRule := rbac.NewRule(Read...).Groups(storageGroup).Resources("storageclasses").RuleOrDie()
+				roles[i].Rules = append(role.Rules, pvRule, scRule)
+				break
+			}
+		}
 	}
 
 	addClusterRoleLabel(roles)

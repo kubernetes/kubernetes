@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"strconv"
 
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -50,9 +51,18 @@ type rsStrategy struct {
 // Strategy is the default logic that applies when creating and updating ReplicaSet objects.
 var Strategy = rsStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// DefaultGarbageCollectionPolicy returns Orphan because that's the default
-// behavior before the server-side garbage collection is implemented.
-func (rsStrategy) DefaultGarbageCollectionPolicy() rest.GarbageCollectionPolicy {
+// DefaultGarbageCollectionPolicy returns OrphanDependents by default. For apps/v1, returns DeleteDependents.
+func (rsStrategy) DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) rest.GarbageCollectionPolicy {
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+		switch groupVersion {
+		case extensionsv1beta1.SchemeGroupVersion, appsv1beta2.SchemeGroupVersion:
+			// for back compatibility
+			return rest.OrphanDependents
+		default:
+			return rest.DeleteDependents
+		}
+	}
 	return rest.OrphanDependents
 }
 

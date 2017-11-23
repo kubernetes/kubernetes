@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
@@ -181,5 +182,68 @@ func newDeploymentWithSelectorLabels(selectorLabels map[string]string) *extensio
 				},
 			},
 		},
+	}
+}
+
+func TestDeploymentDefaultGarbageCollectionPolicy(t *testing.T) {
+	// Make sure we correctly implement the interface.
+	// Otherwise a typo could silently change the default.
+	var gcds rest.GarbageCollectionDeleteStrategy = Strategy
+	tests := []struct {
+		requestInfo      genericapirequest.RequestInfo
+		expectedGCPolicy rest.GarbageCollectionPolicy
+		isNilRequestInfo bool
+	}{
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "extensions",
+				APIVersion: "v1beta1",
+				Resource:   "deployments",
+			},
+			rest.OrphanDependents,
+			false,
+		},
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "apps",
+				APIVersion: "v1beta1",
+				Resource:   "deployments",
+			},
+			rest.OrphanDependents,
+			false,
+		},
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "apps",
+				APIVersion: "v1beta2",
+				Resource:   "deployments",
+			},
+			rest.OrphanDependents,
+			false,
+		},
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "apps",
+				APIVersion: "v1",
+				Resource:   "deployments",
+			},
+			rest.DeleteDependents,
+			false,
+		},
+		{
+			expectedGCPolicy: rest.OrphanDependents,
+			isNilRequestInfo: true,
+		},
+	}
+
+	for _, test := range tests {
+		context := genericapirequest.NewContext()
+		if !test.isNilRequestInfo {
+			context = genericapirequest.WithRequestInfo(context, &test.requestInfo)
+		}
+		if got, want := gcds.DefaultGarbageCollectionPolicy(context), test.expectedGCPolicy; got != want {
+			t.Errorf("%s/%s: DefaultGarbageCollectionPolicy() = %#v, want %#v", test.requestInfo.APIGroup,
+				test.requestInfo.APIVersion, got, want)
+		}
 	}
 }

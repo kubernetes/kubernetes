@@ -180,6 +180,14 @@
    {
     "path": "/apis/admissionregistration.k8s.io",
     "description": "get information of a group"
+   },
+   {
+    "path": "/apis/events.k8s.io/v1beta1",
+    "description": "API at /apis/events.k8s.io/v1beta1"
+   },
+   {
+    "path": "/apis/events.k8s.io",
+    "description": "get information of a group"
    }
   ],
   "apiVersion": "",

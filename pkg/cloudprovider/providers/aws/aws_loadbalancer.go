@@ -34,9 +34,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-const ProxyProtocolPolicyName = "k8s-proxyprotocol-enabled"
+const (
+	ProxyProtocolPolicyName = "k8s-proxyprotocol-enabled"
 
-const SSLNegotiationPolicyNameFormat = "k8s-SSLNegotiationPolicy-%s"
+	SSLNegotiationPolicyNameFormat = "k8s-SSLNegotiationPolicy-%s"
+)
+
+var (
+	// Defaults for ELB Healthcheck
+	defaultHCHealthyThreshold   = int64(2)
+	defaultHCUnhealthyThreshold = int64(6)
+	defaultHCTimeout            = int64(5)
+	defaultHCInterval           = int64(10)
+)
 
 func isNLB(annotations map[string]string) bool {
 	if annotations[ServiceAnnotationLoadBalancerType] == "nlb" {
@@ -1173,44 +1183,72 @@ func awsArnEquals(l, r *string) bool {
 	return strings.EqualFold(aws.StringValue(l), aws.StringValue(r))
 }
 
+// getExpectedHealthCheck returns an elb.Healthcheck for the provided target
+// and using either sensible defaults or overrides via Service annotations
+func (c *Cloud) getExpectedHealthCheck(target string, annotations map[string]string) (*elb.HealthCheck, error) {
+	healthcheck := &elb.HealthCheck{Target: &target}
+	getOrDefault := func(annotation string, defaultValue int64) (*int64, error) {
+		i64 := defaultValue
+		var err error
+		if s, ok := annotations[annotation]; ok {
+			i64, err = strconv.ParseInt(s, 10, 0)
+			if err != nil {
+				return nil, fmt.Errorf("failed parsing health check annotation value: %v", err)
+			}
+		}
+		return &i64, nil
+	}
+	var err error
+	healthcheck.HealthyThreshold, err = getOrDefault(ServiceAnnotationLoadBalancerHCHealthyThreshold, defaultHCHealthyThreshold)
+	if err != nil {
+		return nil, err
+	}
+	healthcheck.UnhealthyThreshold, err = getOrDefault(ServiceAnnotationLoadBalancerHCUnhealthyThreshold, defaultHCUnhealthyThreshold)
+	if err != nil {
+		return nil, err
+	}
+	healthcheck.Timeout, err = getOrDefault(ServiceAnnotationLoadBalancerHCTimeout, defaultHCTimeout)
+	if err != nil {
+		return nil, err
+	}
+	healthcheck.Interval, err = getOrDefault(ServiceAnnotationLoadBalancerHCInterval, defaultHCInterval)
+	if err != nil {
+		return nil, err
+	}
+	if err = healthcheck.Validate(); err != nil {
+		return nil, fmt.Errorf("some of the load balancer health check parameters are invalid: %v", err)
+	}
+	return healthcheck, nil
+}
+
 // Makes sure that the health check for an ELB matches the configured health check node port
-func (c *Cloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerDescription, protocol string, port int32, path string) error {
+func (c *Cloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerDescription, protocol string, port int32, path string, annotations map[string]string) error {
 	name := aws.StringValue(loadBalancer.LoadBalancerName)
 
 	actual := loadBalancer.HealthCheck
-
-	// Default AWS settings
-	expectedHealthyThreshold := int64(2)
-	expectedUnhealthyThreshold := int64(6)
-	expectedTimeout := int64(5)
-	expectedInterval := int64(10)
-
 	expectedTarget := protocol + ":" + strconv.FormatInt(int64(port), 10) + path
+	expected, err := c.getExpectedHealthCheck(expectedTarget, annotations)
+	if err != nil {
+		return fmt.Errorf("cannot update health check for load balancer %q: %q", name, err)
+	}
 
-	if expectedTarget == aws.StringValue(actual.Target) &&
-		expectedHealthyThreshold == orZero(actual.HealthyThreshold) &&
-		expectedUnhealthyThreshold == orZero(actual.UnhealthyThreshold) &&
-		expectedTimeout == orZero(actual.Timeout) &&
-		expectedInterval == orZero(actual.Interval) {
+	// comparing attributes 1 by 1 to avoid breakage in case a new field is
+	// added to the HC which breaks the equality
+	if aws.StringValue(expected.Target) == aws.StringValue(actual.Target) &&
+		aws.Int64Value(expected.HealthyThreshold) == aws.Int64Value(actual.HealthyThreshold) &&
+		aws.Int64Value(expected.UnhealthyThreshold) == aws.Int64Value(actual.UnhealthyThreshold) &&
+		aws.Int64Value(expected.Interval) == aws.Int64Value(actual.Interval) &&
+		aws.Int64Value(expected.Timeout) == aws.Int64Value(actual.Timeout) {
 		return nil
 	}
 
-	glog.V(2).Infof("Updating load-balancer health-check for %q", name)
-
-	healthCheck := &elb.HealthCheck{}
-	healthCheck.HealthyThreshold = &expectedHealthyThreshold
-	healthCheck.UnhealthyThreshold = &expectedUnhealthyThreshold
-	healthCheck.Timeout = &expectedTimeout
-	healthCheck.Interval = &expectedInterval
-	healthCheck.Target = &expectedTarget
-
 	request := &elb.ConfigureHealthCheckInput{}
-	request.HealthCheck = healthCheck
+	request.HealthCheck = expected
 	request.LoadBalancerName = loadBalancer.LoadBalancerName
 
-	_, err := c.elb.ConfigureHealthCheck(request)
+	_, err = c.elb.ConfigureHealthCheck(request)
 	if err != nil {
-		return fmt.Errorf("error configuring load-balancer health-check for %q: %q", name, err)
+		return fmt.Errorf("error configuring load balancer health check for %q: %q", name, err)
 	}
 
 	return nil

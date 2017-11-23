@@ -20,6 +20,8 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -178,7 +181,7 @@ func TestMatchVolume(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		volume, err := volList.findBestMatchForClaim(scenario.claim)
+		volume, err := volList.findBestMatchForClaim(scenario.claim, false)
 		if err != nil {
 			t.Errorf("Unexpected error matching volume by claim: %v", err)
 		}
@@ -249,7 +252,7 @@ func TestMatchingWithBoundVolumes(t *testing.T) {
 		},
 	}
 
-	volume, err := volumeIndex.findBestMatchForClaim(claim)
+	volume, err := volumeIndex.findBestMatchForClaim(claim, false)
 	if err != nil {
 		t.Fatalf("Unexpected error matching volume by claim: %v", err)
 	}
@@ -372,27 +375,27 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 	index.store.Add(ebs)
 	index.store.Add(nfs)
 
-	volume, _ := index.findBestMatchForClaim(claim)
+	volume, _ := index.findBestMatchForClaim(claim, false)
 	if volume.Name != ebs.Name {
 		t.Errorf("Expected %s but got volume %s instead", ebs.Name, volume.Name)
 	}
 
 	claim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}
-	volume, _ = index.findBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim, false)
 	if volume.Name != gce.Name {
 		t.Errorf("Expected %s but got volume %s instead", gce.Name, volume.Name)
 	}
 
 	// order of the requested modes should not matter
 	claim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteMany, v1.ReadWriteOnce, v1.ReadOnlyMany}
-	volume, _ = index.findBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim, false)
 	if volume.Name != nfs.Name {
 		t.Errorf("Expected %s but got volume %s instead", nfs.Name, volume.Name)
 	}
 
 	// fewer modes requested should still match
 	claim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteMany}
-	volume, _ = index.findBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim, false)
 	if volume.Name != nfs.Name {
 		t.Errorf("Expected %s but got volume %s instead", nfs.Name, volume.Name)
 	}
@@ -400,7 +403,7 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 	// pretend the exact match is bound.  should get the next level up of modes.
 	ebs.Spec.ClaimRef = &v1.ObjectReference{}
 	claim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
-	volume, _ = index.findBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim, false)
 	if volume.Name != gce.Name {
 		t.Errorf("Expected %s but got volume %s instead", gce.Name, volume.Name)
 	}
@@ -408,7 +411,7 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 	// continue up the levels of modes.
 	gce.Spec.ClaimRef = &v1.ObjectReference{}
 	claim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
-	volume, _ = index.findBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim, false)
 	if volume.Name != nfs.Name {
 		t.Errorf("Expected %s but got volume %s instead", nfs.Name, volume.Name)
 	}
@@ -416,7 +419,7 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 	// partial mode request
 	gce.Spec.ClaimRef = nil
 	claim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}
-	volume, _ = index.findBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim, false)
 	if volume.Name != gce.Name {
 		t.Errorf("Expected %s but got volume %s instead", gce.Name, volume.Name)
 	}
@@ -675,6 +678,87 @@ func createTestVolumes() []*v1.PersistentVolume {
 				StorageClassName: classLarge,
 			},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:         "affinity-pv",
+				Name:        "affinity001",
+				Annotations: getAnnotationWithNodeAffinity("key1", "value1"),
+			},
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("100G"),
+				},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					Local: &v1.LocalVolumeSource{},
+				},
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+					v1.ReadOnlyMany,
+				},
+				StorageClassName: classWait,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:         "affinity-pv2",
+				Name:        "affinity002",
+				Annotations: getAnnotationWithNodeAffinity("key1", "value1"),
+			},
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("150G"),
+				},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					Local: &v1.LocalVolumeSource{},
+				},
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+					v1.ReadOnlyMany,
+				},
+				StorageClassName: classWait,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:         "affinity-prebound",
+				Name:        "affinity003",
+				Annotations: getAnnotationWithNodeAffinity("key1", "value1"),
+			},
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("100G"),
+				},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					Local: &v1.LocalVolumeSource{},
+				},
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+					v1.ReadOnlyMany,
+				},
+				StorageClassName: classWait,
+				ClaimRef:         &v1.ObjectReference{Name: "claim02", Namespace: "myns"},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:         "affinity-pv3",
+				Name:        "affinity003",
+				Annotations: getAnnotationWithNodeAffinity("key1", "value3"),
+			},
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("200G"),
+				},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					Local: &v1.LocalVolumeSource{},
+				},
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+					v1.ReadOnlyMany,
+				},
+				StorageClassName: classWait,
+			},
+		},
 	}
 }
 
@@ -690,6 +774,32 @@ func testVolume(name, size string) *v1.PersistentVolume {
 			AccessModes:            []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 		},
 	}
+}
+
+func getAnnotationWithNodeAffinity(key string, value string) map[string]string {
+	affinity := &v1.NodeAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+			NodeSelectorTerms: []v1.NodeSelectorTerm{
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      key,
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{value},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	annotations := map[string]string{}
+	err := helper.StorageNodeAffinityToAlphaAnnotation(annotations, affinity)
+	if err != nil {
+		glog.Fatalf("Failed to get node affinity annotation: %v", err)
+	}
+
+	return annotations
 }
 
 func createVolumeModeBlockTestVolume() *v1.PersistentVolume {
@@ -919,7 +1029,7 @@ func TestAlphaFilteringVolumeModes(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		toggleBlockVolumeFeature(scenario.enableBlock, t)
-		pvmatch, err := scenario.vol.findBestMatchForClaim(scenario.pvc)
+		pvmatch, err := scenario.vol.findBestMatchForClaim(scenario.pvc, false)
 		// expected to match but either got an error or no returned pvmatch
 		if pvmatch == nil && scenario.isExpectedMatch {
 			t.Errorf("Unexpected failure for scenario, no matching volume: %s", name)
@@ -972,14 +1082,14 @@ func TestFindingPreboundVolumes(t *testing.T) {
 	index.store.Add(pvBadMode)
 
 	// expected exact match on size
-	volume, _ := index.findBestMatchForClaim(claim)
+	volume, _ := index.findBestMatchForClaim(claim, false)
 	if volume.Name != pv1.Name {
 		t.Errorf("Expected %s but got volume %s instead", pv1.Name, volume.Name)
 	}
 
 	// pretend the exact match is pre-bound.  should get the next size up.
 	pv1.Spec.ClaimRef = &v1.ObjectReference{Name: "foo", Namespace: "bar"}
-	volume, _ = index.findBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim, false)
 	if volume.Name != pv5.Name {
 		t.Errorf("Expected %s but got volume %s instead", pv5.Name, volume.Name)
 	}
@@ -987,7 +1097,7 @@ func TestFindingPreboundVolumes(t *testing.T) {
 	// pretend the exact match is available but the largest volume is pre-bound to the claim.
 	pv1.Spec.ClaimRef = nil
 	pv8.Spec.ClaimRef = claimRef
-	volume, _ = index.findBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim, false)
 	if volume.Name != pv8.Name {
 		t.Errorf("Expected %s but got volume %s instead", pv8.Name, volume.Name)
 	}
@@ -995,7 +1105,7 @@ func TestFindingPreboundVolumes(t *testing.T) {
 	// pretend the volume with too small a size is pre-bound to the claim. should get the exact match.
 	pv8.Spec.ClaimRef = nil
 	pvBadSize.Spec.ClaimRef = claimRef
-	volume, _ = index.findBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim, false)
 	if volume.Name != pv1.Name {
 		t.Errorf("Expected %s but got volume %s instead", pv1.Name, volume.Name)
 	}
@@ -1003,9 +1113,183 @@ func TestFindingPreboundVolumes(t *testing.T) {
 	// pretend the volume without the right access mode is pre-bound to the claim. should get the exact match.
 	pvBadSize.Spec.ClaimRef = nil
 	pvBadMode.Spec.ClaimRef = claimRef
-	volume, _ = index.findBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim, false)
 	if volume.Name != pv1.Name {
 		t.Errorf("Expected %s but got volume %s instead", pv1.Name, volume.Name)
+	}
+}
+
+func TestBestMatchDelayed(t *testing.T) {
+	volList := newPersistentVolumeOrderedIndex()
+	for _, pv := range createTestVolumes() {
+		volList.store.Add(pv)
+	}
+
+	// binding through PV controller should be delayed
+	claim := makePVC("8G", nil)
+	volume, err := volList.findBestMatchForClaim(claim, true)
+	if err != nil {
+		t.Errorf("Unexpected error matching volume by claim: %v", err)
+	}
+	if volume != nil {
+		t.Errorf("Unexpected match with %q", volume.UID)
+	}
+}
+
+func TestFindMatchVolumeWithNode(t *testing.T) {
+	volumes := createTestVolumes()
+	node1 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{"key1": "value1"},
+		},
+	}
+	node2 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{"key1": "value2"},
+		},
+	}
+	node3 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{"key1": "value3"},
+		},
+	}
+
+	scenarios := map[string]struct {
+		expectedMatch   string
+		claim           *v1.PersistentVolumeClaim
+		node            *v1.Node
+		excludedVolumes map[string]*v1.PersistentVolume
+	}{
+		"success-match": {
+			expectedMatch: "affinity-pv",
+			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+				pvc.Spec.StorageClassName = &classWait
+			}),
+			node: node1,
+		},
+		"success-prebound": {
+			expectedMatch: "affinity-prebound",
+			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+				pvc.Spec.StorageClassName = &classWait
+				pvc.Name = "claim02"
+			}),
+			node: node1,
+		},
+		"success-exclusion": {
+			expectedMatch: "affinity-pv2",
+			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+				pvc.Spec.StorageClassName = &classWait
+			}),
+			node:            node1,
+			excludedVolumes: map[string]*v1.PersistentVolume{"affinity001": nil},
+		},
+		"fail-exclusion": {
+			expectedMatch: "",
+			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+				pvc.Spec.StorageClassName = &classWait
+			}),
+			node:            node1,
+			excludedVolumes: map[string]*v1.PersistentVolume{"affinity001": nil, "affinity002": nil},
+		},
+		"fail-accessmode": {
+			expectedMatch: "",
+			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteMany}
+				pvc.Spec.StorageClassName = &classWait
+			}),
+			node: node1,
+		},
+		"fail-nodeaffinity": {
+			expectedMatch: "",
+			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+				pvc.Spec.StorageClassName = &classWait
+			}),
+			node: node2,
+		},
+		"fail-prebound-node-affinity": {
+			expectedMatch: "",
+			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+				pvc.Spec.StorageClassName = &classWait
+				pvc.Name = "claim02"
+			}),
+			node: node2,
+		},
+		"success-bad-and-good-node-affinity": {
+			expectedMatch: "affinity-pv3",
+			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+				pvc.Spec.StorageClassName = &classWait
+				pvc.Name = "claim03"
+			}),
+			node: node3,
+		},
+	}
+
+	for name, scenario := range scenarios {
+		volume, err := findMatchingVolume(scenario.claim, volumes, scenario.node, scenario.excludedVolumes, true)
+		if err != nil {
+			t.Errorf("Unexpected error matching volume by claim: %v", err)
+		}
+		if len(scenario.expectedMatch) != 0 && volume == nil {
+			t.Errorf("Expected match but received nil volume for scenario: %s", name)
+		}
+		if len(scenario.expectedMatch) != 0 && volume != nil && string(volume.UID) != scenario.expectedMatch {
+			t.Errorf("Expected %s but got volume %s in scenario %s", scenario.expectedMatch, volume.UID, name)
+		}
+		if len(scenario.expectedMatch) == 0 && volume != nil {
+			t.Errorf("Unexpected match for scenario: %s, matched with %s instead", name, volume.UID)
+		}
+	}
+}
+
+func TestCheckAccessModes(t *testing.T) {
+	volume := &v1.PersistentVolume{
+		Spec: v1.PersistentVolumeSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadWriteMany},
+		},
+	}
+
+	scenarios := map[string]struct {
+		shouldSucceed bool
+		claim         *v1.PersistentVolumeClaim
+	}{
+		"success-single-mode": {
+			shouldSucceed: true,
+			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteMany}
+			}),
+		},
+		"success-many-modes": {
+			shouldSucceed: true,
+			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteMany, v1.ReadWriteOnce}
+			}),
+		},
+		"fail-single-mode": {
+			shouldSucceed: false,
+			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}
+			}),
+		},
+		"fail-many-modes": {
+			shouldSucceed: false,
+			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteMany, v1.ReadOnlyMany}
+			}),
+		},
+	}
+
+	for name, scenario := range scenarios {
+		result := checkAccessModes(scenario.claim, volume)
+		if result != scenario.shouldSucceed {
+			t.Errorf("Test %q failed: Expected %v, got %v", name, scenario.shouldSucceed, result)
+		}
 	}
 }
 

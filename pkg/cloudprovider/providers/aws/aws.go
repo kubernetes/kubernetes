@@ -48,6 +48,7 @@ import (
 	"path"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -172,6 +173,25 @@ const ServiceAnnotationLoadBalancerBEProtocol = "service.beta.kubernetes.io/aws-
 // For example: "Key1=Val1,Key2=Val2,KeyNoVal1=,KeyNoVal2"
 const ServiceAnnotationLoadBalancerAdditionalTags = "service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags"
 
+// ServiceAnnotationLoadBalancerHCHealthyThreshold is the annotation used on
+// the service to specify the number of successive successful health checks
+// required for a backend to be considered healthy for traffic.
+const ServiceAnnotationLoadBalancerHCHealthyThreshold = "service.beta.kubernetes.io/aws-load-balancer-healthcheck-healthy-threshold"
+
+// ServiceAnnotationLoadBalancerHCUnhealthyThreshold is the annotation used
+// on the service to specify the number of unsuccessful health checks
+// required for a backend to be considered unhealthy for traffic
+const ServiceAnnotationLoadBalancerHCUnhealthyThreshold = "service.beta.kubernetes.io/aws-load-balancer-healthcheck-unhealthy-threshold"
+
+// ServiceAnnotationLoadBalancerHCTimeout is the annotation used on the
+// service to specify, in seconds, how long to wait before marking a health
+// check as failed.
+const ServiceAnnotationLoadBalancerHCTimeout = "service.beta.kubernetes.io/aws-load-balancer-healthcheck-timeout"
+
+// ServiceAnnotationLoadBalancerHCInterval is the annotation used on the
+// service to specify, in seconds, the interval between health checks.
+const ServiceAnnotationLoadBalancerHCInterval = "service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval"
+
 // Event key when a volume is stuck on attaching state when being attached to a volume
 const volumeAttachmentStuck = "VolumeAttachmentStuck"
 
@@ -265,6 +285,10 @@ type EC2 interface {
 	CreateVolume(request *ec2.CreateVolumeInput) (resp *ec2.Volume, err error)
 	// Delete an EBS volume
 	DeleteVolume(*ec2.DeleteVolumeInput) (*ec2.DeleteVolumeOutput, error)
+
+	ModifyVolume(*ec2.ModifyVolumeInput) (*ec2.ModifyVolumeOutput, error)
+
+	DescribeVolumeModifications(*ec2.DescribeVolumesModificationsInput) ([]*ec2.VolumeModification, error)
 
 	DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsInput) ([]*ec2.SecurityGroup, error)
 
@@ -434,6 +458,9 @@ type Volumes interface {
 
 	// Check if disks specified in argument map are still attached to their respective nodes.
 	DisksAreAttached(map[types.NodeName][]KubernetesVolumeID) (map[types.NodeName]map[KubernetesVolumeID]bool, error)
+
+	// Expand the disk to new size
+	ResizeDisk(diskName KubernetesVolumeID, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error)
 }
 
 // InstanceGroups is an interface for managing cloud-managed instance groups / autoscaling instance groups
@@ -812,6 +839,36 @@ func (s *awsSdkEC2) DeleteVolume(request *ec2.DeleteVolumeInput) (*ec2.DeleteVol
 	timeTaken := time.Since(requestTime).Seconds()
 	recordAwsMetric("delete_volume", timeTaken, err)
 	return resp, err
+}
+
+func (s *awsSdkEC2) ModifyVolume(request *ec2.ModifyVolumeInput) (*ec2.ModifyVolumeOutput, error) {
+	requestTime := time.Now()
+	resp, err := s.ec2.ModifyVolume(request)
+	timeTaken := time.Since(requestTime).Seconds()
+	recordAwsMetric("modify_volume", timeTaken, err)
+	return resp, err
+}
+
+func (s *awsSdkEC2) DescribeVolumeModifications(request *ec2.DescribeVolumesModificationsInput) ([]*ec2.VolumeModification, error) {
+	requestTime := time.Now()
+	results := []*ec2.VolumeModification{}
+	var nextToken *string
+	for {
+		resp, err := s.ec2.DescribeVolumesModifications(request)
+		if err != nil {
+			recordAwsMetric("describe_volume_modification", 0, err)
+			return nil, fmt.Errorf("error listing volume modifictions : %v", err)
+		}
+		results = append(results, resp.VolumesModifications...)
+		nextToken = resp.NextToken
+		if aws.StringValue(nextToken) == "" {
+			break
+		}
+		request.NextToken = nextToken
+	}
+	timeTaken := time.Since(requestTime).Seconds()
+	recordAwsMetric("describe_volume_modification", timeTaken, nil)
+	return results, nil
 }
 
 func (s *awsSdkEC2) DescribeSubnets(request *ec2.DescribeSubnetsInput) ([]*ec2.Subnet, error) {
@@ -1634,6 +1691,65 @@ func (d *awsDisk) describeVolume() (*ec2.Volume, error) {
 	return volumes[0], nil
 }
 
+func (d *awsDisk) describeVolumeModification() (*ec2.VolumeModification, error) {
+	volumeID := d.awsID
+	request := &ec2.DescribeVolumesModificationsInput{
+		VolumeIds: []*string{volumeID.awsString()},
+	}
+	volumeMods, err := d.ec2.DescribeVolumeModifications(request)
+
+	if err != nil {
+		return nil, fmt.Errorf("error describing volume modification %s with %v", volumeID, err)
+	}
+
+	if len(volumeMods) == 0 {
+		return nil, fmt.Errorf("no volume modifications found for %s", volumeID)
+	}
+	lastIndex := len(volumeMods) - 1
+	return volumeMods[lastIndex], nil
+}
+
+func (d *awsDisk) modifyVolume(requestGiB int64) (int64, error) {
+	volumeID := d.awsID
+
+	request := &ec2.ModifyVolumeInput{
+		VolumeId: volumeID.awsString(),
+		Size:     aws.Int64(requestGiB),
+	}
+	output, err := d.ec2.ModifyVolume(request)
+	if err != nil {
+		modifyError := fmt.Errorf("AWS modifyVolume failed for %s with %v", volumeID, err)
+		return requestGiB, modifyError
+	}
+
+	volumeModification := output.VolumeModification
+
+	if aws.StringValue(volumeModification.ModificationState) == ec2.VolumeModificationStateCompleted {
+		return aws.Int64Value(volumeModification.TargetSize), nil
+	}
+
+	backoff := wait.Backoff{
+		Duration: 1 * time.Second,
+		Factor:   2,
+		Steps:    10,
+	}
+
+	checkForResize := func() (bool, error) {
+		volumeModification, err := d.describeVolumeModification()
+
+		if err != nil {
+			return false, err
+		}
+
+		if aws.StringValue(volumeModification.ModificationState) == ec2.VolumeModificationStateCompleted {
+			return true, nil
+		}
+		return false, nil
+	}
+	waitWithErr := wait.ExponentialBackoff(backoff, checkForResize)
+	return requestGiB, waitWithErr
+}
+
 // applyUnSchedulableTaint applies a unschedulable taint to a node after verifying
 // if node has become unusable because of volumes getting stuck in attaching state.
 func (c *Cloud) applyUnSchedulableTaint(nodeName types.NodeName, reason string) {
@@ -2300,6 +2416,37 @@ func (c *Cloud) DisksAreAttached(nodeDisks map[types.NodeName][]KubernetesVolume
 	}
 
 	return attached, nil
+}
+
+func (c *Cloud) ResizeDisk(
+	diskName KubernetesVolumeID,
+	oldSize resource.Quantity,
+	newSize resource.Quantity) (resource.Quantity, error) {
+	awsDisk, err := newAWSDisk(c, diskName)
+	if err != nil {
+		return oldSize, err
+	}
+
+	volumeInfo, err := awsDisk.describeVolume()
+	if err != nil {
+		descErr := fmt.Errorf("AWS.ResizeDisk Error describing volume %s with %v", diskName, err)
+		return oldSize, descErr
+	}
+	requestBytes := newSize.Value()
+	// AWS resizes in chunks of GiB (not GB)
+	requestGiB := volume.RoundUpSize(requestBytes, 1024*1024*1024)
+	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", requestGiB))
+
+	// If disk already if of greater or equal size than requested we return
+	if aws.Int64Value(volumeInfo.Size) >= requestGiB {
+		return newSizeQuant, nil
+	}
+	_, err = awsDisk.modifyVolume(requestGiB)
+
+	if err != nil {
+		return oldSize, err
+	}
+	return newSizeQuant, nil
 }
 
 // Gets the current load balancer state
@@ -3375,7 +3522,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 
 	if path, healthCheckNodePort := service.GetServiceHealthCheckPathPort(apiService); path != "" {
 		glog.V(4).Infof("service %v (%v) needs health checks on :%d%s)", apiService.Name, loadBalancerName, healthCheckNodePort, path)
-		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "HTTP", healthCheckNodePort, path)
+		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "HTTP", healthCheckNodePort, path, annotations)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to ensure health check for localized service %v on node port %v: %q", loadBalancerName, healthCheckNodePort, err)
 		}
@@ -3391,7 +3538,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 			break
 		}
 		// there must be no path on TCP health check
-		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "TCP", tcpHealthCheckPort, "")
+		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "TCP", tcpHealthCheckPort, "", annotations)
 		if err != nil {
 			return nil, err
 		}

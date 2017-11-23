@@ -459,12 +459,12 @@ func TestValidateFeatureGates(t *testing.T) {
 	}
 }
 
-func TestValidateIgnoreChecksErrors(t *testing.T) {
+func TestValidateIgnorePreflightErrors(t *testing.T) {
 	var tests = []struct {
-		ignoreChecksErrors  []string
-		skipPreflightChecks bool
-		expectedLen         int
-		expectedError       bool
+		ignorePreflightErrors []string
+		skipPreflightChecks   bool
+		expectedLen           int
+		expectedError         bool
 	}{
 		{[]string{}, false, 0, false},                             // empty list, no old skip-preflight-checks
 		{[]string{}, true, 1, false},                              // empty list, old skip-preflight-checks
@@ -473,17 +473,17 @@ func TestValidateIgnoreChecksErrors(t *testing.T) {
 		{[]string{"check1", "check2", "check1"}, false, 2, false}, // duplicates
 		{[]string{"check1", "check2", "all"}, false, 3, true},     // non-duplicate, but 'all' present together wth individual checks
 		{[]string{"all"}, false, 1, false},                        // skip all checks by using new flag
-		{[]string{"all"}, true, 1, true},                          // skip all checks by using both old and new flags at the same time
+		{[]string{"all"}, true, 1, false},                         // skip all checks by using both old and new flags at the same time
 	}
 	for _, rt := range tests {
-		result, err := ValidateIgnoreChecksErrors(rt.ignoreChecksErrors, rt.skipPreflightChecks)
+		result, err := ValidateIgnorePreflightErrors(rt.ignorePreflightErrors, rt.skipPreflightChecks)
 		switch {
 		case err != nil && !rt.expectedError:
-			t.Errorf("ValidateIgnoreChecksErrors: unexpected error for input (%s, %v), error: %v", rt.ignoreChecksErrors, rt.skipPreflightChecks, err)
+			t.Errorf("ValidateIgnorePreflightErrors: unexpected error for input (%s, %v), error: %v", rt.ignorePreflightErrors, rt.skipPreflightChecks, err)
 		case err == nil && rt.expectedError:
-			t.Errorf("ValidateIgnoreChecksErrors: expected error for input (%s, %v) but got: %v", rt.ignoreChecksErrors, rt.skipPreflightChecks, result)
+			t.Errorf("ValidateIgnorePreflightErrors: expected error for input (%s, %v) but got: %v", rt.ignorePreflightErrors, rt.skipPreflightChecks, result)
 		case result.Len() != rt.expectedLen:
-			t.Errorf("ValidateIgnoreChecksErrors: expected Len = %d for input (%s, %v) but got: %v, %v", rt.expectedLen, rt.ignoreChecksErrors, rt.skipPreflightChecks, result.Len(), result)
+			t.Errorf("ValidateIgnorePreflightErrors: expected Len = %d for input (%s, %v) but got: %v, %v", rt.expectedLen, rt.ignorePreflightErrors, rt.skipPreflightChecks, result.Len(), result)
 		}
 	}
 }

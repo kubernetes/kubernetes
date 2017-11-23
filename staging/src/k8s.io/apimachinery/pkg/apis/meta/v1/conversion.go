@@ -38,6 +38,7 @@ func AddConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_intstr_IntOrString_To_intstr_IntOrString,
 
 		Convert_unversioned_Time_To_unversioned_Time,
+		Convert_unversioned_MicroTime_To_unversioned_MicroTime,
 
 		Convert_Pointer_v1_Duration_To_v1_Duration,
 		Convert_v1_Duration_To_Pointer_v1_Duration,
@@ -196,6 +197,12 @@ func Convert_Pointer_v1_Duration_To_v1_Duration(in **Duration, out *Duration, s 
 func Convert_v1_Duration_To_Pointer_v1_Duration(in *Duration, out **Duration, s conversion.Scope) error {
 	temp := *in //copy
 	*out = &temp
+	return nil
+}
+
+func Convert_unversioned_MicroTime_To_unversioned_MicroTime(in *MicroTime, out *MicroTime, s conversion.Scope) error {
+	// Cannot deep copy these, because time.Time has unexported fields.
+	*out = *in
 	return nil
 }
 

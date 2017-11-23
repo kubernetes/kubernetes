@@ -157,20 +157,15 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	err = scheme.AddFieldLabelConversionFunc("v1", "Pod",
 		func(label, value string) (string, string, error) {
 			switch label {
-			case "metadata.annotations",
-				"metadata.labels",
-				"metadata.name",
+			case "metadata.name",
 				"metadata.namespace",
-				"metadata.uid",
 				"spec.nodeName",
 				"spec.restartPolicy",
-				"spec.serviceAccountName",
 				"spec.schedulerName",
 				"status.phase",
-				"status.hostIP",
 				"status.podIP":
 				return label, value, nil
-				// This is for backwards compatibility with old v1 clients which send spec.host
+			// This is for backwards compatibility with old v1 clients which send spec.host
 			case "spec.host":
 				return "spec.nodeName", value, nil
 			default:

@@ -16,7 +16,7 @@
 
 REGISTRY?="gcr.io/google-containers"
 IMAGE=debian-iptables
-TAG=v9
+TAG=v10
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
 QEMUVERSION=v2.9.1

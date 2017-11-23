@@ -218,7 +218,7 @@ func (o *Options) Run() error {
 		return o.writeConfigFile()
 	}
 
-	proxyServer, err := NewProxyServer(o.config, o.CleanupAndExit, o.CleanupIPVS, o.scheme, o.master)
+	proxyServer, err := NewProxyServer(o)
 	if err != nil {
 		return err
 	}

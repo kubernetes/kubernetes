@@ -15,6 +15,7 @@ go_library(
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
+        "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/leaky:go_default_library",
         "//pkg/kubelet/network:go_default_library",

@@ -75,7 +75,7 @@ type Error struct {
 }
 
 func (e *Error) Error() string {
-	return fmt.Sprintf("[preflight] Some fatal errors occurred:\n%s%s", e.Msg, "[preflight] If you know what you are doing, you can make a check non-fatal with `--ignore-checks-errors=...`")
+	return fmt.Sprintf("[preflight] Some fatal errors occurred:\n%s%s", e.Msg, "[preflight] If you know what you are doing, you can make a check non-fatal with `--ignore-preflight-errors=...`")
 }
 
 // Checker validates the state of the system to ensure kubeadm will be
@@ -837,9 +837,9 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 }
 
 // RunInitMasterChecks executes all individual, applicable to Master node checks.
-func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfiguration, criSocket string, ignoreChecksErrors sets.String) error {
+func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfiguration, criSocket string, ignorePreflightErrors sets.String) error {
 	// First, check if we're root separately from the other preflight checks and fail fast
-	if err := RunRootCheckOnly(ignoreChecksErrors); err != nil {
+	if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
 		return err
 	}
 
@@ -929,13 +929,13 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 			)
 		}
 	}
-	return RunChecks(checks, os.Stderr, ignoreChecksErrors)
+	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 
 // RunJoinNodeChecks executes all individual, applicable to node checks.
-func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfiguration, criSocket string, ignoreChecksErrors sets.String) error {
+func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfiguration, criSocket string, ignorePreflightErrors sets.String) error {
 	// First, check if we're root separately from the other preflight checks and fail fast
-	if err := RunRootCheckOnly(ignoreChecksErrors); err != nil {
+	if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
 		return err
 	}
 
@@ -987,21 +987,21 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 			}
 		}
 	}
-	return RunChecks(checks, os.Stderr, ignoreChecksErrors)
+	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 
 // RunRootCheckOnly initializes checks slice of structs and call RunChecks
-func RunRootCheckOnly(ignoreChecksErrors sets.String) error {
+func RunRootCheckOnly(ignorePreflightErrors sets.String) error {
 	checks := []Checker{
 		IsPrivilegedUserCheck{},
 	}
 
-	return RunChecks(checks, os.Stderr, ignoreChecksErrors)
+	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 
 // RunChecks runs each check, displays it's warnings/errors, and once all
 // are processed will exit if any errors occurred.
-func RunChecks(checks []Checker, ww io.Writer, ignoreChecksErrors sets.String) error {
+func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.String) error {
 	type checkErrors struct {
 		Name   string
 		Errors []error
@@ -1012,7 +1012,7 @@ func RunChecks(checks []Checker, ww io.Writer, ignoreChecksErrors sets.String) e
 		name := c.Name()
 		warnings, errs := c.Check()
 
-		if setHasItemOrAll(ignoreChecksErrors, name) {
+		if setHasItemOrAll(ignorePreflightErrors, name) {
 			// Decrease severity of errors to warnings for this check
 			warnings = append(warnings, errs...)
 			errs = []error{}
@@ -1038,8 +1038,8 @@ func RunChecks(checks []Checker, ww io.Writer, ignoreChecksErrors sets.String) e
 }
 
 // TryStartKubelet attempts to bring up kubelet service
-func TryStartKubelet(ignoreChecksErrors sets.String) {
-	if setHasItemOrAll(ignoreChecksErrors, "StartKubelet") {
+func TryStartKubelet(ignorePreflightErrors sets.String) {
+	if setHasItemOrAll(ignorePreflightErrors, "StartKubelet") {
 		return
 	}
 	// If we notice that the kubelet service is inactive, try to start it

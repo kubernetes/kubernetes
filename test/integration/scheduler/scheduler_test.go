@@ -469,6 +469,7 @@ func TestMultiScheduler(t *testing.T) {
 		informerFactory2.Apps().V1beta1().StatefulSets(),
 		informerFactory2.Core().V1().Services(),
 		informerFactory2.Policy().V1beta1().PodDisruptionBudgets(),
+		informerFactory2.Storage().V1().StorageClasses(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		enableEquivalenceCache,
 	)

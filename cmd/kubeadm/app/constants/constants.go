@@ -155,6 +155,14 @@ const (
 	// after https://github.com/kubernetes/kubernetes/pull/53833 being merged.
 	KubeletBaseConfigurationConfigMapKey = "kubelet"
 
+	// KubeletBaseConfigurationDir specifies the directory on the node where stores the initial remote configuration of kubelet
+	KubeletBaseConfigurationDir = "/var/lib/kubelet/config/init"
+
+	// KubeletBaseConfigurationFile specifies the file name on the node which stores initial remote configuration of kubelet
+	// TODO: Use the constant ("kubelet.config.k8s.io") defined in pkg/kubelet/kubeletconfig/util/keys/keys.go
+	// after https://github.com/kubernetes/kubernetes/pull/53833 being merged.
+	KubeletBaseConfigurationFile = "kubelet"
+
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
 	MinExternalEtcdVersion = "3.0.14"
 
@@ -188,7 +196,7 @@ const (
 	DefaultCIImageRepository = "gcr.io/kubernetes-ci-images"
 
 	// CoreDNS defines a variable used internally when referring to the CoreDNS addon for a cluster
-	CoreDNS = "CoreDNS"
+	CoreDNS = "coredns"
 	// KubeDNS defines a variable used internally when referring to the kube-dns addon for a cluster
 	KubeDNS = "kube-dns"
 )
@@ -226,8 +234,9 @@ var (
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
-		8: "3.0.17",
-		9: "3.1.10",
+		8:  "3.0.17",
+		9:  "3.1.10",
+		10: "3.1.10",
 	}
 )
 

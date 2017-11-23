@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 )
 
 func TestCopyAndReplace(t *testing.T) {
@@ -75,9 +76,9 @@ func TestDefaultPredicates(t *testing.T) {
 		"GeneralPredicates",
 		"CheckNodeMemoryPressure",
 		"CheckNodeDiskPressure",
-		"NoVolumeNodeConflict",
 		"CheckNodeCondition",
 		"PodToleratesNodeTaints",
+		predicates.CheckVolumeBinding,
 	)
 
 	if expected := defaultPredicates(); !result.Equal(expected) {

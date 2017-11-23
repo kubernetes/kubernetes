@@ -1226,6 +1226,10 @@ func printPersistentVolumeClaim(obj *api.PersistentVolumeClaim, options printers
 	}
 
 	phase := obj.Status.Phase
+	if obj.ObjectMeta.DeletionTimestamp != nil {
+		phase = "Terminating"
+	}
+
 	storage := obj.Spec.Resources.Requests[api.ResourceStorage]
 	capacity := ""
 	accessModes := ""

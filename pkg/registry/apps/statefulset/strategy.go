@@ -17,8 +17,11 @@ limitations under the License.
 package statefulset
 
 import (
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -38,9 +41,18 @@ type statefulSetStrategy struct {
 // Strategy is the default logic that applies when creating and updating Replication StatefulSet objects.
 var Strategy = statefulSetStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// DefaultGarbageCollectionPolicy returns Orphan because that was the default
-// behavior before the server-side garbage collection was implemented.
-func (statefulSetStrategy) DefaultGarbageCollectionPolicy() rest.GarbageCollectionPolicy {
+// DefaultGarbageCollectionPolicy returns OrphanDependents by default. For apps/v1, returns DeleteDependents.
+func (statefulSetStrategy) DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) rest.GarbageCollectionPolicy {
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+		switch groupVersion {
+		case appsv1beta1.SchemeGroupVersion, appsv1beta2.SchemeGroupVersion:
+			// for back compatibility
+			return rest.OrphanDependents
+		default:
+			return rest.DeleteDependents
+		}
+	}
 	return rest.OrphanDependents
 }
 

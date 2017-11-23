@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -30,8 +29,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
-	clientset "k8s.io/client-go/kubernetes"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
@@ -111,7 +108,7 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 	var cfgPath string
 	var criSocket string
 	var featureGatesString string
-	var ignoreChecksErrors []string
+	var ignorePreflightErrors []string
 
 	cmd := &cobra.Command{
 		Use:   "join [flags]",
@@ -129,10 +126,10 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 			internalcfg := &kubeadmapi.NodeConfiguration{}
 			legacyscheme.Scheme.Convert(cfg, internalcfg, nil)
 
-			ignoreChecksErrorsSet, err := validation.ValidateIgnoreChecksErrors(ignoreChecksErrors, skipPreFlight)
+			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
 			kubeadmutil.CheckErr(err)
 
-			j, err := NewJoin(cfgPath, args, internalcfg, ignoreChecksErrorsSet, criSocket)
+			j, err := NewJoin(cfgPath, args, internalcfg, ignorePreflightErrorsSet, criSocket)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(j.Validate(cmd))
 			kubeadmutil.CheckErr(j.Run(out))
@@ -140,7 +137,7 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 	}
 
 	AddJoinConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
-	AddJoinOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &criSocket, &ignoreChecksErrors)
+	AddJoinOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &criSocket, &ignorePreflightErrors)
 
 	return cmd
 }
@@ -175,20 +172,20 @@ func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.NodeConfigurat
 }
 
 // AddJoinOtherFlags adds join flags that are not bound to a configuration file to the given flagset
-func AddJoinOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight *bool, criSocket *string, ignoreChecksErrors *[]string) {
+func AddJoinOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight *bool, criSocket *string, ignorePreflightErrors *[]string) {
 	flagSet.StringVar(
 		cfgPath, "config", *cfgPath,
 		"Path to kubeadm config file.")
 
 	flagSet.StringSliceVar(
-		ignoreChecksErrors, "ignore-checks-errors", *ignoreChecksErrors,
+		ignorePreflightErrors, "ignore-preflight-errors", *ignorePreflightErrors,
 		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
 	)
 	flagSet.BoolVar(
 		skipPreFlight, "skip-preflight-checks", false,
 		"Skip preflight checks which normally run before modifying the system.",
 	)
-	flagSet.MarkDeprecated("skip-preflight-checks", "it is now equivalent to --ignore-checks-errors=all")
+	flagSet.MarkDeprecated("skip-preflight-checks", "it is now equivalent to --ignore-preflight-errors=all")
 	flagSet.StringVar(
 		criSocket, "cri-socket", "/var/run/dockershim.sock",
 		`Specify the CRI socket to connect to.`,
@@ -201,7 +198,7 @@ type Join struct {
 }
 
 // NewJoin instantiates Join struct with given arguments
-func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, ignoreChecksErrors sets.String, criSocket string) (*Join, error) {
+func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, ignorePreflightErrors sets.String, criSocket string) (*Join, error) {
 	fmt.Println("[kubeadm] WARNING: kubeadm is currently in beta")
 
 	if cfg.NodeName == "" {
@@ -221,12 +218,12 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, i
 	fmt.Println("[preflight] Running pre-flight checks.")
 
 	// Then continue with the others...
-	if err := preflight.RunJoinNodeChecks(utilsexec.New(), cfg, criSocket, ignoreChecksErrors); err != nil {
+	if err := preflight.RunJoinNodeChecks(utilsexec.New(), cfg, criSocket, ignorePreflightErrors); err != nil {
 		return nil, err
 	}
 
 	// Try to start the kubelet service in case it's inactive
-	preflight.TryStartKubelet(ignoreChecksErrors)
+	preflight.TryStartKubelet(ignorePreflightErrors)
 
 	return &Join{cfg: cfg}, nil
 }
@@ -262,36 +259,11 @@ func (j *Join) Run(out io.Writer) error {
 
 	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
 	if features.Enabled(j.cfg.FeatureGates, features.DynamicKubeletConfig) {
-		client, err := getTLSBootstrappedClient()
-		if err != nil {
-			return err
-		}
-
-		// Update the node with remote base kubelet configuration
-		if err := kubeletphase.UpdateNodeWithConfigMap(client, j.cfg.NodeName); err != nil {
-			return err
+		if err := kubeletphase.ConsumeBaseKubeletConfiguration(j.cfg.NodeName); err != nil {
+			return fmt.Errorf("error consuming base kubelet configuration: %v", err)
 		}
 	}
 
 	fmt.Fprintf(out, joinDoneMsgf)
 	return nil
-}
-
-// getTLSBootstrappedClient waits for the kubelet to perform the TLS bootstrap
-// and then creates a client from config file /etc/kubernetes/kubelet.conf
-func getTLSBootstrappedClient() (clientset.Interface, error) {
-	fmt.Println("[tlsbootstrap] Waiting for the kubelet to perform the TLS Bootstrap...")
-
-	kubeletKubeConfig := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
-
-	// Loop on every falsy return. Return with an error if raised. Exit successfully if true is returned.
-	err := wait.PollImmediateInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {
-		_, err := os.Stat(kubeletKubeConfig)
-		return (err == nil), nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return kubeconfigutil.ClientSetFromFile(kubeletKubeConfig)
 }

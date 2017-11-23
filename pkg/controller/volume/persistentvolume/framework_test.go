@@ -196,6 +196,8 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			if storedVer != requestedVer {
 				return true, obj, versionConflictError
 			}
+			// Don't modify the existing object
+			volume = volume.DeepCopy()
 			volume.ResourceVersion = strconv.Itoa(storedVer + 1)
 		} else {
 			return true, nil, fmt.Errorf("Cannot update volume %s: volume not found", volume.Name)
@@ -220,6 +222,8 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			if storedVer != requestedVer {
 				return true, obj, versionConflictError
 			}
+			// Don't modify the existing object
+			claim = claim.DeepCopy()
 			claim.ResourceVersion = strconv.Itoa(storedVer + 1)
 		} else {
 			return true, nil, fmt.Errorf("Cannot update claim %s: claim not found", claim.Name)
@@ -301,7 +305,12 @@ func (r *volumeReactor) checkVolumes(expectedVolumes []*v1.PersistentVolume) err
 	gotMap := make(map[string]*v1.PersistentVolume)
 	// Clear any ResourceVersion from both sets
 	for _, v := range expectedVolumes {
+		// Don't modify the existing object
+		v := v.DeepCopy()
 		v.ResourceVersion = ""
+		if v.Spec.ClaimRef != nil {
+			v.Spec.ClaimRef.ResourceVersion = ""
+		}
 		expectedMap[v.Name] = v
 	}
 	for _, v := range r.volumes {
@@ -331,6 +340,8 @@ func (r *volumeReactor) checkClaims(expectedClaims []*v1.PersistentVolumeClaim) 
 	expectedMap := make(map[string]*v1.PersistentVolumeClaim)
 	gotMap := make(map[string]*v1.PersistentVolumeClaim)
 	for _, c := range expectedClaims {
+		// Don't modify the existing object
+		c = c.DeepCopy()
 		c.ResourceVersion = ""
 		expectedMap[c.Name] = c
 	}
@@ -822,6 +833,9 @@ var (
 	classUnknownInternal         string = "unknown-internal"
 	classUnsupportedMountOptions string = "unsupported-mountoptions"
 	classLarge                   string = "large"
+	classWait                    string = "wait"
+
+	modeWait = storage.VolumeBindingWaitForFirstConsumer
 )
 
 // wrapTestWithPluginCalls returns a testCall that:

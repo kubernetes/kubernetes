@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	info "github.com/google/cadvisor/info/v1"
@@ -30,6 +31,8 @@ import (
 )
 
 type NvidiaManager struct {
+	sync.RWMutex
+
 	// true if the NVML library (libnvidia-ml.so.1) was loaded successfully
 	nvmlInitialized bool
 
@@ -48,12 +51,12 @@ func (nm *NvidiaManager) Setup() {
 		return
 	}
 
+	nm.initializeNVML()
+	if nm.nvmlInitialized {
+		return
+	}
 	go func() {
 		glog.Info("Starting goroutine to initialize NVML")
-		nm.initializeNVML()
-		if nm.nvmlInitialized {
-			return
-		}
 		// TODO: use globalHousekeepingInterval
 		for range time.Tick(time.Minute) {
 			nm.initializeNVML()
@@ -95,10 +98,13 @@ func (nm *NvidiaManager) initializeNVML() {
 		glog.V(3).Infof("Could not initialize NVML: %v", err)
 		return
 	}
-	nm.nvmlInitialized = true
 	numDevices, err := gonvml.DeviceCount()
 	if err != nil {
 		glog.Warningf("GPU metrics would not be available. Failed to get the number of nvidia devices: %v", err)
+		nm.Lock()
+		// Even though we won't have GPU metrics, the library was initialized and should be shutdown when exiting.
+		nm.nvmlInitialized = true
+		nm.Unlock()
 		return
 	}
 	glog.Infof("NVML initialized. Number of nvidia devices: %v", numDevices)
@@ -116,6 +122,10 @@ func (nm *NvidiaManager) initializeNVML() {
 		}
 		nm.nvidiaDevices[int(minorNumber)] = device
 	}
+	nm.Lock()
+	// Doing this at the end to avoid race in accessing nvidiaDevices in GetCollector.
+	nm.nvmlInitialized = true
+	nm.Unlock()
 }
 
 // Destroy shuts down NVML.
@@ -129,9 +139,12 @@ func (nm *NvidiaManager) Destroy() {
 // present in the devices.list file in the given devicesCgroupPath.
 func (nm *NvidiaManager) GetCollector(devicesCgroupPath string) (AcceleratorCollector, error) {
 	nc := &NvidiaCollector{}
+	nm.RLock()
 	if !nm.nvmlInitialized || len(nm.nvidiaDevices) == 0 {
+		nm.RUnlock()
 		return nc, nil
 	}
+	nm.RUnlock()
 	nvidiaMinorNumbers, err := parseDevicesCgroup(devicesCgroupPath)
 	if err != nil {
 		return nc, err

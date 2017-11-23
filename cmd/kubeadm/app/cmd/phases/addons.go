@@ -17,6 +17,8 @@ limitations under the License.
 package phases
 
 import (
+	"strings"
+
 	"github.com/spf13/cobra"
 
 	clientset "k8s.io/client-go/kubernetes"
@@ -24,6 +26,7 @@ import (
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	dnsaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -93,7 +96,7 @@ func getAddonsSubCommands() []*cobra.Command {
 	// Default values for the cobra help text
 	legacyscheme.Scheme.Default(cfg)
 
-	var cfgPath, kubeConfigFile string
+	var cfgPath, kubeConfigFile, featureGatesString string
 	var subCmds []*cobra.Command
 
 	subCmdProperties := []struct {
@@ -131,7 +134,7 @@ func getAddonsSubCommands() []*cobra.Command {
 			Short:   properties.short,
 			Long:    properties.long,
 			Example: properties.examples,
-			Run:     runAddonsCmdFunc(properties.cmdFunc, cfg, &kubeConfigFile, &cfgPath),
+			Run:     runAddonsCmdFunc(properties.cmdFunc, cfg, &kubeConfigFile, &cfgPath, &featureGatesString),
 		}
 
 		// Add flags to the command
@@ -149,6 +152,8 @@ func getAddonsSubCommands() []*cobra.Command {
 		if properties.use == "all" || properties.use == "kube-dns" {
 			cmd.Flags().StringVar(&cfg.Networking.DNSDomain, "service-dns-domain", cfg.Networking.DNSDomain, `Alternative domain for services`)
 			cmd.Flags().StringVar(&cfg.Networking.ServiceSubnet, "service-cidr", cfg.Networking.ServiceSubnet, `The range of IP address used for service VIPs`)
+			cmd.Flags().StringVar(&featureGatesString, "feature-gates", featureGatesString, "A set of key=value pairs that describe feature gates for various features."+
+				"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
 		}
 		subCmds = append(subCmds, cmd)
 	}
@@ -157,7 +162,7 @@ func getAddonsSubCommands() []*cobra.Command {
 }
 
 // runAddonsCmdFunc creates a cobra.Command Run function, by composing the call to the given cmdFunc with necessary additional steps (e.g preparation of input parameters)
-func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error, cfg *kubeadmapiext.MasterConfiguration, kubeConfigFile *string, cfgPath *string) func(cmd *cobra.Command, args []string) {
+func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error, cfg *kubeadmapiext.MasterConfiguration, kubeConfigFile *string, cfgPath *string, featureGatesString *string) func(cmd *cobra.Command, args []string) {
 
 	// the following statement build a clousure that wraps a call to a cmdFunc, binding
 	// the function itself with the specific parameters of each sub command.
@@ -165,7 +170,12 @@ func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration, client c
 	// are shared between sub commands and gets access to current value e.g. flags value.
 
 	return func(cmd *cobra.Command, args []string) {
+		var err error
 		if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
+			kubeadmutil.CheckErr(err)
+		}
+
+		if cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, *featureGatesString); err != nil {
 			kubeadmutil.CheckErr(err)
 		}
 
@@ -175,6 +185,9 @@ func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration, client c
 		kubeadmutil.CheckErr(err)
 		internalcfg, err = configutil.ConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)
 		kubeadmutil.CheckErr(err)
+		if err := features.ValidateVersion(features.InitFeatureGates, internalcfg.FeatureGates, internalcfg.KubernetesVersion); err != nil {
+			kubeadmutil.CheckErr(err)
+		}
 
 		// Execute the cmdFunc
 		err = cmdFunc(internalcfg, client)

@@ -113,7 +113,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	var dryRun bool
 	var featureGatesString string
 	var criSocket string
-	var ignoreChecksErrors []string
+	var ignorePreflightErrors []string
 
 	cmd := &cobra.Command{
 		Use:   "init",
@@ -128,10 +128,10 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 			internalcfg := &kubeadmapi.MasterConfiguration{}
 			legacyscheme.Scheme.Convert(cfg, internalcfg, nil)
 
-			ignoreChecksErrorsSet, err := validation.ValidateIgnoreChecksErrors(ignoreChecksErrors, skipPreFlight)
+			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
 			kubeadmutil.CheckErr(err)
 
-			i, err := NewInit(cfgPath, internalcfg, ignoreChecksErrorsSet, skipTokenPrint, dryRun, criSocket)
+			i, err := NewInit(cfgPath, internalcfg, ignorePreflightErrorsSet, skipTokenPrint, dryRun, criSocket)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(i.Validate(cmd))
 			kubeadmutil.CheckErr(i.Run(out))
@@ -139,7 +139,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	}
 
 	AddInitConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
-	AddInitOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &skipTokenPrint, &dryRun, &criSocket, &ignoreChecksErrors)
+	AddInitOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &skipTokenPrint, &dryRun, &criSocket, &ignorePreflightErrors)
 
 	return cmd
 }
@@ -195,13 +195,13 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfigur
 }
 
 // AddInitOtherFlags adds init flags that are not bound to a configuration file to the given flagset
-func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, skipTokenPrint, dryRun *bool, criSocket *string, ignoreChecksErrors *[]string) {
+func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, skipTokenPrint, dryRun *bool, criSocket *string, ignorePreflightErrors *[]string) {
 	flagSet.StringVar(
 		cfgPath, "config", *cfgPath,
 		"Path to kubeadm config file. WARNING: Usage of a configuration file is experimental.",
 	)
 	flagSet.StringSliceVar(
-		ignoreChecksErrors, "ignore-checks-errors", *ignoreChecksErrors,
+		ignorePreflightErrors, "ignore-preflight-errors", *ignorePreflightErrors,
 		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
 	)
 	// Note: All flags that are not bound to the cfg object should be whitelisted in cmd/kubeadm/app/apis/kubeadm/validation/validation.go
@@ -209,7 +209,7 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, sk
 		skipPreFlight, "skip-preflight-checks", *skipPreFlight,
 		"Skip preflight checks which normally run before modifying the system.",
 	)
-	flagSet.MarkDeprecated("skip-preflight-checks", "it is now equivalent to --ignore-checks-errors=all")
+	flagSet.MarkDeprecated("skip-preflight-checks", "it is now equivalent to --ignore-preflight-errors=all")
 	// Note: All flags that are not bound to the cfg object should be whitelisted in cmd/kubeadm/app/apis/kubeadm/validation/validation.go
 	flagSet.BoolVar(
 		skipTokenPrint, "skip-token-print", *skipTokenPrint,
@@ -227,7 +227,7 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, sk
 }
 
 // NewInit validates given arguments and instantiates Init struct with provided information.
-func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, ignoreChecksErrors sets.String, skipTokenPrint, dryRun bool, criSocket string) (*Init, error) {
+func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, ignorePreflightErrors sets.String, skipTokenPrint, dryRun bool, criSocket string) (*Init, error) {
 	fmt.Println("[kubeadm] WARNING: kubeadm is currently in beta")
 
 	if cfgPath != "" {
@@ -261,12 +261,12 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, ignoreChecksEr
 
 	fmt.Println("[preflight] Running pre-flight checks.")
 
-	if err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, criSocket, ignoreChecksErrors); err != nil {
+	if err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, criSocket, ignorePreflightErrors); err != nil {
 		return nil, err
 	}
 
 	// Try to start the kubelet service in case it's inactive
-	preflight.TryStartKubelet(ignoreChecksErrors)
+	preflight.TryStartKubelet(ignorePreflightErrors)
 
 	return &Init{cfg: cfg, skipTokenPrint: skipTokenPrint, dryRun: dryRun}, nil
 }
@@ -338,6 +338,14 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error printing files on dryrun: %v", err)
 	}
 
+	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
+		// Write base kubelet configuration for dynamic kubelet configuration feature.
+		if err := kubeletphase.WriteInitKubeletConfigToDiskOnMaster(i.cfg); err != nil {
+			return fmt.Errorf("error writing base kubelet configuration to disk: %v", err)
+		}
+	}
+
 	// Create a kubernetes client and wait for the API server to be healthy (if not dryrunning)
 	client, err := createClient(i.cfg, i.dryRun)
 	if err != nil {
@@ -364,7 +372,7 @@ func (i *Init) Run(out io.Writer) error {
 	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
 		// Create base kubelet configuration for dynamic kubelet configuration feature.
 		if err := kubeletphase.CreateBaseKubeletConfiguration(i.cfg, client); err != nil {
-			return fmt.Errorf("error uploading configuration: %v", err)
+			return fmt.Errorf("error creating base kubelet configuration: %v", err)
 		}
 	}
 

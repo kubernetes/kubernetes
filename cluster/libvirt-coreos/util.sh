@@ -27,7 +27,7 @@ source "$KUBE_ROOT/cluster/common.sh"
 
 export LIBVIRT_DEFAULT_URI=qemu:///system
 export SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-true}
-export ADMISSION_CONTROL=${ADMISSION_CONTROL:-Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota}
+export ADMISSION_CONTROL=${ADMISSION_CONTROL:-Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,PersistentVolumeClaimResize,DefaultTolerationSeconds,PVCProtection,ResourceQuota}
 readonly POOL=kubernetes
 readonly POOL_PATH=/var/lib/libvirt/images/kubernetes
 

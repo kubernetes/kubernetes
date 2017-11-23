@@ -54,6 +54,8 @@ import (
 	fakecertificatesv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1/fake"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	fakecorev1 "k8s.io/client-go/kubernetes/typed/core/v1/fake"
+	eventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
+	fakeeventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1/fake"
 	extensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	fakeextensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1/fake"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
@@ -232,6 +234,16 @@ func (c *Clientset) Core() corev1.CoreV1Interface {
 	return &fakecorev1.FakeCoreV1{Fake: &c.Fake}
 }
 
+// EventsV1beta1 retrieves the EventsV1beta1Client
+func (c *Clientset) EventsV1beta1() eventsv1beta1.EventsV1beta1Interface {
+	return &fakeeventsv1beta1.FakeEventsV1beta1{Fake: &c.Fake}
+}
+
+// Events retrieves the EventsV1beta1Client
+func (c *Clientset) Events() eventsv1beta1.EventsV1beta1Interface {
+	return &fakeeventsv1beta1.FakeEventsV1beta1{Fake: &c.Fake}
+}
+
 // ExtensionsV1beta1 retrieves the ExtensionsV1beta1Client
 func (c *Clientset) ExtensionsV1beta1() extensionsv1beta1.ExtensionsV1beta1Interface {
 	return &fakeextensionsv1beta1.FakeExtensionsV1beta1{Fake: &c.Fake}
@@ -302,11 +314,6 @@ func (c *Clientset) Settings() settingsv1alpha1.SettingsV1alpha1Interface {
 	return &fakesettingsv1alpha1.FakeSettingsV1alpha1{Fake: &c.Fake}
 }
 
-// StorageV1alpha1 retrieves the StorageV1alpha1Client
-func (c *Clientset) StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface {
-	return &fakestoragev1alpha1.FakeStorageV1alpha1{Fake: &c.Fake}
-}
-
 // StorageV1beta1 retrieves the StorageV1beta1Client
 func (c *Clientset) StorageV1beta1() storagev1beta1.StorageV1beta1Interface {
 	return &fakestoragev1beta1.FakeStorageV1beta1{Fake: &c.Fake}
@@ -320,4 +327,9 @@ func (c *Clientset) StorageV1() storagev1.StorageV1Interface {
 // Storage retrieves the StorageV1Client
 func (c *Clientset) Storage() storagev1.StorageV1Interface {
 	return &fakestoragev1.FakeStorageV1{Fake: &c.Fake}
+}
+
+// StorageV1alpha1 retrieves the StorageV1alpha1Client
+func (c *Clientset) StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface {
+	return &fakestoragev1alpha1.FakeStorageV1alpha1{Fake: &c.Fake}
 }

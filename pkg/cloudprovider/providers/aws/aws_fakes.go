@@ -203,6 +203,14 @@ func (ec2i *FakeEC2Impl) RevokeSecurityGroupIngress(*ec2.RevokeSecurityGroupIngr
 	panic("Not implemented")
 }
 
+func (ec2i *FakeEC2Impl) DescribeVolumeModifications(*ec2.DescribeVolumesModificationsInput) ([]*ec2.VolumeModification, error) {
+	panic("Not implemented")
+}
+
+func (ec2i *FakeEC2Impl) ModifyVolume(*ec2.ModifyVolumeInput) (*ec2.ModifyVolumeOutput, error) {
+	panic("Not implemented")
+}
+
 func (ec2i *FakeEC2Impl) CreateSubnet(request *ec2.Subnet) (*ec2.CreateSubnetOutput, error) {
 	ec2i.Subnets = append(ec2i.Subnets, request)
 	response := &ec2.CreateSubnetOutput{

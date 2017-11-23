@@ -343,6 +343,7 @@ func primeAggregatedClusterRoles(clusterRolesToAggregate map[string]string, clus
 		}
 		glog.V(1).Infof("migrating %v to %v", existingRole.Name, newName)
 		existingRole.Name = newName
+		existingRole.ResourceVersion = "" // clear this so the object can be created.
 		if _, err := clusterRoleClient.ClusterRoles().Create(existingRole); err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
