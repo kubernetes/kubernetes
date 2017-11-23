@@ -335,7 +335,7 @@ func (o *DrainOptions) getController(namespace string, controllerRef *metav1.Own
 	case "DaemonSet":
 		return o.client.Extensions().DaemonSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "Job":
-		return o.client.Batch().Jobs(namespace).Get(controllerRef.Name, metav1.GetOptions{})
+		return o.client.BatchV1().Jobs(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "ReplicaSet":
 		return o.client.Extensions().ReplicaSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "StatefulSet":
