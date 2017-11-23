@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/apps/v1beta1"
 	"k8s.io/api/batch/v2alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -27,8 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
+	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -76,7 +78,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.CronJob.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.CronJob.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.CronJob.Store)
 	validCronJob := validNewCronJob()
 	validCronJob.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -98,7 +100,7 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.CronJob.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.CronJob.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.CronJob.Store)
 	schedule := "1 1 1 1 ?"
 	test.TestUpdate(
 		// valid
@@ -127,7 +129,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.CronJob.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.CronJob.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.CronJob.Store)
 	test.TestDelete(validNewCronJob())
 }
 
@@ -140,7 +142,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.CronJob.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.CronJob.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.CronJob.Store)
 	test.TestGet(validNewCronJob())
 }
 
@@ -153,7 +155,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.CronJob.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.CronJob.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.CronJob.Store)
 	test.TestList(validNewCronJob())
 }
 
@@ -166,7 +168,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.CronJob.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.CronJob.Store, legacyscheme.Scheme)
+	test := genericregistrytest.New(t, storage.CronJob.Store)
 	test.TestWatch(
 		validNewCronJob(),
 		// matching labels
@@ -186,8 +188,8 @@ func TestWatch(t *testing.T) {
 }
 
 func TestInstantiate(t *testing.T) {
-	// scheduled jobs should be tested only when batch/v2alpha1 is enabled
-	if *testapi.Batch.GroupVersion() != v2alpha1.SchemeGroupVersion {
+	// scheduled jobs should be tested only when batch/v1beta1 is enabled
+	if *testapi.Batch.GroupVersion() != v1beta1.SchemeGroupVersion {
 		return
 	}
 
@@ -200,7 +202,7 @@ func TestInstantiate(t *testing.T) {
 	// duplicate some of the resttest environment here rather than littering resttest with test methods for
 	// this subresource that doesn't exist anywhere else (also the name Instantiate could be quite misleading)
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
-	createdObj, err := storage.Instantiate.Create(testContext, validCronJob.Name, validCronJob, false)
+	createdObj, err := storage.Instantiate.Create(testContext, validCronJob.Name, validCronJob, rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		t.Fatal(err)
 	}
