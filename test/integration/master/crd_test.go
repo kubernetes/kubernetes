@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package testing
+package master
 
 import (
 	"encoding/json"
@@ -23,8 +23,6 @@ import (
 	"time"
 
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
-	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -38,64 +36,20 @@ import (
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func TestRun(t *testing.T) {
-	config, tearDown := StartTestServerOrDie(t)
-	defer tearDown()
-
-	client, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// test whether the server is really healthy after /healthz told us so
-	t.Logf("Creating Deployment directly after being healthy")
-	var replicas int32 = 1
-	_, err = client.AppsV1beta1().Deployments("default").Create(&appsv1beta1.Deployment{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Deployment",
-			APIVersion: "apps/v1beta1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      "test",
-		},
-		Spec: appsv1beta1.DeploymentSpec{
-			Replicas: &replicas,
-			Strategy: appsv1beta1.DeploymentStrategy{
-				Type: appsv1beta1.RollingUpdateDeploymentStrategyType,
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"foo": "bar"},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "foo",
-							Image: "foo",
-						},
-					},
-				},
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("Failed to create deployment: %v", err)
-	}
-}
-
 func TestCRDShadowGroup(t *testing.T) {
-	config, tearDown := StartTestServerOrDie(t)
-	defer tearDown()
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.SharedEtcd())
+	defer result.TearDownFn()
 
-	kubeclient, err := kubernetes.NewForConfig(config)
+	kubeclient, err := kubernetes.NewForConfig(result.ClientConfig)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	apiextensionsclient, err := apiextensionsclientset.NewForConfig(config)
+	apiextensionsclient, err := apiextensionsclientset.NewForConfig(result.ClientConfig)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -155,15 +109,15 @@ func TestCRDShadowGroup(t *testing.T) {
 func TestCRD(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.Initializers, true)()
 
-	config, tearDown := StartTestServerOrDie(t)
-	defer tearDown()
+	result := kubeapiservertesting.StartTestServerOrDie(t, []string{"--admission-control", "Initializers"}, framework.SharedEtcd())
+	defer result.TearDownFn()
 
-	kubeclient, err := kubernetes.NewForConfig(config)
+	kubeclient, err := kubernetes.NewForConfig(result.ClientConfig)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	apiextensionsclient, err := apiextensionsclientset.NewForConfig(config)
+	apiextensionsclient, err := apiextensionsclientset.NewForConfig(result.ClientConfig)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -196,7 +150,7 @@ func TestCRD(t *testing.T) {
 	}
 
 	t.Logf("Trying to access foos.cr.bar.com with dynamic client")
-	barComConfig := *config
+	barComConfig := *result.ClientConfig
 	barComConfig.GroupVersion = &schema.GroupVersion{Group: "cr.bar.com", Version: "v1"}
 	barComConfig.APIPath = "/apis"
 	barComClient, err := dynamic.NewClient(&barComConfig)
