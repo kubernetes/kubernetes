@@ -47,12 +47,15 @@ func (*FakeController) LastSyncResourceVersion() string {
 
 func alwaysReady() bool { return true }
 
-func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int) (*PodGCController, coreinformers.PodInformer) {
+func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int) (*PodGCController, coreinformers.PodInformer, error) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
-	controller := NewPodGC(kubeClient, podInformer, terminatedPodThreshold)
+	controller, err := NewPodGC(kubeClient, podInformer, terminatedPodThreshold)
+	if err != nil {
+		return nil, nil, err
+	}
 	controller.podListerSynced = alwaysReady
-	return controller, podInformer
+	return controller, podInformer, nil
 }
 
 func TestGCTerminated(t *testing.T) {
@@ -113,7 +116,10 @@ func TestGCTerminated(t *testing.T) {
 
 	for i, test := range testCases {
 		client := fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*testutil.NewNode("node")}})
-		gcc, podInformer := NewFromClient(client, test.threshold)
+		gcc, podInformer, err := NewFromClient(client, test.threshold)
+		if err != nil {
+			t.Fatalf("error creating PodGC controller: %v", err)
+		}
 		deletedPodNames := make([]string, 0)
 		var lock sync.Mutex
 		gcc.deletePod = func(_, name string) error {
@@ -180,7 +186,10 @@ func TestGCOrphaned(t *testing.T) {
 
 	for i, test := range testCases {
 		client := fake.NewSimpleClientset()
-		gcc, podInformer := NewFromClient(client, test.threshold)
+		gcc, podInformer, err := NewFromClient(client, test.threshold)
+		if err != nil {
+			t.Fatalf("error creating PodGC controller: %v", err)
+		}
 		deletedPodNames := make([]string, 0)
 		var lock sync.Mutex
 		gcc.deletePod = func(_, name string) error {
@@ -257,7 +266,10 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 
 	for i, test := range testCases {
 		client := fake.NewSimpleClientset()
-		gcc, podInformer := NewFromClient(client, -1)
+		gcc, podInformer, err := NewFromClient(client, -1)
+		if err != nil {
+			t.Fatalf("error creating PodGC controller: %v", err)
+		}
 		deletedPodNames := make([]string, 0)
 		var lock sync.Mutex
 		gcc.deletePod = func(_, name string) error {

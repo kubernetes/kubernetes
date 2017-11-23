@@ -164,12 +164,16 @@ func dcSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.R
 	if err != nil {
 		t.Fatalf("error creating Deployment controller: %v", err)
 	}
-	rm := replicaset.NewReplicaSetController(
+	metrics.UnregisterMetricAndUntrackRateLimiterUsage("replicaset_controller")
+	rm, err := replicaset.NewReplicaSetController(
 		informers.Extensions().V1beta1().ReplicaSets(),
 		informers.Core().V1().Pods(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "replicaset-controller")),
 		replicaset.BurstReplicas,
 	)
+	if err != nil {
+		t.Fatalf("error creating replicaset controller: %v", err)
+	}
 	return s, closeFn, rm, dc, informers, clientSet
 }
 

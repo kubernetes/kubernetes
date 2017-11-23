@@ -23,6 +23,7 @@ go_test(
         "//pkg/controller/resourcequota:go_default_library",
         "//pkg/quota/generic:go_default_library",
         "//pkg/quota/install:go_default_library",
+        "//pkg/util/metrics:go_default_library",
         "//plugin/pkg/admission/resourcequota:go_default_library",
         "//plugin/pkg/admission/resourcequota/apis/resourcequota:go_default_library",
         "//test/integration/framework:go_default_library",

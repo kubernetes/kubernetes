@@ -87,14 +87,17 @@ type JobController struct {
 	recorder record.EventRecorder
 }
 
-func NewJobController(podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface) *JobController {
+func NewJobController(podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface) (*JobController, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("job_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
+		err := metrics.RegisterMetricAndTrackRateLimiterUsage("job_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	jm := &JobController{
@@ -127,7 +130,7 @@ func NewJobController(podInformer coreinformers.PodInformer, jobInformer batchin
 	jm.updateHandler = jm.updateJobStatus
 	jm.syncHandler = jm.syncJob
 
-	return jm
+	return jm, nil
 }
 
 // Run the main goroutine responsible for watching and syncing jobs.

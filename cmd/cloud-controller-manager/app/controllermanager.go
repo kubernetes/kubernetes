@@ -247,7 +247,10 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 				}
 			}
 
-			routeController := routecontroller.New(routes, client("route-controller"), sharedInformers.Core().V1().Nodes(), s.ClusterName, clusterCIDR)
+			routeController, err := routecontroller.New(routes, client("route-controller"), sharedInformers.Core().V1().Nodes(), s.ClusterName, clusterCIDR)
+			if err != nil {
+				glog.Errorf("Failed to start route controller: %v", err)
+			}
 			go routeController.Run(stop, s.RouteReconciliationPeriod.Duration)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}

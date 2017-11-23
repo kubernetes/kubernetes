@@ -74,9 +74,12 @@ var (
 
 // NewEndpointController returns a new *EndpointController.
 func NewEndpointController(podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
-	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface) *EndpointController {
+	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface) (*EndpointController, error) {
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.CoreV1().RESTClient().GetRateLimiter())
+		err := metrics.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.Core().RESTClient().GetRateLimiter())
+		if err != nil {
+			return nil, err
+		}
 	}
 	e := &EndpointController{
 		client:           client,
@@ -105,7 +108,7 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 	e.endpointsLister = endpointsInformer.Lister()
 	e.endpointsSynced = endpointsInformer.Informer().HasSynced
 
-	return e
+	return e, nil
 }
 
 // EndpointController manages selector-based service endpoints.
