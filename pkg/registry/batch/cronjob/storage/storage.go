@@ -124,18 +124,19 @@ func (r *InstantiateREST) Create(ctx genericapirequest.Context, name string, obj
 		return nil, fmt.Errorf("got object of type %T, expected *batch.CronJob", sourceCronJobObj)
 	}
 
-	// add an extra label onto the created job to signal to the cronjob controller that it should adopt this job
-	jobLabels := make(map[string]string)
-	for _, key := range sourceCronJob.Spec.JobTemplate.Labels {
-		jobLabels[key] = sourceCronJob.Spec.JobTemplate.Labels[key]
+	// add an extra annotation onto the created job to signal to the
+	// cronjob controller that it should adopt this job
+	jobAnnotations := make(map[string]string)
+	for _, key := range sourceCronJob.Spec.JobTemplate.Annotations {
+		jobAnnotations[key] = sourceCronJob.Spec.JobTemplate.Annotations[key]
 	}
-	jobLabels["createdByInstantiate"] = "yes"
+	jobAnnotations["cronjob.kubernetes.io/instantiate"] = "manual"
 
 	job := &batch.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        fmt.Sprintf("%s-manual-%d", name, time.Now().Unix()),
-			Labels:      jobLabels,
-			Annotations: sourceCronJob.Spec.JobTemplate.Annotations,
+			Labels:      sourceCronJob.Spec.JobTemplate.Labels,
+			Annotations: jobAnnotations,
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(sourceCronJob, batch.SchemeGroupVersion.WithKind("CronJob")),
 			},

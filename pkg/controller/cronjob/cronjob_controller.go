@@ -222,7 +222,7 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 			// * if a job was created via the instantiate subresource (will be labeled as createdByInstantiate=yes)
 
 			// if the job was created via the instantiate subresource, adopt it
-			if createdByInstantiate, exists := j.Labels["createdByInstantiate"]; exists && createdByInstantiate == "yes" {
+			if instantiateAnnotation, exists := j.Annotations["cronjob.kubernetes.io/instantiate"]; exists && instantiateAnnotation == "manual" {
 				ref, err := getRef(&j)
 				if err != nil {
 					glog.V(2).Infof("Unable to make object reference for job for %s", nameForLog)
