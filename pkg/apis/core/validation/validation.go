@@ -2570,9 +2570,7 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("nameservers"), dnsConfig.Nameservers, fmt.Sprintf("must not have more than %v nameservers", MaxDNSNameservers)))
 		}
 		for i, ns := range dnsConfig.Nameservers {
-			if ip := net.ParseIP(ns); ip == nil {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("nameservers").Index(i), ns, "must be valid IP address"))
-			}
+			allErrs = append(allErrs, validate.IPString(ns, fldPath.Child("nameservers").Index(i))...)
 		}
 		// Validate searches.
 		if len(dnsConfig.Searches) > MaxDNSSearchPaths {
@@ -2695,9 +2693,7 @@ func validateOnlyAddedTolerations(newTolerations []core.Toleration, oldToleratio
 func ValidateHostAliases(hostAliases []core.HostAlias, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, hostAlias := range hostAliases {
-		if ip := net.ParseIP(hostAlias.IP); ip == nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), hostAlias.IP, "must be valid IP address"))
-		}
+		allErrs = append(allErrs, validate.IPString(hostAlias.IP, fldPath.Child("ip"))...)
 		for _, hostname := range hostAlias.Hostnames {
 			allErrs = append(allErrs, validate.DNS1123Subdomain(hostname, fldPath.Child("hostnames"))...)
 		}
@@ -3495,6 +3491,7 @@ func ValidateService(service *core.Service) field.ErrorList {
 	}
 
 	if helper.IsServiceIPSet(service) {
+		// Need a custom error message, so don't use validate.IPString().
 		if ip := net.ParseIP(service.Spec.ClusterIP); ip == nil {
 			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterIP"), service.Spec.ClusterIP, "must be empty, 'None', or a valid IP address"))
 		}
@@ -4790,25 +4787,7 @@ func validateNonSpecialIP(ipAddress string, fldPath *field.Path) field.ErrorList
 	// unspecified and loopback addresses are nonsensical and link-local
 	// addresses tend to be used for node-centric purposes (e.g. metadata
 	// service).
-	allErrs := field.ErrorList{}
-	ip := net.ParseIP(ipAddress)
-	if ip == nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "must be a valid IP address"))
-		return allErrs
-	}
-	if ip.IsUnspecified() {
-		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be unspecified (0.0.0.0)"))
-	}
-	if ip.IsLoopback() {
-		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be in the loopback range (127.0.0.0/8)"))
-	}
-	if ip.IsLinkLocalUnicast() {
-		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be in the link-local range (169.254.0.0/16)"))
-	}
-	if ip.IsLinkLocalMulticast() {
-		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be in the link-local multicast range (224.0.0.0/24)"))
-	}
-	return allErrs
+	return validate.IPString(ipAddress, fldPath, validate.IPNotUnspecified, validate.IPNotLoopback, validate.IPNotLinkLocal)
 }
 
 func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *field.Path) field.ErrorList {
@@ -4903,9 +4882,7 @@ func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.
 	for i, ingress := range status.Ingress {
 		idxPath := fldPath.Child("ingress").Index(i)
 		if len(ingress.IP) > 0 {
-			if isIP := (net.ParseIP(ingress.IP) != nil); !isIP {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("ip"), ingress.IP, "must be a valid IP address"))
-			}
+			allErrs = append(allErrs, validate.IPString(ingress.IP, idxPath.Child("ip"))...)
 		}
 		if len(ingress.Hostname) > 0 {
 			for _, msg := range validation.IsDNS1123Subdomain(ingress.Hostname) {

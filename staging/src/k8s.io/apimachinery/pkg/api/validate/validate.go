@@ -17,6 +17,7 @@ limitations under the License.
 package validate
 
 import (
+	"net"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -124,4 +125,86 @@ func Immutable(after, before interface{}, fldPath *field.Path) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(fldPath, after, `field is immutable`))
 	}
 	return allErrs
+}
+
+// IPString validates that a string is a valid IP address. Checks is an
+// open-ended list of functions that can check some fact and return additional
+// errors.
+func IPString(value string, fldPath *field.Path, fns ...func(ip net.IP) []string) field.ErrorList {
+	ip, allErrs := parseIP(value, fldPath)
+	if ip == nil {
+		return allErrs
+	}
+	for _, fn := range fns {
+		for _, msg := range fn(ip) {
+			allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
+		}
+	}
+	return allErrs
+}
+
+// Parse an IP xor return an error.
+func parseIP(value string, fldPath *field.Path) (net.IP, field.ErrorList) {
+	ip := net.ParseIP(value)
+	if ip == nil {
+		return nil, field.ErrorList{
+			field.Invalid(fldPath, value, "must be a valid IP address"),
+		}
+	}
+	return ip, nil
+}
+
+// Returns true iff the IP is a v6 address.
+func isIPV6(ip net.IP) bool {
+	// The Go way to check this is to try to convert to 4-byte form.
+	return ip.To4() == nil
+}
+
+// IPNotUnspecified can be passed to IPString as an additional check to ensure
+// the IP is not "unspecified" (0.0.0.0 or ::).
+func IPNotUnspecified(ip net.IP) []string {
+	if ip.IsUnspecified() {
+		return []string{"may not be unspecified"}
+	}
+	return nil
+}
+
+// IPNotLoopback can be passed to IPString as an additional check to ensure
+// the IP is not in the loopback range.
+func IPNotLoopback(ip net.IP) []string {
+	if ip.IsLoopback() {
+		msg4 := "may not be in the loopback range (127.0.0.0/8)"
+		msg6 := "may not be loopback"
+		msg := msg4
+		if isIPV6(ip) {
+			msg = msg6
+		}
+		return []string{msg}
+	}
+	return nil
+}
+
+// IPNotLinkLocal can be passed to IPString as an additional check to ensure
+// the IP is not in the link-local ranges.
+func IPNotLinkLocal(ip net.IP) []string {
+	var msgs []string // nil
+	if ip.IsLinkLocalUnicast() {
+		msg4 := "may not be in the link-local range (169.254.0.0/16)"
+		msg6 := "may not be in the link-local range (fe80::/10)"
+		msg := msg4
+		if isIPV6(ip) {
+			msg = msg6
+		}
+		msgs = append(msgs, msg)
+	}
+	if ip.IsLinkLocalMulticast() {
+		msg4 := "may not be in the link-local multicast range (224.0.0.0/24)"
+		msg6 := "may not be in the link-local multicast range (ff02::/16)"
+		msg := msg4
+		if isIPV6(ip) {
+			msg = msg6
+		}
+		msgs = append(msgs, msg)
+	}
+	return msgs
 }
