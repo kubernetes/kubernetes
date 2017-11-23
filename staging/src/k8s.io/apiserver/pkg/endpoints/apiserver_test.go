@@ -1958,11 +1958,11 @@ func TestGetTable(t *testing.T) {
 				}
 				obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
 				if err != nil {
-					t.Fatalf("%d: unexpected body read error: %v", err)
+					t.Fatalf("%d: unexpected body read error: %v", i, err)
 				}
 				gvk := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
 				if obj.GetObjectKind().GroupVersionKind() != gvk {
-					t.Fatalf("%d: unexpected error body: %#v", obj)
+					t.Fatalf("%d: unexpected error body: %#v", i, obj)
 				}
 				return
 			}
@@ -2083,12 +2083,12 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 			}
 			obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
 			if err != nil {
-				t.Errorf("%d: unexpected body read error: %v", err)
+				t.Errorf("%d: unexpected body read error: %v", i, err)
 				continue
 			}
 			gvk := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
 			if obj.GetObjectKind().GroupVersionKind() != gvk {
-				t.Errorf("%d: unexpected error body: %#v", obj)
+				t.Errorf("%d: unexpected error body: %#v", i, obj)
 			}
 			continue
 		}
