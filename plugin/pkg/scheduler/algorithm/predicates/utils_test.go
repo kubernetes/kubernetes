@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -107,10 +108,8 @@ func Test_decode(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		if got := decode(tt.args); !reflect.DeepEqual(got, tt.want) {
-			t.Errorf("test name = %v, decode() = %v, want %v", tt.name, got, tt.want)
-		}
-
+		got := decode(tt.args)
+		require.True(t, reflect.DeepEqual(got, tt.want), "test name = %v, decode() = %v, want %v", tt.name, got, tt.want)
 	}
 }
 
@@ -175,9 +174,8 @@ func Test_specialPortConflictCheck(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := specialPortConflictCheck(tt.args.specialHostPort, tt.args.otherHostPorts); got != tt.want {
-				t.Errorf("specialPortConflictCheck() = %v, want %v", got, tt.want)
-			}
+			got := specialPortConflictCheck(tt.args.specialHostPort, tt.args.otherHostPorts)
+			require.Equal(t, tt.want, got, "specialPortConflictCheck() = %v, want %v", got, tt.want)
 		})
 	}
 }
@@ -255,9 +253,8 @@ func Test_portsConflict(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := portsConflict(tt.args.existingPorts, tt.args.wantPorts); got != tt.want {
-				t.Errorf("portsConflict() = %v, want %v", got, tt.want)
-			}
+			got := portsConflict(tt.args.existingPorts, tt.args.wantPorts)
+			require.Equal(t, tt.want, got, "portsConflict() = %v, want %v", got, tt.want)
 		})
 	}
 }

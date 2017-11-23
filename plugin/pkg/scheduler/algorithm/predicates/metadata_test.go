@@ -22,6 +22,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -338,21 +339,18 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 		existingPodsMeta1, nodeInfoMap := getMeta(schedulertesting.FakePodLister(test.existingPods))
 		// Add test.addedPod to existingPodsMeta1 and make sure meta is equal to allPodsMeta
 		nodeInfo := nodeInfoMap[test.addedPod.Spec.NodeName]
-		if err := existingPodsMeta1.AddPod(test.addedPod, nodeInfo); err != nil {
-			t.Errorf("test [%v]: error adding pod to meta: %v", test.description, err)
-		}
-		if err := predicateMetadataEquivalent(allPodsMeta, existingPodsMeta1); err != nil {
-			t.Errorf("test [%v]: meta data are not equivalent: %v", test.description, err)
-		}
+		err := existingPodsMeta1.AddPod(test.addedPod, nodeInfo)
+		require.NoError(t, err, "test [%v]: error adding pod to meta: %v", test.description, err)
+		err = predicateMetadataEquivalent(allPodsMeta, existingPodsMeta1)
+		require.NoError(t, err, "test [%v]: meta data are not equivalent: %v", test.description, err)
+
 		// Remove the added pod and from existingPodsMeta1 an make sure it is equal
 		// to meta generated for existing pods.
 		existingPodsMeta2, _ := getMeta(schedulertesting.FakePodLister(test.existingPods))
-		if err := existingPodsMeta1.RemovePod(test.addedPod); err != nil {
-			t.Errorf("test [%v]: error removing pod from meta: %v", test.description, err)
-		}
-		if err := predicateMetadataEquivalent(existingPodsMeta1, existingPodsMeta2); err != nil {
-			t.Errorf("test [%v]: meta data are not equivalent: %v", test.description, err)
-		}
+		err = existingPodsMeta1.RemovePod(test.addedPod)
+		require.NoError(t, err, "test [%v]: error removing pod from meta: %v", test.description, err)
+		err = predicateMetadataEquivalent(existingPodsMeta1, existingPodsMeta2)
+		require.NoError(t, err, "test [%v]: meta data are not equivalent: %v", test.description, err)
 	}
 }
 
@@ -394,7 +392,5 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 		},
 	}
 
-	if !reflect.DeepEqual(source.ShallowCopy().(*predicateMetadata), &source) {
-		t.Errorf("Copy is not equal to source!")
-	}
+	require.True(t, reflect.DeepEqual(source.ShallowCopy().(*predicateMetadata), &source), "Copy is not equal to source!")
 }

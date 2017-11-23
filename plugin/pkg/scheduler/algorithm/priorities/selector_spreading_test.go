@@ -21,6 +21,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
@@ -356,12 +357,8 @@ func TestSelectorSpreadPriority(t *testing.T) {
 
 		ttp := priorityFunction(selectorSpread.CalculateSpreadPriorityMap, selectorSpread.CalculateSpreadPriorityReduce, mataData)
 		list, err := ttp(test.pod, nodeNameToInfo, makeNodeList(test.nodes))
-		if err != nil {
-			t.Errorf("unexpected error: %v index : %d\n", err, i)
-		}
-		if !reflect.DeepEqual(test.expectedList, list) {
-			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
-		}
+		require.NoError(t, err, "unexpected error: %v index : %d\n", err, i)
+		require.True(t, reflect.DeepEqual(test.expectedList, list), "%s: expected %#v, got %#v", test.test, test.expectedList, list)
 	}
 }
 
@@ -590,15 +587,11 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		mataData := mataDataProducer(test.pod, nodeNameToInfo)
 		ttp := priorityFunction(selectorSpread.CalculateSpreadPriorityMap, selectorSpread.CalculateSpreadPriorityReduce, mataData)
 		list, err := ttp(test.pod, nodeNameToInfo, makeLabeledNodeList(labeledNodes))
-		if err != nil {
-			t.Errorf("unexpected error: %v index : %d", err, i)
-		}
+		require.NoError(t, err, "unexpected error: %v index : %d", err, i)
 		// sort the two lists to avoid failures on account of different ordering
 		sort.Sort(test.expectedList)
 		sort.Sort(list)
-		if !reflect.DeepEqual(test.expectedList, list) {
-			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
-		}
+		require.True(t, reflect.DeepEqual(test.expectedList, list), "%s: expected %#v, got %#v", test.test, test.expectedList, list)
 	}
 }
 
@@ -762,15 +755,11 @@ func TestZoneSpreadPriority(t *testing.T) {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, nil)
 		zoneSpread := ServiceAntiAffinity{podLister: schedulertesting.FakePodLister(test.pods), serviceLister: schedulertesting.FakeServiceLister(test.services), label: "zone"}
 		list, err := zoneSpread.CalculateAntiAffinityPriority(test.pod, nodeNameToInfo, makeLabeledNodeList(test.nodes))
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
+		require.NoError(t, err, "unexpected error: %v", err)
 		// sort the two lists to avoid failures on account of different ordering
 		sort.Sort(test.expectedList)
 		sort.Sort(list)
-		if !reflect.DeepEqual(test.expectedList, list) {
-			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
-		}
+		require.True(t, reflect.DeepEqual(test.expectedList, list), "%s: expected %#v, got %#v", test.test, test.expectedList, list)
 	}
 }
 
@@ -789,11 +778,11 @@ func TestGetNodeClassificationByLabels(t *testing.T) {
 	newLabeledNodes, noNonLabeledNodes := serviceAffinity.getNodeClassificationByLabels(makeLabeledNodeList(labeledNodes))
 	noLabeledNodes, newnonLabeledNodes := serviceAffinity.getNodeClassificationByLabels(makeNodeList(expectedNonLabeledNodes))
 	label, _ := newLabeledNodes[machine01]
-	if label != zoneA && len(noNonLabeledNodes) != 0 {
-		t.Errorf("Expected only labeled node with label zoneA and no noNonLabeledNodes")
+	if label == zoneA {
+		require.Len(t, noNonLabeledNodes, 0, "Expected only labeled node with label zoneA and no noNonLabeledNodes")
 	}
-	if len(noLabeledNodes) != 0 && newnonLabeledNodes[0] != machine02 {
-		t.Errorf("Expected only non labled nodes")
+	if len(noLabeledNodes) == 0 {
+		require.Equal(t, machine02, newnonLabeledNodes[0], "Expected only non labled nodes")
 	}
 }
 

@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -40,9 +41,8 @@ func TestResourcePathWithPrefix(t *testing.T) {
 		{"", "resource", "mynamespace", "myresource", "/api/" + Test.externalGroupVersion.Version + "/namespaces/mynamespace/resource/myresource"},
 	}
 	for _, item := range testCases {
-		if actual := Test.ResourcePathWithPrefix(item.prefix, item.resource, item.namespace, item.name); actual != item.expected {
-			t.Errorf("Expected: %s, got: %s for prefix: %s, resource: %s, namespace: %s and name: %s", item.expected, actual, item.prefix, item.resource, item.namespace, item.name)
-		}
+		actual := Test.ResourcePathWithPrefix(item.prefix, item.resource, item.namespace, item.name)
+		require.Equal(t, actual, item.expected, "Expected: %s, got: %s for prefix: %s, resource: %s, namespace: %s and name: %s", item.expected, actual, item.prefix, item.resource, item.namespace, item.name)
 	}
 
 	TestGroup := Test
@@ -62,9 +62,8 @@ func TestResourcePathWithPrefix(t *testing.T) {
 		{"", "resource", "mynamespace", "myresource", "/apis/" + TestGroup.externalGroupVersion.Group + "/" + TestGroup.externalGroupVersion.Version + "/namespaces/mynamespace/resource/myresource"},
 	}
 	for _, item := range testGroupCases {
-		if actual := TestGroup.ResourcePathWithPrefix(item.prefix, item.resource, item.namespace, item.name); actual != item.expected {
-			t.Errorf("Expected: %s, got: %s for prefix: %s, resource: %s, namespace: %s and name: %s", item.expected, actual, item.prefix, item.resource, item.namespace, item.name)
-		}
+		actual := TestGroup.ResourcePathWithPrefix(item.prefix, item.resource, item.namespace, item.name)
+		require.Equal(t, actual, item.expected, "Expected: %s, got: %s for prefix: %s, resource: %s, namespace: %s and name: %s", item.expected, actual, item.prefix, item.resource, item.namespace, item.name)
 	}
 
 }
@@ -82,9 +81,8 @@ func TestResourcePath(t *testing.T) {
 		{"resource", "", "", "/api/" + Test.externalGroupVersion.Version + "/resource"},
 	}
 	for _, item := range testCases {
-		if actual := Test.ResourcePath(item.resource, item.namespace, item.name); actual != item.expected {
-			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s and name: %s", item.expected, actual, item.resource, item.namespace, item.name)
-		}
+		actual := Test.ResourcePath(item.resource, item.namespace, item.name)
+		require.Equal(t, actual, item.expected, "Expected: %s, got: %s for resource: %s, namespace: %s and name: %s", item.expected, actual, item.resource, item.namespace, item.name)
 	}
 
 	TestGroup := Test
@@ -102,9 +100,8 @@ func TestResourcePath(t *testing.T) {
 		{"resource", "", "", "/apis/" + TestGroup.externalGroupVersion.Group + "/" + TestGroup.externalGroupVersion.Version + "/resource"},
 	}
 	for _, item := range testGroupCases {
-		if actual := TestGroup.ResourcePath(item.resource, item.namespace, item.name); actual != item.expected {
-			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s and name: %s", item.expected, actual, item.resource, item.namespace, item.name)
-		}
+		actual := TestGroup.ResourcePath(item.resource, item.namespace, item.name)
+		require.Equal(t, actual, item.expected, "Expected: %s, got: %s for resource: %s, namespace: %s and name: %s", item.expected, actual, item.resource, item.namespace, item.name)
 	}
 
 }
@@ -121,9 +118,8 @@ func TestSubResourcePath(t *testing.T) {
 		{"resource", "mynamespace", "myresource", "", "/api/" + Test.externalGroupVersion.Version + "/namespaces/mynamespace/resource/myresource"},
 	}
 	for _, item := range testCases {
-		if actual := Test.SubResourcePath(item.resource, item.namespace, item.name, item.sub); actual != item.expected {
-			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s, name: %s and sub: %s", item.expected, actual, item.resource, item.namespace, item.name, item.sub)
-		}
+		actual := Test.SubResourcePath(item.resource, item.namespace, item.name, item.sub)
+		require.Equal(t, actual, item.expected, "Expected: %s, got: %s for resource: %s, namespace: %s, name: %s and sub: %s", item.expected, actual, item.resource, item.namespace, item.name, item.sub)
 	}
 
 	TestGroup := Test
@@ -140,9 +136,8 @@ func TestSubResourcePath(t *testing.T) {
 		{"resource", "mynamespace", "myresource", "", "/apis/" + TestGroup.externalGroupVersion.Group + "/" + TestGroup.externalGroupVersion.Version + "/namespaces/mynamespace/resource/myresource"},
 	}
 	for _, item := range testGroupCases {
-		if actual := TestGroup.SubResourcePath(item.resource, item.namespace, item.name, item.sub); actual != item.expected {
-			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s, name: %s and sub: %s", item.expected, actual, item.resource, item.namespace, item.name, item.sub)
-		}
+		actual := TestGroup.SubResourcePath(item.resource, item.namespace, item.name, item.sub)
+		require.Equal(t, actual, item.expected, "Expected: %s, got: %s for resource: %s, namespace: %s, name: %s and sub: %s", item.expected, actual, item.resource, item.namespace, item.name, item.sub)
 	}
 
 }
@@ -157,9 +152,8 @@ func TestSelfLink(t *testing.T) {
 		{"resource", "", "/api/" + Test.externalGroupVersion.Version + "/resource"},
 	}
 	for _, item := range testCases {
-		if actual := Test.SelfLink(item.resource, item.name); actual != item.expected {
-			t.Errorf("Expected: %s, got: %s for resource: %s and name: %s", item.expected, actual, item.resource, item.name)
-		}
+		actual := Test.SelfLink(item.resource, item.name)
+		require.Equal(t, actual, item.expected, "Expected: %s, got: %s for resource: %s and name: %s", item.expected, actual, item.resource, item.name)
 	}
 
 	TestGroup := Test
@@ -174,9 +168,8 @@ func TestSelfLink(t *testing.T) {
 		{"resource", "", "/apis/" + TestGroup.externalGroupVersion.Group + "/" + TestGroup.externalGroupVersion.Version + "/resource"},
 	}
 	for _, item := range testGroupCases {
-		if actual := TestGroup.SelfLink(item.resource, item.name); actual != item.expected {
-			t.Errorf("Expected: %s, got: %s for resource: %s and name: %s", item.expected, actual, item.resource, item.name)
-		}
+		actual := TestGroup.SelfLink(item.resource, item.name)
+		require.Equal(t, actual, item.expected, "Expected: %s, got: %s for resource: %s and name: %s", item.expected, actual, item.resource, item.name)
 	}
 }
 
@@ -191,23 +184,16 @@ func TestV1EncodeDecodeStatus(t *testing.T) {
 	v1Codec := Test.Codec()
 
 	encoded, err := runtime.Encode(v1Codec, status)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err, "unexpected error: %v", err)
+
 	typeMeta := metav1.TypeMeta{}
-	if err := json.Unmarshal(encoded, &typeMeta); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if typeMeta.Kind != "Status" {
-		t.Errorf("Kind is not set to \"Status\". Got %v", string(encoded))
-	}
-	if typeMeta.APIVersion != "v1" {
-		t.Errorf("APIVersion is not set to \"v1\". Got %v", string(encoded))
-	}
+	err = json.Unmarshal(encoded, &typeMeta)
+	require.NoError(t, err, "unexpected error: %v", err)
+	require.Equal(t, typeMeta.Kind, "Status", "Kind is not set to \"Status\". Got %v", string(encoded))
+	require.Equal(t, typeMeta.APIVersion, "v1", "APIVersion is not set to \"v1\". Got %v", string(encoded))
+
 	decoded, err := runtime.Decode(v1Codec, encoded)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err, "unexpected error: %v", err)
 	if !reflect.DeepEqual(status, decoded) {
 		t.Errorf("expected: %#v, got: %#v", status, decoded)
 	}

@@ -21,7 +21,10 @@ go_test(
     srcs = ["validation_test.go"],
     importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/api/validation",
     library = ":go_default_library",
-    deps = ["//plugin/pkg/scheduler/api:go_default_library"],
+    deps = [
+        "//plugin/pkg/scheduler/api:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
+    ],
 )
 
 filegroup(

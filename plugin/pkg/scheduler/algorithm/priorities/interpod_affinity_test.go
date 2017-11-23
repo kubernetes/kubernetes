@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
@@ -517,12 +518,8 @@ func TestInterPodAffinityPriority(t *testing.T) {
 			hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 		}
 		list, err := interPodAffinity.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if !reflect.DeepEqual(test.expectedList, list) {
-			t.Errorf("%s: \nexpected \n\t%#v, \ngot \n\t%#v\n", test.test, test.expectedList, list)
-		}
+		require.NoError(t, err, "unexpected error: %v", err)
+		require.True(t, reflect.DeepEqual(test.expectedList, list), "%s: \nexpected \n\t%#v, \ngot \n\t%#v\n", test.test, test.expectedList, list)
 	}
 }
 
@@ -605,11 +602,7 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 			hardPodAffinityWeight: test.hardPodAffinityWeight,
 		}
 		list, err := ipa.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if !reflect.DeepEqual(test.expectedList, list) {
-			t.Errorf("%s: \nexpected \n\t%#v, \ngot \n\t%#v\n", test.test, test.expectedList, list)
-		}
+		require.NoError(t, err, "unexpected error: %v", err)
+		require.True(t, reflect.DeepEqual(test.expectedList, list), "%s: \nexpected \n\t%#v, \ngot \n\t%#v\n", test.test, test.expectedList, list)
 	}
 }

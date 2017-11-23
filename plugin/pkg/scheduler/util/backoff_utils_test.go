@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	ktypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -65,22 +66,18 @@ func TestBackoff(t *testing.T) {
 
 	for _, test := range tests {
 		duration := backoff.GetEntry(test.podID).getBackoff(backoff.maxDuration)
-		if duration != test.expectedDuration {
-			t.Errorf("expected: %s, got %s for %s", test.expectedDuration.String(), duration.String(), test.podID)
-		}
+		require.Equal(t, duration, test.expectedDuration,
+			"expected: %s, got %s for %s", test.expectedDuration.String(), duration.String(), test.podID)
+
 		clock.t = clock.t.Add(test.advanceClock)
 		backoff.Gc()
 	}
 	fooID := ktypes.NamespacedName{Namespace: "default", Name: "foo"}
 	backoff.perPodBackoff[fooID].backoff = 60 * time.Second
 	duration := backoff.GetEntry(fooID).getBackoff(backoff.maxDuration)
-	if duration != 60*time.Second {
-		t.Errorf("expected: 60, got %s", duration.String())
-	}
+	require.Equal(t, 60*time.Second, duration, "expected: 60, got %s", duration.String())
 	// Verify that we split on namespaces correctly, same name, different namespace
 	fooID.Namespace = "other"
 	duration = backoff.GetEntry(fooID).getBackoff(backoff.maxDuration)
-	if duration != 1*time.Second {
-		t.Errorf("expected: 1, got %s", duration.String())
-	}
+	require.Equal(t, 1*time.Second, duration, "expected: 1, got %s", duration.String())
 }

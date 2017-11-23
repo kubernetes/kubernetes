@@ -19,6 +19,7 @@ package util
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
@@ -52,10 +53,7 @@ func TestGetPodPriority(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if GetPodPriority(test.pod) != test.expectedPriority {
-			t.Errorf("expected pod priority: %v, got %v", test.expectedPriority, GetPodPriority(test.pod))
-		}
-
+		require.Equal(t, GetPodPriority(test.pod), test.expectedPriority, "expected pod priority: %v, got %v", test.expectedPriority, GetPodPriority(test.pod))
 	}
 }
 
@@ -83,13 +81,10 @@ func TestSortableList(t *testing.T) {
 		podList.Items = append(podList.Items, pod)
 	}
 	podList.Sort()
-	if len(podList.Items) != 10 {
-		t.Errorf("expected length of list was 10, got: %v", len(podList.Items))
-	}
+	require.Len(t, podList.Items, 10, "expected length of list was 10, got: %v", len(podList.Items))
+
 	var prevPriority = int32(10)
 	for _, p := range podList.Items {
-		if *p.(*v1.Pod).Spec.Priority >= prevPriority {
-			t.Errorf("Pods are not soreted. Current pod pririty is %v, while previous one was %v.", *p.(*v1.Pod).Spec.Priority, prevPriority)
-		}
+		require.True(t, *p.(*v1.Pod).Spec.Priority < prevPriority, "Pods are not soreted. Current pod pririty is %v, while previous one was %v.", *p.(*v1.Pod).Spec.Priority, prevPriority)
 	}
 }

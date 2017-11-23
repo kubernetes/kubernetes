@@ -21,6 +21,7 @@ go_test(
         "//plugin/pkg/scheduler/testing:go_default_library",
         "//plugin/pkg/scheduler/util:go_default_library",
         "//plugin/pkg/scheduler/volumebinder:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

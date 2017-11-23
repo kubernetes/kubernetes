@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -540,19 +541,15 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		fmt.Printf("%s: Testing scheduler config\n", v)
 
 		policy := schedulerapi.Policy{}
-		if err := runtime.DecodeInto(latestschedulerapi.Codec, []byte(tc.JSON), &policy); err != nil {
-			t.Errorf("%s: Error decoding: %v", v, err)
-			continue
-		}
+		err := runtime.DecodeInto(latestschedulerapi.Codec, []byte(tc.JSON), &policy)
+		require.NoError(t, err, "%s: Error decoding: %v", v, err)
 		for _, predicate := range policy.Predicates {
 			seenPredicates.Insert(predicate.Name)
 		}
 		for _, priority := range policy.Priorities {
 			seenPriorities.Insert(priority.Name)
 		}
-		if !reflect.DeepEqual(policy, tc.ExpectedPolicy) {
-			t.Errorf("%s: Expected:\n\t%#v\nGot:\n\t%#v", v, tc.ExpectedPolicy, policy)
-		}
+		require.True(t, reflect.DeepEqual(policy, tc.ExpectedPolicy), "%s: Expected:\n\t%#v\nGot:\n\t%#v", v, tc.ExpectedPolicy, policy)
 
 		handler := utiltesting.FakeHandler{
 			StatusCode:   500,
@@ -564,7 +561,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 		informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-		if _, err := factory.NewConfigFactory(
+		_, err = factory.NewConfigFactory(
 			"some-scheduler-name",
 			client,
 			informerFactory.Core().V1().Nodes(),
@@ -579,16 +576,10 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			informerFactory.Storage().V1().StorageClasses(),
 			v1.DefaultHardPodAffinitySymmetricWeight,
 			enableEquivalenceCache,
-		).CreateFromConfig(policy); err != nil {
-			t.Errorf("%s: Error constructing: %v", v, err)
-			continue
-		}
+		).CreateFromConfig(policy)
+		require.NoError(t, err, "%s: Error constructing: %v", v, err)
 	}
 
-	if !seenPredicates.HasAll(registeredPredicates.List()...) {
-		t.Errorf("Registered predicates are missing from compatibility test (add to test stanza for version currently in development): %#v", registeredPredicates.Difference(seenPredicates).List())
-	}
-	if !seenPriorities.HasAll(registeredPriorities.List()...) {
-		t.Errorf("Registered priorities are missing from compatibility test (add to test stanza for version currently in development): %#v", registeredPriorities.Difference(seenPriorities).List())
-	}
+	require.True(t, seenPredicates.HasAll(registeredPredicates.List()...), "Registered predicates are missing from compatibility test (add to test stanza for version currently in development): %#v", registeredPredicates.Difference(seenPredicates).List())
+	require.True(t, seenPriorities.HasAll(registeredPriorities.List()...), "Registered priorities are missing from compatibility test (add to test stanza for version currently in development): %#v", registeredPriorities.Difference(seenPriorities).List())
 }

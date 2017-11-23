@@ -19,6 +19,7 @@ package defaults
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 )
@@ -45,9 +46,7 @@ func TestCopyAndReplace(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		result := copyAndReplace(testCase.set, testCase.replaceWhat, testCase.replaceWith)
-		if !result.Equal(testCase.expected) {
-			t.Errorf("expected %v got %v", testCase.expected, result)
-		}
+		require.Equal(t, testCase.expected, result, "expected %v got %v", testCase.expected, result)
 	}
 }
 
@@ -60,9 +59,8 @@ func TestDefaultPriorities(t *testing.T) {
 		"NodePreferAvoidPodsPriority",
 		"NodeAffinityPriority",
 		"TaintTolerationPriority")
-	if expected := defaultPriorities(); !result.Equal(expected) {
-		t.Errorf("expected %v got %v", expected, result)
-	}
+	expected := defaultPriorities()
+	require.Equal(t, expected, result, "expected %v got %v", expected, result)
 }
 
 func TestDefaultPredicates(t *testing.T) {
@@ -81,7 +79,6 @@ func TestDefaultPredicates(t *testing.T) {
 		predicates.CheckVolumeBinding,
 	)
 
-	if expected := defaultPredicates(); !result.Equal(expected) {
-		t.Errorf("expected %v got %v", expected, result)
-	}
+	expected := defaultPredicates()
+	require.Equal(t, expected, result, "expected %v got %v", expected, result)
 }

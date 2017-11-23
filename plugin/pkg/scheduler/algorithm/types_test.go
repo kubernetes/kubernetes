@@ -19,6 +19,7 @@ package algorithm
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -41,25 +42,23 @@ func TestEmptyMetadataProducer(t *testing.T) {
 	// Test EmptyControllerLister should return nill
 	controllerLister := EmptyControllerLister{}
 	nilController, nilError := controllerLister.List(fakeLabelSelector)
-	if nilController != nil || nilError != nil {
-		t.Errorf("failed to produce empty controller lister: got %v, expected nil", nilController)
-	}
+	require.Nil(t, nilController, "failed to produce empty controller lister: got %v, expected nil", nilController)
+	require.Nil(t, nilError, "failed to produce empty controller lister: got %v, expected nil", nilController)
+
 	// Test GetPodControllers on empty controller lister should return nill
 	nilController, nilError = controllerLister.GetPodControllers(fakePod)
-	if nilController != nil || nilError != nil {
-		t.Errorf("failed to produce empty controller lister: got %v, expected nil", nilController)
-	}
+	require.Nil(t, nilController, "failed to produce empty controller lister: got %v, expected nil", nilController)
+	require.Nil(t, nilError, "failed to produce empty controller lister: got %v, expected nil", nilController)
+
 	// Test GetPodReplicaSets on empty replica sets should return nill
 	replicaSetLister := EmptyReplicaSetLister{}
 	nilRss, nilErrRss := replicaSetLister.GetPodReplicaSets(fakePod)
-	if nilRss != nil || nilErrRss != nil {
-		t.Errorf("failed to produce empty replicaSetLister: got %v, expected nil", nilRss)
-	}
+	require.Nil(t, nilRss, "failed to produce empty replicaSetLister: got %v, expected nil", nilRss)
+	require.Nil(t, nilErrRss, "failed to produce empty replicaSetLister: got %v, expected nil", nilRss)
 
 	// Test GetPodStatefulSets on empty replica sets should return nill
 	statefulSetLister := EmptyStatefulSetLister{}
 	nilSSL, nilErrSSL := statefulSetLister.GetPodStatefulSets(fakePod)
-	if nilSSL != nil || nilErrSSL != nil {
-		t.Errorf("failed to produce empty statefulSetLister: got %v, expected nil", nilSSL)
-	}
+	require.Nil(t, nilSSL, "failed to produce empty statefulSetLister: got %v, expected nil", nilSSL)
+	require.Nil(t, nilErrSSL, "failed to produce empty statefulSetLister: got %v, expected nil", nilSSL)
 }

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
 
@@ -73,8 +74,6 @@ func TestValidatePolicy(t *testing.T) {
 
 	for _, test := range tests {
 		actual := ValidatePolicy(test.policy)
-		if fmt.Sprint(test.expected) != fmt.Sprint(actual) {
-			t.Errorf("expected: %s, actual: %s", test.expected, actual)
-		}
+		require.Equal(t, fmt.Sprint(test.expected), fmt.Sprint(actual), "expected: %s, actual: %s", test.expected, actual)
 	}
 }
