@@ -101,8 +101,6 @@ go_test(
         "//conditions:default": [],
     }),
     data = [
-        "fixtures/seccomp/sub/subtest",
-        "fixtures/seccomp/test",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim",
     library = ":go_default_library",
