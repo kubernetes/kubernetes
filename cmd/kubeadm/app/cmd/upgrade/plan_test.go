@@ -60,6 +60,7 @@ func TestSortedSliceFromStringIntMap(t *testing.T) {
 
 // TODO Think about modifying this test to be less verbose checking b/c it can be brittle.
 func TestPrintAvailableUpgrades(t *testing.T) {
+	featureGates := make(map[string]bool)
 	var tests = []struct {
 		upgrades      []upgrade.Upgrade
 		buf           *bytes.Buffer
@@ -334,7 +335,7 @@ _____________________________________________________________________
 	}
 	for _, rt := range tests {
 		rt.buf = bytes.NewBufferString("")
-		printAvailableUpgrades(rt.upgrades, rt.buf)
+		printAvailableUpgrades(rt.upgrades, rt.buf, featureGates)
 		actualBytes := rt.buf.Bytes()
 		if !bytes.Equal(actualBytes, rt.expectedBytes) {
 			t.Errorf(

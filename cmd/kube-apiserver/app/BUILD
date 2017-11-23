@@ -20,6 +20,7 @@ go_library(
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/core:go_default_library",
+        "//pkg/apis/events:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/networking:go_default_library",
         "//pkg/apis/storage:go_default_library",

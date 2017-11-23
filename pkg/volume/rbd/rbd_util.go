@@ -30,11 +30,13 @@ import (
 	"os/exec"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	fileutil "k8s.io/kubernetes/pkg/util/file"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
@@ -43,6 +45,8 @@ import (
 
 const (
 	imageWatcherStr = "watcher="
+	imageSizeStr    = "size "
+	sizeDivStr      = " MB in"
 	kubeLockMagic   = "kubelet_lock_magic_"
 )
 
@@ -439,6 +443,123 @@ func (util *RBDUtil) DeleteImage(p *rbdVolumeDeleter) error {
 		}
 	}
 	return fmt.Errorf("error %v, rbd output: %v", err, string(output))
+}
+
+// ExpandImage runs rbd resize command to resize the specified image
+func (util *RBDUtil) ExpandImage(rbdExpander *rbdVolumeExpander, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error) {
+	var output []byte
+	var err error
+	volSizeBytes := newSize.Value()
+	// convert to MB that rbd defaults on
+	sz := int(volume.RoundUpSize(volSizeBytes, 1024*1024))
+	newVolSz := fmt.Sprintf("%d", sz)
+	newSizeQuant := resource.MustParse(fmt.Sprintf("%dMi", sz))
+
+	// check the current size of rbd image, if equals to or greater that the new request size, do nothing
+	curSize, infoErr := util.rbdInfo(rbdExpander.rbdMounter)
+	if infoErr != nil {
+		return oldSize, fmt.Errorf("rbd info failed, error: %v", infoErr)
+	}
+	if curSize >= sz {
+		return newSizeQuant, nil
+	}
+
+	// rbd resize
+	l := len(rbdExpander.rbdMounter.Mon)
+	// pick a mon randomly
+	start := rand.Int() % l
+	// iterate all monitors until resize succeeds.
+	for i := start; i < start+l; i++ {
+		mon := rbdExpander.rbdMounter.Mon[i%l]
+		glog.V(4).Infof("rbd: resize %s using mon %s, pool %s id %s key %s", rbdExpander.rbdMounter.Image, mon, rbdExpander.rbdMounter.Pool, rbdExpander.rbdMounter.adminId, rbdExpander.rbdMounter.adminSecret)
+		output, err = rbdExpander.exec.Run("rbd",
+			"resize", rbdExpander.rbdMounter.Image, "--size", newVolSz, "--pool", rbdExpander.rbdMounter.Pool, "--id", rbdExpander.rbdMounter.adminId, "-m", mon, "--key="+rbdExpander.rbdMounter.adminSecret)
+		if err == nil {
+			return newSizeQuant, nil
+		} else {
+			glog.Errorf("failed to resize rbd image: %v, command output: %s", err, string(output))
+		}
+	}
+	return oldSize, err
+}
+
+// rbdInfo runs `rbd info` command to get the current image size in MB
+func (util *RBDUtil) rbdInfo(b *rbdMounter) (int, error) {
+	var err error
+	var output string
+	var cmd []byte
+
+	// If we don't have admin id/secret (e.g. attaching), fallback to user id/secret.
+	id := b.adminId
+	secret := b.adminSecret
+	if id == "" {
+		id = b.Id
+		secret = b.Secret
+	}
+
+	l := len(b.Mon)
+	start := rand.Int() % l
+	// iterate all hosts until rbd command succeeds.
+	for i := start; i < start+l; i++ {
+		mon := b.Mon[i%l]
+		// cmd "rbd info" get the image info with the following output:
+		//
+		// # image exists (exit=0)
+		// rbd info volume-4a5bcc8b-2b55-46da-ba04-0d3dc5227f08
+		//    size 1024 MB in 256 objects
+		//    order 22 (4096 kB objects)
+		// 	  block_name_prefix: rbd_data.1253ac238e1f29
+		//    format: 2
+		//    ...
+		//
+		//  rbd info volume-4a5bcc8b-2b55-46da-ba04-0d3dc5227f08 --format json
+		// {"name":"volume-4a5bcc8b-2b55-46da-ba04-0d3dc5227f08","size":1073741824,"objects":256,"order":22,"object_size":4194304,"block_name_prefix":"rbd_data.1253ac238e1f29","format":2,"features":["layering","exclusive-lock","object-map","fast-diff","deep-flatten"],"flags":[]}
+		//
+		//
+		// # image does not exist (exit=2)
+		// rbd: error opening image 1234: (2) No such file or directory
+		//
+		glog.V(4).Infof("rbd: info %s using mon %s, pool %s id %s key %s", b.Image, mon, b.Pool, id, secret)
+		cmd, err = b.exec.Run("rbd",
+			"info", b.Image, "--pool", b.Pool, "-m", mon, "--id", id, "--key="+secret)
+		output = string(cmd)
+
+		// break if command succeeds
+		if err == nil {
+			break
+		}
+
+		if err, ok := err.(*exec.Error); ok {
+			if err.Err == exec.ErrNotFound {
+				glog.Errorf("rbd cmd not found")
+				// fail fast if command not found
+				return 0, err
+			}
+		}
+	}
+
+	// If command never succeed, returns its last error.
+	if err != nil {
+		return 0, err
+	}
+
+	if len(output) == 0 {
+		return 0, fmt.Errorf("can not get image size info %s: %s", b.Image, output)
+	}
+
+	// get the size value string, just between `size ` and ` MB in`, such as `size 1024 MB in 256 objects`
+	sizeIndex := strings.Index(output, imageSizeStr)
+	divIndex := strings.Index(output, sizeDivStr)
+	if sizeIndex == -1 || divIndex == -1 || divIndex <= sizeIndex+5 {
+		return 0, fmt.Errorf("can not get image size info %s: %s", b.Image, output)
+	}
+	rbdSizeStr := output[sizeIndex+5 : divIndex]
+	rbdSize, err := strconv.Atoi(rbdSizeStr)
+	if err != nil {
+		return 0, fmt.Errorf("can not convert size str: %s to int", rbdSizeStr)
+	}
+
+	return rbdSize, nil
 }
 
 // rbdStatus runs `rbd status` command to check if there is watcher on the image.

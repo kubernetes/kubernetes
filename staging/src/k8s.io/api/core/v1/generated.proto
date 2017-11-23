@@ -1029,7 +1029,6 @@ message EnvVarSource {
 }
 
 // Event is a report of an event somewhere in the cluster.
-// TODO: Decide whether to store these separately or with the object they apply to.
 message Event {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
@@ -1068,6 +1067,30 @@ message Event {
   // Type of this event (Normal, Warning), new types could be added in the future
   // +optional
   optional string type = 9;
+
+  // Time when this Event was first observed.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime eventTime = 10;
+
+  // Data about the Event series this event represents or nil if it's a singleton Event.
+  // +optional
+  optional EventSeries series = 11;
+
+  // What action was taken/failed regarding to the Regarding object.
+  // +optional
+  optional string action = 12;
+
+  // Optional secondary object for more complex actions.
+  // +optional
+  optional ObjectReference related = 13;
+
+  // Name of the controller that emitted this Event, e.g. `kubernetes.io/kubelet`.
+  // +optional
+  optional string reportingComponent = 14;
+
+  // ID of the controller instance, e.g. `kubelet-xyzf`.
+  // +optional
+  optional string reportingInstance = 15;
 }
 
 // EventList is a list of events.
@@ -1079,6 +1102,19 @@ message EventList {
 
   // List of events
   repeated Event items = 2;
+}
+
+// EventSeries contain information on series of events, i.e. thing that was/is happening
+// continously for some time.
+message EventSeries {
+  // Number of occurrences in this series up to the last heartbeat time
+  optional int32 count = 1;
+
+  // Time of the last occurence observed
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime lastObservedTime = 2;
+
+  // State of this Series: Ongoing or Finished
+  optional string state = 3;
 }
 
 // EventSource contains information for an event.
