@@ -308,7 +308,8 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace s
 				continue
 			}
 
-			if pvc.Spec.VolumeName == "" {
+			pvName := pvc.Spec.VolumeName
+			if pvName == "" {
 				// PVC is not bound. It was either deleted and created again or
 				// it was forcefuly unbound by admin. The pod can still use the
 				// original PV where it was bound to -> log the error and count
@@ -318,7 +319,6 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace s
 				continue
 			}
 
-			pvName := pvc.Spec.VolumeName
 			pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
 			if err != nil || pv == nil {
 				// if the PV is not found, log the error
