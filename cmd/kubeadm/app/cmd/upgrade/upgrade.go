@@ -18,16 +18,19 @@ package upgrade
 
 import (
 	"io"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
 
 // cmdUpgradeFlags holds the values for the common flags in `kubeadm upgrade`
 type cmdUpgradeFlags struct {
 	kubeConfigPath            string
 	cfgPath                   string
+	featureGatesString        string
 	allowExperimentalUpgrades bool
 	allowRCUpgrades           bool
 	printConfig               bool
@@ -41,6 +44,7 @@ func NewCmdUpgrade(out io.Writer) *cobra.Command {
 	flags := &cmdUpgradeFlags{
 		kubeConfigPath:            "/etc/kubernetes/admin.conf",
 		cfgPath:                   "",
+		featureGatesString:        "",
 		allowExperimentalUpgrades: false,
 		allowRCUpgrades:           false,
 		printConfig:               false,
@@ -62,6 +66,8 @@ func NewCmdUpgrade(out io.Writer) *cobra.Command {
 	cmd.PersistentFlags().StringSliceVar(&flags.ignoreChecksErrors, "ignore-checks-errors", flags.ignoreChecksErrors, "A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.")
 	cmd.PersistentFlags().BoolVar(&flags.skipPreFlight, "skip-preflight-checks", flags.skipPreFlight, "Skip preflight checks that normally run before modifying the system.")
 	cmd.PersistentFlags().MarkDeprecated("skip-preflight-checks", "it is now equivalent to --ignore-checks-errors=all")
+	cmd.PersistentFlags().StringVar(&flags.featureGatesString, "feature-gates", flags.featureGatesString, "A set of key=value pairs that describe feature gates for various features."+
+		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
 
 	cmd.AddCommand(NewCmdApply(flags))
 	cmd.AddCommand(NewCmdPlan(flags))

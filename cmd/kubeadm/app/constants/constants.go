@@ -196,7 +196,7 @@ const (
 	DefaultCIImageRepository = "gcr.io/kubernetes-ci-images"
 
 	// CoreDNS defines a variable used internally when referring to the CoreDNS addon for a cluster
-	CoreDNS = "CoreDNS"
+	CoreDNS = "coredns"
 	// KubeDNS defines a variable used internally when referring to the kube-dns addon for a cluster
 	KubeDNS = "kube-dns"
 )
