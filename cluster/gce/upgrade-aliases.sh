@@ -109,9 +109,12 @@ function add-k8s-subnet-secondary-ranges() {
   fi
 
   echo "Adding secondary ranges: pods-default (${CLUSTER_IP_RANGE}), services-default (${SERVICE_CLUSTER_IP_RANGE})"
-  gcloud alpha compute networks subnets update ${IP_ALIAS_SUBNETWORK} \
+  until gcloud alpha compute networks subnets update ${IP_ALIAS_SUBNETWORK} \
     --project=${PROJECT} --region=${REGION} \
-    --add-secondary-ranges="pods-default=${CLUSTER_IP_RANGE},services-default=${SERVICE_CLUSTER_IP_RANGE}"
+    --add-secondary-ranges="pods-default=${CLUSTER_IP_RANGE},services-default=${SERVICE_CLUSTER_IP_RANGE}"; do
+    printf "."
+    sleep 1
+  done
 }
 
 # Delete all k8s node routes.
