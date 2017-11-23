@@ -903,7 +903,7 @@ func (f *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		glog.Info("Created equivalence class cache")
 	}
 
-	algo := core.NewGenericScheduler(f.schedulerCache, f.equivalencePodCache, f.podQueue, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders, f.volumeBinder)
+	algo := core.NewGenericScheduler(f.schedulerCache, f.equivalencePodCache, f.podQueue, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders, f.volumeBinder, &pvcLister{f.pVCLister})
 
 	podBackoff := util.CreateDefaultPodBackoff()
 	return &scheduler.Config{
@@ -933,6 +933,14 @@ type nodeLister struct {
 
 func (n *nodeLister) List() ([]*v1.Node, error) {
 	return n.NodeLister.List(labels.Everything())
+}
+
+type pvcLister struct {
+	corelisters.PersistentVolumeClaimLister
+}
+
+func (p *pvcLister) Get(namespace, name string) (*v1.PersistentVolumeClaim, error) {
+	return p.PersistentVolumeClaimLister.PersistentVolumeClaims(namespace).Get(name)
 }
 
 func (f *configFactory) GetPriorityFunctionConfigs(priorityKeys sets.String) ([]algorithm.PriorityConfig, error) {

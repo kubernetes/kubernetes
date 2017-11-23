@@ -117,6 +117,12 @@ type ReplicaSetLister interface {
 	GetPodReplicaSets(*v1.Pod) ([]*extensions.ReplicaSet, error)
 }
 
+// PersistentVolumeClaimLister interface represents anything that can list PVCs for a scheduler.
+type PersistentVolumeClaimLister interface {
+	// Gets given PVC
+	Get(namespace, name string) (*v1.PersistentVolumeClaim, error)
+}
+
 var _ ControllerLister = &EmptyControllerLister{}
 
 // EmptyControllerLister implements ControllerLister on []v1.ReplicationController returning empty data

@@ -98,6 +98,7 @@ type genericScheduler struct {
 	extenders             []algorithm.SchedulerExtender
 	lastNodeIndexLock     sync.Mutex
 	lastNodeIndex         uint64
+	pvcLister             algorithm.PersistentVolumeClaimLister
 
 	cachedNodeInfoMap map[string]*schedulercache.NodeInfo
 	volumeBinder      *volumebinder.VolumeBinder
@@ -109,6 +110,10 @@ type genericScheduler struct {
 func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister) (string, error) {
 	trace := utiltrace.New(fmt.Sprintf("Scheduling %s/%s", pod.Namespace, pod.Name))
 	defer trace.LogIfLong(100 * time.Millisecond)
+
+	if err := podPassesBasicChecks(pod, g.pvcLister); err != nil {
+		return "", err
+	}
 
 	nodes, err := nodeLister.List()
 	if err != nil {
@@ -995,6 +1000,32 @@ func podEligibleToPreemptOthers(pod *v1.Pod, nodeNameToInfo map[string]*schedule
 	return true
 }
 
+// podPassesBasicChecks makes sanity checks on the pod if it can be scheduled.
+func podPassesBasicChecks(pod *v1.Pod, pvcLister algorithm.PersistentVolumeClaimLister) error {
+	// Check PVCs used by the pod
+	namespace := pod.Namespace
+	manifest := &(pod.Spec)
+	for i := range manifest.Volumes {
+		volume := &manifest.Volumes[i]
+		if volume.PersistentVolumeClaim == nil {
+			// Volume is not a PVC, ignore
+			continue
+		}
+		pvcName := volume.PersistentVolumeClaim.ClaimName
+		pvc, err := pvcLister.Get(namespace, pvcName)
+		if err != nil {
+			// The error has already enough context ("persistentvolumeclaim "myclaim" not found")
+			return err
+		}
+
+		if pvc.DeletionTimestamp != nil {
+			return fmt.Errorf("persistentvolumeclaim %q is being deleted", pvc.Name)
+		}
+	}
+
+	return nil
+}
+
 func NewGenericScheduler(
 	cache schedulercache.Cache,
 	eCache *EquivalenceCache,
@@ -1004,7 +1035,8 @@ func NewGenericScheduler(
 	prioritizers []algorithm.PriorityConfig,
 	priorityMetaProducer algorithm.MetadataProducer,
 	extenders []algorithm.SchedulerExtender,
-	volumeBinder *volumebinder.VolumeBinder) algorithm.ScheduleAlgorithm {
+	volumeBinder *volumebinder.VolumeBinder,
+	pvcLister algorithm.PersistentVolumeClaimLister) algorithm.ScheduleAlgorithm {
 	return &genericScheduler{
 		cache:                 cache,
 		equivalenceCache:      eCache,
@@ -1016,5 +1048,6 @@ func NewGenericScheduler(
 		extenders:             extenders,
 		cachedNodeInfoMap:     make(map[string]*schedulercache.NodeInfo),
 		volumeBinder:          volumeBinder,
+		pvcLister:             pvcLister,
 	}
 }

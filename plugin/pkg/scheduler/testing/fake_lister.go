@@ -176,3 +176,18 @@ func (f FakeStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (sss []*apps.Stat
 	}
 	return
 }
+
+// FakePersistentVolumeClaimLister implements PersistentVolumeClaimLister on []*v1.PersistentVolumeClaim for test purposes.
+type FakePersistentVolumeClaimLister []*v1.PersistentVolumeClaim
+
+var _ PersistentVolumeClaimLister = FakePersistentVolumeClaimLister{}
+
+// List returns nodes as a []string.
+func (f FakePersistentVolumeClaimLister) Get(namespace, name string) (*v1.PersistentVolumeClaim, error) {
+	for _, pvc := range f {
+		if pvc.Name == name && pvc.Namespace == namespace {
+			return pvc, nil
+		}
+	}
+	return nil, fmt.Errorf("persistentvolumeclaim %q not found", name)
+}
