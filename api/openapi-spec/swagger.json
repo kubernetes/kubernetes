@@ -36784,222 +36784,6 @@
       "description": "If 'true', then the output is pretty printed.",
       "name": "pretty",
       "in": "query"
-<<<<<<< HEAD
-=======
-     }
-    ]
-   },
-   "/apis/batch/v1beta1/namespaces/{namespace}/cronjobs/{name}/instantiate": {
-    "post": {
-     "description": "create instantiate of a CronJob",
-     "consumes": [
-      "*/*"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v1beta1"
-     ],
-     "operationId": "createBatchV1beta1NamespacedCronJobInstantiate",
-     "parameters": [
-      {
-       "name": "body",
-       "in": "body",
-       "required": true,
-       "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJobManualRequest"
-       }
-      }
-     ],
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJobManualRequest"
-       }
-      },
-      "201": {
-       "description": "Created",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJobManualRequest"
-       }
-      },
-      "202": {
-       "description": "Accepted",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJobManualRequest"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     },
-     "x-kubernetes-action": "post",
-     "x-kubernetes-group-version-kind": {
-      "group": "batch",
-      "kind": "CronJobManualRequest",
-      "version": "v1beta1"
-     }
-    },
-    "parameters": [
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "name of the CronJobManualRequest",
-      "name": "name",
-      "in": "path",
-      "required": true
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "object name and auth scope, such as for teams and projects",
-      "name": "namespace",
-      "in": "path",
-      "required": true
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "If 'true', then the output is pretty printed.",
-      "name": "pretty",
-      "in": "query"
-     }
-    ]
-   },
-   "/apis/batch/v1beta1/namespaces/{namespace}/cronjobs/{name}/status": {
-    "get": {
-     "description": "read status of the specified CronJob",
-     "consumes": [
-      "*/*"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v1beta1"
-     ],
-     "operationId": "readBatchV1beta1NamespacedCronJobStatus",
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJob"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     },
-     "x-kubernetes-action": "get",
-     "x-kubernetes-group-version-kind": {
-      "group": "batch",
-      "kind": "CronJob",
-      "version": "v1beta1"
-     }
-    },
-    "put": {
-     "description": "replace status of the specified CronJob",
-     "consumes": [
-      "*/*"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v1beta1"
-     ],
-     "operationId": "replaceBatchV1beta1NamespacedCronJobStatus",
-     "parameters": [
-      {
-       "name": "body",
-       "in": "body",
-       "required": true,
-       "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJob"
-       }
-      }
-     ],
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJob"
-       }
-      },
-      "201": {
-       "description": "Created",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJob"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "batch",
-      "kind": "CronJob",
-      "version": "v1beta1"
-     }
-    },
-    "patch": {
-     "description": "partially update status of the specified CronJob",
-     "consumes": [
-      "application/json-patch+json",
-      "application/merge-patch+json",
-      "application/strategic-merge-patch+json"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v1beta1"
-     ],
-     "operationId": "patchBatchV1beta1NamespacedCronJobStatus",
-     "parameters": [
-      {
-       "name": "body",
-       "in": "body",
-       "required": true,
-       "schema": {
-        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
-       }
-      }
-     ],
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJob"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
->>>>>>> Create Job from specified CronJob in the API
      },
      {
       "uniqueItems": true,
@@ -37928,222 +37712,6 @@
       "description": "If 'true', then the output is pretty printed.",
       "name": "pretty",
       "in": "query"
-<<<<<<< HEAD
-=======
-     }
-    ]
-   },
-   "/apis/batch/v2alpha1/namespaces/{namespace}/cronjobs/{name}/instantiate": {
-    "post": {
-     "description": "create instantiate of a CronJob",
-     "consumes": [
-      "*/*"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v2alpha1"
-     ],
-     "operationId": "createBatchV2alpha1NamespacedCronJobInstantiate",
-     "parameters": [
-      {
-       "name": "body",
-       "in": "body",
-       "required": true,
-       "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJobManualRequest"
-       }
-      }
-     ],
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJobManualRequest"
-       }
-      },
-      "201": {
-       "description": "Created",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJobManualRequest"
-       }
-      },
-      "202": {
-       "description": "Accepted",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJobManualRequest"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     },
-     "x-kubernetes-action": "post",
-     "x-kubernetes-group-version-kind": {
-      "group": "batch",
-      "kind": "CronJobManualRequest",
-      "version": "v2alpha1"
-     }
-    },
-    "parameters": [
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "name of the CronJobManualRequest",
-      "name": "name",
-      "in": "path",
-      "required": true
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "object name and auth scope, such as for teams and projects",
-      "name": "namespace",
-      "in": "path",
-      "required": true
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "If 'true', then the output is pretty printed.",
-      "name": "pretty",
-      "in": "query"
-     }
-    ]
-   },
-   "/apis/batch/v2alpha1/namespaces/{namespace}/cronjobs/{name}/status": {
-    "get": {
-     "description": "read status of the specified CronJob",
-     "consumes": [
-      "*/*"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v2alpha1"
-     ],
-     "operationId": "readBatchV2alpha1NamespacedCronJobStatus",
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJob"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     },
-     "x-kubernetes-action": "get",
-     "x-kubernetes-group-version-kind": {
-      "group": "batch",
-      "kind": "CronJob",
-      "version": "v2alpha1"
-     }
-    },
-    "put": {
-     "description": "replace status of the specified CronJob",
-     "consumes": [
-      "*/*"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v2alpha1"
-     ],
-     "operationId": "replaceBatchV2alpha1NamespacedCronJobStatus",
-     "parameters": [
-      {
-       "name": "body",
-       "in": "body",
-       "required": true,
-       "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJob"
-       }
-      }
-     ],
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJob"
-       }
-      },
-      "201": {
-       "description": "Created",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJob"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "batch",
-      "kind": "CronJob",
-      "version": "v2alpha1"
-     }
-    },
-    "patch": {
-     "description": "partially update status of the specified CronJob",
-     "consumes": [
-      "application/json-patch+json",
-      "application/merge-patch+json",
-      "application/strategic-merge-patch+json"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v2alpha1"
-     ],
-     "operationId": "patchBatchV2alpha1NamespacedCronJobStatus",
-     "parameters": [
-      {
-       "name": "body",
-       "in": "body",
-       "required": true,
-       "schema": {
-        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
-       }
-      }
-     ],
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJob"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
->>>>>>> Create Job from specified CronJob in the API
      },
      {
       "uniqueItems": true,
@@ -43516,6 +43084,90 @@
      }
     ]
    },
+   "/apis/batch/v1beta1/namespaces/{namespace}/cronjobs/{name}/instantiate": {
+    "post": {
+     "description": "create instantiate of a CronJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v1beta1"
+     ],
+     "operationId": "createBatchV1beta1NamespacedCronJobInstantiate",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJobManualRequest"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJobManualRequest"
+       }
+      },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJobManualRequest"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJobManualRequest"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "post",
+     "x-kubernetes-group-version-kind": {
+      "group": "batch",
+      "kind": "CronJobManualRequest",
+      "version": "v1beta1"
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the CronJobManualRequest",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
    "/apis/batch/v1beta1/namespaces/{namespace}/cronjobs/{name}/status": {
     "get": {
      "description": "read status of the specified CronJob",
@@ -44634,6 +44286,90 @@
       "uniqueItems": true,
       "type": "string",
       "description": "name of the CronJob",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/batch/v2alpha1/namespaces/{namespace}/cronjobs/{name}/instantiate": {
+    "post": {
+     "description": "create instantiate of a CronJob",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
+     "operationId": "createBatchV2alpha1NamespacedCronJobInstantiate",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJobManualRequest"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJobManualRequest"
+       }
+      },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJobManualRequest"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJobManualRequest"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "post",
+     "x-kubernetes-group-version-kind": {
+      "group": "batch",
+      "kind": "CronJobManualRequest",
+      "version": "v2alpha1"
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the CronJobManualRequest",
       "name": "name",
       "in": "path",
       "required": true

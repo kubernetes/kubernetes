@@ -33,9 +33,7 @@ import (
 func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1beta1.CronJob{}, func(obj interface{}) { SetObjectDefaults_CronJob(obj.(*v1beta1.CronJob)) })
 	scheme.AddTypeDefaultingFunc(&v1beta1.CronJobList{}, func(obj interface{}) { SetObjectDefaults_CronJobList(obj.(*v1beta1.CronJobList)) })
-	scheme.AddTypeDefaultingFunc(&v1beta1.CronJobManualRequest{}, func(obj interface{}) {
-		SetObjectDefaults_CronJobManualRequest(obj.(*v1beta1.CronJobManualRequest))
-	})
+	scheme.AddTypeDefaultingFunc(&v1beta1.CronJobManualRequest{}, func(obj interface{}) { SetObjectDefaults_CronJobManualRequest(obj.(*v1beta1.CronJobManualRequest)) })
 	scheme.AddTypeDefaultingFunc(&v1beta1.JobTemplate{}, func(obj interface{}) { SetObjectDefaults_JobTemplate(obj.(*v1beta1.JobTemplate)) })
 	return nil
 }
