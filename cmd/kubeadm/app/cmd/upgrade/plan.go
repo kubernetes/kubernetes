@@ -38,10 +38,10 @@ func NewCmdPlan(parentFlags *cmdUpgradeFlags) *cobra.Command {
 		Short: "Check which versions are available to upgrade to and validate whether your current cluster is upgradeable.",
 		Run: func(_ *cobra.Command, _ []string) {
 			var err error
-			parentFlags.ignoreChecksErrorsSet, err = validation.ValidateIgnoreChecksErrors(parentFlags.ignoreChecksErrors, parentFlags.skipPreFlight)
+			parentFlags.ignorePreflightErrorsSet, err = validation.ValidateIgnorePreflightErrors(parentFlags.ignorePreflightErrors, parentFlags.skipPreFlight)
 			kubeadmutil.CheckErr(err)
 			// Ensure the user is root
-			err = runPreflightChecks(parentFlags.ignoreChecksErrorsSet)
+			err = runPreflightChecks(parentFlags.ignorePreflightErrorsSet)
 			kubeadmutil.CheckErr(err)
 
 			err = RunPlan(parentFlags)

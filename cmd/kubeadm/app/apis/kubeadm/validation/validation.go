@@ -331,25 +331,22 @@ func ValidateAPIEndpoint(c *kubeadm.MasterConfiguration, fldPath *field.Path) fi
 	return allErrs
 }
 
-// ValidateIgnoreChecksErrors validates duplicates in ignore-checks-errors flag.
-func ValidateIgnoreChecksErrors(ignoreChecksErrors []string, skipPreflightChecks bool) (sets.String, error) {
+// ValidateIgnorePreflightErrors validates duplicates in ignore-preflight-errors flag.
+func ValidateIgnorePreflightErrors(ignorePreflightErrors []string, skipPreflightChecks bool) (sets.String, error) {
 	ignoreErrors := sets.NewString()
 	allErrs := field.ErrorList{}
 
-	for _, item := range ignoreChecksErrors {
+	for _, item := range ignorePreflightErrors {
 		ignoreErrors.Insert(strings.ToLower(item)) // parameters are case insensitive
 	}
 
 	// TODO: remove once deprecated flag --skip-preflight-checks is removed.
 	if skipPreflightChecks {
-		if ignoreErrors.Has("all") {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("ignore-checks-errors"), strings.Join(ignoreErrors.List(), ","), "'all' is used together with deprecated flag --skip-preflight-checks. Remove deprecated flag"))
-		}
 		ignoreErrors.Insert("all")
 	}
 
 	if ignoreErrors.Has("all") && ignoreErrors.Len() > 1 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("ignore-checks-errors"), strings.Join(ignoreErrors.List(), ","), "don't specify individual checks if 'all' is used"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("ignore-preflight-errors"), strings.Join(ignoreErrors.List(), ","), "don't specify individual checks if 'all' is used"))
 	}
 
 	return ignoreErrors, allErrs.ToAggregate()
