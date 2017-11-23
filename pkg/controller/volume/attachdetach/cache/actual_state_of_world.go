@@ -260,6 +260,99 @@ func (asw *actualStateOfWorld) AddVolumeToReportAsAttached(
 	asw.addVolumeToReportAsAttached(volumeName, nodeName)
 }
 
+// ReportVolumeStatus updates the actual state of the world with the state as queried from the cloudprovider
+func (asw *actualStateOfWorld) ReportVolumeStatus(
+	pluginName string,
+	volumes map[v1.UniqueVolumeName]volume.VolumeStatus,
+	volumeSpecs map[v1.UniqueVolumeName]*volume.Spec) {
+	asw.Lock()
+	defer asw.Lock()
+
+	// Add any missing volumes / attachments
+	for volumeName, status := range volumes {
+		volumeObj, volumeExists := asw.attachedVolumes[volumeName]
+		if !volumeExists {
+			glog.Warningf("ReportVolumeStatus found out-of-sync (missing) volume %q", volumeName)
+			volumeObj = attachedVolume{
+				volumeName:      volumeName,
+				spec:            volumeSpecs[volumeName],
+				nodesAttachedTo: make(map[types.NodeName]nodeAttachedTo),
+				devicePath:      status.DevicePath,
+			}
+			asw.attachedVolumes[volumeName] = volumeObj
+		}
+
+		if status.DevicePath != volumeObj.devicePath {
+			glog.V(2).Infof("ReportVolumeStatus found out-of-sync volume %q: devicePath actual=%q cloud=%q",
+				volumeName,
+				status.DevicePath,
+				volumeObj.devicePath)
+
+			volumeObj.devicePath = status.DevicePath
+		}
+
+		// Add actual attachments to volume
+		for _, nodeName := range status.AttachedToNodes {
+			nodeObj, nodeExists := volumeObj.nodesAttachedTo[nodeName]
+			if !nodeExists {
+				glog.Warningf("ReportVolumeStatus found out-of-sync (missing node) volume %q node %q",
+					volumeName,
+					nodeName)
+
+				nodeObj = nodeAttachedTo{
+					nodeName:              nodeName,
+					mountedByNode:         true, // Assume mounted, until proven otherwise
+					mountedByNodeSetCount: 0,
+					detachRequestedTime:   time.Time{},
+				}
+				volumeObj.nodesAttachedTo[nodeName] = nodeObj
+			}
+
+			asw.addVolumeToReportAsAttached(volumeName, nodeName)
+		}
+	}
+
+	// Remove any extra attachments / volumes
+	for volumeName, volumeObj := range asw.attachedVolumes {
+		volumePluginName, _, err := volumehelper.SplitUniqueName(volumeName)
+		if err != nil {
+			glog.Warningf("SplitUniqueName failed for volume %q", volumeName)
+			continue
+		}
+		if volumePluginName != pluginName {
+			continue
+		}
+
+		nodeNamesMap := make(map[types.NodeName]bool)
+		for _, nodeName := range volumes[volumeName].AttachedToNodes {
+			nodeNamesMap[nodeName] = true
+		}
+
+		// Remove any extra attachments
+		for nodeName := range volumeObj.nodesAttachedTo {
+			attached := nodeNamesMap[nodeName]
+			if attached {
+				continue
+			}
+
+			glog.Warningf("ReportVolumeStatus found out-of-sync (no longer attached to node) volume %q node %q",
+				volumeName,
+				nodeName)
+
+			asw.removeVolumeFromReportAsAttached(volumeName, nodeName)
+
+			delete(volumeObj.nodesAttachedTo, nodeName)
+		}
+
+		if len(volumeObj.nodesAttachedTo) == 0 {
+			// A little superfluous, but we want to make it easy to do diagnostics / debugging from logs
+			glog.Warningf("ReportVolumeStatus found out-of-sync (no longer attached to any node) volume %q",
+				volumeName)
+			delete(asw.attachedVolumes, volumeName)
+		}
+	}
+}
+
 func (asw *actualStateOfWorld) AddVolumeNode(
 	uniqueName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) (v1.UniqueVolumeName, error) {
 	asw.Lock()

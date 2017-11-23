@@ -225,8 +225,28 @@ func (og *operationGenerator) GenerateBulkVolumeVerifyFunc(
 				newAttacherErr)
 			return nil
 		}
-		bulkVolumeVerifier, ok := volumeAttacher.(volume.BulkVolumeVerifier)
 
+		bulkVolumeStatus, ok := volumeAttacher.(volume.BulkVolumeStatus)
+		if ok {
+			volumes, bulkStatusErr := bulkVolumeStatus.GetBulkVolumeStatus(volumeSpecMap)
+			if bulkStatusErr != nil {
+				glog.Errorf("Error checking status of all volumes:  %v", bulkStatusErr)
+				return nil
+			}
+
+			nameToSpec := make(map[v1.UniqueVolumeName]*volume.Spec)
+			for k, v := range volumeSpecMap {
+				nameToSpec[v] = k
+			}
+			if err := actualStateOfWorld.(ActualStateOfWorldVolumeManager).ReportVolumeStatus(pluginName, volumes, nameToSpec); err != nil {
+				glog.Errorf("ReportVolumeStatus failed: %v", err)
+			}
+
+			// Always stop here - don't fall back to other implementations
+			return nil
+		}
+
+		bulkVolumeVerifier, ok := volumeAttacher.(volume.BulkVolumeVerifier)
 		if !ok {
 			glog.Errorf("BulkVerifyVolume failed to type assert attacher %q", bulkVolumeVerifier)
 			return nil

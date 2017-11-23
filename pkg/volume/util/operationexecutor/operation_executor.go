@@ -199,6 +199,13 @@ type ActualStateOfWorldAttacherUpdater interface {
 	AddVolumeToReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName)
 }
 
+// ActualStateOfWorldVolumeManager is a set of operations for the actual state of the world,
+// that only apply to the volumemanager, not to kubelet implementations.
+type ActualStateOfWorldVolumeManager interface {
+	// ReportVolumeStatus updates the the status of all volumes in the system
+	ReportVolumeStatus(pluginName string, volumes map[v1.UniqueVolumeName]volume.VolumeStatus, volumeSpecs map[v1.UniqueVolumeName]*volume.Spec) error
+}
+
 // VolumeLogger defines a set of operations for generating volume-related logging and error msgs
 type VolumeLogger interface {
 	// Creates a detailed msg that can be used in logs

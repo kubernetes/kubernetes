@@ -234,6 +234,19 @@ type BulkVolumeVerifier interface {
 	BulkVerifyVolumes(volumesByNode map[types.NodeName][]*Spec) (map[types.NodeName]map[*Spec]bool, error)
 }
 
+type BulkVolumeStatus interface {
+	// GetBulkVolumeStatus returns the attachment state of all the specified volumes
+	GetBulkVolumeStatus(volumeSpecMap map[*Spec]v1.UniqueVolumeName) (map[v1.UniqueVolumeName]VolumeStatus, error)
+}
+
+type VolumeStatus struct {
+	// AttachedToNodes is a list of nodes this volumes is attached to.
+	AttachedToNodes []types.NodeName
+
+	// DevicePath contains the path on the node where the volume is attached
+	DevicePath string
+}
+
 // Detacher can detach a volume from a node.
 type Detacher interface {
 	// Detach the given volume from the node with the given Name.

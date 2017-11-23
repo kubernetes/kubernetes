@@ -453,6 +453,15 @@ type Volumes interface {
 
 	// Check if disks specified in argument map are still attached to their respective nodes.
 	DisksAreAttached(map[types.NodeName][]KubernetesVolumeID) (map[types.NodeName]map[KubernetesVolumeID]bool, error)
+
+	// GetBulkVolumeStatus returns the status of multiple volumes (likely most/all volumes)
+	GetBulkVolumeStatus(volumes []KubernetesVolumeID) (map[KubernetesVolumeID]VolumeStatus, error)
+}
+
+type VolumeStatus struct {
+	VolumeName KubernetesVolumeID
+	NodeName   types.NodeName
+	DevicePath string
 }
 
 // InstanceGroups is an interface for managing cloud-managed instance groups / autoscaling instance groups
@@ -2319,6 +2328,99 @@ func (c *Cloud) DisksAreAttached(nodeDisks map[types.NodeName][]KubernetesVolume
 	}
 
 	return attached, nil
+}
+
+func (c *Cloud) GetBulkVolumeStatus(volumes []KubernetesVolumeID) (map[KubernetesVolumeID]VolumeStatus, error) {
+	statuses := make(map[KubernetesVolumeID]VolumeStatus)
+
+	volumeIDMap := make(map[awsVolumeID]KubernetesVolumeID)
+	for _, volume := range volumes {
+		volumeID, err := volume.mapToAWSVolumeID()
+		if err != nil {
+			return nil, fmt.Errorf("error mapping volume %q to aws id: %v", volume, err)
+		}
+		volumeIDMap[volumeID] = volume
+	}
+
+	// We don't filter by volume id; we expect we are fetching most volumes
+	request := &ec2.DescribeVolumesInput{}
+	ec2Volumes, err := c.ec2.DescribeVolumes(request)
+	if err != nil {
+		return statuses, fmt.Errorf("error describing volumes: %v", err)
+	}
+
+	instanceIdToName := make(map[awsInstanceID]types.NodeName)
+	{
+		instanceIDSet := sets.NewString()
+		for _, volume := range ec2Volumes {
+			volumeID := awsVolumeID(aws.StringValue(volume.VolumeId))
+			if volumeIDMap[volumeID] == "" {
+				// We aren't interested in this volume
+				continue
+			}
+			for _, a := range volume.Attachments {
+				instanceID := aws.StringValue(a.InstanceId)
+				if instanceID != "" {
+					instanceIDSet.Insert(instanceID)
+				}
+			}
+		}
+
+		if instanceIDSet.Len() != 0 {
+			var instanceIDs []awsInstanceID
+			for _, id := range instanceIDSet.List() {
+				instanceIDs = append(instanceIDs, awsInstanceID(id))
+			}
+
+			cacheCriteria := cacheCriteria{
+				// MaxAge not required, because we only care about node name, which should not change
+				HasInstances: instanceIDs, // refresh so we fetch all these instances
+			}
+
+			snapshot, err := c.instanceCache.describeAllInstancesCached(cacheCriteria)
+			if err != nil {
+				return nil, err
+			}
+
+			instances := snapshot.FindInstances(instanceIDs)
+			for _, instanceID := range instanceIDs {
+				instance := instances[instanceID]
+				if instance != nil {
+					// We'll log this later
+					instanceIdToName[instanceID] = mapInstanceToNodeName(instance)
+				}
+			}
+		}
+	}
+
+	for _, ec2Volume := range ec2Volumes {
+		var status VolumeStatus
+
+		volumeID := awsVolumeID(aws.StringValue(ec2Volume.VolumeId))
+		kubernetesVolumeName := volumeIDMap[volumeID]
+		if kubernetesVolumeName == "" {
+			// We aren't interested in this volume
+			continue
+		}
+
+		status.VolumeName = kubernetesVolumeName
+
+		for _, a := range ec2Volume.Attachments {
+			instanceID := awsInstanceID(aws.StringValue(a.InstanceId))
+			nodeName := instanceIdToName[instanceID]
+			if nodeName == "" {
+				glog.Warningf("volume %q attached to unknown instance %q", volumeID, instanceID)
+				// This is not good - we'll treat the volume as detached, but we likely won't be able to attach it
+			} else {
+				status.NodeName = nodeName
+				status.DevicePath = aws.StringValue(a.Device)
+			}
+		}
+
+		statuses[kubernetesVolumeName] = status
+	}
+
+	return statuses, nil
 }
 
 // Gets the current load balancer state

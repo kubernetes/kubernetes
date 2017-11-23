@@ -138,7 +138,7 @@ type VolumePlugin interface {
 
 	// SupportsBulkVolumeVerification checks if volume plugin type is capable
 	// of enabling bulk polling of all nodes. This can speed up verification of
-	// attached volumes by quite a bit, but underlying pluging must support it.
+	// attached volumes by quite a bit, but underlying plugin must support it.
 	SupportsBulkVolumeVerification() bool
 }
 
