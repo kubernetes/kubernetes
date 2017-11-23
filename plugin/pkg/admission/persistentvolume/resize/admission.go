@@ -155,6 +155,10 @@ func (pvcr *persistentVolumeClaimResize) checkVolumePlugin(pv *api.PersistentVol
 	if pv.Spec.Cinder != nil {
 		return true
 	}
+
+	if pv.Spec.GCEPersistentDisk != nil {
+		return true
+	}
 	return false
 
 }

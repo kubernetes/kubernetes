@@ -47,6 +47,7 @@ filegroup(
         "//pkg/util/procfs:all-srcs",
         "//pkg/util/reflector/prometheus:all-srcs",
         "//pkg/util/removeall:all-srcs",
+        "//pkg/util/resizefs:all-srcs",
         "//pkg/util/resourcecontainer:all-srcs",
         "//pkg/util/rlimit:all-srcs",
         "//pkg/util/selinux:all-srcs",

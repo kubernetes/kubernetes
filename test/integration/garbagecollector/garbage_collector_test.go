@@ -41,11 +41,10 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	apitesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/test/integration"
-
-	"github.com/coreos/pkg/capnslog"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func getForegroundOptions() *metav1.DeleteOptions {
@@ -201,28 +200,15 @@ type testContext struct {
 
 // if workerCount > 0, will start the GC, otherwise it's up to the caller to Run() the GC.
 func setup(t *testing.T, workerCount int) *testContext {
-	masterConfig, tearDownMaster := apitesting.StartTestServerOrDie(t)
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.SharedEtcd())
 
-	// TODO: Disable logging here until we resolve teardown issues which result in
-	// massive log spam. Another path forward would be to refactor
-	// StartTestServerOrDie to work with the etcd instance already started by the
-	// integration test scripts.
-	// See https://github.com/kubernetes/kubernetes/issues/49489.
-	repo, err := capnslog.GetRepoLogger("github.com/coreos/etcd")
-	if err != nil {
-		t.Fatalf("couldn't configure logging: %v", err)
-	}
-	repo.SetLogLevel(map[string]capnslog.LogLevel{
-		"etcdserver/api/v3rpc": capnslog.CRITICAL,
-	})
-
-	clientSet, err := clientset.NewForConfig(masterConfig)
+	clientSet, err := clientset.NewForConfig(result.ClientConfig)
 	if err != nil {
 		t.Fatalf("error creating clientset: %v", err)
 	}
 
 	// Helpful stuff for testing CRD.
-	apiExtensionClient, err := apiextensionsclientset.NewForConfig(masterConfig)
+	apiExtensionClient, err := apiextensionsclientset.NewForConfig(result.ClientConfig)
 	if err != nil {
 		t.Fatalf("error creating extension clientset: %v", err)
 	}
@@ -234,7 +220,7 @@ func setup(t *testing.T, workerCount int) *testContext {
 	restMapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.InterfacesForUnstructured)
 	restMapper.Reset()
 	deletableResources := garbagecollector.GetDeletableResources(discoveryClient)
-	config := *masterConfig
+	config := *result.ClientConfig
 	config.ContentConfig = dynamic.ContentConfig()
 	metaOnlyClientPool := dynamic.NewClientPool(&config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 	clientPool := dynamic.NewClientPool(&config, restMapper, dynamic.LegacyAPIPathResolverFunc)
@@ -257,10 +243,7 @@ func setup(t *testing.T, workerCount int) *testContext {
 	stopCh := make(chan struct{})
 	tearDown := func() {
 		close(stopCh)
-		tearDownMaster()
-		repo.SetLogLevel(map[string]capnslog.LogLevel{
-			"etcdserver/api/v3rpc": capnslog.ERROR,
-		})
+		result.TearDownFn()
 	}
 	syncPeriod := 5 * time.Second
 	startGC := func(workers int) {

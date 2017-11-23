@@ -17,14 +17,13 @@ limitations under the License.
 package framework
 
 import (
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"path"
 	goruntime "runtime"
 	"strconv"
 	"sync"
-	"testing"
 	"time"
 
 	"github.com/go-openapi/spec"
@@ -38,7 +37,6 @@ import (
 	extensions "k8s.io/api/extensions/v1beta1"
 	rbac "k8s.io/api/rbac/v1alpha1"
 	storage "k8s.io/api/storage/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -62,13 +60,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/generated/openapi"
-	"k8s.io/kubernetes/pkg/kubectl"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/version"
@@ -395,67 +390,6 @@ func (m *MasterComponents) Stop(apiServer, rcManager bool) {
 	}
 }
 
-func CreateTestingNamespace(baseName string, apiserver *httptest.Server, t *testing.T) *v1.Namespace {
-	// TODO: Create a namespace with a given basename.
-	// Currently we neither create the namespace nor delete all its contents at the end.
-	// But as long as tests are not using the same namespaces, this should work fine.
-	return &v1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			// TODO: Once we start creating namespaces, switch to GenerateName.
-			Name: baseName,
-		},
-	}
-}
-
-func DeleteTestingNamespace(ns *v1.Namespace, apiserver *httptest.Server, t *testing.T) {
-	// TODO: Remove all resources from a given namespace once we implement CreateTestingNamespace.
-}
-
-// RCFromManifest reads a .json file and returns the rc in it.
-func RCFromManifest(fileName string) *v1.ReplicationController {
-	data, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		glog.Fatalf("Unexpected error reading rc manifest %v", err)
-	}
-	var controller v1.ReplicationController
-	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &controller); err != nil {
-		glog.Fatalf("Unexpected error reading rc manifest %v", err)
-	}
-	return &controller
-}
-
-// StopRC stops the rc via kubectl's stop library
-func StopRC(rc *v1.ReplicationController, clientset internalclientset.Interface) error {
-	reaper, err := kubectl.ReaperFor(api.Kind("ReplicationController"), clientset)
-	if err != nil || reaper == nil {
-		return err
-	}
-	err = reaper.Stop(rc.Namespace, rc.Name, 0, nil)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// ScaleRC scales the given rc to the given replicas.
-func ScaleRC(name, ns string, replicas int32, clientset internalclientset.Interface) (*api.ReplicationController, error) {
-	scaler, err := kubectl.ScalerFor(api.Kind("ReplicationController"), clientset)
-	if err != nil {
-		return nil, err
-	}
-	retry := &kubectl.RetryParams{Interval: 50 * time.Millisecond, Timeout: DefaultTimeout}
-	waitForReplicas := &kubectl.RetryParams{Interval: 50 * time.Millisecond, Timeout: DefaultTimeout}
-	err = scaler.Scale(ns, name, uint(replicas), nil, retry, waitForReplicas)
-	if err != nil {
-		return nil, err
-	}
-	scaled, err := clientset.Core().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	return scaled, nil
-}
-
 // CloseFunc can be called to cleanup the master
 type CloseFunc func()
 
@@ -523,4 +457,11 @@ func FindFreeLocalPort() (int, error) {
 		return 0, err
 	}
 	return port, nil
+}
+
+// SharedEtcd creates a storage config for a shared etcd instance, with a unique prefix.
+func SharedEtcd() *storagebackend.Config {
+	cfg := storagebackend.NewDefaultConfig(path.Join(uuid.New(), "registry"), nil)
+	cfg.ServerList = []string{GetEtcdURL()}
+	return cfg
 }

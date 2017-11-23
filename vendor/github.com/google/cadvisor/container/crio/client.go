@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	CrioSocket            = "/var/run/crio.sock"
+	CrioSocket            = "/var/run/crio/crio.sock"
 	maxUnixSocketPathSize = len(syscall.RawSockaddrUnix{}.Path)
 )
 
