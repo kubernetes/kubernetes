@@ -98,8 +98,8 @@ func AddToScheme(scheme *runtime.Scheme) {
 	rbacv1alpha1.AddToScheme(scheme)
 	schedulingv1alpha1.AddToScheme(scheme)
 	settingsv1alpha1.AddToScheme(scheme)
-	storagev1alpha1.AddToScheme(scheme)
 	storagev1beta1.AddToScheme(scheme)
 	storagev1.AddToScheme(scheme)
+	storagev1alpha1.AddToScheme(scheme)
 
 }

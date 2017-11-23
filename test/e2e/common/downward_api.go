@@ -38,11 +38,11 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
 
 	/*
-		    Testname: downwardapi-env-name-namespace
-		    Description: Ensure that downward API can provide pod's name and
-			namespaces as environment variables.
+		    Testname: downwardapi-env-name-namespace-podip
+		    Description: Ensure that downward API can provide pod's name, namespace
+			and IP address as environment variables.
 	*/
-	framework.ConformanceIt("should provide pod name and namespace as env vars ", func() {
+	framework.ConformanceIt("should provide pod name, namespace and IP address as env vars ", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
@@ -63,24 +63,6 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 					},
 				},
 			},
-		}
-
-		expectations := []string{
-			fmt.Sprintf("POD_NAME=%v", podName),
-			fmt.Sprintf("POD_NAMESPACE=%v", f.Namespace.Name),
-		}
-
-		testDownwardAPI(f, podName, env, expectations)
-	})
-
-	/*
-		    Testname: downwardapi-env-pod-ip
-		    Description: Ensure that downward API can provide an IP address for
-			pod as an environment variable.
-	*/
-	framework.ConformanceIt("should provide pod IP as an env var ", func() {
-		podName := "downward-api-" + string(uuid.NewUUID())
-		env := []v1.EnvVar{
 			{
 				Name: "POD_IP",
 				ValueFrom: &v1.EnvVarSource{
@@ -93,6 +75,8 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 		}
 
 		expectations := []string{
+			fmt.Sprintf("POD_NAME=%v", podName),
+			fmt.Sprintf("POD_NAMESPACE=%v", f.Namespace.Name),
 			"POD_IP=(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)",
 		}
 

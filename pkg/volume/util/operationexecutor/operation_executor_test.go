@@ -80,7 +80,6 @@ func TestOperationExecutor_MountVolume_ConcurrentMountForAttachablePlugins(t *te
 	volumesToMount := make([]VolumeToMount, numVolumesToAttach)
 	pdName := "pd-volume"
 	volumeName := v1.UniqueVolumeName(pdName)
-
 	// Act
 	for i := range volumesToMount {
 		podName := "pod-" + strconv.Itoa((i + 1))
