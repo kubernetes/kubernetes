@@ -26,6 +26,7 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -339,4 +340,11 @@ func (testcase *testcase) GetVolumeLabels(volumeName aws.KubernetesVolumeID) (ma
 
 func (testcase *testcase) GetDiskPath(volumeName aws.KubernetesVolumeID) (string, error) {
 	return "", errors.New("Not implemented")
+}
+
+func (testcase *testcase) ResizeDisk(
+	volumeName aws.KubernetesVolumeID,
+	oldSize resource.Quantity,
+	newSize resource.Quantity) (resource.Quantity, error) {
+	return oldSize, errors.New("Not implemented")
 }

@@ -34,6 +34,7 @@ go_test(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/cloudprovider/providers/aws:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
