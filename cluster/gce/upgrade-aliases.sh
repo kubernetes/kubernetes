@@ -22,7 +22,7 @@ set -o nounset
 set -o pipefail
 
 if [[ "${KUBERNETES_PROVIDER:-gce}" != "gce" ]]; then
-  echo "!!! ${1} only works on GCE" >&2
+  echo "ERR: KUBERNETES_PROVIDER must be gce" >&2
   exit 1
 fi
 
@@ -35,7 +35,7 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 # Assumed vars:
 #   PROJECT
 function get-k8s-node-routes-count() {
-  local k8s_node_routes_count=$(gcloud alpha compute routes list \
+  local k8s_node_routes_count=$(gcloud compute routes list \
     --project=${PROJECT} --filter='description=k8s-node-route' \
     --format='value(name)' | wc -l)
   echo -n "${k8s_node_routes_count}"
@@ -50,7 +50,7 @@ function get-k8s-node-routes-count() {
 # Vars set:
 #  IP_ALIAS_SUBNETWORK
 function detect-k8s-subnetwork() {
-  local subnetwork_url=$(gcloud alpha compute instances describe \
+  local subnetwork_url=$(gcloud compute instances describe \
     ${KUBE_MASTER} --project=${PROJECT} --zone=${ZONE} \
     --format='value(networkInterfaces[0].subnetwork)')
   if [ -n ${subnetwork_url} ]; then
@@ -71,7 +71,8 @@ function set-allow-subnet-cidr-routes-overlap() {
   allow_subnet_cidr_routes_overlap=$(gcloud alpha compute networks subnets \
     describe ${IP_ALIAS_SUBNETWORK} --project=${PROJECT} --region=${REGION} \
     --format='value(allowSubnetCidrRoutesOverlap)')
-  if [ ${allow_subnet_cidr_routes_overlap,,} = $1 ]; then
+  local allow_overlap=$1
+  if [ ${allow_subnet_cidr_routes_overlap,,} = ${allow_overlap} ]; then
     echo "Subnet ${IP_ALIAS_SUBNETWORK}'s allowSubnetCidrRoutesOverlap is already set as $1"
     return
   fi
