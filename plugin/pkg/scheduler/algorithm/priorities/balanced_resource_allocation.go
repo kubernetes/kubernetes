@@ -100,7 +100,7 @@ func fractionOfCapacity(requested, capacity int64) float64 {
 
 // BalancedResourceAllocationMap favors nodes with balanced resource usage rate.
 // BalancedResourceAllocationMap should **NOT** be used alone, and **MUST** be used together with LeastRequestedPriority.
-// It calculates the difference between the cpu and memory fracion of capacity, and prioritizes the host based on how
+// It calculates the difference between the cpu and memory fraction of capacity, and prioritizes the host based on how
 // close the two metrics are to each other.
 // Detail: score = 10 - abs(cpuFraction-memoryFraction)*10. The algorithm is partly inspired by:
 // "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced Resource Utilization"
