@@ -36,6 +36,9 @@ import (
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
+	kubeletvalidation "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 	kubeproxyscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
 	proxyvalidation "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/validation"
@@ -75,6 +78,9 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("feature-gates"))...)
 	allErrs = append(allErrs, ValidateAPIEndpoint(c, field.NewPath("api-endpoint"))...)
 	//allErrs = append(allErrs, ValidateProxy(c, field.NewPath("kube-proxy"))...)
+	if features.Enabled(c.FeatureGates, features.DynamicKubeletConfig) {
+		allErrs = append(allErrs, ValidateKubeletConfiguration(&c.KubeletConfiguration, field.NewPath("kubeletConfiguration"))...)
+	}
 	return allErrs
 }
 
@@ -368,4 +374,30 @@ func ValidateIgnorePreflightErrors(ignorePreflightErrors []string, skipPreflight
 	}
 
 	return ignoreErrors, allErrs.ToAggregate()
+}
+
+// ValidateKubeletConfiguration validates kubelet configuration and collects all encountered errors
+func ValidateKubeletConfiguration(c *kubeadm.KubeletConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	scheme, _, err := kubeletscheme.NewSchemeAndCodecs()
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, "kubeletConfiguration", err.Error()))
+		return allErrs
+	}
+
+	// Convert versioned config to internal config
+	internalcfg := &kubeletconfig.KubeletConfiguration{}
+	err = scheme.Convert(c.BaseConfig, internalcfg, nil)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, "kubeletConfiguration", err.Error()))
+		return allErrs
+	}
+
+	err = kubeletvalidation.ValidateKubeletConfiguration(internalcfg)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, "kubeletConfiguration", err.Error()))
+	}
+
+	return allErrs
 }
