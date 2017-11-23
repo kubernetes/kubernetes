@@ -59,10 +59,10 @@ for gv in "${GROUP_VERSIONS[@]}"; do
 	# collect internal groups
 	int_group="${pkg_dir%/*}/"
 	if [[ "${pkg_dir}" = core/* ]]; then
-	    int_group="api/"
+	  int_group="api/"
 	fi
     if ! [[ " ${INTERNAL_DIRS[@]:-} " =~ " ${int_group} " ]]; then
-        INTERNAL_DIRS+=("${int_group}")
+      INTERNAL_DIRS+=("${int_group}")
     fi
 done
 # delimit by commas for the command

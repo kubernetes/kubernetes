@@ -19,10 +19,12 @@ package fuzzer
 import (
 	"reflect"
 	"strconv"
+	"time"
 
 	fuzz "github.com/google/gofuzz"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -482,6 +484,13 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		func(s *core.NodeStatus, c fuzz.Continue) {
 			c.FuzzNoCustom(s)
 			s.Allocatable = s.Capacity
+		},
+		func(e *core.Event, c fuzz.Continue) {
+			c.FuzzNoCustom(e)
+			e.EventTime = metav1.MicroTime{Time: time.Unix(1, 1000)}
+			if e.Series != nil {
+				e.Series.LastObservedTime = metav1.MicroTime{Time: time.Unix(3, 3000)}
+			}
 		},
 	}
 }

@@ -3958,7 +3958,7 @@ type Event struct {
 	// +optional
 	metav1.ObjectMeta
 
-	// Required. The object that this event is about.
+	// Required. The object that this event is about. Mapped to events.Event.regarding
 	// +optional
 	InvolvedObject ObjectReference
 
@@ -3970,7 +3970,7 @@ type Event struct {
 	Reason string
 
 	// Optional. A human-readable description of the status of this operation.
-	// TODO: decide on maximum length.
+	// TODO: decide on maximum length. Mapped to events.Event.note
 	// +optional
 	Message string
 
@@ -3993,7 +3993,48 @@ type Event struct {
 	// Type of this event (Normal, Warning), new types could be added in the future.
 	// +optional
 	Type string
+
+	// Time when this Event was first observed.
+	// +optional
+	EventTime metav1.MicroTime
+
+	// Data about the Event series this event represents or nil if it's a singleton Event.
+	// +optional
+	Series *EventSeries
+
+	// What action was taken/failed regarding to the Regarding object.
+	// +optional
+	Action string
+
+	// Optional secondary object for more complex actions.
+	// +optional
+	Related *ObjectReference
+
+	// Name of the controller that emitted this Event, e.g. `kubernetes.io/kubelet`.
+	// +optional
+	ReportingController string
+
+	// ID of the controller instance, e.g. `kubelet-xyzf`.
+	// +optional
+	ReportingInstance string
 }
+
+type EventSeries struct {
+	// Number of occurrences in this series up to the last heartbeat time
+	Count int32
+	// Time of the last occurence observed
+	LastObservedTime metav1.MicroTime
+	// State of this Series: Ongoing or Finished
+	State EventSeriesState
+}
+
+type EventSeriesState string
+
+const (
+	EventSeriesStateOngoing  EventSeriesState = "Ongoing"
+	EventSeriesStateFinished EventSeriesState = "Finished"
+	EventSeriesStateUnknown  EventSeriesState = "Unknown"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
