@@ -228,8 +228,7 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 					glog.V(2).Infof("Unable to make object reference for job for %s", nameForLog)
 				}
 				sj.Status.Active = append(sj.Status.Active, *ref)
-
-				// should we update LastScheduleTime, since this job was not scheduled?
+				// LastScheduleTime is intentionally not updated (only for automatic triggers)
 			}
 
 			// TODO: maybe handle the general adoption case?  Concurrency/suspend rules will not apply in that case, obviously, since we can't stop users from creating jobs if they have permission.  It is assumed that if a
