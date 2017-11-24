@@ -201,7 +201,6 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 	podCIDR := cidr.String()
 
 	for rep := 0; rep < cidrUpdateRetries; rep++ {
-		// TODO: change it to using PATCH instead of full Node updates.
 		node, err = ca.nodeLister.Get(nodeName)
 		if err != nil {
 			glog.Errorf("Failed while getting node %v to retry updating Node.Spec.PodCIDR: %v", nodeName, err)
@@ -220,8 +219,7 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 			//
 			// See https://github.com/kubernetes/kubernetes/pull/42147#discussion_r103357248
 		}
-		node.Spec.PodCIDR = podCIDR
-		if _, err = ca.client.CoreV1().Nodes().Update(node); err == nil {
+		if err = nodeutil.PatchNodeCIDR(ca.client, types.NodeName(node.Name), podCIDR); err == nil {
 			glog.Infof("Set node %v PodCIDR to %v", node.Name, podCIDR)
 			break
 		}
