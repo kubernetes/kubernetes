@@ -156,6 +156,10 @@ func (pvcr *persistentVolumeClaimResize) checkVolumePlugin(pv *api.PersistentVol
 	if pv.Spec.GCEPersistentDisk != nil {
 		return true
 	}
-	return false
 
+	if pv.Spec.AWSElasticBlockStore != nil {
+		return true
+	}
+
+	return false
 }

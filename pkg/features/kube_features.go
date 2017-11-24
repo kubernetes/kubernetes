@@ -200,6 +200,12 @@ const (
 	//
 	// Enable Block volume support in containers.
 	BlockVolume utilfeature.Feature = "BlockVolume"
+
+	// owner: @pospispa
+	//
+	// alpha: v1.9
+	// Postpone deletion of a persistent volume claim in case it is used by a pod
+	PVCProtection utilfeature.Feature = "PVCProtection"
 )
 
 func init() {
@@ -237,6 +243,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	CSIPersistentVolume:                         {Default: false, PreRelease: utilfeature.Alpha},
 	CustomPodDNS:                                {Default: false, PreRelease: utilfeature.Alpha},
 	BlockVolume:                                 {Default: false, PreRelease: utilfeature.Alpha},
+	PVCProtection:                               {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
