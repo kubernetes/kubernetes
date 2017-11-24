@@ -47,9 +47,8 @@ func New(name string) (*Config, error) {
 	if _, found := configs[name]; found {
 		return nil, fmt.Errorf("register config %q twice", name)
 	}
-	newConfig := Config{}
-	configs[name] = &newConfig
-	return &newConfig, nil
+	configs[name] = &Config{}
+	return configs[name], nil
 }
 
 func Delete(name string) {
