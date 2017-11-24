@@ -77,7 +77,7 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 	allErrs = append(allErrs, ValidateToken(c.Token, field.NewPath("token"))...)
 	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("feature-gates"))...)
 	allErrs = append(allErrs, ValidateAPIEndpoint(c, field.NewPath("api-endpoint"))...)
-	//allErrs = append(allErrs, ValidateProxy(c, field.NewPath("kube-proxy"))...)
+	allErrs = append(allErrs, ValidateProxy(c, field.NewPath("kube-proxy"))...)
 	if features.Enabled(c.FeatureGates, features.DynamicKubeletConfig) {
 		allErrs = append(allErrs, ValidateKubeletConfiguration(&c.KubeletConfiguration, field.NewPath("kubeletConfiguration"))...)
 	}
