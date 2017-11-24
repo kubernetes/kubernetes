@@ -352,7 +352,6 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 		shouldPassAdmit       bool
 		shouldPassValidate    bool
 		expectMutation        bool
-		expectedPodUser       *int64
 		expectedContainerUser *int64
 		expectedPSP           string
 	}{
@@ -363,7 +362,6 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			shouldPassAdmit:       true,
 			shouldPassValidate:    true,
 			expectMutation:        false,
-			expectedPodUser:       nil,
 			expectedContainerUser: nil,
 			expectedPSP:           privilegedPSP.Name,
 		},
@@ -374,7 +372,6 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			shouldPassAdmit:       true,
 			shouldPassValidate:    true,
 			expectMutation:        false,
-			expectedPodUser:       nil,
 			expectedContainerUser: nil,
 			expectedPSP:           privilegedPSP.Name,
 		},
@@ -385,7 +382,6 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			shouldPassAdmit:       true,
 			shouldPassValidate:    true,
 			expectMutation:        true,
-			expectedPodUser:       nil,
 			expectedContainerUser: &mutating1.Spec.RunAsUser.Ranges[0].Min,
 			expectedPSP:           mutating1.Name,
 		},
@@ -397,7 +393,6 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			shouldPassAdmit:       true,
 			shouldPassValidate:    true,
 			expectMutation:        false,
-			expectedPodUser:       nil,
 			expectedContainerUser: nil,
 			expectedPSP:           privilegedPSP.Name,
 		},
@@ -409,7 +404,6 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			shouldPassAdmit:       true,
 			shouldPassValidate:    false,
 			expectMutation:        false,
-			expectedPodUser:       nil,
 			expectedContainerUser: nil,
 			expectedPSP:           "",
 		},
@@ -421,7 +415,6 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			shouldPassAdmit:       true,
 			shouldPassValidate:    true,
 			expectMutation:        false,
-			expectedPodUser:       nil,
 			expectedContainerUser: nil,
 			expectedPSP:           "",
 		},
@@ -433,7 +426,6 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			shouldPassAdmit:       true,
 			shouldPassValidate:    true,
 			expectMutation:        false,
-			expectedPodUser:       nil,
 			expectedContainerUser: nil,
 			expectedPSP:           "",
 		},
@@ -447,10 +439,8 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			if v.pod.Spec.SecurityContext != nil {
 				actualPodUser = v.pod.Spec.SecurityContext.RunAsUser
 			}
-			if (actualPodUser == nil) != (v.expectedPodUser == nil) {
-				t.Errorf("%s expected pod user %v, got %v", k, v.expectedPodUser, actualPodUser)
-			} else if actualPodUser != nil && *actualPodUser != *v.expectedPodUser {
-				t.Errorf("%s expected pod user %v, got %v", k, *v.expectedPodUser, *actualPodUser)
+			if actualPodUser != nil {
+				t.Errorf("%s expected pod user nil, got %v", k, *actualPodUser)
 			}
 
 			actualContainerUser := (*int64)(nil)
