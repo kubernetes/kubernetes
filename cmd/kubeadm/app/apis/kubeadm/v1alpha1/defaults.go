@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 	kubeproxyscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
@@ -117,7 +116,6 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 
 // SetDefaults_ProxyConfiguration assigns default values for the Proxy
 func SetDefaults_ProxyConfiguration(obj *MasterConfiguration) {
-
 	if obj.KubeProxy.Config == nil {
 		obj.KubeProxy.Config = &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
 	}
@@ -125,10 +123,6 @@ func SetDefaults_ProxyConfiguration(obj *MasterConfiguration) {
 		obj.KubeProxy.Config.ClusterCIDR = obj.Networking.PodSubnet
 	}
 
-	if features.Enabled(obj.FeatureGates, features.SupportIPVSProxyMode) {
-		obj.KubeProxy.Config.FeatureGates = "true"
-		obj.KubeProxy.Config.Mode = "ipvs"
-	}
 	kubeproxyscheme.Scheme.Default(obj.KubeProxy.Config)
 }
 
