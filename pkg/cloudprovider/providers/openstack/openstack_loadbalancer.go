@@ -1322,13 +1322,16 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 		}
 	}
 
-	// delete all monitors
-	for _, monitorID := range monitorIDs {
-		err := v2monitors.Delete(lbaas.lb, monitorID).ExtractErr()
-		if err != nil && !isNotFound(err) {
-			return err
+	if lbaas.opts.CreateMonitor {
+
+		// delete all monitors
+		for _, monitorID := range monitorIDs {
+			err := v2monitors.Delete(lbaas.lb, monitorID).ExtractErr()
+			if err != nil && !isNotFound(err) {
+				return err
+			}
+			waitLoadbalancerActiveProvisioningStatus(lbaas.lb, loadbalancer.ID)
 		}
-		waitLoadbalancerActiveProvisioningStatus(lbaas.lb, loadbalancer.ID)
 	}
 
 	// delete all members and pools
