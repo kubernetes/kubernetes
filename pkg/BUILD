@@ -85,7 +85,6 @@ filegroup(
         "//pkg/features:all-srcs",
         "//pkg/fieldpath:all-srcs",
         "//pkg/generated:all-srcs",
-        "//pkg/hyperkube:all-srcs",
         "//pkg/kubeapiserver:all-srcs",
         "//pkg/kubectl:all-srcs",
         "//pkg/kubelet:all-srcs",
