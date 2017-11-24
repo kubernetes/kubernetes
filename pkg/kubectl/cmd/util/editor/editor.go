@@ -33,7 +33,6 @@ import (
 )
 
 const (
-	// sorry, blame Git
 	// TODO: on Windows rely on 'start' to launch the editor associated
 	// with the given file type. If we can't because of the need of
 	// blocking, use a script with 'ftype' and 'assoc' to detect it.
@@ -43,6 +42,7 @@ const (
 	windowsShell  = "cmd"
 )
 
+// Editor contains args from cli command line and command tool in platform
 type Editor struct {
 	Args  []string
 	Shell bool
@@ -136,8 +136,8 @@ func (e Editor) Launch(path string) error {
 	return nil
 }
 
-// LaunchTempFile reads the provided stream into a temporary file in the given directory
-// and file prefix, and then invokes Launch with the path of that file. It will return
+// LaunchTempFile reads the provided stream into a temporary file with prefix and suffix
+// in the given directory, and then invokes Launch with the path of that file. It will return
 // the contents of the file after launch, any errors that occur, and the path of the
 // temporary file so the caller can clean it up as needed.
 func (e Editor) LaunchTempFile(prefix, suffix string, r io.Reader) ([]byte, string, error) {
