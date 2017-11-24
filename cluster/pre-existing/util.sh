@@ -60,3 +60,18 @@ function create-certs {
   KUBEAPISERVER_CERT_BASE64=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   KUBEAPISERVER_KEY_BASE64=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 }
+function detect-master() {
+  detect-project
+  KUBE_MASTER=${MASTER_NAME}
+  echo "Trying to find master named '${MASTER_NAME}'" >&2
+  if [[ -z "${KUBE_MASTER_IP-}" ]]; then
+    local master_address_name="${MASTER_NAME}-ip"
+    echo "Looking for address '${master_address_name}'" >&2
+    KUBE_MASTER_IP=${MASTER_IP}
+  fi
+  if [[ -z "${KUBE_MASTER_IP-}" ]]; then
+    echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'" >&2
+    exit 1
+  fi
+  echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)" >&2
+}
