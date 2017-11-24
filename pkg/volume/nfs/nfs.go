@@ -194,15 +194,15 @@ func (nfsMounter *nfsMounter) CanMount() error {
 	exec := nfsMounter.plugin.host.GetExec(nfsMounter.plugin.GetPluginName())
 	switch runtime.GOOS {
 	case "linux":
-		if _, err := exec.Run("/bin/ls", "/sbin/mount.nfs"); err != nil {
+		if _, err := exec.Run("test", "-x", "/sbin/mount.nfs"); err != nil {
 			return fmt.Errorf("Required binary /sbin/mount.nfs is missing")
 		}
-		if _, err := exec.Run("/bin/ls", "/sbin/mount.nfs4"); err != nil {
+		if _, err := exec.Run("test", "-x", "/sbin/mount.nfs4"); err != nil {
 			return fmt.Errorf("Required binary /sbin/mount.nfs4 is missing")
 		}
 		return nil
 	case "darwin":
-		if _, err := exec.Run("/bin/ls", "/sbin/mount_nfs"); err != nil {
+		if _, err := exec.Run("test", "-x", "/sbin/mount_nfs"); err != nil {
 			return fmt.Errorf("Required binary /sbin/mount_nfs is missing")
 		}
 	}
