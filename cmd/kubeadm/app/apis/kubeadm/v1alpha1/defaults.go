@@ -110,7 +110,9 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 	}
 
 	SetDefaultsEtcdSelfHosted(obj)
-	SetDefaults_KubeletConfiguration(obj)
+	if features.Enabled(obj.FeatureGates, features.DynamicKubeletConfig) {
+		SetDefaults_KubeletConfiguration(obj)
+	}
 	SetDefaults_ProxyConfiguration(obj)
 }
 
