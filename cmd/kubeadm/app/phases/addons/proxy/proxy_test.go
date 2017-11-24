@@ -134,12 +134,11 @@ func TestCompileManifests(t *testing.T) {
 		},
 		{
 			manifest: KubeProxyDaemonSet18,
-			data: struct{ ImageRepository, Arch, Version, ImageOverride, ExtraParams, ClusterCIDR, MasterTaintKey, CloudTaintKey string }{
+			data: struct{ ImageRepository, Arch, Version, ImageOverride, ClusterCIDR, MasterTaintKey, CloudTaintKey string }{
 				ImageRepository: "foo",
 				Arch:            "foo",
 				Version:         "foo",
 				ImageOverride:   "foo",
-				ExtraParams:     "foo",
 				ClusterCIDR:     "foo",
 				MasterTaintKey:  "foo",
 				CloudTaintKey:   "foo",

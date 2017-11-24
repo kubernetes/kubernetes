@@ -107,7 +107,6 @@ spec:
         command:
         - /usr/local/bin/kube-proxy
         - --kubeconfig=/var/lib/kube-proxy/kubeconfig.conf
-        {{ .ExtraParams }}
         {{ .ClusterCIDR }}
         securityContext:
           privileged: true
