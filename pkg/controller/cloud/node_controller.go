@@ -363,7 +363,7 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 
 		curNode.Spec.Taints = excludeTaintFromList(curNode.Spec.Taints, *cloudTaint)
 
-		_, err = cnc.kubeClient.CoreV1().Nodes().Update(curNode)
+		_, err = nodeutil.PatchNode(cnc.kubeClient.CoreV1(), types.NodeName(node.Name), node, curNode, "status")
 		if err != nil {
 			return err
 		}

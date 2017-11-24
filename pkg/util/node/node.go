@@ -167,7 +167,12 @@ func PatchNodeCIDR(c clientset.Interface, node types.NodeName, cidr string) erro
 
 // PatchNodeStatus patches node status.
 func PatchNodeStatus(c v1core.CoreV1Interface, nodeName types.NodeName, oldNode *v1.Node, newNode *v1.Node) (*v1.Node, []byte, error) {
-	patchBytes, err := preparePatchBytesforNodeStatus(nodeName, oldNode, newNode)
+	// Reset spec to make sure only patch for Status or ObjectMeta is generated.
+	// Note that we don't reset ObjectMeta here, because:
+	// 1. This aligns with Nodes().UpdateStatus().
+	// 2. Some component does use this to update node annotations.
+	newNode.Spec = oldNode.Spec
+	patchBytes, err := preparePatchBytes(nodeName, oldNode, newNode)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -179,17 +184,27 @@ func PatchNodeStatus(c v1core.CoreV1Interface, nodeName types.NodeName, oldNode 
 	return updatedNode, patchBytes, nil
 }
 
-func preparePatchBytesforNodeStatus(nodeName types.NodeName, oldNode *v1.Node, newNode *v1.Node) ([]byte, error) {
+func PatchNode(c v1core.CoreV1Interface, nodeName types.NodeName, oldNode *v1.Node, newNode *v1.Node, subresources ...string) (*v1.Node, error) {
+	patchBytes, err := preparePatchBytes(nodeName, oldNode, newNode)
+
+	if err != nil {
+		return nil, err
+	}
+
+	updatedNode, err := c.Nodes().Patch(string(nodeName), types.StrategicMergePatchType, patchBytes, subresources...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to patch %q for node %q: %v", patchBytes, nodeName, err)
+	}
+	return updatedNode, nil
+
+}
+
+func preparePatchBytes(nodeName types.NodeName, oldNode *v1.Node, newNode *v1.Node) ([]byte, error) {
 	oldData, err := json.Marshal(oldNode)
 	if err != nil {
 		return nil, fmt.Errorf("failed to Marshal oldData for node %q: %v", nodeName, err)
 	}
 
-	// Reset spec to make sure only patch for Status or ObjectMeta is generated.
-	// Note that we don't reset ObjectMeta here, because:
-	// 1. This aligns with Nodes().UpdateStatus().
-	// 2. Some component does use this to update node annotations.
-	newNode.Spec = oldNode.Spec
 	newData, err := json.Marshal(newNode)
 	if err != nil {
 		return nil, fmt.Errorf("failed to Marshal newData for node %q: %v", nodeName, err)
