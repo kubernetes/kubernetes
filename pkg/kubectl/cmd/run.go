@@ -165,6 +165,21 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 		return fmt.Errorf("Invalid image name %q: %v", imageName, reference.ErrReferenceInvalidFormat)
 	}
 
+	outputFormat := cmdutil.GetFlagString(cmd, "output")
+	showLabelsFlag := cmdutil.GetFlagBool(cmd, "show-labels")
+	dryRunFlag := cmdutil.GetDryRunFlag(cmd)
+	if showLabelsFlag {
+		if dryRunFlag {
+			if outputFormat != "" && outputFormat != "wide" {
+				return fmt.Errorf("When --show-labels and --dry-run are set to true, --output must be wide or \"\" ")
+			}
+		} else {
+			if outputFormat != "wide" {
+				return fmt.Errorf("When --show-labels is set to true with default dry-run value (false), --output must be wide ")
+			}
+		}
+	}
+
 	interactive := cmdutil.GetFlagBool(cmd, "stdin")
 	tty := cmdutil.GetFlagBool(cmd, "tty")
 	if tty && !interactive {
@@ -401,11 +416,10 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 
 	}
 
-	outputFormat := cmdutil.GetFlagString(cmd, "output")
-	if outputFormat != "" || cmdutil.GetDryRunFlag(cmd) {
+	if outputFormat != "" || dryRunFlag {
 		return f.PrintObject(cmd, false, runObject.Mapper, runObject.Object, cmdOut)
 	}
-	f.PrintSuccess(runObject.Mapper, false, cmdOut, runObject.Mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
+	f.PrintSuccess(runObject.Mapper, false, cmdOut, runObject.Mapping.Resource, args[0], dryRunFlag, "created")
 	return nil
 }
 
@@ -550,17 +564,19 @@ func generateService(f cmdutil.Factory, cmd *cobra.Command, args []string, servi
 		return nil, err
 	}
 
-	if cmdutil.GetFlagString(cmd, "output") != "" || cmdutil.GetDryRunFlag(cmd) {
+	outputFormat := cmdutil.GetFlagString(cmd, "output")
+	dryRunFlag := cmdutil.GetDryRunFlag(cmd)
+	if outputFormat != "" || dryRunFlag {
 		err := f.PrintObject(cmd, false, runObject.Mapper, runObject.Object, out)
 		if err != nil {
 			return nil, err
 		}
-		if cmdutil.GetFlagString(cmd, "output") == "yaml" {
+		if outputFormat == "yaml" {
 			fmt.Fprintln(out, "---")
 		}
 		return runObject, nil
 	}
-	f.PrintSuccess(runObject.Mapper, false, out, runObject.Mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
+	f.PrintSuccess(runObject.Mapper, false, out, runObject.Mapping.Resource, args[0], dryRunFlag, "created")
 
 	return runObject, nil
 }
