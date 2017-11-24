@@ -23,6 +23,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 	kubeproxyscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
@@ -201,5 +203,10 @@ func SetDefaults_KubeletConfiguration(obj *MasterConfiguration) {
 	}
 	if obj.KubeletConfiguration.BaseConfig.CAdvisorPort == nil {
 		obj.KubeletConfiguration.BaseConfig.CAdvisorPort = utilpointer.Int32Ptr(0)
+	}
+
+	scheme, _, _ := kubeletscheme.NewSchemeAndCodecs()
+	if scheme != nil {
+		scheme.Default(obj.KubeletConfiguration.BaseConfig)
 	}
 }
