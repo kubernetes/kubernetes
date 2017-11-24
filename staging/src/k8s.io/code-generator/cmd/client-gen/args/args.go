@@ -43,7 +43,7 @@ type CustomArgs struct {
 	// ClientsetOutputPath is the path the clientset will be generated at. It's
 	// populated from command-line arguments.
 	ClientsetOutputPath string
-	// ClientsetAPIPath is the default API path for generated clients.
+	// ClientsetAPIPath is the default API HTTP path for generated clients.
 	ClientsetAPIPath string
 	// ClientsetOnly determines if we should generate the clients for groups and
 	// types along with the clientset. It's populated from command-line
@@ -58,7 +58,7 @@ func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
 	pflag.Var(NewGVTypesValue(&ca.IncludedTypesOverrides, []string{}), "included-types-overrides", "list of group/version/type for which client should be generated. By default, client is generated for all types which have genclient in types.go. This overrides that. For each groupVersion in this list, only the types mentioned here will be included. The default check of genclient will be used for other group versions.")
 	pflag.StringVar(&ca.InputBasePath, "input-base", "k8s.io/kubernetes/pkg/apis", "base path to look for the api group.")
 	pflag.StringVarP(&ca.ClientsetName, "clientset-name", "n", "internalclientset", "the name of the generated clientset package.")
-	pflag.StringVarP(&ca.ClientsetAPIPath, "clientset-api-path", "", "", "the value of default API path.")
+	pflag.StringVarP(&ca.ClientsetAPIPath, "clientset-api-path", "", "/apis", "the value of default API HTTP path, starting with / and without trailing /.")
 	pflag.StringVar(&ca.ClientsetOutputPath, "clientset-path", "k8s.io/kubernetes/pkg/client/clientset_generated/", "the generated clientset will be output to <clientset-path>/<clientset-name>.")
 	pflag.BoolVar(&ca.ClientsetOnly, "clientset-only", false, "when set, client-gen only generates the clientset shell, without generating the individual typed clients")
 	pflag.BoolVar(&ca.FakeClient, "fake-clientset", true, "when set, client-gen will generate the fake clientset that can be used in tests")
