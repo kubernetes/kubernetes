@@ -47,7 +47,7 @@ func (i awsVolumeID) awsString() *string {
 type KubernetesVolumeID string
 
 // mapToAWSVolumeID extracts the awsVolumeID from the KubernetesVolumeID
-func (name KubernetesVolumeID) mapToAWSVolumeID() (awsVolumeID, error) {
+func (name KubernetesVolumeID) MapToAWSVolumeID() (awsVolumeID, error) {
 	// name looks like aws://availability-zone/awsVolumeId
 
 	// The original idea of the URL-style name was to put the AZ into the
