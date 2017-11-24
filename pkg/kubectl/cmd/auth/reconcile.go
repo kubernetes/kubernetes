@@ -23,21 +23,31 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/apis/rbac"
-	internalcoreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	internalrbacclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
+	rbacv1 "k8s.io/api/rbac/v1"
+	v1alpha1 "k8s.io/api/rbac/v1alpha1"
+	v1beta1 "k8s.io/api/rbac/v1beta1"
+	"k8s.io/apimachinery/pkg/runtime"
+	core "k8s.io/client-go/kubernetes/typed/core/v1"
+	clientrbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
+	clientrbacv1alpha1 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1"
+	clientrbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	reconciliationv1 "k8s.io/kubernetes/pkg/kubectl/reconciliation/v1"
+	reconciliationv1alpha1 "k8s.io/kubernetes/pkg/kubectl/reconciliation/v1alpha1"
+	reconciliationv1beta1 "k8s.io/kubernetes/pkg/kubectl/reconciliation/v1beta1"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/registry/rbac/reconciliation"
 )
 
 // ReconcileOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type ReconcileOptions struct {
-	Visitor         resource.Visitor
-	RBACClient      internalrbacclient.RbacInterface
-	NamespaceClient internalcoreclient.NamespaceInterface
+	Visitor            resource.Visitor
+	RBACClientV1       clientrbacv1.RbacV1Interface
+	RBACClientV1aplha1 clientrbacv1alpha1.RbacV1alpha1Interface
+	RBACClientV1beta1  clientrbacv1beta1.RbacV1beta1Interface
+
+	NamespaceClient core.NamespaceInterface
 
 	Print func(*resource.Info) error
 
@@ -94,7 +104,7 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 	}
 
 	r := f.NewBuilder().
-		Internal().
+		Unstructured().
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
@@ -106,11 +116,13 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 	}
 	o.Visitor = r
 
-	client, err := f.ClientSet()
+	client, err := f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
-	o.RBACClient = client.Rbac()
+	o.RBACClientV1 = client.RbacV1()
+	o.RBACClientV1aplha1 = client.RbacV1alpha1()
+	o.RBACClientV1beta1 = client.RbacV1beta1()
 	o.NamespaceClient = client.Core().Namespaces()
 
 	mapper, _ := f.Object()
@@ -132,8 +144,14 @@ func (o *ReconcileOptions) Validate() error {
 	if o.Visitor == nil {
 		return errors.New("ReconcileOptions.Visitor must be set")
 	}
-	if o.RBACClient == nil {
-		return errors.New("ReconcileOptions.RBACClient must be set")
+	if o.RBACClientV1 == nil {
+		return errors.New("ReconcileOptions.RBACClientV1 must be set")
+	}
+	if o.RBACClientV1aplha1 == nil {
+		return errors.New("ReconcileOptions.RBACClientV1aplha1 must be set")
+	}
+	if o.RBACClientV1beta1 == nil {
+		return errors.New("ReconcileOptions.RBACClientV1beta1 must be set")
 	}
 	if o.NamespaceClient == nil {
 		return errors.New("ReconcileOptions.NamespaceClient must be set")
@@ -160,15 +178,21 @@ func (o *ReconcileOptions) RunReconcile() error {
 		// we really need more straightforward printing options
 		shallowInfoCopy := *info
 
+		_, isUnstructured := info.Object.(runtime.Unstructured)
+		if isUnstructured {
+			info.Object = info.AsVersioned()
+		}
+
 		switch t := info.Object.(type) {
-		case *rbac.Role:
-			reconcileOptions := reconciliation.ReconcileRoleOptions{
+		//v1alpha1
+		case *v1alpha1.Role:
+			reconcileOptions := reconciliationv1alpha1.ReconcileRoleOptions{
 				Confirm:                true,
 				RemoveExtraPermissions: false,
-				Role: reconciliation.RoleRuleOwner{Role: t},
-				Client: reconciliation.RoleModifier{
+				Role: reconciliationv1alpha1.RoleRuleOwner{Role: t},
+				Client: reconciliationv1alpha1.RoleModifier{
 					NamespaceClient: o.NamespaceClient,
-					Client:          o.RBACClient,
+					Client:          o.RBACClientV1aplha1,
 				},
 			}
 			result, err := reconcileOptions.Run()
@@ -178,13 +202,13 @@ func (o *ReconcileOptions) RunReconcile() error {
 			shallowInfoCopy.Object = result.Role.GetObject()
 			o.Print(&shallowInfoCopy)
 
-		case *rbac.ClusterRole:
-			reconcileOptions := reconciliation.ReconcileRoleOptions{
+		case *v1alpha1.ClusterRole:
+			reconcileOptions := reconciliationv1alpha1.ReconcileRoleOptions{
 				Confirm:                true,
 				RemoveExtraPermissions: false,
-				Role: reconciliation.ClusterRoleRuleOwner{ClusterRole: t},
-				Client: reconciliation.ClusterRoleModifier{
-					Client: o.RBACClient.ClusterRoles(),
+				Role: reconciliationv1alpha1.ClusterRoleRuleOwner{ClusterRole: t},
+				Client: reconciliationv1alpha1.ClusterRoleModifier{
+					Client: o.RBACClientV1aplha1.ClusterRoles(),
 				},
 			}
 			result, err := reconcileOptions.Run()
@@ -194,13 +218,13 @@ func (o *ReconcileOptions) RunReconcile() error {
 			shallowInfoCopy.Object = result.Role.GetObject()
 			o.Print(&shallowInfoCopy)
 
-		case *rbac.RoleBinding:
-			reconcileOptions := reconciliation.ReconcileRoleBindingOptions{
+		case *v1alpha1.RoleBinding:
+			reconcileOptions := reconciliationv1alpha1.ReconcileRoleBindingOptions{
 				Confirm:             true,
 				RemoveExtraSubjects: false,
-				RoleBinding:         reconciliation.RoleBindingAdapter{RoleBinding: t},
-				Client: reconciliation.RoleBindingClientAdapter{
-					Client:          o.RBACClient,
+				RoleBinding:         reconciliationv1alpha1.RoleBindingAdapter{RoleBinding: t},
+				Client: reconciliationv1alpha1.RoleBindingClientAdapter{
+					Client:          o.RBACClientV1aplha1,
 					NamespaceClient: o.NamespaceClient,
 				},
 			}
@@ -211,13 +235,150 @@ func (o *ReconcileOptions) RunReconcile() error {
 			shallowInfoCopy.Object = result.RoleBinding.GetObject()
 			o.Print(&shallowInfoCopy)
 
-		case *rbac.ClusterRoleBinding:
-			reconcileOptions := reconciliation.ReconcileRoleBindingOptions{
+		case *v1alpha1.ClusterRoleBinding:
+			reconcileOptions := reconciliationv1alpha1.ReconcileRoleBindingOptions{
 				Confirm:             true,
 				RemoveExtraSubjects: false,
-				RoleBinding:         reconciliation.ClusterRoleBindingAdapter{ClusterRoleBinding: t},
-				Client: reconciliation.ClusterRoleBindingClientAdapter{
-					Client: o.RBACClient.ClusterRoleBindings(),
+				RoleBinding:         reconciliationv1alpha1.ClusterRoleBindingAdapter{ClusterRoleBinding: t},
+				Client: reconciliationv1alpha1.RoleBindingClientAdapter{
+					Client:          o.RBACClientV1aplha1,
+					NamespaceClient: o.NamespaceClient,
+				},
+			}
+			result, err := reconcileOptions.Run()
+			if err != nil {
+				return err
+			}
+			shallowInfoCopy.Object = result.RoleBinding.GetObject()
+			o.Print(&shallowInfoCopy)
+
+		//	v1beta1
+		case *v1beta1.Role:
+			reconcileOptions := reconciliationv1beta1.ReconcileRoleOptions{
+				Confirm:                true,
+				RemoveExtraPermissions: false,
+				Role: reconciliationv1beta1.RoleRuleOwner{Role: t},
+				Client: reconciliationv1beta1.RoleModifier{
+					NamespaceClient: o.NamespaceClient,
+					Client:          o.RBACClientV1beta1,
+				},
+			}
+			result, err := reconcileOptions.Run()
+			if err != nil {
+				return err
+			}
+			shallowInfoCopy.Object = result.Role.GetObject()
+			o.Print(&shallowInfoCopy)
+
+		case *v1beta1.ClusterRole:
+			reconcileOptions := reconciliationv1beta1.ReconcileRoleOptions{
+				Confirm:                true,
+				RemoveExtraPermissions: false,
+				Role: reconciliationv1beta1.ClusterRoleRuleOwner{ClusterRole: t},
+				Client: reconciliationv1beta1.RoleModifier{
+					NamespaceClient: o.NamespaceClient,
+					Client:          o.RBACClientV1beta1,
+				},
+			}
+			result, err := reconcileOptions.Run()
+			if err != nil {
+				return err
+			}
+			shallowInfoCopy.Object = result.Role.GetObject()
+			o.Print(&shallowInfoCopy)
+
+		case *v1beta1.RoleBinding:
+			reconcileOptions := reconciliationv1beta1.ReconcileRoleBindingOptions{
+				Confirm:             true,
+				RemoveExtraSubjects: false,
+				RoleBinding:         reconciliationv1beta1.RoleBindingAdapter{RoleBinding: t},
+				Client: reconciliationv1beta1.RoleBindingClientAdapter{
+					Client:          o.RBACClientV1beta1,
+					NamespaceClient: o.NamespaceClient,
+				},
+			}
+			result, err := reconcileOptions.Run()
+			if err != nil {
+				return err
+			}
+			shallowInfoCopy.Object = result.RoleBinding.GetObject()
+			o.Print(&shallowInfoCopy)
+
+		case *v1beta1.ClusterRoleBinding:
+			reconcileOptions := reconciliationv1beta1.ReconcileRoleBindingOptions{
+				Confirm:             true,
+				RemoveExtraSubjects: false,
+				RoleBinding:         reconciliationv1beta1.ClusterRoleBindingAdapter{ClusterRoleBinding: t},
+				Client: reconciliationv1beta1.RoleBindingClientAdapter{
+					Client:          o.RBACClientV1beta1,
+					NamespaceClient: o.NamespaceClient,
+				},
+			}
+			result, err := reconcileOptions.Run()
+			if err != nil {
+				return err
+			}
+			shallowInfoCopy.Object = result.RoleBinding.GetObject()
+			o.Print(&shallowInfoCopy)
+
+		// v1
+		case *rbacv1.Role:
+			reconcileOptions := reconciliationv1.ReconcileRoleOptions{
+				Confirm:                true,
+				RemoveExtraPermissions: false,
+				Role: reconciliationv1.RoleRuleOwner{Role: t},
+				Client: reconciliationv1.RoleModifier{
+					NamespaceClient: o.NamespaceClient,
+					Client:          o.RBACClientV1,
+				},
+			}
+			result, err := reconcileOptions.Run()
+			if err != nil {
+				return err
+			}
+			shallowInfoCopy.Object = result.Role.GetObject()
+			o.Print(&shallowInfoCopy)
+
+		case *rbacv1.ClusterRole:
+			reconcileOptions := reconciliationv1.ReconcileRoleOptions{
+				Confirm:                true,
+				RemoveExtraPermissions: false,
+				Role: reconciliationv1.ClusterRoleRuleOwner{ClusterRole: t},
+				Client: reconciliationv1.ClusterRoleModifier{
+					Client: o.RBACClientV1.ClusterRoles(),
+				},
+			}
+			result, err := reconcileOptions.Run()
+			if err != nil {
+				return err
+			}
+			shallowInfoCopy.Object = result.Role.GetObject()
+			o.Print(&shallowInfoCopy)
+
+		case *rbacv1.RoleBinding:
+			reconcileOptions := reconciliationv1.ReconcileRoleBindingOptions{
+				Confirm:             true,
+				RemoveExtraSubjects: false,
+				RoleBinding:         reconciliationv1.RoleBindingAdapter{RoleBinding: t},
+				Client: reconciliationv1.RoleBindingClientAdapter{
+					Client:          o.RBACClientV1,
+					NamespaceClient: o.NamespaceClient,
+				},
+			}
+			result, err := reconcileOptions.Run()
+			if err != nil {
+				return err
+			}
+			shallowInfoCopy.Object = result.RoleBinding.GetObject()
+			o.Print(&shallowInfoCopy)
+
+		case *rbacv1.ClusterRoleBinding:
+			reconcileOptions := reconciliationv1.ReconcileRoleBindingOptions{
+				Confirm:             true,
+				RemoveExtraSubjects: false,
+				RoleBinding:         reconciliationv1.ClusterRoleBindingAdapter{ClusterRoleBinding: t},
+				Client: reconciliationv1.ClusterRoleBindingClientAdapter{
+					Client: o.RBACClientV1.ClusterRoleBindings(),
 				},
 			}
 			result, err := reconcileOptions.Run()
