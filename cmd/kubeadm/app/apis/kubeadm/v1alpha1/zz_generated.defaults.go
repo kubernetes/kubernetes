@@ -23,6 +23,7 @@ package v1alpha1
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	kubeletconfig_v1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeproxyconfig_v1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
@@ -36,6 +37,9 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_MasterConfiguration(in *MasterConfiguration) {
 	SetDefaults_MasterConfiguration(in)
+	if in.KubeProxy.Config != nil {
+		kubeproxyconfig_v1alpha1.SetDefaults_KubeProxyConfiguration(in.KubeProxy.Config)
+	}
 	if in.KubeletConfiguration.BaseConfig != nil {
 		kubeletconfig_v1alpha1.SetDefaults_KubeletConfiguration(in.KubeletConfiguration.BaseConfig)
 	}

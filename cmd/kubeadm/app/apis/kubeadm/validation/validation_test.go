@@ -18,11 +18,15 @@ package validation
 
 import (
 	"testing"
+	"time"
 
 	"github.com/spf13/pflag"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	"k8s.io/kubernetes/pkg/util/pointer"
 )
 
 func TestValidateTokenDiscovery(t *testing.T) {
@@ -330,6 +334,17 @@ func TestValidateMasterConfiguration(t *testing.T) {
 				API: kubeadm.API{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
+				},
+				KubeProxy: kubeadm.KubeProxy{
+					Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
+						Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
+							Max:        pointer.Int32Ptr(2),
+							MaxPerCore: pointer.Int32Ptr(1),
+							Min:        pointer.Int32Ptr(1),
+							TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+							TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+						},
+					},
 				},
 				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{

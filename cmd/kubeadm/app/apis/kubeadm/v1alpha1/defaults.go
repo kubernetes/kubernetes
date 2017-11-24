@@ -23,7 +23,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeproxyscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
+	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
@@ -57,6 +60,10 @@ const (
 	DefaultEtcdCertDir = "/etc/kubernetes/pki/etcd"
 	// DefaultEtcdClusterServiceName is the default name of the service backing the etcd cluster
 	DefaultEtcdClusterServiceName = "etcd-cluster"
+	// DefaultProxyBindAddressv4 is the default bind address when the advertise address is v4
+	DefaultProxyBindAddressv4 = "0.0.0.0"
+	// DefaultProxyBindAddressv6 is the default bind address when the advertise address is v6
+	DefaultProxyBindAddressv6 = "::"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -105,6 +112,24 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 
 	SetDefaultsEtcdSelfHosted(obj)
 	SetDefaults_KubeletConfiguration(obj)
+	SetDefaults_ProxyConfiguration(obj)
+}
+
+// SetDefaults_ProxyConfiguration assigns default values for the Proxy
+func SetDefaults_ProxyConfiguration(obj *MasterConfiguration) {
+
+	if obj.KubeProxy.Config == nil {
+		obj.KubeProxy.Config = &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
+	}
+	if obj.KubeProxy.Config.ClusterCIDR == "" && obj.Networking.PodSubnet != "" {
+		obj.KubeProxy.Config.ClusterCIDR = obj.Networking.PodSubnet
+	}
+
+	if features.Enabled(obj.FeatureGates, features.SupportIPVSProxyMode) {
+		obj.KubeProxy.Config.FeatureGates = "true"
+		obj.KubeProxy.Config.Mode = "ipvs"
+	}
+	kubeproxyscheme.Scheme.Default(obj.KubeProxy.Config)
 }
 
 // SetDefaults_NodeConfiguration assigns default values to a regular node
