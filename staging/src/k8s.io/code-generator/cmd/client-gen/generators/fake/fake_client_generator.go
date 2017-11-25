@@ -116,7 +116,7 @@ func PackageForClientset(customArgs *clientgenargs.CustomArgs, fakeClientsetPack
 					DefaultGen: generator.DefaultGen{
 						OptionalName: "register",
 					},
-					InputPackages: customArgs.GroupVersionToInputPath,
+					InputPackages: customArgs.GroupVersionPackages(),
 					OutputPackage: fakeClientsetPackage,
 					Groups:        customArgs.Groups,
 					GroupGoNames:  groupGoNames,

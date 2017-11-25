@@ -75,27 +75,27 @@ func (a sortableSliceOfVersions) Less(i, j int) bool {
 // Determine the default version among versions. If a user calls a group client
 // without specifying the version (e.g., c.Core(), instead of c.CoreV1()), the
 // default version will be returned.
-func defaultVersion(versions []Version) Version {
+func defaultVersion(versions []PackageVersion) Version {
 	var versionStrings []string
 	for _, version := range versions {
-		versionStrings = append(versionStrings, string(version))
+		versionStrings = append(versionStrings, version.Version.String())
 	}
 	sort.Sort(sortableSliceOfVersions(versionStrings))
 	return Version(versionStrings[len(versionStrings)-1])
 }
 
-// ToGroupVersionPackages is a helper function used by generators for groups.
-func ToGroupVersionPackages(groups []GroupVersions, groupGoNames map[GroupVersion]string) []GroupVersionPackage {
-	var groupVersionPackages []GroupVersionPackage
+// ToGroupVersionInfo is a helper function used by generators for groups.
+func ToGroupVersionInfo(groups []GroupVersions, groupGoNames map[GroupVersion]string) []GroupVersionInfo {
+	var groupVersionPackages []GroupVersionInfo
 	for _, group := range groups {
 		defaultVersion := defaultVersion(group.Versions)
 		for _, version := range group.Versions {
-			groupGoName := groupGoNames[GroupVersion{Group: group.Group, Version: version}]
-			groupVersionPackages = append(groupVersionPackages, GroupVersionPackage{
+			groupGoName := groupGoNames[GroupVersion{Group: group.Group, Version: version.Version}]
+			groupVersionPackages = append(groupVersionPackages, GroupVersionInfo{
 				Group:                Group(namer.IC(group.Group.NonEmpty())),
-				Version:              Version(namer.IC(version.String())),
-				PackageAlias:         strings.ToLower(groupGoName + version.NonEmpty()),
-				IsDefaultVersion:     version == defaultVersion && version != "",
+				Version:              Version(namer.IC(version.Version.String())),
+				PackageAlias:         strings.ToLower(groupGoName + version.Version.NonEmpty()),
+				IsDefaultVersion:     version.Version == defaultVersion && version.Version != "",
 				GroupGoName:          groupGoName,
 				LowerCaseGroupGoName: namer.IL(groupGoName),
 			})

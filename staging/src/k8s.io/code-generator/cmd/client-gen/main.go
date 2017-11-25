@@ -19,7 +19,6 @@ package main
 
 import (
 	"flag"
-	"path"
 	"path/filepath"
 
 	"github.com/golang/glog"
@@ -53,12 +52,11 @@ func main() {
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
-	// Prefix with InputBaseDir and add client dirs as input dirs.
-	for gv, pth := range customArgs.GroupVersionToInputPath {
-		customArgs.GroupVersionToInputPath[gv] = path.Join(customArgs.InputBasePath, pth)
-	}
-	for _, pkg := range customArgs.GroupVersionToInputPath {
-		arguments.InputDirs = append(arguments.InputDirs, pkg)
+	// add group version package as input dirs for gengo
+	for _, pkg := range customArgs.Groups {
+		for _, v := range pkg.Versions {
+			arguments.InputDirs = append(arguments.InputDirs, v.Package)
+		}
 	}
 
 	if err := arguments.Execute(
