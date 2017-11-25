@@ -22,13 +22,13 @@ import (
 	"net/http"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
@@ -54,9 +54,9 @@ var _ = runtime.Encoder(customVersionCodec{})
 
 func TestCreateJobFromCronJob(t *testing.T) {
 	jobSpec := batch.JobSpec{
-		Template: api.PodTemplateSpec{
-			Spec: api.PodSpec{
-				Containers: []api.Container{
+		Template: core.PodTemplateSpec{
+			Spec: core.PodSpec{
+				Containers: []core.Container{
 					{Image: "fake"},
 				},
 			},
@@ -65,7 +65,7 @@ func TestCreateJobFromCronJob(t *testing.T) {
 
 	cjmiObject := &batch.CronJobManualRequest{
 		CreatedJob: batch.Job{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-cronjob-manual-1234567890",
 			},
 			Spec: jobSpec,
@@ -73,11 +73,11 @@ func TestCreateJobFromCronJob(t *testing.T) {
 	}
 
 	cronJobObject := &batch.CronJob{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-cronjob",
 		},
-		TypeMeta: v1.TypeMeta{
-			APIVersion: "v2alpha1",
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1beta1",
 			Kind:       "batch",
 		},
 		Spec: batch.CronJobSpec{
@@ -93,27 +93,26 @@ func TestCreateJobFromCronJob(t *testing.T) {
 	tf.Printer = &testPrinter{}
 	tf.ClientConfig = &restclient.Config{
 		ContentConfig: restclient.ContentConfig{
-			GroupVersion: &schema.GroupVersion{Group: "batch", Version: "v2alpha1"},
+			GroupVersion: &schema.GroupVersion{Group: "batch", Version: "v1beta1"},
 		},
 	}
 
 	alphaBatchCodec := &customVersionCodec{
 		ns:           ns,
-		groupVersion: &schema.GroupVersion{Group: "batch", Version: "v2alpha1"},
+		groupVersion: &schema.GroupVersion{Group: "batch", Version: "v1beta1"},
 	}
 
 	tf.Namespace = "test"
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/apis/batch/v2alpha1/namespaces/test/cronjobs/test-cronjob" && m == "GET":
+			case p == "/apis/batch/v1beta1/namespaces/test/cronjobs/test-cronjob" && m == "GET":
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(alphaBatchCodec, cronJobObject)}, nil
-			case p == "/apis/batch/v2alpha1/namespaces/test/cronjobs/test-cronjob/instantiate" && m == "POST":
+			case p == "/apis/batch/v1beta1/namespaces/test/cronjobs/test-cronjob/instantiate" && m == "POST":
 				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(alphaBatchCodec, cjmiObject)}, nil
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("unexpected request for p=%s and m=%s: %#v\n%#v", p, m, req.URL, req)
 				return nil, nil
 			}
 		}),

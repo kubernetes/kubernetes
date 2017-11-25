@@ -230,6 +230,7 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 		stub:             `{"metadata": {"name": "cjv1beta1"}, "spec": {"jobTemplate": {"spec": {"template": {"metadata": {"labels": {"controller-uid": "uid0"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container0"}], "dnsPolicy": "ClusterFirst", "restartPolicy": "Never"}}}}, "schedule": "* * * * *"}}`,
 		expectedEtcdPath: "/registry/cronjobs/etcdstoragepathtestnamespace/cjv1beta1",
 	},
+	// TODO - add for cronjobmanualrequests
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/batch/v2alpha1
@@ -238,6 +239,7 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 		expectedEtcdPath: "/registry/cronjobs/etcdstoragepathtestnamespace/cjv2alpha1",
 		expectedGVK:      gvkP("batch", "v1beta1", "CronJob"),
 	},
+	// TODO - add for cronjobmanualrequests
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/certificates/v1beta1
