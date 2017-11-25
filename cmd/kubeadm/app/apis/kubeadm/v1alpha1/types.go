@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -29,6 +30,7 @@ type MasterConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
 	API                  API                  `json:"api"`
+	KubeProxy            KubeProxy            `json:"kubeProxy"`
 	Etcd                 Etcd                 `json:"etcd"`
 	KubeletConfiguration KubeletConfiguration `json:"kubeletConfiguration"`
 	Networking           Networking           `json:"networking"`
@@ -154,4 +156,9 @@ type HostPathMount struct {
 	Name      string `json:"name"`
 	HostPath  string `json:"hostPath"`
 	MountPath string `json:"mountPath"`
+}
+
+// KubeProxy contains elements describing the proxy configuration
+type KubeProxy struct {
+	Config *kubeproxyconfigv1alpha1.KubeProxyConfiguration `json:"config,omitempty"`
 }

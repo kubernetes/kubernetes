@@ -36,11 +36,12 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	v1node "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/node/util"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
 
 // cloudCIDRAllocator allocates node CIDRs according to IP address aliases
@@ -103,6 +104,12 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 		AddFunc: util.CreateAddNodeHandler(ca.AllocateOrOccupyCIDR),
 		UpdateFunc: util.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
 			if newNode.Spec.PodCIDR == "" {
+				return ca.AllocateOrOccupyCIDR(newNode)
+			}
+			// Even if PodCIDR is assigned, but NetworkUnavailable condition is
+			// set to true, we need to process the node to set the condition.
+			_, cond := v1node.GetNodeCondition(&newNode.Status, v1.NodeNetworkUnavailable)
+			if cond == nil || cond.Status != v1.ConditionFalse {
 				return ca.AllocateOrOccupyCIDR(newNode)
 			}
 			return nil
@@ -201,7 +208,6 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 	podCIDR := cidr.String()
 
 	for rep := 0; rep < cidrUpdateRetries; rep++ {
-		// TODO: change it to using PATCH instead of full Node updates.
 		node, err = ca.nodeLister.Get(nodeName)
 		if err != nil {
 			glog.Errorf("Failed while getting node %v to retry updating Node.Spec.PodCIDR: %v", nodeName, err)
@@ -210,7 +216,8 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 		if node.Spec.PodCIDR != "" {
 			if node.Spec.PodCIDR == podCIDR {
 				glog.V(4).Infof("Node %v already has allocated CIDR %v. It matches the proposed one.", node.Name, podCIDR)
-				return nil
+				// We don't return to set the NetworkUnavailable condition if needed.
+				break
 			}
 			glog.Errorf("PodCIDR being reassigned! Node %v spec has %v, but cloud provider has assigned %v",
 				node.Name, node.Spec.PodCIDR, podCIDR)
@@ -220,8 +227,7 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 			//
 			// See https://github.com/kubernetes/kubernetes/pull/42147#discussion_r103357248
 		}
-		node.Spec.PodCIDR = podCIDR
-		if _, err = ca.client.CoreV1().Nodes().Update(node); err == nil {
+		if err = utilnode.PatchNodeCIDR(ca.client, types.NodeName(node.Name), podCIDR); err == nil {
 			glog.Infof("Set node %v PodCIDR to %v", node.Name, podCIDR)
 			break
 		}
@@ -233,7 +239,7 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 		return err
 	}
 
-	err = nodeutil.SetNodeCondition(ca.client, types.NodeName(node.Name), v1.NodeCondition{
+	err = utilnode.SetNodeCondition(ca.client, types.NodeName(node.Name), v1.NodeCondition{
 		Type:               v1.NodeNetworkUnavailable,
 		Status:             v1.ConditionFalse,
 		Reason:             "RouteCreated",

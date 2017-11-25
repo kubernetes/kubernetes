@@ -30,12 +30,6 @@ import (
 	// Volume plugins
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/photon"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/aws_ebs"
 	"k8s.io/kubernetes/pkg/volume/azure_dd"
@@ -165,22 +159,12 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componen
 	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
 
-	if cloud != nil {
-		switch {
-		case aws.ProviderName == cloud.ProviderName():
-			allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
-		case gce.ProviderName == cloud.ProviderName():
-			allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
-		case openstack.ProviderName == cloud.ProviderName():
-			allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
-		case vsphere.ProviderName == cloud.ProviderName():
-			allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
-		case azure.CloudProviderName == cloud.ProviderName():
-			allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
-		case photon.ProviderName == cloud.ProviderName():
-			allPlugins = append(allPlugins, photon_pd.ProbeVolumePlugins()...)
-		}
-	}
+	allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, photon_pd.ProbeVolumePlugins()...)
 
 	return allPlugins
 }

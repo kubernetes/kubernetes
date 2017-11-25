@@ -39,9 +39,6 @@ const (
 	// StoreCertsInSecrets is alpha in v1.8
 	StoreCertsInSecrets = "StoreCertsInSecrets"
 
-	// SupportIPVSProxyMode is alpha in v1.8
-	SupportIPVSProxyMode = "SupportIPVSProxyMode"
-
 	// DynamicKubeletConfig is alpha in v1.9
 	DynamicKubeletConfig = "DynamicKubeletConfig"
 )
@@ -53,7 +50,6 @@ var InitFeatureGates = FeatureList{
 	SelfHosting:          {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
 	StoreCertsInSecrets:  {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
 	HighAvailability:     {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
-	SupportIPVSProxyMode: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
 	CoreDNS:              {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
 	DynamicKubeletConfig: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
 }
