@@ -539,7 +539,7 @@ func BuildAuthenticator(s *options.ServerRunOptions, storageFactory serverstorag
 		glog.Errorf("Failed to setup bootstrap token authenticator because the loopback clientset was not setup properly.")
 	} else {
 		authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
-			sharedInformers.Core().InternalVersion().Secrets().Lister().Secrets(v1.NamespaceSystem),
+			sharedInformers.Core().Internalversion().Secrets().Lister().Secrets(v1.NamespaceSystem),
 		)
 	}
 	return authenticatorConfig.New()

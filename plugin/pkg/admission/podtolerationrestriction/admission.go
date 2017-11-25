@@ -203,7 +203,7 @@ func (a *podTolerationsPlugin) SetInternalKubeClientSet(client clientset.Interfa
 }
 
 func (p *podTolerationsPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	namespaceInformer := f.Core().InternalVersion().Namespaces()
+	namespaceInformer := f.Core().Internalversion().Namespaces()
 	p.namespaceLister = namespaceInformer.Lister()
 	p.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 

@@ -208,7 +208,7 @@ func (a *podNodeSelector) SetInternalKubeClientSet(client internalclientset.Inte
 }
 
 func (p *podNodeSelector) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	namespaceInformer := f.Core().InternalVersion().Namespaces()
+	namespaceInformer := f.Core().Internalversion().Namespaces()
 	p.namespaceLister = namespaceInformer.Lister()
 	p.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 }

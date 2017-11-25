@@ -246,7 +246,7 @@ func TestPodAdmission(t *testing.T) {
 			namespace.Annotations[NSWLTolerations] = string(tolerationStr)
 		}
 
-		informerFactory.Core().InternalVersion().Namespaces().Informer().GetStore().Update(namespace)
+		informerFactory.Core().Internalversion().Namespaces().Informer().GetStore().Update(namespace)
 
 		handler.pluginConfig = &pluginapi.Configuration{Default: test.defaultClusterTolerations, Whitelist: test.clusterWhitelist}
 		pod := test.pod
@@ -340,7 +340,7 @@ func TestIgnoreUpdatingInitializedPod(t *testing.T) {
 		},
 	}
 	namespace.Annotations = map[string]string{NSDefaultTolerations: string(tolerationsStr)}
-	err = informerFactory.Core().InternalVersion().Namespaces().Informer().GetStore().Update(namespace)
+	err = informerFactory.Core().Internalversion().Namespaces().Informer().GetStore().Update(namespace)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -94,7 +94,7 @@ func newPlugin(strategyFactory psp.StrategyFactory, failOnNoPolicies bool) *PodS
 }
 
 func (a *PodSecurityPolicyPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	podSecurityPolicyInformer := f.Extensions().InternalVersion().PodSecurityPolicies()
+	podSecurityPolicyInformer := f.Extensions().Internalversion().PodSecurityPolicies()
 	a.lister = podSecurityPolicyInformer.Lister()
 	a.SetReadyFunc(podSecurityPolicyInformer.Informer().HasSynced)
 }

@@ -60,9 +60,9 @@ func newPlugin() *persistentVolumeClaimResize {
 }
 
 func (pvcr *persistentVolumeClaimResize) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	pvcInformer := f.Core().InternalVersion().PersistentVolumes()
+	pvcInformer := f.Core().Internalversion().PersistentVolumes()
 	pvcr.pvLister = pvcInformer.Lister()
-	scInformer := f.Storage().InternalVersion().StorageClasses()
+	scInformer := f.Storage().Internalversion().StorageClasses()
 	pvcr.scLister = scInformer.Lister()
 	pvcr.SetReadyFunc(func() bool {
 		return pvcInformer.Informer().HasSynced() && scInformer.Informer().HasSynced()

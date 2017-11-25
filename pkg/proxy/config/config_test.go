@@ -233,7 +233,7 @@ func TestNewServiceAddedAndNotified(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewServiceConfig(sharedInformers.Core().InternalVersion().Services(), time.Minute)
+	config := NewServiceConfig(sharedInformers.Core().Internalversion().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
 	config.RegisterEventHandler(handler)
 	go sharedInformers.Start(stopCh)
@@ -257,7 +257,7 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewServiceConfig(sharedInformers.Core().InternalVersion().Services(), time.Minute)
+	config := NewServiceConfig(sharedInformers.Core().Internalversion().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
 	config.RegisterEventHandler(handler)
 	go sharedInformers.Start(stopCh)
@@ -293,7 +293,7 @@ func TestNewServicesMultipleHandlersAddedAndNotified(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewServiceConfig(sharedInformers.Core().InternalVersion().Services(), time.Minute)
+	config := NewServiceConfig(sharedInformers.Core().Internalversion().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
 	handler2 := NewServiceHandlerMock()
 	config.RegisterEventHandler(handler)
@@ -327,7 +327,7 @@ func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewEndpointsConfig(sharedInformers.Core().InternalVersion().Endpoints(), time.Minute)
+	config := NewEndpointsConfig(sharedInformers.Core().Internalversion().Endpoints(), time.Minute)
 	handler := NewEndpointsHandlerMock()
 	handler2 := NewEndpointsHandlerMock()
 	config.RegisterEventHandler(handler)
@@ -367,7 +367,7 @@ func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewEndpointsConfig(sharedInformers.Core().InternalVersion().Endpoints(), time.Minute)
+	config := NewEndpointsConfig(sharedInformers.Core().Internalversion().Endpoints(), time.Minute)
 	handler := NewEndpointsHandlerMock()
 	handler2 := NewEndpointsHandlerMock()
 	config.RegisterEventHandler(handler)

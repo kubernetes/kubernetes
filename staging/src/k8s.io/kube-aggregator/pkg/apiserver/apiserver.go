@@ -176,7 +176,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		proxyTransport:   c.ExtraConfig.ProxyTransport,
 		proxyHandlers:    map[string]*proxyHandler{},
 		handledGroups:    sets.String{},
-		lister:           informerFactory.Apiregistration().InternalVersion().APIServices().Lister(),
+		lister:           informerFactory.Apiregistration().Internalversion().APIServices().Lister(),
 		APIRegistrationInformers: informerFactory,
 		serviceResolver:          c.ExtraConfig.ServiceResolver,
 	}
@@ -201,9 +201,9 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
 
-	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().InternalVersion().APIServices(), c.GenericConfig.SharedInformerFactory.Core().V1().Services(), s)
+	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().Internalversion().APIServices(), c.GenericConfig.SharedInformerFactory.Core().V1().Services(), s)
 	availableController := statuscontrollers.NewAvailableConditionController(
-		informerFactory.Apiregistration().InternalVersion().APIServices(),
+		informerFactory.Apiregistration().Internalversion().APIServices(),
 		c.GenericConfig.SharedInformerFactory.Core().V1().Services(),
 		c.GenericConfig.SharedInformerFactory.Core().V1().Endpoints(),
 		apiregistrationClient.Apiregistration(),

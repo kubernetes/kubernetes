@@ -807,9 +807,9 @@ func TestAdmitEmptyPodNamespace(t *testing.T) {
 
 func admitPod(pod *api.Pod, pip *settings.PodPreset) error {
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	store := informerFactory.Settings().InternalVersion().PodPresets().Informer().GetStore()
+	store := informerFactory.Settings().Internalversion().PodPresets().Informer().GetStore()
 	store.Add(pip)
-	plugin := NewTestAdmission(informerFactory.Settings().InternalVersion().PodPresets().Lister())
+	plugin := NewTestAdmission(informerFactory.Settings().Internalversion().PodPresets().Lister())
 	attrs := kadmission.NewAttributesRecord(
 		pod,
 		nil,
