@@ -244,9 +244,7 @@ func (op *updateOp) validateRange(ctx context.Context, sync *NodeSync, node *v1.
 // alias.
 func (op *updateOp) updateNodeFromAlias(ctx context.Context, sync *NodeSync, node *v1.Node, aliasRange *net.IPNet) error {
 	if sync.mode != SyncFromCloud {
-		sync.kubeAPI.EmitNodeWarningEvent(node.Name, InvalidModeEvent,
-			"Cannot sync from cloud in mode %q", sync.mode)
-		return fmt.Errorf("cannot sync from cloud in mode %q", sync.mode)
+		glog.Warningf("Detect mode %q while expect to sync from cloud", sync.mode)
 	}
 
 	glog.V(2).Infof("Updating node spec with alias range, node.PodCIDR = %v", aliasRange)
@@ -276,9 +274,7 @@ func (op *updateOp) updateNodeFromAlias(ctx context.Context, sync *NodeSync, nod
 // updateAliasFromNode updates the cloud alias given the node allocation.
 func (op *updateOp) updateAliasFromNode(ctx context.Context, sync *NodeSync, node *v1.Node) error {
 	if sync.mode != SyncFromCluster {
-		sync.kubeAPI.EmitNodeWarningEvent(
-			node.Name, InvalidModeEvent, "Cannot sync to cloud in mode %q", sync.mode)
-		return fmt.Errorf("cannot sync to cloud in mode %q", sync.mode)
+		glog.Warningf("Detect mode %q while expect to sync from cluster", sync.mode)
 	}
 
 	_, aliasRange, err := net.ParseCIDR(node.Spec.PodCIDR)
