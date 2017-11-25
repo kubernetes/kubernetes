@@ -64,8 +64,8 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 			fakeGroupClientPackage := filepath.Join(groupClientPackage, "fake")
 
 			groupAlias := strings.ToLower(g.groupGoNames[clientgentypes.GroupVersion{group.Group, version}])
-			imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", groupAlias, version.NonEmpty(), groupClientPackage)))
-			imports = append(imports, strings.ToLower(fmt.Sprintf("fake%s%s \"%s\"", groupAlias, version.NonEmpty(), fakeGroupClientPackage)))
+			imports = append(imports, fmt.Sprintf("%s%s \"%s\"", groupAlias, version.NonEmpty(), groupClientPackage))
+			imports = append(imports, fmt.Sprintf("fake%s%s \"%s\"", groupAlias, version.NonEmpty(), fakeGroupClientPackage))
 		}
 	}
 	// the package that has the clientset Interface

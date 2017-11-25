@@ -98,7 +98,7 @@ func (a *QuotaAdmission) SetInternalKubeClientSet(client internalclientset.Inter
 }
 
 func (a *QuotaAdmission) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	a.quotaAccessor.lister = f.Core().InternalVersion().ResourceQuotas().Lister()
+	a.quotaAccessor.lister = f.Core().Internalversion().ResourceQuotas().Lister()
 }
 
 func (a *QuotaAdmission) SetQuotaConfiguration(c quota.Configuration) {

@@ -54,7 +54,7 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	serviceConfig := NewServiceConfig(sharedInformers.Core().InternalVersion().Services(), time.Minute)
+	serviceConfig := NewServiceConfig(sharedInformers.Core().Internalversion().Services(), time.Minute)
 	serviceConfig.RegisterEventHandler(handler)
 	go sharedInformers.Start(stopCh)
 	go serviceConfig.Run(stopCh)
@@ -122,7 +122,7 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	endpointsConfig := NewEndpointsConfig(sharedInformers.Core().InternalVersion().Endpoints(), time.Minute)
+	endpointsConfig := NewEndpointsConfig(sharedInformers.Core().Internalversion().Endpoints(), time.Minute)
 	endpointsConfig.RegisterEventHandler(handler)
 	go sharedInformers.Start(stopCh)
 	go endpointsConfig.Run(stopCh)
@@ -198,8 +198,8 @@ func TestInitialSync(t *testing.T) {
 	client := fake.NewSimpleClientset(svc1, svc2, eps2, eps1)
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 
-	svcConfig := NewServiceConfig(sharedInformers.Core().InternalVersion().Services(), 0)
-	epsConfig := NewEndpointsConfig(sharedInformers.Core().InternalVersion().Endpoints(), 0)
+	svcConfig := NewServiceConfig(sharedInformers.Core().Internalversion().Services(), 0)
+	epsConfig := NewEndpointsConfig(sharedInformers.Core().Internalversion().Endpoints(), 0)
 	svcHandler := newSvcHandler(t, []*api.Service{svc2, svc1}, wg.Done)
 	svcConfig.RegisterEventHandler(svcHandler)
 	epsHandler := newEpsHandler(t, []*api.Endpoints{eps2, eps1}, wg.Done)

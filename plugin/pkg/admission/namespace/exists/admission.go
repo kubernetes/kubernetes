@@ -97,7 +97,7 @@ func (e *Exists) SetInternalKubeClientSet(client internalclientset.Interface) {
 
 // SetInternalKubeInformerFactory implements the WantsInternalKubeInformerFactory interface.
 func (e *Exists) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	namespaceInformer := f.Core().InternalVersion().Namespaces()
+	namespaceInformer := f.Core().Internalversion().Namespaces()
 	e.namespaceLister = namespaceInformer.Lister()
 	e.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 }

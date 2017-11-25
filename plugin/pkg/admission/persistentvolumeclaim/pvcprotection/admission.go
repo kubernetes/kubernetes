@@ -62,7 +62,7 @@ func newPlugin() *pvcProtectionPlugin {
 }
 
 func (c *pvcProtectionPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	informer := f.Core().InternalVersion().PersistentVolumeClaims()
+	informer := f.Core().Internalversion().PersistentVolumeClaims()
 	c.lister = informer.Lister()
 	c.SetReadyFunc(informer.Informer().HasSynced)
 }

@@ -37,7 +37,7 @@ func addPriorityClasses(ctrl *PriorityPlugin, priorityClasses []*scheduling.Prio
 	ctrl.SetInternalKubeInformerFactory(informerFactory)
 	// First add the existing classes to the cache.
 	for _, c := range priorityClasses {
-		informerFactory.Scheduling().InternalVersion().PriorityClasses().Informer().GetStore().Add(c)
+		informerFactory.Scheduling().Internalversion().PriorityClasses().Informer().GetStore().Add(c)
 	}
 }
 

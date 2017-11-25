@@ -108,10 +108,10 @@ func (a *serviceAccount) SetInternalKubeClientSet(cl internalclientset.Interface
 }
 
 func (a *serviceAccount) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	serviceAccountInformer := f.Core().InternalVersion().ServiceAccounts()
+	serviceAccountInformer := f.Core().Internalversion().ServiceAccounts()
 	a.serviceAccountLister = serviceAccountInformer.Lister()
 
-	secretInformer := f.Core().InternalVersion().Secrets()
+	secretInformer := f.Core().Internalversion().Secrets()
 	a.secretLister = secretInformer.Lister()
 
 	a.SetReadyFunc(func() bool {

@@ -94,7 +94,7 @@ func (p *PriorityPlugin) SetInternalKubeClientSet(client internalclientset.Inter
 
 // SetInternalKubeInformerFactory implements the WantsInternalKubeInformerFactory interface.
 func (p *PriorityPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	priorityInformer := f.Scheduling().InternalVersion().PriorityClasses()
+	priorityInformer := f.Scheduling().Internalversion().PriorityClasses()
 	p.lister = priorityInformer.Lister()
 	p.SetReadyFunc(priorityInformer.Informer().HasSynced)
 }

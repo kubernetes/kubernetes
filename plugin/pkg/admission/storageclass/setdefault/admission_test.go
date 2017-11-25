@@ -197,7 +197,7 @@ func TestAdmission(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 		ctrl.SetInternalKubeInformerFactory(informerFactory)
 		for _, c := range test.classes {
-			informerFactory.Storage().InternalVersion().StorageClasses().Informer().GetStore().Add(c)
+			informerFactory.Storage().Internalversion().StorageClasses().Informer().GetStore().Add(c)
 		}
 		attrs := admission.NewAttributesRecord(
 			claim, // new object

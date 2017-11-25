@@ -60,7 +60,7 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 		for _, version := range group.Versions {
 			typedClientPath := filepath.Join(g.clientsetPackage, "typed", group.PackageName, version.NonEmpty())
 			groupAlias := strings.ToLower(g.groupGoNames[clientgentypes.GroupVersion{group.Group, version}])
-			imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", groupAlias, version.NonEmpty(), typedClientPath)))
+			imports = append(imports, fmt.Sprintf("%s%s \"%s\"", groupAlias, version.NonEmpty(), typedClientPath))
 		}
 	}
 	return

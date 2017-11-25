@@ -85,7 +85,7 @@ func (a *podPresetPlugin) SetInternalKubeClientSet(client internalclientset.Inte
 }
 
 func (a *podPresetPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	podPresetInformer := f.Settings().InternalVersion().PodPresets()
+	podPresetInformer := f.Settings().Internalversion().PodPresets()
 	a.lister = podPresetInformer.Lister()
 	a.SetReadyFunc(podPresetInformer.Informer().HasSynced)
 }

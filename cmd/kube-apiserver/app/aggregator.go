@@ -101,10 +101,10 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 	if err != nil {
 		return nil, err
 	}
-	autoRegistrationController := autoregister.NewAutoRegisterController(aggregatorServer.APIRegistrationInformers.Apiregistration().InternalVersion().APIServices(), apiRegistrationClient)
+	autoRegistrationController := autoregister.NewAutoRegisterController(aggregatorServer.APIRegistrationInformers.Apiregistration().Internalversion().APIServices(), apiRegistrationClient)
 	apiServices := apiServicesToRegister(delegateAPIServer, autoRegistrationController)
 	crdRegistrationController := crdregistration.NewAutoRegistrationController(
-		apiExtensionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions(),
+		apiExtensionInformers.Apiextensions().Internalversion().CustomResourceDefinitions(),
 		autoRegistrationController)
 
 	aggregatorServer.GenericAPIServer.AddPostStartHook("kube-apiserver-autoregistration", func(context genericapiserver.PostStartHookContext) error {
@@ -122,7 +122,7 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 		makeAPIServiceAvailableHealthzCheck(
 			"autoregister-completion",
 			apiServices,
-			aggregatorServer.APIRegistrationInformers.Apiregistration().InternalVersion().APIServices(),
+			aggregatorServer.APIRegistrationInformers.Apiregistration().Internalversion().APIServices(),
 		),
 	)
 

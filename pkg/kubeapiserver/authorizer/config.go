@@ -77,8 +77,8 @@ func (config AuthorizationConfig) New() (authorizer.Authorizer, authorizer.RuleR
 			graph := node.NewGraph()
 			node.AddGraphEventHandlers(
 				graph,
-				config.InformerFactory.Core().InternalVersion().Pods(),
-				config.InformerFactory.Core().InternalVersion().PersistentVolumes(),
+				config.InformerFactory.Core().Internalversion().Pods(),
+				config.InformerFactory.Core().Internalversion().PersistentVolumes(),
 			)
 			nodeAuthorizer := node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
 			authorizers = append(authorizers, nodeAuthorizer)
@@ -115,10 +115,10 @@ func (config AuthorizationConfig) New() (authorizer.Authorizer, authorizer.RuleR
 			ruleResolvers = append(ruleResolvers, webhookAuthorizer)
 		case modes.ModeRBAC:
 			rbacAuthorizer := rbac.New(
-				&rbac.RoleGetter{Lister: config.InformerFactory.Rbac().InternalVersion().Roles().Lister()},
-				&rbac.RoleBindingLister{Lister: config.InformerFactory.Rbac().InternalVersion().RoleBindings().Lister()},
-				&rbac.ClusterRoleGetter{Lister: config.InformerFactory.Rbac().InternalVersion().ClusterRoles().Lister()},
-				&rbac.ClusterRoleBindingLister{Lister: config.InformerFactory.Rbac().InternalVersion().ClusterRoleBindings().Lister()},
+				&rbac.RoleGetter{Lister: config.InformerFactory.Rbac().Internalversion().Roles().Lister()},
+				&rbac.RoleBindingLister{Lister: config.InformerFactory.Rbac().Internalversion().RoleBindings().Lister()},
+				&rbac.ClusterRoleGetter{Lister: config.InformerFactory.Rbac().Internalversion().ClusterRoles().Lister()},
+				&rbac.ClusterRoleBindingLister{Lister: config.InformerFactory.Rbac().Internalversion().ClusterRoleBindings().Lister()},
 			)
 			authorizers = append(authorizers, rbacAuthorizer)
 			ruleResolvers = append(ruleResolvers, rbacAuthorizer)

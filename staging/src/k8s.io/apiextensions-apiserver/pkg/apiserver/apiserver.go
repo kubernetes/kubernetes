@@ -177,8 +177,8 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		versionDiscoveryHandler,
 		groupDiscoveryHandler,
 		s.GenericAPIServer.RequestContextMapper(),
-		s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions().Lister(),
-		s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(),
+		s.Informers.Apiextensions().Internalversion().CustomResourceDefinitions().Lister(),
+		s.Informers.Apiextensions().Internalversion().CustomResourceDefinitions(),
 		delegateHandler,
 		c.ExtraConfig.CRDRESTOptionsGetter,
 		c.GenericConfig.AdmissionControl,
@@ -191,10 +191,10 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return s, nil
 	}
 
-	crdController := NewDiscoveryController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(), versionDiscoveryHandler, groupDiscoveryHandler, c.GenericConfig.RequestContextMapper)
-	namingController := status.NewNamingConditionController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(), crdClient.Apiextensions())
+	crdController := NewDiscoveryController(s.Informers.Apiextensions().Internalversion().CustomResourceDefinitions(), versionDiscoveryHandler, groupDiscoveryHandler, c.GenericConfig.RequestContextMapper)
+	namingController := status.NewNamingConditionController(s.Informers.Apiextensions().Internalversion().CustomResourceDefinitions(), crdClient.Apiextensions())
 	finalizingController := finalizer.NewCRDFinalizer(
-		s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(),
+		s.Informers.Apiextensions().Internalversion().CustomResourceDefinitions(),
 		crdClient.Apiextensions(),
 		crdHandler,
 	)

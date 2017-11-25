@@ -74,7 +74,7 @@ type liveLookupEntry struct {
 }
 
 func (l *LimitRanger) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	limitRangeInformer := f.Core().InternalVersion().LimitRanges()
+	limitRangeInformer := f.Core().Internalversion().LimitRanges()
 	l.SetReadyFunc(limitRangeInformer.Informer().HasSynced)
 	l.lister = limitRangeInformer.Lister()
 }

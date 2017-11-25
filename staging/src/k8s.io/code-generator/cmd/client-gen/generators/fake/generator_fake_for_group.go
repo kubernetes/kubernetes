@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-	"strings"
 
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -64,7 +63,7 @@ func (g *genFakeForGroup) Namers(c *generator.Context) namer.NameSystems {
 func (g *genFakeForGroup) Imports(c *generator.Context) (imports []string) {
 	imports = g.imports.ImportLines()
 	if len(g.types) != 0 {
-		imports = append(imports, strings.ToLower(fmt.Sprintf("%s \"%s\"", filepath.Base(g.realClientPackage), g.realClientPackage)))
+		imports = append(imports, fmt.Sprintf("%s \"%s\"", filepath.Base(g.realClientPackage), g.realClientPackage))
 	}
 	return imports
 }
@@ -90,7 +89,7 @@ func (g *genFakeForGroup) GenerateType(c *generator.Context, t *types.Type, w io
 			"type":              t,
 			"GroupGoName":       g.groupGoName,
 			"Version":           namer.IC(g.version),
-			"realClientPackage": strings.ToLower(filepath.Base(g.realClientPackage)),
+			"realClientPackage": filepath.Base(g.realClientPackage),
 		}
 		if tags.NonNamespaced {
 			sw.Do(getterImplNonNamespaced, wrapper)

@@ -65,7 +65,7 @@ func newPlugin() *claimDefaulterPlugin {
 }
 
 func (a *claimDefaulterPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	informer := f.Storage().InternalVersion().StorageClasses()
+	informer := f.Storage().Internalversion().StorageClasses()
 	a.lister = informer.Lister()
 	a.SetReadyFunc(informer.Informer().HasSynced)
 }

@@ -19,7 +19,6 @@ package generators
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -68,7 +67,7 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 
 	glog.V(5).Infof("processing type %v", t)
 
-	listerPackage := fmt.Sprintf("%s/%s/%s", g.listersPackage, g.groupPkgName, strings.ToLower(g.groupVersion.Version.NonEmpty()))
+	listerPackage := fmt.Sprintf("%s/%s/%s", g.listersPackage, g.groupPkgName, g.groupVersion.Version.NonEmpty())
 	clientSetInterface := c.Universe.Type(types.Name{Package: g.clientSetPackage, Name: "Interface"})
 	informerFor := "InformerFor"
 

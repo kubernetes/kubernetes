@@ -49,11 +49,11 @@ const defaultContainerName = "test-c"
 // NewTestAdmission provides an admission plugin with test implementations of internal structs.
 func NewTestAdmission(psps []*extensions.PodSecurityPolicy, authz authorizer.Authorizer) *PodSecurityPolicyPlugin {
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	store := informerFactory.Extensions().InternalVersion().PodSecurityPolicies().Informer().GetStore()
+	store := informerFactory.Extensions().Internalversion().PodSecurityPolicies().Informer().GetStore()
 	for _, psp := range psps {
 		store.Add(psp)
 	}
-	lister := informerFactory.Extensions().InternalVersion().PodSecurityPolicies().Lister()
+	lister := informerFactory.Extensions().Internalversion().PodSecurityPolicies().Lister()
 	if authz == nil {
 		authz = &TestAuthorizer{}
 	}
