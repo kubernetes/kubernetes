@@ -107,7 +107,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 			internalGVPkg = strings.Join(parts[0:len(parts)-1], "/")
 		}
-		groupPackageName := strings.ToLower(gv.Group.NonEmpty())
+		groupPackageName := gv.Group.NonEmpty()
 
 		// If there's a comment of the form "// +groupName=somegroup" or
 		// "// +groupName=somegroup.foo.bar.io", use the first field (somegroup) as the name of the
@@ -130,9 +130,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		orderer := namer.Orderer{Namer: namer.NewPrivateNamer(0)}
 		typesToGenerate = orderer.OrderTypes(typesToGenerate)
 
-		packagePath := filepath.Join(arguments.OutputPackagePath, groupPackageName, strings.ToLower(gv.Version.NonEmpty()))
+		packagePath := filepath.Join(arguments.OutputPackagePath, groupPackageName, gv.Version.NonEmpty())
 		packageList = append(packageList, &generator.DefaultPackage{
-			PackageName: strings.ToLower(gv.Version.NonEmpty()),
+			PackageName: gv.Version.NonEmpty(),
 			PackagePath: packagePath,
 			HeaderText:  boilerplate,
 			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {

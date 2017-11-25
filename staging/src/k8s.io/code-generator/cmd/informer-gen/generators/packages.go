@@ -158,7 +158,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			gv.Version = clientgentypes.Version(parts[len(parts)-1])
 			targetGroupVersions = externalGroupVersions
 		}
-		groupPkgName := strings.ToLower(gv.Group.NonEmpty())
+		groupPkgName := gv.Group.NonEmpty()
 
 		// If there's a comment of the form "// +groupName=somegroup" or
 		// "// +groupName=somegroup.foo.bar.io", use the first field (somegroup) as the name of the
@@ -315,10 +315,10 @@ func groupPackage(basePackage string, groupVersions clientgentypes.GroupVersions
 }
 
 func versionPackage(basePackage string, groupPkgName string, gv clientgentypes.GroupVersion, groupGoName string, boilerplate []byte, typesToGenerate []*types.Type, clientSetPackage, listersPackage string) generator.Package {
-	packagePath := filepath.Join(basePackage, groupPkgName, strings.ToLower(gv.Version.NonEmpty()))
+	packagePath := filepath.Join(basePackage, groupPkgName, gv.Version.NonEmpty())
 
 	return &generator.DefaultPackage{
-		PackageName: strings.ToLower(gv.Version.NonEmpty()),
+		PackageName: gv.Version.NonEmpty(),
 		PackagePath: packagePath,
 		HeaderText:  boilerplate,
 		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {

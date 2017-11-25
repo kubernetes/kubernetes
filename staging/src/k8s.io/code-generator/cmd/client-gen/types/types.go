@@ -24,7 +24,7 @@ func (v Version) String() string {
 
 func (v Version) NonEmpty() string {
 	if v == "" {
-		return "internalVersion"
+		return "internalversion"
 	}
 	return v.String()
 }
