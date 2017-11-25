@@ -25,8 +25,8 @@ import (
 
 // Interface provides access to each of this group's versions.
 type Interface interface {
-	// InternalVersion provides access to shared informers for resources in InternalVersion.
-	InternalVersion() internalversion.Interface
+	// Internalversion provides access to shared informers for resources in Internalversion.
+	Internalversion() internalversion.Interface
 }
 
 type group struct {
@@ -40,7 +40,7 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &group{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// InternalVersion returns a new internalversion.Interface.
-func (g *group) InternalVersion() internalversion.Interface {
+// Internalversion returns a new internalversion.Interface.
+func (g *group) Internalversion() internalversion.Interface {
 	return internalversion.New(g.factory, g.namespace, g.tweakListOptions)
 }
