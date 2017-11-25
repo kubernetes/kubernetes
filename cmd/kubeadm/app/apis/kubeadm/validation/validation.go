@@ -36,6 +36,12 @@ import (
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
+	kubeletvalidation "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
+	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
+	kubeproxyscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
+	proxyvalidation "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/validation"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/node"
 )
@@ -71,7 +77,25 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 	allErrs = append(allErrs, ValidateToken(c.Token, field.NewPath("token"))...)
 	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("feature-gates"))...)
 	allErrs = append(allErrs, ValidateAPIEndpoint(c, field.NewPath("api-endpoint"))...)
+	allErrs = append(allErrs, ValidateProxy(c, field.NewPath("kube-proxy"))...)
+	if features.Enabled(c.FeatureGates, features.DynamicKubeletConfig) {
+		allErrs = append(allErrs, ValidateKubeletConfiguration(&c.KubeletConfiguration, field.NewPath("kubeletConfiguration"))...)
+	}
 	return allErrs
+}
+
+// ValidateProxy validates proxy configuration and collects all encountered errors
+func ValidateProxy(c *kubeadm.MasterConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// Convert to the internal version
+	internalcfg := &kubeproxyconfig.KubeProxyConfiguration{}
+	err := kubeproxyscheme.Scheme.Convert(c.KubeProxy.Config, internalcfg, nil)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, "KubeProxy.Config", err.Error()))
+		return allErrs
+	}
+	return proxyvalidation.Validate(internalcfg)
 }
 
 // ValidateNodeConfiguration validates node configuration and collects all encountered errors
@@ -350,4 +374,30 @@ func ValidateIgnorePreflightErrors(ignorePreflightErrors []string, skipPreflight
 	}
 
 	return ignoreErrors, allErrs.ToAggregate()
+}
+
+// ValidateKubeletConfiguration validates kubelet configuration and collects all encountered errors
+func ValidateKubeletConfiguration(c *kubeadm.KubeletConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	scheme, _, err := kubeletscheme.NewSchemeAndCodecs()
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, "kubeletConfiguration", err.Error()))
+		return allErrs
+	}
+
+	// Convert versioned config to internal config
+	internalcfg := &kubeletconfig.KubeletConfiguration{}
+	err = scheme.Convert(c.BaseConfig, internalcfg, nil)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, "kubeletConfiguration", err.Error()))
+		return allErrs
+	}
+
+	err = kubeletvalidation.ValidateKubeletConfiguration(internalcfg)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, "kubeletConfiguration", err.Error()))
+	}
+
+	return allErrs
 }

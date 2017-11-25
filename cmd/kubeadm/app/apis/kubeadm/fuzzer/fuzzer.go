@@ -25,6 +25,7 @@ import (
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
@@ -76,6 +77,41 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				},
 			}
 			kubeletconfigv1alpha1.SetDefaults_KubeletConfiguration(obj.KubeletConfiguration.BaseConfig)
+			obj.KubeProxy = kubeadm.KubeProxy{
+				Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
+					FeatureGates:       "foo",
+					BindAddress:        "foo",
+					HealthzBindAddress: "foo:10256",
+					MetricsBindAddress: "foo:",
+					EnableProfiling:    bool(true),
+					ClusterCIDR:        "foo",
+					HostnameOverride:   "foo",
+					ClientConnection: kubeproxyconfigv1alpha1.ClientConnectionConfiguration{
+						KubeConfigFile:     "foo",
+						AcceptContentTypes: "foo",
+						ContentType:        "foo",
+						QPS:                float32(5),
+						Burst:              10,
+					},
+					IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
+						SyncPeriod: metav1.Duration{Duration: 1},
+					},
+					IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
+						MasqueradeBit: utilpointer.Int32Ptr(0),
+						SyncPeriod:    metav1.Duration{Duration: 1},
+					},
+					OOMScoreAdj:       utilpointer.Int32Ptr(0),
+					ResourceContainer: "foo",
+					UDPIdleTimeout:    metav1.Duration{Duration: 1},
+					Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
+						MaxPerCore: utilpointer.Int32Ptr(2),
+						Min:        utilpointer.Int32Ptr(1),
+						TCPEstablishedTimeout: &metav1.Duration{Duration: 5},
+						TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5},
+					},
+					ConfigSyncPeriod: metav1.Duration{Duration: 1},
+				},
+			}
 		},
 		func(obj *kubeadm.NodeConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
