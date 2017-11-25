@@ -17,34 +17,39 @@ limitations under the License.
 package main
 
 import (
+	"flag"
 	"path/filepath"
-
-	"k8s.io/code-generator/cmd/informer-gen/generators"
-	"k8s.io/gengo/args"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"k8s.io/code-generator/cmd/informer-gen/generators"
+	"k8s.io/gengo/args"
+
+	generatorargs "k8s.io/code-generator/cmd/informer-gen/args"
 )
 
 func main() {
-	arguments := args.Default()
-
-	// Custom arguments.
-	customArgs := &generators.CustomArgs{
-		VersionedClientSetPackage: "k8s.io/kubernetes/pkg/client/clientset_generated/clientset",
-		InternalClientSetPackage:  "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset",
-		ListersPackage:            "k8s.io/kubernetes/pkg/client/listers",
-		SingleDirectory:           false,
-	}
-	customArgs.AddFlags(pflag.CommandLine)
+	genericArgs, customArgs := generatorargs.NewDefaults()
 
 	// Override defaults.
-	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
-	arguments.OutputPackagePath = "k8s.io/kubernetes/pkg/client/informers/informers_generated"
-	arguments.CustomArgs = customArgs
+	// TODO: move out of informer-gen
+	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
+	genericArgs.OutputPackagePath = "k8s.io/kubernetes/pkg/client/informers/informers_generated"
+	customArgs.VersionedClientSetPackage = "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	customArgs.InternalClientSetPackage = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	customArgs.ListersPackage = "k8s.io/kubernetes/pkg/client/listers"
+
+	genericArgs.AddFlags(pflag.CommandLine)
+	customArgs.AddFlags(pflag.CommandLine)
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
+
+	if err := generatorargs.Validate(genericArgs); err != nil {
+		glog.Fatalf("Error: %v", err)
+	}
 
 	// Run it.
-	if err := arguments.Execute(
+	if err := genericArgs.Execute(
 		generators.NameSystems(),
 		generators.DefaultNameSystem(),
 		generators.Packages,

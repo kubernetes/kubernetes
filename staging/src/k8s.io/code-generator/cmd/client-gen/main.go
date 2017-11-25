@@ -23,43 +23,37 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
-
-	clientgenargs "k8s.io/code-generator/cmd/client-gen/args"
-	"k8s.io/code-generator/cmd/client-gen/generators"
 	"k8s.io/gengo/args"
+
+	generatorargs "k8s.io/code-generator/cmd/client-gen/args"
+	"k8s.io/code-generator/cmd/client-gen/generators"
 )
 
 func main() {
-	arguments := args.Default().WithoutDefaultFlagParsing()
-
-	// Custom args.
-	customArgs := &clientgenargs.CustomArgs{}
-	customArgs.AddFlags(pflag.CommandLine)
+	genericArgs, customArgs := generatorargs.NewDefaults()
 
 	// Override defaults.
-	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
-	arguments.CustomArgs = customArgs
-	arguments.InputDirs = []string{
-		"k8s.io/apimachinery/pkg/fields",
-		"k8s.io/apimachinery/pkg/labels",
-		"k8s.io/apimachinery/pkg/watch",
-		"k8s.io/apimachinery/pkg/apimachinery/registered",
-	}
+	// TODO: move this out of client-gen
+	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
+	customArgs.ClientsetOutputPath = "k8s.io/kubernetes/pkg/client/clientset_generated/"
 
-	// Register default flags. We do this manually here because we have to override InputDirs below after additional
-	// input dirs are parse fromt he command-line.
-	arguments.AddFlags(pflag.CommandLine)
+	genericArgs.AddFlags(pflag.CommandLine)
+	customArgs.AddFlags(pflag.CommandLine, "k8s.io/kubernetes/pkg/apis") // TODO: move this input path out of client-gen
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
+
+	if err := generatorargs.Validate(genericArgs); err != nil {
+		glog.Fatalf("Error: %v", err)
+	}
 
 	// add group version package as input dirs for gengo
 	for _, pkg := range customArgs.Groups {
 		for _, v := range pkg.Versions {
-			arguments.InputDirs = append(arguments.InputDirs, v.Package)
+			genericArgs.InputDirs = append(genericArgs.InputDirs, v.Package)
 		}
 	}
 
-	if err := arguments.Execute(
+	if err := genericArgs.Execute(
 		generators.NameSystems(),
 		generators.DefaultNameSystem(),
 		generators.Packages,

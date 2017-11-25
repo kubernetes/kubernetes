@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/golang/glog"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -29,8 +30,7 @@ import (
 
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
-
-	"github.com/golang/glog"
+	informergenargs "k8s.io/code-generator/cmd/informer-gen/args"
 )
 
 // NameSystems returns the name system used by the generators in this package.
@@ -113,7 +113,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 	boilerplate = append(boilerplate, []byte(generatedBy())...)
 
-	customArgs, ok := arguments.CustomArgs.(*CustomArgs)
+	customArgs, ok := arguments.CustomArgs.(*informergenargs.CustomArgs)
 	if !ok {
 		glog.Fatalf("Wrong CustomArgs type: %T", arguments.CustomArgs)
 	}

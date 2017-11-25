@@ -45,12 +45,12 @@ func TestGVPackageFlag(t *testing.T) {
 			args: []string{"foo/bar/v1", "foo/bar/v2", "foo/bar/", "foo/v1"},
 			expectedGroups: []types.GroupVersions{
 				{PackageName: "bar", Group: types.Group("bar"), Versions: []types.PackageVersion{
-					{"foo/bar/v1", types.Version("v1")},
-					{"foo/bar/v2", types.Version("v2")},
-					{"foo/bar", types.Version("")},
+					{"v1", "foo/bar/v1"},
+					{"v2", "foo/bar/v2"},
+					{"", "foo/bar"},
 				}},
 				{PackageName: "foo", Group: types.Group("foo"), Versions: []types.PackageVersion{
-					{"foo/v1", types.Version("v1")},
+					{"v1", "foo/v1"},
 				}},
 			},
 		},
@@ -59,12 +59,12 @@ func TestGVPackageFlag(t *testing.T) {
 			def:  []string{"foo/bar/v1alpha1", "foo/v1"},
 			expectedGroups: []types.GroupVersions{
 				{PackageName: "bar", Group: types.Group("bar"), Versions: []types.PackageVersion{
-					{"foo/bar/v1", types.Version("v1")},
-					{"foo/bar/v2", types.Version("v2")},
-					{"foo/bar", types.Version("")},
+					{"v1", "foo/bar/v1"},
+					{"v2", "foo/bar/v2"},
+					{"", "foo/bar"},
 				}},
 				{PackageName: "foo", Group: types.Group("foo"), Versions: []types.PackageVersion{
-					{"foo/v1", types.Version("v1")},
+					{"v1", "foo/v1"},
 				}},
 			},
 		},
@@ -72,8 +72,8 @@ func TestGVPackageFlag(t *testing.T) {
 			args: []string{"api/v1", "api"},
 			expectedGroups: []types.GroupVersions{
 				{PackageName: "core", Group: types.Group("api"), Versions: []types.PackageVersion{
-					{"core/v1", types.Version("v1")},
-					{"core", types.Version("")},
+					{"v1", "core/v1"},
+					{"", "core"},
 				}},
 			},
 		},
@@ -82,7 +82,7 @@ func TestGVPackageFlag(t *testing.T) {
 			importBasePath: "k8s.io/api",
 			expectedGroups: []types.GroupVersions{
 				{PackageName: "foo", Group: types.Group("foo"), Versions: []types.PackageVersion{
-					{"k8s.io/api/foo/v1", types.Version("v1")},
+					{"v1", "k8s.io/api/foo/v1"},
 				}},
 			},
 		},
@@ -90,8 +90,9 @@ func TestGVPackageFlag(t *testing.T) {
 	for i, test := range tests {
 		fs := pflag.NewFlagSet("testGVPackage", pflag.ContinueOnError)
 		groups := []types.GroupVersions{}
-		importBasePath := test.importBasePath
-		fs.Var(NewGVPackagesValue(NewGroupVersionsBuilder(&groups, &importBasePath), test.def), "input", "usage")
+		builder := NewGroupVersionsBuilder(&groups)
+		fs.Var(NewGVPackagesValue(builder, test.def), "input", "usage")
+		fs.Var(NewInputBasePathValue(builder, test.importBasePath), "input-base-path", "usage")
 
 		args := []string{}
 		for _, a := range test.args {
