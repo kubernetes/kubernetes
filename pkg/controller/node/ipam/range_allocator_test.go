@@ -333,6 +333,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 			}(),
 			serviceCIDR:                      nil,
 			subNetMaskSize:                   30,
+			allocatedCIDRs:                   []string{"127.123.234.4/30", "127.123.234.8/30", "127.123.234.12/30"},
 			expectedAllocatedCIDRFirstRound:  "127.123.234.0/30",
 			cidrsToRelease:                   []string{"127.123.234.0/30"},
 			expectedAllocatedCIDRSecondRound: "127.123.234.0/30",

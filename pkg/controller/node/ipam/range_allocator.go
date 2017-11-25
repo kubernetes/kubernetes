@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	informers "k8s.io/client-go/informers/core/v1"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/node/ipam/cidrset"
 	"k8s.io/kubernetes/pkg/controller/node/util"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 type rangeAllocator struct {
@@ -282,7 +284,6 @@ func (r *rangeAllocator) updateCIDRAllocation(data nodeAndCIDR) error {
 
 	podCIDR := data.cidr.String()
 	for rep := 0; rep < cidrUpdateRetries; rep++ {
-		// TODO: change it to using PATCH instead of full Node updates.
 		node, err = r.nodeLister.Get(data.nodeName)
 		if err != nil {
 			glog.Errorf("Failed while getting node %v to retry updating Node.Spec.PodCIDR: %v", data.nodeName, err)
@@ -299,8 +300,7 @@ func (r *rangeAllocator) updateCIDRAllocation(data nodeAndCIDR) error {
 			}
 			return nil
 		}
-		node.Spec.PodCIDR = podCIDR
-		if _, err = r.client.CoreV1().Nodes().Update(node); err == nil {
+		if err = nodeutil.PatchNodeCIDR(r.client, types.NodeName(node.Name), podCIDR); err == nil {
 			glog.Infof("Set node %v PodCIDR to %v", node.Name, podCIDR)
 			break
 		}

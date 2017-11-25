@@ -48,14 +48,14 @@ type upgradeVariables struct {
 }
 
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
-func enforceRequirements(featureGatesString, kubeConfigPath, cfgPath string, printConfig, dryRun bool) (*upgradeVariables, error) {
+func enforceRequirements(featureGatesString, kubeConfigPath, cfgPath string, printConfig, dryRun bool, ignoreChecksErrors sets.String) (*upgradeVariables, error) {
 	client, err := getClient(kubeConfigPath, dryRun)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create a Kubernetes client from file %q: %v", kubeConfigPath, err)
 	}
 
 	// Run healthchecks against the cluster
-	if err := upgrade.CheckClusterHealth(client); err != nil {
+	if err := upgrade.CheckClusterHealth(client, ignoreChecksErrors); err != nil {
 		return nil, fmt.Errorf("[upgrade/health] FATAL: %v", err)
 	}
 

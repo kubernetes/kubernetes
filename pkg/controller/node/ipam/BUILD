@@ -42,6 +42,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/node/ipam",
     deps = [
+        "//pkg/api/v1/node:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
         "//pkg/controller:go_default_library",
