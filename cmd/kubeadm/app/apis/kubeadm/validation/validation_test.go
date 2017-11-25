@@ -19,6 +19,7 @@ package validation
 import (
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -624,6 +625,251 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 	}
 	if allErrors := ValidateKubeletConfiguration(errorCase, nil); len(allErrors) == 0 {
 		t.Errorf("failed ValidateKubeletConfiguration: expect errors but got no error")
+	}
+}
+
+func TestValidateKubeProxyConfiguration(t *testing.T) {
+	successCases := []kubeadm.MasterConfiguration{
+		{
+			KubeProxy: kubeadm.KubeProxy{
+				Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
+					BindAddress:        "192.168.59.103",
+					HealthzBindAddress: "0.0.0.0:10256",
+					MetricsBindAddress: "127.0.0.1:10249",
+					ClusterCIDR:        "192.168.59.0/24",
+					UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
+					ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
+					IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
+						MasqueradeAll: true,
+						SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+						MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+					},
+					IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
+						SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
+						MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
+					},
+					Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
+						Max:        utilpointer.Int32Ptr(2),
+						MaxPerCore: utilpointer.Int32Ptr(1),
+						Min:        utilpointer.Int32Ptr(1),
+						TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+						TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+					},
+				},
+			},
+		},
+	}
+
+	for _, successCase := range successCases {
+		if errs := ValidateProxy(&successCase, nil); len(errs) != 0 {
+			t.Errorf("failed ValidateProxy: expect no errors but got %v", errs)
+		}
+	}
+
+	errorCases := []struct {
+		masterConfig kubeadm.MasterConfiguration
+		msg          string
+	}{
+		{
+			masterConfig: kubeadm.MasterConfiguration{
+				KubeProxy: kubeadm.KubeProxy{
+					Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
+						// only BindAddress is invalid
+						BindAddress:        "10.10.12.11:2000",
+						HealthzBindAddress: "0.0.0.0:10256",
+						MetricsBindAddress: "127.0.0.1:10249",
+						ClusterCIDR:        "192.168.59.0/24",
+						UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
+						ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
+						IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
+							MasqueradeAll: true,
+							SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+							MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+						},
+						IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
+							SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
+							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
+						},
+						Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
+							Max:        utilpointer.Int32Ptr(2),
+							MaxPerCore: utilpointer.Int32Ptr(1),
+							Min:        utilpointer.Int32Ptr(1),
+							TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+							TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+						},
+					},
+				},
+			},
+			msg: "not a valid textual representation of an IP address",
+		},
+		{
+			masterConfig: kubeadm.MasterConfiguration{
+				KubeProxy: kubeadm.KubeProxy{
+					Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
+						BindAddress: "10.10.12.11",
+						// only HealthzBindAddress is invalid
+						HealthzBindAddress: "0.0.0.0",
+						MetricsBindAddress: "127.0.0.1:10249",
+						ClusterCIDR:        "192.168.59.0/24",
+						UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
+						ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
+						IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
+							MasqueradeAll: true,
+							SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+							MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+						},
+						IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
+							SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
+							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
+						},
+						Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
+							Max:        utilpointer.Int32Ptr(2),
+							MaxPerCore: utilpointer.Int32Ptr(1),
+							Min:        utilpointer.Int32Ptr(1),
+							TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+							TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+						},
+					},
+				},
+			},
+			msg: "must be IP:port",
+		},
+		{
+			masterConfig: kubeadm.MasterConfiguration{
+				KubeProxy: kubeadm.KubeProxy{
+					Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
+						BindAddress:        "10.10.12.11",
+						HealthzBindAddress: "0.0.0.0:12345",
+						// only MetricsBindAddress is invalid
+						MetricsBindAddress: "127.0.0.1",
+						ClusterCIDR:        "192.168.59.0/24",
+						UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
+						ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
+						IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
+							MasqueradeAll: true,
+							SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+							MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+						},
+						IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
+							SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
+							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
+						},
+						Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
+							Max:        utilpointer.Int32Ptr(2),
+							MaxPerCore: utilpointer.Int32Ptr(1),
+							Min:        utilpointer.Int32Ptr(1),
+							TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+							TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+						},
+					},
+				},
+			},
+			msg: "must be IP:port",
+		},
+		{
+			masterConfig: kubeadm.MasterConfiguration{
+				KubeProxy: kubeadm.KubeProxy{
+					Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
+						BindAddress:        "10.10.12.11",
+						HealthzBindAddress: "0.0.0.0:12345",
+						MetricsBindAddress: "127.0.0.1:10249",
+						// only ClusterCIDR is invalid
+						ClusterCIDR:      "192.168.59.0",
+						UDPIdleTimeout:   metav1.Duration{Duration: 1 * time.Second},
+						ConfigSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
+						IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
+							MasqueradeAll: true,
+							SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+							MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+						},
+						IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
+							SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
+							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
+						},
+						Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
+							Max:        utilpointer.Int32Ptr(2),
+							MaxPerCore: utilpointer.Int32Ptr(1),
+							Min:        utilpointer.Int32Ptr(1),
+							TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+							TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+						},
+					},
+				},
+			},
+			msg: "must be a valid CIDR block (e.g. 10.100.0.0/16)",
+		},
+		{
+			masterConfig: kubeadm.MasterConfiguration{
+				KubeProxy: kubeadm.KubeProxy{
+					Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
+						BindAddress:        "10.10.12.11",
+						HealthzBindAddress: "0.0.0.0:12345",
+						MetricsBindAddress: "127.0.0.1:10249",
+						ClusterCIDR:        "192.168.59.0/24",
+						// only UDPIdleTimeout is invalid
+						UDPIdleTimeout:   metav1.Duration{Duration: -1 * time.Second},
+						ConfigSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
+						IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
+							MasqueradeAll: true,
+							SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+							MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+						},
+						IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
+							SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
+							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
+						},
+						Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
+							Max:        utilpointer.Int32Ptr(2),
+							MaxPerCore: utilpointer.Int32Ptr(1),
+							Min:        utilpointer.Int32Ptr(1),
+							TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+							TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+						},
+					},
+				},
+			},
+			msg: "must be greater than 0",
+		},
+		{
+			masterConfig: kubeadm.MasterConfiguration{
+				KubeProxy: kubeadm.KubeProxy{
+					Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
+						BindAddress:        "10.10.12.11",
+						HealthzBindAddress: "0.0.0.0:12345",
+						MetricsBindAddress: "127.0.0.1:10249",
+						ClusterCIDR:        "192.168.59.0/24",
+						UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
+						// only ConfigSyncPeriod is invalid
+						ConfigSyncPeriod: metav1.Duration{Duration: -1 * time.Second},
+						IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
+							MasqueradeAll: true,
+							SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+							MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+						},
+						IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
+							SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
+							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
+						},
+						Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
+							Max:        utilpointer.Int32Ptr(2),
+							MaxPerCore: utilpointer.Int32Ptr(1),
+							Min:        utilpointer.Int32Ptr(1),
+							TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+							TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+						},
+					},
+				},
+			},
+			msg: "must be greater than 0",
+		},
+	}
+
+	for i, errorCase := range errorCases {
+		if errs := ValidateProxy(&errorCase.masterConfig, nil); len(errs) == 0 {
+			t.Errorf("%d failed ValidateProxy: expected error for %s, but got no error", i, errorCase.msg)
+		} else if !strings.Contains(errs[0].Error(), errorCase.msg) {
+			t.Errorf("%d failed ValidateProxy: unexpected error: %v, expected: %s", i, errs[0], errorCase.msg)
+		}
 	}
 }
 
