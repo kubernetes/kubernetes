@@ -70,9 +70,10 @@ func (r *Mock) SyncPod(pod *v1.Pod, apiStatus v1.PodStatus, status *PodStatus, s
 	return args.Get(0).(PodSyncResult)
 }
 
-func (r *Mock) KillPod(pod *v1.Pod, runningPod Pod, gracePeriodOverride *int64) error {
+func (r *Mock) KillPod(pod *v1.Pod, runningPod Pod, gracePeriodOverride *int64) (result PodSyncResult) {
 	args := r.Called(pod, runningPod, gracePeriodOverride)
-	return args.Error(0)
+	result.Fail(args.Error(0))
+	return
 }
 
 func (r *Mock) RunContainerInPod(container v1.Container, pod *v1.Pod, volumeMap map[string]volume.VolumePlugin) error {

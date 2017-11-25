@@ -1457,8 +1457,8 @@ func (r *Runtime) RunPod(pod *v1.Pod, pullSecrets []v1.Secret) error {
 	// This is a temporary solution until we have a clean design on how
 	// kubelet handles events. See https://github.com/kubernetes/kubernetes/issues/23084.
 	if err := r.runLifecycleHooks(pod, runtimePod, lifecyclePostStartHook); err != nil {
-		if errKill := r.KillPod(pod, *runtimePod, nil); errKill != nil {
-			return errors.NewAggregate([]error{err, errKill})
+		if errKill := r.KillPod(pod, *runtimePod, nil); errKill.Error() != nil {
+			return errors.NewAggregate([]error{err, errKill.Error()})
 		}
 		r.cleanupPodNetwork(pod, networkNamespace)
 		return err
@@ -1733,12 +1733,12 @@ func (r *Runtime) waitPreStopHooks(pod *v1.Pod, runningPod *kubecontainer.Pod) {
 
 // KillPod invokes 'systemctl kill' to kill the unit that runs the pod.
 // TODO: add support for gracePeriodOverride which is used in eviction scenarios
-func (r *Runtime) KillPod(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
+func (r *Runtime) KillPod(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (result kubecontainer.PodSyncResult) {
 	glog.V(4).Infof("Rkt is killing pod: name %q.", runningPod.Name)
 
 	if len(runningPod.Containers) == 0 {
 		glog.V(4).Infof("rkt: Pod %q is already being killed, no action will be taken", runningPod.Name)
-		return nil
+		return
 	}
 
 	if pod != nil {
@@ -1748,7 +1748,8 @@ func (r *Runtime) KillPod(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriod
 	containerID, err := parseContainerID(runningPod.Containers[0].ID)
 	if err != nil {
 		glog.Errorf("rkt: Failed to get rkt uuid of the pod %q: %v", runningPod.Name, err)
-		return err
+		result.Fail(err)
+		return
 	}
 	serviceName := makePodServiceFileName(containerID.uuid)
 	serviceFile := serviceFilePath(serviceName)
@@ -1763,23 +1764,26 @@ func (r *Runtime) KillPod(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriod
 	reschan := make(chan string)
 	if _, err = r.systemd.StopUnit(serviceName, "replace", reschan); err != nil {
 		glog.Errorf("rkt: Failed to stop unit %q: %v", serviceName, err)
-		return err
+		result.Fail(err)
+		return
 	}
 
 	res := <-reschan
 	if res != "done" {
 		err := fmt.Errorf("invalid result: %s", res)
 		glog.Errorf("rkt: Failed to stop unit %q: %v", serviceName, err)
-		return err
+		result.Fail(err)
+		return
 	}
 
 	// Clean up networking. Use the service file to get pod details since 'pod' can be nil.
 	if err := r.cleanupPodNetworkFromServiceFile(serviceFile); err != nil {
 		glog.Errorf("rkt: failed to tear down network for unit %q: %v", serviceName, err)
-		return err
+		result.Fail(err)
+		return
 	}
 
-	return nil
+	return
 }
 
 func (r *Runtime) Type() string {
@@ -1863,7 +1867,7 @@ func (r *Runtime) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecontainer.
 	if restartPod {
 		// Kill the pod only if the pod is actually running.
 		if len(runningPod.Containers) > 0 {
-			if err = r.KillPod(pod, runningPod, nil); err != nil {
+			if result = r.KillPod(pod, runningPod, nil); result.Error() != nil {
 				return
 			}
 		}
