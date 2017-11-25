@@ -84,7 +84,7 @@ function set-allow-subnet-cidr-routes-overlap() {
   local access_token=$(gcloud auth print-access-token)
   local request="{\"allowSubnetCidrRoutesOverlap\":$1, \"fingerprint\":\"${fingerprint}\"}"
   local subnetwork_url="${GCE_API_ENDPOINT}projects/${PROJECT}/regions/${REGION}/subnetworks/${IP_ALIAS_SUBNETWORK}"
-  until curl --header "Content-Type: application/json" --header "Authorization: Bearer ${access_token}" \
+  until curl -s --header "Content-Type: application/json" --header "Authorization: Bearer ${access_token}" \
     -X PATCH -d "${request}" "${subnetwork_url}" --output /dev/null; do
     printf "."
     sleep 1
