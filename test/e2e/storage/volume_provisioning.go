@@ -161,6 +161,80 @@ func testDynamicProvisioning(t storageClassTest, client clientset.Interface, cla
 	return pv
 }
 
+// testGlusterDynamicProvisioning tests the same workflow of testDynamicProvisioning expect it wont attach
+// pv to a pod volume and try write/read. This is due to a limitation in heketi which require raw devices to
+// provision a real volume. But this test make sure heketi responded properly for the volumecreate requests
+// from the gluster dynamic provisioner.
+func testGlusterDynamicProvisioning(t storageClassTest, client clientset.Interface, claim *v1.PersistentVolumeClaim, class *storage.StorageClass) {
+	var err error
+	if class != nil {
+		By("creating a StorageClass " + class.Name)
+		class, err = client.StorageV1().StorageClasses().Create(class)
+		Expect(err).NotTo(HaveOccurred())
+		defer func() {
+			framework.Logf("deleting storage class %s", class.Name)
+			framework.ExpectNoError(client.StorageV1().StorageClasses().Delete(class.Name, nil))
+		}()
+	}
+
+	By("creating a claim")
+	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
+	Expect(err).NotTo(HaveOccurred())
+	defer func() {
+		framework.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
+		// typically this claim has already been deleted
+		err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil)
+		if err != nil && !apierrs.IsNotFound(err) {
+			framework.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
+		}
+	}()
+	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("checking the claim")
+	// Get new copy of the claim
+	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
+	Expect(err).NotTo(HaveOccurred())
+
+	// Get the bound PV
+	pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
+	Expect(err).NotTo(HaveOccurred())
+
+	// Check sizes
+	expectedCapacity := resource.MustParse(t.expectedSize)
+	pvCapacity := pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
+	Expect(pvCapacity.Value()).To(Equal(expectedCapacity.Value()), "pvCapacity is not equal to expectedCapacity")
+
+	requestedCapacity := resource.MustParse(t.claimSize)
+	claimCapacity := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	Expect(claimCapacity.Value()).To(Equal(requestedCapacity.Value()), "claimCapacity is not equal to requestedCapacity")
+
+	// Check PV properties
+	By("checking the PV")
+	Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(Equal(v1.PersistentVolumeReclaimDelete))
+	expectedAccessModes := []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+	Expect(pv.Spec.AccessModes).To(Equal(expectedAccessModes))
+	Expect(pv.Spec.ClaimRef.Name).To(Equal(claim.ObjectMeta.Name))
+	Expect(pv.Spec.ClaimRef.Namespace).To(Equal(claim.ObjectMeta.Namespace))
+
+	// Run the checker
+	if t.pvCheck != nil {
+		err = t.pvCheck(pv)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	By(fmt.Sprintf("deleting claim %q/%q", claim.Namespace, claim.Name))
+	framework.ExpectNoError(client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil))
+
+	// Wait for the PV to get deleted. Technically, the first few delete
+	// attempts may fail, as the volume is still attached to a node because
+	// kubelet is slowly cleaning up the previous pod, however it should succeed
+	// in a couple of minutes. Wait 20 minutes to recover from random cloud
+	// hiccups.
+	By(fmt.Sprintf("deleting the claim's PV %q", pv.Name))
+	framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(client, pv.Name, 5*time.Second, 20*time.Minute))
+}
+
 // checkAWSEBS checks properties of an AWS EBS. Test framework does not
 // instantiate full AWS provider, therefore we need use ec2 API directly.
 func checkAWSEBS(volume *v1.PersistentVolume, volumeType string, encrypted bool) error {
@@ -706,6 +780,37 @@ var _ = SIGDescribe("Dynamic Provisioning", func() {
 			Expect(claim.Status.Phase).To(Equal(v1.ClaimPending))
 		})
 	})
+
+	framework.KubeDescribe("GlusterDynamicProvisioner", func() {
+		It("should create and delete persistent volumes [fast]", func() {
+			By("creating a Gluster DP server Pod")
+			pod := startGlusterDpServerPod(c, ns)
+			serverUrl := "https://" + pod.Status.PodIP + ":8081"
+
+			By("creating a StorageClass")
+			test := storageClassTest{
+				name:         "Gluster Dynamoc provisioner test",
+				provisioner:  "kubernetes.io/glusterfs",
+				claimSize:    "1500Mi",
+				expectedSize: "1500Mi",
+				parameters:   map[string]string{"resturl": serverUrl},
+			}
+			class := newStorageClass(test, ns, "gluster")
+			_, err := c.Storage().StorageClasses().Create(class)
+			defer c.Storage().StorageClasses().Delete(class.Name, nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating a claim with an alpha dynamic provisioning annotation")
+			claim := newClaim(test, ns, "default")
+			defer func() {
+				c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
+			}()
+			claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
+			Expect(err).NotTo(HaveOccurred())
+
+			testDynamicProvisioning(test, c, claim, class)
+		})
+	})
 })
 
 func getDefaultStorageClassName(c clientset.Interface) string {
@@ -887,6 +992,55 @@ func newBetaStorageClass(t storageClassTest, suffix string) *storagebeta.Storage
 		Provisioner: pluginName,
 		Parameters:  t.parameters,
 	}
+}
+
+func startGlusterDpServerPod(c clientset.Interface, ns string) *v1.Pod {
+	podClient := c.CoreV1().Pods(ns)
+
+	provisionerPod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "glusterdynamic-provisioner-",
+		},
+
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "glusterdynamic-provisioner",
+					Image: "quay.io/humblec/glusterdynamic-provisioner:v1.0",
+					Args: []string{
+						"-config=" + "/etc/heketi/heketi.json",
+					},
+					Ports: []v1.ContainerPort{
+						{Name: "heketi", ContainerPort: 8081},
+					},
+					Env: []v1.EnvVar{
+						{
+							Name: "POD_IP",
+							ValueFrom: &v1.EnvVarSource{
+								FieldRef: &v1.ObjectFieldSelector{
+									FieldPath: "status.podIP",
+								},
+							},
+						},
+					},
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+			},
+		},
+	}
+	provisionerPod, err := podClient.Create(provisionerPod)
+	framework.ExpectNoError(err, "Failed to create %s pod: %v", provisionerPod.Name, err)
+
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, provisionerPod))
+
+	By("locating the provisioner pod")
+	pod, err := podClient.Get(provisionerPod.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
+	return pod
 }
 
 func startExternalProvisioner(c clientset.Interface, ns string) *v1.Pod {
