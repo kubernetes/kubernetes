@@ -1446,15 +1446,14 @@ func printDeployment(obj *extensions.Deployment, options printers.PrintOptions) 
 	updatedReplicas := obj.Status.UpdatedReplicas
 	availableReplicas := obj.Status.AvailableReplicas
 	age := translateTimestamp(obj.CreationTimestamp)
-	containers := obj.Spec.Template.Spec.Containers
-	selector, err := metav1.LabelSelectorAsSelector(obj.Spec.Selector)
-	if err != nil {
-		// this shouldn't happen if LabelSelector passed validation
-		return nil, err
-	}
 	row.Cells = append(row.Cells, obj.Name, desiredReplicas, currentReplicas, updatedReplicas, availableReplicas, age)
 	if options.Wide {
-		containers, images := layoutContainerCells(containers)
+		containers, images := layoutContainerCells(obj.Spec.Template.Spec.Containers)
+		selector, err := metav1.LabelSelectorAsSelector(obj.Spec.Selector)
+		if err != nil {
+			// this shouldn't happen if LabelSelector passed validation
+			return nil, err
+		}
 		row.Cells = append(row.Cells, containers, images, selector.String())
 	}
 	return []metav1alpha1.TableRow{row}, nil
