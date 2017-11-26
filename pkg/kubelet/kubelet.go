@@ -2183,7 +2183,7 @@ func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID str
 
 // isSyncPodWorthy filters out events that are not worthy of pod syncing
 func isSyncPodWorthy(event *pleg.PodLifecycleEvent) bool {
-	// ContatnerRemoved doesn't affect pod state
+	// ContainerRemoved doesn't affect pod state
 	return event.Type != pleg.ContainerRemoved
 }
 
