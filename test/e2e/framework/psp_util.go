@@ -97,7 +97,7 @@ var (
 )
 
 func CreatePrivilegedPSPBinding(f *Framework, namespace string) {
-	if !IsPodSecurityPolicyEnabled(f) {
+	if !IsPodSecurityPolicyEnabled(f) || !IsRBACEnabled(f) {
 		return
 	}
 	// Create the privileged PSP & role
