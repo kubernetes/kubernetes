@@ -83,6 +83,7 @@ func newProxyServer(
 
 	var iptInterface utiliptables.Interface
 	var ipvsInterface utilipvs.Interface
+	var kernelHandler ipvs.KernelHandler
 	var ipsetInterface utilipset.Interface
 	var dbus utildbus.Interface
 
@@ -92,6 +93,7 @@ func newProxyServer(
 	dbus = utildbus.New()
 	iptInterface = utiliptables.New(execer, dbus, protocol)
 	ipvsInterface = utilipvs.New(execer)
+	kernelHandler = ipvs.NewLinuxKernelHandler()
 	ipsetInterface = utilipset.New(execer)
 
 	// We omit creation of pretty much everything if we run in cleanup mode
@@ -133,7 +135,7 @@ func newProxyServer(
 	var serviceEventHandler proxyconfig.ServiceHandler
 	var endpointsEventHandler proxyconfig.EndpointsHandler
 
-	proxyMode := getProxyMode(string(config.Mode), iptInterface, ipsetInterface, iptables.LinuxKernelCompatTester{})
+	proxyMode := getProxyMode(string(config.Mode), iptInterface, kernelHandler, ipsetInterface, iptables.LinuxKernelCompatTester{})
 	if proxyMode == proxyModeIPTables {
 		glog.V(0).Info("Using iptables Proxier.")
 		nodeIP := net.ParseIP(config.BindAddress)
@@ -269,7 +271,7 @@ func newProxyServer(
 	}, nil
 }
 
-func getProxyMode(proxyMode string, iptver iptables.IPTablesVersioner, ipsetver ipvs.IPSetVersioner, kcompat iptables.KernelCompatTester) string {
+func getProxyMode(proxyMode string, iptver iptables.IPTablesVersioner, khandle ipvs.KernelHandler, ipsetver ipvs.IPSetVersioner, kcompat iptables.KernelCompatTester) string {
 	if proxyMode == proxyModeUserspace {
 		return proxyModeUserspace
 	}
@@ -280,7 +282,7 @@ func getProxyMode(proxyMode string, iptver iptables.IPTablesVersioner, ipsetver 
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SupportIPVSProxyMode) {
 		if proxyMode == proxyModeIPVS {
-			return tryIPVSProxy(iptver, ipsetver, kcompat)
+			return tryIPVSProxy(iptver, khandle, ipsetver, kcompat)
 		} else {
 			glog.Warningf("Can't use ipvs proxier, trying iptables proxier")
 			return tryIPTablesProxy(iptver, kcompat)
@@ -290,10 +292,10 @@ func getProxyMode(proxyMode string, iptver iptables.IPTablesVersioner, ipsetver 
 	return tryIPTablesProxy(iptver, kcompat)
 }
 
-func tryIPVSProxy(iptver iptables.IPTablesVersioner, ipsetver ipvs.IPSetVersioner, kcompat iptables.KernelCompatTester) string {
+func tryIPVSProxy(iptver iptables.IPTablesVersioner, khandle ipvs.KernelHandler, ipsetver ipvs.IPSetVersioner, kcompat iptables.KernelCompatTester) string {
 	// guaranteed false on error, error only necessary for debugging
-	// IPVS Proxier relies on ipset
-	useIPVSProxy, err := ipvs.CanUseIPVSProxier(ipsetver)
+	// IPVS Proxier relies on ip_vs_* kernel modules and ipset
+	useIPVSProxy, err := ipvs.CanUseIPVSProxier(khandle, ipsetver)
 	if err != nil {
 		// Try to fallback to iptables before falling back to userspace
 		utilruntime.HandleError(fmt.Errorf("can't determine whether to use ipvs proxy, error: %v", err))

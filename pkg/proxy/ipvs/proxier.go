@@ -688,14 +688,28 @@ func (em proxyEndpointsMap) unmerge(other proxyEndpointsMap) {
 	}
 }
 
-// CanUseIPVSProxier returns true if we can use the ipvs Proxier.
-// This is determined by checking if all the required kernel modules can be loaded. It may
-// return an error if it fails to get the kernel modules information without error, in which
-// case it will also return false.
-func CanUseIPVSProxier(ipsetver IPSetVersioner) (bool, error) {
-	// Try to load IPVS required kernel modules using modprobe
+// KernelHandler can handle the current installed kernel modules.
+type KernelHandler interface {
+	GetModules() ([]string, error)
+}
+
+// LinuxKernelHandler implements KernelHandler interface.
+type LinuxKernelHandler struct {
+	executor utilexec.Interface
+}
+
+// NewLinuxKernelHandler initializes LinuxKernelHandler with exec.
+func NewLinuxKernelHandler() *LinuxKernelHandler {
+	return &LinuxKernelHandler{
+		executor: utilexec.New(),
+	}
+}
+
+// GetModules returns all installed kernel modules.
+func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
+	// Try to load IPVS required kernel modules using modprobe first
 	for _, kmod := range ipvsModules {
-		err := utilexec.New().Command("modprobe", "--", kmod).Run()
+		err := handle.executor.Command("modprobe", "--", kmod).Run()
 		if err != nil {
 			glog.Warningf("Failed to load kernel module %v with modprobe. "+
 				"You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", kmod)
@@ -703,12 +717,24 @@ func CanUseIPVSProxier(ipsetver IPSetVersioner) (bool, error) {
 	}
 
 	// Find out loaded kernel modules
-	out, err := utilexec.New().Command("cut", "-f1", "-d", " ", "/proc/modules").CombinedOutput()
+	out, err := handle.executor.Command("cut", "-f1", "-d", " ", "/proc/modules").CombinedOutput()
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
 	mods := strings.Split(string(out), "\n")
+	return mods, nil
+}
+
+// CanUseIPVSProxier returns true if we can use the ipvs Proxier.
+// This is determined by checking if all the required kernel modules can be loaded. It may
+// return an error if it fails to get the kernel modules information without error, in which
+// case it will also return false.
+func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner) (bool, error) {
+	mods, err := handle.GetModules()
+	if err != nil {
+		return false, fmt.Errorf("error getting installed ipvs required kernel modules: %v", err)
+	}
 	wantModules := sets.NewString()
 	loadModules := sets.NewString()
 	wantModules.Insert(ipvsModules...)

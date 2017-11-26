@@ -72,6 +72,15 @@ func (fake *fakeKernelCompatTester) IsCompatible() error {
 	return nil
 }
 
+// fakeKernelHandler implements KernelHandler.
+type fakeKernelHandler struct {
+	modules []string
+}
+
+func (fake *fakeKernelHandler) GetModules() ([]string, error) {
+	return fake.modules, nil
+}
+
 func Test_getProxyMode(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("skipping on non-Linux")
@@ -82,6 +91,7 @@ func Test_getProxyMode(t *testing.T) {
 		annotationVal   string
 		iptablesVersion string
 		ipsetVersion    string
+		kmods           []string
 		kernelCompat    bool
 		iptablesError   error
 		ipsetError      error
@@ -140,7 +150,8 @@ func Test_getProxyMode(t *testing.T) {
 		versioner := &fakeIPTablesVersioner{c.iptablesVersion, c.iptablesError}
 		kcompater := &fakeKernelCompatTester{c.kernelCompat}
 		ipsetver := &fakeIPSetVersioner{c.ipsetVersion, c.ipsetError}
-		r := getProxyMode(c.flag, versioner, ipsetver, kcompater)
+		khandler := &fakeKernelHandler{c.kmods}
+		r := getProxyMode(c.flag, versioner, khandler, ipsetver, kcompater)
 		if r != c.expected {
 			t.Errorf("Case[%d] Expected %q, got %q", i, c.expected, r)
 		}
