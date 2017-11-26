@@ -201,6 +201,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "Containers", Type: "string", Priority: 1, Description: "Names of each container in the template."},
 		{Name: "Images", Type: "string", Priority: 1, Description: "Images referenced by each container in the template."},
+		{Name: "Selector", Type: "string", Priority: 1, Description: appsv1beta1.StatefulSetSpec{}.SwaggerDoc()["selector"]},
 	}
 	h.TableHandler(statefulSetColumnDefinitions, printStatefulSet)
 	h.TableHandler(statefulSetColumnDefinitions, printStatefulSetList)
@@ -961,7 +962,11 @@ func printStatefulSet(obj *apps.StatefulSet, options printers.PrintOptions) ([]m
 	row.Cells = append(row.Cells, obj.Name, desiredReplicas, currentReplicas, createTime)
 	if options.Wide {
 		names, images := layoutContainerCells(obj.Spec.Template.Spec.Containers)
-		row.Cells = append(row.Cells, names, images)
+		selector, err := metav1.LabelSelectorAsSelector(obj.Spec.Selector)
+		if err != nil {
+			return nil, err
+		}
+		row.Cells = append(row.Cells, names, images, selector.String())
 	}
 	return []metav1alpha1.TableRow{row}, nil
 }
