@@ -37,9 +37,13 @@ func TestRoutes(t *testing.T) {
 		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
 	}
 
+	if os.routeOpts.RouterId == "" {
+		t.Skip("router-id is empty. skipping test")
+	}
+
 	r, ok := os.Routes()
 	if !ok {
-		t.Fatalf("Routes() returned false - perhaps your stack doens't support Neutron?")
+		t.Skip("Routes() returned false - perhaps your stack does not support Neutron extraroute extension?")
 	}
 
 	newroute := cloudprovider.Route{
