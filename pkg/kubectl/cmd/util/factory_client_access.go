@@ -433,10 +433,6 @@ func (f *ring0Factory) Printer(mapping *meta.RESTMapping, options printers.Print
 }
 
 func (f *ring0Factory) Pauser(info *resource.Info) ([]byte, error) {
-	_, isUnstructured := info.Object.(runtime.Unstructured)
-	if isUnstructured {
-		info.Object = info.AsVersioned()
-	}
 	switch obj := info.Object.(type) {
 	case *extensionsv1beta1.Deployment:
 		if obj.Spec.Paused {
@@ -472,10 +468,6 @@ func (f *ring0Factory) ResolveImage(name string) (string, error) {
 }
 
 func (f *ring0Factory) Resumer(info *resource.Info) ([]byte, error) {
-	_, isUnstructured := info.Object.(runtime.Unstructured)
-	if isUnstructured {
-		info.Object = info.AsVersioned()
-	}
 	switch obj := info.Object.(type) {
 	case *extensionsv1beta1.Deployment:
 		if !obj.Spec.Paused {

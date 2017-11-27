@@ -145,6 +145,9 @@ func (saConfig *serviceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 	if err != nil {
 		return err
 	}
+	for i, info := range saConfig.infos {
+		saConfig.infos[i].Object = info.AsVersioned()
+	}
 	return nil
 }
 

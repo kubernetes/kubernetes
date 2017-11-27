@@ -412,13 +412,13 @@ func TestAddSubject(t *testing.T) {
 	}
 	for _, tt := range tests {
 		changed := false
-		got := []rbacv1.Subject{}
-		if changed, got = addSubjects(tt.existing, tt.subjects); (changed != false) != tt.wantChange {
+		got := []subjectInterface{}
+		if changed, got = addSubjects(V1SubjectsToSubjectInterfaces(tt.existing), V1SubjectsToSubjectInterfaces(tt.subjects)); (changed != false) != tt.wantChange {
 			t.Errorf("%q. addSubjects() changed = %v, wantChange = %v", tt.Name, changed, tt.wantChange)
 		}
 
 		want := tt.expected
-		if !reflect.DeepEqual(got, want) {
+		if !reflect.DeepEqual(SubjectInterfacesToV1Subjects(got), want) {
 			t.Errorf("%q. addSubjects() failed", tt.Name)
 			t.Errorf("Got: %v", got)
 			t.Errorf("Want: %v", want)

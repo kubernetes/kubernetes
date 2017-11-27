@@ -129,6 +129,7 @@ func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, out
 		if err != nil {
 			return err
 		}
+		info.Object = info.AsVersioned()
 		o.Infos = append(o.Infos, info)
 		return nil
 	})

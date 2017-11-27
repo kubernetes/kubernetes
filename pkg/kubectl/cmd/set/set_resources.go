@@ -172,6 +172,9 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	if err != nil {
 		return err
 	}
+	for i, info := range o.Infos {
+		o.Infos[i].Object = info.AsVersioned()
+	}
 	return nil
 }
 
