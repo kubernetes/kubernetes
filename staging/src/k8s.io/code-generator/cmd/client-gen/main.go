@@ -35,22 +35,22 @@ func main() {
 	// Override defaults.
 	// TODO: move this out of client-gen
 	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
-	customArgs.ClientsetOutputPath = "k8s.io/kubernetes/pkg/client/clientset_generated/"
+	genericArgs.OutputPackagePath = "k8s.io/kubernetes/pkg/client/clientset_generated/"
 
 	genericArgs.AddFlags(pflag.CommandLine)
 	customArgs.AddFlags(pflag.CommandLine, "k8s.io/kubernetes/pkg/apis") // TODO: move this input path out of client-gen
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
-	if err := generatorargs.Validate(genericArgs); err != nil {
-		glog.Fatalf("Error: %v", err)
-	}
-
 	// add group version package as input dirs for gengo
 	for _, pkg := range customArgs.Groups {
 		for _, v := range pkg.Versions {
 			genericArgs.InputDirs = append(genericArgs.InputDirs, v.Package)
 		}
+	}
+
+	if err := generatorargs.Validate(genericArgs); err != nil {
+		glog.Fatalf("Error: %v", err)
 	}
 
 	if err := genericArgs.Execute(

@@ -87,9 +87,9 @@ fi
 if [ "${GENS}" = "all" ] || grep -qw "client" <<<"${GENS}"; then
   echo "Generating clientset for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/clientset"
   if [ -n "${INT_APIS_PKG}" ]; then
-    ${GOPATH}/bin/client-gen --clientset-name internalversion --input-base "" --input $(codegen::join , $(printf '%s/ ' "${INT_FQ_APIS[@]}")) --clientset-path ${OUTPUT_PKG}/clientset "$@"
+    ${GOPATH}/bin/client-gen --clientset-name internalversion --input-base "" --input $(codegen::join , $(printf '%s/ ' "${INT_FQ_APIS[@]}")) --output-package ${OUTPUT_PKG}/clientset "$@"
   fi
-  ${GOPATH}/bin/client-gen --clientset-name versioned --input-base "" --input $(codegen::join , "${EXT_FQ_APIS[@]}") --clientset-path ${OUTPUT_PKG}/clientset "$@"
+  ${GOPATH}/bin/client-gen --clientset-name versioned --input-base "" --input $(codegen::join , "${EXT_FQ_APIS[@]}") --output-package ${OUTPUT_PKG}/clientset "$@"
 fi
 
 if [ "${GENS}" = "all" ] || grep -qw "lister" <<<"${GENS}"; then

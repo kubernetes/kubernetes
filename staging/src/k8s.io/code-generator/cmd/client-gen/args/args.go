@@ -46,9 +46,6 @@ type CustomArgs struct {
 	// ClientsetName is the name of the clientset to be generated. It's
 	// populated from command-line arguments.
 	ClientsetName string
-	// ClientsetOutputPath is the path the clientset will be generated at. It's
-	// populated from command-line arguments.
-	ClientsetOutputPath string
 	// ClientsetAPIPath is the default API HTTP path for generated clients.
 	ClientsetAPIPath string
 	// ClientsetOnly determines if we should generate the clients for groups and
@@ -71,7 +68,7 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 	genericArgs.InputDirs = DefaultInputDirs
 
 	if pkg := codegenutil.CurrentPackage(); len(pkg) != 0 {
-		customArgs.ClientsetOutputPath = path.Join(pkg, "pkg/client/clientset/")
+		genericArgs.OutputPackagePath = path.Join(pkg, "pkg/client/clientset")
 	}
 
 	return genericArgs, customArgs
@@ -84,9 +81,11 @@ func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet, inputBase string) {
 	pflag.Var(NewInputBasePathValue(gvsBuilder, inputBase), "input-base", "base path to look for the api group.")
 	pflag.StringVarP(&ca.ClientsetName, "clientset-name", "n", ca.ClientsetName, "the name of the generated clientset package.")
 	pflag.StringVarP(&ca.ClientsetAPIPath, "clientset-api-path", "", ca.ClientsetAPIPath, "the value of default API HTTP path, starting with / and without trailing /.")
-	pflag.StringVar(&ca.ClientsetOutputPath, "clientset-path", ca.ClientsetOutputPath, "the generated clientset will be output to <clientset-path>/<clientset-name>.")
 	pflag.BoolVar(&ca.ClientsetOnly, "clientset-only", ca.ClientsetOnly, "when set, client-gen only generates the clientset shell, without generating the individual typed clients")
 	pflag.BoolVar(&ca.FakeClient, "fake-clientset", ca.FakeClient, "when set, client-gen will generate the fake clientset that can be used in tests")
+
+	// support old flags
+	fs.SetNormalizeFunc(mapFlagName("clientset-path", "output-package", fs.GetNormalizeFunc()))
 }
 
 func Validate(genericArgs *args.GeneratorArgs) error {
@@ -101,9 +100,6 @@ func Validate(genericArgs *args.GeneratorArgs) error {
 	if len(customArgs.ClientsetAPIPath) == 0 {
 		return fmt.Errorf("clientset API path cannot be empty")
 	}
-	if len(customArgs.ClientsetOutputPath) == 0 {
-		return fmt.Errorf("clientset path cannot be empty")
-	}
 
 	return nil
 }
@@ -117,4 +113,13 @@ func (ca *CustomArgs) GroupVersionPackages() map[types.GroupVersion]string {
 		}
 	}
 	return res
+}
+
+func mapFlagName(from, to string, old func(fs *pflag.FlagSet, name string) pflag.NormalizedName) func(fs *pflag.FlagSet, name string) pflag.NormalizedName {
+	return func(fs *pflag.FlagSet, name string) pflag.NormalizedName {
+		if name == from {
+			name = to
+		}
+		return old(fs, name)
+	}
 }

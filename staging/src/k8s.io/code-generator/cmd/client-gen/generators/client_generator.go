@@ -371,7 +371,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	}
 
 	var packageList []generator.Package
-	clientsetPackage := filepath.Join(customArgs.ClientsetOutputPath, customArgs.ClientsetName)
+	clientsetPackage := filepath.Join(arguments.OutputPackagePath, customArgs.ClientsetName)
 
 	packageList = append(packageList, packageForClientset(customArgs, clientsetPackage, groupGoNames, boilerplate))
 	packageList = append(packageList, packageForScheme(customArgs, clientsetPackage, arguments.OutputBase, groupGoNames, boilerplate))
