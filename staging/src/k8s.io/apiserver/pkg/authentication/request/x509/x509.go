@@ -22,14 +22,38 @@ import (
 	"encoding/asn1"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
+
+var clientCertificateExpirationHistogram = prometheus.NewHistogram(
+	prometheus.HistogramOpts{
+		Namespace: "apiserver",
+		Subsystem: "client",
+		Name:      "certificate_expiration_seconds",
+		Help:      "Distribution of the remaining lifetime on the certificate used to authenticate a request.",
+		Buckets: []float64{
+			0,
+			(6 * time.Hour).Seconds(),
+			(12 * time.Hour).Seconds(),
+			(24 * time.Hour).Seconds(),
+			(2 * 24 * time.Hour).Seconds(),
+			(4 * 24 * time.Hour).Seconds(),
+			(7 * 24 * time.Hour).Seconds(),
+		},
+	},
+)
+
+func init() {
+	prometheus.MustRegister(clientCertificateExpirationHistogram)
+}
 
 // UserConversion defines an interface for extracting user info from a client certificate chain
 type UserConversion interface {
@@ -71,6 +95,8 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		}
 	}
 
+	remaining := req.TLS.PeerCertificates[0].NotAfter.Sub(time.Now())
+	clientCertificateExpirationHistogram.Observe(remaining.Seconds())
 	chains, err := req.TLS.PeerCertificates[0].Verify(optsCopy)
 	if err != nil {
 		return nil, false, err
