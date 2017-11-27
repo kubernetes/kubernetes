@@ -17,13 +17,11 @@ limitations under the License.
 package priorities
 
 import (
-	"strings"
 	"sync"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
@@ -62,17 +60,14 @@ type podAffinityPriorityMap struct {
 	// counts store the mapping from node name to so-far computed score of
 	// the node.
 	counts map[string]float64
-	// failureDomains contain default failure domains keys
-	failureDomains priorityutil.Topologies
 	// The first error that we faced.
 	firstError error
 }
 
 func newPodAffinityPriorityMap(nodes []*v1.Node) *podAffinityPriorityMap {
 	return &podAffinityPriorityMap{
-		nodes:          nodes,
-		counts:         make(map[string]float64, len(nodes)),
-		failureDomains: priorityutil.Topologies{DefaultKeys: strings.Split(kubeletapis.DefaultFailureDomains, ",")},
+		nodes:  nodes,
+		counts: make(map[string]float64, len(nodes)),
 	}
 }
 
@@ -97,7 +92,7 @@ func (p *podAffinityPriorityMap) processTerm(term *v1.PodAffinityTerm, podDefini
 			p.Lock()
 			defer p.Unlock()
 			for _, node := range p.nodes {
-				if p.failureDomains.NodesHaveSameTopologyKey(node, fixedNode, term.TopologyKey) {
+				if priorityutil.NodesHaveSameTopologyKey(node, fixedNode, term.TopologyKey) {
 					p.counts[node.Name] += weight
 				}
 			}
