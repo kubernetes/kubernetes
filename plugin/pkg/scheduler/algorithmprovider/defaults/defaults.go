@@ -114,7 +114,7 @@ func defaultPredicates() sets.String {
 		factory.RegisterFitPredicateFactory(
 			"NoVolumeZoneConflict",
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
-				return predicates.NewVolumeZonePredicate(args.PVInfo, args.PVCInfo)
+				return predicates.NewVolumeZonePredicate(args.PVInfo, args.PVCInfo, args.StorageClassInfo)
 			},
 		),
 		// Fit is determined by whether or not there would be too many AWS EBS volumes attached to the node
@@ -165,11 +165,11 @@ func defaultPredicates() sets.String {
 		// Fit is determined based on whether a pod can tolerate all of the node's taints
 		factory.RegisterFitPredicate("PodToleratesNodeTaints", predicates.PodToleratesNodeTaints),
 
-		// Fit is determined by volume zone requirements.
+		// Fit is determined by volume topology requirements.
 		factory.RegisterFitPredicateFactory(
-			"NoVolumeNodeConflict",
+			predicates.CheckVolumeBinding,
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
-				return predicates.NewVolumeNodePredicate(args.PVInfo, args.PVCInfo, nil)
+				return predicates.NewVolumeBindingPredicate(args.VolumeBinder)
 			},
 		),
 	)

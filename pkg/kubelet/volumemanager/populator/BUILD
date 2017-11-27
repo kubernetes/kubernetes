@@ -19,6 +19,7 @@ go_library(
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/kubelet/volumemanager/cache:go_default_library",
         "//pkg/volume:go_default_library",
+        "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

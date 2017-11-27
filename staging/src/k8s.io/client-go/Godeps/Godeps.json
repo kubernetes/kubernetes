@@ -435,6 +435,10 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
+			"ImportPath": "k8s.io/api/events/v1beta1",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
 			"ImportPath": "k8s.io/api/extensions/v1beta1",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
@@ -696,6 +700,10 @@
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/common",
+			"Rev": "39a7bf85c140f972372c2a0d1ee40adbf0c8bfe1"
+		},
+		{
+			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto",
 			"Rev": "39a7bf85c140f972372c2a0d1ee40adbf0c8bfe1"
 		}
 	]

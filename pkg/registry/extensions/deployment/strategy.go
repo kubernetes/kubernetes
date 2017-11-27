@@ -18,6 +18,7 @@ package deployment
 
 import (
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -43,9 +44,18 @@ type deploymentStrategy struct {
 // objects via the REST API.
 var Strategy = deploymentStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// DefaultGarbageCollectionPolicy returns Orphan because that's the default
-// behavior before the server-side garbage collection is implemented.
-func (deploymentStrategy) DefaultGarbageCollectionPolicy() rest.GarbageCollectionPolicy {
+// DefaultGarbageCollectionPolicy returns OrphanDependents by default. For apps/v1, returns DeleteDependents.
+func (deploymentStrategy) DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) rest.GarbageCollectionPolicy {
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+		switch groupVersion {
+		case extensionsv1beta1.SchemeGroupVersion, appsv1beta1.SchemeGroupVersion, appsv1beta2.SchemeGroupVersion:
+			// for back compatibility
+			return rest.OrphanDependents
+		default:
+			return rest.DeleteDependents
+		}
+	}
 	return rest.OrphanDependents
 }
 

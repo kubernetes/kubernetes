@@ -69,11 +69,9 @@ func TestObserveAdmissionController(t *testing.T) {
 		"rejected":    "false",
 	}
 	expectHistogramCountTotal(t, "apiserver_admission_controller_admission_latencies_seconds", wantLabels, 1)
-	expectFindMetric(t, "apiserver_admission_controller_admission_latencies_seconds_summary", wantLabels)
 
 	wantLabels["type"] = "validate"
 	expectHistogramCountTotal(t, "apiserver_admission_controller_admission_latencies_seconds", wantLabels, 1)
-	expectFindMetric(t, "apiserver_admission_controller_admission_latencies_seconds_summary", wantLabels)
 }
 
 func TestObserveWebhook(t *testing.T) {
@@ -90,7 +88,6 @@ func TestObserveWebhook(t *testing.T) {
 		"rejected":    "false",
 	}
 	expectHistogramCountTotal(t, "apiserver_admission_webhook_admission_latencies_seconds", wantLabels, 1)
-	expectFindMetric(t, "apiserver_admission_webhook_admission_latencies_seconds_summary", wantLabels)
 }
 
 func TestWithMetrics(t *testing.T) {

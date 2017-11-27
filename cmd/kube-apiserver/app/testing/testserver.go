@@ -21,13 +21,14 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
+	pflag "github.com/spf13/pflag"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/generic/registry"
-	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
@@ -37,15 +38,21 @@ import (
 // TearDownFunc is to be called to tear down a test server.
 type TearDownFunc func()
 
-// StartTestServer starts a etcd server and kube-apiserver. A rest client config and a tear-down func
-// are returned.
+// TestServer return values supplied by kube-test-ApiServer
+type TestServer struct {
+	ClientConfig *restclient.Config        // Rest client config
+	ServerOpts   *options.ServerRunOptions // ServerOpts
+	TearDownFn   TearDownFunc              // TearDown function
+	TmpDir       string                    // Temp Dir used, by the apiserver
+}
+
+// StartTestServer starts a etcd server and kube-apiserver. A rest client config and a tear-down func,
+// and location of the tmpdir are returned.
 //
 // Note: we return a tear-down func instead of a stop channel because the later will leak temporariy
 // 		 files that becaues Golang testing's call to os.Exit will not give a stop channel go routine
 // 		 enough time to remove temporariy files.
-func StartTestServer(t *testing.T) (result *restclient.Config, tearDownForCaller TearDownFunc, err error) {
-	var tmpDir string
-	var etcdServer *etcdtesting.EtcdTestServer
+func StartTestServer(t *testing.T, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
 
 	// TODO : Remove TrackStorageCleanup below when PR
 	// https://github.com/kubernetes/kubernetes/pull/50690
@@ -56,46 +63,45 @@ func StartTestServer(t *testing.T) (result *restclient.Config, tearDownForCaller
 	tearDown := func() {
 		registry.CleanupStorage()
 		close(stopCh)
-		if etcdServer != nil {
-			etcdServer.Terminate(t)
-		}
-		if len(tmpDir) != 0 {
-			os.RemoveAll(tmpDir)
+		if len(result.TmpDir) != 0 {
+			os.RemoveAll(result.TmpDir)
 		}
 	}
 	defer func() {
-		if tearDownForCaller == nil {
+		if result.TearDownFn == nil {
 			tearDown()
 		}
 	}()
 
-	t.Logf("Starting etcd...")
-	etcdServer, storageConfig := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
-
-	tmpDir, err = ioutil.TempDir("", "kubernetes-kube-apiserver")
+	result.TmpDir, err = ioutil.TempDir("", "kubernetes-kube-apiserver")
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create temp dir: %v", err)
+		return result, fmt.Errorf("failed to create temp dir: %v", err)
 	}
+
+	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
 	s := options.NewServerRunOptions()
+	s.AddFlags(fs)
+
 	s.InsecureServing.BindPort = 0
+
 	s.SecureServing.Listener, s.SecureServing.BindPort, err = createListenerOnFreePort()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create listener: %v", err)
+		return result, fmt.Errorf("failed to create listener: %v", err)
 	}
-
-	s.SecureServing.ServerCert.CertDirectory = tmpDir
+	s.SecureServing.ServerCert.CertDirectory = result.TmpDir
 	s.ServiceClusterIPRange.IP = net.IPv4(10, 0, 0, 0)
 	s.ServiceClusterIPRange.Mask = net.CIDRMask(16, 32)
 	s.Etcd.StorageConfig = *storageConfig
-	s.Etcd.DefaultStorageMediaType = "application/json"
-	s.Admission.PluginNames = strings.Split("Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds", ",")
 	s.APIEnablement.RuntimeConfig.Set("api/all=true")
+
+	fs.Parse(customFlags)
 
 	t.Logf("Starting kube-apiserver on port %d...", s.SecureServing.BindPort)
 	server, err := app.CreateServerChain(s, stopCh)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create server chain: %v", err)
+		return result, fmt.Errorf("failed to create server chain: %v", err)
+
 	}
 	go func(stopCh <-chan struct{}) {
 		if err := server.PrepareRun().Run(stopCh); err != nil {
@@ -104,9 +110,10 @@ func StartTestServer(t *testing.T) (result *restclient.Config, tearDownForCaller
 	}(stopCh)
 
 	t.Logf("Waiting for /healthz to be ok...")
+
 	client, err := kubernetes.NewForConfig(server.LoopbackClientConfig)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create a client: %v", err)
+		return result, fmt.Errorf("failed to create a client: %v", err)
 	}
 	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
 		result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do()
@@ -118,23 +125,27 @@ func StartTestServer(t *testing.T) (result *restclient.Config, tearDownForCaller
 		return false, nil
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to wait for /healthz to return ok: %v", err)
+		return result, fmt.Errorf("failed to wait for /healthz to return ok: %v", err)
 	}
 
 	// from here the caller must call tearDown
-	return server.LoopbackClientConfig, tearDown, nil
+	result.ClientConfig = server.LoopbackClientConfig
+	result.ServerOpts = s
+	result.TearDownFn = tearDown
+
+	return result, nil
 }
 
-// StartTestServerOrDie calls StartTestServer with up to 5 retries on bind error and dies with
-// t.Fatal if it does not succeed.
-func StartTestServerOrDie(t *testing.T) (*restclient.Config, TearDownFunc) {
-	config, td, err := StartTestServer(t)
+// StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.
+func StartTestServerOrDie(t *testing.T, flags []string, storageConfig *storagebackend.Config) *TestServer {
+
+	result, err := StartTestServer(t, flags, storageConfig)
 	if err == nil {
-		return config, td
+		return &result
 	}
 
-	t.Fatalf("Failed to launch server: %v", err)
-	return nil, nil
+	t.Fatalf("failed to launch server: %v", err)
+	return nil
 }
 
 func createListenerOnFreePort() (net.Listener, int, error) {

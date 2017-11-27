@@ -47,6 +47,7 @@ var _ volume.VolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.PersistentVolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.DeletableVolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.ProvisionableVolumePlugin = &gcePersistentDiskPlugin{}
+var _ volume.ExpandableVolumePlugin = &gcePersistentDiskPlugin{}
 
 const (
 	gcePersistentDiskPluginName = "kubernetes.io/gce-pd"
@@ -188,6 +189,28 @@ func (plugin *gcePersistentDiskPlugin) newProvisionerInternal(options volume.Vol
 		},
 		options: options,
 	}, nil
+}
+
+func (plugin *gcePersistentDiskPlugin) RequiresFSResize() bool {
+	return true
+}
+
+func (plugin *gcePersistentDiskPlugin) ExpandVolumeDevice(
+	spec *volume.Spec,
+	newSize resource.Quantity,
+	oldSize resource.Quantity) (resource.Quantity, error) {
+	cloud, err := getCloudProvider(plugin.host.GetCloudProvider())
+
+	if err != nil {
+		return oldSize, err
+	}
+	pdName := spec.PersistentVolume.Spec.GCEPersistentDisk.PDName
+	updatedQuantity, err := cloud.ResizeDisk(pdName, oldSize, newSize)
+
+	if err != nil {
+		return oldSize, err
+	}
+	return updatedQuantity, nil
 }
 
 func (plugin *gcePersistentDiskPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {

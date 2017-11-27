@@ -2058,6 +2058,7 @@ EOF
       controller_yaml="${controller_yaml}/heapster-controller.yaml"
     fi
     remove-salt-config-comments "${controller_yaml}"
+
     sed -i -e "s@{{ cluster_name }}@${CLUSTER_NAME}@g" "${controller_yaml}"
     sed -i -e "s@{{ *base_metrics_memory *}}@${base_metrics_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *base_metrics_cpu *}}@${base_metrics_cpu}@g" "${controller_yaml}"
@@ -2067,6 +2068,27 @@ EOF
     sed -i -e "s@{{ *nanny_memory *}}@${nanny_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *metrics_cpu_per_node *}}@${metrics_cpu_per_node}@g" "${controller_yaml}"
     update-prometheus-to-sd-parameters ${controller_yaml}
+
+    if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "stackdriver" ]]; then
+      use_old_resources="${HEAPSTER_USE_OLD_STACKDRIVER_RESOURCES:-true}"
+      use_new_resources="${HEAPSTER_USE_NEW_STACKDRIVER_RESOURCES:-false}"
+      sed -i -e "s@{{ use_old_resources }}@${use_old_resources}@g" "${controller_yaml}"
+      sed -i -e "s@{{ use_new_resources }}@${use_new_resources}@g" "${controller_yaml}"
+    fi
+  fi
+  if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "stackdriver" ]] ||
+     ([[ "${ENABLE_CLUSTER_LOGGING:-}" == "true" ]] &&
+     [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]); then
+    if [[ "${ENABLE_METADATA_AGENT:-}" == "stackdriver" ]] &&
+       [[ "${METADATA_AGENT_VERSION:-}" != "" ]]; then
+      metadata_agent_cpu_request="${METADATA_AGENT_CPU_REQUEST:-40m}"
+      metadata_agent_memory_request="${METADATA_AGENT_MEMORY_REQUEST:-50Mi}"
+      setup-addon-manifests "addons" "metadata-agent/stackdriver"
+      deployment_yaml="${dst_dir}/metadata-agent/stackdriver/metadata-agent.yaml"
+      sed -i -e "s@{{ metadata_agent_version }}@${METADATA_AGENT_VERSION}@g" "${deployment_yaml}"
+      sed -i -e "s@{{ metadata_agent_cpu_request }}@${metadata_agent_cpu_request}@g" "${deployment_yaml}"
+      sed -i -e "s@{{ metadata_agent_memory_request }}@${metadata_agent_memory_request}@g" "${deployment_yaml}"
+    fi
   fi
   if [[ "${ENABLE_METRICS_SERVER:-}" == "true" ]]; then
     setup-addon-manifests "addons" "metrics-server"

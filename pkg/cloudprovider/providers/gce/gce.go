@@ -252,6 +252,8 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 	cloudConfig.TokenSource = google.ComputeTokenSource("")
 	cloudConfig.UseMetadataServer = true
 
+	featureMap := make(map[string]bool)
+	cloudConfig.AlphaFeatureGate = &AlphaFeatureGate{featureMap}
 	if configFile != nil {
 		if configFile.Global.ApiEndpoint != "" {
 			cloudConfig.ApiEndpoint = configFile.Global.ApiEndpoint

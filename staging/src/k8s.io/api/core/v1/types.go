@@ -4468,7 +4468,6 @@ const (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Event is a report of an event somewhere in the cluster.
-// TODO: Decide whether to store these separately or with the object they apply to.
 type Event struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -4508,7 +4507,50 @@ type Event struct {
 	// Type of this event (Normal, Warning), new types could be added in the future
 	// +optional
 	Type string `json:"type,omitempty" protobuf:"bytes,9,opt,name=type"`
+
+	// Time when this Event was first observed.
+	// +optional
+	EventTime metav1.MicroTime `json:"eventTime,omitempty" protobuf:"bytes,10,opt,name=eventTime"`
+
+	// Data about the Event series this event represents or nil if it's a singleton Event.
+	// +optional
+	Series *EventSeries `json:"series,omitempty" protobuf:"bytes,11,opt,name=series"`
+
+	// What action was taken/failed regarding to the Regarding object.
+	// +optional
+	Action string `json:"action,omitempty" protobuf:"bytes,12,opt,name=action"`
+
+	// Optional secondary object for more complex actions.
+	// +optional
+	Related *ObjectReference `json:"related,omitempty" protobuf:"bytes,13,opt,name=related"`
+
+	// Name of the controller that emitted this Event, e.g. `kubernetes.io/kubelet`.
+	// +optional
+	ReportingController string `json:"reportingComponent" protobuf:"bytes,14,opt,name=reportingComponent"`
+
+	// ID of the controller instance, e.g. `kubelet-xyzf`.
+	// +optional
+	ReportingInstance string `json:"reportingInstance" protobuf:"bytes,15,opt,name=reportingInstance"`
 }
+
+// EventSeries contain information on series of events, i.e. thing that was/is happening
+// continously for some time.
+type EventSeries struct {
+	// Number of occurrences in this series up to the last heartbeat time
+	Count int32 `json:"count,omitempty" protobuf:"varint,1,name=count"`
+	// Time of the last occurence observed
+	LastObservedTime metav1.MicroTime `json:"lastObservedTime,omitempty" protobuf:"bytes,2,name=lastObservedTime"`
+	// State of this Series: Ongoing or Finished
+	State EventSeriesState `json:"state,omitempty" protobuf:"bytes,3,name=state"`
+}
+
+type EventSeriesState string
+
+const (
+	EventSeriesStateOngoing  EventSeriesState = "Ongoing"
+	EventSeriesStateFinished EventSeriesState = "Finished"
+	EventSeriesStateUnknown  EventSeriesState = "Unknown"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 

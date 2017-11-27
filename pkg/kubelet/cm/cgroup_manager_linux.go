@@ -45,6 +45,8 @@ const (
 	libcontainerCgroupfs libcontainerCgroupManagerType = "cgroupfs"
 	// libcontainerSystemd means use libcontainer with systemd
 	libcontainerSystemd libcontainerCgroupManagerType = "systemd"
+	// systemdSuffix is the cgroup name suffix for systemd
+	systemdSuffix string = ".slice"
 )
 
 // hugePageSizeList is useful for converting to the hugetlb canonical unit
@@ -68,8 +70,8 @@ func ConvertCgroupNameToSystemd(cgroupName CgroupName, outputToCgroupFs bool) st
 			}
 			// detect if we are given a systemd style name.
 			// if so, we do not want to do double encoding.
-			if strings.HasSuffix(part, ".slice") {
-				part = strings.TrimSuffix(part, ".slice")
+			if IsSystemdStyleName(part) {
+				part = strings.TrimSuffix(part, systemdSuffix)
 				separatorIndex := strings.LastIndex(part, "-")
 				if separatorIndex >= 0 && separatorIndex < len(part) {
 					part = part[separatorIndex+1:]
@@ -87,8 +89,8 @@ func ConvertCgroupNameToSystemd(cgroupName CgroupName, outputToCgroupFs bool) st
 		result = "-"
 	}
 	// always have a .slice suffix
-	if !strings.HasSuffix(result, ".slice") {
-		result = result + ".slice"
+	if !IsSystemdStyleName(result) {
+		result = result + systemdSuffix
 	}
 
 	// if the caller desired the result in cgroupfs format...
@@ -112,6 +114,13 @@ func ConvertCgroupFsNameToSystemd(cgroupfsName string) (string, error) {
 	// above and beyond the simple assumption here that the base of the path encodes the hierarchy
 	// per systemd convention.
 	return path.Base(cgroupfsName), nil
+}
+
+func IsSystemdStyleName(name string) bool {
+	if strings.HasSuffix(name, systemdSuffix) {
+		return true
+	}
+	return false
 }
 
 // libcontainerAdapter provides a simplified interface to libcontainer based on libcontainer type.
@@ -151,15 +160,18 @@ func (l *libcontainerAdapter) revertName(name string) CgroupName {
 	if l.cgroupManagerType != libcontainerSystemd {
 		return CgroupName(name)
 	}
+	return CgroupName(RevertFromSystemdToCgroupStyleName(name))
+}
 
+func RevertFromSystemdToCgroupStyleName(name string) string {
 	driverName, err := ConvertCgroupFsNameToSystemd(name)
 	if err != nil {
 		panic(err)
 	}
-	driverName = strings.TrimSuffix(driverName, ".slice")
+	driverName = strings.TrimSuffix(driverName, systemdSuffix)
 	driverName = strings.Replace(driverName, "-", "/", -1)
 	driverName = strings.Replace(driverName, "_", "-", -1)
-	return CgroupName(driverName)
+	return driverName
 }
 
 // adaptName converts a CgroupName identifier to a driver specific conversion value.

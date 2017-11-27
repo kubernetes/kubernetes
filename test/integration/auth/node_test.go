@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -27,9 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
 	"k8s.io/apiserver/pkg/authentication/user"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -37,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
 	"k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -131,6 +136,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+
 	if _, err := superuserClient.Core().PersistentVolumes().Create(&api.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{Name: "mypv"},
 		Spec: api.PersistentVolumeSpec{
@@ -249,6 +255,21 @@ func TestNodeAuthorizer(t *testing.T) {
 		})
 	}
 
+	capacity := 50
+	updatePVCCapacity := func(client clientset.Interface) error {
+		capacity++
+		statusString := fmt.Sprintf("{\"status\": {\"capacity\": {\"storage\": \"%dG\"}}}", capacity)
+		patchBytes := []byte(statusString)
+		_, err := client.Core().PersistentVolumeClaims("ns").Patch("mypvc", types.StrategicMergePatchType, patchBytes, "status")
+		return err
+	}
+
+	updatePVCPhase := func(client clientset.Interface) error {
+		patchBytes := []byte(`{"status":{"phase": "Bound"}}`)
+		_, err := client.Core().PersistentVolumeClaims("ns").Patch("mypvc", types.StrategicMergePatchType, patchBytes, "status")
+		return err
+	}
+
 	nodeanonClient := clientsetForToken(tokenNodeUnknown, clientConfig)
 	node1Client := clientsetForToken(tokenNode1, clientConfig)
 	node2Client := clientsetForToken(tokenNode2, clientConfig)
@@ -287,6 +308,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectForbidden(t, getConfigMap(node2Client))
 	expectForbidden(t, getPVC(node2Client))
 	expectForbidden(t, getPV(node2Client))
+
 	expectForbidden(t, createNode2NormalPod(nodeanonClient))
 	// mirror pod and self node lifecycle is allowed
 	expectAllowed(t, createNode2MirrorPod(node2Client))
@@ -333,6 +355,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectAllowed(t, getConfigMap(node2Client))
 	expectAllowed(t, getPVC(node2Client))
 	expectAllowed(t, getPV(node2Client))
+
 	expectForbidden(t, createNode2NormalPod(node2Client))
 	expectAllowed(t, updateNode2NormalPodStatus(node2Client))
 	expectAllowed(t, deleteNode2NormalPod(node2Client))
@@ -343,6 +366,24 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectAllowed(t, createNode2MirrorPod(superuserClient))
 	expectAllowed(t, createNode2NormalPodEviction(node2Client))
 	expectAllowed(t, createNode2MirrorPodEviction(node2Client))
+
+	// re-create a pod as an admin to add object references
+	expectAllowed(t, createNode2NormalPod(superuserClient))
+	// With ExpandPersistentVolumes feature disabled
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, false)()
+	// node->pvc relationship not established
+	expectForbidden(t, updatePVCCapacity(node1Client))
+	// node->pvc relationship established but feature is disabled
+	expectForbidden(t, updatePVCCapacity(node2Client))
+
+	//Enabled ExpandPersistentVolumes feature
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, true)()
+	// Node->pvc relationship not established
+	expectForbidden(t, updatePVCCapacity(node1Client))
+	// node->pvc relationship established and feature is enabled
+	expectAllowed(t, updatePVCCapacity(node2Client))
+	// node->pvc relationship established but updating phase
+	expectForbidden(t, updatePVCPhase(node2Client))
 }
 
 func expectForbidden(t *testing.T, err error) {

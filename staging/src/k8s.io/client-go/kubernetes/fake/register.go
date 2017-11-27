@@ -33,6 +33,7 @@ import (
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -90,6 +91,7 @@ func AddToScheme(scheme *runtime.Scheme) {
 	batchv2alpha1.AddToScheme(scheme)
 	certificatesv1beta1.AddToScheme(scheme)
 	corev1.AddToScheme(scheme)
+	eventsv1beta1.AddToScheme(scheme)
 	extensionsv1beta1.AddToScheme(scheme)
 	networkingv1.AddToScheme(scheme)
 	policyv1beta1.AddToScheme(scheme)
@@ -98,8 +100,8 @@ func AddToScheme(scheme *runtime.Scheme) {
 	rbacv1alpha1.AddToScheme(scheme)
 	schedulingv1alpha1.AddToScheme(scheme)
 	settingsv1alpha1.AddToScheme(scheme)
-	storagev1alpha1.AddToScheme(scheme)
 	storagev1beta1.AddToScheme(scheme)
 	storagev1.AddToScheme(scheme)
+	storagev1alpha1.AddToScheme(scheme)
 
 }

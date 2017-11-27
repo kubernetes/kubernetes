@@ -17,6 +17,7 @@ limitations under the License.
 package operationexecutor
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
@@ -33,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/resizefs"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -451,6 +454,14 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 			glog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.WaitForAttach succeeded", fmt.Sprintf("DevicePath %q", devicePath)))
 
+			// resizeFileSystem will resize the file system if user has requested a resize of
+			// underlying persistent volume and is allowed to do so.
+			resizeError := og.resizeFileSystem(volumeToMount, devicePath, volumePlugin.GetPluginName())
+
+			if resizeError != nil {
+				return volumeToMount.GenerateErrorDetailed("MountVolume.Resize failed", resizeError)
+			}
+
 			deviceMountPath, err :=
 				volumeAttacher.GetDeviceMountPath(volumeToMount.VolumeSpec)
 			if err != nil {
@@ -526,6 +537,65 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 		return nil
 	}, volumePlugin.GetPluginName(), nil
+}
+
+func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, devicePath string, pluginName string) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+		glog.V(6).Infof("Resizing is not enabled for this volume %s", volumeToMount.VolumeName)
+		return nil
+	}
+	mounter := og.volumePluginMgr.Host.GetMounter(pluginName)
+	// Get expander, if possible
+	expandableVolumePlugin, _ :=
+		og.volumePluginMgr.FindExpandablePluginBySpec(volumeToMount.VolumeSpec)
+
+	if expandableVolumePlugin != nil &&
+		expandableVolumePlugin.RequiresFSResize() &&
+		volumeToMount.VolumeSpec.PersistentVolume != nil {
+		pv := volumeToMount.VolumeSpec.PersistentVolume
+		pvc, err := og.kubeClient.CoreV1().PersistentVolumeClaims(pv.Spec.ClaimRef.Namespace).Get(pv.Spec.ClaimRef.Name, metav1.GetOptions{})
+		if err != nil {
+			// Return error rather than leave the file system un-resized, caller will log and retry
+			return volumeToMount.GenerateErrorDetailed("MountVolume get PVC failed", err)
+		}
+
+		pvcStatusCap := pvc.Status.Capacity[v1.ResourceStorage]
+		pvSpecCap := pv.Spec.Capacity[v1.ResourceStorage]
+		if pvcStatusCap.Cmp(pvSpecCap) < 0 {
+			// File system resize was requested, proceed
+			glog.V(4).Infof(volumeToMount.GenerateMsgDetailed("MountVolume.resizeFileSystem entering", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath)))
+
+			diskFormatter := &mount.SafeFormatAndMount{
+				Interface: mounter,
+				Exec:      og.volumePluginMgr.Host.GetExec(expandableVolumePlugin.GetPluginName()),
+			}
+
+			resizer := resizefs.NewResizeFs(diskFormatter)
+			resizeStatus, resizeErr := resizer.Resize(devicePath)
+
+			if resizeErr != nil {
+				resizeDetailedError := volumeToMount.GenerateErrorDetailed("MountVolume.resizeFileSystem failed", resizeErr)
+				glog.Error(resizeDetailedError)
+				og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FileSystemResizeFailed, resizeDetailedError.Error())
+				return resizeDetailedError
+			}
+
+			if resizeStatus {
+				simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MountVolume.resizeFileSystem succeeded", "")
+				og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, simpleMsg)
+				glog.Infof(detailedMsg)
+			}
+
+			// File system resize succeeded, now update the PVC's Capacity to match the PV's
+			err = updatePVCStatusCapacity(pvc.Name, pvc, pv.Spec.Capacity, og.kubeClient)
+			if err != nil {
+				// On retry, resizeFileSystem will be called again but do nothing
+				return volumeToMount.GenerateErrorDetailed("MountVolume update PVC status failed", err)
+			}
+			return nil
+		}
+	}
+	return nil
 }
 
 func (og *operationGenerator) GenerateUnmountVolumeFunc(
@@ -1104,6 +1174,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 				og.recorder.Eventf(pvcWithResizeRequest.PVC, v1.EventTypeWarning, kevents.VolumeResizeFailed, expandErr.Error())
 				return expandErr
 			}
+			glog.Infof("ExpandVolume succeeded for volume %s", pvcWithResizeRequest.QualifiedName())
 			newSize = updatedSize
 			// k8s doesn't have transactions, we can't guarantee that after updating PV - updating PVC will be
 			// successful, that is why all PVCs for which pvc.Spec.Size > pvc.Status.Size must be reprocessed
@@ -1115,6 +1186,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 				og.recorder.Eventf(pvcWithResizeRequest.PVC, v1.EventTypeWarning, kevents.VolumeResizeFailed, updateErr.Error())
 				return updateErr
 			}
+			glog.Infof("ExpandVolume.UpdatePV succeeded for volume %s", pvcWithResizeRequest.QualifiedName())
 		}
 
 		// No Cloudprovider resize needed, lets mark resizing as done
@@ -1189,4 +1261,31 @@ func isDeviceOpened(deviceToDetach AttachedVolume, mounter mount.Interface) (boo
 		}
 	}
 	return deviceOpened, nil
+}
+
+func updatePVCStatusCapacity(pvcName string, pvc *v1.PersistentVolumeClaim, capacity v1.ResourceList, client clientset.Interface) error {
+	pvcCopy := pvc.DeepCopy()
+
+	oldData, err := json.Marshal(pvcCopy)
+	if err != nil {
+		return fmt.Errorf("Failed to marshal oldData for pvc %q with %v", pvcName, err)
+	}
+
+	pvcCopy.Status.Capacity = capacity
+	newData, err := json.Marshal(pvcCopy)
+
+	if err != nil {
+		return fmt.Errorf("Failed to marshal newData for pvc %q with %v", pvcName, err)
+	}
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, pvcCopy)
+
+	if err != nil {
+		return fmt.Errorf("Failed to CreateTwoWayMergePatch for pvc %q with %v ", pvcName, err)
+	}
+	_, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).
+		Patch(pvcName, types.StrategicMergePatchType, patchBytes, "status")
+	if err != nil {
+		return fmt.Errorf("Failed to patch PVC %q with %v", pvcName, err)
+	}
+	return nil
 }

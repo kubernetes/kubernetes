@@ -1526,14 +1526,20 @@ function check-cluster() {
   fi
 
   local start_time=$(date +%s)
+  local curl_out=$(mktemp)
+  kube::util::trap_add "rm -f ${curl_out}" EXIT
   until curl --cacert "${CERT_DIR}/pki/ca.crt" \
           -H "Authorization: Bearer ${KUBE_BEARER_TOKEN}" \
           ${secure} \
-          --max-time 5 --fail --output /dev/null --silent \
-          "https://${KUBE_MASTER_IP}/api/v1/pods"; do
+          --max-time 5 --fail \
+          "https://${KUBE_MASTER_IP}/api/v1/pods" > "${curl_out}" 2>&1; do
       local elapsed=$(($(date +%s) - ${start_time}))
       if [[ ${elapsed} -gt ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} ]]; then
           echo -e "${color_red}Cluster failed to initialize within ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} seconds.${color_norm}" >&2
+          echo "Last output from querying API server follows:" >&2
+          echo "-----------------------------------------------------" >&2
+          cat "${curl_out}" >&2
+          echo "-----------------------------------------------------" >&2
           exit 2
       fi
       printf "."

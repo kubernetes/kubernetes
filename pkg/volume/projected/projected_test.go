@@ -545,6 +545,48 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 		success    bool
 	}{
 		{
+			name: "annotation",
+			volumeFile: []v1.DownwardAPIVolumeFile{
+				{Path: "annotation", FieldRef: &v1.ObjectFieldSelector{
+					FieldPath: "metadata.annotations['a1']"}}},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: testNamespace,
+					Annotations: map[string]string{
+						"a1": "value1",
+						"a2": "value2",
+					},
+					UID: testPodUID},
+			},
+			mode: 0644,
+			payload: map[string]util.FileProjection{
+				"annotation": {Data: []byte("value1"), Mode: 0644},
+			},
+			success: true,
+		},
+		{
+			name: "annotation-error",
+			volumeFile: []v1.DownwardAPIVolumeFile{
+				{Path: "annotation", FieldRef: &v1.ObjectFieldSelector{
+					FieldPath: "metadata.annotations['']"}}},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: testNamespace,
+					Annotations: map[string]string{
+						"a1": "value1",
+						"a2": "value2",
+					},
+					UID: testPodUID},
+			},
+			mode: 0644,
+			payload: map[string]util.FileProjection{
+				"annotation": {Data: []byte("does-not-matter-because-this-test-case-will-fail-anyway"), Mode: 0644},
+			},
+			success: false,
+		},
+		{
 			name: "labels",
 			volumeFile: []v1.DownwardAPIVolumeFile{
 				{Path: "labels", FieldRef: &v1.ObjectFieldSelector{

@@ -307,7 +307,7 @@ type CpuStats struct {
 }
 
 type PerDiskStats struct {
-	Device string            `json:"-"`
+	Device string            `json:"device"`
 	Major  uint64            `json:"major"`
 	Minor  uint64            `json:"minor"`
 	Stats  map[string]uint64 `json:"stats"`

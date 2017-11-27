@@ -23,7 +23,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeproxyscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
+	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
@@ -57,6 +61,12 @@ const (
 	DefaultEtcdCertDir = "/etc/kubernetes/pki/etcd"
 	// DefaultEtcdClusterServiceName is the default name of the service backing the etcd cluster
 	DefaultEtcdClusterServiceName = "etcd-cluster"
+	// DefaultProxyBindAddressv4 is the default bind address when the advertise address is v4
+	DefaultProxyBindAddressv4 = "0.0.0.0"
+	// DefaultProxyBindAddressv6 is the default bind address when the advertise address is v6
+	DefaultProxyBindAddressv6 = "::"
+	// KubeproxyKubeConfigFileName efines the file name for the kube-proxy's KubeConfig file
+	KubeproxyKubeConfigFileName = "/var/lib/kube-proxy/kubeconfig.conf"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -104,7 +114,26 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 	}
 
 	SetDefaultsEtcdSelfHosted(obj)
-	SetDefaults_KubeletConfiguration(obj)
+	if features.Enabled(obj.FeatureGates, features.DynamicKubeletConfig) {
+		SetDefaults_KubeletConfiguration(obj)
+	}
+	SetDefaults_ProxyConfiguration(obj)
+}
+
+// SetDefaults_ProxyConfiguration assigns default values for the Proxy
+func SetDefaults_ProxyConfiguration(obj *MasterConfiguration) {
+	if obj.KubeProxy.Config == nil {
+		obj.KubeProxy.Config = &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
+	}
+	if obj.KubeProxy.Config.ClusterCIDR == "" && obj.Networking.PodSubnet != "" {
+		obj.KubeProxy.Config.ClusterCIDR = obj.Networking.PodSubnet
+	}
+
+	if obj.KubeProxy.Config.ClientConnection.KubeConfigFile == "" {
+		obj.KubeProxy.Config.ClientConnection.KubeConfigFile = KubeproxyKubeConfigFileName
+	}
+
+	kubeproxyscheme.Scheme.Default(obj.KubeProxy.Config)
 }
 
 // SetDefaults_NodeConfiguration assigns default values to a regular node
@@ -180,5 +209,10 @@ func SetDefaults_KubeletConfiguration(obj *MasterConfiguration) {
 	}
 	if obj.KubeletConfiguration.BaseConfig.CAdvisorPort == nil {
 		obj.KubeletConfiguration.BaseConfig.CAdvisorPort = utilpointer.Int32Ptr(0)
+	}
+
+	scheme, _, _ := kubeletscheme.NewSchemeAndCodecs()
+	if scheme != nil {
+		scheme.Default(obj.KubeletConfiguration.BaseConfig)
 	}
 }

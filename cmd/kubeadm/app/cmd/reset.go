@@ -47,30 +47,30 @@ func NewCmdReset(out io.Writer) *cobra.Command {
 	var skipPreFlight bool
 	var certsDir string
 	var criSocketPath string
-	var ignoreChecksErrors []string
+	var ignorePreflightErrors []string
 
 	cmd := &cobra.Command{
 		Use:   "reset",
 		Short: "Run this to revert any changes made to this host by 'kubeadm init' or 'kubeadm join'.",
 		Run: func(cmd *cobra.Command, args []string) {
-			ignoreChecksErrorsSet, err := validation.ValidateIgnoreChecksErrors(ignoreChecksErrors, skipPreFlight)
+			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
 			kubeadmutil.CheckErr(err)
 
-			r, err := NewReset(ignoreChecksErrorsSet, certsDir, criSocketPath)
+			r, err := NewReset(ignorePreflightErrorsSet, certsDir, criSocketPath)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(r.Run(out))
 		},
 	}
 
 	cmd.PersistentFlags().StringSliceVar(
-		&ignoreChecksErrors, "ignore-checks-errors", ignoreChecksErrors,
+		&ignorePreflightErrors, "ignore-preflight-errors", ignorePreflightErrors,
 		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
 	)
 	cmd.PersistentFlags().BoolVar(
 		&skipPreFlight, "skip-preflight-checks", false,
 		"Skip preflight checks which normally run before modifying the system.",
 	)
-	cmd.PersistentFlags().MarkDeprecated("skip-preflight-checks", "it is now equivalent to --ignore-checks-errors=all")
+	cmd.PersistentFlags().MarkDeprecated("skip-preflight-checks", "it is now equivalent to --ignore-preflight-errors=all")
 
 	cmd.PersistentFlags().StringVar(
 		&certsDir, "cert-dir", kubeadmapiext.DefaultCertificatesDir,
@@ -92,10 +92,10 @@ type Reset struct {
 }
 
 // NewReset instantiate Reset struct
-func NewReset(ignoreChecksErrors sets.String, certsDir, criSocketPath string) (*Reset, error) {
+func NewReset(ignorePreflightErrors sets.String, certsDir, criSocketPath string) (*Reset, error) {
 	fmt.Println("[preflight] Running pre-flight checks.")
 
-	if err := preflight.RunRootCheckOnly(ignoreChecksErrors); err != nil {
+	if err := preflight.RunRootCheckOnly(ignorePreflightErrors); err != nil {
 		return nil, err
 	}
 

@@ -14,6 +14,7 @@ go_library(
         "device_util_unsupported.go",
         "doc.go",
         "error.go",
+        "finalizer.go",
         "fs_unsupported.go",
         "io_util.go",
         "metrics.go",
@@ -61,6 +62,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "finalizer_test.go",
         "util_test.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
@@ -74,6 +76,7 @@ go_test(
     deps = [
         "//pkg/apis/core/install:go_default_library",
         "//pkg/apis/core/v1/helper:go_default_library",
+        "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",

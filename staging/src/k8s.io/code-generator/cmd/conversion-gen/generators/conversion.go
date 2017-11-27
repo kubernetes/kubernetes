@@ -279,7 +279,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			externalTypes := externalTypesValues[0]
 			glog.V(5).Infof("  external types tags: %q", externalTypes)
 			var err error
-			typesPkg, err = context.AddDirectory(filepath.Join(pkg.Path, externalTypes))
+			typesPkg, err = context.AddDirectory(externalTypes)
 			if err != nil {
 				glog.Fatalf("cannot import package %s", externalTypes)
 			}

@@ -50,6 +50,7 @@ go_library(
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",

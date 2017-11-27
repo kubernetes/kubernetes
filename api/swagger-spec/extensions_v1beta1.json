@@ -10314,6 +10314,13 @@
        "$ref": "v1beta1.AllowedHostPath"
       },
       "description": "is a white list of allowed host paths. Empty indicates that all host paths may be used."
+     },
+     "allowedFlexVolumes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.AllowedFlexVolume"
+      },
+      "description": "AllowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes is allowed in the \"Volumes\" field."
      }
     }
    },
@@ -10439,6 +10446,19 @@
      "pathPrefix": {
       "type": "string",
       "description": "is the path prefix that the host volume must match. It does not support `*`. Trailing slashes are trimmed when validating the path prefix with a host path.\n\nExamples: `/foo` would allow `/foo`, `/foo/` and `/foo/bar` `/foo` would not allow `/food` or `/etc/foo`"
+     }
+    }
+   },
+   "v1beta1.AllowedFlexVolume": {
+    "id": "v1beta1.AllowedFlexVolume",
+    "description": "AllowedFlexVolume represents a single Flexvolume that is allowed to be used.",
+    "required": [
+     "driver"
+    ],
+    "properties": {
+     "driver": {
+      "type": "string",
+      "description": "Driver is the name of the Flexvolume driver."
      }
     }
    },

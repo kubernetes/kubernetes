@@ -19634,7 +19634,9 @@
     "description": "Event is a report of an event somewhere in the cluster.",
     "required": [
      "metadata",
-     "involvedObject"
+     "involvedObject",
+     "reportingComponent",
+     "reportingInstance"
     ],
     "properties": {
      "kind": {
@@ -19681,6 +19683,30 @@
      "type": {
       "type": "string",
       "description": "Type of this event (Normal, Warning), new types could be added in the future"
+     },
+     "eventTime": {
+      "type": "string",
+      "description": "Time when this Event was first observed."
+     },
+     "series": {
+      "$ref": "v1.EventSeries",
+      "description": "Data about the Event series this event represents or nil if it's a singleton Event."
+     },
+     "action": {
+      "type": "string",
+      "description": "What action was taken/failed regarding to the Regarding object."
+     },
+     "related": {
+      "$ref": "v1.ObjectReference",
+      "description": "Optional secondary object for more complex actions."
+     },
+     "reportingComponent": {
+      "type": "string",
+      "description": "Name of the controller that emitted this Event, e.g. `kubernetes.io/kubelet`."
+     },
+     "reportingInstance": {
+      "type": "string",
+      "description": "ID of the controller instance, e.g. `kubelet-xyzf`."
      }
     }
    },
@@ -19695,6 +19721,25 @@
      "host": {
       "type": "string",
       "description": "Node name on which the event is generated."
+     }
+    }
+   },
+   "v1.EventSeries": {
+    "id": "v1.EventSeries",
+    "description": "EventSeries contain information on series of events, i.e. thing that was/is happening continously for some time.",
+    "properties": {
+     "count": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Number of occurrences in this series up to the last heartbeat time"
+     },
+     "lastObservedTime": {
+      "type": "string",
+      "description": "Time of the last occurence observed"
+     },
+     "state": {
+      "type": "string",
+      "description": "State of this Series: Ongoing or Finished"
      }
     }
    },

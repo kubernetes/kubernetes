@@ -938,6 +938,11 @@ type PodSecurityPolicySpec struct {
 	// is a white list of allowed host paths. Empty indicates that all host paths may be used.
 	// +optional
 	AllowedHostPaths []AllowedHostPath `json:"allowedHostPaths,omitempty" protobuf:"bytes,17,rep,name=allowedHostPaths"`
+	// AllowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all
+	// Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes
+	// is allowed in the "Volumes" field.
+	// +optional
+	AllowedFlexVolumes []AllowedFlexVolume `json:"allowedFlexVolumes,omitempty" protobuf:"bytes,18,rep,name=allowedFlexVolumes"`
 }
 
 // defines the host volume conditions that will be enabled by a policy
@@ -980,6 +985,12 @@ var (
 	AzureDisk             FSType = "azureDisk"
 	All                   FSType = "*"
 )
+
+// AllowedFlexVolume represents a single Flexvolume that is allowed to be used.
+type AllowedFlexVolume struct {
+	// Driver is the name of the Flexvolume driver.
+	Driver string `json:"driver" protobuf:"bytes,1,opt,name=driver"`
+}
 
 // Host Port Range defines a range of host ports that will be enabled by a policy
 // for pods to use.  It requires both the start and end to be defined.
