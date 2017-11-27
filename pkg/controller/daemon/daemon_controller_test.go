@@ -1450,6 +1450,9 @@ func TestTaintPressureNodeDaemonLaunchesPod(t *testing.T) {
 		// Rollback feature gate to false.
 		utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=False")
 	}
+
+	// Rollback feature gate to default value.
+	utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=False")
 }
 
 // DaemonSet should launch a critical pod even when the node has insufficient free resource.
@@ -1495,6 +1498,9 @@ func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
 			t.Fatalf("unexpected UpdateStrategy %+v", strategy)
 		}
 	}
+
+	// Rollback feature gate to default value.
+	utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=False")
 }
 
 // DaemonSets should NOT launch a critical pod when there are port conflicts.
@@ -1526,6 +1532,9 @@ func TestPortConflictNodeDaemonDoesNotLaunchCriticalPod(t *testing.T) {
 		manager.dsStore.Add(ds)
 		syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 0)
 	}
+
+	// Rollback feature gate to default value.
+	utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=False")
 }
 
 func setDaemonSetCritical(ds *extensions.DaemonSet) {
