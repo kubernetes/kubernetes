@@ -179,9 +179,8 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.DiscoveryInterface, p
 			return
 		}
 
-		// Something has changed, so track the new state and perform a sync.
+		// Something has changed, time to sync.
 		glog.V(2).Infof("syncing garbage collector with updated resources from discovery: %v", newResources)
-		oldResources = newResources
 
 		// Ensure workers are paused to avoid processing events before informers
 		// have resynced.
@@ -208,7 +207,13 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.DiscoveryInterface, p
 		}
 		if !controller.WaitForCacheSync("garbage collector", stopCh, gc.dependencyGraphBuilder.IsSynced) {
 			utilruntime.HandleError(fmt.Errorf("timed out waiting for dependency graph builder sync during GC sync"))
+			return
 		}
+
+		// Finally, keep track of our new state. Do this after all preceding steps
+		// have succeeded to ensure we'll retry on subsequent syncs if an error
+		// occured.
+		oldResources = newResources
 	}, period, stopCh)
 }
 
