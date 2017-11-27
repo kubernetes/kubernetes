@@ -32,7 +32,8 @@ const (
 )
 
 var (
-	latencyBuckets       = prometheus.ExponentialBuckets(25000, 2.0, 7)
+	// Use buckets ranging from 25 ms to ~2.5 seconds.
+	latencyBuckets       = prometheus.ExponentialBuckets(25000, 2.5, 5)
 	latencySummaryMaxAge = 5 * time.Hour
 
 	// Metrics provides access to all admission metrics.
@@ -112,17 +113,17 @@ func newAdmissionMetrics() *AdmissionMetrics {
 	// Each step is identified by a distinct type label value.
 	step := newMetricSet("step",
 		[]string{"type", "operation", "group", "version", "resource", "subresource", "rejected"},
-		"Admission sub-step %s, broken out for each operation and API resource and step type (validate or admit).")
+		"Admission sub-step %s, broken out for each operation and API resource and step type (validate or admit).", true)
 
 	// Built-in admission controller metrics. Each admission controller is identified by name.
 	controller := newMetricSet("controller",
 		[]string{"name", "type", "operation", "group", "version", "resource", "subresource", "rejected"},
-		"Admission controller %s, identified by name and broken out for each operation and API resource and type (validate or admit).")
+		"Admission controller %s, identified by name and broken out for each operation and API resource and type (validate or admit).", false)
 
 	// Admission webhook metrics. Each webhook is identified by name.
 	webhook := newMetricSet("webhook",
 		[]string{"name", "type", "operation", "group", "version", "resource", "subresource", "rejected"},
-		"Admission webhook %s, identified by name and broken out for each operation and API resource and type (validate or admit).")
+		"Admission webhook %s, identified by name and broken out for each operation and API resource and type (validate or admit).", false)
 
 	step.mustRegister()
 	controller.mustRegister()
@@ -159,7 +160,21 @@ type metricSet struct {
 	latenciesSummary *prometheus.SummaryVec
 }
 
-func newMetricSet(name string, labels []string, helpTemplate string) *metricSet {
+func newMetricSet(name string, labels []string, helpTemplate string, hasSummary bool) *metricSet {
+	var summary *prometheus.SummaryVec
+	if hasSummary {
+		summary = prometheus.NewSummaryVec(
+			prometheus.SummaryOpts{
+				Namespace: namespace,
+				Subsystem: subsystem,
+				Name:      fmt.Sprintf("%s_admission_latencies_seconds_summary", name),
+				Help:      fmt.Sprintf(helpTemplate, "latency summary"),
+				MaxAge:    latencySummaryMaxAge,
+			},
+			labels,
+		)
+	}
+
 	return &metricSet{
 		latencies: prometheus.NewHistogramVec(
 			prometheus.HistogramOpts{
@@ -171,34 +186,32 @@ func newMetricSet(name string, labels []string, helpTemplate string) *metricSet 
 			},
 			labels,
 		),
-		latenciesSummary: prometheus.NewSummaryVec(
-			prometheus.SummaryOpts{
-				Namespace: namespace,
-				Subsystem: subsystem,
-				Name:      fmt.Sprintf("%s_admission_latencies_seconds_summary", name),
-				Help:      fmt.Sprintf(helpTemplate, "latency summary"),
-				MaxAge:    latencySummaryMaxAge,
-			},
-			labels,
-		),
+
+		latenciesSummary: summary,
 	}
 }
 
 // MustRegister registers all the prometheus metrics in the metricSet.
 func (m *metricSet) mustRegister() {
 	prometheus.MustRegister(m.latencies)
-	prometheus.MustRegister(m.latenciesSummary)
+	if m.latenciesSummary != nil {
+		prometheus.MustRegister(m.latenciesSummary)
+	}
 }
 
 // Reset resets all the prometheus metrics in the metricSet.
 func (m *metricSet) reset() {
 	m.latencies.Reset()
-	m.latenciesSummary.Reset()
+	if m.latenciesSummary != nil {
+		m.latenciesSummary.Reset()
+	}
 }
 
 // Observe records an observed admission event to all metrics in the metricSet.
 func (m *metricSet) observe(elapsed time.Duration, labels ...string) {
 	elapsedMicroseconds := float64(elapsed / time.Microsecond)
 	m.latencies.WithLabelValues(labels...).Observe(elapsedMicroseconds)
-	m.latenciesSummary.WithLabelValues(labels...).Observe(elapsedMicroseconds)
+	if m.latenciesSummary != nil {
+		m.latenciesSummary.WithLabelValues(labels...).Observe(elapsedMicroseconds)
+	}
 }

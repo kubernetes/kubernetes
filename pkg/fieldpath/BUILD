@@ -13,7 +13,10 @@ go_library(
         "fieldpath.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/fieldpath",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library"],
+    deps = [
+        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/validation:go_default_library",
+    ],
 )
 
 go_test(

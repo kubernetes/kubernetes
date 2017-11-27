@@ -91,7 +91,7 @@ func (m *metadata) InstanceID(name types.NodeName) (string, error) {
 // InstanceType returns the type of the specified instance.
 func (m *metadata) InstanceType(name types.NodeName) (string, error) {
 	instanceType, err := m.get(metadataTypeInstanceType)
-	if err == nil {
+	if err != nil {
 		return "", fmt.Errorf("could not get instance type: %v", err)
 	}
 

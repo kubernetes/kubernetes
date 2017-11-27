@@ -3386,6 +3386,9 @@ func describePodSecurityPolicy(psp *extensions.PodSecurityPolicy) (string, error
 		w.Write(LEVEL_1, "Allowed Capabilities:\t%s\n", capsToString(psp.Spec.AllowedCapabilities))
 		w.Write(LEVEL_1, "Allowed Volume Types:\t%s\n", fsTypeToString(psp.Spec.Volumes))
 
+		if len(psp.Spec.AllowedFlexVolumes) > 0 {
+			w.Write(LEVEL_1, "Allowed FlexVolume Types:\t%s\n", flexVolumesToString(psp.Spec.AllowedFlexVolumes))
+		}
 		w.Write(LEVEL_1, "Allow Host Network:\t%t\n", psp.Spec.HostNetwork)
 		w.Write(LEVEL_1, "Allow Host Ports:\t%s\n", hostPortRangeToString(psp.Spec.HostPorts))
 		w.Write(LEVEL_1, "Allow Host PID:\t%t\n", psp.Spec.HostPID)
@@ -3419,10 +3422,14 @@ func describePodSecurityPolicy(psp *extensions.PodSecurityPolicy) (string, error
 }
 
 func stringOrNone(s string) string {
+	return stringOrDefaultValue(s, "<none>")
+}
+
+func stringOrDefaultValue(s, defaultValue string) string {
 	if len(s) > 0 {
 		return s
 	}
-	return "<none>"
+	return defaultValue
 }
 
 func fsTypeToString(volumes []extensions.FSType) string {
@@ -3431,6 +3438,14 @@ func fsTypeToString(volumes []extensions.FSType) string {
 		strVolumes = append(strVolumes, string(v))
 	}
 	return stringOrNone(strings.Join(strVolumes, ","))
+}
+
+func flexVolumesToString(flexVolumes []extensions.AllowedFlexVolume) string {
+	volumes := []string{}
+	for _, flexVolume := range flexVolumes {
+		volumes = append(volumes, "driver="+flexVolume.Driver)
+	}
+	return stringOrDefaultValue(strings.Join(volumes, ","), "<all>")
 }
 
 func hostPortRangeToString(ranges []extensions.HostPortRange) string {

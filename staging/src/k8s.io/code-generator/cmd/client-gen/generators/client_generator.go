@@ -47,7 +47,7 @@ func NameSystems() namer.NameSystems {
 		// these exceptions are used to deconflict the generated code
 		// you can put your fully qualified package like
 		// to generate a name that doesn't conflict with your group.
-		// "k8s.io/apis/events/v1alpha1.Event": "EventResource"
+		// "k8s.io/apis/events/v1beta1.Event": "EventResource"
 		},
 		KeyFunc: func(t *types.Type) string {
 			return t.Name.Package + "." + t.Name.Name
@@ -59,12 +59,38 @@ func NameSystems() namer.NameSystems {
 		// these exceptions are used to deconflict the generated code
 		// you can put your fully qualified package like
 		// to generate a name that doesn't conflict with your group.
-		// "k8s.io/apis/events/v1alpha1.Event": "eventResource"
+		// "k8s.io/apis/events/v1beta1.Event": "eventResource"
 		},
 		KeyFunc: func(t *types.Type) string {
 			return t.Name.Package + "." + t.Name.Name
 		},
 		Delegate: namer.NewPrivateNamer(0),
+	}
+	publicPluralNamer := &ExceptionNamer{
+		Exceptions: map[string]string{
+		// these exceptions are used to deconflict the generated code
+		// you can put your fully qualified package like
+		// to generate a name that doesn't conflict with your group.
+		// "k8s.io/apis/events/v1beta1.Event": "EventResource"
+		},
+		KeyFunc: func(t *types.Type) string {
+			return t.Name.Package + "." + t.Name.Name
+		},
+		Delegate: namer.NewPublicPluralNamer(pluralExceptions),
+	}
+	privatePluralNamer := &ExceptionNamer{
+		Exceptions: map[string]string{
+			// you can put your fully qualified package like
+			// to generate a name that doesn't conflict with your group.
+			// "k8s.io/apis/events/v1beta1.Event": "eventResource"
+			// these exceptions are used to deconflict the generated code
+			"k8s.io/apis/events/v1beta1.Event":        "eventResources",
+			"k8s.io/kubernetes/pkg/apis/events.Event": "eventResources",
+		},
+		KeyFunc: func(t *types.Type) string {
+			return t.Name.Package + "." + t.Name.Name
+		},
+		Delegate: namer.NewPrivatePluralNamer(pluralExceptions),
 	}
 
 	return namer.NameSystems{
@@ -72,8 +98,8 @@ func NameSystems() namer.NameSystems {
 		"public":             publicNamer,
 		"private":            privateNamer,
 		"raw":                namer.NewRawNamer("", nil),
-		"publicPlural":       namer.NewPublicPluralNamer(pluralExceptions),
-		"privatePlural":      namer.NewPrivatePluralNamer(pluralExceptions),
+		"publicPlural":       publicPluralNamer,
+		"privatePlural":      privatePluralNamer,
 		"allLowercasePlural": lowercaseNamer,
 		"resource":           NewTagOverrideNamer("resourceName", lowercaseNamer),
 	}

@@ -32,6 +32,7 @@ import (
 	v2alpha1 "k8s.io/api/batch/v2alpha1"
 	certificates_v1beta1 "k8s.io/api/certificates/v1beta1"
 	core_v1 "k8s.io/api/core/v1"
+	events_v1beta1 "k8s.io/api/events/v1beta1"
 	extensions_v1beta1 "k8s.io/api/extensions/v1beta1"
 	networking_v1 "k8s.io/api/networking/v1"
 	policy_v1beta1 "k8s.io/api/policy/v1beta1"
@@ -172,6 +173,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Core().V1().Services().Informer()}, nil
 	case core_v1.SchemeGroupVersion.WithResource("serviceaccounts"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Core().V1().ServiceAccounts().Informer()}, nil
+
+		// Group=events.k8s.io, Version=v1beta1
+	case events_v1beta1.SchemeGroupVersion.WithResource("events"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Events().V1beta1().Events().Informer()}, nil
 
 		// Group=extensions, Version=v1beta1
 	case extensions_v1beta1.SchemeGroupVersion.WithResource("daemonsets"):

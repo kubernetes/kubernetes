@@ -69,6 +69,7 @@ func (f fakeEtcdCluster) GetEtcdClusterStatus() (*clientv3.StatusResponse, error
 }
 
 func TestGetAvailableUpgrades(t *testing.T) {
+	featureGates := make(map[string]bool)
 	tests := []struct {
 		vg                          *fakeVersionGetter
 		expectedUpgrades            []Upgrade
@@ -429,7 +430,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 						KubeVersion:    "v1.10.0-alpha.2",
 						KubeadmVersion: "v1.10.0-alpha.2",
 						DNSVersion:     "1.14.7",
-						EtcdVersion:    "3.1.11",
+						EtcdVersion:    "3.1.10",
 					},
 				},
 			},
@@ -444,7 +445,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 	testCluster := fakeEtcdCluster{}
 	for _, rt := range tests {
 
-		actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, testCluster)
+		actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, testCluster, featureGates)
 		if !reflect.DeepEqual(actualUpgrades, rt.expectedUpgrades) {
 			t.Errorf("failed TestGetAvailableUpgrades\n\texpected upgrades: %v\n\tgot: %v", rt.expectedUpgrades, actualUpgrades)
 		}
