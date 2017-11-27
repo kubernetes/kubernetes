@@ -29,6 +29,6 @@ all: transform
 %.sed: %.base
 	sed -f transforms2sed.sed $<  | sed s/__SOURCE_FILENAME__/$</g > $@
 
-transform: kube-dns.yaml.in kube-dns.yaml.sed
+transform: kube-dns.yaml.in kube-dns.yaml.sed coredns.yaml.in coredns.yaml.sed
 
 .PHONY: transform
