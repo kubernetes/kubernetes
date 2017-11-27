@@ -603,15 +603,21 @@ func (q *Quantity) Neg() {
 // of most Quantity values.
 const int64QuantityExpectedBytes = 18
 
-// String formats the Quantity as a string, caching the result if not calculated.
+// String formats the Quantity as a string. The unbuffered version exists to provide human readable
+// log format for structs/maps that contain nested Quantity field.
+func (q Quantity) String() string {
+	result := make([]byte, 0, int64QuantityExpectedBytes)
+	number, suffix := q.CanonicalizeBytes(result)
+	number = append(number, suffix...)
+	return string(number)
+}
+
+// StringBuffered formats the Quantity as a string, caching the result if not calculated.
 // String is an expensive operation and caching this result significantly reduces the cost of
 // normal parse / marshal operations on Quantity.
-func (q *Quantity) String() string {
+func (q *Quantity) StringBuffered() string {
 	if len(q.s) == 0 {
-		result := make([]byte, 0, int64QuantityExpectedBytes)
-		number, suffix := q.CanonicalizeBytes(result)
-		number = append(number, suffix...)
-		q.s = string(number)
+		q.s = q.String()
 	}
 	return q.s
 }

@@ -32,10 +32,16 @@ func ExampleFormat() {
 	cores := resource.NewMilliQuantity(5300, resource.DecimalSI)
 	fmt.Printf("cores = %v\n", cores)
 
+	sampleMap := map[string]resource.Quantity{
+		"test": *memorySize,
+	}
+	fmt.Printf("sampleMap = %v\n", sampleMap)
+
 	// Output:
 	// memorySize = 5Gi
 	// diskSize = 5G
 	// cores = 5300m
+	// sampleMap = map[test:5Gi]
 }
 
 func ExampleMustParse() {

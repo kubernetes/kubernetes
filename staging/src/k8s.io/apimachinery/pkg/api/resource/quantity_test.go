@@ -636,7 +636,7 @@ func TestQuantityNeg(t *testing.T) {
 	}
 }
 
-func TestQuantityString(t *testing.T) {
+func TestQuantityStringBuffered(t *testing.T) {
 	table := []struct {
 		in        Quantity
 		expect    string
@@ -686,7 +686,7 @@ func TestQuantityString(t *testing.T) {
 		{decQuantity(1080, -6, DecimalSI), "1080u", ""},
 	}
 	for _, item := range table {
-		got := item.in.String()
+		got := item.in.StringBuffered()
 		if e, a := item.expect, got; e != a {
 			t.Errorf("%#v: expected %v, got %v", item.in, e, a)
 		}
@@ -708,11 +708,11 @@ func TestQuantityString(t *testing.T) {
 		if len(q.s) != 0 {
 			t.Errorf("%#v: unexpected nested string: %v", item.expect, q.s)
 		}
-		if q.String() != item.expect {
+		if q.StringBuffered() != item.expect {
 			t.Errorf("%#v: unexpected alternate canonical: %v", item.expect, q.String())
 		}
 		if len(q.s) == 0 || q.s != item.expect {
-			t.Errorf("%#v: did not set canonical string on ToString: %s", item.expect, q.s)
+			t.Errorf("%#v: did not set canonical string on StringBuffered: %s", item.expect, q.s)
 		}
 	}
 	desired := &inf.Dec{} // Avoid modifying the values in the table.
@@ -1219,7 +1219,6 @@ func BenchmarkQuantityString(b *testing.B) {
 	var s string
 	for i := 0; i < b.N; i++ {
 		q := values[i%len(values)]
-		q.s = ""
 		s = q.String()
 	}
 	b.StopTimer()
@@ -1231,13 +1230,13 @@ func BenchmarkQuantityString(b *testing.B) {
 func BenchmarkQuantityStringPrecalc(b *testing.B) {
 	values := benchmarkQuantities()
 	for i := range values {
-		_ = values[i].String()
+		_ = values[i].StringBuffered()
 	}
 	b.ResetTimer()
 	var s string
 	for i := 0; i < b.N; i++ {
 		q := values[i%len(values)]
-		s = q.String()
+		s = q.StringBuffered()
 	}
 	b.StopTimer()
 	if len(s) == 0 {
@@ -1254,7 +1253,6 @@ func BenchmarkQuantityStringBinarySI(b *testing.B) {
 	var s string
 	for i := 0; i < b.N; i++ {
 		q := values[i%len(values)]
-		q.s = ""
 		s = q.String()
 	}
 	b.StopTimer()

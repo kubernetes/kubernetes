@@ -46,7 +46,7 @@ func (m *Quantity) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	// BEGIN CUSTOM MARSHAL
-	out := m.String()
+	out := m.StringBuffered()
 	i = encodeVarintGenerated(data, i, uint64(len(out)))
 	i += copy(data[i:], out)
 	// END CUSTOM MARSHAL
@@ -69,7 +69,7 @@ func (m *Quantity) Size() (n int) {
 	_ = l
 
 	// BEGIN CUSTOM SIZE
-	l = len(m.String())
+	l = len(m.StringBuffered())
 	// END CUSTOM SIZE
 
 	n += 1 + l + sovGenerated(uint64(l))
