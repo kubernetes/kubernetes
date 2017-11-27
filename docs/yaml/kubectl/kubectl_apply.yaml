@@ -48,6 +48,10 @@ options:
   default_value: "false"
   usage: |
     When using the default or custom-column output format, don't print headers (default print headers).
+- name: openapi-patch
+  default_value: "true"
+  usage: |
+    If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.
 - name: output
   shorthand: o
   usage: |

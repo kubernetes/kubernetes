@@ -30,7 +30,16 @@ Upgrade your cluster smoothly to a newer version with this command.
     Path to kubeadm config file. WARNING: Usage of a configuration file is experimental!
 
 .PP
-\fB\-\-ignore\-checks\-errors\fP=[]
+\fB\-\-feature\-gates\fP=""
+    A set of key=value pairs that describe feature gates for various features.Options are:
+CoreDNS=true|false (ALPHA \- default=false)
+DynamicKubeletConfig=true|false (ALPHA \- default=false)
+HighAvailability=true|false (ALPHA \- default=false)
+SelfHosting=true|false (BETA \- default=false)
+StoreCertsInSecrets=true|false (ALPHA \- default=false)
+
+.PP
+\fB\-\-ignore\-preflight\-errors\fP=[]
     A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.
 
 .PP

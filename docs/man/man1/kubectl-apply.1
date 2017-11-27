@@ -65,6 +65,10 @@ Alpha Disclaimer: the \-\-prune functionality is not yet complete. Do not use un
     When using the default or custom\-column output format, don't print headers (default print headers).
 
 .PP
+\fB\-\-openapi\-patch\fP=true
+    If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked\-in types.
+
+.PP
 \fB\-o\fP, \fB\-\-output\fP=""
     Output format. One of: json|yaml|wide|name|custom\-columns=...|custom\-columns\-file=...|go\-template=...|go\-template\-file=...|jsonpath=...|jsonpath\-file=... See custom columns [
 \[la]http://kubernetes.io/docs/user-guide/kubectl-overview/#custom-columns\[ra]], golang template [
@@ -181,6 +185,10 @@ Alpha Disclaimer: the \-\-prune functionality is not yet complete. Do not use un
 .PP
 \fB\-\-container\-hints\fP="/etc/cadvisor/container\_hints.json"
     location of the container hints file
+
+.PP
+\fB\-\-containerd\fP="unix:///var/run/containerd.sock"
+    containerd endpoint
 
 .PP
 \fB\-\-context\fP=""

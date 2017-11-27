@@ -26,8 +26,7 @@ DynamicKubeletConfig=true|false (ALPHA - default=false)
 HighAvailability=true|false (ALPHA - default=false)
 SelfHosting=true|false (BETA - default=false)
 StoreCertsInSecrets=true|false (ALPHA - default=false)
-SupportIPVSProxyMode=true|false (ALPHA - default=false)
-      --ignore-checks-errors stringSlice        A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.
+      --ignore-preflight-errors stringSlice     A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.
       --kubernetes-version string               Choose a specific Kubernetes version for the control plane. (default "stable-1.8")
       --node-name string                        Specify the node name.
       --pod-network-cidr string                 Specify range of IP addresses for the pod network. If set, the control plane will automatically allocate CIDRs for every node.

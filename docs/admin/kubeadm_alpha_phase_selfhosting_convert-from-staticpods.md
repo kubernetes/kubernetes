@@ -35,7 +35,6 @@ DynamicKubeletConfig=true|false (ALPHA - default=false)
 HighAvailability=true|false (ALPHA - default=false)
 SelfHosting=true|false (BETA - default=false)
 StoreCertsInSecrets=true|false (ALPHA - default=false)
-SupportIPVSProxyMode=true|false (ALPHA - default=false)
       --kubeconfig string      The KubeConfig file to use when talking to the cluster (default "/etc/kubernetes/admin.conf")
 ```
 
