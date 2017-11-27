@@ -214,6 +214,7 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.DiscoveryInterface, p
 		// have succeeded to ensure we'll retry on subsequent syncs if an error
 		// occured.
 		oldResources = newResources
+		glog.V(2).Infof("synced garbage collector")
 	}, period, stopCh)
 }
 
