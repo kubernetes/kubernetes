@@ -205,6 +205,9 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.DiscoveryInterface, p
 			utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors: %v", err))
 			return
 		}
+		// TODO: WaitForCacheSync can block forever during normal operation. Could
+		// pass a timeout channel, but we have to consider the implications of
+		// un-pausing the GC with a partially synced graph builder.
 		if !controller.WaitForCacheSync("garbage collector", stopCh, gc.dependencyGraphBuilder.IsSynced) {
 			utilruntime.HandleError(fmt.Errorf("timed out waiting for dependency graph builder sync during GC sync"))
 			return
