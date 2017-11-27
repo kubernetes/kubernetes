@@ -93,6 +93,10 @@ func Run(s *options.CloudControllerManagerServer) error {
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
 
+	if cloud == nil {
+		glog.Fatalf("cloud provider is nil")
+	}
+
 	if cloud.HasClusterID() == false {
 		if s.AllowUntaggedCloud == true {
 			glog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
