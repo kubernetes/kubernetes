@@ -421,6 +421,7 @@ func configFromEnv() (cfg Config, ok bool) {
 			cfg.Global.DomainId != "" || cfg.Global.DomainName != ""))
 
 	cfg.Metadata.SearchOrder = fmt.Sprintf("%s,%s", configDriveID, metadataID)
+	cfg.BlockStorage.BSVersion = "auto"
 
 	return
 }
