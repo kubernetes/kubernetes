@@ -65,6 +65,8 @@ const (
 	DefaultProxyBindAddressv4 = "0.0.0.0"
 	// DefaultProxyBindAddressv6 is the default bind address when the advertise address is v6
 	DefaultProxyBindAddressv6 = "::"
+	// KubeproxyKubeConfigFileName efines the file name for the kube-proxy's KubeConfig file
+	KubeproxyKubeConfigFileName = "/var/lib/kube-proxy/kubeconfig.conf"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -125,6 +127,10 @@ func SetDefaults_ProxyConfiguration(obj *MasterConfiguration) {
 	}
 	if obj.KubeProxy.Config.ClusterCIDR == "" && obj.Networking.PodSubnet != "" {
 		obj.KubeProxy.Config.ClusterCIDR = obj.Networking.PodSubnet
+	}
+
+	if obj.KubeProxy.Config.ClientConnection.KubeConfigFile == "" {
+		obj.KubeProxy.Config.ClientConnection.KubeConfigFile = KubeproxyKubeConfigFileName
 	}
 
 	kubeproxyscheme.Scheme.Default(obj.KubeProxy.Config)
