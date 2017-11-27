@@ -11,7 +11,11 @@ go_test(
     srcs = ["validation_test.go"],
     importpath = "k8s.io/apimachinery/pkg/apis/meta/v1/validation",
     library = ":go_default_library",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library"],
+    deps = [
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+    ],
 )
 
 go_library(
