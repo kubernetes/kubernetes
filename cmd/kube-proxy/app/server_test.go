@@ -145,6 +145,23 @@ func Test_getProxyMode(t *testing.T) {
 			kernelCompat:    true,
 			expected:        proxyModeIPTables,
 		},
+		{ // specify ipvs, feature gateway disabled, iptables version ok, kernel is compatible
+			flag:            "ipvs",
+			iptablesVersion: iptables.MinCheckVersion,
+			kernelCompat:    true,
+			expected:        proxyModeIPTables,
+		},
+		{ // specify ipvs, feature gateway disabled, iptables version too low
+			flag:            "ipvs",
+			iptablesVersion: "0.0.0",
+			expected:        proxyModeUserspace,
+		},
+		{ // specify ipvs, feature gateway disabled, iptables version ok, kernel is not compatible
+			flag:            "ipvs",
+			iptablesVersion: iptables.MinCheckVersion,
+			kernelCompat:    false,
+			expected:        proxyModeUserspace,
+		},
 	}
 	for i, c := range cases {
 		versioner := &fakeIPTablesVersioner{c.iptablesVersion, c.iptablesError}
