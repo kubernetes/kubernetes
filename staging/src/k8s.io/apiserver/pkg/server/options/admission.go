@@ -38,6 +38,13 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+var scheme = runtime.NewScheme()
+
+func init() {
+	apiserverapi.AddToScheme(scheme)
+	apiserverapiv1alpha1.AddToScheme(scheme)
+}
+
 // AdmissionOptions holds the admission options
 type AdmissionOptions struct {
 	// RecommendedPluginOrder holds an ordered list of plugin names we recommend to use by default
@@ -69,8 +76,6 @@ func NewAdmissionOptions() *AdmissionOptions {
 		RecommendedPluginOrder: []string{lifecycle.PluginName, initialization.PluginName, mutatingwebhook.PluginName, validatingwebhook.PluginName},
 		DefaultOffPlugins:      []string{initialization.PluginName, mutatingwebhook.PluginName, validatingwebhook.PluginName},
 	}
-	apiserverapi.AddToScheme(options.Plugins.ConfigScheme)
-	apiserverapiv1alpha1.AddToScheme(options.Plugins.ConfigScheme)
 	server.RegisterAllAdmissionPlugins(options.Plugins)
 	return options
 }
@@ -120,7 +125,7 @@ func (a *AdmissionOptions) ApplyTo(
 		pluginNames = a.enabledPluginNames()
 	}
 
-	pluginsConfigProvider, err := admission.ReadAdmissionConfiguration(pluginNames, a.ConfigFile, a.Plugins.ConfigScheme)
+	pluginsConfigProvider, err := admission.ReadAdmissionConfiguration(pluginNames, a.ConfigFile, scheme)
 	if err != nil {
 		return fmt.Errorf("failed to read plugin config: %v", err)
 	}
