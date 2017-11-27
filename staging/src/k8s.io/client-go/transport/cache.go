@@ -88,5 +88,5 @@ func tlsConfigKey(c *Config) (string, error) {
 		return "", err
 	}
 	// Only include the things that actually affect the tls.Config
-	return fmt.Sprintf("%v/%x/%x/%x", c.TLS.Insecure, c.TLS.CAData, c.TLS.CertData, c.TLS.KeyData), nil
+	return fmt.Sprintf("%v/%x/%x/%x/%v", c.TLS.Insecure, c.TLS.CAData, c.TLS.CertData, c.TLS.KeyData, c.TLS.ServerName), nil
 }
