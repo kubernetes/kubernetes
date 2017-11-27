@@ -173,12 +173,6 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.DiscoveryInterface, p
 		// Get the current resource list from discovery.
 		newResources := GetDeletableResources(discoveryClient)
 
-		// Detect first or abnormal sync and try again later.
-		if oldResources == nil || len(oldResources) == 0 {
-			oldResources = newResources
-			return
-		}
-
 		// Decide whether discovery has reported a change.
 		if reflect.DeepEqual(oldResources, newResources) {
 			glog.V(5).Infof("no resource updates from discovery, skipping garbage collector sync")
