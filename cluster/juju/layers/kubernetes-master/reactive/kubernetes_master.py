@@ -102,25 +102,11 @@ def check_for_upgrade_needed():
     add_rbac_roles()
     set_state('reconfigure.authentication.setup')
     remove_state('authentication.setup')
-    if should_reinstall_snaps():
-        set_upgrade_needed()
-
-
-def should_reinstall_snaps():
-    ''' Return true if we should redeploy snaps. '''
-    # Snaps should be upgrades if:
-    # a) channel changed, or
-    # b) the Charms attached snaps (resources) changed
-    config = hookenv.config()
-    previous_channel = config.previous('channel')
-    new_channel = hookenv.config('channel')
-    if new_channel != previous_channel:
-        return True
-
     resources = ['kubectl', 'kube-apiserver', 'kube-controller-manager',
                  'kube-scheduler', 'cdk-addons']
     paths = [hookenv.resource_get(resource) for resource in resources]
-    return any_file_changed(paths)
+    if any_file_changed(paths):
+        set_upgrade_needed()
 
 
 def add_rbac_roles():
