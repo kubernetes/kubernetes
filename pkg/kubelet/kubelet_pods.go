@@ -909,13 +909,13 @@ func (kl *Kubelet) PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bo
 		glog.V(3).Infof("Pod %q is terminated, but some containers are still running", format.Pod(pod))
 		return false
 	}
-	// pod's containers should be deleted
 	runtimeStatus, err := kl.podCache.Get(pod.UID)
 	if err != nil {
 		glog.V(3).Infof("Pod %q is terminated, Error getting runtimeStatus from the podCache: %s", format.Pod(pod), err)
 		return false
 	}
-	if len(runtimeStatus.ContainerStatuses) > 0 {
+	if !areDeleted(runtimeStatus.ContainerStatuses) {
+		// We shouldn't delete pods that still have undeleted containers,
 		glog.V(3).Infof("Pod %q is terminated, but some containers have not been cleaned up: %+v", format.Pod(pod), runtimeStatus.ContainerStatuses)
 		return false
 	}
@@ -948,6 +948,17 @@ func (kl *Kubelet) podResourcesAreReclaimed(pod *v1.Pod) bool {
 func notRunning(statuses []v1.ContainerStatus) bool {
 	for _, status := range statuses {
 		if status.State.Terminated == nil && status.State.Waiting == nil {
+			return false
+		}
+	}
+	return true
+}
+
+// areDeleted returns true if every status has an empty container ID, or the status list
+// is empty.
+func areDeleted(statuses []kubecontainer.ContainerStatus) bool {
+	for _, status := range statuses {
+		if !status.ID.IsEmpty() {
 			return false
 		}
 	}
