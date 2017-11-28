@@ -257,8 +257,6 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 		}
 	}
 
-	// cache the service, we need the info for service deletion
-	cachedService.state = service
 	err, retry := s.createLoadBalancerIfNeeded(key, service)
 	if err != nil {
 		message := "Error creating load balancer"
@@ -278,6 +276,7 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 	// NOTE: Since we update the cached service if and only if we successfully
 	// processed it, a cached service being nil implies that it hasn't yet
 	// been successfully processed.
+	cachedService.state = service
 	s.cache.set(key, cachedService)
 
 	cachedService.resetRetryDelay()
