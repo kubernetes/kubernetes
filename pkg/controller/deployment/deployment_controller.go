@@ -587,7 +587,12 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		dc.eventRecorder.Eventf(d, v1.EventTypeWarning, "SelectingAll", "This deployment is selecting all pods. A non-empty selector is required.")
 		if d.Status.ObservedGeneration < d.Generation {
 			d.Status.ObservedGeneration = d.Generation
-			dc.client.ExtensionsV1beta1().Deployments(d.Namespace).UpdateStatus(d)
+			err := dc.client.ExtensionsV1beta1().Deployments(d.Namespace).UpdateStatus(d)
+			if err != nil {
+			    glog.Warningf("not persisting update to deployment '%s/%s' that has been changed since we received it: %v",
+				namespace, name, err)
+			    return err
+			}
 		}
 		return nil
 	}
