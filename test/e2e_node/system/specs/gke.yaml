@@ -243,7 +243,7 @@ packageSpecs:
 
 # packageSpecOverrides contains the OS distro specific package requirements.
 packageSpecOverrides:
-# The following overrides apply to all Ubuntu images.
+# The following overrides are applied to all Ubuntu images.
 - osDistro: ubuntu
   subtractions:
   - name: apparmor-profiles
