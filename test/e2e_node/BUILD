@@ -12,6 +12,7 @@ go_library(
         "container.go",
         "doc.go",
         "docker_util.go",
+        "framework.go",
         "gpu_device_plugin.go",
         "gpus.go",
         "image_list.go",
