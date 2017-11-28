@@ -347,13 +347,6 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		}
 	} else {
 		node.Spec.ExternalID = kl.hostname
-		if kl.autoDetectCloudProvider {
-			// If no cloud provider is defined - use the one detected by cadvisor
-			info, err := kl.GetCachedMachineInfo()
-			if err == nil {
-				kl.updateCloudProviderFromMachineInfo(node, info)
-			}
-		}
 	}
 	kl.setNodeStatus(node)
 
