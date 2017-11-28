@@ -92,9 +92,6 @@ func (t *AppArmorUpgradeTest) verifyPodStillUp(f *framework.Framework) {
 func (t *AppArmorUpgradeTest) verifyNewPodSucceeds(f *framework.Framework) {
 	By("Verifying an AppArmor profile is enforced for a new pod")
 	common.CreateAppArmorTestPod(f, false, true)
-
-	By("Verifying an unconfined AppArmor profile is enforced for a new pod")
-	common.CreateAppArmorTestPod(f, true, true)
 }
 
 func (t *AppArmorUpgradeTest) verifyNodesAppArmorEnabled(f *framework.Framework) {

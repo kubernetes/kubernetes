@@ -120,7 +120,12 @@ func TestAggregatedAPIServer(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			kubeClientConfigValue.Store(kubeAPIServerConfig.GenericConfig.LoopbackClientConfig)
+			// Adjust the loopback config for external use (external server name and CA)
+			kubeAPIServerClientConfig := rest.CopyConfig(kubeAPIServerConfig.GenericConfig.LoopbackClientConfig)
+			kubeAPIServerClientConfig.CAFile = path.Join(certDir, "apiserver.crt")
+			kubeAPIServerClientConfig.CAData = nil
+			kubeAPIServerClientConfig.ServerName = ""
+			kubeClientConfigValue.Store(kubeAPIServerClientConfig)
 
 			kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.EmptyDelegate, sharedInformers, versionedInformers)
 			if err != nil {
