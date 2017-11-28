@@ -1321,7 +1321,9 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 }
 
 func NewPod(ds *extensions.DaemonSet, nodeName string) *v1.Pod {
-	newPod := &v1.Pod{Spec: ds.Spec.Template.Spec, ObjectMeta: ds.Spec.Template.ObjectMeta}
+	oldPod := &v1.Pod{Spec: ds.Spec.Template.Spec, ObjectMeta: ds.Spec.Template.ObjectMeta}
+	newPod := oldPod.DeepCopy()
+
 	newPod.Namespace = ds.Namespace
 	newPod.Spec.NodeName = nodeName
 	return newPod
