@@ -238,7 +238,7 @@ func (b *glusterfsMounter) CanMount() error {
 	exe := b.plugin.host.GetExec(b.plugin.GetPluginName())
 	switch runtime.GOOS {
 	case "linux":
-		if _, err := exe.Run("/bin/ls", gciLinuxGlusterMountBinaryPath); err != nil {
+		if _, err := exe.Run("test", "-x", gciLinuxGlusterMountBinaryPath); err != nil {
 			return fmt.Errorf("Required binary %s is missing", gciLinuxGlusterMountBinaryPath)
 		}
 	}
