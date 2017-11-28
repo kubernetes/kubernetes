@@ -173,7 +173,7 @@ func (manager *gceServiceManager) CreateRegionalDiskOnCloudProvider(
 			manager.gce.projectID, manager.gce.region, diskToCreateAlpha).Do()
 	}
 
-	return nil, fmt.Errorf("The regional PD feature is only available via the GCE Alpha API. Enable \"GCEDiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
+	return nil, fmt.Errorf("The regional PD feature is only available via the GCE Alpha API. Enable \"DiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
 }
 
 func (manager *gceServiceManager) AttachDiskOnCloudProvider(
@@ -323,7 +323,7 @@ func (manager *gceServiceManager) GetRegionalDiskFromCloudProvider(
 		}, nil
 	}
 
-	return nil, fmt.Errorf("The regional PD feature is only available via the GCE Alpha API. Enable \"GCEDiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
+	return nil, fmt.Errorf("The regional PD feature is only available via the GCE Alpha API. Enable \"DiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
 }
 
 func (manager *gceServiceManager) DeleteDiskOnCloudProvider(
@@ -346,7 +346,7 @@ func (manager *gceServiceManager) DeleteRegionalDiskOnCloudProvider(
 			manager.gce.projectID, manager.gce.region, diskName).Do()
 	}
 
-	return nil, fmt.Errorf("DeleteRegionalDiskOnCloudProvider is a regional PD feature and is only available via the GCE Alpha API. Enable \"GCEDiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
+	return nil, fmt.Errorf("DeleteRegionalDiskOnCloudProvider is a regional PD feature and is only available via the GCE Alpha API. Enable \"DiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
 }
 
 func (manager *gceServiceManager) WaitForZoneOp(
@@ -497,7 +497,7 @@ func (manager *gceServiceManager) RegionalResizeDiskOnCloudProvider(disk *GCEDis
 		}
 		return manager.gce.serviceAlpha.RegionDisks.Resize(manager.gce.projectID, disk.Region, disk.Name, resizeServiceRequest).Do()
 	}
-	return nil, fmt.Errorf("RegionalResizeDiskOnCloudProvider is a regional PD feature and is only available via the GCE Alpha API. Enable \"GCEDiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
+	return nil, fmt.Errorf("RegionalResizeDiskOnCloudProvider is a regional PD feature and is only available via the GCE Alpha API. Enable \"DiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
 }
 
 // Disks is interface for manipulation with GCE PDs.
