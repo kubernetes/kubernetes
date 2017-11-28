@@ -943,66 +943,15 @@ run_create_secret_tests() {
     set +o errexit
 }
 
-
-# Runs tests related to kubectl apply.
-run_kubectl_apply_tests() {
+# Runs all pod related tests.
+run_kubectl_apply_prune_tests() {
   set -o nounset
   set -o errexit
 
+  kube::log::status "Testing kubectl apply --prune"
   create_and_use_new_namespace
-  kube::log::status "Testing kubectl apply"
-  ## kubectl apply should create the resource that doesn't exist yet
-  # Pre-Condition: no POD exists
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
-  # Command: apply a pod "test-pod" (doesn't exist) should create this pod
-  kubectl apply -f hack/testdata/pod.yaml "${kube_flags[@]}"
-  # Post-Condition: pod "test-pod" is created
-  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
-  # Post-Condition: pod "test-pod" has configuration annotation
-  [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
-  # Clean up
-  kubectl delete pods test-pod "${kube_flags[@]}"
 
-
-  ## kubectl apply should be able to clear defaulted fields.
-  # Pre-Condition: no deployment exists
-  kube::test::get_object_assert deployments "{{range.items}}{{$id_field}}:{{end}}" ''
-  # Command: apply a deployment "test-deployment-retainkeys" (doesn't exist) should create this deployment
-  kubectl apply -f hack/testdata/retainKeys/deployment/deployment-before.yaml "${kube_flags[@]}"
-  # Post-Condition: deployment "test-deployment-retainkeys" created
-  kube::test::get_object_assert deployments "{{range.items}}{{$id_field}}{{end}}" 'test-deployment-retainkeys'
-  # Post-Condition: deployment "test-deployment-retainkeys" has defaulted fields
-  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep RollingUpdate)" ]]
-  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep maxSurge)" ]]
-  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep maxUnavailable)" ]]
-  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep emptyDir)" ]]
-  # Command: apply a deployment "test-deployment-retainkeys" should clear
-  # defaulted fields and successfully update the deployment
-  [[ "$(kubectl apply -f hack/testdata/retainKeys/deployment/deployment-after.yaml "${kube_flags[@]}")" ]]
-  # Post-Condition: deployment "test-deployment-retainkeys" has updated fields
-  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep Recreate)" ]]
-  ! [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep RollingUpdate)" ]]
-  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep hostPath)" ]]
-  ! [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep emptyDir)" ]]
-  # Clean up
-  kubectl delete deployments test-deployment-retainkeys "${kube_flags[@]}"
-
-
-  ## kubectl apply -f with label selector should only apply matching objects
-  # Pre-Condition: no POD exists
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
-  # apply
-  kubectl apply -l unique-label=bingbang -f hack/testdata/filter "${kube_flags[@]}"
-  # check right pod exists
-  kube::test::get_object_assert 'pods selector-test-pod' "{{${labels_field}.name}}" 'selector-test-pod'
-  # check wrong pod doesn't exist
-  output_message=$(! kubectl get pods selector-test-pod-dont-apply 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'pods "selector-test-pod-dont-apply" not found'
-  # cleanup
-  kubectl delete pods selector-test-pod
-
-
-  ## kubectl apply --prune
+  ## Kubectl apply --prune
   # Pre-Condition: no POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -1025,7 +974,7 @@ run_kubectl_apply_tests() {
   # cleanup
   kubectl delete pods b
 
-  # same thing without prune for a sanity check
+  ## Same thing without prune for a sanity check
   # Pre-Condition: no POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -1082,6 +1031,137 @@ run_kubectl_apply_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # cleanup
   kubectl delete svc prune-svc 2>&1 "${kube_flags[@]}"
+
+  ## Test resources created w/o apply don't get pruned
+  # Create pod with apply, and check that it exists
+  kubectl create -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
+  # Apply different pod, and ensure previous pod is not pruned
+  kubectl apply --prune --all -f hack/testdata/pod-2.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
+  kube::test::get_object_assert 'pods test-pod-2' "{{${labels_field}.name}}" 'test-pod-label-2'
+  # Clean up pods
+  kubectl delete pods test-pod "${kube_flags[@]}"
+  kubectl delete pods test-pod-2 "${kube_flags[@]}"
+
+  ## If different label specified, then pod does not get pruned
+  # First, ensure that no pods exist
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Next, create pod with apply, and ensure it exists
+  kubectl apply -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
+  # Now, prune specifying new pods label, which does not prune previously created pod
+  kubectl apply --prune -l name=test-pod-label-2 -f hack/testdata/pod-2.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
+  kube::test::get_object_assert 'pods test-pod-2' "{{${labels_field}.name}}" 'test-pod-label-2'
+  # Clean up pods
+  kubectl delete pods test-pod "${kube_flags[@]}"
+  kubectl delete pods test-pod-2 "${kube_flags[@]}"
+
+  ## Test prune and dryRun does not really prune
+  # First, ensure that no pods exist
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Next, create pod with apply, and ensure it exists
+  kubectl apply -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
+  # Now, prune with dry-run does not actually create test-pod-2 or prune test-pod
+  kubectl apply --dry-run --prune --all -f hack/testdata/pod-2.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
+  output_message=$(! kubectl get pods test-pod-2 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'pods "test-pod-2" not found'
+  # Clean up pods
+  kubectl delete pods test-pod "${kube_flags[@]}"
+
+  ## Non-namespaced resources get pruned (PersistentVolume) example
+  # First, ensure that no persistentvolumes exist
+  kube::test::get_object_assert persistentvolumes "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Next, create persistentvolume through apply, and ensure it exists
+  kubectl apply -f hack/testdata/pv.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert persistentvolumes "{{range.items}}{{$id_field}}:{{end}}" 'pv-test:'
+  # Next, apply a new peristentvolume and check the previous one was pruned
+  kubectl apply --prune --all -f hack/testdata/pv-2.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert persistentvolumes "{{range.items}}{{$id_field}}:{{end}}" 'pv-test-2:'
+  kubectl delete persistentvolumes pv-test-2
+  
+  ## Test pruning only affects resources applied in "visited" namespaces.
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  kubectl apply -f hack/testdata/pod.yaml
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
+  # Create pod in current namespace; pruning should not delete first pod
+  current_context=$(kubectl config current-context)
+  # Apply new pod into new namespace
+  namespace="apply-prune-test"
+  kube::log::status "Creating namespace $namespace"
+  kubectl create namespace "$namespace"
+  kubectl config set-context "apply-prune" --namespace="$namespace"
+  kubectl config use-context "apply-prune"
+  kubectl apply --prune --all -f hack/testdata/pod-2.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert 'pods test-pod-2' "{{${labels_field}.name}}" 'test-pod-label-2'
+  # Ensure pod in initial namespace is not pruned
+  kubectl config use-context ${CONTEXT}
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
+
+  set +o nounset
+  set +o errexit
+}
+
+
+# Runs tests related to kubectl apply.
+run_kubectl_apply_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+  kube::log::status "Testing kubectl apply"
+  ## kubectl apply should create the resource that doesn't exist yet
+  # Pre-Condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command: apply a pod "test-pod" (doesn't exist) should create this pod
+  kubectl apply -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  # Post-Condition: pod "test-pod" is created
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
+  # Post-Condition: pod "test-pod" has configuration annotation
+  [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  # Clean up
+  kubectl delete pods test-pod "${kube_flags[@]}"
+
+  ## kubectl apply should be able to clear defaulted fields.
+  # Pre-Condition: no deployment exists
+  kube::test::get_object_assert deployments "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command: apply a deployment "test-deployment-retainkeys" (doesn't exist) should create this deployment
+  kubectl apply -f hack/testdata/retainKeys/deployment/deployment-before.yaml "${kube_flags[@]}"
+  # Post-Condition: deployment "test-deployment-retainkeys" created
+  kube::test::get_object_assert deployments "{{range.items}}{{$id_field}}{{end}}" 'test-deployment-retainkeys'
+  # Post-Condition: deployment "test-deployment-retainkeys" has defaulted fields
+  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep RollingUpdate)" ]]
+  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep maxSurge)" ]]
+  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep maxUnavailable)" ]]
+  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep emptyDir)" ]]
+  # Command: apply a deployment "test-deployment-retainkeys" should clear
+  # defaulted fields and successfully update the deployment
+  [[ "$(kubectl apply -f hack/testdata/retainKeys/deployment/deployment-after.yaml "${kube_flags[@]}")" ]]
+  # Post-Condition: deployment "test-deployment-retainkeys" has updated fields
+  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep Recreate)" ]]
+  ! [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep RollingUpdate)" ]]
+  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep hostPath)" ]]
+  ! [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep emptyDir)" ]]
+  # Clean up
+  kubectl delete deployments test-deployment-retainkeys "${kube_flags[@]}"
+
+
+  ## kubectl apply -f with label selector should only apply matching objects
+  # Pre-Condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # apply
+  kubectl apply -l unique-label=bingbang -f hack/testdata/filter "${kube_flags[@]}"
+  # check right pod exists
+  kube::test::get_object_assert 'pods selector-test-pod' "{{${labels_field}.name}}" 'selector-test-pod'
+  # check wrong pod doesn't exist
+  output_message=$(! kubectl get pods selector-test-pod-dont-apply 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'pods "selector-test-pod-dont-apply" not found'
+  # cleanup
+  kubectl delete pods selector-test-pod
+
 
   set +o nounset
   set +o errexit
@@ -4625,6 +4705,7 @@ runTests() {
 
   if kube::test::if_supports_resource "${pods}" ; then
     record_command run_kubectl_apply_tests
+    record_command run_kubectl_apply_prune_tests
     record_command run_kubectl_run_tests
     record_command run_kubectl_create_filter_tests
   fi
