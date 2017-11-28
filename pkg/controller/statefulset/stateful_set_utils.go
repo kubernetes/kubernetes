@@ -98,6 +98,12 @@ func getPodName(set *apps.StatefulSet, ordinal int) string {
 // must be a PersistentVolumeClaim from set's VolumeClaims template.
 func getPersistentVolumeClaimName(set *apps.StatefulSet, claim *v1.PersistentVolumeClaim, ordinal int) string {
 	// NOTE: This name format is used by the heuristics for zone spreading in ChooseZoneForVolume
+	// Milo:
+	var volumeClaimBaseName string
+	volumeClaimBaseName = claim.ObjectMeta.Annotations["volumeClaimBaseName"]
+	if volumeClaimBaseName != "" {
+		return fmt.Sprintf("%s-%d", volumeClaimBaseName, ordinal)
+	}
 	return fmt.Sprintf("%s-%s-%d", claim.Name, set.Name, ordinal)
 }
 
