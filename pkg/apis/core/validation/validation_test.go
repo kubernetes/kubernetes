@@ -469,7 +469,7 @@ func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
 	validPvSourceNoUpdate := validVolume.DeepCopy()
 	invalidPvSourceUpdateType := validVolume.DeepCopy()
 	invalidPvSourceUpdateType.Spec.PersistentVolumeSource = core.PersistentVolumeSource{
-		FlexVolume: &core.FlexVolumeSource{
+		FlexVolume: &core.FlexPersistentVolumeSource{
 			Driver: "kubernetes.io/blue",
 			FSType: "ext4",
 		},
