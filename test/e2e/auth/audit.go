@@ -53,7 +53,7 @@ var (
 var _ = SIGDescribe("Advanced Audit", func() {
 	f := framework.NewDefaultFramework("audit")
 	BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "gke")
+		framework.SkipUnlessProviderIs("gce")
 	})
 
 	It("should audit API calls", func() {
