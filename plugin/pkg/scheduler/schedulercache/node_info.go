@@ -24,7 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	clientcache "k8s.io/client-go/tools/cache"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/util"
 )
@@ -38,7 +38,7 @@ type NodeInfo struct {
 
 	pods             []*v1.Pod
 	podsWithAffinity []*v1.Pod
-	usedPorts        map[int]bool
+	usedPorts        map[string]bool
 
 	// Total requested resource of all pods on this node.
 	// It includes assumed pods which scheduler sends binding to apiserver but
@@ -164,7 +164,7 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		nonzeroRequest:      &Resource{},
 		allocatableResource: &Resource{},
 		generation:          0,
-		usedPorts:           make(map[int]bool),
+		usedPorts:           make(map[string]bool),
 	}
 	for _, pod := range pods {
 		ni.AddPod(pod)
@@ -188,7 +188,7 @@ func (n *NodeInfo) Pods() []*v1.Pod {
 	return n.pods
 }
 
-func (n *NodeInfo) UsedPorts() map[int]bool {
+func (n *NodeInfo) UsedPorts() map[string]bool {
 	if n == nil {
 		return nil
 	}
@@ -269,7 +269,7 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		taintsErr:               n.taintsErr,
 		memoryPressureCondition: n.memoryPressureCondition,
 		diskPressureCondition:   n.diskPressureCondition,
-		usedPorts:               make(map[int]bool),
+		usedPorts:               make(map[string]bool),
 		generation:              n.generation,
 	}
 	if len(n.pods) > 0 {
@@ -408,11 +408,26 @@ func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, used bool) {
 			// "0" is explicitly ignored in PodFitsHostPorts,
 			// which is the only function that uses this value.
 			if podPort.HostPort != 0 {
-				if used {
-					n.usedPorts[int(podPort.HostPort)] = used
-				} else {
-					delete(n.usedPorts, int(podPort.HostPort))
+				// user does not explicitly set protocol, default is tcp
+				portProtocol := podPort.Protocol
+				if podPort.Protocol == "" {
+					portProtocol = v1.ProtocolTCP
 				}
+
+				// user does not explicitly set hostIP, default is 0.0.0.0
+				portHostIP := podPort.HostIP
+				if podPort.HostIP == "" {
+					portHostIP = util.DefaultBindAllHostIP
+				}
+
+				str := fmt.Sprintf("%s/%s/%d", portProtocol, portHostIP, podPort.HostPort)
+
+				if used {
+					n.usedPorts[str] = used
+				} else {
+					delete(n.usedPorts, str)
+				}
+
 			}
 		}
 	}

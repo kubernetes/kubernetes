@@ -48,8 +48,10 @@ type GroupVersion struct {
 }
 
 type GroupVersions struct {
-	Group    Group
-	Versions []Version
+	// The package name of the group, e.g. extensions or networking
+	PackageName string
+	Group       Group
+	Versions    []Version
 }
 
 // GroupVersionPackage contains group name, version name, and the package name client-gen will generate for this group version.
@@ -58,13 +60,13 @@ type GroupVersionPackage struct {
 	Version Version
 	// If a user calls a group client without specifying the version (e.g.,
 	// c.Core(), instead of c.CoreV1()), the default version will be returned.
-	IsDefaultVersion      bool
-	GroupVersion          string
-	LowerCaseGroupVersion string
-	PackageName           string
+	IsDefaultVersion     bool
+	PackageAlias         string
+	GroupGoName          string
+	LowerCaseGroupGoName string
 }
 
 type GroupInstallPackage struct {
-	Group              Group
-	InstallPackageName string
+	Group               Group
+	InstallPackageAlias string
 }

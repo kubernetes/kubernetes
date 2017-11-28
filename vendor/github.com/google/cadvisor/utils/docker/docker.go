@@ -19,7 +19,7 @@ import (
 	"os"
 	"strings"
 
-	dockertypes "github.com/docker/engine-api/types"
+	dockertypes "github.com/docker/docker/api/types"
 )
 
 const (

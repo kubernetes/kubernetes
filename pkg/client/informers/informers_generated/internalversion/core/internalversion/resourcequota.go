@@ -23,7 +23,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/internalinterfaces"
 	internalversion "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
@@ -38,34 +38,49 @@ type ResourceQuotaInformer interface {
 }
 
 type resourceQuotaInformer struct {
-	factory internalinterfaces.SharedInformerFactory
+	factory          internalinterfaces.SharedInformerFactory
+	tweakListOptions internalinterfaces.TweakListOptionsFunc
+	namespace        string
 }
 
 // NewResourceQuotaInformer constructs a new informer for ResourceQuota type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewResourceQuotaInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredResourceQuotaInformer(client, namespace, resyncPeriod, indexers, nil)
+}
+
+// NewFilteredResourceQuotaInformer constructs a new informer for ResourceQuota type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewFilteredResourceQuotaInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
 				return client.Core().ResourceQuotas(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
 				return client.Core().ResourceQuotas(namespace).Watch(options)
 			},
 		},
-		&api.ResourceQuota{},
+		&core.ResourceQuota{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func defaultResourceQuotaInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewResourceQuotaInformer(client, v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+func (f *resourceQuotaInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredResourceQuotaInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *resourceQuotaInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&api.ResourceQuota{}, defaultResourceQuotaInformer)
+	return f.factory.InformerFor(&core.ResourceQuota{}, f.defaultInformer)
 }
 
 func (f *resourceQuotaInformer) Lister() internalversion.ResourceQuotaLister {

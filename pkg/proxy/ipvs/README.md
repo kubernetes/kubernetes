@@ -47,6 +47,18 @@ kubeadm init --feature-gates=SupportIPVSProxyMode=true
 
 to specify the ipvs mode before deploying the cluster if want to run kube-proxy in ipvs mode.
 
+If you are using kubeadm with a configuration file, you can specify the ipvs mode adding `SupportIPVSProxyMode: true` below the `featureGates` field.
+Then the configuration file is similar to:
+
+```json
+kind: MasterConfiguration
+apiVersion: kubeadm.k8s.io/v1alpha1
+...
+featureGates:
+  SupportIPVSProxyMode: true
+...
+```
+
 #### Test
 
 Use `ipvsadm` tool to test whether the kube-proxy start succeed. By default we may get result like:

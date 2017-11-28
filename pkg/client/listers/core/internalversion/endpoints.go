@@ -22,13 +22,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // EndpointsLister helps list Endpoints.
 type EndpointsLister interface {
 	// List lists all Endpoints in the indexer.
-	List(selector labels.Selector) (ret []*api.Endpoints, err error)
+	List(selector labels.Selector) (ret []*core.Endpoints, err error)
 	// Endpoints returns an object that can list and get Endpoints.
 	Endpoints(namespace string) EndpointsNamespaceLister
 	EndpointsListerExpansion
@@ -45,9 +45,9 @@ func NewEndpointsLister(indexer cache.Indexer) EndpointsLister {
 }
 
 // List lists all Endpoints in the indexer.
-func (s *endpointsLister) List(selector labels.Selector) (ret []*api.Endpoints, err error) {
+func (s *endpointsLister) List(selector labels.Selector) (ret []*core.Endpoints, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.Endpoints))
+		ret = append(ret, m.(*core.Endpoints))
 	})
 	return ret, err
 }
@@ -60,9 +60,9 @@ func (s *endpointsLister) Endpoints(namespace string) EndpointsNamespaceLister {
 // EndpointsNamespaceLister helps list and get Endpoints.
 type EndpointsNamespaceLister interface {
 	// List lists all Endpoints in the indexer for a given namespace.
-	List(selector labels.Selector) (ret []*api.Endpoints, err error)
+	List(selector labels.Selector) (ret []*core.Endpoints, err error)
 	// Get retrieves the Endpoints from the indexer for a given namespace and name.
-	Get(name string) (*api.Endpoints, error)
+	Get(name string) (*core.Endpoints, error)
 	EndpointsNamespaceListerExpansion
 }
 
@@ -74,21 +74,21 @@ type endpointsNamespaceLister struct {
 }
 
 // List lists all Endpoints in the indexer for a given namespace.
-func (s endpointsNamespaceLister) List(selector labels.Selector) (ret []*api.Endpoints, err error) {
+func (s endpointsNamespaceLister) List(selector labels.Selector) (ret []*core.Endpoints, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.Endpoints))
+		ret = append(ret, m.(*core.Endpoints))
 	})
 	return ret, err
 }
 
 // Get retrieves the Endpoints from the indexer for a given namespace and name.
-func (s endpointsNamespaceLister) Get(name string) (*api.Endpoints, error) {
+func (s endpointsNamespaceLister) Get(name string) (*core.Endpoints, error) {
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(api.Resource("endpoints"), name)
+		return nil, errors.NewNotFound(core.Resource("endpoints"), name)
 	}
-	return obj.(*api.Endpoints), nil
+	return obj.(*core.Endpoints), nil
 }

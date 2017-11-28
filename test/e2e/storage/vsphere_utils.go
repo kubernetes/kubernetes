@@ -38,14 +38,30 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
+const (
+	volumesPerNode = 55
+	storageclass1  = "sc-default"
+	storageclass2  = "sc-vsan"
+	storageclass3  = "sc-spbm"
+	storageclass4  = "sc-user-specified-ds"
+)
+
+// volumeState represents the state of a volume.
+type volumeState int32
+
+const (
+	volumeStateDetached volumeState = 1
+	volumeStateAttached volumeState = 2
+)
+
 // Sanity check for vSphere testing.  Verify the persistent disk attached to the node.
-func verifyVSphereDiskAttached(vsp *vsphere.VSphere, volumePath string, nodeName types.NodeName) (bool, error) {
+func verifyVSphereDiskAttached(c clientset.Interface, vsp *vsphere.VSphere, volumePath string, nodeName types.NodeName) (bool, error) {
 	var (
 		isAttached bool
 		err        error
 	)
 	if vsp == nil {
-		vsp, err = vsphere.GetVSphere()
+		vsp, err = getVSphere(c)
 		Expect(err).NotTo(HaveOccurred())
 	}
 	isAttached, err = vsp.DiskIsAttached(volumePath, nodeName)
@@ -53,40 +69,98 @@ func verifyVSphereDiskAttached(vsp *vsphere.VSphere, volumePath string, nodeName
 	return isAttached, err
 }
 
-// Wait until vsphere vmdk is deteched from the given node or time out after 5 minutes
-func waitForVSphereDiskToDetach(vsp *vsphere.VSphere, volumePath string, nodeName types.NodeName) error {
+// Wait until vsphere volumes are detached from the list of nodes or time out after 5 minutes
+func waitForVSphereDisksToDetach(c clientset.Interface, vsp *vsphere.VSphere, nodeVolumes map[k8stype.NodeName][]string) error {
 	var (
 		err            error
-		diskAttached   = true
+		disksAttached  = true
 		detachTimeout  = 5 * time.Minute
 		detachPollTime = 10 * time.Second
 	)
 	if vsp == nil {
-		vsp, err = vsphere.GetVSphere()
+		vsp, err = getVSphere(c)
 		if err != nil {
 			return err
 		}
 	}
 	err = wait.Poll(detachPollTime, detachTimeout, func() (bool, error) {
-		diskAttached, err = verifyVSphereDiskAttached(vsp, volumePath, nodeName)
+		attachedResult, err := vsp.DisksAreAttached(nodeVolumes)
+		if err != nil {
+			return false, err
+		}
+		for nodeName, nodeVolumes := range attachedResult {
+			for volumePath, attached := range nodeVolumes {
+				if attached {
+					framework.Logf("Waiting for volumes %q to detach from %q.", volumePath, string(nodeName))
+					return false, nil
+				}
+			}
+		}
+		disksAttached = false
+		framework.Logf("Volume are successfully detached from all the nodes: %+v", nodeVolumes)
+		return true, nil
+	})
+	if err != nil {
+		return err
+	}
+	if disksAttached {
+		return fmt.Errorf("Gave up waiting for volumes to detach after %v", detachTimeout)
+	}
+	return nil
+}
+
+// Wait until vsphere vmdk moves to expected state on the given node, or time out after 6 minutes
+func waitForVSphereDiskStatus(c clientset.Interface, vsp *vsphere.VSphere, volumePath string, nodeName types.NodeName, expectedState volumeState) error {
+	var (
+		err          error
+		diskAttached bool
+		currentState volumeState
+		timeout      = 6 * time.Minute
+		pollTime     = 10 * time.Second
+	)
+
+	var attachedState = map[bool]volumeState{
+		true:  volumeStateAttached,
+		false: volumeStateDetached,
+	}
+
+	var attachedStateMsg = map[volumeState]string{
+		volumeStateAttached: "attached to",
+		volumeStateDetached: "detached from",
+	}
+
+	err = wait.Poll(pollTime, timeout, func() (bool, error) {
+		diskAttached, err = verifyVSphereDiskAttached(c, vsp, volumePath, nodeName)
 		if err != nil {
 			return true, err
 		}
-		if !diskAttached {
-			framework.Logf("Volume %q appears to have successfully detached from %q.",
-				volumePath, nodeName)
+
+		currentState = attachedState[diskAttached]
+		if currentState == expectedState {
+			framework.Logf("Volume %q has successfully %s %q", volumePath, attachedStateMsg[currentState], nodeName)
 			return true, nil
 		}
-		framework.Logf("Waiting for Volume %q to detach from %q.", volumePath, nodeName)
+		framework.Logf("Waiting for Volume %q to be %s %q.", volumePath, attachedStateMsg[expectedState], nodeName)
 		return false, nil
 	})
 	if err != nil {
 		return err
 	}
-	if diskAttached {
-		return fmt.Errorf("Gave up waiting for Volume %q to detach from %q after %v", volumePath, nodeName, detachTimeout)
+
+	if currentState != expectedState {
+		err = fmt.Errorf("Gave up waiting for Volume %q to be %s %q after %v", volumePath, attachedStateMsg[expectedState], nodeName, timeout)
 	}
-	return nil
+	return err
+}
+
+// Wait until vsphere vmdk is attached from the given node or time out after 6 minutes
+func waitForVSphereDiskToAttach(c clientset.Interface, vsp *vsphere.VSphere, volumePath string, nodeName types.NodeName) error {
+	return waitForVSphereDiskStatus(c, vsp, volumePath, nodeName, volumeStateAttached)
+}
+
+// Wait until vsphere vmdk is detached from the given node or time out after 6 minutes
+func waitForVSphereDiskToDetach(c clientset.Interface, vsp *vsphere.VSphere, volumePath string, nodeName types.NodeName) error {
+	return waitForVSphereDiskStatus(c, vsp, volumePath, nodeName, volumeStateDetached)
 }
 
 // function to create vsphere volume spec with given VMDK volume path, Reclaim Policy and labels
@@ -340,12 +414,12 @@ func createEmptyFilesOnVSphereVolume(namespace string, podName string, filePaths
 }
 
 // verify volumes are attached to the node and are accessible in pod
-func verifyVSphereVolumesAccessible(pod *v1.Pod, persistentvolumes []*v1.PersistentVolume, vsp *vsphere.VSphere) {
+func verifyVSphereVolumesAccessible(c clientset.Interface, pod *v1.Pod, persistentvolumes []*v1.PersistentVolume, vsp *vsphere.VSphere) {
 	nodeName := pod.Spec.NodeName
 	namespace := pod.Namespace
 	for index, pv := range persistentvolumes {
 		// Verify disks are attached to the node
-		isAttached, err := verifyVSphereDiskAttached(vsp, pv.Spec.VsphereVolume.VolumePath, k8stype.NodeName(nodeName))
+		isAttached, err := verifyVSphereDiskAttached(c, vsp, pv.Spec.VsphereVolume.VolumePath, k8stype.NodeName(nodeName))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(isAttached).To(BeTrue(), fmt.Sprintf("disk %v is not attached with the node", pv.Spec.VsphereVolume.VolumePath))
 		// Verify Volumes are accessible
@@ -362,4 +436,24 @@ func getvSphereVolumePathFromClaim(client clientset.Interface, namespace string,
 	pv, err := client.CoreV1().PersistentVolumes().Get(pvclaim.Spec.VolumeName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	return pv.Spec.VsphereVolume.VolumePath
+}
+
+func addNodesToVCP(vsp *vsphere.VSphere, c clientset.Interface) error {
+	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, node := range nodes.Items {
+		vsp.NodeAdded(&node)
+	}
+	return nil
+}
+
+func getVSphere(c clientset.Interface) (*vsphere.VSphere, error) {
+	vsp, err := vsphere.GetVSphere()
+	if err != nil {
+		return nil, err
+	}
+	addNodesToVCP(vsp, c)
+	return vsp, nil
 }

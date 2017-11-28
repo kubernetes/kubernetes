@@ -32,7 +32,15 @@ import (
 // endpoint maps to a single registered device plugin. It is responsible
 // for managing gRPC communications with the device plugin and caching
 // device states reported by the device plugin.
-type endpoint struct {
+type endpoint interface {
+	run()
+	stop()
+	allocate(devs []string) (*pluginapi.AllocateResponse, error)
+	getDevices() []pluginapi.Device
+	callback(resourceName string, added, updated, deleted []pluginapi.Device)
+}
+
+type endpointImpl struct {
 	client     pluginapi.DevicePluginClient
 	clientConn *grpc.ClientConn
 
@@ -42,30 +50,34 @@ type endpoint struct {
 	devices map[string]pluginapi.Device
 	mutex   sync.Mutex
 
-	callback MonitorCallback
+	cb monitorCallback
 }
 
 // newEndpoint creates a new endpoint for the given resourceName.
-func newEndpoint(socketPath, resourceName string, callback MonitorCallback) (*endpoint, error) {
+func newEndpointImpl(socketPath, resourceName string, devices map[string]pluginapi.Device, callback monitorCallback) (*endpointImpl, error) {
 	client, c, err := dial(socketPath)
 	if err != nil {
 		glog.Errorf("Can't create new endpoint with path %s err %v", socketPath, err)
 		return nil, err
 	}
 
-	return &endpoint{
+	return &endpointImpl{
 		client:     client,
 		clientConn: c,
 
 		socketPath:   socketPath,
 		resourceName: resourceName,
 
-		devices:  nil,
-		callback: callback,
+		devices: devices,
+		cb:      callback,
 	}, nil
 }
 
-func (e *endpoint) getDevices() []pluginapi.Device {
+func (e *endpointImpl) callback(resourceName string, added, updated, deleted []pluginapi.Device) {
+	e.cb(resourceName, added, updated, deleted)
+}
+
+func (e *endpointImpl) getDevices() []pluginapi.Device {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 	var devs []pluginapi.Device
@@ -77,44 +89,19 @@ func (e *endpoint) getDevices() []pluginapi.Device {
 	return devs
 }
 
-// list initializes ListAndWatch gRPC call for the device plugin and gets the
-// initial list of the devices. Returns ListAndWatch gRPC stream on success.
-func (e *endpoint) list() (pluginapi.DevicePlugin_ListAndWatchClient, error) {
+// run initializes ListAndWatch gRPC call for the device plugin and
+// blocks on receiving ListAndWatch gRPC stream updates. Each ListAndWatch
+// stream update contains a new list of device states. listAndWatch compares the new
+// device states with its cached states to get list of new, updated, and deleted devices.
+// It then issues a callback to pass this information to the device manager which
+// will adjust the resource available information accordingly.
+func (e *endpointImpl) run() {
 	stream, err := e.client.ListAndWatch(context.Background(), &pluginapi.Empty{})
 	if err != nil {
 		glog.Errorf(errListAndWatch, e.resourceName, err)
-		return nil, err
+
+		return
 	}
-
-	devs, err := stream.Recv()
-	if err != nil {
-		glog.Errorf(errListAndWatch, e.resourceName, err)
-		return nil, err
-	}
-
-	devices := make(map[string]pluginapi.Device)
-	var added, updated, deleted []pluginapi.Device
-	for _, d := range devs.Devices {
-		devices[d.ID] = *d
-		added = append(added, *d)
-	}
-
-	e.mutex.Lock()
-	e.devices = devices
-	e.mutex.Unlock()
-
-	e.callback(e.resourceName, added, updated, deleted)
-
-	return stream, nil
-}
-
-// listAndWatch blocks on receiving ListAndWatch gRPC stream updates. Each ListAndWatch
-// stream update contains a new list of device states. listAndWatch compares the new
-// device states with its cached states to get list of new, updated, and deleted devices.
-// It then issues a callback to pass this information to the device_plugin_handler which
-// will adjust the resource available information accordingly.
-func (e *endpoint) listAndWatch(stream pluginapi.DevicePlugin_ListAndWatchClient) {
-	glog.V(3).Infof("Starting ListAndWatch")
 
 	devices := make(map[string]pluginapi.Device)
 
@@ -185,13 +172,13 @@ func (e *endpoint) listAndWatch(stream pluginapi.DevicePlugin_ListAndWatchClient
 }
 
 // allocate issues Allocate gRPC call to the device plugin.
-func (e *endpoint) allocate(devs []string) (*pluginapi.AllocateResponse, error) {
+func (e *endpointImpl) allocate(devs []string) (*pluginapi.AllocateResponse, error) {
 	return e.client.Allocate(context.Background(), &pluginapi.AllocateRequest{
 		DevicesIDs: devs,
 	})
 }
 
-func (e *endpoint) stop() {
+func (e *endpointImpl) stop() {
 	e.clientConn.Close()
 }
 

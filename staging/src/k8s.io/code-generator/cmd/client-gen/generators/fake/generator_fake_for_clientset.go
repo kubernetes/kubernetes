@@ -32,6 +32,7 @@ import (
 type genClientset struct {
 	generator.DefaultGen
 	groups               []clientgentypes.GroupVersions
+	groupGoNames         map[clientgentypes.GroupVersion]string
 	fakeClientsetPackage string
 	outputPackage        string
 	imports              namer.ImportTracker
@@ -59,11 +60,12 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
 	for _, group := range g.groups {
 		for _, version := range group.Versions {
-			groupClientPackage := filepath.Join(g.fakeClientsetPackage, "typed", group.Group.NonEmpty(), version.NonEmpty())
+			groupClientPackage := filepath.Join(g.fakeClientsetPackage, "typed", group.PackageName, version.NonEmpty())
 			fakeGroupClientPackage := filepath.Join(groupClientPackage, "fake")
 
-			imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", group.Group.NonEmpty(), version.NonEmpty(), groupClientPackage)))
-			imports = append(imports, strings.ToLower(fmt.Sprintf("fake%s%s \"%s\"", group.Group.NonEmpty(), version.NonEmpty(), fakeGroupClientPackage)))
+			groupAlias := strings.ToLower(g.groupGoNames[clientgentypes.GroupVersion{group.Group, version}])
+			imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", groupAlias, version.NonEmpty(), groupClientPackage)))
+			imports = append(imports, strings.ToLower(fmt.Sprintf("fake%s%s \"%s\"", groupAlias, version.NonEmpty(), fakeGroupClientPackage)))
 		}
 	}
 	// the package that has the clientset Interface
@@ -85,16 +87,24 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	// perhaps we can adapt the go2ild framework to this kind of usage.
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 
-	allGroups := clientgentypes.ToGroupVersionPackages(g.groups)
+	allGroups := clientgentypes.ToGroupVersionPackages(g.groups, g.groupGoNames)
 
 	sw.Do(common, nil)
 	sw.Do(checkImpl, nil)
 
-	for _, g := range allGroups {
-		sw.Do(clientsetInterfaceImplTemplate, g)
+	for _, group := range allGroups {
+		m := map[string]interface{}{
+			"group":        group.Group,
+			"version":      group.Version,
+			"PackageAlias": group.PackageAlias,
+			"GroupGoName":  group.GroupGoName,
+			"Version":      namer.IC(group.Version.String()),
+		}
+
+		sw.Do(clientsetInterfaceImplTemplate, m)
 		// don't generated the default method if generating internalversion clientset
-		if g.IsDefaultVersion && g.Version != "" {
-			sw.Do(clientsetInterfaceDefaultVersionImpl, g)
+		if group.IsDefaultVersion && group.Version != "" {
+			sw.Do(clientsetInterfaceDefaultVersionImpl, m)
 		}
 	}
 
@@ -140,15 +150,15 @@ var _ clientset.Interface = &Clientset{}
 `
 
 var clientsetInterfaceImplTemplate = `
-// $.GroupVersion$ retrieves the $.GroupVersion$Client
-func (c *Clientset) $.GroupVersion$() $.PackageName$.$.GroupVersion$Interface {
-	return &fake$.PackageName$.Fake$.GroupVersion${Fake: &c.Fake}
+// $.GroupGoName$$.Version$ retrieves the $.GroupGoName$$.Version$Client
+func (c *Clientset) $.GroupGoName$$.Version$() $.PackageAlias$.$.GroupGoName$$.Version$Interface {
+	return &fake$.PackageAlias$.Fake$.GroupGoName$$.Version${Fake: &c.Fake}
 }
 `
 
 var clientsetInterfaceDefaultVersionImpl = `
-// $.Group$ retrieves the $.GroupVersion$Client
-func (c *Clientset) $.Group$() $.PackageName$.$.GroupVersion$Interface {
-	return &fake$.PackageName$.Fake$.GroupVersion${Fake: &c.Fake}
+// $.GroupGoName$ retrieves the $.GroupGoName$$.Version$Client
+func (c *Clientset) $.GroupGoName$() $.PackageAlias$.$.GroupGoName$$.Version$Interface {
+	return &fake$.PackageAlias$.Fake$.GroupGoName$$.Version${Fake: &c.Fake}
 }
 `

@@ -315,8 +315,9 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		for _, name := range test.nodes {
 			cache.AddNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}})
 		}
+		queue := NewSchedulingQueue()
 		scheduler := NewGenericScheduler(
-			cache, nil, test.predicates, algorithm.EmptyPredicateMetadataProducer, test.prioritizers, algorithm.EmptyMetadataProducer, extenders)
+			cache, nil, queue, test.predicates, algorithm.EmptyPredicateMetadataProducer, test.prioritizers, algorithm.EmptyMetadataProducer, extenders, nil)
 		podIgnored := &v1.Pod{}
 		machine, err := scheduler.Schedule(podIgnored, schedulertesting.FakeNodeLister(makeNodeList(test.nodes)))
 		if test.expectsErr {

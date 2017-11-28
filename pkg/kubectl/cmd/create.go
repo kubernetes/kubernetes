@@ -108,6 +108,7 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.AddCommand(NewCmdCreateRole(f, out))
 	cmd.AddCommand(NewCmdCreateRoleBinding(f, out))
 	cmd.AddCommand(NewCmdCreatePodDisruptionBudget(f, out))
+	cmd.AddCommand(NewCmdCreatePriorityClass(f, out))
 	return cmd
 }
 
@@ -183,18 +184,13 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 		return err
 	}
 
-	mapper, typer, err := f.UnstructuredObject()
-	if err != nil {
-		return err
-	}
-
 	r := f.NewBuilder().
-		Unstructured(f.UnstructuredClientForMapping, mapper, typer).
+		Unstructured().
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
-		SelectorParam(options.Selector).
+		LabelSelectorParam(options.Selector).
 		Flatten().
 		Do()
 	err = r.Err()
@@ -204,6 +200,7 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 
 	dryRun := cmdutil.GetFlagBool(cmd, "dry-run")
 	output := cmdutil.GetFlagString(cmd, "output")
+	mapper := r.Mapper().RESTMapper
 
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
@@ -230,13 +227,13 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 
 		shortOutput := output == "name"
 		if len(output) > 0 && !shortOutput {
-			return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
+			return f.PrintResourceInfoForCommand(cmd, info, out)
 		}
 		if !shortOutput {
 			f.PrintObjectSpecificMessage(info.Object, out)
 		}
 
-		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
+		f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
 		return nil
 	})
 	if err != nil {
@@ -348,7 +345,7 @@ func RunCreateSubcommand(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, o
 	}
 
 	if useShortOutput := options.OutputFormat == "name"; useShortOutput || len(options.OutputFormat) == 0 {
-		cmdutil.PrintSuccess(mapper, useShortOutput, out, mapping.Resource, info.Name, options.DryRun, "created")
+		f.PrintSuccess(mapper, useShortOutput, out, mapping.Resource, info.Name, options.DryRun, "created")
 		return nil
 	}
 

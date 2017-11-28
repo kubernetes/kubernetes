@@ -47,6 +47,7 @@ func TestAddonsSubCommandsHasFlags(t *testing.T) {
 				"apiserver-bind-port",
 				"pod-network-cidr",
 				"service-dns-domain",
+				"service-cidr",
 			},
 		},
 		{
@@ -61,6 +62,7 @@ func TestAddonsSubCommandsHasFlags(t *testing.T) {
 			command: "kube-dns",
 			additionalFlags: []string{
 				"service-dns-domain",
+				"service-cidr",
 			},
 		},
 	}

@@ -11,6 +11,7 @@ go_library(
     srcs = ["constants.go"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/constants",
     deps = [
+        "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
     ],
@@ -34,4 +35,5 @@ go_test(
     srcs = ["constants_test.go"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/constants",
     library = ":go_default_library",
+    deps = ["//pkg/util/version:go_default_library"],
 )

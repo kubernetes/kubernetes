@@ -24,14 +24,14 @@ from charms.reactive import when
 from charms.reactive import when_not
 from charms.reactive.helpers import data_changed
 
-from charmhelpers.core import hookenv
+from charmhelpers.core import hookenv, unitdata
 
 from shlex import split
 
 from subprocess import check_call
 from subprocess import check_output
 
-
+db = unitdata.kv()
 USER = 'system:e2e'
 
 
@@ -91,16 +91,15 @@ def install_snaps():
 
 @when('tls_client.ca.saved', 'tls_client.client.certificate.saved',
       'tls_client.client.key.saved', 'kubernetes-master.available',
-      'kubernetes-e2e.installed', 'e2e.auth.bootstrapped',
-      'kube-control.auth.available')
+      'kubernetes-e2e.installed', 'e2e.auth.bootstrapped')
 @when_not('kubeconfig.ready')
-def prepare_kubeconfig_certificates(master, kube_control):
+def prepare_kubeconfig_certificates(master):
     ''' Prepare the data to feed to create the kubeconfig file. '''
 
     layer_options = layer.options('tls-client')
     # Get all the paths to the tls information required for kubeconfig.
     ca = layer_options.get('ca_certificate_path')
-    creds = kube_control.get_auth_credentials(USER)
+    creds = db.get('credentials')
     data_changed('kube-control.creds', creds)
 
     servers = get_kube_api_servers(master)
@@ -135,6 +134,10 @@ def catch_change_in_creds(kube_control):
     if creds \
             and data_changed('kube-control.creds', creds) \
             and creds['user'] == USER:
+        # We need to cache the credentials here because if the
+        # master changes (master leader dies and replaced by a new one)
+        # the new master will have no recollection of our certs.
+        db.set('credentials', creds)
         set_state('e2e.auth.bootstrapped')
 
 

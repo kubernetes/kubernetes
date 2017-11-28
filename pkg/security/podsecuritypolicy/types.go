@@ -18,7 +18,7 @@ package podsecuritypolicy
 
 import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/capabilities"

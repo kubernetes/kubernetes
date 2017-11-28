@@ -25,6 +25,7 @@ import (
 	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
@@ -143,19 +144,21 @@ func TestCreateRole(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		buf := bytes.NewBuffer([]byte{})
-		cmd := NewCmdCreateRole(f, buf)
-		cmd.Flags().Set("dry-run", "true")
-		cmd.Flags().Set("output", "object")
-		cmd.Flags().Set("verb", test.verbs)
-		cmd.Flags().Set("resource", test.resources)
-		if test.resourceNames != "" {
-			cmd.Flags().Set("resource-name", test.resourceNames)
-		}
-		cmd.Run(cmd, []string{roleName})
-		if !reflect.DeepEqual(test.expectedRole, printer.CachedRole) {
-			t.Errorf("%s:\nexpected:\n%#v\nsaw:\n%#v", name, test.expectedRole, printer.CachedRole)
-		}
+		t.Run(name, func(t *testing.T) {
+			buf := bytes.NewBuffer([]byte{})
+			cmd := NewCmdCreateRole(f, buf)
+			cmd.Flags().Set("dry-run", "true")
+			cmd.Flags().Set("output", "object")
+			cmd.Flags().Set("verb", test.verbs)
+			cmd.Flags().Set("resource", test.resources)
+			if test.resourceNames != "" {
+				cmd.Flags().Set("resource-name", test.resourceNames)
+			}
+			cmd.Run(cmd, []string{roleName})
+			if !reflect.DeepEqual(test.expectedRole, printer.CachedRole) {
+				t.Errorf("%s", diff.ObjectReflectDiff(test.expectedRole, printer.CachedRole))
+			}
+		})
 	}
 }
 

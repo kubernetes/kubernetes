@@ -41,7 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	clientset "k8s.io/client-go/kubernetes"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -495,8 +495,8 @@ var _ = SIGDescribe("Dynamic Provisioning", func() {
 			gceCloud, err := framework.GetGCECloud()
 			Expect(err).NotTo(HaveOccurred())
 
-			// Get all k8s managed zones
-			managedZones, err = gceCloud.GetAllZones()
+			// Get all k8s managed zones (same as zones with nodes in them for test)
+			managedZones, err = gceCloud.GetAllZonesFromCloudProvider()
 			Expect(err).NotTo(HaveOccurred())
 
 			// Get a list of all zones in the project

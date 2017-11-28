@@ -11,7 +11,7 @@ go_library(
     srcs = ["repair.go"],
     importpath = "k8s.io/kubernetes/pkg/registry/core/service/portallocator/controller",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/registry/core/rangeallocation:go_default_library",
         "//pkg/registry/core/service:go_default_library",
@@ -31,7 +31,7 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/registry/core/service/portallocator/controller",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
         "//pkg/registry/core/service/portallocator:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

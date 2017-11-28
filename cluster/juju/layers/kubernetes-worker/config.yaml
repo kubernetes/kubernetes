@@ -31,3 +31,21 @@ options:
     description: |
       When true, worker services will not be upgraded until the user triggers
       it manually by running the upgrade action.
+  kubelet-extra-args:
+    type: string
+    default: ""
+    description: |
+      Space separated list of flags and key=value pairs that will be passed as arguments to
+      kubelet. For example a value like this:
+        runtime-config=batch/v2alpha1=true profiling=true
+      will result in kube-apiserver being run with the following options:
+        --runtime-config=batch/v2alpha1=true --profiling=true
+  proxy-extra-args:
+    type: string
+    default: ""
+    description: |
+      Space separated list of flags and key=value pairs that will be passed as arguments to
+      kube-proxy. For example a value like this:
+        runtime-config=batch/v2alpha1=true profiling=true
+      will result in kube-apiserver being run with the following options:
+        --runtime-config=batch/v2alpha1=true --profiling=true

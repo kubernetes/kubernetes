@@ -37,8 +37,8 @@ import (
 // https://github.com/kubernetes/kubernetes/blob/master/docs/proposals/kubelet-eviction.md
 
 var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", func() {
-	const (
-		evictionHard = "memory.available<40%"
+	var (
+		evictionHard = map[string]string{"memory.available": "40%"}
 	)
 
 	f := framework.NewDefaultFramework("eviction-test")

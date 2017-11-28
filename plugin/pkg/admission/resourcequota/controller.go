@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration

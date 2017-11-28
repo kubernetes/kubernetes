@@ -36,8 +36,8 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	api "k8s.io/kubernetes/pkg/apis/core"
 
 	// install the clientgo image policy API for use with api registry
 	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
@@ -219,6 +219,10 @@ func (a *Plugin) admitPod(pod *api.Pod, attributes admission.Attributes, review 
 // For additional HTTP configuration, refer to the kubeconfig documentation
 // http://kubernetes.io/v1.1/docs/user-guide/kubeconfig-file.html.
 func NewImagePolicyWebhook(configFile io.Reader) (*Plugin, error) {
+	if configFile == nil {
+		return nil, fmt.Errorf("no config specified")
+	}
+
 	// TODO: move this to a versioned configuration file format
 	var config AdmissionConfig
 	d := yaml.NewYAMLOrJSONDecoder(configFile, 4096)

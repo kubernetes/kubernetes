@@ -21,10 +21,11 @@ import (
 
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 )
 
@@ -65,6 +66,13 @@ func (c *mockVolumes) DiskIsAttached(volumeName aws.KubernetesVolumeID, nodeName
 
 func (c *mockVolumes) DisksAreAttached(nodeDisks map[types.NodeName][]aws.KubernetesVolumeID) (map[types.NodeName]map[aws.KubernetesVolumeID]bool, error) {
 	return nil, fmt.Errorf("not implemented")
+}
+
+func (c *mockVolumes) ResizeDisk(
+	diskName aws.KubernetesVolumeID,
+	oldSize resource.Quantity,
+	newSize resource.Quantity) (resource.Quantity, error) {
+	return oldSize, nil
 }
 
 func mockVolumeFailure(err error) *mockVolumes {

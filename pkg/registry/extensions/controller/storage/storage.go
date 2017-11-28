@@ -21,13 +21,15 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	autoscalingvalidation "k8s.io/kubernetes/pkg/apis/autoscaling/validation"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/registry/core/replicationcontroller"
 	controllerstore "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage"
 )
@@ -58,7 +60,7 @@ var _ = rest.Patcher(&ScaleREST{})
 
 // New creates a new Scale object
 func (r *ScaleREST) New() runtime.Object {
-	return &extensions.Scale{}
+	return &autoscaling.Scale{}
 }
 
 func (r *ScaleREST) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
@@ -81,12 +83,12 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 	if obj == nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("nil update passed to Scale"))
 	}
-	scale, ok := obj.(*extensions.Scale)
+	scale, ok := obj.(*autoscaling.Scale)
 	if !ok {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("wrong object passed to Scale update: %v", obj))
 	}
 
-	if errs := extvalidation.ValidateScale(scale); len(errs) > 0 {
+	if errs := autoscalingvalidation.ValidateScale(scale); len(errs) > 0 {
 		return nil, false, errors.NewInvalid(extensions.Kind("Scale"), scale.Name, errs)
 	}
 
@@ -100,8 +102,8 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 }
 
 // scaleFromRC returns a scale subresource for a replication controller.
-func scaleFromRC(rc *api.ReplicationController) *extensions.Scale {
-	return &extensions.Scale{
+func scaleFromRC(rc *api.ReplicationController) *autoscaling.Scale {
+	return &autoscaling.Scale{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              rc.Name,
 			Namespace:         rc.Namespace,
@@ -109,14 +111,12 @@ func scaleFromRC(rc *api.ReplicationController) *extensions.Scale {
 			ResourceVersion:   rc.ResourceVersion,
 			CreationTimestamp: rc.CreationTimestamp,
 		},
-		Spec: extensions.ScaleSpec{
+		Spec: autoscaling.ScaleSpec{
 			Replicas: rc.Spec.Replicas,
 		},
-		Status: extensions.ScaleStatus{
+		Status: autoscaling.ScaleStatus{
 			Replicas: rc.Status.Replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: rc.Spec.Selector,
-			},
+			Selector: labels.SelectorFromSet(labels.Set(rc.Spec.Selector)).String(),
 		},
 	}
 }

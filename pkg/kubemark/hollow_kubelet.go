@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -50,7 +50,7 @@ func NewHollowKubelet(
 	nodeName string,
 	client *clientset.Clientset,
 	cadvisorInterface cadvisor.Interface,
-	dockerClient libdocker.Interface,
+	dockerClientConfig *dockershim.ClientConfig,
 	kubeletPort, kubeletReadOnlyPort int,
 	containerManager cm.ContainerManager,
 	maxPods int, podsPerCore int,
@@ -66,18 +66,18 @@ func NewHollowKubelet(
 	volumePlugins := empty_dir.ProbeVolumePlugins()
 	volumePlugins = append(volumePlugins, secret.ProbeVolumePlugins()...)
 	d := &kubelet.Dependencies{
-		KubeClient:        client,
-		HeartbeatClient:   client.CoreV1(),
-		DockerClient:      dockerClient,
-		CAdvisorInterface: cadvisorInterface,
-		Cloud:             nil,
-		OSInterface:       &containertest.FakeOS{},
-		ContainerManager:  containerManager,
-		VolumePlugins:     volumePlugins,
-		TLSOptions:        nil,
-		OOMAdjuster:       oom.NewFakeOOMAdjuster(),
-		Writer:            &kubeio.StdWriter{},
-		Mounter:           mount.New("" /* default mount path */),
+		KubeClient:         client,
+		HeartbeatClient:    client.CoreV1(),
+		DockerClientConfig: dockerClientConfig,
+		CAdvisorInterface:  cadvisorInterface,
+		Cloud:              nil,
+		OSInterface:        &containertest.FakeOS{},
+		ContainerManager:   containerManager,
+		VolumePlugins:      volumePlugins,
+		TLSOptions:         nil,
+		OOMAdjuster:        oom.NewFakeOOMAdjuster(),
+		Writer:             &kubeio.StdWriter{},
+		Mounter:            mount.New("" /* default mount path */),
 	}
 
 	return &HollowKubelet{
@@ -115,6 +115,7 @@ func GetHollowKubeletConfig(
 	f.MinimumGCAge = metav1.Duration{Duration: 1 * time.Minute}
 	f.MaxContainerCount = 100
 	f.MaxPerPodContainerCount = 2
+	f.RegisterNode = true
 	f.RegisterSchedulable = true
 
 	// Config struct
@@ -150,7 +151,6 @@ func GetHollowKubeletConfig(
 	// set promiscuous mode on docker0.
 	c.HairpinMode = kubeletconfig.HairpinVeth
 	c.MaxOpenFiles = 1024
-	c.RegisterNode = true
 	c.RegistryBurst = 10
 	c.RegistryPullQPS = 5.0
 	c.ResolverConfig = kubetypes.ResolvConfDefault

@@ -27,7 +27,7 @@ import (
 
 // Utilities for dealing with conntrack
 
-const noConnectionToDelete = "0 flow entries have been deleted"
+const NoConnectionToDelete = "0 flow entries have been deleted"
 
 func IsIPv6(netIP net.IP) bool {
 	return netIP != nil && netIP.To4() == nil
@@ -50,7 +50,7 @@ func parametersWithFamily(isIPv6 bool, parameters ...string) []string {
 func ClearUDPConntrackForIP(execer exec.Interface, ip string) error {
 	parameters := parametersWithFamily(IsIPv6String(ip), "-D", "--orig-dst", ip, "-p", "udp")
 	err := ExecConntrackTool(execer, parameters...)
-	if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
+	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
 		// TODO: Better handling for deletion failure. When failure occur, stale udp connection may not get flushed.
 		// These stale udp connection will keep black hole traffic. Making this a best effort operation for now, since it
 		// is expensive to baby-sit all udp connections to kubernetes services.
@@ -84,7 +84,7 @@ func ClearUDPConntrackForPort(execer exec.Interface, port int, isIPv6 bool) erro
 	}
 	parameters := parametersWithFamily(isIPv6, "-D", "-p", "udp", "--dport", strconv.Itoa(port))
 	err := ExecConntrackTool(execer, parameters...)
-	if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
+	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
 		return fmt.Errorf("error deleting conntrack entries for UDP port: %d, error: %v", port, err)
 	}
 	return nil
@@ -95,7 +95,7 @@ func ClearUDPConntrackForPort(execer exec.Interface, port int, isIPv6 bool) erro
 func ClearUDPConntrackForPeers(execer exec.Interface, origin, dest string) error {
 	parameters := parametersWithFamily(IsIPv6String(origin), "-D", "--orig-dst", origin, "--dst-nat", dest, "-p", "udp")
 	err := ExecConntrackTool(execer, parameters...)
-	if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
+	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
 		// TODO: Better handling for deletion failure. When failure occur, stale udp connection may not get flushed.
 		// These stale udp connection will keep black hole traffic. Making this a best effort operation for now, since it
 		// is expensive to baby sit all udp connections to kubernetes services.

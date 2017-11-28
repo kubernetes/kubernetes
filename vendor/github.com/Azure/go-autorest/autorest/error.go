@@ -1,5 +1,19 @@
 package autorest
 
+// Copyright 2017 Microsoft Corporation
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 import (
 	"fmt"
 	"net/http"
@@ -31,6 +45,9 @@ type DetailedError struct {
 
 	// Service Error is the response body of failed API in bytes
 	ServiceError []byte
+
+	// Response is the response object that was returned during failure if applicable.
+	Response *http.Response
 }
 
 // NewError creates a new Error conforming object from the passed packageType, method, and
@@ -67,6 +84,7 @@ func NewErrorWithError(original error, packageType string, method string, resp *
 		Method:      method,
 		StatusCode:  statusCode,
 		Message:     fmt.Sprintf(message, args...),
+		Response:    resp,
 	}
 }
 

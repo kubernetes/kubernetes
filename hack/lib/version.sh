@@ -22,6 +22,7 @@
 #          source code.
 #    KUBE_GIT_TREE_STATE - "clean" indicates no changes since the git commit id
 #        "dirty" indicates source code changes after the git commit id
+#        "archive" indicates the tree was produced by 'git archive'
 #    KUBE_GIT_VERSION - "vX.Y" used to indicate the last release version.
 #    KUBE_GIT_MAJOR - The major part of the version
 #    KUBE_GIT_MINOR - The minor component of the version
@@ -34,6 +35,19 @@ kube::version::get_version_vars() {
   if [[ -n ${KUBE_GIT_VERSION_FILE-} ]]; then
     kube::version::load_version_vars "${KUBE_GIT_VERSION_FILE}"
     return
+  fi
+
+  # If the kubernetes source was exported through git archive, then
+  # we likely don't have a git tree, but these magic values may be filled in.
+  if [[ '$Format:%%$' == "%" ]]; then
+    KUBE_GIT_COMMIT='$Format:%H$'
+    KUBE_GIT_TREE_STATE="archive"
+    # When a 'git archive' is exported, the '$Format:%D$' below will look
+    # something like 'HEAD -> release-1.8, tag: v1.8.3' where then 'tag: '
+    # can be extracted from it.
+    if [[ '$Format:%D$' =~ tag:\ (v[^ ]+) ]]; then
+     KUBE_GIT_VERSION="${BASH_REMATCH[1]}"
+    fi
   fi
 
   local git=(git --work-tree "${KUBE_ROOT}")

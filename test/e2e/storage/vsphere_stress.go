@@ -18,6 +18,10 @@ package storage
 
 import (
 	"fmt"
+	"os"
+	"strconv"
+	"sync"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
@@ -26,11 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	k8stype "k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"os"
-	"strconv"
-	"sync"
 )
 
 /*
@@ -45,13 +45,6 @@ import (
 */
 var _ = SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("vcp-stress")
-	const (
-		volumesPerNode = 55
-		storageclass1  = "sc-default"
-		storageclass2  = "sc-vsan"
-		storageclass3  = "sc-spbm"
-		storageclass4  = "sc-user-specified-ds"
-	)
 	var (
 		client        clientset.Interface
 		namespace     string
@@ -141,9 +134,8 @@ var _ = SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", func() {
 func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.Interface, namespace string, instanceId string, sc *storageV1.StorageClass, iterations int, wg *sync.WaitGroup) {
 	defer wg.Done()
 	defer GinkgoRecover()
-	vsp, err := vsphere.GetVSphere()
+	vsp, err := getVSphere(f.ClientSet)
 	Expect(err).NotTo(HaveOccurred())
-
 	for iterationCount := 0; iterationCount < iterations; iterationCount++ {
 		logPrefix := fmt.Sprintf("Instance: [%v], Iteration: [%v] :", instanceId, iterationCount+1)
 		By(fmt.Sprintf("%v Creating PVC using the Storage Class: %v", logPrefix, sc.Name))
@@ -159,7 +151,7 @@ func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.I
 
 		By(fmt.Sprintf("%v Creating Pod using the claim: %v", logPrefix, pvclaim.Name))
 		// Create pod to attach Volume to Node
-		pod, err := framework.CreatePod(client, namespace, pvclaims, false, "")
+		pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, "")
 		Expect(err).NotTo(HaveOccurred())
 
 		By(fmt.Sprintf("%v Waiting for the Pod: %v to be in the running state", logPrefix, pod.Name))
@@ -170,19 +162,19 @@ func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.I
 		Expect(err).NotTo(HaveOccurred())
 
 		By(fmt.Sprintf("%v Verifing the volume: %v is attached to the node VM: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName))
-		isVolumeAttached, verifyDiskAttachedError := verifyVSphereDiskAttached(vsp, persistentvolumes[0].Spec.VsphereVolume.VolumePath, types.NodeName(pod.Spec.NodeName))
+		isVolumeAttached, verifyDiskAttachedError := verifyVSphereDiskAttached(client, vsp, persistentvolumes[0].Spec.VsphereVolume.VolumePath, types.NodeName(pod.Spec.NodeName))
 		Expect(isVolumeAttached).To(BeTrue())
 		Expect(verifyDiskAttachedError).NotTo(HaveOccurred())
 
 		By(fmt.Sprintf("%v Verifing the volume: %v is accessible in the pod: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Name))
-		verifyVSphereVolumesAccessible(pod, persistentvolumes, vsp)
+		verifyVSphereVolumesAccessible(client, pod, persistentvolumes, vsp)
 
 		By(fmt.Sprintf("%v Deleting pod: %v", logPrefix, pod.Name))
 		err = framework.DeletePodWithWait(f, client, pod)
 		Expect(err).NotTo(HaveOccurred())
 
 		By(fmt.Sprintf("%v Waiting for volume: %v to be detached from the node: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName))
-		err = waitForVSphereDiskToDetach(vsp, persistentvolumes[0].Spec.VsphereVolume.VolumePath, k8stype.NodeName(pod.Spec.NodeName))
+		err = waitForVSphereDiskToDetach(client, vsp, persistentvolumes[0].Spec.VsphereVolume.VolumePath, k8stype.NodeName(pod.Spec.NodeName))
 		Expect(err).NotTo(HaveOccurred())
 
 		By(fmt.Sprintf("%v Deleting the Claim: %v", logPrefix, pvclaim.Name))

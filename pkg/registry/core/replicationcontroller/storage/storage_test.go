@@ -28,10 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
@@ -98,7 +99,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Controller.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Controller.Store)
+	test := genericregistrytest.New(t, storage.Controller.Store)
 	controller := validNewController()
 	controller.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -119,7 +120,7 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Controller.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Controller.Store)
+	test := genericregistrytest.New(t, storage.Controller.Store)
 	test.TestUpdate(
 		// valid
 		validNewController(),
@@ -147,7 +148,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Controller.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Controller.Store)
+	test := genericregistrytest.New(t, storage.Controller.Store)
 	test.TestDelete(validNewController())
 }
 
@@ -206,7 +207,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Controller.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Controller.Store)
+	test := genericregistrytest.New(t, storage.Controller.Store)
 	test.TestGet(validNewController())
 }
 
@@ -214,7 +215,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Controller.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Controller.Store)
+	test := genericregistrytest.New(t, storage.Controller.Store)
 	test.TestList(validNewController())
 }
 
@@ -222,7 +223,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Controller.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Controller.Store)
+	test := genericregistrytest.New(t, storage.Controller.Store)
 	test.TestWatch(
 		validController,
 		// matching labels

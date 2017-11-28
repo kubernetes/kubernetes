@@ -19,7 +19,7 @@ package pod
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -243,12 +243,15 @@ func DropDisabledAlphaFields(podSpec *api.PodSpec) {
 			}
 		}
 	}
+
 	for i := range podSpec.Containers {
 		DropDisabledVolumeMountsAlphaFields(podSpec.Containers[i].VolumeMounts)
 	}
 	for i := range podSpec.InitContainers {
 		DropDisabledVolumeMountsAlphaFields(podSpec.InitContainers[i].VolumeMounts)
 	}
+
+	DropDisabledVolumeDevicesAlphaFields(podSpec)
 }
 
 // DropDisabledVolumeMountsAlphaFields removes disabled fields from []VolumeMount.
@@ -257,6 +260,19 @@ func DropDisabledVolumeMountsAlphaFields(volumeMounts []api.VolumeMount) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.MountPropagation) {
 		for i := range volumeMounts {
 			volumeMounts[i].MountPropagation = nil
+		}
+	}
+}
+
+// DropDisabledVolumeDevicesAlphaFields removes disabled fields from []VolumeDevice.
+// This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a VolumeDevice
+func DropDisabledVolumeDevicesAlphaFields(podSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		for i := range podSpec.Containers {
+			podSpec.Containers[i].VolumeDevices = nil
+		}
+		for i := range podSpec.InitContainers {
+			podSpec.InitContainers[i].VolumeDevices = nil
 		}
 	}
 }

@@ -74,6 +74,36 @@ var status = &metav1.Status{
 	Message: "",
 }
 
+func TestSelfLink(t *testing.T) {
+	testCases := []struct {
+		resource string
+		name     string
+		expected string
+	}{
+		{"resource", "name", "/api/" + Default.GroupVersion().Version + "/resource/name"},
+		{"resource", "", "/api/" + Default.GroupVersion().Version + "/resource"},
+	}
+	for _, item := range testCases {
+		if actual := Default.SelfLink(item.resource, item.name); actual != item.expected {
+			t.Errorf("Expected: %s, got: %s for resource: %s and name: %s", item.expected, actual, item.resource, item.name)
+		}
+	}
+
+	testGroupCases := []struct {
+		resource string
+		name     string
+		expected string
+	}{
+		{"resource", "name", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/resource/name"},
+		{"resource", "", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/resource"},
+	}
+	for _, item := range testGroupCases {
+		if actual := Admission.SelfLink(item.resource, item.name); actual != item.expected {
+			t.Errorf("Expected: %s, got: %s for resource: %s and name: %s", item.expected, actual, item.resource, item.name)
+		}
+	}
+}
+
 func TestV1EncodeDecodeStatus(t *testing.T) {
 	v1Codec := Default.Codec()
 

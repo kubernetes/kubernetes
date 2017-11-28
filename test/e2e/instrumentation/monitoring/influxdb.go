@@ -39,6 +39,7 @@ var _ = instrumentation.SIGDescribe("Monitoring", func() {
 
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce")
+		framework.SkipUnlessClusterMonitoringModeIs("influxdb")
 	})
 
 	It("should verify monitoring pods and all cluster nodes are available on influxdb using heapster.", func() {
@@ -113,7 +114,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c clientset.Interface) ([]string, 
 	for _, rcLabel := range rcLabels {
 		selector := labels.Set{"k8s-app": rcLabel}.AsSelector()
 		options := metav1.ListOptions{LabelSelector: selector.String()}
-		deploymentList, err := c.Extensions().Deployments(metav1.NamespaceSystem).List(options)
+		deploymentList, err := c.ExtensionsV1beta1().Deployments(metav1.NamespaceSystem).List(options)
 		if err != nil {
 			return nil, err
 		}

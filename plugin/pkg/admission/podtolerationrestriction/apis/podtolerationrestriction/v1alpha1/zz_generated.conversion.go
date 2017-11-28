@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	podtolerationrestriction "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
 	unsafe "unsafe"
 )
@@ -43,8 +43,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_Configuration_To_podtolerationrestriction_Configuration(in *Configuration, out *podtolerationrestriction.Configuration, s conversion.Scope) error {
-	out.Default = *(*[]api.Toleration)(unsafe.Pointer(&in.Default))
-	out.Whitelist = *(*[]api.Toleration)(unsafe.Pointer(&in.Whitelist))
+	out.Default = *(*[]core.Toleration)(unsafe.Pointer(&in.Default))
+	out.Whitelist = *(*[]core.Toleration)(unsafe.Pointer(&in.Whitelist))
 	return nil
 }
 

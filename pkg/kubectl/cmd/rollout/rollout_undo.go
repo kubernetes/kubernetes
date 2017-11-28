@@ -43,7 +43,8 @@ type UndoOptions struct {
 	ToRevision  int64
 	DryRun      bool
 
-	Out io.Writer
+	PrintSuccess func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
+	Out          io.Writer
 }
 
 var (
@@ -100,6 +101,7 @@ func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io
 		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
 	}
 
+	o.PrintSuccess = f.PrintSuccess
 	o.ToRevision = cmdutil.GetFlagInt64(cmd, "to-revision")
 	o.Mapper, o.Typer = f.Object()
 	o.Out = out
@@ -111,6 +113,7 @@ func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io
 	}
 
 	r := f.NewBuilder().
+		Internal().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, args...).
@@ -146,7 +149,7 @@ func (o *UndoOptions) RunUndo() error {
 			allErrs = append(allErrs, cmdutil.AddSourceToErr("undoing", info.Source, err))
 			continue
 		}
-		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, result)
+		o.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, result)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

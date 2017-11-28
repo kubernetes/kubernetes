@@ -29,6 +29,11 @@ import (
 var _ = Describe("[sig-api-machinery] ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
 
+	/*
+		    Testname: configmap-in-env-field
+		    Description: Make sure config map value can be used as an environment
+			variable in the container (on container.env field)
+	*/
 	framework.ConformanceIt("should be consumable via environment variable ", func() {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newConfigMap(f, name)
@@ -72,6 +77,11 @@ var _ = Describe("[sig-api-machinery] ConfigMap", func() {
 		})
 	})
 
+	/*
+		    Testname: configmap-envfrom-field
+		    Description: Make sure config map value can be used as an source for
+			environment variables in the container (on container.envFrom field)
+	*/
 	framework.ConformanceIt("should be consumable via the environment ", func() {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newEnvFromConfigMap(f, name)

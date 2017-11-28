@@ -63,6 +63,13 @@ message StorageClass {
   // AllowVolumeExpansion shows whether the storage class allow volume expand
   // +optional
   optional bool allowVolumeExpansion = 6;
+
+  // VolumeBindingMode indicates how PersistentVolumeClaims should be
+  // provisioned and bound.  When unset, VolumeBindingImmediate is used.
+  // This field is alpha-level and is only honored by servers that enable
+  // the VolumeScheduling feature.
+  // +optional
+  optional string volumeBindingMode = 7;
 }
 
 // StorageClassList is a collection of storage classes.

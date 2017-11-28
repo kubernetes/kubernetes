@@ -75,12 +75,14 @@ func TestFileStateTryRestore(t *testing.T) {
 	testCases := []struct {
 		description      string
 		stateFileContent string
+		policyName       string
 		expErr           string
 		expectedState    *stateMemory
 	}{
 		{
 			"Invalid JSON - empty file",
 			"\n",
+			"none",
 			"state file: could not unmarshal, corrupted state file",
 			&stateMemory{
 				assignments:   ContainerCPUAssignments{},
@@ -90,6 +92,7 @@ func TestFileStateTryRestore(t *testing.T) {
 		{
 			"Invalid JSON - invalid content",
 			"{",
+			"none",
 			"state file: could not unmarshal, corrupted state file",
 			&stateMemory{
 				assignments:   ContainerCPUAssignments{},
@@ -98,7 +101,8 @@ func TestFileStateTryRestore(t *testing.T) {
 		},
 		{
 			"Try restore defaultCPUSet only",
-			"{ \"defaultCpuSet\": \"4-6\"}",
+			`{"policyName": "none", "defaultCpuSet": "4-6"}`,
+			"none",
 			"",
 			&stateMemory{
 				assignments:   ContainerCPUAssignments{},
@@ -107,7 +111,8 @@ func TestFileStateTryRestore(t *testing.T) {
 		},
 		{
 			"Try restore defaultCPUSet only - invalid name",
-			"{ \"defCPUSet\": \"4-6\"}",
+			`{"policyName": "none", "defaultCpuSet" "4-6"}`,
+			"none",
 			"",
 			&stateMemory{
 				assignments:   ContainerCPUAssignments{},
@@ -116,11 +121,14 @@ func TestFileStateTryRestore(t *testing.T) {
 		},
 		{
 			"Try restore assignments only",
-			"{" +
-				"\"entries\": { " +
-				"\"container1\": \"4-6\"," +
-				"\"container2\": \"1-3\"" +
-				"} }",
+			`{
+				"policyName": "none",
+				"entries": {
+					"container1": "4-6",
+					"container2": "1-3"
+				}
+			}`,
+			"none",
 			"",
 			&stateMemory{
 				assignments: ContainerCPUAssignments{
@@ -131,8 +139,23 @@ func TestFileStateTryRestore(t *testing.T) {
 			},
 		},
 		{
+			"Try restore invalid policy name",
+			`{
+				"policyName": "A",
+				"defaultCpuSet": "0-7",
+				"entries": {}
+			}`,
+			"B",
+			"policy configured \"B\" != policy from state file \"A\"",
+			&stateMemory{
+				assignments:   ContainerCPUAssignments{},
+				defaultCPUSet: cpuset.NewCPUSet(),
+			},
+		},
+		{
 			"Try restore invalid assignments",
-			"{ \"entries\": }",
+			`{"entries": }`,
+			"none",
 			"state file: could not unmarshal, corrupted state file",
 			&stateMemory{
 				assignments:   ContainerCPUAssignments{},
@@ -141,12 +164,15 @@ func TestFileStateTryRestore(t *testing.T) {
 		},
 		{
 			"Try restore valid file",
-			"{ " +
-				"\"defaultCpuSet\": \"23-24\", " +
-				"\"entries\": { " +
-				"\"container1\": \"4-6\", " +
-				"\"container2\": \"1-3\"" +
-				" } }",
+			`{
+				"policyName": "none",
+				"defaultCpuSet": "23-24",
+				"entries": {
+					"container1": "4-6",
+					"container2": "1-3"
+				}
+			}`,
+			"none",
 			"",
 			&stateMemory{
 				assignments: ContainerCPUAssignments{
@@ -158,7 +184,11 @@ func TestFileStateTryRestore(t *testing.T) {
 		},
 		{
 			"Try restore un-parsable defaultCPUSet ",
-			"{ \"defaultCpuSet\": \"2-sd\" }",
+			`{
+				"policyName": "none",
+				"defaultCpuSet": "2-sd"
+			}`,
+			"none",
 			"state file: could not parse state file",
 			&stateMemory{
 				assignments:   ContainerCPUAssignments{},
@@ -167,12 +197,15 @@ func TestFileStateTryRestore(t *testing.T) {
 		},
 		{
 			"Try restore un-parsable assignments",
-			"{ " +
-				"\"defaultCpuSet\": \"23-24\", " +
-				"\"entries\": { " +
-				"\"container1\": \"p-6\", " +
-				"\"container2\": \"1-3\"" +
-				" } }",
+			`{
+				"policyName": "none",
+				"defaultCpuSet": "23-24",
+				"entries": {
+					"container1": "p-6",
+					"container2": "1-3"
+				}
+			}`,
+			"none",
 			"state file: could not parse state file",
 			&stateMemory{
 				assignments:   ContainerCPUAssignments{},
@@ -182,6 +215,7 @@ func TestFileStateTryRestore(t *testing.T) {
 		{
 			"TryRestoreState creates empty state file",
 			"",
+			"none",
 			"",
 			&stateMemory{
 				assignments:   ContainerCPUAssignments{},
@@ -205,7 +239,7 @@ func TestFileStateTryRestore(t *testing.T) {
 			defer os.Remove(sfilePath.Name())
 
 			logData, fileState := stderrCapture(t, func() State {
-				return NewFileState(sfilePath.Name())
+				return NewFileState(sfilePath.Name(), tc.policyName)
 			})
 
 			if tc.expErr != "" {
@@ -250,7 +284,7 @@ func TestFileStateTryRestorePanic(t *testing.T) {
 				}
 			}
 		}()
-		NewFileState(sfilePath)
+		NewFileState(sfilePath, "static")
 	})
 }
 
@@ -302,6 +336,7 @@ func TestUpdateStateFile(t *testing.T) {
 			}
 			fileState := stateFile{
 				stateFilePath: sfilePath.Name(),
+				policyName:    "static",
 				cache:         NewMemoryState(),
 			}
 
@@ -331,7 +366,7 @@ func TestUpdateStateFile(t *testing.T) {
 					return
 				}
 			}
-			newFileState := NewFileState(sfilePath.Name())
+			newFileState := NewFileState(sfilePath.Name(), "static")
 			stateEqual(t, newFileState, tc.expectedState)
 		})
 	}
@@ -382,7 +417,7 @@ func TestHelpersStateFile(t *testing.T) {
 				t.Errorf("cannot create temporary test file: %q", err.Error())
 			}
 
-			state := NewFileState(sfFile.Name())
+			state := NewFileState(sfFile.Name(), "static")
 			state.SetDefaultCPUSet(tc.defaultCPUset)
 
 			for containerName, containerCPUs := range tc.containers {
@@ -425,7 +460,7 @@ func TestClearStateStateFile(t *testing.T) {
 				t.Errorf("cannot create temporary test file: %q", err.Error())
 			}
 
-			state := NewFileState(sfFile.Name())
+			state := NewFileState(sfFile.Name(), "static")
 			state.SetDefaultCPUSet(testCase.defaultCPUset)
 			for containerName, containerCPUs := range testCase.containers {
 				state.SetCPUSet(containerName, containerCPUs)

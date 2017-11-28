@@ -71,7 +71,7 @@ func generatedBy() string {
 func objectMetaForPackage(p *types.Package) (*types.Type, bool, error) {
 	generatingForPackage := false
 	for _, t := range p.Types {
-		if !util.MustParseClientGenTags(t.SecondClosestCommentLines).GenerateClient {
+		if !util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...)).GenerateClient {
 			continue
 		}
 		generatingForPackage = true
@@ -90,10 +90,6 @@ func objectMetaForPackage(p *types.Package) (*types.Type, bool, error) {
 // isInternal returns true if the tags for a member do not contain a json tag
 func isInternal(m types.Member) bool {
 	return !strings.Contains(m.Tags, "json")
-}
-
-func packageForGroup(base string, group clientgentypes.Group) string {
-	return filepath.Join(base, group.NonEmpty())
 }
 
 func packageForInternalInterfaces(base string) string {
@@ -133,6 +129,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 	externalGroupVersions := make(map[string]clientgentypes.GroupVersions)
 	internalGroupVersions := make(map[string]clientgentypes.GroupVersions)
+	groupGoNames := make(map[string]string)
 	for _, inputDir := range arguments.InputDirs {
 		p := context.Universe.Package(vendorless(inputDir))
 
@@ -161,17 +158,25 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			gv.Version = clientgentypes.Version(parts[len(parts)-1])
 			targetGroupVersions = externalGroupVersions
 		}
+		groupPkgName := strings.ToLower(gv.Group.NonEmpty())
 
 		// If there's a comment of the form "// +groupName=somegroup" or
 		// "// +groupName=somegroup.foo.bar.io", use the first field (somegroup) as the name of the
 		// group when generating.
 		if override := types.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
-			gv.Group = clientgentypes.Group(strings.SplitN(override[0], ".", 2)[0])
+			gv.Group = clientgentypes.Group(override[0])
+		}
+
+		// If there's a comment of the form "// +groupGoName=SomeUniqueShortName", use that as
+		// the Go group identifier in CamelCase. It defaults
+		groupGoNames[groupPkgName] = namer.IC(strings.Split(gv.Group.NonEmpty(), ".")[0])
+		if override := types.ExtractCommentTags("+", p.Comments)["groupGoName"]; override != nil {
+			groupGoNames[groupPkgName] = namer.IC(override[0])
 		}
 
 		var typesToGenerate []*types.Type
 		for _, t := range p.Types {
-			tags := util.MustParseClientGenTags(t.SecondClosestCommentLines)
+			tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
 			if !tags.GenerateClient || tags.NoVerbs || !tags.HasVerb("list") || !tags.HasVerb("watch") {
 				continue
 			}
@@ -187,50 +192,46 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			continue
 		}
 
-		icGroupName := namer.IC(gv.Group.NonEmpty())
-		groupVersionsEntry, ok := targetGroupVersions[icGroupName]
+		groupVersionsEntry, ok := targetGroupVersions[groupPkgName]
 		if !ok {
 			groupVersionsEntry = clientgentypes.GroupVersions{
-				Group: gv.Group,
+				PackageName: groupPkgName,
+				Group:       gv.Group,
 			}
 		}
 		groupVersionsEntry.Versions = append(groupVersionsEntry.Versions, gv.Version)
-		targetGroupVersions[icGroupName] = groupVersionsEntry
+		targetGroupVersions[groupPkgName] = groupVersionsEntry
 
 		orderer := namer.Orderer{Namer: namer.NewPrivateNamer(0)}
 		typesToGenerate = orderer.OrderTypes(typesToGenerate)
 
 		if internal {
-			packageList = append(packageList, versionPackage(internalVersionPackagePath, gv, boilerplate, typesToGenerate, customArgs.InternalClientSetPackage, customArgs.ListersPackage))
+			packageList = append(packageList, versionPackage(internalVersionPackagePath, groupPkgName, gv, groupGoNames[groupPkgName], boilerplate, typesToGenerate, customArgs.InternalClientSetPackage, customArgs.ListersPackage))
 		} else {
-			packageList = append(packageList, versionPackage(externalVersionPackagePath, gv, boilerplate, typesToGenerate, customArgs.VersionedClientSetPackage, customArgs.ListersPackage))
+			packageList = append(packageList, versionPackage(externalVersionPackagePath, groupPkgName, gv, groupGoNames[groupPkgName], boilerplate, typesToGenerate, customArgs.VersionedClientSetPackage, customArgs.ListersPackage))
 		}
 	}
 
 	if len(externalGroupVersions) != 0 {
-		packageList = append(packageList, factoryInterfacePackage(externalVersionPackagePath, boilerplate, customArgs.VersionedClientSetPackage, typesForGroupVersion))
-		packageList = append(packageList, factoryPackage(externalVersionPackagePath, boilerplate, externalGroupVersions, customArgs.VersionedClientSetPackage, typesForGroupVersion))
-		for _, groupVersionsEntry := range externalGroupVersions {
-			packageList = append(packageList, groupPackage(externalVersionPackagePath, groupVersionsEntry, boilerplate))
+		packageList = append(packageList, factoryInterfacePackage(externalVersionPackagePath, boilerplate, customArgs.VersionedClientSetPackage))
+		packageList = append(packageList, factoryPackage(externalVersionPackagePath, boilerplate, groupGoNames, externalGroupVersions, customArgs.VersionedClientSetPackage, typesForGroupVersion))
+		for _, gvs := range externalGroupVersions {
+			packageList = append(packageList, groupPackage(externalVersionPackagePath, gvs, boilerplate))
 		}
 	}
 
 	if len(internalGroupVersions) != 0 {
-		packageList = append(packageList, factoryInterfacePackage(internalVersionPackagePath, boilerplate, customArgs.InternalClientSetPackage, typesForGroupVersion))
-		packageList = append(packageList, factoryPackage(internalVersionPackagePath, boilerplate, internalGroupVersions, customArgs.InternalClientSetPackage, typesForGroupVersion))
-		for _, groupVersionsEntry := range internalGroupVersions {
-			packageList = append(packageList, groupPackage(internalVersionPackagePath, groupVersionsEntry, boilerplate))
+		packageList = append(packageList, factoryInterfacePackage(internalVersionPackagePath, boilerplate, customArgs.InternalClientSetPackage))
+		packageList = append(packageList, factoryPackage(internalVersionPackagePath, boilerplate, groupGoNames, internalGroupVersions, customArgs.InternalClientSetPackage, typesForGroupVersion))
+		for _, gvs := range internalGroupVersions {
+			packageList = append(packageList, groupPackage(internalVersionPackagePath, gvs, boilerplate))
 		}
 	}
 
 	return packageList
 }
 
-func isInternalVersion(gv clientgentypes.GroupVersion) bool {
-	return len(gv.Version) == 0
-}
-
-func factoryPackage(basePackage string, boilerplate []byte, groupVersions map[string]clientgentypes.GroupVersions, clientSetPackage string, typesForGroupVersion map[clientgentypes.GroupVersion][]*types.Type) generator.Package {
+func factoryPackage(basePackage string, boilerplate []byte, groupGoNames map[string]string, groupVersions map[string]clientgentypes.GroupVersions, clientSetPackage string, typesForGroupVersion map[clientgentypes.GroupVersion][]*types.Type) generator.Package {
 	return &generator.DefaultPackage{
 		PackageName: filepath.Base(basePackage),
 		PackagePath: basePackage,
@@ -245,6 +246,7 @@ func factoryPackage(basePackage string, boilerplate []byte, groupVersions map[st
 				groupVersions:             groupVersions,
 				clientSetPackage:          clientSetPackage,
 				internalInterfacesPackage: packageForInternalInterfaces(basePackage),
+				gvGoNames:                 groupGoNames,
 			})
 
 			generators = append(generators, &genericGenerator{
@@ -255,6 +257,7 @@ func factoryPackage(basePackage string, boilerplate []byte, groupVersions map[st
 				imports:              generator.NewImportTracker(),
 				groupVersions:        groupVersions,
 				typesForGroupVersion: typesForGroupVersion,
+				groupGoNames:         groupGoNames,
 			})
 
 			return generators
@@ -262,7 +265,7 @@ func factoryPackage(basePackage string, boilerplate []byte, groupVersions map[st
 	}
 }
 
-func factoryInterfacePackage(basePackage string, boilerplate []byte, clientSetPackage string, typesForGroupVersion map[clientgentypes.GroupVersion][]*types.Type) generator.Package {
+func factoryInterfacePackage(basePackage string, boilerplate []byte, clientSetPackage string) generator.Package {
 	packagePath := packageForInternalInterfaces(basePackage)
 
 	return &generator.DefaultPackage{
@@ -285,10 +288,11 @@ func factoryInterfacePackage(basePackage string, boilerplate []byte, clientSetPa
 }
 
 func groupPackage(basePackage string, groupVersions clientgentypes.GroupVersions, boilerplate []byte) generator.Package {
-	packagePath := filepath.Join(basePackage, strings.ToLower(groupVersions.Group.NonEmpty()))
+	packagePath := filepath.Join(basePackage, groupVersions.PackageName)
+	groupPkgName := strings.Split(string(groupVersions.Group), ".")[0]
 
 	return &generator.DefaultPackage{
-		PackageName: strings.ToLower(groupVersions.Group.NonEmpty()),
+		PackageName: groupPkgName,
 		PackagePath: packagePath,
 		HeaderText:  boilerplate,
 		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
@@ -304,14 +308,14 @@ func groupPackage(basePackage string, groupVersions clientgentypes.GroupVersions
 			return generators
 		},
 		FilterFunc: func(c *generator.Context, t *types.Type) bool {
-			tags := util.MustParseClientGenTags(t.SecondClosestCommentLines)
+			tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
 			return tags.GenerateClient && tags.HasVerb("list") && tags.HasVerb("watch")
 		},
 	}
 }
 
-func versionPackage(basePackage string, gv clientgentypes.GroupVersion, boilerplate []byte, typesToGenerate []*types.Type, clientSetPackage, listersPackage string) generator.Package {
-	packagePath := filepath.Join(basePackage, strings.ToLower(gv.Group.NonEmpty()), strings.ToLower(gv.Version.NonEmpty()))
+func versionPackage(basePackage string, groupPkgName string, gv clientgentypes.GroupVersion, groupGoName string, boilerplate []byte, typesToGenerate []*types.Type, clientSetPackage, listersPackage string) generator.Package {
+	packagePath := filepath.Join(basePackage, groupPkgName, strings.ToLower(gv.Version.NonEmpty()))
 
 	return &generator.DefaultPackage{
 		PackageName: strings.ToLower(gv.Version.NonEmpty()),
@@ -334,7 +338,9 @@ func versionPackage(basePackage string, gv clientgentypes.GroupVersion, boilerpl
 						OptionalName: strings.ToLower(t.Name.Name),
 					},
 					outputPackage:             packagePath,
+					groupPkgName:              groupPkgName,
 					groupVersion:              gv,
+					groupGoName:               groupGoName,
 					typeToGenerate:            t,
 					imports:                   generator.NewImportTracker(),
 					clientSetPackage:          clientSetPackage,
@@ -345,7 +351,7 @@ func versionPackage(basePackage string, gv clientgentypes.GroupVersion, boilerpl
 			return generators
 		},
 		FilterFunc: func(c *generator.Context, t *types.Type) bool {
-			tags := util.MustParseClientGenTags(t.SecondClosestCommentLines)
+			tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
 			return tags.GenerateClient && tags.HasVerb("list") && tags.HasVerb("watch")
 		},
 	}

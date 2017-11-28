@@ -205,6 +205,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "apps", Version: "v1beta1"}:                          {group: 17800, version: 1},
 	{Group: "apps", Version: "v1beta2"}:                          {group: 17800, version: 9},
 	{Group: "apps", Version: "v1"}:                               {group: 17800, version: 15},
+	{Group: "events.k8s.io", Version: "v1beta1"}:                 {group: 17750, version: 5},
 	{Group: "authentication.k8s.io", Version: "v1"}:              {group: 17700, version: 15},
 	{Group: "authentication.k8s.io", Version: "v1beta1"}:         {group: 17700, version: 9},
 	{Group: "authorization.k8s.io", Version: "v1"}:               {group: 17600, version: 15},
@@ -223,7 +224,9 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "settings.k8s.io", Version: "v1alpha1"}:              {group: 16900, version: 9},
 	{Group: "storage.k8s.io", Version: "v1"}:                     {group: 16800, version: 15},
 	{Group: "storage.k8s.io", Version: "v1beta1"}:                {group: 16800, version: 9},
+	{Group: "storage.k8s.io", Version: "v1alpha1"}:               {group: 16800, version: 1},
 	{Group: "apiextensions.k8s.io", Version: "v1beta1"}:          {group: 16700, version: 9},
+	{Group: "admissionregistration.k8s.io", Version: "v1beta1"}:  {group: 16700, version: 12},
 	{Group: "admissionregistration.k8s.io", Version: "v1alpha1"}: {group: 16700, version: 9},
 	{Group: "scheduling.k8s.io", Version: "v1alpha1"}:            {group: 16600, version: 9},
 }

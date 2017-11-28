@@ -45,7 +45,8 @@ type PauseConfig struct {
 	Encoder runtime.Encoder
 	Infos   []*resource.Info
 
-	Out io.Writer
+	PrintSuccess func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
+	Out          io.Writer
 }
 
 var (
@@ -100,6 +101,7 @@ func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, out i
 		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
 	}
 
+	o.PrintSuccess = f.PrintSuccess
 	o.Mapper, o.Typer = f.Object()
 	o.Encoder = f.JSONEncoder()
 
@@ -112,6 +114,7 @@ func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, out i
 	}
 
 	r := f.NewBuilder().
+		Internal().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, args...).
@@ -141,7 +144,7 @@ func (o PauseConfig) RunPause() error {
 		}
 
 		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
-			cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "already paused")
+			o.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "already paused")
 			continue
 		}
 
@@ -152,7 +155,7 @@ func (o PauseConfig) RunPause() error {
 		}
 
 		info.Refresh(obj, true)
-		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "paused")
+		o.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "paused")
 	}
 
 	return utilerrors.NewAggregate(allErrs)

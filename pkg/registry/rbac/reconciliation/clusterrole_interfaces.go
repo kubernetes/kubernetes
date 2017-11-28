@@ -66,6 +66,14 @@ func (o ClusterRoleRuleOwner) SetRules(in []rbac.PolicyRule) {
 	o.ClusterRole.Rules = in
 }
 
+func (o ClusterRoleRuleOwner) GetAggregationRule() *rbac.AggregationRule {
+	return o.ClusterRole.AggregationRule
+}
+
+func (o ClusterRoleRuleOwner) SetAggregationRule(in *rbac.AggregationRule) {
+	o.ClusterRole.AggregationRule = in
+}
+
 type ClusterRoleModifier struct {
 	Client internalversion.ClusterRoleInterface
 }

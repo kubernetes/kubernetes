@@ -24,7 +24,7 @@ import (
 	"sort"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 

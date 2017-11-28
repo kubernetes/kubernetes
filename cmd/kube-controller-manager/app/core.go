@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
 	"k8s.io/kubernetes/pkg/controller/volume/expand"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
+	"k8s.io/kubernetes/pkg/controller/volume/pvcprotection"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
@@ -68,6 +69,7 @@ func startServiceController(ctx ControllerContext) (bool, error) {
 		ctx.Options.ClusterName,
 	)
 	if err != nil {
+		// This error shouldn't fail. It lives like this as a legacy.
 		glog.Errorf("Failed to start service controller: %v", err)
 		return false, nil
 	}
@@ -258,7 +260,9 @@ func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 		Registry:                  generic.NewRegistry(quotaConfiguration.Evaluators()),
 	}
 	if resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter())
+		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+			return true, err
+		}
 	}
 
 	resourceQuotaController, err := resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions)
@@ -302,12 +306,16 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 }
 
 func startServiceAccountController(ctx ControllerContext) (bool, error) {
-	go serviceaccountcontroller.NewServiceAccountsController(
+	sac, err := serviceaccountcontroller.NewServiceAccountsController(
 		ctx.InformerFactory.Core().V1().ServiceAccounts(),
 		ctx.InformerFactory.Core().V1().Namespaces(),
 		ctx.ClientBuilder.ClientOrDie("service-account-controller"),
 		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
-	).Run(1, ctx.Stop)
+	)
+	if err != nil {
+		return true, fmt.Errorf("error creating ServiceAccount controller: %v", err)
+	}
+	go sac.Run(1, ctx.Stop)
 	return true, nil
 }
 
@@ -341,10 +349,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	clientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 
 	// Get an initial set of deletable resources to prime the garbage collector.
-	deletableResources, err := garbagecollector.GetDeletableResources(discoveryClient)
-	if err != nil {
-		return true, err
-	}
+	deletableResources := garbagecollector.GetDeletableResources(discoveryClient)
 	ignoredResources := make(map[schema.GroupResource]struct{})
 	for _, r := range ctx.Options.GCIgnoredResources {
 		ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
@@ -371,4 +376,16 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	go garbageCollector.Sync(gcClientset.Discovery(), 30*time.Second, ctx.Stop)
 
 	return true, nil
+}
+
+func startPVCProtectionController(ctx ControllerContext) (bool, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PVCProtection) {
+		go pvcprotection.NewPVCProtectionController(
+			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
+			ctx.InformerFactory.Core().V1().Pods(),
+			ctx.ClientBuilder.ClientOrDie("pvc-protection-controller"),
+		).Run(1, ctx.Stop)
+		return true, nil
+	}
+	return false, nil
 }

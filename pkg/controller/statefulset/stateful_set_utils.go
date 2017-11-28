@@ -112,7 +112,8 @@ func identityMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
 	return ordinal >= 0 &&
 		set.Name == parent &&
 		pod.Name == getPodName(set, ordinal) &&
-		pod.Namespace == set.Namespace
+		pod.Namespace == set.Namespace &&
+		pod.Labels[apps.StatefulSetPodNameLabel] == pod.Name
 }
 
 // storageMatches returns true if pod's Volumes cover the set of PersistentVolumeClaims
@@ -187,11 +188,15 @@ func initIdentity(set *apps.StatefulSet, pod *v1.Pod) {
 	pod.Spec.Subdomain = set.Spec.ServiceName
 }
 
-// updateIdentity updates pod's name, hostname, and subdomain to conform to set's name and headless service.
+// updateIdentity updates pod's name, hostname, and subdomain, and StatefulSetPodNameLabel to conform to set's name
+// and headless service.
 func updateIdentity(set *apps.StatefulSet, pod *v1.Pod) {
 	pod.Name = getPodName(set, getOrdinal(pod))
 	pod.Namespace = set.Namespace
-
+	if pod.Labels == nil {
+		pod.Labels = make(map[string]string)
+	}
+	pod.Labels[apps.StatefulSetPodNameLabel] = pod.Name
 }
 
 // isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady.

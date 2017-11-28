@@ -72,5 +72,23 @@ func (loader *fsLoader) Load() (*kubeletconfig.KubeletConfiguration, error) {
 		return nil, fmt.Errorf("init config file %q was empty, but some parameters are required", path)
 	}
 
-	return utilcodec.DecodeKubeletConfiguration(loader.kubeletCodecs, data)
+	kc, err := utilcodec.DecodeKubeletConfiguration(loader.kubeletCodecs, data)
+	if err != nil {
+		return nil, err
+	}
+
+	// make all paths absolute
+	resolveRelativePaths(kubeletconfig.KubeletConfigurationPathRefs(kc), loader.configDir)
+	return kc, nil
+}
+
+// resolveRelativePaths makes relative paths absolute by resolving them against `root`
+func resolveRelativePaths(paths []*string, root string) {
+	for _, path := range paths {
+		// leave empty paths alone, "no path" is a valid input
+		// do not attempt to resolve paths that are already absolute
+		if len(*path) > 0 && !filepath.IsAbs(*path) {
+			*path = filepath.Join(root, *path)
+		}
+	}
 }

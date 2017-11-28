@@ -31,8 +31,8 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	_ "k8s.io/kubernetes/pkg/api/install"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
 func TestStatefulPodControlCreatesPods(t *testing.T) {

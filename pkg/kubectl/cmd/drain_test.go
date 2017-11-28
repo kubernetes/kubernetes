@@ -43,11 +43,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/ref"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -763,7 +763,7 @@ func TestDeletePods(t *testing.T) {
 
 	for _, test := range tests {
 		f, _, _, _ := cmdtesting.NewAPIFactory()
-		o := DrainOptions{}
+		o := DrainOptions{Factory: f}
 		o.mapper, _ = f.Object()
 		o.Out = os.Stdout
 		_, pods := createPods(false)

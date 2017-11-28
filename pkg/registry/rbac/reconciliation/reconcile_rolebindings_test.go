@@ -19,7 +19,7 @@ package reconciliation
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/helper"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 

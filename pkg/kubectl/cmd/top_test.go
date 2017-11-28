@@ -28,7 +28,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 )
@@ -59,7 +58,7 @@ func marshallBody(metrics interface{}) (io.ReadCloser, error) {
 	return ioutil.NopCloser(bytes.NewReader(result)), nil
 }
 
-func testNodeMetricsData() (*metricsapi.NodeMetricsList, *api.NodeList) {
+func testNodeMetricsData() (*metricsapi.NodeMetricsList, *v1.NodeList) {
 	metrics := &metricsapi.NodeMetricsList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "1",
@@ -85,28 +84,28 @@ func testNodeMetricsData() (*metricsapi.NodeMetricsList, *api.NodeList) {
 			},
 		},
 	}
-	nodes := &api.NodeList{
+	nodes := &v1.NodeList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "15",
 		},
-		Items: []api.Node{
+		Items: []v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "node1", ResourceVersion: "10"},
-				Status: api.NodeStatus{
-					Allocatable: api.ResourceList{
-						api.ResourceCPU:     *resource.NewMilliQuantity(10, resource.DecimalSI),
-						api.ResourceMemory:  *resource.NewQuantity(20*(1024*1024), resource.DecimalSI),
-						api.ResourceStorage: *resource.NewQuantity(30*(1024*1024), resource.DecimalSI),
+				Status: v1.NodeStatus{
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:     *resource.NewMilliQuantity(10, resource.DecimalSI),
+						v1.ResourceMemory:  *resource.NewQuantity(20*(1024*1024), resource.DecimalSI),
+						v1.ResourceStorage: *resource.NewQuantity(30*(1024*1024), resource.DecimalSI),
 					},
 				},
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "node2", ResourceVersion: "11"},
-				Status: api.NodeStatus{
-					Allocatable: api.ResourceList{
-						api.ResourceCPU:     *resource.NewMilliQuantity(50, resource.DecimalSI),
-						api.ResourceMemory:  *resource.NewQuantity(60*(1024*1024), resource.DecimalSI),
-						api.ResourceStorage: *resource.NewQuantity(70*(1024*1024), resource.DecimalSI),
+				Status: v1.NodeStatus{
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:     *resource.NewMilliQuantity(50, resource.DecimalSI),
+						v1.ResourceMemory:  *resource.NewQuantity(60*(1024*1024), resource.DecimalSI),
+						v1.ResourceStorage: *resource.NewQuantity(70*(1024*1024), resource.DecimalSI),
 					},
 				},
 			},

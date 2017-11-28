@@ -26,10 +26,6 @@ type FakeAdmissionregistrationV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeAdmissionregistrationV1alpha1) ExternalAdmissionHookConfigurations() v1alpha1.ExternalAdmissionHookConfigurationInterface {
-	return &FakeExternalAdmissionHookConfigurations{c}
-}
-
 func (c *FakeAdmissionregistrationV1alpha1) InitializerConfigurations() v1alpha1.InitializerConfigurationInterface {
 	return &FakeInitializerConfigurations{c}
 }

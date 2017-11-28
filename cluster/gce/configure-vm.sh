@@ -66,10 +66,6 @@ function create-node-pki {
     KUBELET_KEY_PATH="${pki_dir}/kubelet.key"
     echo "${KUBELET_KEY}" | base64 --decode > "${KUBELET_KEY_PATH}"
   fi
-
-  # TODO(mikedanese): remove this when we don't support downgrading to versions
-  # < 1.6.
-  ln -sf "${CA_CERT_BUNDLE_PATH}" /etc/kubernetes/ca.crt
 }
 
 # A hookpoint for setting up local devices
@@ -426,6 +422,7 @@ enable_rescheduler: '$(echo "$ENABLE_RESCHEDULER" | sed -e "s/'/''/g")'
 logging_destination: '$(echo "$LOGGING_DESTINATION" | sed -e "s/'/''/g")'
 elasticsearch_replicas: '$(echo "$ELASTICSEARCH_LOGGING_REPLICAS" | sed -e "s/'/''/g")'
 enable_cluster_dns: '$(echo "$ENABLE_CLUSTER_DNS" | sed -e "s/'/''/g")'
+cluster_dns_core_dns: '$(echo "$CLUSTER_DNS_CORE_DNS" | sed -e "s/'/''/g")'
 enable_cluster_registry: '$(echo "$ENABLE_CLUSTER_REGISTRY" | sed -e "s/'/''/g")'
 dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
 dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'

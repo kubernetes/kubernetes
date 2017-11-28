@@ -82,6 +82,7 @@ type Table string
 const (
 	TableNAT    Table = "nat"
 	TableFilter Table = "filter"
+	TableMangle Table = "mangle"
 )
 
 type Chain string
@@ -91,6 +92,7 @@ const (
 	ChainPrerouting  Chain = "PREROUTING"
 	ChainOutput      Chain = "OUTPUT"
 	ChainInput       Chain = "INPUT"
+	ChainForward     Chain = "FORWARD"
 )
 
 const (
@@ -592,7 +594,7 @@ func getIPTablesRestoreWaitFlag(exec utilexec.Interface, protocol Protocol) []st
 		return nil
 	}
 
-	return []string{"--wait=2"}
+	return []string{WaitSecondsString}
 }
 
 // getIPTablesRestoreVersionString runs "iptables-restore --version" to get the version string

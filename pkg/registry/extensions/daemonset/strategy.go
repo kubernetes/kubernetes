@@ -17,9 +17,6 @@ limitations under the License.
 package daemonset
 
 import (
-	"fmt"
-
-	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -45,9 +42,18 @@ type daemonSetStrategy struct {
 // Strategy is the default logic that applies when creating and updating DaemonSet objects.
 var Strategy = daemonSetStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// DefaultGarbageCollectionPolicy returns Orphan because that was the default
-// behavior before the server-side garbage collection was implemented.
-func (daemonSetStrategy) DefaultGarbageCollectionPolicy() rest.GarbageCollectionPolicy {
+// DefaultGarbageCollectionPolicy returns OrphanDependents by default. For apps/v1, returns DeleteDependents.
+func (daemonSetStrategy) DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) rest.GarbageCollectionPolicy {
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+		switch groupVersion {
+		case extensionsv1beta1.SchemeGroupVersion, appsv1beta2.SchemeGroupVersion:
+			// for back compatibility
+			return rest.OrphanDependents
+		default:
+			return rest.DeleteDependents
+		}
+	}
 	return rest.OrphanDependents
 }
 
@@ -136,11 +142,9 @@ func (daemonSetStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old 
 		switch groupVersion {
 		case extensionsv1beta1.SchemeGroupVersion:
 			// no-op for compatibility
-		case appsv1beta2.SchemeGroupVersion, appsv1.SchemeGroupVersion:
+		default:
 			// disallow mutation of selector
 			allErrs = append(allErrs, apivalidation.ValidateImmutableField(newDaemonSet.Spec.Selector, oldDaemonSet.Spec.Selector, field.NewPath("spec").Child("selector"))...)
-		default:
-			panic(fmt.Sprintf("unexpected group/version: %v", groupVersion))
 		}
 	}
 

@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
@@ -147,7 +147,7 @@ func TestPriorityClassAdmission(t *testing.T) {
 			admission.Create,
 			nil,
 		)
-		err := ctrl.Admit(attrs)
+		err := ctrl.Validate(attrs)
 		glog.Infof("Got %v", err)
 		if err != nil && !test.expectError {
 			t.Errorf("Test %q: unexpected error received: %v", test.name, err)
@@ -219,7 +219,7 @@ func TestDefaultPriority(t *testing.T) {
 			t.Errorf("Test %q: expected default priority %d, but got %d", test.name, test.expectedDefaultBefore, defaultPriority)
 		}
 		if test.attributes != nil {
-			err := ctrl.Admit(test.attributes)
+			err := ctrl.Validate(test.attributes)
 			if err != nil {
 				t.Errorf("Test %q: unexpected error received: %v", test.name, err)
 			}

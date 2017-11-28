@@ -84,7 +84,7 @@ func ExampleParseEnv_good() {
 	ss := []string{"ENV=VARIABLE", "AND=ANOTHER", "REMOVE-", "-"}
 	fmt.Println(ParseEnv(ss, r))
 	// Output:
-	// [{ENV VARIABLE <nil>} {AND ANOTHER <nil>} {FROM READER <nil>}] [REMOVE] <nil>
+	// [{ENV VARIABLE nil} {AND ANOTHER nil} {FROM READER nil}] [REMOVE] <nil>
 }
 
 func ExampleParseEnv_bad() {

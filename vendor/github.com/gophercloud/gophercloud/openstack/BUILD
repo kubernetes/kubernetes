@@ -30,8 +30,10 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes:all-srcs",
+        "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/common/extensions:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/attachinterfaces:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach:all-srcs",

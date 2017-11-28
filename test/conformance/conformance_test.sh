@@ -21,5 +21,9 @@
 
 set -o errexit
 
-diff -u test/conformance/testdata/conformance.txt test/conformance/conformance.txt
-echo PASS
+if diff -u test/conformance/testdata/conformance.txt test/conformance/conformance.txt; then
+  echo PASS
+  exit 0
+fi
+echo 'See instructions in test/conformance/README.md'
+exit 1

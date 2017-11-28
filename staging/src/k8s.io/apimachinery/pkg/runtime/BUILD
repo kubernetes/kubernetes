@@ -19,6 +19,7 @@ go_library(
         "codec.go",
         "codec_check.go",
         "conversion.go",
+        "converter.go",
         "doc.go",
         "embedded.go",
         "error.go",
@@ -37,10 +38,13 @@ go_library(
     importpath = "k8s.io/apimachinery/pkg/runtime",
     deps = [
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion/queryparams:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
     ],
 )
 
@@ -48,6 +52,7 @@ go_test(
     name = "go_default_xtest",
     srcs = [
         "conversion_test.go",
+        "converter_test.go",
         "embedded_test.go",
         "extension_test.go",
         "scheme_test.go",
@@ -56,13 +61,17 @@ go_test(
     deps = [
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/testing:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",
     ],
 )
 

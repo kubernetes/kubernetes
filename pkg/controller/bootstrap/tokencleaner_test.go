@@ -25,21 +25,28 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func init() {
 	spew.Config.DisableMethods = true
 }
 
-func newTokenCleaner() (*TokenCleaner, *fake.Clientset) {
+func newTokenCleaner() (*TokenCleaner, *fake.Clientset, error) {
 	options := DefaultTokenCleanerOptions()
 	cl := fake.NewSimpleClientset()
-	return NewTokenCleaner(cl, options), cl
+	tcc, err := NewTokenCleaner(cl, options)
+	if err != nil {
+		return nil, nil, err
+	}
+	return tcc, cl, nil
 }
 
 func TestCleanerNoExpiration(t *testing.T) {
-	cleaner, cl := newTokenCleaner()
+	cleaner, cl, err := newTokenCleaner()
+	if err != nil {
+		t.Fatalf("error creating TokenCleaner: %v", err)
+	}
 
 	secret := newTokenSecret("tokenID", "tokenSecret")
 	cleaner.secrets.Add(secret)
@@ -52,7 +59,10 @@ func TestCleanerNoExpiration(t *testing.T) {
 }
 
 func TestCleanerExpired(t *testing.T) {
-	cleaner, cl := newTokenCleaner()
+	cleaner, cl, err := newTokenCleaner()
+	if err != nil {
+		t.Fatalf("error creating TokenCleaner: %v", err)
+	}
 
 	secret := newTokenSecret("tokenID", "tokenSecret")
 	addSecretExpiration(secret, timeString(-time.Hour))
@@ -71,7 +81,10 @@ func TestCleanerExpired(t *testing.T) {
 }
 
 func TestCleanerNotExpired(t *testing.T) {
-	cleaner, cl := newTokenCleaner()
+	cleaner, cl, err := newTokenCleaner()
+	if err != nil {
+		t.Fatalf("error creating TokenCleaner: %v", err)
+	}
 
 	secret := newTokenSecret("tokenID", "tokenSecret")
 	addSecretExpiration(secret, timeString(time.Hour))

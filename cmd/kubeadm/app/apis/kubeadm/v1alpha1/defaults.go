@@ -23,6 +23,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
+	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeproxyscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
+	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 const (
@@ -30,6 +36,8 @@ const (
 	DefaultServiceDNSDomain = "cluster.local"
 	// DefaultServicesSubnet defines default service subnet range
 	DefaultServicesSubnet = "10.96.0.0/12"
+	// DefaultClusterDNSIP defines default DNS IP
+	DefaultClusterDNSIP = "10.96.0.10"
 	// DefaultKubernetesVersion defines default kubernetes version
 	DefaultKubernetesVersion = "stable-1.8"
 	// DefaultAPIBindPort defines default API port
@@ -40,6 +48,8 @@ const (
 	DefaultCertificatesDir = "/etc/kubernetes/pki"
 	// DefaultImageRepository defines default image registry
 	DefaultImageRepository = "gcr.io/google_containers"
+	// DefaultManifestsDir defines default manifests directory
+	DefaultManifestsDir = "/etc/kubernetes/manifests"
 
 	// DefaultEtcdDataDir defines default location of etcd where static pods will save data to
 	DefaultEtcdDataDir = "/var/lib/etcd"
@@ -51,6 +61,12 @@ const (
 	DefaultEtcdCertDir = "/etc/kubernetes/pki/etcd"
 	// DefaultEtcdClusterServiceName is the default name of the service backing the etcd cluster
 	DefaultEtcdClusterServiceName = "etcd-cluster"
+	// DefaultProxyBindAddressv4 is the default bind address when the advertise address is v4
+	DefaultProxyBindAddressv4 = "0.0.0.0"
+	// DefaultProxyBindAddressv6 is the default bind address when the advertise address is v6
+	DefaultProxyBindAddressv6 = "::"
+	// KubeproxyKubeConfigFileName efines the file name for the kube-proxy's KubeConfig file
+	KubeproxyKubeConfigFileName = "/var/lib/kube-proxy/kubeconfig.conf"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -83,8 +99,8 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.CertificatesDir = DefaultCertificatesDir
 	}
 
-	if obj.TokenTTL.Duration == 0 {
-		obj.TokenTTL = metav1.Duration{
+	if obj.TokenTTL == nil {
+		obj.TokenTTL = &metav1.Duration{
 			Duration: constants.DefaultTokenDuration,
 		}
 	}
@@ -98,6 +114,26 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 	}
 
 	SetDefaultsEtcdSelfHosted(obj)
+	if features.Enabled(obj.FeatureGates, features.DynamicKubeletConfig) {
+		SetDefaults_KubeletConfiguration(obj)
+	}
+	SetDefaults_ProxyConfiguration(obj)
+}
+
+// SetDefaults_ProxyConfiguration assigns default values for the Proxy
+func SetDefaults_ProxyConfiguration(obj *MasterConfiguration) {
+	if obj.KubeProxy.Config == nil {
+		obj.KubeProxy.Config = &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
+	}
+	if obj.KubeProxy.Config.ClusterCIDR == "" && obj.Networking.PodSubnet != "" {
+		obj.KubeProxy.Config.ClusterCIDR = obj.Networking.PodSubnet
+	}
+
+	if obj.KubeProxy.Config.ClientConnection.KubeConfigFile == "" {
+		obj.KubeProxy.Config.ClientConnection.KubeConfigFile = KubeproxyKubeConfigFileName
+	}
+
+	kubeproxyscheme.Scheme.Default(obj.KubeProxy.Config)
 }
 
 // SetDefaults_NodeConfiguration assigns default values to a regular node
@@ -140,5 +176,43 @@ func SetDefaultsEtcdSelfHosted(obj *MasterConfiguration) {
 
 	if obj.Etcd.SelfHosted.CertificatesDir == "" {
 		obj.Etcd.SelfHosted.CertificatesDir = DefaultEtcdCertDir
+	}
+}
+
+// SetDefaults_KubeletConfiguration assigns default values to kubelet
+func SetDefaults_KubeletConfiguration(obj *MasterConfiguration) {
+	if obj.KubeletConfiguration.BaseConfig == nil {
+		obj.KubeletConfiguration.BaseConfig = &kubeletconfigv1alpha1.KubeletConfiguration{}
+	}
+	if obj.KubeletConfiguration.BaseConfig.PodManifestPath == "" {
+		obj.KubeletConfiguration.BaseConfig.PodManifestPath = DefaultManifestsDir
+	}
+	if obj.KubeletConfiguration.BaseConfig.AllowPrivileged == nil {
+		obj.KubeletConfiguration.BaseConfig.AllowPrivileged = utilpointer.BoolPtr(true)
+	}
+	if obj.KubeletConfiguration.BaseConfig.ClusterDNS == nil {
+		dnsIP, err := constants.GetDNSIP(obj.Networking.ServiceSubnet)
+		if err != nil {
+			obj.KubeletConfiguration.BaseConfig.ClusterDNS = []string{DefaultClusterDNSIP}
+		} else {
+			obj.KubeletConfiguration.BaseConfig.ClusterDNS = []string{dnsIP.String()}
+		}
+	}
+	if obj.KubeletConfiguration.BaseConfig.ClusterDomain == "" {
+		obj.KubeletConfiguration.BaseConfig.ClusterDomain = DefaultServiceDNSDomain
+	}
+	if obj.KubeletConfiguration.BaseConfig.Authorization.Mode == "" {
+		obj.KubeletConfiguration.BaseConfig.Authorization.Mode = kubeletconfigv1alpha1.KubeletAuthorizationModeWebhook
+	}
+	if obj.KubeletConfiguration.BaseConfig.Authentication.X509.ClientCAFile == "" {
+		obj.KubeletConfiguration.BaseConfig.Authentication.X509.ClientCAFile = DefaultCACertPath
+	}
+	if obj.KubeletConfiguration.BaseConfig.CAdvisorPort == nil {
+		obj.KubeletConfiguration.BaseConfig.CAdvisorPort = utilpointer.Int32Ptr(0)
+	}
+
+	scheme, _, _ := kubeletscheme.NewSchemeAndCodecs()
+	if scheme != nil {
+		scheme.Default(obj.KubeletConfiguration.BaseConfig)
 	}
 }

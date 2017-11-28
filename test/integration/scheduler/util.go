@@ -27,14 +27,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	informers "k8s.io/client-go/informers"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
@@ -58,13 +58,14 @@ type TestContext struct {
 // configuration.
 func initTest(t *testing.T, nsPrefix string) *TestContext {
 	var context TestContext
-	_, context.httpServer, context.closeFn = framework.RunAMaster(nil)
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	_, context.httpServer, context.closeFn = framework.RunAMaster(masterConfig)
 
 	context.ns = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), context.httpServer, t)
 
-	context.clientSet = clientset.NewForConfigOrDie(&restclient.Config{Host: context.httpServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
+	context.clientSet = clientset.NewForConfigOrDie(&restclient.Config{Host: context.httpServer.URL})
 	context.informerFactory = informers.NewSharedInformerFactory(context.clientSet, 0)
-	podInformer := factory.NewPodInformer(context.clientSet, 30*time.Second, v1.DefaultSchedulerName)
+	podInformer := factory.NewPodInformer(context.clientSet, 12*time.Hour, v1.DefaultSchedulerName)
 	context.schedulerConfigFactory = factory.NewConfigFactory(
 		v1.DefaultSchedulerName,
 		context.clientSet,
@@ -77,6 +78,7 @@ func initTest(t *testing.T, nsPrefix string) *TestContext {
 		context.informerFactory.Apps().V1beta1().StatefulSets(),
 		context.informerFactory.Core().V1().Services(),
 		context.informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		context.informerFactory.Storage().V1().StorageClasses(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		true,
 	)
@@ -289,10 +291,10 @@ func runPausePod(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) {
 func podDeleted(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
 		pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
-		if pod.DeletionTimestamp != nil {
+		if errors.IsNotFound(err) {
 			return true, nil
 		}
-		if errors.IsNotFound(err) {
+		if pod.DeletionTimestamp != nil {
 			return true, nil
 		}
 		return false, nil
@@ -331,6 +333,23 @@ func podScheduled(c clientset.Interface, podNamespace, podName string) wait.Cond
 	}
 }
 
+// podUnschedulable returns a condition function that returns true if the given pod
+// gets unschedulable status.
+func podUnschedulable(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		if err != nil {
+			// This could be a connection error so we want to retry.
+			return false, nil
+		}
+		_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
+		return cond != nil && cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonUnschedulable, nil
+	}
+}
+
 // waitForPodToScheduleWithTimeout waits for a pod to get scheduled and returns
 // an error if it does not scheduled within the given timeout.
 func waitForPodToScheduleWithTimeout(cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
@@ -346,6 +365,21 @@ func waitForPodToSchedule(cs clientset.Interface, pod *v1.Pod) error {
 // deletePod deletes the given pod in the given namespace.
 func deletePod(cs clientset.Interface, podName string, nsName string) error {
 	return cs.CoreV1().Pods(nsName).Delete(podName, metav1.NewDeleteOptions(0))
+}
+
+// cleanupPods deletes the given pods and waits for them to be actually deleted.
+func cleanupPods(cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
+	for _, p := range pods {
+		err := cs.CoreV1().Pods(p.Namespace).Delete(p.Name, metav1.NewDeleteOptions(0))
+		if err != nil && !errors.IsNotFound(err) {
+			t.Errorf("error while deleting pod %v/%v: %v", p.Namespace, p.Name, err)
+		}
+	}
+	for _, p := range pods {
+		if err := wait.Poll(time.Second, wait.ForeverTestTimeout, podDeleted(cs, p.Namespace, p.Name)); err != nil {
+			t.Errorf("error while waiting for pod  %v/%v to get deleted: %v", p.Namespace, p.Name, err)
+		}
+	}
 }
 
 // printAllPods prints a list of all the pods and their node names. This is used

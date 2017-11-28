@@ -47,7 +47,7 @@ func WithAuthorization(handler http.Handler, requestContextMapper request.Reques
 			return
 		}
 		authorized, reason, err := a.Authorize(attributes)
-		if authorized {
+		if authorized == authorizer.DecisionAllow {
 			handler.ServeHTTP(w, req)
 			return
 		}

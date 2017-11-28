@@ -23,6 +23,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -35,27 +36,32 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/kube-openapi/pkg/util/proto"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/v1"
+
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
+
+var openapiSchemaPath = filepath.Join("..", "..", "..", "..", "api", "openapi-spec", "swagger.json")
 
 // This init should be removed after switching this command and its tests to user external types.
 func init() {
 	api.AddToScheme(scheme.Scheme)
-	scheme.Scheme.AddConversionFuncs(v1.Convert_api_PodSpec_To_v1_PodSpec)
-	scheme.Scheme.AddConversionFuncs(v1.Convert_v1_PodSecurityContext_To_api_PodSecurityContext)
+	scheme.Scheme.AddConversionFuncs(v1.Convert_core_PodSpec_To_v1_PodSpec)
+	scheme.Scheme.AddConversionFuncs(v1.Convert_v1_PodSecurityContext_To_core_PodSecurityContext)
 }
 
 var unstructuredSerializer = dynamic.ContentConfig().NegotiatedSerializer
@@ -203,14 +209,46 @@ func testComponentStatusData() *api.ComponentStatusList {
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestGetUnknownSchemaObject(t *testing.T) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
+	tf.WithCustomScheme()
 	_, _, codec, _ := cmdtesting.NewTestFactory()
 	tf.Printer = &testPrinter{}
+	tf.OpenAPISchemaFunc = openapitesting.CreateOpenAPISchemaFunc(openapiSchemaPath)
+
+	obj := &cmdtesting.ExternalType{
+		Kind:       "Type",
+		APIVersion: "apitest/unlikelyversion",
+		Name:       "foo",
+	}
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", "foo"))},
+		Resp: &http.Response{
+			StatusCode: 200, Header: defaultHeader(),
+			Body: objBody(codec, obj),
+		},
 	}
 	tf.Namespace = "test"
 	tf.ClientConfig = defaultClientConfig()
+
+	mapper, _ := f.Object()
+	m, err := mapper.RESTMapping(schema.GroupKind{Group: "apitest", Kind: "Type"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	convertedObj, err := m.ConvertToVersion(&unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "Type",
+			"apiVersion": "apitest/unlikelyversion",
+			"name":       "foo",
+		},
+	}, schema.GroupVersion{Group: "apitest", Version: "unlikelyversion"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(convertedObj, obj) {
+		t.Fatalf("unexpected conversion of unstructured object to structured: %s", diff.ObjectReflectDiff(convertedObj, obj))
+	}
+
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
@@ -223,6 +261,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	if len(actual) != len(expected) {
 		t.Fatalf("expected: %#v, but actual: %#v", expected, actual)
 	}
+	t.Logf("actual: %#v", actual[0])
 	for i, obj := range actual {
 		expectedJSON := runtime.EncodeOrDie(codec, expected[i])
 		expectedMap := map[string]interface{}{}
@@ -230,7 +269,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		actualJSON := runtime.EncodeOrDie(scheme.Codecs.LegacyCodec(), obj)
+		actualJSON := runtime.EncodeOrDie(codec, obj)
 		actualMap := map[string]interface{}{}
 		if err := encjson.Unmarshal([]byte(actualJSON), &actualMap); err != nil {
 			t.Fatal(err)
@@ -375,30 +414,32 @@ func TestGetObjectsFiltered(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		t.Logf("%d", i)
-		f, tf, codec, _ := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{GenericPrinter: test.genericPrinter}
-		tf.UnstructuredClient = &fake.RESTClient{
-			GroupVersion:         schema.GroupVersion{Version: "v1"},
-			NegotiatedSerializer: unstructuredSerializer,
-			Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.resp)},
-		}
-		tf.Namespace = "test"
-		buf := bytes.NewBuffer([]byte{})
-		errBuf := bytes.NewBuffer([]byte{})
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			f, tf, codec, _ := cmdtesting.NewAPIFactory()
+			tf.WithLegacyScheme()
+			tf.Printer = &testPrinter{GenericPrinter: test.genericPrinter}
+			tf.UnstructuredClient = &fake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Version: "v1"},
+				NegotiatedSerializer: unstructuredSerializer,
+				Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.resp)},
+			}
+			tf.Namespace = "test"
+			buf := bytes.NewBuffer([]byte{})
+			errBuf := bytes.NewBuffer([]byte{})
 
-		cmd := NewCmdGet(f, buf, errBuf)
-		cmd.SetOutput(buf)
-		for k, v := range test.flags {
-			cmd.Flags().Lookup(k).Value.Set(v)
-		}
-		cmd.Run(cmd, test.args)
+			cmd := NewCmdGet(f, buf, errBuf)
+			cmd.SetOutput(buf)
+			for k, v := range test.flags {
+				cmd.Flags().Lookup(k).Value.Set(v)
+			}
+			cmd.Run(cmd, test.args)
 
-		verifyObjects(t, test.expect, tf.Printer.(*testPrinter).Objects)
+			verifyObjects(t, test.expect, tf.Printer.(*testPrinter).Objects)
 
-		if len(buf.String()) == 0 {
-			t.Errorf("%d: unexpected empty output", i)
-		}
+			if len(buf.String()) == 0 {
+				t.Errorf("%d: unexpected empty output", i)
+			}
+		})
 	}
 }
 
@@ -825,7 +866,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	}
 }
 
-func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
+func TestGetMultipleTypeObjectsWithLabelSelector(t *testing.T) {
 	pods, svc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
@@ -865,6 +906,49 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 
 	if len(buf.String()) == 0 {
 		t.Error("unexpected empty output")
+	}
+}
+
+func TestGetMultipleTypeObjectsWithFieldSelector(t *testing.T) {
+	pods, svc, _ := testData()
+
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			if req.URL.Query().Get(metav1.FieldSelectorQueryParam("v1")) != "a=b" {
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+			}
+			switch req.URL.Path {
+			case "/namespaces/test/pods":
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)}, nil
+			case "/namespaces/test/services":
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svc)}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+	errBuf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdGet(f, buf, errBuf)
+	cmd.SetOutput(buf)
+
+	cmd.Flags().Set("field-selector", "a=b")
+	cmd.Run(cmd, []string{"pods,services"})
+
+	expected, err := extractResourceList([]runtime.Object{pods, svc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
+
+	if len(buf.String()) == 0 {
+		t.Errorf("unexpected empty output")
 	}
 }
 
@@ -1006,7 +1090,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 	return pods, events
 }
 
-func TestWatchSelector(t *testing.T) {
+func TestWatchLabelSelector(t *testing.T) {
 	pods, events := watchTestData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
@@ -1051,6 +1135,54 @@ func TestWatchSelector(t *testing.T) {
 
 	if len(buf.String()) == 0 {
 		t.Error("unexpected empty output")
+	}
+}
+
+func TestWatchFieldSelector(t *testing.T) {
+	pods, events := watchTestData()
+
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	podList := &api.PodList{
+		Items: pods,
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "10",
+		},
+	}
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			if req.URL.Query().Get(metav1.FieldSelectorQueryParam("v1")) != "a=b" {
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+			}
+			switch req.URL.Path {
+			case "/namespaces/test/pods":
+				if req.URL.Query().Get("watch") == "true" {
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[2:])}, nil
+				}
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, podList)}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+	errBuf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdGet(f, buf, errBuf)
+	cmd.SetOutput(buf)
+
+	cmd.Flags().Set("watch", "true")
+	cmd.Flags().Set("field-selector", "a=b")
+	cmd.Run(cmd, []string{"pods"})
+
+	expected := []runtime.Object{&pods[0], &pods[1], events[2].Object, events[3].Object}
+	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
+
+	if len(buf.String()) == 0 {
+		t.Errorf("unexpected empty output")
 	}
 }
 

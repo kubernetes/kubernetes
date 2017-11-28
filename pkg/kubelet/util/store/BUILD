@@ -23,6 +23,7 @@ go_test(
     deps = [
         "//pkg/util/filesystem:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
     ],
 )
 

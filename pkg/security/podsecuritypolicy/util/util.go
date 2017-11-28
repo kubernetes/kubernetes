@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -67,6 +67,7 @@ func GetAllFSTypesAsSet() sets.String {
 		string(extensions.Projected),
 		string(extensions.PortworxVolume),
 		string(extensions.ScaleIO),
+		string(extensions.CSI),
 	)
 	return fstypes
 }

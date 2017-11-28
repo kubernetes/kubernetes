@@ -130,6 +130,6 @@ func (o RenameContextOptions) RunRenameContext(out io.Writer) error {
 		return err
 	}
 
-	fmt.Fprintf(out, "Context %q was renamed to %q.\n", o.contextName, o.newName)
+	fmt.Fprintf(out, "Context %q renamed to %q.\n", o.contextName, o.newName)
 	return nil
 }

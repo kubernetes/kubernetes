@@ -98,18 +98,23 @@ function kube::release::package_tarballs() {
 
 # Package the source code we built, for compliance/licensing/audit/yadda.
 function kube::release::package_src_tarball() {
+  local -r src_tarball="${RELEASE_TARS}/kubernetes-src.tar.gz"
   kube::log::status "Building tarball: src"
-  local source_files=(
-    $(cd "${KUBE_ROOT}" && find . -mindepth 1 -maxdepth 1 \
-      -not \( \
-        \( -path ./_\*        -o \
-           -path ./.git\*     -o \
-           -path ./.config\* -o \
-           -path ./.gsutil\*    \
-        \) -prune \
-      \))
-  )
-  "${TAR}" czf "${RELEASE_TARS}/kubernetes-src.tar.gz" -C "${KUBE_ROOT}" "${source_files[@]}"
+  if [[ "${KUBE_GIT_TREE_STATE-}" == "clean" ]]; then
+    git archive -o "${src_tarball}" HEAD
+  else
+    local source_files=(
+      $(cd "${KUBE_ROOT}" && find . -mindepth 1 -maxdepth 1 \
+        -not \( \
+          \( -path ./_\*        -o \
+             -path ./.git\*     -o \
+             -path ./.config\* -o \
+             -path ./.gsutil\*    \
+          \) -prune \
+        \))
+    )
+    "${TAR}" czf "${src_tarball}" -C "${KUBE_ROOT}" "${source_files[@]}"
+  fi
 }
 
 # Package up all of the cross compiled clients. Over time this should grow into
@@ -412,7 +417,6 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${salt_dir}/rescheduler/rescheduler.manifest" "${gci_dst_dir}/"
   cp "${salt_dir}/e2e-image-puller/e2e-image-puller.manifest" "${gci_dst_dir}/"
   cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${gci_dst_dir}/gci-configure-helper.sh"
-  cp "${KUBE_ROOT}/cluster/gce/gci/mounter/mounter" "${gci_dst_dir}/gci-mounter"
   cp "${KUBE_ROOT}/cluster/gce/gci/health-monitor.sh" "${gci_dst_dir}/health-monitor.sh"
   cp "${KUBE_ROOT}/cluster/gce/container-linux/configure-helper.sh" "${gci_dst_dir}/container-linux-configure-helper.sh"
   cp -r "${salt_dir}/kube-admission-controls/limit-range" "${gci_dst_dir}"

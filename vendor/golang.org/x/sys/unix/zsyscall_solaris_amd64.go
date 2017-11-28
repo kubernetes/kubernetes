@@ -25,7 +25,11 @@ import (
 //go:cgo_import_dynamic libc___xnet_recvmsg __xnet_recvmsg "libsocket.so"
 //go:cgo_import_dynamic libc___xnet_sendmsg __xnet_sendmsg "libsocket.so"
 //go:cgo_import_dynamic libc_acct acct "libc.so"
+//go:cgo_import_dynamic libc___makedev __makedev "libc.so"
+//go:cgo_import_dynamic libc___major __major "libc.so"
+//go:cgo_import_dynamic libc___minor __minor "libc.so"
 //go:cgo_import_dynamic libc_ioctl ioctl "libc.so"
+//go:cgo_import_dynamic libc_poll poll "libc.so"
 //go:cgo_import_dynamic libc_access access "libc.so"
 //go:cgo_import_dynamic libc_adjtime adjtime "libc.so"
 //go:cgo_import_dynamic libc_chdir chdir "libc.so"
@@ -75,6 +79,7 @@ import (
 //go:cgo_import_dynamic libc_mlock mlock "libc.so"
 //go:cgo_import_dynamic libc_mlockall mlockall "libc.so"
 //go:cgo_import_dynamic libc_mprotect mprotect "libc.so"
+//go:cgo_import_dynamic libc_msync msync "libc.so"
 //go:cgo_import_dynamic libc_munlock munlock "libc.so"
 //go:cgo_import_dynamic libc_munlockall munlockall "libc.so"
 //go:cgo_import_dynamic libc_nanosleep nanosleep "libc.so"
@@ -129,7 +134,6 @@ import (
 //go:cgo_import_dynamic libc_getpeername getpeername "libsocket.so"
 //go:cgo_import_dynamic libc_setsockopt setsockopt "libsocket.so"
 //go:cgo_import_dynamic libc_recvfrom recvfrom "libsocket.so"
-//go:cgo_import_dynamic libc_sysconf sysconf "libc.so"
 
 //go:linkname procpipe libc_pipe
 //go:linkname procgetsockname libc_getsockname
@@ -146,7 +150,11 @@ import (
 //go:linkname proc__xnet_recvmsg libc___xnet_recvmsg
 //go:linkname proc__xnet_sendmsg libc___xnet_sendmsg
 //go:linkname procacct libc_acct
+//go:linkname proc__makedev libc___makedev
+//go:linkname proc__major libc___major
+//go:linkname proc__minor libc___minor
 //go:linkname procioctl libc_ioctl
+//go:linkname procpoll libc_poll
 //go:linkname procAccess libc_access
 //go:linkname procAdjtime libc_adjtime
 //go:linkname procChdir libc_chdir
@@ -196,6 +204,7 @@ import (
 //go:linkname procMlock libc_mlock
 //go:linkname procMlockall libc_mlockall
 //go:linkname procMprotect libc_mprotect
+//go:linkname procMsync libc_msync
 //go:linkname procMunlock libc_munlock
 //go:linkname procMunlockall libc_munlockall
 //go:linkname procNanosleep libc_nanosleep
@@ -250,7 +259,6 @@ import (
 //go:linkname procgetpeername libc_getpeername
 //go:linkname procsetsockopt libc_setsockopt
 //go:linkname procrecvfrom libc_recvfrom
-//go:linkname procsysconf libc_sysconf
 
 var (
 	procpipe,
@@ -268,7 +276,11 @@ var (
 	proc__xnet_recvmsg,
 	proc__xnet_sendmsg,
 	procacct,
+	proc__makedev,
+	proc__major,
+	proc__minor,
 	procioctl,
+	procpoll,
 	procAccess,
 	procAdjtime,
 	procChdir,
@@ -318,6 +330,7 @@ var (
 	procMlock,
 	procMlockall,
 	procMprotect,
+	procMsync,
 	procMunlock,
 	procMunlockall,
 	procNanosleep,
@@ -371,8 +384,7 @@ var (
 	proc__xnet_getsockopt,
 	procgetpeername,
 	procsetsockopt,
-	procrecvfrom,
-	procsysconf syscallFunc
+	procrecvfrom syscallFunc
 )
 
 func pipe(p *[2]_C_int) (n int, err error) {
@@ -522,8 +534,35 @@ func acct(path *byte) (err error) {
 	return
 }
 
+func __makedev(version int, major uint, minor uint) (val uint64) {
+	r0, _, _ := sysvicall6(uintptr(unsafe.Pointer(&proc__makedev)), 3, uintptr(version), uintptr(major), uintptr(minor), 0, 0, 0)
+	val = uint64(r0)
+	return
+}
+
+func __major(version int, dev uint64) (val uint) {
+	r0, _, _ := sysvicall6(uintptr(unsafe.Pointer(&proc__major)), 2, uintptr(version), uintptr(dev), 0, 0, 0, 0)
+	val = uint(r0)
+	return
+}
+
+func __minor(version int, dev uint64) (val uint) {
+	r0, _, _ := sysvicall6(uintptr(unsafe.Pointer(&proc__minor)), 2, uintptr(version), uintptr(dev), 0, 0, 0, 0)
+	val = uint(r0)
+	return
+}
+
 func ioctl(fd int, req uint, arg uintptr) (err error) {
 	_, _, e1 := sysvicall6(uintptr(unsafe.Pointer(&procioctl)), 3, uintptr(fd), uintptr(req), uintptr(arg), 0, 0, 0)
+	if e1 != 0 {
+		err = e1
+	}
+	return
+}
+
+func poll(fds *PollFd, nfds int, timeout int) (n int, err error) {
+	r0, _, e1 := sysvicall6(uintptr(unsafe.Pointer(&procpoll)), 3, uintptr(unsafe.Pointer(fds)), uintptr(nfds), uintptr(timeout), 0, 0, 0)
+	n = int(r0)
 	if e1 != 0 {
 		err = e1
 	}
@@ -1014,6 +1053,18 @@ func Mprotect(b []byte, prot int) (err error) {
 		_p0 = &b[0]
 	}
 	_, _, e1 := sysvicall6(uintptr(unsafe.Pointer(&procMprotect)), 3, uintptr(unsafe.Pointer(_p0)), uintptr(len(b)), uintptr(prot), 0, 0, 0)
+	if e1 != 0 {
+		err = e1
+	}
+	return
+}
+
+func Msync(b []byte, flags int) (err error) {
+	var _p0 *byte
+	if len(b) > 0 {
+		_p0 = &b[0]
+	}
+	_, _, e1 := sysvicall6(uintptr(unsafe.Pointer(&procMsync)), 3, uintptr(unsafe.Pointer(_p0)), uintptr(len(b)), uintptr(flags), 0, 0, 0)
 	if e1 != 0 {
 		err = e1
 	}
@@ -1584,15 +1635,6 @@ func recvfrom(fd int, p []byte, flags int, from *RawSockaddrAny, fromlen *_Sockl
 	}
 	r0, _, e1 := sysvicall6(uintptr(unsafe.Pointer(&procrecvfrom)), 6, uintptr(fd), uintptr(unsafe.Pointer(_p0)), uintptr(len(p)), uintptr(flags), uintptr(unsafe.Pointer(from)), uintptr(unsafe.Pointer(fromlen)))
 	n = int(r0)
-	if e1 != 0 {
-		err = e1
-	}
-	return
-}
-
-func sysconf(name int) (n int64, err error) {
-	r0, _, e1 := sysvicall6(uintptr(unsafe.Pointer(&procsysconf)), 1, uintptr(name), 0, 0, 0, 0, 0)
-	n = int64(r0)
 	if e1 != 0 {
 		err = e1
 	}

@@ -47,7 +47,7 @@ func NameSystems() namer.NameSystems {
 		// these exceptions are used to deconflict the generated code
 		// you can put your fully qualified package like
 		// to generate a name that doesn't conflict with your group.
-		// "k8s.io/apis/events/v1alpha1.Event": "EventResource"
+		// "k8s.io/apis/events/v1beta1.Event": "EventResource"
 		},
 		KeyFunc: func(t *types.Type) string {
 			return t.Name.Package + "." + t.Name.Name
@@ -59,12 +59,38 @@ func NameSystems() namer.NameSystems {
 		// these exceptions are used to deconflict the generated code
 		// you can put your fully qualified package like
 		// to generate a name that doesn't conflict with your group.
-		// "k8s.io/apis/events/v1alpha1.Event": "eventResource"
+		// "k8s.io/apis/events/v1beta1.Event": "eventResource"
 		},
 		KeyFunc: func(t *types.Type) string {
 			return t.Name.Package + "." + t.Name.Name
 		},
 		Delegate: namer.NewPrivateNamer(0),
+	}
+	publicPluralNamer := &ExceptionNamer{
+		Exceptions: map[string]string{
+		// these exceptions are used to deconflict the generated code
+		// you can put your fully qualified package like
+		// to generate a name that doesn't conflict with your group.
+		// "k8s.io/apis/events/v1beta1.Event": "EventResource"
+		},
+		KeyFunc: func(t *types.Type) string {
+			return t.Name.Package + "." + t.Name.Name
+		},
+		Delegate: namer.NewPublicPluralNamer(pluralExceptions),
+	}
+	privatePluralNamer := &ExceptionNamer{
+		Exceptions: map[string]string{
+			// you can put your fully qualified package like
+			// to generate a name that doesn't conflict with your group.
+			// "k8s.io/apis/events/v1beta1.Event": "eventResource"
+			// these exceptions are used to deconflict the generated code
+			"k8s.io/apis/events/v1beta1.Event":        "eventResources",
+			"k8s.io/kubernetes/pkg/apis/events.Event": "eventResources",
+		},
+		KeyFunc: func(t *types.Type) string {
+			return t.Name.Package + "." + t.Name.Name
+		},
+		Delegate: namer.NewPrivatePluralNamer(pluralExceptions),
 	}
 
 	return namer.NameSystems{
@@ -72,8 +98,8 @@ func NameSystems() namer.NameSystems {
 		"public":             publicNamer,
 		"private":            privateNamer,
 		"raw":                namer.NewRawNamer("", nil),
-		"publicPlural":       namer.NewPublicPluralNamer(pluralExceptions),
-		"privatePlural":      namer.NewPrivatePluralNamer(pluralExceptions),
+		"publicPlural":       publicPluralNamer,
+		"privatePlural":      privatePluralNamer,
 		"allLowercasePlural": lowercaseNamer,
 		"resource":           NewTagOverrideNamer("resourceName", lowercaseNamer),
 	}
@@ -103,8 +129,8 @@ func DefaultNameSystem() string {
 	return "public"
 }
 
-func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetPackage string, apiPath string, srcTreePath string, inputPackage string, boilerplate []byte) generator.Package {
-	groupVersionClientPackage := strings.ToLower(filepath.Join(clientsetPackage, "typed", gv.Group.NonEmpty(), gv.Version.NonEmpty()))
+func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetPackage string, groupPackageName string, groupGoName string, apiPath string, srcTreePath string, inputPackage string, boilerplate []byte) generator.Package {
+	groupVersionClientPackage := strings.ToLower(filepath.Join(clientsetPackage, "typed", groupPackageName, gv.Version.NonEmpty()))
 	return &generator.DefaultPackage{
 		PackageName: strings.ToLower(gv.Version.NonEmpty()),
 		PackagePath: groupVersionClientPackage,
@@ -130,6 +156,7 @@ func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 					clientsetPackage: clientsetPackage,
 					group:            gv.Group.NonEmpty(),
 					version:          gv.Version.String(),
+					groupGoName:      groupGoName,
 					typeToMatch:      t,
 					imports:          generator.NewImportTracker(),
 				})
@@ -137,13 +164,14 @@ func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 
 			generators = append(generators, &genGroup{
 				DefaultGen: generator.DefaultGen{
-					OptionalName: gv.Group.NonEmpty() + "_client",
+					OptionalName: groupPackageName + "_client",
 				},
 				outputPackage:    groupVersionClientPackage,
 				inputPackage:     inputPackage,
 				clientsetPackage: clientsetPackage,
 				group:            gv.Group.NonEmpty(),
 				version:          gv.Version.String(),
+				groupGoName:      groupGoName,
 				apiPath:          apiPath,
 				types:            typeList,
 				imports:          generator.NewImportTracker(),
@@ -161,12 +189,12 @@ func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 			return generators
 		},
 		FilterFunc: func(c *generator.Context, t *types.Type) bool {
-			return util.MustParseClientGenTags(t.SecondClosestCommentLines).GenerateClient
+			return util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...)).GenerateClient
 		},
 	}
 }
 
-func packageForClientset(customArgs *clientgenargs.CustomArgs, clientsetPackage string, boilerplate []byte) generator.Package {
+func packageForClientset(customArgs *clientgenargs.CustomArgs, clientsetPackage string, groupGoNames map[clientgentypes.GroupVersion]string, boilerplate []byte) generator.Package {
 	return &generator.DefaultPackage{
 		PackageName: customArgs.ClientsetName,
 		PackagePath: clientsetPackage,
@@ -186,6 +214,7 @@ func packageForClientset(customArgs *clientgenargs.CustomArgs, clientsetPackage 
 						OptionalName: "clientset",
 					},
 					groups:           customArgs.Groups,
+					groupGoNames:     groupGoNames,
 					clientsetPackage: clientsetPackage,
 					outputPackage:    customArgs.ClientsetName,
 					imports:          generator.NewImportTracker(),
@@ -196,7 +225,7 @@ func packageForClientset(customArgs *clientgenargs.CustomArgs, clientsetPackage 
 	}
 }
 
-func packageForScheme(customArgs *clientgenargs.CustomArgs, clientsetPackage string, srcTreePath string, boilerplate []byte) generator.Package {
+func packageForScheme(customArgs *clientgenargs.CustomArgs, clientsetPackage string, srcTreePath string, groupGoNames map[clientgentypes.GroupVersion]string, boilerplate []byte) generator.Package {
 	schemePackage := filepath.Join(clientsetPackage, "scheme")
 
 	// create runtime.Registry for internal client because it has to know about group versions
@@ -233,6 +262,7 @@ NextGroup:
 					OutputPackage:  schemePackage,
 					OutputPath:     filepath.Join(srcTreePath, schemePackage),
 					Groups:         customArgs.Groups,
+					GroupGoNames:   groupGoNames,
 					ImportTracker:  generator.NewImportTracker(),
 					CreateRegistry: internalClient,
 				},
@@ -245,6 +275,8 @@ NextGroup:
 // applyGroupOverrides applies group name overrides to each package, if applicable. If there is a
 // comment of the form "// +groupName=somegroup" or "// +groupName=somegroup.foo.bar.io", use the
 // first field (somegroup) as the name of the group when generating.
+//
+// If the first field of the groupName is not unique within the clientset, use "// +groupName=unique
 func applyGroupOverrides(universe types.Universe, customArgs *clientgenargs.CustomArgs) {
 	// Create a map from "old GV" to "new GV" so we know what changes we need to make.
 	changes := make(map[clientgentypes.GroupVersion]clientgentypes.GroupVersion)
@@ -252,7 +284,7 @@ func applyGroupOverrides(universe types.Universe, customArgs *clientgenargs.Cust
 		p := universe.Package(inputDir)
 		if override := types.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
 			newGV := clientgentypes.GroupVersion{
-				Group:   clientgentypes.Group(strings.SplitN(override[0], ".", 2)[0]),
+				Group:   clientgentypes.Group(override[0]),
 				Version: gv.Version,
 			}
 			changes[gv] = newGV
@@ -269,8 +301,9 @@ func applyGroupOverrides(universe types.Universe, customArgs *clientgenargs.Cust
 		if newGV, ok := changes[gv]; ok {
 			// There's an override, so use it.
 			newGVS := clientgentypes.GroupVersions{
-				Group:    newGV.Group,
-				Versions: gvs.Versions,
+				PackageName: gvs.PackageName,
+				Group:       newGV.Group,
+				Versions:    gvs.Versions,
 			}
 			newGroups = append(newGroups, newGVS)
 		} else {
@@ -310,9 +343,18 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	applyGroupOverrides(context.Universe, customArgs)
 
 	gvToTypes := map[clientgentypes.GroupVersion][]*types.Type{}
+	groupGoNames := make(map[clientgentypes.GroupVersion]string)
 	for gv, inputDir := range customArgs.GroupVersionToInputPath {
-		// Package are indexed with the vendor prefix stripped
 		p := context.Universe.Package(path.Vendorless(inputDir))
+
+		// If there's a comment of the form "// +groupGoName=SomeUniqueShortName", use that as
+		// the Go group identifier in CamelCase. It defaults
+		groupGoNames[gv] = namer.IC(strings.Split(gv.Group.NonEmpty(), ".")[0])
+		if override := types.ExtractCommentTags("+", p.Comments)["groupGoName"]; override != nil {
+			groupGoNames[gv] = namer.IC(override[0])
+		}
+
+		// Package are indexed with the vendor prefix stripped
 		for n, t := range p.Types {
 			// filter out types which are not included in user specified overrides.
 			typesOverride, ok := includedTypesOverrides[gv]
@@ -330,7 +372,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			} else {
 				// User has not specified any override for this group version.
 				// filter out types which dont have genclient.
-				if tags := util.MustParseClientGenTags(t.SecondClosestCommentLines); !tags.GenerateClient {
+				if tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...)); !tags.GenerateClient {
 					continue
 				}
 			}
@@ -344,10 +386,10 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	var packageList []generator.Package
 	clientsetPackage := filepath.Join(customArgs.ClientsetOutputPath, customArgs.ClientsetName)
 
-	packageList = append(packageList, packageForClientset(customArgs, clientsetPackage, boilerplate))
-	packageList = append(packageList, packageForScheme(customArgs, clientsetPackage, arguments.OutputBase, boilerplate))
+	packageList = append(packageList, packageForClientset(customArgs, clientsetPackage, groupGoNames, boilerplate))
+	packageList = append(packageList, packageForScheme(customArgs, clientsetPackage, arguments.OutputBase, groupGoNames, boilerplate))
 	if customArgs.FakeClient {
-		packageList = append(packageList, fake.PackageForClientset(customArgs, clientsetPackage, boilerplate))
+		packageList = append(packageList, fake.PackageForClientset(customArgs, clientsetPackage, groupGoNames, boilerplate))
 	}
 
 	// If --clientset-only=true, we don't regenerate the individual typed clients.
@@ -361,9 +403,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			gv := clientgentypes.GroupVersion{Group: group.Group, Version: version}
 			types := gvToTypes[gv]
 			inputPath := customArgs.GroupVersionToInputPath[gv]
-			packageList = append(packageList, packageForGroup(gv, orderer.OrderTypes(types), clientsetPackage, customArgs.ClientsetAPIPath, arguments.OutputBase, inputPath, boilerplate))
+			packageList = append(packageList, packageForGroup(gv, orderer.OrderTypes(types), clientsetPackage, group.PackageName, groupGoNames[gv], customArgs.ClientsetAPIPath, arguments.OutputBase, inputPath, boilerplate))
 			if customArgs.FakeClient {
-				packageList = append(packageList, fake.PackageForGroup(gv, orderer.OrderTypes(types), clientsetPackage, inputPath, boilerplate))
+				packageList = append(packageList, fake.PackageForGroup(gv, orderer.OrderTypes(types), clientsetPackage, group.PackageName, groupGoNames[gv], inputPath, boilerplate))
 			}
 		}
 	}
@@ -379,7 +421,7 @@ type tagOverrideNamer struct {
 }
 
 func (n *tagOverrideNamer) Name(t *types.Type) string {
-	if nameOverride := extractTag(n.tagName, t.SecondClosestCommentLines); nameOverride != "" {
+	if nameOverride := extractTag(n.tagName, append(t.SecondClosestCommentLines, t.CommentLines...)); nameOverride != "" {
 		return nameOverride
 	}
 

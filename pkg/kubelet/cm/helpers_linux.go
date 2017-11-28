@@ -26,9 +26,10 @@ import (
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
 	"k8s.io/api/core/v1"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
-	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 )
 
 const (
@@ -221,4 +222,9 @@ func getCgroupProcs(dir string) ([]int, error) {
 		}
 	}
 	return out, nil
+}
+
+// GetPodCgroupNameSuffix returns the last element of the pod CgroupName identifier
+func GetPodCgroupNameSuffix(podUID types.UID) string {
+	return podCgroupNamePrefix + string(podUID)
 }

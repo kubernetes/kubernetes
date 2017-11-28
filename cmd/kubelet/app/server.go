@@ -46,7 +46,6 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flag"
-	clientgoclientset "k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
@@ -56,6 +55,7 @@ import (
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/chaosclient"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -72,7 +72,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	dockerremote "k8s.io/kubernetes/pkg/kubelet/dockershim/remote"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -145,12 +144,13 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		writer = &kubeio.NsenterWriter{}
 	}
 
-	var dockerClient libdocker.Interface
+	var dockerClientConfig *dockershim.ClientConfig
 	if s.ContainerRuntime == kubetypes.DockerContainerRuntime {
-		dockerClient = libdocker.ConnectToDockerOrDie(s.DockerEndpoint, s.RuntimeRequestTimeout.Duration,
-			s.ImagePullProgressDeadline.Duration)
-	} else {
-		dockerClient = nil
+		dockerClientConfig = &dockershim.ClientConfig{
+			DockerEndpoint:            s.DockerEndpoint,
+			RuntimeRequestTimeout:     s.RuntimeRequestTimeout.Duration,
+			ImagePullProgressDeadline: s.ImagePullProgressDeadline.Duration,
+		}
 	}
 
 	return &kubelet.Dependencies{
@@ -158,7 +158,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		CAdvisorInterface:   nil, // cadvisor.New launches background processes (bg http.ListenAndServe, and some bg cleaners), not set here
 		Cloud:               nil, // cloud provider might start background processes
 		ContainerManager:    nil,
-		DockerClient:        dockerClient,
+		DockerClientConfig:  dockerClientConfig,
 		KubeClient:          nil,
 		HeartbeatClient:     nil,
 		ExternalKubeClient:  nil,
@@ -331,7 +331,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		var kubeClient clientset.Interface
 		var eventClient v1core.EventsGetter
 		var heartbeatClient v1core.CoreV1Interface
-		var externalKubeClient clientgoclientset.Interface
+		var externalKubeClient clientset.Interface
 
 		clientConfig, err := CreateAPIServerClientConfig(s)
 
@@ -352,12 +352,12 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 			kubeClient, err = clientset.NewForConfig(clientConfig)
 			if err != nil {
 				glog.Warningf("New kubeClient from clientConfig error: %v", err)
-			} else if kubeClient.Certificates() != nil && clientCertificateManager != nil {
+			} else if kubeClient.CertificatesV1beta1() != nil && clientCertificateManager != nil {
 				glog.V(2).Info("Starting client certificate rotation.")
-				clientCertificateManager.SetCertificateSigningRequestClient(kubeClient.Certificates().CertificateSigningRequests())
+				clientCertificateManager.SetCertificateSigningRequestClient(kubeClient.CertificatesV1beta1().CertificateSigningRequests())
 				clientCertificateManager.Start()
 			}
-			externalKubeClient, err = clientgoclientset.NewForConfig(clientConfig)
+			externalKubeClient, err = clientset.NewForConfig(clientConfig)
 			if err != nil {
 				glog.Warningf("New kubeClient from clientConfig error: %v", err)
 			}
@@ -414,7 +414,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 
 	if kubeDeps.CAdvisorInterface == nil {
 		imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(s.ContainerRuntime, s.RemoteRuntimeEndpoint)
-		kubeDeps.CAdvisorInterface, err = cadvisor.New(s.Address, uint(s.CAdvisorPort), imageFsInfoProvider, s.RootDirectory)
+		kubeDeps.CAdvisorInterface, err = cadvisor.New(s.Address, uint(s.CAdvisorPort), imageFsInfoProvider, s.RootDirectory, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint))
 		if err != nil {
 			return err
 		}
@@ -439,7 +439,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		var hardEvictionThresholds []evictionapi.Threshold
 		// If the user requested to ignore eviction thresholds, then do not set valid values for hardEvictionThresholds here.
 		if !s.ExperimentalNodeAllocatableIgnoreEvictionThreshold {
-			hardEvictionThresholds, err = eviction.ParseThresholdConfig([]string{}, s.EvictionHard, "", "", "")
+			hardEvictionThresholds, err = eviction.ParseThresholdConfig([]string{}, s.EvictionHard, nil, nil, nil)
 			if err != nil {
 				return err
 			}
@@ -462,6 +462,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 				CgroupsPerQOS:         s.CgroupsPerQOS,
 				CgroupRoot:            s.CgroupRoot,
 				CgroupDriver:          s.CgroupDriver,
+				KubeletRootDir:        s.RootDirectory,
 				ProtectKernelDefaults: s.ProtectKernelDefaults,
 				NodeAllocatableConfig: cm.NodeAllocatableConfig{
 					KubeReservedCgroupName:   s.KubeReservedCgroup,
@@ -710,6 +711,8 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		kubeFlags.CloudProvider,
 		kubeFlags.CertDirectory,
 		kubeFlags.RootDirectory,
+		kubeFlags.RegisterNode,
+		kubeFlags.RegisterWithTaints,
 		kubeFlags.AllowedUnsafeSysctls,
 		kubeFlags.Containerized,
 		kubeFlags.RemoteRuntimeEndpoint,
@@ -724,7 +727,10 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		kubeFlags.MasterServiceNamespace,
 		kubeFlags.RegisterSchedulable,
 		kubeFlags.NonMasqueradeCIDR,
-		kubeFlags.KeepTerminatedPodVolumes)
+		kubeFlags.KeepTerminatedPodVolumes,
+		kubeFlags.NodeLabels,
+		kubeFlags.SeccompProfileRoot,
+		kubeFlags.BootstrapCheckpointPath)
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %v", err)
 	}
@@ -779,6 +785,8 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	cloudProvider string,
 	certDirectory string,
 	rootDirectory string,
+	registerNode bool,
+	registerWithTaints []api.Taint,
 	allowedUnsafeSysctls []string,
 	containerized bool,
 	remoteRuntimeEndpoint string,
@@ -793,7 +801,10 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	masterServiceNamespace string,
 	registerSchedulable bool,
 	nonMasqueradeCIDR string,
-	keepTerminatedPodVolumes bool) (k kubelet.Bootstrap, err error) {
+	keepTerminatedPodVolumes bool,
+	nodeLabels map[string]string,
+	seccompProfileRoot string,
+	bootstrapCheckpointPath string) (k kubelet.Bootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
@@ -808,6 +819,8 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		cloudProvider,
 		certDirectory,
 		rootDirectory,
+		registerNode,
+		registerWithTaints,
 		allowedUnsafeSysctls,
 		containerized,
 		remoteRuntimeEndpoint,
@@ -822,7 +835,10 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		masterServiceNamespace,
 		registerSchedulable,
 		nonMasqueradeCIDR,
-		keepTerminatedPodVolumes)
+		keepTerminatedPodVolumes,
+		nodeLabels,
+		seccompProfileRoot,
+		bootstrapCheckpointPath)
 	if err != nil {
 		return nil, err
 	}
@@ -836,7 +852,7 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 // parseResourceList parses the given configuration map into an API
 // ResourceList or returns an error.
-func parseResourceList(m kubeletconfiginternal.ConfigurationMap) (v1.ResourceList, error) {
+func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 	if len(m) == 0 {
 		return nil, nil
 	}
@@ -898,19 +914,22 @@ func BootstrapKubeletConfigController(defaultConfig *kubeletconfiginternal.Kubel
 // TODO(random-liu): Move this to a separate binary.
 func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConfiguration) error {
 	r := &f.ContainerRuntimeOptions
-	// Create docker client.
-	dockerClient := libdocker.ConnectToDockerOrDie(r.DockerEndpoint, c.RuntimeRequestTimeout.Duration,
-		r.ImagePullProgressDeadline.Duration)
+
+	// Initialize docker client configuration.
+	dockerClientConfig := &dockershim.ClientConfig{
+		DockerEndpoint:            r.DockerEndpoint,
+		RuntimeRequestTimeout:     c.RuntimeRequestTimeout.Duration,
+		ImagePullProgressDeadline: r.ImagePullProgressDeadline.Duration,
+	}
 
 	// Initialize network plugin settings.
-	binDir := r.CNIBinDir
 	nh := &kubelet.NoOpLegacyHost{}
 	pluginSettings := dockershim.NetworkPluginSettings{
 		HairpinMode:       kubeletconfiginternal.HairpinMode(c.HairpinMode),
 		NonMasqueradeCIDR: f.NonMasqueradeCIDR,
 		PluginName:        r.NetworkPluginName,
 		PluginConfDir:     r.CNIConfDir,
-		PluginBinDir:      binDir,
+		PluginBinDir:      r.CNIBinDir,
 		MTU:               int(r.NetworkPluginMTU),
 		LegacyRuntimeHost: nh,
 	}
@@ -925,7 +944,7 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 		SupportedPortForwardProtocols:   streaming.DefaultConfig.SupportedPortForwardProtocols,
 	}
 
-	ds, err := dockershim.NewDockerService(dockerClient, r.PodSandboxImage, streamingConfig, &pluginSettings,
+	ds, err := dockershim.NewDockerService(dockerClientConfig, r.PodSandboxImage, streamingConfig, &pluginSettings,
 		f.RuntimeCgroups, c.CgroupDriver, r.DockershimRootDirectory, r.DockerDisableSharedPID)
 	if err != nil {
 		return err

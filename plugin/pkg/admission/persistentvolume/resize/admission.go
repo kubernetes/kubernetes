@@ -21,8 +21,8 @@ import (
 	"io"
 
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
-	apihelper "k8s.io/kubernetes/pkg/api/helper"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	apihelper "k8s.io/kubernetes/pkg/apis/core/helper"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	pvlister "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	storagelisters "k8s.io/kubernetes/pkg/client/listers/storage/internalversion"
@@ -149,9 +149,17 @@ func (pvcr *persistentVolumeClaimResize) allowResize(pvc, oldPvc *api.Persistent
 
 // checkVolumePlugin checks whether the volume plugin supports resize
 func (pvcr *persistentVolumeClaimResize) checkVolumePlugin(pv *api.PersistentVolume) bool {
-	if pv.Spec.Glusterfs != nil {
+	if pv.Spec.Glusterfs != nil || pv.Spec.Cinder != nil || pv.Spec.RBD != nil {
 		return true
 	}
-	return false
 
+	if pv.Spec.GCEPersistentDisk != nil {
+		return true
+	}
+
+	if pv.Spec.AWSElasticBlockStore != nil {
+		return true
+	}
+
+	return false
 }

@@ -28,9 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
@@ -94,7 +96,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.ReplicaSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.ReplicaSet.Store)
+	test := genericregistrytest.New(t, storage.ReplicaSet.Store)
 	rs := validNewReplicaSet()
 	rs.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -115,7 +117,7 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.ReplicaSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.ReplicaSet.Store)
+	test := genericregistrytest.New(t, storage.ReplicaSet.Store)
 	test.TestUpdate(
 		// valid
 		validNewReplicaSet(),
@@ -143,7 +145,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.ReplicaSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.ReplicaSet.Store)
+	test := genericregistrytest.New(t, storage.ReplicaSet.Store)
 	test.TestDelete(validNewReplicaSet())
 }
 
@@ -202,7 +204,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.ReplicaSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.ReplicaSet.Store)
+	test := genericregistrytest.New(t, storage.ReplicaSet.Store)
 	test.TestGet(validNewReplicaSet())
 }
 
@@ -210,7 +212,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.ReplicaSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.ReplicaSet.Store)
+	test := genericregistrytest.New(t, storage.ReplicaSet.Store)
 	test.TestList(validNewReplicaSet())
 }
 
@@ -218,7 +220,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.ReplicaSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.ReplicaSet.Store)
+	test := genericregistrytest.New(t, storage.ReplicaSet.Store)
 	test.TestWatch(
 		validNewReplicaSet(),
 		// matching labels
@@ -261,7 +263,12 @@ func TestScaleGet(t *testing.T) {
 		t.Fatalf("error setting new replica set (key: %s) %v: %v", key, validReplicaSet, err)
 	}
 
-	want := &extensions.Scale{
+	selector, err := metav1.LabelSelectorAsSelector(validReplicaSet.Spec.Selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := &autoscaling.Scale{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              name,
 			Namespace:         metav1.NamespaceDefault,
@@ -269,16 +276,16 @@ func TestScaleGet(t *testing.T) {
 			ResourceVersion:   rs.ResourceVersion,
 			CreationTimestamp: rs.CreationTimestamp,
 		},
-		Spec: extensions.ScaleSpec{
+		Spec: autoscaling.ScaleSpec{
 			Replicas: validReplicaSet.Spec.Replicas,
 		},
-		Status: extensions.ScaleStatus{
+		Status: autoscaling.ScaleStatus{
 			Replicas: validReplicaSet.Status.Replicas,
-			Selector: validReplicaSet.Spec.Selector,
+			Selector: selector.String(),
 		},
 	}
 	obj, err := storage.Scale.Get(ctx, name, &metav1.GetOptions{})
-	got := obj.(*extensions.Scale)
+	got := obj.(*autoscaling.Scale)
 	if err != nil {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
 	}
@@ -301,12 +308,12 @@ func TestScaleUpdate(t *testing.T) {
 		t.Fatalf("error setting new replica set (key: %s) %v: %v", key, validReplicaSet, err)
 	}
 	replicas := 12
-	update := extensions.Scale{
+	update := autoscaling.Scale{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: extensions.ScaleSpec{
+		Spec: autoscaling.ScaleSpec{
 			Replicas: int32(replicas),
 		},
 	}
@@ -319,7 +326,7 @@ func TestScaleUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
 	}
-	scale := obj.(*extensions.Scale)
+	scale := obj.(*autoscaling.Scale)
 	if scale.Spec.Replicas != int32(replicas) {
 		t.Errorf("wrong replicas count expected: %d got: %d", replicas, scale.Spec.Replicas)
 	}

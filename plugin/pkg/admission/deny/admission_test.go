@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestAdmission(t *testing.T) {

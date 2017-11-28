@@ -73,7 +73,7 @@ var _ = SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 			framework.Failf("Unable to find ready and schedulable Node")
 		}
 		if !isNodeLabeled {
-			nodeLabelValue := "vsphere_e2e_" + string(uuid.NewUUID())
+			nodeLabelValue = "vsphere_e2e_" + string(uuid.NewUUID())
 			nodeKeyValueLabel = make(map[string]string)
 			nodeKeyValueLabel["vsphere_e2e_label"] = nodeLabelValue
 			framework.AddOrUpdateLabelOnNode(client, nodeName, "vsphere_e2e_label", nodeLabelValue)
@@ -81,7 +81,8 @@ var _ = SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 		}
 	})
 	framework.AddCleanupAction(func() {
-		if len(nodeLabelValue) > 0 {
+		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
+		if len(namespace) > 0 && len(nodeLabelValue) > 0 {
 			framework.RemoveLabelOffNode(client, nodeName, "vsphere_e2e_label")
 		}
 	})
@@ -144,9 +145,9 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	pod, err := client.CoreV1().Pods(namespace).Create(podSpec)
 	Expect(err).NotTo(HaveOccurred())
 
-	vsp, err := vsphere.GetVSphere()
+	vsp, err := getVSphere(client)
 	Expect(err).NotTo(HaveOccurred())
-	verifyVSphereDiskAttached(vsp, pv.Spec.VsphereVolume.VolumePath, k8stype.NodeName(nodeName))
+	verifyVSphereDiskAttached(client, vsp, pv.Spec.VsphereVolume.VolumePath, k8stype.NodeName(nodeName))
 
 	By("Waiting for pod to be running")
 	Expect(framework.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(Succeed())

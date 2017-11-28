@@ -11,8 +11,8 @@ go_library(
     srcs = ["admission.go"],
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/storageclass/setdefault",
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/helper:go_default_library",
+        "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/helper:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//pkg/apis/storage/util:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
@@ -31,7 +31,7 @@ go_test(
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/storageclass/setdefault",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//pkg/apis/storage/util:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",

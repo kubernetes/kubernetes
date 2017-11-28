@@ -114,10 +114,6 @@ RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 # Optional: set feature gates
 FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
 
-if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
-    FEATURE_GATES="${FEATURE_GATES},Accelerators=true"
-fi
-
 TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 
 # Extra docker options for nodes.
@@ -237,7 +233,16 @@ if [[ ${KUBE_ENABLE_INSECURE_REGISTRY:-false} == "true" ]]; then
   EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS} --insecure-registry 10.0.0.0/8"
 fi
 
+if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
+    FEATURE_GATES="${FEATURE_GATES},DevicePlugins=true"
+    if [[ "${NODE_ACCELERATORS}" =~ .*type=([a-zA-Z0-9-]+).* ]]; then
+        NODE_LABELS="${NODE_LABELS},cloud.google.com/gke-accelerator=${BASH_REMATCH[1]}"
+    fi
+fi
+
 # Optional: Install cluster DNS.
+# Set CLUSTER_DNS_CORE_DNS to 'true' to install CoreDNS instead of kube-dns.
+CLUSTER_DNS_CORE_DNS="${CLUSTER_DNS_CORE_DNS:-false}"
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
 DNS_SERVER_IP="10.0.0.10"
 DNS_DOMAIN="cluster.local"
@@ -302,6 +307,11 @@ if [[ -n "${GCE_ALPHA_FEATURES:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} GCE_ALPHA_FEATURES"
 fi
 
+# Disable Docker live-restore.
+if [[ -n "${DISABLE_DOCKER_LIVE_RESTORE:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} DISABLE_DOCKER_LIVE_RESTORE"
+fi
+
 # Override default GLBC image
 if [[ -n "${GCE_GLBC_IMAGE:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} GCE_GLBC_IMAGE"
@@ -313,7 +323,7 @@ if [[ -z "${KUBE_ADMISSION_CONTROL:-}" ]]; then
     ADMISSION_CONTROL="${ADMISSION_CONTROL},PodSecurityPolicy"
   fi
   # ResourceQuota must come last, or a creation is recorded, but the pod may be forbidden.
-  ADMISSION_CONTROL="${ADMISSION_CONTROL},ResourceQuota,GenericAdmissionWebhook"
+  ADMISSION_CONTROL="${ADMISSION_CONTROL},MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"
 else
   ADMISSION_CONTROL=${KUBE_ADMISSION_CONTROL}
 fi

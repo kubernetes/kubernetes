@@ -18,6 +18,7 @@ package state
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/golang/glog"
 	"io/ioutil"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
@@ -26,6 +27,7 @@ import (
 )
 
 type stateFileData struct {
+	PolicyName    string            `json:"policyName"`
 	DefaultCPUSet string            `json:"defaultCpuSet"`
 	Entries       map[string]string `json:"entries,omitempty"`
 }
@@ -35,19 +37,21 @@ var _ State = &stateFile{}
 type stateFile struct {
 	sync.RWMutex
 	stateFilePath string
+	policyName    string
 	cache         State
 }
 
 // NewFileState creates new State for keeping track of cpu/pod assignment with file backend
-func NewFileState(filePath string) State {
+func NewFileState(filePath string, policyName string) State {
 	stateFile := &stateFile{
 		stateFilePath: filePath,
 		cache:         NewMemoryState(),
+		policyName:    policyName,
 	}
 
 	if err := stateFile.tryRestoreState(); err != nil {
 		// could not restore state, init new state file
-		glog.Infof("[cpumanager] state file: initializing empty state file")
+		glog.Infof("[cpumanager] state file: initializing empty state file - reason: \"%s\"", err)
 		stateFile.cache.ClearState()
 		stateFile.storeState()
 	}
@@ -85,6 +89,10 @@ func (sf *stateFile) tryRestoreState() error {
 			return err
 		}
 
+		if sf.policyName != readState.PolicyName {
+			return fmt.Errorf("policy configured \"%s\" != policy from state file \"%s\"", sf.policyName, readState.PolicyName)
+		}
+
 		if tmpDefaultCPUSet, err = cpuset.Parse(readState.DefaultCPUSet); err != nil {
 			glog.Warningf("[cpumanager] state file: could not parse state file - [defaultCpuSet:\"%s\"]", readState.DefaultCPUSet)
 			return err
@@ -113,6 +121,7 @@ func (sf *stateFile) storeState() {
 	var err error
 
 	data := stateFileData{
+		PolicyName:    sf.policyName,
 		DefaultCPUSet: sf.cache.GetDefaultCPUSet().String(),
 		Entries:       map[string]string{},
 	}

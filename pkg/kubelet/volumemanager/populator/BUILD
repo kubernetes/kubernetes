@@ -11,6 +11,7 @@ go_library(
     srcs = ["desired_state_of_world_populator.go"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/volumemanager/populator",
     deps = [
+        "//pkg/features:go_default_library",
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
@@ -18,6 +19,7 @@ go_library(
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/kubelet/volumemanager/cache:go_default_library",
         "//pkg/volume:go_default_library",
+        "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -25,6 +27,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
     ],
 )
@@ -61,6 +64,9 @@ go_test(
         "//pkg/volume/util/volumehelper:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "//vendor/k8s.io/client-go/testing:go_default_library",
     ],
 )

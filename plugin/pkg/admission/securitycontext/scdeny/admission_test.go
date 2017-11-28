@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // ensures the SecurityContext is denied if it defines anything more than Caps or Privileged

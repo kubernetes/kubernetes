@@ -145,6 +145,10 @@ type conversionFuncMap map[conversionPair]*types.Type
 
 // Returns all manually-defined conversion functions in the package.
 func getManualConversionFunctions(context *generator.Context, pkg *types.Package, manualMap conversionFuncMap) {
+	if pkg == nil {
+		glog.Warningf("Skipping nil package passed to getManualConversionFunctions")
+		return
+	}
 	glog.V(5).Infof("Scanning for conversion functions in %v", pkg.Name)
 
 	scopeName := types.Ref(conversionPackagePath, "Scope").Name
@@ -275,7 +279,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			externalTypes := externalTypesValues[0]
 			glog.V(5).Infof("  external types tags: %q", externalTypes)
 			var err error
-			typesPkg, err = context.AddDirectory(filepath.Join(pkg.Path, externalTypes))
+			typesPkg, err = context.AddDirectory(externalTypes)
 			if err != nil {
 				glog.Fatalf("cannot import package %s", externalTypes)
 			}

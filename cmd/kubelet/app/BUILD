@@ -11,7 +11,6 @@ go_test(
     srcs = ["server_test.go"],
     importpath = "k8s.io/kubernetes/cmd/kubelet/app",
     library = ":go_default_library",
-    deps = ["//pkg/kubelet/apis/kubeletconfig:go_default_library"],
 )
 
 go_library(
@@ -31,6 +30,7 @@ go_library(
     deps = [
         "//cmd/kubelet/app/options:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/client/chaosclient:go_default_library",
         "//pkg/cloudprovider:go_default_library",
@@ -52,7 +52,6 @@ go_library(
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/dockershim:go_default_library",
-        "//pkg/kubelet/dockershim/libdocker:go_default_library",
         "//pkg/kubelet/dockershim/remote:go_default_library",
         "//pkg/kubelet/eviction:go_default_library",
         "//pkg/kubelet/eviction/api:go_default_library",
@@ -78,6 +77,7 @@ go_library(
         "//pkg/volume/cephfs:go_default_library",
         "//pkg/volume/cinder:go_default_library",
         "//pkg/volume/configmap:go_default_library",
+        "//pkg/volume/csi:go_default_library",
         "//pkg/volume/downwardapi:go_default_library",
         "//pkg/volume/empty_dir:go_default_library",
         "//pkg/volume/fc:go_default_library",

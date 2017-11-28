@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
@@ -148,6 +148,21 @@ func SetNodeCondition(c clientset.Interface, node types.NodeName, condition v1.N
 	}
 	_, err = c.CoreV1().Nodes().PatchStatus(string(node), patch)
 	return err
+}
+
+// PatchNodeCIDR patches the specified node's CIDR to the given value.
+func PatchNodeCIDR(c clientset.Interface, node types.NodeName, cidr string) error {
+	raw, err := json.Marshal(cidr)
+	if err != nil {
+		return fmt.Errorf("failed to json.Marshal CIDR: %v", err)
+	}
+
+	patchBytes := []byte(fmt.Sprintf(`{"spec":{"podCIDR":%s}}`, raw))
+
+	if _, err := c.CoreV1().Nodes().Patch(string(node), types.StrategicMergePatchType, patchBytes); err != nil {
+		return fmt.Errorf("failed to patch node CIDR: %v", err)
+	}
+	return nil
 }
 
 // PatchNodeStatus patches node status.

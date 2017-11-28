@@ -14,7 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// If you make changes to this file, you should also make the corresponding change in ReplicationController.
+// ### ATTENTION ###
+//
+// This code implements both ReplicaSet and ReplicationController.
+//
+// For RC, the objects are converted on the way in and out (see ../replication/),
+// as if ReplicationController were just an older API version of ReplicaSet.
+// However, RC and RS still have separate storage and separate instantiations
+// of the ReplicaSetController object.
+//
+// Use rsc.Kind in log messages rather than hard-coding "ReplicaSet".
 
 package replicaset
 
@@ -22,6 +31,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -59,12 +70,14 @@ const (
 	statusUpdateRetries = 1
 )
 
-// controllerKind contains the schema.GroupVersionKind for this controller type.
-var controllerKind = v1beta1.SchemeGroupVersion.WithKind("ReplicaSet")
-
 // ReplicaSetController is responsible for synchronizing ReplicaSet objects stored
 // in the system with actual running pods.
 type ReplicaSetController struct {
+	// GroupVersionKind indicates the controller type.
+	// Different instances of this struct may handle different GVKs.
+	// For example, this struct can be used (with adapters) to handle ReplicationController.
+	schema.GroupVersionKind
+
 	kubeClient clientset.Interface
 	podControl controller.PodControlInterface
 
@@ -95,22 +108,35 @@ type ReplicaSetController struct {
 
 // NewReplicaSetController configures a replica set controller with the specified event recorder
 func NewReplicaSetController(rsInformer extensionsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicaSetController {
-	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("replicaset_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
-	}
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
-
-	rsc := &ReplicaSetController{
-		kubeClient: kubeClient,
-		podControl: controller.RealPodControl{
+	return NewBaseController(rsInformer, podInformer, kubeClient, burstReplicas,
+		v1beta1.SchemeGroupVersion.WithKind("ReplicaSet"),
+		"replicaset_controller",
+		"replicaset",
+		controller.RealPodControl{
 			KubeClient: kubeClient,
 			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "replicaset-controller"}),
 		},
-		burstReplicas: burstReplicas,
-		expectations:  controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
-		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "replicaset"),
+	)
+}
+
+// NewBaseController is the implementation of NewReplicaSetController with additional injected
+// parameters so that it can also serve as the implementation of NewReplicationController.
+func NewBaseController(rsInformer extensionsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int,
+	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface) *ReplicaSetController {
+	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage(metricOwnerName, kubeClient.CoreV1().RESTClient().GetRateLimiter())
+	}
+
+	rsc := &ReplicaSetController{
+		GroupVersionKind: gvk,
+		kubeClient:       kubeClient,
+		podControl:       podControl,
+		burstReplicas:    burstReplicas,
+		expectations:     controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
+		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), queueName),
 	}
 
 	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -153,10 +179,11 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer rsc.queue.ShutDown()
 
-	glog.Infof("Starting replica set controller")
-	defer glog.Infof("Shutting down replica set Controller")
+	controllerName := strings.ToLower(rsc.Kind)
+	glog.Infof("Starting %v controller", controllerName)
+	defer glog.Infof("Shutting down %v controller", controllerName)
 
-	if !controller.WaitForCacheSync("replica set", stopCh, rsc.podListerSynced, rsc.rsListerSynced) {
+	if !controller.WaitForCacheSync(rsc.Kind, stopCh, rsc.podListerSynced, rsc.rsListerSynced) {
 		return
 	}
 
@@ -176,7 +203,7 @@ func (rsc *ReplicaSetController) getPodReplicaSets(pod *v1.Pod) []*extensions.Re
 	if len(rss) > 1 {
 		// ControllerRef will ensure we don't do anything crazy, but more than one
 		// item in this list nevertheless constitutes user error.
-		utilruntime.HandleError(fmt.Errorf("user error! more than one ReplicaSet is selecting pods with labels: %+v", pod.Labels))
+		utilruntime.HandleError(fmt.Errorf("user error! more than one %v is selecting pods with labels: %+v", rsc.Kind, pod.Labels))
 	}
 	return rss
 }
@@ -187,7 +214,7 @@ func (rsc *ReplicaSetController) getPodReplicaSets(pod *v1.Pod) []*extensions.Re
 func (rsc *ReplicaSetController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *extensions.ReplicaSet {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
-	if controllerRef.Kind != controllerKind.Kind {
+	if controllerRef.Kind != rsc.Kind {
 		return nil
 	}
 	rs, err := rsc.rsLister.ReplicaSets(namespace).Get(controllerRef.Name)
@@ -220,7 +247,7 @@ func (rsc *ReplicaSetController) updateRS(old, cur interface{}) {
 	// that bad as ReplicaSets that haven't met expectations yet won't
 	// sync, and all the listing is done using local stores.
 	if *(oldRS.Spec.Replicas) != *(curRS.Spec.Replicas) {
-		glog.V(4).Infof("Replica set %v updated. Desired pod count change: %d->%d", curRS.Name, *(oldRS.Spec.Replicas), *(curRS.Spec.Replicas))
+		glog.V(4).Infof("%v %v updated. Desired pod count change: %d->%d", rsc.Kind, curRS.Name, *(oldRS.Spec.Replicas), *(curRS.Spec.Replicas))
 	}
 	rsc.enqueueReplicaSet(cur)
 }
@@ -319,7 +346,7 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 		// Note that this still suffers from #29229, we are just moving the problem one level
 		// "closer" to kubelet (from the deployment to the replica set controller).
 		if !podutil.IsPodReady(oldPod) && podutil.IsPodReady(curPod) && rs.Spec.MinReadySeconds > 0 {
-			glog.V(2).Infof("ReplicaSet %q will be enqueued after %ds for availability check", rs.Name, rs.Spec.MinReadySeconds)
+			glog.V(2).Infof("%v %q will be enqueued after %ds for availability check", rsc.Kind, rs.Name, rs.Spec.MinReadySeconds)
 			// Add a second to avoid milliseconds skew in AddAfter.
 			// See https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info.
 			rsc.enqueueReplicaSetAfter(rs, (time.Duration(rs.Spec.MinReadySeconds)*time.Second)+time.Second)
@@ -434,7 +461,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *exte
 	diff := len(filteredPods) - int(*(rs.Spec.Replicas))
 	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for ReplicaSet %#v: %v", rs, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for %v %#v: %v", rsc.Kind, rs, err))
 		return nil
 	}
 	if diff < 0 {
@@ -448,7 +475,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *exte
 		// into a performance bottleneck. We should generate a UID for the pod
 		// beforehand and store it via ExpectCreations.
 		rsc.expectations.ExpectCreations(rsKey, diff)
-		glog.V(2).Infof("Too few %q/%q replicas, need %d, creating %d", rs.Namespace, rs.Name, *(rs.Spec.Replicas), diff)
+		glog.V(2).Infof("Too few replicas for %v %s/%s, need %d, creating %d", rsc.Kind, rs.Namespace, rs.Name, *(rs.Spec.Replicas), diff)
 		// Batch the pod creates. Batch sizes start at SlowStartInitialBatchSize
 		// and double with each successful iteration in a kind of "slow start".
 		// This handles attempts to start large numbers of pods that would
@@ -460,8 +487,8 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *exte
 		successfulCreations, err := slowStartBatch(diff, controller.SlowStartInitialBatchSize, func() error {
 			boolPtr := func(b bool) *bool { return &b }
 			controllerRef := &metav1.OwnerReference{
-				APIVersion:         controllerKind.GroupVersion().String(),
-				Kind:               controllerKind.Kind,
+				APIVersion:         rsc.GroupVersion().String(),
+				Kind:               rsc.Kind,
 				Name:               rs.Name,
 				UID:                rs.UID,
 				BlockOwnerDeletion: boolPtr(true),
@@ -485,7 +512,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *exte
 		// The skipped pods will be retried later. The next controller resync will
 		// retry the slow start process.
 		if skippedPods := diff - successfulCreations; skippedPods > 0 {
-			glog.V(2).Infof("Slow-start failure. Skipping creation of %d pods, decrementing expectations for replica set %v/%v", skippedPods, rs.Namespace, rs.Name)
+			glog.V(2).Infof("Slow-start failure. Skipping creation of %d pods, decrementing expectations for %v %v/%v", skippedPods, rsc.Kind, rs.Namespace, rs.Name)
 			for i := 0; i < skippedPods; i++ {
 				// Decrement the expected number of creates because the informer won't observe this pod
 				rsc.expectations.CreationObserved(rsKey)
@@ -496,7 +523,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *exte
 		if diff > rsc.burstReplicas {
 			diff = rsc.burstReplicas
 		}
-		glog.V(2).Infof("Too many %q/%q replicas, need %d, deleting %d", rs.Namespace, rs.Name, *(rs.Spec.Replicas), diff)
+		glog.V(2).Infof("Too many replicas for %v %s/%s, need %d, deleting %d", rsc.Kind, rs.Namespace, rs.Name, *(rs.Spec.Replicas), diff)
 
 		// Choose which Pods to delete, preferring those in earlier phases of startup.
 		podsToDelete := getPodsToDelete(filteredPods, diff)
@@ -518,7 +545,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *exte
 				if err := rsc.podControl.DeletePod(rs.Namespace, targetPod.Name, rs); err != nil {
 					// Decrement the expected number of deletes because the informer won't observe this deletion
 					podKey := controller.PodKey(targetPod)
-					glog.V(2).Infof("Failed to delete %v, decrementing expectations for controller %q/%q", podKey, rs.Namespace, rs.Name)
+					glog.V(2).Infof("Failed to delete %v, decrementing expectations for %v %s/%s", podKey, rsc.Kind, rs.Namespace, rs.Name)
 					rsc.expectations.DeletionObserved(rsKey, podKey)
 					errCh <- err
 				}
@@ -543,9 +570,10 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *exte
 // meaning it did not expect to see any more of its pods created or deleted. This function is not meant to be
 // invoked concurrently with the same key.
 func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
+
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished syncing replica set %q (%v)", key, time.Now().Sub(startTime))
+		glog.V(4).Infof("Finished syncing %v %q (%v)", rsc.Kind, key, time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -554,7 +582,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	}
 	rs, err := rsc.rsLister.ReplicaSets(namespace).Get(name)
 	if errors.IsNotFound(err) {
-		glog.V(4).Infof("ReplicaSet has been deleted %v", key)
+		glog.V(4).Infof("%v %v has been deleted", rsc.Kind, key)
 		rsc.expectations.DeleteExpectations(key)
 		return nil
 	}
@@ -599,7 +627,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	newStatus := calculateStatus(rs, filteredPods, manageReplicasErr)
 
 	// Always updates status as pods come up or die.
-	updatedRS, err := updateReplicaSetStatus(rsc.kubeClient.Extensions().ReplicaSets(rs.Namespace), rs, newStatus)
+	updatedRS, err := updateReplicaSetStatus(rsc.kubeClient.ExtensionsV1beta1().ReplicaSets(rs.Namespace), rs, newStatus)
 	if err != nil {
 		// Multiple things could lead to this update failing. Requeuing the replica set ensures
 		// Returning an error causes a requeue without forcing a hotloop
@@ -623,11 +651,11 @@ func (rsc *ReplicaSetController) claimPods(rs *extensions.ReplicaSet, selector l
 			return nil, err
 		}
 		if fresh.UID != rs.UID {
-			return nil, fmt.Errorf("original ReplicaSet %v/%v is gone: got uid %v, wanted %v", rs.Namespace, rs.Name, fresh.UID, rs.UID)
+			return nil, fmt.Errorf("original %v %v/%v is gone: got uid %v, wanted %v", rsc.Kind, rs.Namespace, rs.Name, fresh.UID, rs.UID)
 		}
 		return fresh, nil
 	})
-	cm := controller.NewPodControllerRefManager(rsc.podControl, rs, selector, controllerKind, canAdoptFunc)
+	cm := controller.NewPodControllerRefManager(rsc.podControl, rs, selector, rsc.GroupVersionKind, canAdoptFunc)
 	return cm.ClaimPods(filteredPods)
 }
 

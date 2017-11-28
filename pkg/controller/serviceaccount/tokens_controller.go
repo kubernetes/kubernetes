@@ -70,7 +70,7 @@ type TokensControllerOptions struct {
 }
 
 // NewTokensController returns a new *TokensController.
-func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secrets informers.SecretInformer, cl clientset.Interface, options TokensControllerOptions) *TokensController {
+func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secrets informers.SecretInformer, cl clientset.Interface, options TokensControllerOptions) (*TokensController, error) {
 	maxRetries := options.MaxRetries
 	if maxRetries == 0 {
 		maxRetries = 10
@@ -87,7 +87,9 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 		maxRetries: maxRetries,
 	}
 	if cl != nil && cl.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_tokens_controller", cl.CoreV1().RESTClient().GetRateLimiter())
+		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_tokens_controller", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+			return nil, err
+		}
 	}
 
 	e.serviceAccounts = serviceAccounts.Lister()
@@ -124,7 +126,7 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 		options.SecretResync,
 	)
 
-	return e
+	return e, nil
 }
 
 // TokensController manages ServiceAccountToken secrets for ServiceAccount objects

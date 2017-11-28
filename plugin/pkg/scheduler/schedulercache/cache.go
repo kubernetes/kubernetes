@@ -241,6 +241,7 @@ func (cache *schedulerCache) AddPod(pod *v1.Pod) error {
 		}
 		delete(cache.assumedPods, key)
 		cache.podStates[key].deadline = nil
+		cache.podStates[key].pod = pod
 	case !ok:
 		// Pod was expired. We should add it back.
 		cache.addPod(pod)
@@ -438,7 +439,7 @@ func (cache *schedulerCache) cleanupAssumedPods(now time.Time) {
 			panic("Key found in assumed set but not in podStates. Potentially a logical error.")
 		}
 		if !ps.bindingFinished {
-			glog.Warningf("Couldn't expire cache for pod %v/%v. Binding is still in progress.",
+			glog.V(3).Infof("Couldn't expire cache for pod %v/%v. Binding is still in progress.",
 				ps.pod.Namespace, ps.pod.Name)
 			continue
 		}

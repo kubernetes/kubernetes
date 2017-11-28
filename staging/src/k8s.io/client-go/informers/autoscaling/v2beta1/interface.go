@@ -29,15 +29,17 @@ type Interface interface {
 }
 
 type version struct {
-	internalinterfaces.SharedInformerFactory
+	factory          internalinterfaces.SharedInformerFactory
+	namespace        string
+	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
 // New returns a new Interface.
-func New(f internalinterfaces.SharedInformerFactory) Interface {
-	return &version{f}
+func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
+	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
 // HorizontalPodAutoscalers returns a HorizontalPodAutoscalerInformer.
 func (v *version) HorizontalPodAutoscalers() HorizontalPodAutoscalerInformer {
-	return &horizontalPodAutoscalerInformer{factory: v.SharedInformerFactory}
+	return &horizontalPodAutoscalerInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

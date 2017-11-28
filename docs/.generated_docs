@@ -12,7 +12,9 @@ docs/admin/kubeadm_alpha_phase_addon_all.md
 docs/admin/kubeadm_alpha_phase_addon_kube-dns.md
 docs/admin/kubeadm_alpha_phase_addon_kube-proxy.md
 docs/admin/kubeadm_alpha_phase_bootstrap-token.md
+docs/admin/kubeadm_alpha_phase_bootstrap-token_all.md
 docs/admin/kubeadm_alpha_phase_bootstrap-token_cluster-info.md
+docs/admin/kubeadm_alpha_phase_bootstrap-token_create.md
 docs/admin/kubeadm_alpha_phase_bootstrap-token_node.md
 docs/admin/kubeadm_alpha_phase_bootstrap-token_node_allow-auto-approve.md
 docs/admin/kubeadm_alpha_phase_bootstrap-token_node_allow-post-csrs.md
@@ -73,7 +75,9 @@ docs/man/man1/kubeadm-alpha-phase-addon-all.1
 docs/man/man1/kubeadm-alpha-phase-addon-kube-dns.1
 docs/man/man1/kubeadm-alpha-phase-addon-kube-proxy.1
 docs/man/man1/kubeadm-alpha-phase-addon.1
+docs/man/man1/kubeadm-alpha-phase-bootstrap-token-all.1
 docs/man/man1/kubeadm-alpha-phase-bootstrap-token-cluster-info.1
+docs/man/man1/kubeadm-alpha-phase-bootstrap-token-create.1
 docs/man/man1/kubeadm-alpha-phase-bootstrap-token-node-allow-auto-approve.1
 docs/man/man1/kubeadm-alpha-phase-bootstrap-token-node-allow-post-csrs.1
 docs/man/man1/kubeadm-alpha-phase-bootstrap-token-node.1
@@ -170,6 +174,7 @@ docs/man/man1/kubectl-create-configmap.1
 docs/man/man1/kubectl-create-deployment.1
 docs/man/man1/kubectl-create-namespace.1
 docs/man/man1/kubectl-create-poddisruptionbudget.1
+docs/man/man1/kubectl-create-priorityclass.1
 docs/man/man1/kubectl-create-quota.1
 docs/man/man1/kubectl-create-role.1
 docs/man/man1/kubectl-create-rolebinding.1
@@ -269,6 +274,7 @@ docs/user-guide/kubectl/kubectl_create_configmap.md
 docs/user-guide/kubectl/kubectl_create_deployment.md
 docs/user-guide/kubectl/kubectl_create_namespace.md
 docs/user-guide/kubectl/kubectl_create_poddisruptionbudget.md
+docs/user-guide/kubectl/kubectl_create_priorityclass.md
 docs/user-guide/kubectl/kubectl_create_quota.md
 docs/user-guide/kubectl/kubectl_create_role.md
 docs/user-guide/kubectl/kubectl_create_rolebinding.md

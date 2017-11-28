@@ -30,14 +30,17 @@ const (
 	// HighAvailability is alpha in v1.9
 	HighAvailability = "HighAvailability"
 
+	// CoreDNS is alpha in v1.9
+	CoreDNS = "CoreDNS"
+
 	// SelfHosting is beta in v1.8
 	SelfHosting = "SelfHosting"
 
 	// StoreCertsInSecrets is alpha in v1.8
 	StoreCertsInSecrets = "StoreCertsInSecrets"
 
-	// SupportIPVSProxyMode is alpha in v1.8
-	SupportIPVSProxyMode = "SupportIPVSProxyMode"
+	// DynamicKubeletConfig is alpha in v1.9
+	DynamicKubeletConfig = "DynamicKubeletConfig"
 )
 
 var v190 = version.MustParseSemantic("v1.9.0-alpha.1")
@@ -47,7 +50,8 @@ var InitFeatureGates = FeatureList{
 	SelfHosting:          {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
 	StoreCertsInSecrets:  {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
 	HighAvailability:     {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
-	SupportIPVSProxyMode: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
+	CoreDNS:              {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
+	DynamicKubeletConfig: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
 }
 
 // Feature represents a feature being gated
@@ -119,7 +123,7 @@ func KnownFeatures(f *FeatureList) []string {
 	return known
 }
 
-// NewFeatureGate parse a string of the form "key1=value1,key2=value2,..." into a
+// NewFeatureGate parses a string of the form "key1=value1,key2=value2,..." into a
 // map[string]bool of known keys or returns an error.
 func NewFeatureGate(f *FeatureList, value string) (map[string]bool, error) {
 	featureGate := map[string]bool{}
@@ -147,5 +151,22 @@ func NewFeatureGate(f *FeatureList, value string) (map[string]bool, error) {
 		featureGate[k] = boolValue
 	}
 
+	ResolveFeatureGateDependencies(featureGate)
+
 	return featureGate, nil
+}
+
+// ResolveFeatureGateDependencies resolve dependencies between feature gates
+func ResolveFeatureGateDependencies(featureGate map[string]bool) {
+
+	// if StoreCertsInSecrets enabled, SelfHosting should enabled
+	if Enabled(featureGate, StoreCertsInSecrets) {
+		featureGate[SelfHosting] = true
+	}
+
+	// if HighAvailability enabled, both StoreCertsInSecrets and SelfHosting should enabled
+	if Enabled(featureGate, HighAvailability) && !Enabled(featureGate, StoreCertsInSecrets) {
+		featureGate[SelfHosting] = true
+		featureGate[StoreCertsInSecrets] = true
+	}
 }

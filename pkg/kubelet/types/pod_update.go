@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeapi "k8s.io/kubernetes/pkg/api"
+	kubeapi "k8s.io/kubernetes/pkg/apis/core"
 )
 
 const (
@@ -49,6 +49,8 @@ const (
 	// Pods with the given ids have unexpected status in this source,
 	// kubelet should reconcile status with this source
 	RECONCILE
+	// Pods with the given ids have been restored from a checkpoint.
+	RESTORE
 
 	// These constants identify the sources of pods
 	// Updates from a file

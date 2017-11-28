@@ -22,7 +22,10 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/apis/apiserver"
+	apiserverapi "k8s.io/apiserver/pkg/apis/apiserver"
+	apiserverapiv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
 )
 
 func TestReadAdmissionConfiguration(t *testing.T) {
@@ -132,11 +135,16 @@ func TestReadAdmissionConfiguration(t *testing.T) {
 			PluginNames:             []string{"NamespaceLifecycle", "InitialResources"},
 		},
 	}
+
+	scheme := runtime.NewScheme()
+	apiserverapi.AddToScheme(scheme)
+	apiserverapiv1alpha1.AddToScheme(scheme)
+
 	for testName, testCase := range testCases {
 		if err = ioutil.WriteFile(configFileName, []byte(testCase.ConfigBody), 0644); err != nil {
 			t.Fatalf("unexpected err writing temp file: %v", err)
 		}
-		config, err := ReadAdmissionConfiguration(testCase.PluginNames, configFileName)
+		config, err := ReadAdmissionConfiguration(testCase.PluginNames, configFileName, scheme)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}

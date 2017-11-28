@@ -62,7 +62,7 @@ spec:
                 fieldPath: metadata.namespace
         command:
           - /pod_nanny
-          - --cpu=80m
+          - --cpu=40m
           - --extra-cpu=0.5m
           - --memory=140Mi
           - --extra-memory=4Mi

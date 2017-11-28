@@ -14,7 +14,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/proxy/healthcheck",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/renstrom/dedent:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

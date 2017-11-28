@@ -221,13 +221,13 @@ func resourceMatches(p abac.Policy, a authorizer.Attributes) bool {
 }
 
 // Authorizer implements authorizer.Authorize
-func (pl policyList) Authorize(a authorizer.Attributes) (bool, string, error) {
+func (pl policyList) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
 	for _, p := range pl {
 		if matches(*p, a) {
-			return true, "", nil
+			return authorizer.DecisionAllow, "", nil
 		}
 	}
-	return false, "No policy matched.", nil
+	return authorizer.DecisionNoOpinion, "No policy matched.", nil
 	// TODO: Benchmark how much time policy matching takes with a medium size
 	// policy file, compared to other steps such as encoding/decoding.
 	// Then, add Caching only if needed.

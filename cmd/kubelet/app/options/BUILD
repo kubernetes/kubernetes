@@ -15,6 +15,7 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kubelet/app/options",
     deps = [
         "//pkg/apis/componentconfig:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",

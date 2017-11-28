@@ -37,6 +37,7 @@ import (
 	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
+	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingapiv1 "k8s.io/api/networking/v1"
 	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
@@ -53,8 +54,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/kubernetes/pkg/api"
-	kapi "k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
@@ -78,6 +78,7 @@ import (
 	batchrest "k8s.io/kubernetes/pkg/registry/batch/rest"
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
+	eventsrest "k8s.io/kubernetes/pkg/registry/events/rest"
 	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
 	networkingrest "k8s.io/kubernetes/pkg/registry/networking/rest"
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
@@ -196,7 +197,7 @@ func (c *Config) createNoneReconciler() reconcilers.EndpointReconciler {
 
 func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 	ttl := c.ExtraConfig.MasterEndpointReconcileTTL
-	config, err := c.ExtraConfig.StorageFactory.NewConfig(kapi.Resource("apiServerIPInfo"))
+	config, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("apiServerIPInfo"))
 	if err != nil {
 		glog.Fatalf("Error determining service IP ranges: %v", err)
 	}
@@ -204,7 +205,7 @@ func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 	if err != nil {
 		glog.Fatalf("Error creating storage factory: %v", err)
 	}
-	endpointConfig, err := c.ExtraConfig.StorageFactory.NewConfig(kapi.Resource("endpoints"))
+	endpointConfig, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("endpoints"))
 	if err != nil {
 		glog.Fatalf("Error getting storage config: %v", err)
 	}
@@ -212,7 +213,7 @@ func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 		StorageConfig:           endpointConfig,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 0,
-		ResourcePrefix:          c.ExtraConfig.StorageFactory.ResourcePrefix(kapi.Resource("endpoints")),
+		ResourcePrefix:          c.ExtraConfig.StorageFactory.ResourcePrefix(api.Resource("endpoints")),
 	})
 	endpointRegistry := endpoint.NewRegistry(endpointsStorage)
 	masterLeases := reconcilers.NewLeases(leaseStorage, "/masterleases/", ttl)
@@ -351,6 +352,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		// See https://github.com/kubernetes/kubernetes/issues/42392
 		appsrest.RESTStorageProvider{},
 		admissionregistrationrest.RESTStorageProvider{},
+		eventsrest.RESTStorageProvider{TTL: c.ExtraConfig.EventTTL},
 	}
 	m.InstallAPIs(c.ExtraConfig.APIResourceConfigSource, c.GenericConfig.RESTOptionsGetter, restStorageProviders...)
 
@@ -480,6 +482,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		authorizationapiv1.SchemeGroupVersion,
 		authorizationapiv1beta1.SchemeGroupVersion,
 		networkingapiv1.SchemeGroupVersion,
+		eventsv1beta1.SchemeGroupVersion,
 	)
 
 	// all extensions resources except these are disabled by default

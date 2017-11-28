@@ -17,6 +17,7 @@ go_test(
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/controller/daemon:go_default_library",
+        "//pkg/util/metrics:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",

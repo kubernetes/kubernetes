@@ -22,13 +22,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // LimitRangeLister helps list LimitRanges.
 type LimitRangeLister interface {
 	// List lists all LimitRanges in the indexer.
-	List(selector labels.Selector) (ret []*api.LimitRange, err error)
+	List(selector labels.Selector) (ret []*core.LimitRange, err error)
 	// LimitRanges returns an object that can list and get LimitRanges.
 	LimitRanges(namespace string) LimitRangeNamespaceLister
 	LimitRangeListerExpansion
@@ -45,9 +45,9 @@ func NewLimitRangeLister(indexer cache.Indexer) LimitRangeLister {
 }
 
 // List lists all LimitRanges in the indexer.
-func (s *limitRangeLister) List(selector labels.Selector) (ret []*api.LimitRange, err error) {
+func (s *limitRangeLister) List(selector labels.Selector) (ret []*core.LimitRange, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.LimitRange))
+		ret = append(ret, m.(*core.LimitRange))
 	})
 	return ret, err
 }
@@ -60,9 +60,9 @@ func (s *limitRangeLister) LimitRanges(namespace string) LimitRangeNamespaceList
 // LimitRangeNamespaceLister helps list and get LimitRanges.
 type LimitRangeNamespaceLister interface {
 	// List lists all LimitRanges in the indexer for a given namespace.
-	List(selector labels.Selector) (ret []*api.LimitRange, err error)
+	List(selector labels.Selector) (ret []*core.LimitRange, err error)
 	// Get retrieves the LimitRange from the indexer for a given namespace and name.
-	Get(name string) (*api.LimitRange, error)
+	Get(name string) (*core.LimitRange, error)
 	LimitRangeNamespaceListerExpansion
 }
 
@@ -74,21 +74,21 @@ type limitRangeNamespaceLister struct {
 }
 
 // List lists all LimitRanges in the indexer for a given namespace.
-func (s limitRangeNamespaceLister) List(selector labels.Selector) (ret []*api.LimitRange, err error) {
+func (s limitRangeNamespaceLister) List(selector labels.Selector) (ret []*core.LimitRange, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.LimitRange))
+		ret = append(ret, m.(*core.LimitRange))
 	})
 	return ret, err
 }
 
 // Get retrieves the LimitRange from the indexer for a given namespace and name.
-func (s limitRangeNamespaceLister) Get(name string) (*api.LimitRange, error) {
+func (s limitRangeNamespaceLister) Get(name string) (*core.LimitRange, error) {
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(api.Resource("limitrange"), name)
+		return nil, errors.NewNotFound(core.Resource("limitrange"), name)
 	}
-	return obj.(*api.LimitRange), nil
+	return obj.(*core.LimitRange), nil
 }

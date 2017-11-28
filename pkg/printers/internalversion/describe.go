@@ -46,10 +46,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	clientextensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/events"
-	"k8s.io/kubernetes/pkg/api/helper"
-	"k8s.io/kubernetes/pkg/api/helper/qos"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/ref"
 	resourcehelper "k8s.io/kubernetes/pkg/api/resource"
@@ -57,6 +54,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -856,6 +856,26 @@ func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, w PrefixWriter) {
 		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.ISCSIInterface, iscsi.FSType, iscsi.ReadOnly, iscsi.Portals, iscsi.DiscoveryCHAPAuth, iscsi.SessionCHAPAuth, iscsi.SecretRef, initiator)
 }
 
+func printISCSIPersistentVolumeSource(iscsi *api.ISCSIPersistentVolumeSource, w PrefixWriter) {
+	initiatorName := "<none>"
+	if iscsi.InitiatorName != nil {
+		initiatorName = *iscsi.InitiatorName
+	}
+	w.Write(LEVEL_2, "Type:\tISCSI (an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod)\n"+
+		"    TargetPortal:\t%v\n"+
+		"    IQN:\t%v\n"+
+		"    Lun:\t%v\n"+
+		"    ISCSIInterface\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n"+
+		"    Portals:\t%v\n"+
+		"    DiscoveryCHAPAuth:\t%v\n"+
+		"    SessionCHAPAuth:\t%v\n"+
+		"    SecretRef:\t%v\n"+
+		"    InitiatorName:\t%v\n",
+		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.ISCSIInterface, iscsi.FSType, iscsi.ReadOnly, iscsi.Portals, iscsi.DiscoveryCHAPAuth, iscsi.SessionCHAPAuth, iscsi.SecretRef, initiatorName)
+}
+
 func printGlusterfsVolumeSource(glusterfs *api.GlusterfsVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tGlusterfs (a Glusterfs mount on the host that shares a pod's lifetime)\n"+
 		"    EndpointsName:\t%v\n"+
@@ -1073,6 +1093,14 @@ func printFlockerVolumeSource(flocker *api.FlockerVolumeSource, w PrefixWriter) 
 		flocker.DatasetName, flocker.DatasetUUID)
 }
 
+func printCSIPersistentVolumeSource(csi *api.CSIPersistentVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tCSI (a Container Storage Interface (CSI) volume source)\n"+
+		"    Driver:\t%v\n"+
+		"    VolumeHandle:\t%v\n",
+		"    ReadOnly:\t%v\n",
+		csi.Driver, csi.VolumeHandle, csi.ReadOnly)
+}
+
 type PersistentVolumeDescriber struct {
 	clientset.Interface
 }
@@ -1108,6 +1136,9 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 		}
 		w.Write(LEVEL_0, "Reclaim Policy:\t%v\n", pv.Spec.PersistentVolumeReclaimPolicy)
 		w.Write(LEVEL_0, "Access Modes:\t%s\n", helper.GetAccessModesAsString(pv.Spec.AccessModes))
+		if pv.Spec.VolumeMode != nil {
+			w.Write(LEVEL_0, "VolumeMode:\t%v\n", *pv.Spec.VolumeMode)
+		}
 		storage := pv.Spec.Capacity[api.ResourceStorage]
 		w.Write(LEVEL_0, "Capacity:\t%s\n", storage.String())
 		w.Write(LEVEL_0, "Message:\t%s\n", pv.Status.Message)
@@ -1123,7 +1154,7 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 		case pv.Spec.NFS != nil:
 			printNFSVolumeSource(pv.Spec.NFS, w)
 		case pv.Spec.ISCSI != nil:
-			printISCSIVolumeSource(pv.Spec.ISCSI, w)
+			printISCSIPersistentVolumeSource(pv.Spec.ISCSI, w)
 		case pv.Spec.Glusterfs != nil:
 			printGlusterfsVolumeSource(pv.Spec.Glusterfs, w)
 		case pv.Spec.RBD != nil:
@@ -1156,6 +1187,8 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 			printFlexVolumeSource(pv.Spec.FlexVolume, w)
 		case pv.Spec.Flocker != nil:
 			printFlockerVolumeSource(pv.Spec.Flocker, w)
+		case pv.Spec.CSI != nil:
+			printCSIPersistentVolumeSource(pv.Spec.CSI, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -1191,10 +1224,15 @@ func describePersistentVolumeClaim(pvc *api.PersistentVolumeClaim, events *api.E
 		w.Write(LEVEL_0, "Name:\t%s\n", pvc.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", pvc.Namespace)
 		w.Write(LEVEL_0, "StorageClass:\t%s\n", helper.GetPersistentVolumeClaimClass(pvc))
-		w.Write(LEVEL_0, "Status:\t%v\n", pvc.Status.Phase)
+		if pvc.ObjectMeta.DeletionTimestamp != nil {
+			w.Write(LEVEL_0, "Status:\tTerminating (since %s)\n", pvc.ObjectMeta.DeletionTimestamp.Time.Format(time.RFC1123Z))
+		} else {
+			w.Write(LEVEL_0, "Status:\t%v\n", pvc.Status.Phase)
+		}
 		w.Write(LEVEL_0, "Volume:\t%s\n", pvc.Spec.VolumeName)
 		printLabelsMultiline(w, "Labels", pvc.Labels)
 		printAnnotationsMultiline(w, "Annotations", pvc.Annotations)
+		w.Write(LEVEL_0, "Finalizers:\t%v\n", pvc.ObjectMeta.Finalizers)
 		storage := pvc.Spec.Resources.Requests[api.ResourceStorage]
 		capacity := ""
 		accessModes := ""
@@ -1205,6 +1243,9 @@ func describePersistentVolumeClaim(pvc *api.PersistentVolumeClaim, events *api.E
 		}
 		w.Write(LEVEL_0, "Capacity:\t%s\n", capacity)
 		w.Write(LEVEL_0, "Access Modes:\t%s\n", accessModes)
+		if pvc.Spec.VolumeMode != nil {
+			w.Write(LEVEL_0, "VolumeMode:\t%v\n", *pvc.Spec.VolumeMode)
+		}
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -1335,6 +1376,7 @@ func describeContainerProbe(container api.Container, w PrefixWriter) {
 }
 
 func describeContainerVolumes(container api.Container, w PrefixWriter) {
+	// Show volumeMounts
 	none := ""
 	if len(container.VolumeMounts) == 0 {
 		none = "\t<none>"
@@ -1352,6 +1394,14 @@ func describeContainerVolumes(container api.Container, w PrefixWriter) {
 			flags = append(flags, fmt.Sprintf("path=%q", mount.SubPath))
 		}
 		w.Write(LEVEL_3, "%s from %s (%s)\n", mount.MountPath, mount.Name, strings.Join(flags, ","))
+	}
+	// Show volumeDevices if exists
+	if len(container.VolumeDevices) > 0 {
+		w.Write(LEVEL_2, "Devices:%s\n", none)
+		sort.Sort(SortableVolumeDevices(container.VolumeDevices))
+		for _, device := range container.VolumeDevices {
+			w.Write(LEVEL_3, "%s from %s\n", device.DevicePath, device.Name)
+		}
 	}
 }
 
@@ -2088,7 +2138,7 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 			if sp.TargetPort.Type == intstr.Type(intstr.Int) {
 				w.Write(LEVEL_0, "TargetPort:\t%d/%s\n", sp.TargetPort.IntVal, sp.Protocol)
 			} else {
-				w.Write(LEVEL_0, "TargetPort:\t%d/%s\n", sp.TargetPort.StrVal, sp.Protocol)
+				w.Write(LEVEL_0, "TargetPort:\t%s/%s\n", sp.TargetPort.StrVal, sp.Protocol)
 			}
 			if sp.NodePort != 0 {
 				w.Write(LEVEL_0, "NodePort:\t%s\t%d/%s\n", name, sp.NodePort, sp.Protocol)
@@ -3090,7 +3140,7 @@ func describeNetworkPolicy(networkPolicy *networking.NetworkPolicy) (string, err
 
 func describeNetworkPolicySpec(nps networking.NetworkPolicySpec, w PrefixWriter) {
 	w.Write(LEVEL_0, "Spec:\n")
-	w.Write(LEVEL_1, "Pod Selector: ")
+	w.Write(LEVEL_1, "PodSelector: ")
 	if len(nps.PodSelector.MatchLabels) == 0 && len(nps.PodSelector.MatchExpressions) == 0 {
 		w.Write(LEVEL_2, "<none> (Allowing the specific traffic to all pods in this namespace)\n")
 	} else {
@@ -3098,11 +3148,14 @@ func describeNetworkPolicySpec(nps networking.NetworkPolicySpec, w PrefixWriter)
 	}
 	w.Write(LEVEL_1, "Allowing ingress traffic:\n")
 	printNetworkPolicySpecIngressFrom(nps.Ingress, "    ", w)
+	w.Write(LEVEL_1, "Allowing egress traffic:\n")
+	printNetworkPolicySpecEgressTo(nps.Egress, "    ", w)
+	w.Write(LEVEL_1, "Policy Types: %v\n", policyTypesToString(nps.PolicyTypes))
 }
 
 func printNetworkPolicySpecIngressFrom(npirs []networking.NetworkPolicyIngressRule, initialIndent string, w PrefixWriter) {
 	if len(npirs) == 0 {
-		w.WriteLine("<none> (Selected pods are isolated for ingress connectivity)")
+		w.Write(LEVEL_0, "%s%s\n", initialIndent, "<none> (Selected pods are isolated for ingress connectivity)")
 		return
 	}
 	for i, npir := range npirs {
@@ -3125,13 +3178,58 @@ func printNetworkPolicySpecIngressFrom(npirs []networking.NetworkPolicyIngressRu
 			for _, from := range npir.From {
 				w.Write(LEVEL_0, "%s", initialIndent)
 				if from.PodSelector != nil {
-					w.Write(LEVEL_0, "%s: %s\n", "From Pod Selector", metav1.FormatLabelSelector(from.PodSelector))
+					w.Write(LEVEL_0, "%s: %s\n", "From PodSelector", metav1.FormatLabelSelector(from.PodSelector))
 				} else if from.NamespaceSelector != nil {
-					w.Write(LEVEL_0, "%s: %s\n", "From Namespace Selector", metav1.FormatLabelSelector(from.NamespaceSelector))
+					w.Write(LEVEL_0, "%s: %s\n", "From NamespaceSelector", metav1.FormatLabelSelector(from.NamespaceSelector))
+				} else if from.IPBlock != nil {
+					w.Write(LEVEL_0, "From IPBlock:\n")
+					w.Write(LEVEL_0, "%s%sCIDR: %s\n", initialIndent, initialIndent, from.IPBlock.CIDR)
+					w.Write(LEVEL_0, "%s%sExcept: %v\n", initialIndent, initialIndent, strings.Join(from.IPBlock.Except, ", "))
 				}
 			}
 		}
 		if i != len(npirs)-1 {
+			w.Write(LEVEL_0, "%s%s\n", initialIndent, "----------")
+		}
+	}
+}
+
+func printNetworkPolicySpecEgressTo(npers []networking.NetworkPolicyEgressRule, initialIndent string, w PrefixWriter) {
+	if len(npers) == 0 {
+		w.Write(LEVEL_0, "%s%s\n", initialIndent, "<none> (Selected pods are isolated for egress connectivity)")
+		return
+	}
+	for i, nper := range npers {
+		if len(nper.Ports) == 0 {
+			w.Write(LEVEL_0, "%s%s\n", initialIndent, "To Port: <any> (traffic allowed to all ports)")
+		} else {
+			for _, port := range nper.Ports {
+				var proto api.Protocol
+				if port.Protocol != nil {
+					proto = *port.Protocol
+				} else {
+					proto = api.ProtocolTCP
+				}
+				w.Write(LEVEL_0, "%s%s: %s/%s\n", initialIndent, "To Port", port.Port, proto)
+			}
+		}
+		if len(nper.To) == 0 {
+			w.Write(LEVEL_0, "%s%s\n", initialIndent, "To: <any> (traffic not restricted by source)")
+		} else {
+			for _, to := range nper.To {
+				w.Write(LEVEL_0, "%s", initialIndent)
+				if to.PodSelector != nil {
+					w.Write(LEVEL_0, "%s: %s\n", "To PodSelector", metav1.FormatLabelSelector(to.PodSelector))
+				} else if to.NamespaceSelector != nil {
+					w.Write(LEVEL_0, "%s: %s\n", "To NamespaceSelector", metav1.FormatLabelSelector(to.NamespaceSelector))
+				} else if to.IPBlock != nil {
+					w.Write(LEVEL_0, "To IPBlock:\n")
+					w.Write(LEVEL_0, "%s%sCIDR: %s\n", initialIndent, initialIndent, to.IPBlock.CIDR)
+					w.Write(LEVEL_0, "%s%sExcept: %v\n", initialIndent, initialIndent, strings.Join(to.IPBlock.Except, ", "))
+				}
+			}
+		}
+		if i != len(npers)-1 {
 			w.Write(LEVEL_0, "%s%s\n", initialIndent, "----------")
 		}
 	}
@@ -3165,6 +3263,9 @@ func describeStorageClass(sc *storage.StorageClass, events *api.EventList) (stri
 		w.Write(LEVEL_0, "Parameters:\t%s\n", labels.FormatLabels(sc.Parameters))
 		if sc.ReclaimPolicy != nil {
 			w.Write(LEVEL_0, "ReclaimPolicy:\t%s\n", *sc.ReclaimPolicy)
+		}
+		if sc.VolumeBindingMode != nil {
+			w.Write(LEVEL_0, "VolumeBindingMode:\t%s\n", *sc.VolumeBindingMode)
 		}
 		if events != nil {
 			DescribeEvents(events, w)
@@ -3285,6 +3386,9 @@ func describePodSecurityPolicy(psp *extensions.PodSecurityPolicy) (string, error
 		w.Write(LEVEL_1, "Allowed Capabilities:\t%s\n", capsToString(psp.Spec.AllowedCapabilities))
 		w.Write(LEVEL_1, "Allowed Volume Types:\t%s\n", fsTypeToString(psp.Spec.Volumes))
 
+		if len(psp.Spec.AllowedFlexVolumes) > 0 {
+			w.Write(LEVEL_1, "Allowed FlexVolume Types:\t%s\n", flexVolumesToString(psp.Spec.AllowedFlexVolumes))
+		}
 		w.Write(LEVEL_1, "Allow Host Network:\t%t\n", psp.Spec.HostNetwork)
 		w.Write(LEVEL_1, "Allow Host Ports:\t%s\n", hostPortRangeToString(psp.Spec.HostPorts))
 		w.Write(LEVEL_1, "Allow Host PID:\t%t\n", psp.Spec.HostPID)
@@ -3317,18 +3421,15 @@ func describePodSecurityPolicy(psp *extensions.PodSecurityPolicy) (string, error
 	})
 }
 
-func stringOrAll(s string) string {
-	if len(s) > 0 {
-		return s
-	}
-	return "*"
+func stringOrNone(s string) string {
+	return stringOrDefaultValue(s, "<none>")
 }
 
-func stringOrNone(s string) string {
+func stringOrDefaultValue(s, defaultValue string) string {
 	if len(s) > 0 {
 		return s
 	}
-	return "<none>"
+	return defaultValue
 }
 
 func fsTypeToString(volumes []extensions.FSType) string {
@@ -3337,6 +3438,14 @@ func fsTypeToString(volumes []extensions.FSType) string {
 		strVolumes = append(strVolumes, string(v))
 	}
 	return stringOrNone(strings.Join(strVolumes, ","))
+}
+
+func flexVolumesToString(flexVolumes []extensions.AllowedFlexVolume) string {
+	volumes := []string{}
+	for _, flexVolume := range flexVolumes {
+		volumes = append(volumes, "driver="+flexVolume.Driver)
+	}
+	return stringOrDefaultValue(strings.Join(volumes, ","), "<all>")
 }
 
 func hostPortRangeToString(ranges []extensions.HostPortRange) string {
@@ -3383,6 +3492,18 @@ func capsToString(caps []api.Capability) string {
 			strCaps = append(strCaps, string(c))
 		}
 		formattedString = strings.Join(strCaps, ",")
+	}
+	return stringOrNone(formattedString)
+}
+
+func policyTypesToString(pts []networking.PolicyType) string {
+	formattedString := ""
+	if pts != nil {
+		strPts := []string{}
+		for _, p := range pts {
+			strPts = append(strPts, string(p))
+		}
+		formattedString = strings.Join(strPts, ", ")
 	}
 	return stringOrNone(formattedString)
 }
@@ -3715,6 +3836,20 @@ func (list SortableVolumeMounts) Swap(i, j int) {
 
 func (list SortableVolumeMounts) Less(i, j int) bool {
 	return list[i].MountPath < list[j].MountPath
+}
+
+type SortableVolumeDevices []api.VolumeDevice
+
+func (list SortableVolumeDevices) Len() int {
+	return len(list)
+}
+
+func (list SortableVolumeDevices) Swap(i, j int) {
+	list[i], list[j] = list[j], list[i]
+}
+
+func (list SortableVolumeDevices) Less(i, j int) bool {
+	return list[i].DevicePath < list[j].DevicePath
 }
 
 // TODO: get rid of this and plumb the caller correctly

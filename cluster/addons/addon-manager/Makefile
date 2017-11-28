@@ -15,7 +15,7 @@
 IMAGE=gcr.io/google-containers/kube-addon-manager
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
-VERSION=v6.4-beta.2
+VERSION=v6.5
 KUBECTL_VERSION?=v1.6.4
 
 ifeq ($(ARCH),amd64)

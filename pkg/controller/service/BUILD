@@ -14,7 +14,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/service",
     deps = [
-        "//pkg/api/v1/helper:go_default_library",
+        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/features:go_default_library",
@@ -50,6 +50,8 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "//vendor/k8s.io/client-go/listers/core/v1:go_default_library",
+        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
     ],
 )

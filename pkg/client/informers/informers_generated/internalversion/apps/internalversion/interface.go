@@ -31,20 +31,22 @@ type Interface interface {
 }
 
 type version struct {
-	internalinterfaces.SharedInformerFactory
+	factory          internalinterfaces.SharedInformerFactory
+	namespace        string
+	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
 // New returns a new Interface.
-func New(f internalinterfaces.SharedInformerFactory) Interface {
-	return &version{f}
+func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
+	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
 // ControllerRevisions returns a ControllerRevisionInformer.
 func (v *version) ControllerRevisions() ControllerRevisionInformer {
-	return &controllerRevisionInformer{factory: v.SharedInformerFactory}
+	return &controllerRevisionInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // StatefulSets returns a StatefulSetInformer.
 func (v *version) StatefulSets() StatefulSetInformer {
-	return &statefulSetInformer{factory: v.SharedInformerFactory}
+	return &statefulSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

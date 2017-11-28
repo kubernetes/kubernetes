@@ -55,19 +55,36 @@ func GetCgroupSubsystems() (CgroupSubsystems, error) {
 	if err != nil {
 		return CgroupSubsystems{}, err
 	}
+
+	return getCgroupSubsystemsHelper(allCgroups)
+}
+
+func getCgroupSubsystemsHelper(allCgroups []cgroups.Mount) (CgroupSubsystems, error) {
 	if len(allCgroups) == 0 {
 		return CgroupSubsystems{}, fmt.Errorf("failed to find cgroup mounts")
 	}
 
 	// Trim the mounts to only the subsystems we care about.
 	supportedCgroups := make([]cgroups.Mount, 0, len(allCgroups))
+	recordedMountpoints := make(map[string]struct{}, len(allCgroups))
 	mountPoints := make(map[string]string, len(allCgroups))
 	for _, mount := range allCgroups {
 		for _, subsystem := range mount.Subsystems {
-			if _, ok := supportedSubsystems[subsystem]; ok {
-				supportedCgroups = append(supportedCgroups, mount)
-				mountPoints[subsystem] = mount.Mountpoint
+			if _, ok := supportedSubsystems[subsystem]; !ok {
+				// Unsupported subsystem
+				continue
 			}
+			if _, ok := mountPoints[subsystem]; ok {
+				// duplicate mount for this subsystem; use the first one we saw
+				glog.V(5).Infof("skipping %s, already using mount at %s", mount.Mountpoint, mountPoints[subsystem])
+				continue
+			}
+			if _, ok := recordedMountpoints[mount.Mountpoint]; !ok {
+				// avoid appending the same mount twice in e.g. `cpu,cpuacct` case
+				supportedCgroups = append(supportedCgroups, mount)
+				recordedMountpoints[mount.Mountpoint] = struct{}{}
+			}
+			mountPoints[subsystem] = mount.Mountpoint
 		}
 	}
 
@@ -84,6 +101,7 @@ var supportedSubsystems map[string]struct{} = map[string]struct{}{
 	"memory":  {},
 	"cpuset":  {},
 	"blkio":   {},
+	"devices": {},
 }
 
 // Get cgroup and networking stats of the specified container
@@ -452,6 +470,17 @@ var numCpusFunc = getNumberOnlineCPUs
 func setCpuStats(s *cgroups.Stats, ret *info.ContainerStats) {
 	ret.Cpu.Usage.User = s.CpuStats.CpuUsage.UsageInUsermode
 	ret.Cpu.Usage.System = s.CpuStats.CpuUsage.UsageInKernelmode
+	ret.Cpu.Usage.Total = 0
+	ret.Cpu.CFS.Periods = s.CpuStats.ThrottlingData.Periods
+	ret.Cpu.CFS.ThrottledPeriods = s.CpuStats.ThrottlingData.ThrottledPeriods
+	ret.Cpu.CFS.ThrottledTime = s.CpuStats.ThrottlingData.ThrottledTime
+
+	if len(s.CpuStats.CpuUsage.PercpuUsage) == 0 {
+		// libcontainer's 'GetStats' can leave 'PercpuUsage' nil if it skipped the
+		// cpuacct subsystem.
+		return
+	}
+
 	numPossible := uint32(len(s.CpuStats.CpuUsage.PercpuUsage))
 	// Note that as of https://patchwork.kernel.org/patch/8607101/ (kernel v4.7),
 	// the percpu usage information includes extra zero values for all additional
@@ -470,15 +499,11 @@ func setCpuStats(s *cgroups.Stats, ret *info.ContainerStats) {
 	numActual = minUint32(numPossible, numActual)
 	ret.Cpu.Usage.PerCpu = make([]uint64, numActual)
 
-	ret.Cpu.Usage.Total = 0
 	for i := uint32(0); i < numActual; i++ {
 		ret.Cpu.Usage.PerCpu[i] = s.CpuStats.CpuUsage.PercpuUsage[i]
 		ret.Cpu.Usage.Total += s.CpuStats.CpuUsage.PercpuUsage[i]
 	}
 
-	ret.Cpu.CFS.Periods = s.CpuStats.ThrottlingData.Periods
-	ret.Cpu.CFS.ThrottledPeriods = s.CpuStats.ThrottlingData.ThrottledPeriods
-	ret.Cpu.CFS.ThrottledTime = s.CpuStats.ThrottlingData.ThrottledTime
 }
 
 // Copied from
@@ -509,6 +534,7 @@ func setDiskIoStats(s *cgroups.Stats, ret *info.ContainerStats) {
 
 func setMemoryStats(s *cgroups.Stats, ret *info.ContainerStats) {
 	ret.Memory.Usage = s.MemoryStats.Usage.Usage
+	ret.Memory.MaxUsage = s.MemoryStats.Usage.MaxUsage
 	ret.Memory.Failcnt = s.MemoryStats.Usage.Failcnt
 	ret.Memory.Cache = s.MemoryStats.Stats["cache"]
 

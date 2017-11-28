@@ -26,7 +26,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/kuberuntime",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/v1/helper:go_default_library",
+        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubelet/apis/cri:go_default_library",
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
@@ -34,6 +34,7 @@ go_library(
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/images:go_default_library",
+        "//pkg/kubelet/kuberuntime/logs:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/prober/results:go_default_library",
@@ -48,8 +49,6 @@ go_library(
         "//pkg/util/tail:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor/github.com/armon/circbuf:go_default_library",
-        "//vendor/github.com/docker/docker/pkg/jsonlog:go_default_library",
-        "//vendor/github.com/fsnotify/fsnotify:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
@@ -73,7 +72,6 @@ go_test(
         "kuberuntime_container_test.go",
         "kuberuntime_gc_test.go",
         "kuberuntime_image_test.go",
-        "kuberuntime_logs_test.go",
         "kuberuntime_manager_test.go",
         "kuberuntime_sandbox_test.go",
         "labels_test.go",
@@ -113,6 +111,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubelet/kuberuntime/logs:all-srcs",
+    ],
     tags = ["automanaged"],
 )

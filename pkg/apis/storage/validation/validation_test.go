@@ -18,12 +18,21 @@ package validation
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/storage"
+)
+
+var (
+	deleteReclaimPolicy = api.PersistentVolumeReclaimDelete
+	immediateMode1      = storage.VolumeBindingImmediate
+	immediateMode2      = storage.VolumeBindingImmediate
+	waitingMode         = storage.VolumeBindingWaitForFirstConsumer
+	invalidMode         = storage.VolumeBindingMode("foo")
 )
 
 func TestValidateStorageClass(t *testing.T) {
@@ -156,4 +165,420 @@ func TestAlphaExpandPersistentVolumesFeatureValidation(t *testing.T) {
 		t.Errorf("expected failure, but got no error")
 	}
 
+}
+
+func TestVolumeAttachmentValidation(t *testing.T) {
+	volumeName := "pv-name"
+	empty := ""
+	successCases := []storage.VolumeAttachment{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+				NodeName: "mynode",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo-with-status"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+				NodeName: "mynode",
+			},
+			Status: storage.VolumeAttachmentStatus{
+				Attached: true,
+				AttachmentMetadata: map[string]string{
+					"foo": "bar",
+				},
+				AttachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+				DetachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+			},
+		},
+	}
+
+	for _, volumeAttachment := range successCases {
+		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+	errorCases := []storage.VolumeAttachment{
+		{
+			// Empty attacher name
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "",
+				NodeName: "mynode",
+			},
+		},
+		{
+			// Invalid attacher name
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "invalid!@#$%^&*()",
+				NodeName: "mynode",
+			},
+		},
+		{
+			// Empty node name
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "",
+			},
+		},
+		{
+			// No volume name
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: nil,
+				},
+			},
+		},
+		{
+			// Empty volume name
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &empty,
+				},
+			},
+		},
+		{
+			// Too long error message
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+			},
+			Status: storage.VolumeAttachmentStatus{
+				Attached: true,
+				AttachmentMetadata: map[string]string{
+					"foo": "bar",
+				},
+				AttachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+				DetachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: strings.Repeat("a", maxVolumeErrorMessageSize+1),
+				},
+			},
+		},
+		{
+			// Too long metadata
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+			},
+			Status: storage.VolumeAttachmentStatus{
+				Attached: true,
+				AttachmentMetadata: map[string]string{
+					"foo": strings.Repeat("a", maxAttachedVolumeMetadataSize),
+				},
+				AttachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+				DetachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+			},
+		},
+	}
+
+	for _, volumeAttachment := range errorCases {
+		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) == 0 {
+			t.Errorf("Expected failure for test: %v", volumeAttachment)
+		}
+	}
+}
+
+func TestVolumeAttachmentUpdateValidation(t *testing.T) {
+	volumeName := "foo"
+	newVolumeName := "bar"
+
+	old := storage.VolumeAttachment{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+		Spec: storage.VolumeAttachmentSpec{
+			Attacher: "myattacher",
+			Source: storage.VolumeAttachmentSource{
+				PersistentVolumeName: &volumeName,
+			},
+			NodeName: "mynode",
+		},
+	}
+	successCases := []storage.VolumeAttachment{
+		{
+			// no change
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+				NodeName: "mynode",
+			},
+		},
+		{
+			// modify status
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+				NodeName: "mynode",
+			},
+			Status: storage.VolumeAttachmentStatus{
+				Attached: true,
+				AttachmentMetadata: map[string]string{
+					"foo": "bar",
+				},
+				AttachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+				DetachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+			},
+		},
+	}
+
+	for _, volumeAttachment := range successCases {
+		if errs := ValidateVolumeAttachmentUpdate(&volumeAttachment, &old); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := []storage.VolumeAttachment{
+		{
+			// change attacher
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "another-attacher",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+				NodeName: "mynode",
+			},
+		},
+		{
+			// change volume
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &newVolumeName,
+				},
+				NodeName: "mynode",
+			},
+		},
+		{
+			// change node
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+				NodeName: "anothernode",
+			},
+		},
+		{
+			// add invalid status
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+				NodeName: "mynode",
+			},
+			Status: storage.VolumeAttachmentStatus{
+				Attached: true,
+				AttachmentMetadata: map[string]string{
+					"foo": "bar",
+				},
+				AttachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: strings.Repeat("a", maxAttachedVolumeMetadataSize),
+				},
+				DetachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+			},
+		},
+	}
+
+	for _, volumeAttachment := range errorCases {
+		if errs := ValidateVolumeAttachmentUpdate(&volumeAttachment, &old); len(errs) == 0 {
+			t.Errorf("Expected failure for test: %v", volumeAttachment)
+		}
+	}
+}
+
+func makeClassWithBinding(mode *storage.VolumeBindingMode) *storage.StorageClass {
+	return &storage.StorageClass{
+		ObjectMeta:        metav1.ObjectMeta{Name: "foo", ResourceVersion: "foo"},
+		Provisioner:       "kubernetes.io/foo-provisioner",
+		ReclaimPolicy:     &deleteReclaimPolicy,
+		VolumeBindingMode: mode,
+	}
+}
+
+// TODO: Remove these tests once feature gate is not required
+func TestValidateVolumeBindingModeAlphaDisabled(t *testing.T) {
+	errorCases := map[string]*storage.StorageClass{
+		"immediate mode": makeClassWithBinding(&immediateMode1),
+		"waiting mode":   makeClassWithBinding(&waitingMode),
+		"invalid mode":   makeClassWithBinding(&invalidMode),
+	}
+
+	for testName, storageClass := range errorCases {
+		if errs := ValidateStorageClass(storageClass); len(errs) == 0 {
+			t.Errorf("Expected failure for test: %v", testName)
+		}
+	}
+}
+
+type bindingTest struct {
+	class         *storage.StorageClass
+	shouldSucceed bool
+}
+
+func TestValidateVolumeBindingMode(t *testing.T) {
+	cases := map[string]bindingTest{
+		"no mode": {
+			class:         makeClassWithBinding(nil),
+			shouldSucceed: false,
+		},
+		"immediate mode": {
+			class:         makeClassWithBinding(&immediateMode1),
+			shouldSucceed: true,
+		},
+		"waiting mode": {
+			class:         makeClassWithBinding(&waitingMode),
+			shouldSucceed: true,
+		},
+		"invalid mode": {
+			class:         makeClassWithBinding(&invalidMode),
+			shouldSucceed: false,
+		},
+	}
+
+	// TODO: remove when feature gate not required
+	err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
+	if err != nil {
+		t.Fatalf("Failed to enable feature gate for VolumeScheduling: %v", err)
+	}
+
+	for testName, testCase := range cases {
+		errs := ValidateStorageClass(testCase.class)
+		if testCase.shouldSucceed && len(errs) != 0 {
+			t.Errorf("Expected success for test %q, got %v", testName, errs)
+		}
+		if !testCase.shouldSucceed && len(errs) == 0 {
+			t.Errorf("Expected failure for test %q, got success", testName)
+		}
+	}
+
+	err = utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
+	if err != nil {
+		t.Fatalf("Failed to disable feature gate for VolumeScheduling: %v", err)
+	}
+}
+
+type updateTest struct {
+	oldClass      *storage.StorageClass
+	newClass      *storage.StorageClass
+	shouldSucceed bool
+}
+
+func TestValidateUpdateVolumeBindingMode(t *testing.T) {
+	noBinding := makeClassWithBinding(nil)
+	immediateBinding1 := makeClassWithBinding(&immediateMode1)
+	immediateBinding2 := makeClassWithBinding(&immediateMode2)
+	waitBinding := makeClassWithBinding(&waitingMode)
+
+	cases := map[string]updateTest{
+		"old and new no mode": {
+			oldClass:      noBinding,
+			newClass:      noBinding,
+			shouldSucceed: true,
+		},
+		"old and new same mode ptr": {
+			oldClass:      immediateBinding1,
+			newClass:      immediateBinding1,
+			shouldSucceed: true,
+		},
+		"old and new same mode value": {
+			oldClass:      immediateBinding1,
+			newClass:      immediateBinding2,
+			shouldSucceed: true,
+		},
+		"old no mode, new mode": {
+			oldClass:      noBinding,
+			newClass:      waitBinding,
+			shouldSucceed: false,
+		},
+		"old mode, new no mode": {
+			oldClass:      waitBinding,
+			newClass:      noBinding,
+			shouldSucceed: false,
+		},
+		"old and new different modes": {
+			oldClass:      waitBinding,
+			newClass:      immediateBinding1,
+			shouldSucceed: false,
+		},
+	}
+
+	// TODO: remove when feature gate not required
+	err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
+	if err != nil {
+		t.Fatalf("Failed to enable feature gate for VolumeScheduling: %v", err)
+	}
+
+	for testName, testCase := range cases {
+		errs := ValidateStorageClassUpdate(testCase.newClass, testCase.oldClass)
+		if testCase.shouldSucceed && len(errs) != 0 {
+			t.Errorf("Expected success for %v, got %v", testName, errs)
+		}
+		if !testCase.shouldSucceed && len(errs) == 0 {
+			t.Errorf("Expected failure for %v, got success", testName)
+		}
+	}
+
+	err = utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
+	if err != nil {
+		t.Fatalf("Failed to disable feature gate for VolumeScheduling: %v", err)
+	}
 }

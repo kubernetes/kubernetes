@@ -147,6 +147,15 @@ func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloud
 		glog.V(5).Infof("This node %s is still tainted. Will not process.", node.Name)
 		return
 	}
+	// Node that isn't present according to the cloud provider shouldn't have its address updated
+	exists, err := ensureNodeExistsByProviderIDOrExternalID(instances, node)
+	if err != nil {
+		// Continue to update node address when not sure the node is not exists
+		glog.Errorf("%v", err)
+	} else if !exists {
+		glog.V(4).Infof("The node %s is no longer present according to the cloud provider, do not process.", node.Name)
+		return
+	}
 
 	nodeAddresses, err := getNodeAddressesByProviderIDOrName(instances, node)
 	if err != nil {

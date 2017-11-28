@@ -22,7 +22,8 @@ class Numeric
   end
 end
 
-pods_json = `kubectl get pods -o json`
+namespace = ENV['KUBECTL_PLUGINS_CURRENT_NAMESPACE'] || 'default'
+pods_json = `kubectl --namespace #{namespace} get pods -o json`
 pods_parsed = JSON.parse(pods_json)
 
 puts "The Magnificent Aging Plugin."

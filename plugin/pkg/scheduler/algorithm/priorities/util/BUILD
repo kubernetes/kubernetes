@@ -8,12 +8,21 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["topologies_test.go"],
+    srcs = [
+        "non_zero_test.go",
+        "topologies_test.go",
+        "util_test.go",
+    ],
     importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util",
     library = ":go_default_library",
     deps = [
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/selection:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )
 

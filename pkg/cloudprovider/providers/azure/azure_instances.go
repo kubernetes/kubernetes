@@ -48,19 +48,10 @@ func (az *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 		}
 		return addresses, nil
 	}
-	ip, err := az.getIPForMachine(name)
+	ip, err := az.GetIPForMachineWithRetry(name)
 	if err != nil {
-		if az.CloudProviderBackoff {
-			glog.V(2).Infof("NodeAddresses(%s) backing off", name)
-			ip, err = az.GetIPForMachineWithRetry(name)
-			if err != nil {
-				glog.V(2).Infof("NodeAddresses(%s) abort backoff", name)
-				return nil, err
-			}
-		} else {
-			glog.Errorf("error: az.NodeAddresses, az.getIPForMachine(%s), err=%v", name, err)
-			return nil, err
-		}
+		glog.V(2).Infof("NodeAddresses(%s) abort backoff", name)
+		return nil, err
 	}
 
 	return []v1.NodeAddress{
@@ -126,6 +117,44 @@ func (az *Cloud) InstanceID(name types.NodeName) (string, error) {
 			}
 		}
 	}
+
+	if az.Config.VMType == vmTypeVMSS {
+		id, err := az.getVmssInstanceID(name)
+		if err == cloudprovider.InstanceNotFound || err == ErrorNotVmssInstance {
+			// Retry with standard type because master nodes may not belong to any vmss.
+			return az.getStandardInstanceID(name)
+		}
+
+		return id, err
+	}
+
+	return az.getStandardInstanceID(name)
+}
+
+func (az *Cloud) getVmssInstanceID(name types.NodeName) (string, error) {
+	var machine compute.VirtualMachineScaleSetVM
+	var exists bool
+	var err error
+	az.operationPollRateLimiter.Accept()
+	machine, exists, err = az.getVmssVirtualMachine(name)
+	if err != nil {
+		if az.CloudProviderBackoff {
+			glog.V(2).Infof("InstanceID(%s) backing off", name)
+			machine, exists, err = az.GetScaleSetsVMWithRetry(name)
+			if err != nil {
+				glog.V(2).Infof("InstanceID(%s) abort backoff", name)
+				return "", err
+			}
+		} else {
+			return "", err
+		}
+	} else if !exists {
+		return "", cloudprovider.InstanceNotFound
+	}
+	return *machine.ID, nil
+}
+
+func (az *Cloud) getStandardInstanceID(name types.NodeName) (string, error) {
 	var machine compute.VirtualMachine
 	var exists bool
 	var err error
@@ -177,6 +206,39 @@ func (az *Cloud) InstanceType(name types.NodeName) (string, error) {
 			}
 		}
 	}
+
+	if az.Config.VMType == vmTypeVMSS {
+		machineType, err := az.getVmssInstanceType(name)
+		if err == cloudprovider.InstanceNotFound || err == ErrorNotVmssInstance {
+			// Retry with standard type because master nodes may not belong to any vmss.
+			return az.getStandardInstanceType(name)
+		}
+
+		return machineType, err
+	}
+
+	return az.getStandardInstanceType(name)
+}
+
+// getVmssInstanceType gets instance with type vmss.
+func (az *Cloud) getVmssInstanceType(name types.NodeName) (string, error) {
+	machine, exists, err := az.getVmssVirtualMachine(name)
+	if err != nil {
+		glog.Errorf("error: az.InstanceType(%s), az.getVmssVirtualMachine(%s) err=%v", name, name, err)
+		return "", err
+	} else if !exists {
+		return "", cloudprovider.InstanceNotFound
+	}
+
+	if machine.Sku.Name != nil {
+		return *machine.Sku.Name, nil
+	}
+
+	return "", fmt.Errorf("instance type is not set")
+}
+
+// getStandardInstanceType gets instance with standard type.
+func (az *Cloud) getStandardInstanceType(name types.NodeName) (string, error) {
 	machine, exists, err := az.getVirtualMachine(name)
 	if err != nil {
 		glog.Errorf("error: az.InstanceType(%s), az.getVirtualMachine(%s) err=%v", name, name, err)
@@ -197,39 +259,6 @@ func (az *Cloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 // On most clouds (e.g. GCE) this is the hostname, so we provide the hostname
 func (az *Cloud) CurrentNodeName(hostname string) (types.NodeName, error) {
 	return types.NodeName(hostname), nil
-}
-
-func (az *Cloud) listAllNodesInResourceGroup() ([]compute.VirtualMachine, error) {
-	allNodes := []compute.VirtualMachine{}
-
-	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("VirtualMachinesClient.List(%s): start", az.ResourceGroup)
-	result, err := az.VirtualMachinesClient.List(az.ResourceGroup)
-	glog.V(10).Infof("VirtualMachinesClient.List(%s): end", az.ResourceGroup)
-	if err != nil {
-		glog.Errorf("error: az.listAllNodesInResourceGroup(), az.VirtualMachinesClient.List(%s), err=%v", az.ResourceGroup, err)
-		return nil, err
-	}
-
-	morePages := (result.Value != nil && len(*result.Value) > 1)
-
-	for morePages {
-		allNodes = append(allNodes, *result.Value...)
-
-		az.operationPollRateLimiter.Accept()
-		glog.V(10).Infof("VirtualMachinesClient.ListAllNextResults(%v): start", az.ResourceGroup)
-		result, err = az.VirtualMachinesClient.ListAllNextResults(result)
-		glog.V(10).Infof("VirtualMachinesClient.ListAllNextResults(%v): end", az.ResourceGroup)
-		if err != nil {
-			glog.Errorf("error: az.listAllNodesInResourceGroup(), az.VirtualMachinesClient.ListAllNextResults(%v), err=%v", result, err)
-			return nil, err
-		}
-
-		morePages = (result.Value != nil && len(*result.Value) > 1)
-	}
-
-	return allNodes, nil
-
 }
 
 // mapNodeNameToVMName maps a k8s NodeName to an Azure VM Name

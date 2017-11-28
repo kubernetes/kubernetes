@@ -26,9 +26,11 @@ import (
 
 	"github.com/ghodss/yaml"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -46,14 +48,14 @@ type upgradeVariables struct {
 }
 
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
-func enforceRequirements(kubeConfigPath, cfgPath string, printConfig, dryRun bool) (*upgradeVariables, error) {
+func enforceRequirements(featureGatesString, kubeConfigPath, cfgPath string, printConfig, dryRun bool, ignoreChecksErrors sets.String) (*upgradeVariables, error) {
 	client, err := getClient(kubeConfigPath, dryRun)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create a Kubernetes client from file %q: %v", kubeConfigPath, err)
 	}
 
 	// Run healthchecks against the cluster
-	if err := upgrade.CheckClusterHealth(client); err != nil {
+	if err := upgrade.CheckClusterHealth(client, ignoreChecksErrors); err != nil {
 		return nil, fmt.Errorf("[upgrade/health] FATAL: %v", err)
 	}
 
@@ -66,6 +68,14 @@ func enforceRequirements(kubeConfigPath, cfgPath string, printConfig, dryRun boo
 	// If the user told us to print this information out; do it!
 	if printConfig {
 		printConfiguration(cfg, os.Stdout)
+	}
+
+	cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString)
+	if err != nil {
+		return nil, fmt.Errorf("[upgrade/config] FATAL: %v", err)
+	}
+	if err := features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {
+		return nil, err
 	}
 
 	return &upgradeVariables{
@@ -97,14 +107,9 @@ func printConfiguration(cfg *kubeadmapiext.MasterConfiguration, w io.Writer) {
 }
 
 // runPreflightChecks runs the root preflight check
-func runPreflightChecks(skipPreFlight bool) error {
-	if skipPreFlight {
-		fmt.Println("[preflight] Skipping pre-flight checks")
-		return nil
-	}
-
-	fmt.Println("[preflight] Running pre-flight checks")
-	return preflight.RunRootCheckOnly()
+func runPreflightChecks(ignorePreflightErrors sets.String) error {
+	fmt.Println("[preflight] Running pre-flight checks.")
+	return preflight.RunRootCheckOnly(ignorePreflightErrors)
 }
 
 // getClient gets a real or fake client depending on whether the user is dry-running or not

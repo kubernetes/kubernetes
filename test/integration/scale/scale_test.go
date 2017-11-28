@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 	apitesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
 type subresourceTest struct {
@@ -43,6 +44,10 @@ func makeGVR(group, version, resource string) schema.GroupVersionResource {
 }
 func makeGVK(group, version, kind string) schema.GroupVersionKind {
 	return schema.GroupVersionKind{Group: group, Version: version, Kind: kind}
+}
+
+func TestMain(m *testing.M) {
+	framework.EtcdMain(m.Run)
 }
 
 func TestScaleSubresources(t *testing.T) {
@@ -68,9 +73,9 @@ func TestScaleSubresources(t *testing.T) {
 		makeGVR("apps", "v1beta2", "replicasets/scale"):  makeGVK("apps", "v1beta2", "Scale"),
 		makeGVR("apps", "v1beta2", "statefulsets/scale"): makeGVK("apps", "v1beta2", "Scale"),
 
-		// makeGVR("apps", "v1", "deployments/scale"):  makeGVK("autoscaling", "v1", "Scale"),
-		// makeGVR("apps", "v1", "replicasets/scale"):  makeGVK("autoscaling", "v1", "Scale"),
-		// makeGVR("apps", "v1", "statefulsets/scale"): makeGVK("autoscaling", "v1", "Scale"),
+		makeGVR("apps", "v1", "deployments/scale"):  makeGVK("autoscaling", "v1", "Scale"),
+		makeGVR("apps", "v1", "replicasets/scale"):  makeGVK("autoscaling", "v1", "Scale"),
+		makeGVR("apps", "v1", "statefulsets/scale"): makeGVK("autoscaling", "v1", "Scale"),
 	}
 
 	autoscalingGVK := schema.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"}
@@ -209,7 +214,7 @@ var (
 )
 
 func setup(t *testing.T) (client kubernetes.Interface, tearDown func()) {
-	masterConfig, tearDownMaster := apitesting.StartTestServerOrDie(t)
+	result := apitesting.StartTestServerOrDie(t, nil, framework.SharedEtcd())
 
 	// TODO: Disable logging here until we resolve teardown issues which result in
 	// massive log spam. Another path forward would be to refactor
@@ -224,13 +229,13 @@ func setup(t *testing.T) (client kubernetes.Interface, tearDown func()) {
 		"etcdserver/api/v3rpc": capnslog.CRITICAL,
 	})
 
-	masterConfig.AcceptContentTypes = ""
-	masterConfig.ContentType = ""
-	masterConfig.NegotiatedSerializer = nil
-	clientSet, err := kubernetes.NewForConfig(masterConfig)
+	result.ClientConfig.AcceptContentTypes = ""
+	result.ClientConfig.ContentType = ""
+	result.ClientConfig.NegotiatedSerializer = nil
+	clientSet, err := kubernetes.NewForConfig(result.ClientConfig)
 	if err != nil {
 		t.Fatalf("error creating clientset: %v", err)
 	}
 
-	return clientSet, tearDownMaster
+	return clientSet, result.TearDownFn
 }

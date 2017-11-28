@@ -122,6 +122,7 @@ release_filegroup(
 release_filegroup(
     name = "server-targets",
     srcs = [
+        "//cluster/gce/gci/mounter",
         "//cmd/cloud-controller-manager",
         "//cmd/hyperkube",
         "//cmd/kube-apiserver",

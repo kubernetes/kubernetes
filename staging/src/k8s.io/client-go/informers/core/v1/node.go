@@ -38,19 +38,33 @@ type NodeInformer interface {
 }
 
 type nodeInformer struct {
-	factory internalinterfaces.SharedInformerFactory
+	factory          internalinterfaces.SharedInformerFactory
+	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
 // NewNodeInformer constructs a new informer for Node type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewNodeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredNodeInformer(client, resyncPeriod, indexers, nil)
+}
+
+// NewFilteredNodeInformer constructs a new informer for Node type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewFilteredNodeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
 				return client.CoreV1().Nodes().List(options)
 			},
 			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
 				return client.CoreV1().Nodes().Watch(options)
 			},
 		},
@@ -60,12 +74,12 @@ func NewNodeInformer(client kubernetes.Interface, resyncPeriod time.Duration, in
 	)
 }
 
-func defaultNodeInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewNodeInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+func (f *nodeInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredNodeInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *nodeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&core_v1.Node{}, defaultNodeInformer)
+	return f.factory.InformerFor(&core_v1.Node{}, f.defaultInformer)
 }
 
 func (f *nodeInformer) Lister() v1.NodeLister {

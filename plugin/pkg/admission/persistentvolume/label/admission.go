@@ -24,7 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
@@ -52,6 +52,7 @@ type persistentVolumeLabel struct {
 	gceCloudProvider *gce.GCECloud
 }
 
+var _ admission.MutationInterface = &persistentVolumeLabel{}
 var _ kubeapiserveradmission.WantsCloudConfig = &persistentVolumeLabel{}
 
 // NewPersistentVolumeLabel returns an admission.Interface implementation which adds labels to PersistentVolume CREATE requests,

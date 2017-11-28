@@ -25,6 +25,7 @@ go_library(
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "perfcounter_nodestats.go",
             "perfcounters.go",
+            "version.go",
         ],
         "//conditions:default": [],
     }),
@@ -34,8 +35,9 @@ go_library(
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "//vendor/github.com/JeffAshton/win_pdh:go_default_library",
             "//vendor/github.com/golang/glog:go_default_library",
-            "//vendor/github.com/lxn/win:go_default_library",
+            "//vendor/golang.org/x/sys/windows:go_default_library",
             "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         ],
         "//conditions:default": [],

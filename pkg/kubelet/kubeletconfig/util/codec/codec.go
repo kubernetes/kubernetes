@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	// ensure the core apis are installed
-	_ "k8s.io/kubernetes/pkg/api/install"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"

@@ -243,11 +243,15 @@ func (ctrl *PersistentVolumeController) deleteClaim(claim *v1.PersistentVolumeCl
 	_ = ctrl.claims.Delete(claim)
 	glog.V(4).Infof("claim %q deleted", claimToClaimKey(claim))
 
+	volumeName := claim.Spec.VolumeName
+	if volumeName == "" {
+		glog.V(5).Infof("deleteClaim[%q]: volume not bound", claimToClaimKey(claim))
+		return
+	}
 	// sync the volume when its claim is deleted.  Explicitly sync'ing the
 	// volume here in response to claim deletion prevents the volume from
 	// waiting until the next sync period for its Release.
-	volumeName := claim.Spec.VolumeName
-	glog.V(5).Infof("deleteClaim[%s]: scheduling sync of volume %q", claimToClaimKey(claim), volumeName)
+	glog.V(5).Infof("deleteClaim[%q]: scheduling sync of volume %s", claimToClaimKey(claim), volumeName)
 	ctrl.volumeQueue.Add(volumeName)
 }
 

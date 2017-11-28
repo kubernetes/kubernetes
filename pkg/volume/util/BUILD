@@ -13,10 +13,13 @@ go_library(
         "device_util.go",
         "device_util_unsupported.go",
         "doc.go",
+        "error.go",
+        "finalizer.go",
         "fs_unsupported.go",
         "io_util.go",
         "metrics.go",
         "util.go",
+        "util_unsupported.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:darwin_amd64": [
             "fs.go",
@@ -24,13 +27,14 @@ go_library(
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "device_util_linux.go",
             "fs.go",
+            "util_linux.go",
         ],
         "//conditions:default": [],
     }),
     importpath = "k8s.io/kubernetes/pkg/volume/util",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/v1/helper:go_default_library",
+        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -41,6 +45,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
     ] + select({
@@ -57,6 +62,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "finalizer_test.go",
         "util_test.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
@@ -68,8 +74,9 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/volume/util",
     library = ":go_default_library",
     deps = [
-        "//pkg/api/install:go_default_library",
-        "//pkg/api/v1/helper:go_default_library",
+        "//pkg/apis/core/install:go_default_library",
+        "//pkg/apis/core/v1/helper:go_default_library",
+        "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",

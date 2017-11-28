@@ -45,6 +45,83 @@ var classGold string = "gold"
 var _ = SIGDescribe("ResourceQuota", func() {
 	f := framework.NewDefaultFramework("resourcequota")
 
+	BeforeEach(func() {
+		// only run the tests when LocalStorageCapacityIsolation feature is enabled
+		framework.SkipUnlessLocalEphemeralStorageEnabled()
+	})
+
+	It("should create a ResourceQuota and capture the life of a pod.", func() {
+		By("Creating a ResourceQuota")
+		quotaName := "test-quota"
+		resourceQuota := newTestResourceQuotaForEphemeralStorage(quotaName)
+		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		Expect(err).NotTo(HaveOccurred())
+
+		defer func() {
+			By("Removing resourceQuota")
+			err = deleteResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota.Name)
+			Expect(err).NotTo(HaveOccurred())
+		}()
+
+		By("Ensuring resource quota status is calculated")
+		usedResources := v1.ResourceList{}
+		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a Pod that fits quota")
+		podName := "test-pod"
+		requests := v1.ResourceList{}
+		requests[v1.ResourceEphemeralStorage] = resource.MustParse("300Mi")
+		pod := newTestPodForQuota(f, podName, requests, v1.ResourceList{})
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+		podToUpdate := pod
+
+		defer func() {
+			By("Deleting the pod")
+			err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
+			Expect(err).NotTo(HaveOccurred())
+		}()
+
+		By("Ensuring ResourceQuota status captures the pod usage")
+		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourcePods] = resource.MustParse("1")
+		usedResources[v1.ResourceEphemeralStorage] = requests[v1.ResourceEphemeralStorage]
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Not allowing a pod to be created that exceeds remaining quota")
+		requests = v1.ResourceList{}
+		requests[v1.ResourceEphemeralStorage] = resource.MustParse("300Mi")
+		pod = newTestPodForQuota(f, "fail-pod", requests, v1.ResourceList{})
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).To(HaveOccurred())
+
+		By("Ensuring a pod cannot update its resource requirements")
+		// a pod cannot dynamically update its resource requirements.
+		requests = v1.ResourceList{}
+		requests[v1.ResourceEphemeralStorage] = resource.MustParse("100Mi")
+		podToUpdate.Spec.Containers[0].Resources.Requests = requests
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(podToUpdate)
+		Expect(err).To(HaveOccurred())
+
+		By("Ensuring attempts to update pod resource requirements did not change quota usage")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status released the pod usage")
+		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		usedResources[v1.ResourceEphemeralStorage] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+	})
+})
+
+var _ = SIGDescribe("ResourceQuota", func() {
+	f := framework.NewDefaultFramework("resourcequota")
+
 	It("should create a ResourceQuota and ensure its status is promptly calculated.", func() {
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
@@ -724,6 +801,16 @@ func newTestResourceQuotaWithScope(name string, scope v1.ResourceQuotaScope) *v1
 	return &v1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec:       v1.ResourceQuotaSpec{Hard: hard, Scopes: []v1.ResourceQuotaScope{scope}},
+	}
+}
+
+// newTestResourceQuotaForEphemeralStorage returns a quota that enforces default constraints for testing alpha feature LocalStorageCapacityIsolation
+func newTestResourceQuotaForEphemeralStorage(name string) *v1.ResourceQuota {
+	hard := v1.ResourceList{}
+	hard[v1.ResourceEphemeralStorage] = resource.MustParse("500Mi")
+	return &v1.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec:       v1.ResourceQuotaSpec{Hard: hard},
 	}
 }
 

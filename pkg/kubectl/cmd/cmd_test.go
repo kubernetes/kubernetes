@@ -36,9 +36,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -71,17 +71,6 @@ func defaultClientConfig() *restclient.Config {
 			NegotiatedSerializer: scheme.Codecs,
 			ContentType:          runtime.ContentTypeJSON,
 			GroupVersion:         &schema.GroupVersion{Version: "v1"},
-		},
-	}
-}
-
-func defaultClientConfigForVersion(version *schema.GroupVersion) *restclient.Config {
-	return &restclient.Config{
-		APIPath: "/api",
-		ContentConfig: restclient.ContentConfig{
-			NegotiatedSerializer: scheme.Codecs,
-			ContentType:          runtime.ContentTypeJSON,
-			GroupVersion:         version,
 		},
 	}
 }
@@ -559,7 +548,7 @@ func Example_printPodHideTerminated() {
 	podList := newAllPhasePodList()
 	// filter pods
 	filterFuncs := f.DefaultResourceFilterFunc()
-	filterOpts := f.DefaultResourceFilterOptions(cmd, false)
+	filterOpts := cmdutil.ExtractCmdPrintOptions(cmd, false)
 	_, filteredPodList, errs := cmdutil.FilterResourceList(podList, filterFuncs, filterOpts)
 	if errs != nil {
 		fmt.Printf("Unexpected filter error: %v\n", errs)

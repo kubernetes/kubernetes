@@ -197,6 +197,7 @@ package_group(
         "//pkg/kubectl/cmd/auth",
         "//pkg/kubectl/cmd/resource",
         "//pkg/kubectl/cmd/set",
+        "//pkg/kubectl/explain",
     ],
 )
 
@@ -209,6 +210,7 @@ package_group(
         "//cmd/clicheck",
         "//cmd/hyperkube",
         "//cmd/kube-proxy/app",
+        "//plugin/cmd/kube-scheduler/app",
     ],
 )
 

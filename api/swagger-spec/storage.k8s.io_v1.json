@@ -814,6 +814,10 @@
      "allowVolumeExpansion": {
       "type": "boolean",
       "description": "AllowVolumeExpansion shows whether the storage class allow volume expand"
+     },
+     "volumeBindingMode": {
+      "$ref": "v1.VolumeBindingMode",
+      "description": "VolumeBindingMode indicates how PersistentVolumeClaims should be provisioned and bound.  When unset, VolumeBindingImmediate is used. This field is alpha-level and is only honored by servers that enable the VolumeScheduling feature."
      }
     }
    },
@@ -1057,6 +1061,10 @@
    },
    "v1.PersistentVolumeReclaimPolicy": {
     "id": "v1.PersistentVolumeReclaimPolicy",
+    "properties": {}
+   },
+   "v1.VolumeBindingMode": {
+    "id": "v1.VolumeBindingMode",
     "properties": {}
    },
    "v1.WatchEvent": {

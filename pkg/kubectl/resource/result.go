@@ -41,6 +41,7 @@ type Result struct {
 	singleItemImplied  bool
 	targetsSingleItems bool
 
+	mapper       *Mapper
 	ignoreErrors []utilerrors.Matcher
 
 	// populated by a call to Infos
@@ -72,6 +73,11 @@ func (r *Result) IgnoreErrors(fns ...ErrMatchFunc) *Result {
 		r.ignoreErrors = append(r.ignoreErrors, utilerrors.Matcher(fn))
 	}
 	return r
+}
+
+// Mapper returns a copy of the builder's mapper.
+func (r *Result) Mapper() *Mapper {
+	return r.mapper
 }
 
 // Err returns one or more errors (via a util.ErrorList) that occurred prior

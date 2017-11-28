@@ -30,8 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
-	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 	apiv1resource "k8s.io/kubernetes/pkg/api/v1/resource"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -233,7 +233,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	activePods := podFunc()
 	// make observations and get a function to derive pod usage stats relative to those observations.
-	observations, statsFunc, err := makeSignalObservations(m.summaryProvider, capacityProvider, activePods, *m.dedicatedImageFs)
+	observations, statsFunc, err := makeSignalObservations(m.summaryProvider, capacityProvider, activePods)
 	if err != nil {
 		glog.Errorf("eviction manager: unexpected err: %v", err)
 		return nil

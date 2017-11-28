@@ -30,7 +30,11 @@ const (
 	// TaintNodeUnreachable would be automatically added by node controller
 	// when node becomes unreachable (corresponding to NodeReady status ConditionUnknown)
 	// and removed when node becomes reachable (NodeReady status ConditionTrue).
-	TaintNodeUnreachable = "node.alpha.kubernetes.io/unreachable"
+	TaintNodeUnreachable = "node.kubernetes.io/unreachable"
+
+	// DeprecatedTaintNodeUnreachable is the deprecated version of TaintNodeUnreachable.
+	// It is deprecated since 1.9
+	DeprecatedTaintNodeUnreachable = "node.alpha.kubernetes.io/unreachable"
 
 	// When feature-gate for TaintBasedEvictions=true flag is enabled,
 	// TaintNodeOutOfDisk would be automatically added by node controller

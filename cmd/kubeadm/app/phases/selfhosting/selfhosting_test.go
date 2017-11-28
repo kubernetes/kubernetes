@@ -26,6 +26,7 @@ import (
 	apps "k8s.io/api/apps/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -112,6 +113,9 @@ metadata:
   name: self-hosted-kube-apiserver
   namespace: kube-system
 spec:
+  selector:
+    matchLabels:
+      k8s-app: self-hosted-kube-apiserver
   template:
     metadata:
       creationTimestamp: null
@@ -270,6 +274,9 @@ metadata:
   name: self-hosted-kube-controller-manager
   namespace: kube-system
 spec:
+  selector:
+    matchLabels:
+      k8s-app: self-hosted-kube-controller-manager
   template:
     metadata:
       creationTimestamp: null
@@ -397,6 +404,9 @@ metadata:
   name: self-hosted-kube-scheduler
   namespace: kube-system
 spec:
+  selector:
+    matchLabels:
+      k8s-app: self-hosted-kube-scheduler
   template:
     metadata:
       creationTimestamp: null
@@ -479,10 +489,11 @@ func TestBuildDaemonSet(t *testing.T) {
 		}
 		defer os.Remove(tempFile)
 
-		podSpec, err := loadPodSpecFromFile(tempFile)
+		pod, err := volumeutil.LoadPodFromFile(tempFile)
 		if err != nil {
 			t.Fatalf("couldn't load the specified Pod")
 		}
+		podSpec := &pod.Spec
 
 		ds := BuildDaemonSet(rt.component, podSpec, GetDefaultMutators())
 		dsBytes, err := util.MarshalToYaml(ds, apps.SchemeGroupVersion)
@@ -554,7 +565,7 @@ spec:
 		}
 		defer os.Remove(tempFile)
 
-		_, err = loadPodSpecFromFile(tempFile)
+		_, err = volumeutil.LoadPodFromFile(tempFile)
 		if (err != nil) != rt.expectError {
 			t.Errorf("failed TestLoadPodSpecFromFile:\nexpected error:\n%t\nsaw:\n%v", rt.expectError, err)
 		}

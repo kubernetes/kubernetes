@@ -888,6 +888,75 @@ func TestNodeAddressesChangeDetected(t *testing.T) {
 		"Node address changes are not detected correctly")
 }
 
+// This test checks that a node with the external cloud provider taint is cloudprovider initialized and
+// and node addresses will not be updated when node isn't present according to the cloudprovider
+func TestNodeAddressesNotUpdate(t *testing.T) {
+	fnh := &testutil.FakeNodeHandler{
+		Existing: []*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels:            map[string]string{},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    "ImproveCoverageTaint",
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	factory := informers.NewSharedInformerFactory(fnh, controller.NoResyncPeriodFunc())
+
+	fakeCloud := &fakecloud.FakeCloud{
+		InstanceTypes: map[types.NodeName]string{},
+		Addresses: []v1.NodeAddress{
+			{
+				Type:    v1.NodeHostName,
+				Address: "node0.cloud.internal",
+			},
+			{
+				Type:    v1.NodeInternalIP,
+				Address: "10.0.0.1",
+			},
+			{
+				Type:    v1.NodeExternalIP,
+				Address: "132.143.154.163",
+			},
+		},
+		ExistsByProviderID: false,
+		Err:                nil,
+	}
+
+	cloudNodeController := &CloudNodeController{
+		kubeClient:   fnh,
+		nodeInformer: factory.Core().V1().Nodes(),
+		cloud:        fakeCloud,
+	}
+
+	cloudNodeController.updateNodeAddress(fnh.Existing[0], fakeCloud)
+
+	if len(fnh.UpdatedNodes) != 0 {
+		t.Errorf("Node was not correctly updated, the updated len(nodes) got: %v, wanted=0", len(fnh.UpdatedNodes))
+	}
+}
+
 // This test checks that a node is set with the correct providerID
 func TestNodeProviderID(t *testing.T) {
 	fnh := &testutil.FakeNodeHandler{

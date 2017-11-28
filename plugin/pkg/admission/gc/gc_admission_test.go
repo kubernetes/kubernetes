@@ -27,47 +27,47 @@ import (
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 type fakeAuthorizer struct{}
 
-func (fakeAuthorizer) Authorize(a authorizer.Attributes) (bool, string, error) {
+func (fakeAuthorizer) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
 	username := a.GetUser().GetName()
 
 	if username == "non-deleter" {
 		if a.GetVerb() == "delete" {
-			return false, "", nil
+			return authorizer.DecisionNoOpinion, "", nil
 		}
 		if a.GetVerb() == "update" && a.GetSubresource() == "finalizers" {
-			return false, "", nil
+			return authorizer.DecisionNoOpinion, "", nil
 		}
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 	}
 
 	if username == "non-pod-deleter" {
 		if a.GetVerb() == "delete" && a.GetResource() == "pods" {
-			return false, "", nil
+			return authorizer.DecisionNoOpinion, "", nil
 		}
 		if a.GetVerb() == "update" && a.GetResource() == "pods" && a.GetSubresource() == "finalizers" {
-			return false, "", nil
+			return authorizer.DecisionNoOpinion, "", nil
 		}
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 	}
 
 	if username == "non-rc-deleter" {
 		if a.GetVerb() == "delete" && a.GetResource() == "replicationcontrollers" {
-			return false, "", nil
+			return authorizer.DecisionNoOpinion, "", nil
 		}
 		if a.GetVerb() == "update" && a.GetResource() == "replicationcontrollers" && a.GetSubresource() == "finalizers" {
-			return false, "", nil
+			return authorizer.DecisionNoOpinion, "", nil
 		}
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 	}
 
-	return true, "", nil
+	return authorizer.DecisionAllow, "", nil
 }
 
 // newGCPermissionsEnforcement returns the admission controller configured for testing.
@@ -86,11 +86,8 @@ func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 		whiteList: whiteList,
 	}
 
-	genericPluginInitializer, err := initializer.New(nil, nil, fakeAuthorizer{}, nil)
-	if err != nil {
-		return nil, err
-	}
-	pluginInitializer := kubeadmission.NewPluginInitializer(nil, nil, nil, legacyscheme.Registry.RESTMapper(), nil, nil, nil)
+	genericPluginInitializer := initializer.New(nil, nil, fakeAuthorizer{}, nil)
+	pluginInitializer := kubeadmission.NewPluginInitializer(nil, nil, nil, legacyscheme.Registry.RESTMapper(), nil)
 	initializersChain := admission.PluginInitializers{}
 	initializersChain = append(initializersChain, genericPluginInitializer)
 	initializersChain = append(initializersChain, pluginInitializer)

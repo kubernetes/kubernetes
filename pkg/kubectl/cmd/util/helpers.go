@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/evanphx/json-patch"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
@@ -356,6 +356,15 @@ func GetFlagBool(cmd *cobra.Command, flag string) bool {
 // Assumes the flag has a default value.
 func GetFlagInt(cmd *cobra.Command, flag string) int {
 	i, err := cmd.Flags().GetInt(flag)
+	if err != nil {
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+	}
+	return i
+}
+
+// Assumes the flag has a default value.
+func GetFlagInt32(cmd *cobra.Command, flag string) int32 {
+	i, err := cmd.Flags().GetInt32(flag)
 	if err != nil {
 		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}

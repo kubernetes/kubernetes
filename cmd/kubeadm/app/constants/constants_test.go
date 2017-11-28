@@ -17,6 +17,9 @@ limitations under the License.
 package constants
 
 import (
+	"fmt"
+	"k8s.io/kubernetes/pkg/util/version"
+	"strings"
 	"testing"
 )
 
@@ -107,6 +110,61 @@ func TestAddSelfHostedPrefix(t *testing.T) {
 				rt.expected,
 				actual,
 			)
+		}
+	}
+}
+
+func TestEtcdSupportedVersion(t *testing.T) {
+	var tests = []struct {
+		kubernetesVersion string
+		expectedVersion   *version.Version
+		expectedError     error
+	}{
+		{
+			kubernetesVersion: "1.8.0",
+			expectedVersion:   version.MustParseSemantic("3.0.17"),
+			expectedError:     nil,
+		},
+		{
+			kubernetesVersion: "1.80.0",
+			expectedVersion:   nil,
+			expectedError:     fmt.Errorf("Unsupported or unknown kubernetes version"),
+		},
+		{
+			kubernetesVersion: "1.9.0",
+			expectedVersion:   version.MustParseSemantic("3.1.10"),
+			expectedError:     nil,
+		},
+		{
+			kubernetesVersion: "1.10.0",
+			expectedVersion:   version.MustParseSemantic("3.1.10"),
+			expectedError:     nil,
+		},
+		{
+			kubernetesVersion: "1.8.6",
+			expectedVersion:   version.MustParseSemantic("3.0.17"),
+			expectedError:     nil,
+		},
+	}
+	for _, rt := range tests {
+		actualVersion, actualError := EtcdSupportedVersion(rt.kubernetesVersion)
+		if actualError != nil {
+			if actualError.Error() != rt.expectedError.Error() {
+				t.Errorf(
+					"failed EtcdSupportedVersion:\n\texpected error: %v\n\t  actual error: %v",
+					rt.expectedError,
+					actualError,
+				)
+			}
+
+		} else {
+			if strings.Compare(actualVersion.String(), rt.expectedVersion.String()) != 0 {
+				t.Errorf(
+					"failed EtcdSupportedVersion:\n\texpected version: %s\n\t  actual version: %s",
+					rt.expectedVersion.String(),
+					actualVersion.String(),
+				)
+			}
 		}
 	}
 }

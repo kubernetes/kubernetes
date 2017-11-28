@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -201,19 +200,12 @@ var _ = SIGDescribe("Networking", func() {
 			config.DialFromNode("udp", config.NodeIP, config.NodeUdpPort, config.MaxTries, config.MaxTries, sets.NewString())
 		})
 
-		It("should function for client IP based session affinity: http [Slow]", func() {
+		It("should function for client IP based session affinity: http", func() {
 			config := framework.NewNetworkingTestConfig(f)
-			By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, framework.ClusterHttpPort))
-			updateSessionAffinity := func(svc *v1.Service) {
-				svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
-			}
-			_, err := framework.UpdateService(f.ClientSet, config.NodePortService.Namespace, config.NodePortService.Name, updateSessionAffinity)
-			if err != nil {
-				framework.Failf("Failed to update service session affinity, error: %v", err)
-			}
+			By(fmt.Sprintf("dialing(http) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIP, framework.ClusterHttpPort))
 
 			// Check if number of endpoints returned are exactly one.
-			eps, err := config.GetEndpointsFromTestContainer("http", config.ClusterIP, framework.ClusterHttpPort, framework.SessionAffinityChecks)
+			eps, err := config.GetEndpointsFromTestContainer("http", config.SessionAffinityService.Spec.ClusterIP, framework.ClusterHttpPort, framework.SessionAffinityChecks)
 			if err != nil {
 				framework.Failf("Failed to get endpoints from test container, error: %v", err)
 			}
@@ -225,19 +217,12 @@ var _ = SIGDescribe("Networking", func() {
 			}
 		})
 
-		It("should function for client IP based session affinity: udp [Slow]", func() {
+		It("should function for client IP based session affinity: udp", func() {
 			config := framework.NewNetworkingTestConfig(f)
-			By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, framework.ClusterUdpPort))
-			updateSessionAffinity := func(svc *v1.Service) {
-				svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
-			}
-			_, err := framework.UpdateService(f.ClientSet, config.NodePortService.Namespace, config.NodePortService.Name, updateSessionAffinity)
-			if err != nil {
-				framework.Failf("Failed to update service session affinity, error: %v", err)
-			}
+			By(fmt.Sprintf("dialing(udp) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIP, framework.ClusterUdpPort))
 
 			// Check if number of endpoints returned are exactly one.
-			eps, err := config.GetEndpointsFromTestContainer("udp", config.ClusterIP, framework.ClusterUdpPort, framework.SessionAffinityChecks)
+			eps, err := config.GetEndpointsFromTestContainer("udp", config.SessionAffinityService.Spec.ClusterIP, framework.ClusterUdpPort, framework.SessionAffinityChecks)
 			if err != nil {
 				framework.Failf("Failed to get endpoints from test container, error: %v", err)
 			}

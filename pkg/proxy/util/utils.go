@@ -20,8 +20,8 @@ import (
 	"net"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 
 	"github.com/golang/glog"
 )

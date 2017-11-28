@@ -69,6 +69,14 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 		},
 	})
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "clusterrole-aggregation-controller"},
+		Rules: []rbac.PolicyRule{
+			// this controller must have full permissions to allow it to mutate any role in any way
+			rbac.NewRule("*").Groups("*").Resources("*").RuleOrDie(),
+			rbac.NewRule("*").URLs("*").RuleOrDie(),
+		},
+	})
+	addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "cronjob-controller"},
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("get", "list", "watch", "update").Groups(batchGroup).Resources("cronjobs").RuleOrDie(),
@@ -162,7 +170,7 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 			rbac.NewRule("get").Groups(legacyGroup).Resources("services/proxy").Names("https:heapster:", "http:heapster:").RuleOrDie(),
 			// allow listing resource metrics and custom metrics
 			rbac.NewRule("list").Groups(resMetricsGroup).Resources("pods").RuleOrDie(),
-			rbac.NewRule("list").Groups(customMetricsGroup).Resources("*").RuleOrDie(),
+			rbac.NewRule("get", "list").Groups(customMetricsGroup).Resources("*").RuleOrDie(),
 			eventsRule(),
 		},
 	})
@@ -307,6 +315,16 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 			eventsRule(),
 		},
 	})
+	if utilfeature.DefaultFeatureGate.Enabled(features.PVCProtection) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "pvc-protection-controller"},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("get", "list", "watch", "update").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+				rbac.NewRule("list", "watch", "get").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+				eventsRule(),
+			},
+		})
+	}
 
 	return controllerRoles, controllerRoleBindings
 }

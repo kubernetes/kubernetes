@@ -304,6 +304,11 @@ func (plugin *kubenetNetworkPlugin) Capabilities() utilsets.Int {
 // TODO: Don't pass the pod to this method, it only needs it for bandwidth
 // shaping and hostport management.
 func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kubecontainer.ContainerID, pod *v1.Pod, annotations map[string]string) error {
+	// Disable DAD so we skip the kernel delay on bringing up new interfaces.
+	if err := plugin.disableContainerDAD(id); err != nil {
+		glog.V(3).Infof("Failed to disable DAD in container: %v", err)
+	}
+
 	// Bring up container loopback interface
 	if _, err := plugin.addContainerToNetwork(plugin.loConfig, "lo", namespace, name, id); err != nil {
 		return err
@@ -819,4 +824,44 @@ func (plugin *kubenetNetworkPlugin) syncEbtablesDedupRules(macAddr net.HardwareA
 		glog.Errorf("Failed to ensure packets from podCidr but has mac address of cbr0 to get dropped.")
 		return
 	}
+}
+
+// disableContainerDAD disables duplicate address detection in the container.
+// DAD has a negative affect on pod creation latency, since we have to wait
+// a second or more for the addresses to leave the "tentative" state. Since
+// we're sure there won't be an address conflict (since we manage them manually),
+// this is safe. See issue 54651.
+//
+// This sets net.ipv6.conf.default.dad_transmits to 0. It must be run *before*
+// the CNI plugins are run.
+func (plugin *kubenetNetworkPlugin) disableContainerDAD(id kubecontainer.ContainerID) error {
+	key := "net/ipv6/conf/default/dad_transmits"
+
+	sysctlBin, err := plugin.execer.LookPath("sysctl")
+	if err != nil {
+		return fmt.Errorf("Could not find sysctl binary: %s", err)
+	}
+
+	netnsPath, err := plugin.host.GetNetNS(id.ID)
+	if err != nil {
+		return fmt.Errorf("Failed to get netns: %v", err)
+	}
+	if netnsPath == "" {
+		return fmt.Errorf("Pod has no network namespace")
+	}
+
+	// If the sysctl doesn't exist, it means ipv6 is disabled; log and move on
+	if _, err := plugin.sysctl.GetSysctl(key); err != nil {
+		return fmt.Errorf("Ipv6 not enabled: %v", err)
+	}
+
+	output, err := plugin.execer.Command(plugin.nsenterPath,
+		fmt.Sprintf("--net=%s", netnsPath), "-F", "--",
+		sysctlBin, "-w", fmt.Sprintf("%s=%s", key, "0"),
+	).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Failed to write sysctl: output: %s error: %s",
+			output, err)
+	}
+	return nil
 }

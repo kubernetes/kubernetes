@@ -294,8 +294,10 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 		ret.OIDCCAFile = s.OIDC.CAFile
 		ret.OIDCClientID = s.OIDC.ClientID
 		ret.OIDCGroupsClaim = s.OIDC.GroupsClaim
+		ret.OIDCGroupsPrefix = s.OIDC.GroupsPrefix
 		ret.OIDCIssuerURL = s.OIDC.IssuerURL
 		ret.OIDCUsernameClaim = s.OIDC.UsernameClaim
+		ret.OIDCUsernamePrefix = s.OIDC.UsernamePrefix
 	}
 
 	if s.PasswordFile != nil {

@@ -32,6 +32,7 @@ import (
 type genClientset struct {
 	generator.DefaultGen
 	groups             []clientgentypes.GroupVersions
+	groupGoNames       map[clientgentypes.GroupVersion]string
 	clientsetPackage   string
 	outputPackage      string
 	imports            namer.ImportTracker
@@ -57,8 +58,9 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
 	for _, group := range g.groups {
 		for _, version := range group.Versions {
-			typedClientPath := filepath.Join(g.clientsetPackage, "typed", group.Group.NonEmpty(), version.NonEmpty())
-			imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", group.Group.NonEmpty(), version.NonEmpty(), typedClientPath)))
+			typedClientPath := filepath.Join(g.clientsetPackage, "typed", group.PackageName, version.NonEmpty())
+			groupAlias := strings.ToLower(g.groupGoNames[clientgentypes.GroupVersion{group.Group, version}])
+			imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", groupAlias, version.NonEmpty(), typedClientPath)))
 		}
 	}
 	return
@@ -69,7 +71,7 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	// perhaps we can adapt the go2ild framework to this kind of usage.
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 
-	allGroups := clientgentypes.ToGroupVersionPackages(g.groups)
+	allGroups := clientgentypes.ToGroupVersionPackages(g.groups, g.groupGoNames)
 	m := map[string]interface{}{
 		"allGroups":                            allGroups,
 		"Config":                               c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Config"}),
@@ -103,9 +105,9 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 var clientsetInterface = `
 type Interface interface {
 	Discovery() $.DiscoveryInterface|raw$
-    $range .allGroups$$.GroupVersion$() $.PackageName$.$.GroupVersion$Interface
+    $range .allGroups$$.GroupGoName$$.Version$() $.PackageAlias$.$.GroupGoName$$.Version$Interface
 	$if .IsDefaultVersion$// Deprecated: please explicitly pick a version if possible.
-	$.Group$() $.PackageName$.$.GroupVersion$Interface
+	$.GroupGoName$() $.PackageAlias$.$.GroupGoName$$.Version$Interface
 	$end$$end$
 }
 `
@@ -115,23 +117,23 @@ var clientsetTemplate = `
 // version included in a Clientset.
 type Clientset struct {
 	*$.DiscoveryClient|raw$
-    $range .allGroups$$.LowerCaseGroupVersion$ *$.PackageName$.$.GroupVersion$Client
+    $range .allGroups$$.LowerCaseGroupGoName$$.Version$ *$.PackageAlias$.$.GroupGoName$$.Version$Client
     $end$
 }
 `
 
 var clientsetInterfaceImplTemplate = `
-// $.GroupVersion$ retrieves the $.GroupVersion$Client
-func (c *Clientset) $.GroupVersion$() $.PackageName$.$.GroupVersion$Interface {
-	return c.$.LowerCaseGroupVersion$
+// $.GroupGoName$$.Version$ retrieves the $.GroupGoName$$.Version$Client
+func (c *Clientset) $.GroupGoName$$.Version$() $.PackageAlias$.$.GroupGoName$$.Version$Interface {
+	return c.$.LowerCaseGroupGoName$$.Version$
 }
 `
 
 var clientsetInterfaceDefaultVersionImpl = `
-// Deprecated: $.Group$ retrieves the default version of $.Group$Client.
+// Deprecated: $.GroupGoName$ retrieves the default version of $.GroupGoName$Client.
 // Please explicitly pick a version.
-func (c *Clientset) $.Group$() $.PackageName$.$.GroupVersion$Interface {
-	return c.$.LowerCaseGroupVersion$
+func (c *Clientset) $.GroupGoName$() $.PackageAlias$.$.GroupGoName$$.Version$Interface {
+	return c.$.LowerCaseGroupGoName$$.Version$
 }
 `
 
@@ -154,7 +156,7 @@ func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
-$range .allGroups$    cs.$.LowerCaseGroupVersion$, err =$.PackageName$.NewForConfig(&configShallowCopy)
+$range .allGroups$    cs.$.LowerCaseGroupGoName$$.Version$, err =$.PackageAlias$.NewForConfig(&configShallowCopy)
 	if err!=nil {
 		return nil, err
 	}
@@ -173,7 +175,7 @@ var newClientsetForConfigOrDieTemplate = `
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *$.Config|raw$) *Clientset {
 	var cs Clientset
-$range .allGroups$    cs.$.LowerCaseGroupVersion$ =$.PackageName$.NewForConfigOrDie(c)
+$range .allGroups$    cs.$.LowerCaseGroupGoName$$.Version$ =$.PackageAlias$.NewForConfigOrDie(c)
 $end$
 	cs.DiscoveryClient = $.NewDiscoveryClientForConfigOrDie|raw$(c)
 	return &cs
@@ -184,7 +186,7 @@ var newClientsetForRESTClientTemplate = `
 // New creates a new Clientset for the given RESTClient.
 func New(c $.RESTClientInterface|raw$) *Clientset {
 	var cs Clientset
-$range .allGroups$    cs.$.LowerCaseGroupVersion$ =$.PackageName$.New(c)
+$range .allGroups$    cs.$.LowerCaseGroupGoName$$.Version$ =$.PackageAlias$.New(c)
 $end$
 	cs.DiscoveryClient = $.NewDiscoveryClient|raw$(c)
 	return &cs
