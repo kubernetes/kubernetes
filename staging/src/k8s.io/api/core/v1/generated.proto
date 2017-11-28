@@ -2979,6 +2979,7 @@ message PodSpec {
   // DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.
   // To have DNS options set along with hostNetwork, you have to specify DNS policy
   // explicitly to 'ClusterFirstWithHostNet'.
+  // Note that 'None' policy is an alpha feature introduced in v1.9 and CustomPodDNS feature gate must be enabled to use it.
   // +optional
   optional string dnsPolicy = 6;
 
@@ -3091,6 +3092,7 @@ message PodSpec {
   // Specifies the DNS parameters of a pod.
   // Parameters specified here will be merged to the generated DNS
   // configuration based on DNSPolicy.
+  // This is an alpha feature introduced in v1.9 and CustomPodDNS feature gate must be enabled to use it.
   // +optional
   optional PodDNSConfig dnsConfig = 26;
 }
