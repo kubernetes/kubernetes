@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 	"regexp"
 	"strings"
@@ -120,6 +121,20 @@ func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
+	outputFormat := cmdutil.GetFlagString(cmd, "output")
+	dryRunFlag := cmdutil.GetDryRunFlag(cmd)
+	if cmdutil.GetFlagBool(cmd, "show-labels") {
+		if dryRunFlag {
+			if outputFormat != "" && outputFormat != "wide" {
+				return fmt.Errorf("When --show-labels and --dry-run are set to true, --output must be wide or \"\" ")
+			}
+		} else {
+			if outputFormat != "wide" {
+				return fmt.Errorf("When --show-labels is set to true with default dry-run value (false), --output must be wide ")
+			}
+		}
+	}
+
 	namespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -253,12 +268,8 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			}
 		}
 		info.Refresh(object, true)
-		if cmdutil.GetDryRunFlag(cmd) {
-			if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-				return f.PrintObject(cmd, false, mapper, object, out)
-			}
-			f.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, true, "exposed")
-			return nil
+		if dryRunFlag {
+			return f.PrintObject(cmd, false, mapper, object, out)
 		}
 		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
 			return err
@@ -274,7 +285,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			return f.PrintObject(cmd, false, mapper, object, out)
 		}
 
-		f.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "exposed")
+		f.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, dryRunFlag, "exposed")
 		return nil
 	})
 	if err != nil {
