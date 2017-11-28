@@ -31,6 +31,7 @@ import (
 	volumeexpand "github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
 	volumes_v1 "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
 	volumes_v2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
+	volumes_v3 "github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -52,6 +53,12 @@ type VolumesV1 struct {
 
 // Volumes implementation for v2
 type VolumesV2 struct {
+	blockstorage *gophercloud.ServiceClient
+	opts         BlockStorageOpts
+}
+
+// Volumes implementation for v3
+type VolumesV3 struct {
 	blockstorage *gophercloud.ServiceClient
 	opts         BlockStorageOpts
 }
@@ -131,6 +138,26 @@ func (volumes *VolumesV2) createVolume(opts VolumeCreateOpts) (string, string, e
 	return vol.ID, vol.AvailabilityZone, nil
 }
 
+func (volumes *VolumesV3) createVolume(opts VolumeCreateOpts) (string, string, error) {
+	startTime := time.Now()
+
+	create_opts := volumes_v3.CreateOpts{
+		Name:             opts.Name,
+		Size:             opts.Size,
+		VolumeType:       opts.VolumeType,
+		AvailabilityZone: opts.Availability,
+		Metadata:         opts.Metadata,
+	}
+
+	vol, err := volumes_v3.Create(volumes.blockstorage, create_opts).Extract()
+	timeTaken := time.Since(startTime).Seconds()
+	recordOpenstackOperationMetric("create_v3_volume", timeTaken, err)
+	if err != nil {
+		return "", "", err
+	}
+	return vol.ID, vol.AvailabilityZone, nil
+}
+
 func (volumes *VolumesV1) getVolume(volumeID string) (Volume, error) {
 	startTime := time.Now()
 	volumeV1, err := volumes_v1.Get(volumes.blockstorage, volumeID).Extract()
@@ -179,6 +206,29 @@ func (volumes *VolumesV2) getVolume(volumeID string) (Volume, error) {
 	return volume, nil
 }
 
+func (volumes *VolumesV3) getVolume(volumeID string) (Volume, error) {
+	startTime := time.Now()
+	volumeV3, err := volumes_v3.Get(volumes.blockstorage, volumeID).Extract()
+	timeTaken := time.Since(startTime).Seconds()
+	recordOpenstackOperationMetric("get_v3_volume", timeTaken, err)
+	if err != nil {
+		return Volume{}, fmt.Errorf("error occurred getting volume by ID: %s, err: %v", volumeID, err)
+	}
+
+	volume := Volume{
+		ID:     volumeV3.ID,
+		Name:   volumeV3.Name,
+		Status: volumeV3.Status,
+	}
+
+	if len(volumeV3.Attachments) > 0 {
+		volume.AttachedServerId = volumeV3.Attachments[0].ServerID
+		volume.AttachedDevice = volumeV3.Attachments[0].Device
+	}
+
+	return volume, nil
+}
+
 func (volumes *VolumesV1) deleteVolume(volumeID string) error {
 	startTime := time.Now()
 	err := volumes_v1.Delete(volumes.blockstorage, volumeID).ExtractErr()
@@ -195,6 +245,14 @@ func (volumes *VolumesV2) deleteVolume(volumeID string) error {
 	return err
 }
 
+func (volumes *VolumesV3) deleteVolume(volumeID string) error {
+	startTime := time.Now()
+	err := volumes_v3.Delete(volumes.blockstorage, volumeID).ExtractErr()
+	timeTaken := time.Since(startTime).Seconds()
+	recordOpenstackOperationMetric("delete_v3_volume", timeTaken, err)
+	return err
+}
+
 func (volumes *VolumesV1) expandVolume(volumeID string, newSize int) error {
 	startTime := time.Now()
 	create_opts := volumeexpand.ExtendSizeOpts{
@@ -203,7 +261,6 @@ func (volumes *VolumesV1) expandVolume(volumeID string, newSize int) error {
 	err := volumeexpand.ExtendSize(volumes.blockstorage, volumeID, create_opts).ExtractErr()
 	timeTaken := time.Since(startTime).Seconds()
 	recordOpenstackOperationMetric("expand_volume", timeTaken, err)
-
 	return err
 }
 
@@ -215,7 +272,17 @@ func (volumes *VolumesV2) expandVolume(volumeID string, newSize int) error {
 	err := volumeexpand.ExtendSize(volumes.blockstorage, volumeID, create_opts).ExtractErr()
 	timeTaken := time.Since(startTime).Seconds()
 	recordOpenstackOperationMetric("expand_volume", timeTaken, err)
+	return err
+}
 
+func (volumes *VolumesV3) expandVolume(volumeID string, newSize int) error {
+	startTime := time.Now()
+	create_opts := volumeexpand.ExtendSizeOpts{
+		NewSize: newSize,
+	}
+	err := volumeexpand.ExtendSize(volumes.blockstorage, volumeID, create_opts).ExtractErr()
+	timeTaken := time.Since(startTime).Seconds()
+	recordOpenstackOperationMetric("expand_volume", timeTaken, err)
 	return err
 }
 

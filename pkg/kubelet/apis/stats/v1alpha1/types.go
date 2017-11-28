@@ -141,10 +141,10 @@ type PodReference struct {
 	UID       string `json:"uid"`
 }
 
-// NetworkStats contains data about network resources.
-type NetworkStats struct {
-	// The time at which these stats were updated.
-	Time metav1.Time `json:"time"`
+// InterfaceStats contains resource value data about interface.
+type InterfaceStats struct {
+	// The name of the interface
+	Name string `json:"name"`
 	// Cumulative count of bytes received.
 	// +optional
 	RxBytes *uint64 `json:"rxBytes,omitempty"`
@@ -157,6 +157,17 @@ type NetworkStats struct {
 	// Cumulative count of transmit errors encountered.
 	// +optional
 	TxErrors *uint64 `json:"txErrors,omitempty"`
+}
+
+// NetworkStats contains data about network resources.
+type NetworkStats struct {
+	// The time at which these stats were updated.
+	Time metav1.Time `json:"time"`
+
+	// Stats for the default interface, if found
+	InterfaceStats `json:",inline"`
+
+	Interfaces []InterfaceStats `json:"interfaces,omitempty"`
 }
 
 // CPUStats contains data about CPU usage.
