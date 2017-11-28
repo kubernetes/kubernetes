@@ -62,7 +62,11 @@ func getSeccompDockerOpts(seccompProfile string) ([]dockerOpt, error) {
 		return nil, fmt.Errorf("unknown seccomp profile option: %s", seccompProfile)
 	}
 
-	fname := strings.TrimPrefix(seccompProfile, "localhost/") // by pod annotation validation, name is a valid subpath
+	// get the full path of seccomp profile when prefixed with 'localhost/'.
+	fname := strings.TrimPrefix(seccompProfile, "localhost/")
+	if !filepath.IsAbs(fname) {
+		return nil, fmt.Errorf("seccomp profile path must be absolute, but got relative path %q", fname)
+	}
 	file, err := ioutil.ReadFile(filepath.FromSlash(fname))
 	if err != nil {
 		return nil, fmt.Errorf("cannot load seccomp profile %q: %v", fname, err)

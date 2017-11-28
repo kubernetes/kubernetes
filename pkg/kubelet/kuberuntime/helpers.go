@@ -278,7 +278,7 @@ func (m *kubeGenericRuntimeManager) getSeccompProfileFromAnnotations(annotations
 	if strings.HasPrefix(profile, "localhost/") {
 		name := strings.TrimPrefix(profile, "localhost/")
 		fname := filepath.Join(m.seccompProfileRoot, filepath.FromSlash(name))
-		return fname
+		return "localhost/" + fname
 	}
 
 	return profile
