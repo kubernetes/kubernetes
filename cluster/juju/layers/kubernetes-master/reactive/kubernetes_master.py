@@ -62,7 +62,6 @@ nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
 
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
 
-
 def set_upgrade_needed():
     set_state('kubernetes-master.upgrade-needed')
     config = hookenv.config()
@@ -102,11 +101,28 @@ def check_for_upgrade_needed():
     add_rbac_roles()
     set_state('reconfigure.authentication.setup')
     remove_state('authentication.setup')
+    if snap_resources_changed():
+        set_upgrade_needed()
+
+
+def snap_resources_changed():
+    '''
+    Check if the snapped resources have changed. The first time this method is
+    called will report no change.
+
+    Returns: True in case a snap resource file has changed
+
+    '''
+    db = unitdata.kv()
     resources = ['kubectl', 'kube-apiserver', 'kube-controller-manager',
                  'kube-scheduler', 'cdk-addons']
     paths = [hookenv.resource_get(resource) for resource in resources]
-    if any_file_changed(paths):
-        set_upgrade_needed()
+    if db.get('snap.resources.fingerprint.initialised'):
+        return any_file_changed(paths)
+    else:
+        db.set('snap.resources.fingerprint.initialised', True)
+        any_file_changed(paths)
+        return False
 
 
 def add_rbac_roles():
@@ -221,6 +237,7 @@ def install_snaps():
     snap.install('kube-scheduler', channel=channel)
     hookenv.status_set('maintenance', 'Installing cdk-addons snap')
     snap.install('cdk-addons', channel=channel)
+    snap_resources_changed()
     set_state('kubernetes-master.snaps.installed')
     remove_state('kubernetes-master.components.started')
 
