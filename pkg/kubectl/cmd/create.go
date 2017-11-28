@@ -23,7 +23,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -247,7 +249,7 @@ type CreateSubcommandOptions struct {
 
 // RunCreateSubcommand executes a create subcommand using the specified options
 func RunCreateSubcommand(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *CreateSubcommandOptions) error {
-	namespace, _, err := f.DefaultNamespace()
+	namespace, nsOverriden, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
@@ -287,6 +289,10 @@ func RunCreateSubcommand(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, o
 		obj, err = resource.NewHelper(client, mapping).Create(namespace, false, info.Object)
 		if err != nil {
 			return err
+		}
+	} else {
+		if meta, err := meta.Accessor(obj); err == nil && nsOverriden {
+			meta.SetNamespace(namespace)
 		}
 	}
 
