@@ -421,6 +421,7 @@ func configFromEnv() (cfg Config, ok bool) {
 			cfg.Global.DomainId != "" || cfg.Global.DomainName != ""))
 
 	cfg.Metadata.SearchOrder = fmt.Sprintf("%s,%s", configDriveID, metadataID)
+	cfg.BlockStorage.BSVersion = "auto"
 
 	return
 }
@@ -443,7 +444,7 @@ func TestLoadBalancer(t *testing.T) {
 		t.Skipf("No config found in environment")
 	}
 
-	versions := []string{"v1", "v2", ""}
+	versions := []string{"v2", ""}
 
 	for _, v := range versions {
 		t.Logf("Trying LBVersion = '%s'\n", v)
@@ -525,30 +526,30 @@ func TestVolumes(t *testing.T) {
 
 	id, err := os.InstanceID()
 	if err != nil {
-		t.Fatalf("Cannot find instance id: %v", err)
+		t.Logf("Cannot find instance id: %v - perhaps you are running this test outside a VM launched by OpenStack", err)
+	} else {
+		diskId, err := os.AttachDisk(id, vol)
+		if err != nil {
+			t.Fatalf("Cannot AttachDisk Cinder volume %s: %v", vol, err)
+		}
+		t.Logf("Volume (%s) attached, disk ID: %s\n", vol, diskId)
+
+		WaitForVolumeStatus(t, os, vol, volumeInUseStatus)
+
+		devicePath := os.GetDevicePath(diskId)
+		if diskPathRegexp.FindString(devicePath) == "" {
+			t.Fatalf("GetDevicePath returned and unexpected path for Cinder volume %s, returned %s", vol, devicePath)
+		}
+		t.Logf("Volume (%s) found at path: %s\n", vol, devicePath)
+
+		err = os.DetachDisk(id, vol)
+		if err != nil {
+			t.Fatalf("Cannot DetachDisk Cinder volume %s: %v", vol, err)
+		}
+		t.Logf("Volume (%s) detached\n", vol)
+
+		WaitForVolumeStatus(t, os, vol, volumeAvailableStatus)
 	}
-
-	diskId, err := os.AttachDisk(id, vol)
-	if err != nil {
-		t.Fatalf("Cannot AttachDisk Cinder volume %s: %v", vol, err)
-	}
-	t.Logf("Volume (%s) attached, disk ID: %s\n", vol, diskId)
-
-	WaitForVolumeStatus(t, os, vol, volumeInUseStatus)
-
-	devicePath := os.GetDevicePath(diskId)
-	if diskPathRegexp.FindString(devicePath) == "" {
-		t.Fatalf("GetDevicePath returned and unexpected path for Cinder volume %s, returned %s", vol, devicePath)
-	}
-	t.Logf("Volume (%s) found at path: %s\n", vol, devicePath)
-
-	err = os.DetachDisk(id, vol)
-	if err != nil {
-		t.Fatalf("Cannot DetachDisk Cinder volume %s: %v", vol, err)
-	}
-	t.Logf("Volume (%s) detached\n", vol)
-
-	WaitForVolumeStatus(t, os, vol, volumeAvailableStatus)
 
 	err = os.DeleteVolume(vol)
 	if err != nil {
