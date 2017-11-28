@@ -236,7 +236,7 @@ func makeExpetectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerIn
 }
 
 func TestGenerateContainerConfig(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager()
+	_, imageService, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	pod := &v1.Pod{
@@ -290,6 +290,18 @@ func TestGenerateContainerConfig(t *testing.T) {
 
 	_, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image)
 	assert.Error(t, err)
+
+	imageId, _ := imageService.PullImage(&runtimeapi.ImageSpec{Image: "busybox"}, nil)
+	image, _ := imageService.ImageStatus(&runtimeapi.ImageSpec{Image: imageId})
+
+	image.Uid = nil
+	image.Username = "test"
+
+	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsUser = nil
+	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsNonRoot = &runAsNonRootTrue
+
+	_, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image)
+	assert.Error(t, err, "RunAsNonRoot should fail for non-numeric username")
 }
 
 func TestLifeCycleHook(t *testing.T) {
