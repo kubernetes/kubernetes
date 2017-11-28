@@ -32,6 +32,7 @@ import (
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	storagelisters "k8s.io/kubernetes/pkg/client/listers/storage/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 )
 
 const (
@@ -96,6 +97,15 @@ func (c *claimDefaulterPlugin) Admit(a admission.Attributes) error {
 	pvc, ok := a.GetObject().(*api.PersistentVolumeClaim)
 	// if we can't convert then we don't handle this object so just return
 	if !ok {
+		return nil
+	}
+
+	updateInitialized, err := util.IsUpdatingInitializedObject(a)
+	if err != nil {
+		return err
+	}
+	if updateInitialized {
+		// spec of an initialized pvc is immutable
 		return nil
 	}
 

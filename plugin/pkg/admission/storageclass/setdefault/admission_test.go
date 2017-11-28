@@ -229,5 +229,43 @@ func TestAdmission(t *testing.T) {
 		if test.expectedClassName == "" && class != "" {
 			t.Errorf("Test %q: expected class name %q, got %q", test.name, test.expectedClassName, class)
 		}
+
+		// should handle update of uninitialized pvc exactly the same, disregard of the old pvc.
+		clone, err = api.Scheme.DeepCopy(test.claim)
+		if err != nil {
+			t.Fatalf("Cannot clone claim: %v", err)
+		}
+		uninitializedPVC := clone.(*api.PersistentVolumeClaim)
+		uninitializedPVC.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "init"}}}
+		attrs = admission.NewAttributesRecord(
+			claim,            // new object
+			uninitializedPVC, // old object
+			api.Kind("PersistentVolumeClaim").WithVersion("version"),
+			claim.Namespace,
+			claim.Name,
+			api.Resource("persistentvolumeclaims").WithVersion("version"),
+			"", // subresource
+			admission.Update,
+			nil, // userInfo
+		)
+		err = ctrl.Admit(attrs)
+		glog.Infof("Got %v", err)
+		if err != nil && !test.expectError {
+			t.Errorf("Test %q: unexpected error received: %v", test.name, err)
+		}
+		if err == nil && test.expectError {
+			t.Errorf("Test %q: expected error and no error recevied", test.name)
+		}
+
+		class = ""
+		if claim.Spec.StorageClassName != nil {
+			class = *claim.Spec.StorageClassName
+		}
+		if test.expectedClassName != "" && test.expectedClassName != class {
+			t.Errorf("Test %q: expected class name %q, got %q", test.name, test.expectedClassName, class)
+		}
+		if test.expectedClassName == "" && class != "" {
+			t.Errorf("Test %q: expected class name %q, got %q", test.name, test.expectedClassName, class)
+		}
 	}
 }
