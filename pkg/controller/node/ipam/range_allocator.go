@@ -176,7 +176,10 @@ func (r *rangeAllocator) worker(stopChan <-chan struct{}) {
 				glog.Warning("Channel nodeCIDRUpdateChannel was unexpectedly closed")
 				return
 			}
-			r.updateCIDRAllocation(workItem)
+			if err := r.updateCIDRAllocation(workItem); err != nil {
+				// Requeue the failed node for update again.
+				r.nodeCIDRUpdateChannel <- workItem
+			}
 		case <-stopChan:
 			return
 		}
