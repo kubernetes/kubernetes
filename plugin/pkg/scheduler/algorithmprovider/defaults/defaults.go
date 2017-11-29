@@ -68,17 +68,17 @@ func init() {
 	// Fit is defined based on the absence of port conflicts.
 	// This predicate is actually a default predicate, because it is invoked from
 	// predicates.GeneralPredicates()
-	factory.RegisterFitPredicate("PodFitsHostPorts", predicates.PodFitsHostPorts)
+	factory.RegisterMandatoryFitPredicate("PodFitsHostPorts", predicates.PodFitsHostPorts)
 	// Fit is determined by resource availability.
 	// This predicate is actually a default predicate, because it is invoked from
 	// predicates.GeneralPredicates()
-	factory.RegisterFitPredicate("PodFitsResources", predicates.PodFitsResources)
+	factory.RegisterMandatoryFitPredicate("PodFitsResources", predicates.PodFitsResources)
 	// Fit is determined by the presence of the Host parameter and a string match
 	// This predicate is actually a default predicate, because it is invoked from
 	// predicates.GeneralPredicates()
-	factory.RegisterFitPredicate("HostName", predicates.PodFitsHost)
+	factory.RegisterMandatoryFitPredicate("HostName", predicates.PodFitsHost)
 	// Fit is determined by node selector query.
-	factory.RegisterFitPredicate("MatchNodeSelector", predicates.PodMatchNodeSelector)
+	factory.RegisterMandatoryFitPredicate("MatchNodeSelector", predicates.PodMatchNodeSelector)
 
 	// Use equivalence class to speed up predicates & priorities
 	factory.RegisterGetEquivalencePodFunction(predicates.GetEquivalencePod)

@@ -151,7 +151,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 	schedPredicates := config.Algorithm.Predicates()
 	schedPrioritizers := config.Algorithm.Prioritizers()
 	// Includes one mandatory predicates.
-	if len(schedPredicates) != 3 || len(schedPrioritizers) != 2 {
+	if len(schedPredicates) != 7 || len(schedPrioritizers) != 2 {
 		t.Errorf("Unexpected number of predicates or priority functions. Number of predicates: %v, number of prioritizers: %v", len(schedPredicates), len(schedPrioritizers))
 	}
 	// Check a predicate and a priority function.
