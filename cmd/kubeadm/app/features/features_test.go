@@ -168,16 +168,16 @@ func TestResolveFeatureGateDependencies(t *testing.T) {
 			expectedFeatures: map[string]bool{},
 		},
 		{ // others flags
-			inputFeatures:    map[string]bool{"SupportIPVSProxyMode": true},
-			expectedFeatures: map[string]bool{"SupportIPVSProxyMode": true},
+			inputFeatures:    map[string]bool{CoreDNS: true},
+			expectedFeatures: map[string]bool{CoreDNS: true},
 		},
 		{ // just StoreCertsInSecrets flags
-			inputFeatures:    map[string]bool{"StoreCertsInSecrets": true},
-			expectedFeatures: map[string]bool{"StoreCertsInSecrets": true, "SelfHosting": true},
+			inputFeatures:    map[string]bool{StoreCertsInSecrets: true},
+			expectedFeatures: map[string]bool{StoreCertsInSecrets: true, SelfHosting: true},
 		},
 		{ // just HighAvailability flags
-			inputFeatures:    map[string]bool{"HighAvailability": true},
-			expectedFeatures: map[string]bool{"HighAvailability": true, "StoreCertsInSecrets": true, "SelfHosting": true},
+			inputFeatures:    map[string]bool{HighAvailability: true},
+			expectedFeatures: map[string]bool{HighAvailability: true, StoreCertsInSecrets: true, SelfHosting: true},
 		},
 	}
 

@@ -200,7 +200,7 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 
 	coreDNSServiceAccount := &v1.ServiceAccount{}
 	if err := kuberuntime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), []byte(CoreDNSServiceAccount), coreDNSServiceAccount); err != nil {
-		return fmt.Errorf("unable to decode CoreDNS configmap %v", err)
+		return fmt.Errorf("unable to decode CoreDNS serviceaccount %v", err)
 	}
 
 	// Create the ConfigMap for CoreDNS or update it in case it already exists
