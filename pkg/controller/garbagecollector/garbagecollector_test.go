@@ -593,7 +593,7 @@ func TestDeleteOwnerRefPatch(t *testing.T) {
 			},
 		},
 	}
-	patch := deleteOwnerRefPatch("100", "2", "3")
+	patch := deleteOwnerRefStrategicMergePatch("100", "2", "3")
 	patched, err := strategicpatch.StrategicMergePatch(originalData, patch, v1.Pod{})
 	if err != nil {
 		t.Fatal(err)
@@ -638,7 +638,7 @@ func TestUnblockOwnerReference(t *testing.T) {
 	n := node{
 		owners: accessor.GetOwnerReferences(),
 	}
-	patch, err := n.patchToUnblockOwnerReferences()
+	patch, err := n.unblockOwnerReferencesStrategicMergePatch()
 	if err != nil {
 		t.Fatal(err)
 	}
