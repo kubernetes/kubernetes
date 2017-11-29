@@ -2169,17 +2169,17 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.DeploymentRollback"
+        "responseModel": "v1beta1.DeploymentStatus"
        },
        {
         "code": 201,
         "message": "Created",
-        "responseModel": "v1beta1.DeploymentRollback"
+        "responseModel": "v1beta1.DeploymentStatus"
        },
        {
         "code": 202,
         "message": "Accepted",
-        "responseModel": "v1beta1.DeploymentRollback"
+        "responseModel": "v1beta1.DeploymentStatus"
        }
       ],
       "produces": [
