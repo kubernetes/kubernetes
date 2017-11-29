@@ -65,6 +65,11 @@ metadata:
 spec:
   {{pod_priority}}
   hostNetwork: true
+  tolerations:
+  - operator: "Exists"
+    effect: "NoExecute"
+  - operator: "Exists"
+    effect: "NoSchedule"
   containers:
   - name: kube-proxy
     image: {{pillar['kube_docker_registry']}}/kube-proxy:{{pillar['kube-proxy_docker_tag']}}
