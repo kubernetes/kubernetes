@@ -155,7 +155,6 @@ go_test(
         "//pkg/kubelet/dockershim/libdocker:go_default_library",
         "//pkg/kubelet/dockershim/network:go_default_library",
         "//pkg/kubelet/dockershim/network/testing:go_default_library",
-        "//pkg/kubelet/dockershim/testing:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/cache:go_default_library",
         "//pkg/security/apparmor:go_default_library",

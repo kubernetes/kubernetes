@@ -144,7 +144,12 @@ func (pdev podDevices) toCheckpointData() []checkpoint.PodDevicesEntry {
 					glog.Errorf("Can't marshal allocResp for %v %v %v: %v", podUID, conName, resource, err)
 					continue
 				}
-				data = append(data, checkpoint.PodDevicesEntry{podUID, conName, resource, devIds, allocResp})
+				data = append(data, checkpoint.PodDevicesEntry{
+					PodUID:        podUID,
+					ContainerName: conName,
+					ResourceName:  resource,
+					DeviceIDs:     devIds,
+					AllocResp:     allocResp})
 			}
 		}
 	}

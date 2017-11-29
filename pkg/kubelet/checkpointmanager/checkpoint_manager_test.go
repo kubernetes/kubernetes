@@ -18,12 +18,11 @@ package checkpointmanager
 
 import (
 	"encoding/json"
-	"hash/fnv"
 	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 	utilstore "k8s.io/kubernetes/pkg/kubelet/checkpointmanager/testing"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/testing/example_checkpoint_formats/v1"
 )
@@ -50,7 +49,7 @@ type CheckpointDataV2 struct {
 type protocol string
 
 // portMapping is the port mapping configurations of a sandbox.
-type portMapping struct {
+type PortMapping struct {
 	// protocol of the port mapping.
 	Protocol *protocol
 	// Port number within the container.
@@ -153,7 +152,7 @@ func TestCheckpointManager(t *testing.T) {
 	port443 := int32(443)
 	proto := protocol("tcp")
 
-	portMappings := []*portMapping{
+	portMappings := []*PortMapping{
 		{
 			&proto,
 			&port80,

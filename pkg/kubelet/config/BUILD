@@ -58,6 +58,7 @@ go_library(
         "//pkg/apis/core/v1:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
         "//pkg/kubelet/checkpoint:go_default_library",
+        "//pkg/kubelet/checkpointmanager:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/types:go_default_library",

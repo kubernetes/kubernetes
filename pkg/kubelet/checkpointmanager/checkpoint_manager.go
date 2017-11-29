@@ -18,6 +18,7 @@ package checkpointmanager
 
 import (
 	"fmt"
+	"sync"
 
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
@@ -48,8 +49,10 @@ type CheckpointManager interface {
 type impl struct {
 	path  string
 	store utilstore.Store
+	mutex sync.Mutex
 }
 
+// NewCheckpointManager returns a new instance of a checkpoint manager
 func NewCheckpointManager(checkpointDir string) (CheckpointManager, error) {
 	fstore, err := utilstore.NewFileStore(checkpointDir, utilfs.DefaultFs{})
 	if err != nil {
@@ -88,6 +91,7 @@ func (manager *impl) GetCheckpoint(checkpointKey string, checkpoint Checkpoint) 
 	return err
 }
 
+// RemoveCheckpoint will not return error if checkpoint does not exist.
 func (manager *impl) RemoveCheckpoint(checkpointKey string) error {
 	manager.mutex.Lock()
 	defer manager.mutex.Unlock()

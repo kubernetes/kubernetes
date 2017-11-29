@@ -1,8 +1,9 @@
 ## DISCLAIMER
-Sig-Node community has reached a general consensus, as a best practice, to
+- Sig-Node community has reached a general consensus, as a best practice, to
 avoid introducing any new checkpointing support. We reached this understanding
 after struggling with some hard-to-debug issues in the production environments
 caused by the checkpointing.
+- Any changes to the checkpointed data structure would be considered incompatible and a component should add its own handling if it needs to ensure backward compatibility of reading old-format checkpoint files.
 
 ## Introduction
 This folder contains a framework & primitives, Checkpointing Manager, which is
