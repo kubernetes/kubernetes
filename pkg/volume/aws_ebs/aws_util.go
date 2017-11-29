@@ -18,6 +18,9 @@ package aws_ebs
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -27,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/aws_ebs/nvme"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -178,7 +182,7 @@ func verifyAllPathsRemoved(devicePaths []string) (bool, error) {
 // Returns list of all paths for given EBS mount
 // This is more interesting on GCE (where we are able to identify volumes under /dev/disk-by-id)
 // Here it is mostly about applying the partition path
-func getDiskByIdPaths(partition string, devicePath string) []string {
+func getDiskByIdPaths(volumeID aws.KubernetesVolumeID, partition string, devicePath string) []string {
 	devicePaths := []string{}
 	if devicePath != "" {
 		devicePaths = append(devicePaths, devicePath)
@@ -187,6 +191,21 @@ func getDiskByIdPaths(partition string, devicePath string) []string {
 	if partition != "" {
 		for i, path := range devicePaths {
 			devicePaths[i] = path + diskPartitionSuffix + partition
+		}
+	}
+
+	// We need to find NVME volumes, which are mounted on a "random" nvme path ("/dev/nvme0n1"),
+	// and we have to get the volume id from the nvme interface
+	awsVolumeID, err := volumeID.MapToAWSVolumeID()
+	if err != nil {
+		glog.Warningf("error mapping volume %q to AWS volume: %v", volumeID, err)
+	} else {
+		nvmeName := strings.Replace(string(awsVolumeID), "-", "", -1)
+		nvmePath, err := findNvmeVolume(nvmeName)
+		if err != nil {
+			glog.Warningf("error looking for nvme volume %q: %v", volumeID, err)
+		} else if nvmePath != "" {
+			devicePaths = append(devicePaths, nvmePath)
 		}
 	}
 
@@ -201,4 +220,67 @@ func getCloudProvider(cloudProvider cloudprovider.Interface) (*aws.Cloud, error)
 	}
 
 	return awsCloudProvider, nil
+}
+
+func findNvmeVolume(findName string) (device string, err error) {
+	devices, err := ioutil.ReadDir("/dev")
+	if err != nil {
+		return "", fmt.Errorf("error listing /dev directory: %v", err)
+	}
+	for _, device := range devices {
+		name := device.Name()
+		if !strings.HasPrefix(name, "nvme") {
+			continue
+		}
+		glog.V(6).Infof("found nvme %q", name)
+
+		// Skip partition devices
+		{
+			num := 0
+			ns := 0
+			partition := 0
+			tokens, err := fmt.Sscanf(name, "nvme%dn%dp%d", &num, &ns, &partition)
+			if err == nil && tokens == 3 {
+				glog.V(4).Infof("skipping nvme partition device %q", name)
+				continue
+			}
+		}
+
+		p := filepath.Join("/dev", name)
+
+		// Skip non-block devices
+		{
+			s, err := os.Stat(p)
+			if err != nil {
+				glog.Warningf("ignoring error doing stat on %q: %v", p, err)
+				continue
+			}
+			mode := s.Mode()
+			if (mode&os.ModeDevice == 0) || (mode&os.ModeCharDevice != 0) {
+				glog.V(2).Infof("ignoring nvme device %q because of mode %v", p, s.Mode())
+				continue
+			}
+			glog.V(6).Infof("%q had mode %v", p, mode)
+		}
+
+		glog.V(4).Infof("found nvme candidate %q", p)
+
+		info, found, err := nvme.Identify(p)
+		if err != nil {
+			glog.Warningf("ignoring error identifying nvme device %q: %v", p, err)
+			continue
+		}
+		if !found {
+			glog.Warningf("identification not supported for nvme device %q", p)
+			continue
+		}
+
+		glog.V(4).Infof("got info for %q: %q", p, info)
+		if info != "" && findName == info {
+			glog.Infof("found matching nvme volume %q at %q", info, p)
+			return filepath.Join("/dev", name), nil
+		}
+	}
+
+	return "", nil
 }

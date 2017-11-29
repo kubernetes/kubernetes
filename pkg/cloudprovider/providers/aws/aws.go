@@ -1662,7 +1662,7 @@ type awsDisk struct {
 }
 
 func newAWSDisk(aws *Cloud, name KubernetesVolumeID) (*awsDisk, error) {
-	awsID, err := name.mapToAWSVolumeID()
+	awsID, err := name.MapToAWSVolumeID()
 	if err != nil {
 		return nil, err
 	}
@@ -2334,7 +2334,7 @@ func (c *Cloud) DiskIsAttached(diskName KubernetesVolumeID, nodeName types.NodeN
 		return false, err
 	}
 
-	diskID, err := diskName.mapToAWSVolumeID()
+	diskID, err := diskName.MapToAWSVolumeID()
 	if err != nil {
 		return false, fmt.Errorf("error mapping volume spec %q to aws id: %v", diskName, err)
 	}
@@ -2398,7 +2398,7 @@ func (c *Cloud) DisksAreAttached(nodeDisks map[types.NodeName][]KubernetesVolume
 
 		idToDiskName := make(map[awsVolumeID]KubernetesVolumeID)
 		for _, diskName := range diskNames {
-			volumeID, err := diskName.mapToAWSVolumeID()
+			volumeID, err := diskName.MapToAWSVolumeID()
 			if err != nil {
 				return nil, fmt.Errorf("error mapping volume spec %q to aws id: %v", diskName, err)
 			}
