@@ -71,7 +71,6 @@ type GarbageCollector struct {
 	dependencyGraphBuilder *GraphBuilder
 	// GC caches the owners that do not exist according to the API server.
 	absentOwnerCache *UIDCache
-	sharedInformers  informers.SharedInformerFactory
 
 	workerLock sync.RWMutex
 }
@@ -428,8 +427,12 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 		// waitingForDependentsDeletion needs to be deleted from the
 		// ownerReferences, otherwise the referenced objects will be stuck with
 		// the FinalizerDeletingDependents and never get deleted.
-		patch := deleteOwnerRefPatch(item.identity.UID, append(ownerRefsToUIDs(dangling), ownerRefsToUIDs(waitingForDependentsDeletion)...)...)
-		_, err = gc.patchObject(item.identity, patch)
+		patch, err := gc.deleteOwnerRefJSONMergePatch(item, append(ownerRefsToUIDs(dangling), ownerRefsToUIDs(waitingForDependentsDeletion)...)...)
+		fmt.Printf("CHAO: patch=%s\n, err=%v\n", patch, err)
+		if err != nil {
+			return err
+		}
+		_, err = gc.patchObject(item.identity, patch, types.MergePatchType)
 		return err
 	case len(waitingForDependentsDeletion) != 0 && item.dependentsLength() != 0:
 		deps := item.getDependents()
@@ -441,11 +444,11 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 				// there are multiple workers run attemptToDeleteItem in
 				// parallel, the circle detection can fail in a race condition.
 				glog.V(2).Infof("processing object %s, some of its owners and its dependent [%s] have FinalizerDeletingDependents, to prevent potential cycle, its ownerReferences are going to be modified to be non-blocking, then the object is going to be deleted with Foreground", item.identity, dep.identity)
-				patch, err := item.patchToUnblockOwnerReferences()
+				patch, err := gc.unblockOwnerReferencesJSONMergePatch(item)
 				if err != nil {
 					return err
 				}
-				if _, err := gc.patchObject(item.identity, patch); err != nil {
+				if _, err := gc.patchObject(item.identity, patch, types.StrategicMergePatchType); err != nil {
 					return err
 				}
 				break
@@ -505,8 +508,13 @@ func (gc *GarbageCollector) orphanDependents(owner objectReference, dependents [
 		go func(dependent *node) {
 			defer wg.Done()
 			// the dependent.identity.UID is used as precondition
-			patch := deleteOwnerRefPatch(dependent.identity.UID, owner.UID)
-			_, err := gc.patchObject(dependent.identity, patch)
+			patch, err := gc.deleteOwnerRefJSONMergePatch(dependent, owner.UID)
+			fmt.Printf("CHAO: patch=%s\n, err=%v\n", patch, err)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			_, err = gc.patchObject(dependent.identity, patch, types.MergePatchType)
 			// note that if the target ownerReference doesn't exist in the
 			// dependent, strategic merge patch will NOT return an error.
 			if err != nil && !errors.IsNotFound(err) {
