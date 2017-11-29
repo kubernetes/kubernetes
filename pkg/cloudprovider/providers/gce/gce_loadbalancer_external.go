@@ -368,7 +368,10 @@ func (gce *GCECloud) ensureExternalLoadBalancerDeleted(clusterName string, servi
 			glog.Infof("Failed to retrieve health check %v:%v", loadBalancerName, err)
 			return err
 		}
-		hcNames = append(hcNames, hcToDelete.Name)
+		// If we got 'StatusNotFound' LB was already deleted and it's safe to ignore.
+		if err == nil {
+			hcNames = append(hcNames, hcToDelete.Name)
+		}
 	} else {
 		clusterID, err := gce.ClusterID.GetID()
 		if err != nil {
