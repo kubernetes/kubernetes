@@ -146,7 +146,10 @@ func (ca *cloudCIDRAllocator) worker(stopChan <-chan struct{}) {
 				glog.Warning("Channel nodeCIDRUpdateChannel was unexpectedly closed")
 				return
 			}
-			ca.updateCIDRAllocation(workItem)
+			if err := ca.updateCIDRAllocation(workItem); err != nil {
+				// Requeue the failed node for update again.
+				ca.nodeUpdateChannel <- workItem
+			}
 		case <-stopChan:
 			return
 		}

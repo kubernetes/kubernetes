@@ -56,6 +56,10 @@ metadata:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
+  selector:
+    matchLabels:
+      k8s-app: fluentd-es
+      version: v2.0.2
   template:
     metadata:
       labels:

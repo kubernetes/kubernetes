@@ -50,8 +50,11 @@ var (
 	patch, _     = json.Marshal(jsonpatch.Patch{})
 )
 
-var _ = SIGDescribe("Advanced Audit [Feature:Audit]", func() {
+var _ = SIGDescribe("Advanced Audit", func() {
 	f := framework.NewDefaultFramework("audit")
+	BeforeEach(func() {
+		framework.SkipUnlessProviderIs("gce")
+	})
 
 	It("should audit API calls", func() {
 		namespace := f.Namespace.Name
