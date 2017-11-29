@@ -38,9 +38,9 @@ var _ volume.ProvisionableVolumePlugin = &azureFilePlugin{}
 // azure cloud provider should implement it
 type azureCloudProvider interface {
 	// create a file share
-	CreateFileShare(name, storageAccount, storageType, location string, requestGiB int) (string, string, error)
+	CreateFileShare(shareName, accountName, accountType, location string, requestGiB int) (string, string, error)
 	// delete a file share
-	DeleteFileShare(accountName, key, name string) error
+	DeleteFileShare(accountName, accountKey, shareName string) error
 	// resize a file share
 	ResizeFileShare(accountName, accountKey, name string, sizeGiB int) error
 }

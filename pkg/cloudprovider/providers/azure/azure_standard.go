@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
 )
 
 const (
@@ -52,6 +53,8 @@ const (
 
 	// nodeLabelRole specifies the role of a node
 	nodeLabelRole = "kubernetes.io/role"
+
+	storageAccountNameMaxLength = 24
 )
 
 var errNotInVMSet = errors.New("vm is not in the vmset")
@@ -657,4 +660,14 @@ func (as *availabilitySet) EnsureHostsInPool(serviceName string, nodes []*v1.Nod
 func (as *availabilitySet) EnsureBackendPoolDeleted(poolID, vmSetName string) error {
 	// Do nothing for availability set.
 	return nil
+}
+
+// get a storage account by UUID
+func generateStorageAccountName(accountNamePrefix string) string {
+	uniqueID := strings.Replace(string(uuid.NewUUID()), "-", "", -1)
+	accountName := strings.ToLower(accountNamePrefix + uniqueID)
+	if len(accountName) > storageAccountNameMaxLength {
+		return accountName[:storageAccountNameMaxLength-1]
+	}
+	return accountName
 }
