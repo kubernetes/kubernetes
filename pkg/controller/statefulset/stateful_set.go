@@ -71,6 +71,8 @@ type StatefulSetController struct {
 	setListerSynced cache.InformerSynced
 	// pvcListerSynced returns true if the pvc shared informer has synced at least once
 	pvcListerSynced cache.InformerSynced
+	// revListerSynced returns true if the rev shared informer has synced at least once
+	revListerSynced cache.InformerSynced
 	// StatefulSets that need to be synced.
 	queue workqueue.RateLimitingInterface
 }
@@ -103,6 +105,8 @@ func NewStatefulSetController(
 		pvcListerSynced: pvcInformer.Informer().HasSynced,
 		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
 		podControl:      controller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
+
+		revListerSynced: revInformer.Informer().HasSynced,
 	}
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -146,7 +150,7 @@ func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 	glog.Infof("Starting stateful set controller")
 	defer glog.Infof("Shutting down statefulset controller")
 
-	if !controller.WaitForCacheSync("stateful set", stopCh, ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced) {
+	if !controller.WaitForCacheSync("stateful set", stopCh, ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced, ssc.revListerSynced) {
 		return
 	}
 

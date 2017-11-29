@@ -172,31 +172,31 @@
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud",
-			"Rev": "54086d6c81b90e91e1d52b866ee726baf5cbe2b1"
+			"Rev": "db5f840b1d1a595280d643defc09ce277996959e"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack",
-			"Rev": "54086d6c81b90e91e1d52b866ee726baf5cbe2b1"
+			"Rev": "db5f840b1d1a595280d643defc09ce277996959e"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v2/tenants",
-			"Rev": "54086d6c81b90e91e1d52b866ee726baf5cbe2b1"
+			"Rev": "db5f840b1d1a595280d643defc09ce277996959e"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v2/tokens",
-			"Rev": "54086d6c81b90e91e1d52b866ee726baf5cbe2b1"
+			"Rev": "db5f840b1d1a595280d643defc09ce277996959e"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens",
-			"Rev": "54086d6c81b90e91e1d52b866ee726baf5cbe2b1"
+			"Rev": "db5f840b1d1a595280d643defc09ce277996959e"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/utils",
-			"Rev": "54086d6c81b90e91e1d52b866ee726baf5cbe2b1"
+			"Rev": "db5f840b1d1a595280d643defc09ce277996959e"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/pagination",
-			"Rev": "54086d6c81b90e91e1d52b866ee726baf5cbe2b1"
+			"Rev": "db5f840b1d1a595280d643defc09ce277996959e"
 		},
 		{
 			"ImportPath": "github.com/gregjones/httpcache",

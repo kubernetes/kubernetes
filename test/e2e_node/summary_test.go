@@ -169,11 +169,15 @@ var _ = framework.KubeDescribe("Summary API", func() {
 					}),
 				}),
 				"Network": ptrMatchAllFields(gstruct.Fields{
-					"Time":     recent(maxStatsAge),
-					"RxBytes":  bounded(10, 10*framework.Mb),
-					"RxErrors": bounded(0, 1000),
-					"TxBytes":  bounded(10, 10*framework.Mb),
-					"TxErrors": bounded(0, 1000),
+					"Time": recent(maxStatsAge),
+					"InterfaceStats": gstruct.MatchAllFields(gstruct.Fields{
+						"Name":     Equal("eth0"),
+						"RxBytes":  bounded(10, 10*framework.Mb),
+						"RxErrors": bounded(0, 1000),
+						"TxBytes":  bounded(10, 10*framework.Mb),
+						"TxErrors": bounded(0, 1000),
+					}),
+					"Interfaces": Not(BeNil()),
 				}),
 				"CPU": ptrMatchAllFields(gstruct.Fields{
 					"Time":                 recent(maxStatsAge),
@@ -236,13 +240,17 @@ var _ = framework.KubeDescribe("Summary API", func() {
 						"MajorPageFaults": bounded(0, 100000),
 					}),
 					// TODO(#28407): Handle non-eth0 network interface names.
-					"Network": Or(BeNil(), ptrMatchAllFields(gstruct.Fields{
-						"Time":     recent(maxStatsAge),
-						"RxBytes":  bounded(1*framework.Mb, 100*framework.Gb),
-						"RxErrors": bounded(0, 100000),
-						"TxBytes":  bounded(10*framework.Kb, 10*framework.Gb),
-						"TxErrors": bounded(0, 100000),
-					})),
+					"Network": ptrMatchAllFields(gstruct.Fields{
+						"Time": recent(maxStatsAge),
+						"InterfaceStats": gstruct.MatchAllFields(gstruct.Fields{
+							"Name":     Or(BeEmpty(), Equal("eth0")),
+							"RxBytes":  Or(BeNil(), bounded(1*framework.Mb, 100*framework.Gb)),
+							"RxErrors": Or(BeNil(), bounded(0, 100000)),
+							"TxBytes":  Or(BeNil(), bounded(10*framework.Kb, 10*framework.Gb)),
+							"TxErrors": Or(BeNil(), bounded(0, 100000)),
+						}),
+						"Interfaces": Not(BeNil()),
+					}),
 					"Fs": ptrMatchAllFields(gstruct.Fields{
 						"Time":           recent(maxStatsAge),
 						"AvailableBytes": fsCapacityBounds,
