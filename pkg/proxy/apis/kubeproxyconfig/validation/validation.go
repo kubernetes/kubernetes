@@ -146,9 +146,10 @@ func validateProxyMode(mode kubeproxyconfig.ProxyMode, fldPath *field.Path) fiel
 	case kubeproxyconfig.ProxyModeUserspace:
 	case kubeproxyconfig.ProxyModeIPTables:
 	case kubeproxyconfig.ProxyModeIPVS:
+	case kubeproxyconfig.ProxyModeKernelspace:
 	case "":
 	default:
-		modes := []string{string(kubeproxyconfig.ProxyModeUserspace), string(kubeproxyconfig.ProxyModeIPTables), string(kubeproxyconfig.ProxyModeIPVS)}
+		modes := []string{string(kubeproxyconfig.ProxyModeUserspace), string(kubeproxyconfig.ProxyModeIPTables), string(kubeproxyconfig.ProxyModeIPVS), string(kubeproxyconfig.ProxyModeKernelspace)}
 		errMsg := fmt.Sprintf("must be %s or blank (blank means the best-available proxy (currently iptables)", strings.Join(modes, ","))
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("ProxyMode"), string(mode), errMsg))
 	}
