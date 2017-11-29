@@ -62,13 +62,14 @@ nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
 
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
 
-def set_upgrade_needed():
+
+def set_upgrade_needed(forced=False):
     set_state('kubernetes-master.upgrade-needed')
     config = hookenv.config()
     previous_channel = config.previous('channel')
     require_manual = config.get('require-manual-upgrade')
     hookenv.log('set upgrade needed')
-    if previous_channel is None or not require_manual:
+    if previous_channel is None or not require_manual or forced:
         hookenv.log('forcing upgrade')
         set_state('kubernetes-master.upgrade-specified')
 
@@ -101,16 +102,27 @@ def check_for_upgrade_needed():
     add_rbac_roles()
     set_state('reconfigure.authentication.setup')
     remove_state('authentication.setup')
-    if snap_resources_changed():
+    changed = snap_resources_changed()
+    if changed == 'yes':
         set_upgrade_needed()
+    elif changed == 'unknown':
+        # We are here on an upgrade from non-rolling master
+        # Since this upgrade might also include resource updates eg
+        # juju upgrade-charm kubernetes-master --resource kube-any=my.snap
+        # we take no risk and forcibly upgrade the snaps.
+        # Forcibly means we do not prompt the user to call the upgrade action.
+        set_upgrade_needed(forced=True)
+
 
 
 def snap_resources_changed():
     '''
     Check if the snapped resources have changed. The first time this method is
-    called will report no change.
+    called will report "unknown".
 
-    Returns: True in case a snap resource file has changed
+    Returns: "yes" in case a snap resource file has changed,
+             "no" in case a snap resources are the same as last call,
+             "unknown" if it is the first time this method is called
 
     '''
     db = unitdata.kv()
@@ -118,11 +130,12 @@ def snap_resources_changed():
                  'kube-scheduler', 'cdk-addons']
     paths = [hookenv.resource_get(resource) for resource in resources]
     if db.get('snap.resources.fingerprint.initialised'):
-        return any_file_changed(paths)
+        result = 'yes' if any_file_changed(paths) else 'no'
+        return result
     else:
         db.set('snap.resources.fingerprint.initialised', True)
         any_file_changed(paths)
-        return False
+        return 'unknown'
 
 
 def add_rbac_roles():
