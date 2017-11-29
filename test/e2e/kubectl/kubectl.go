@@ -847,6 +847,11 @@ metadata:
 
 			// Pod
 			forEachPod(func(pod v1.Pod) {
+				servergte, err := framework.ServerVersionGTE(utilversion.MustParseSemantic("v1.9.0-alpha.2"), c.Discovery())
+				Expect(err).NotTo(HaveOccurred())
+				kubectlgte, err := framework.KubectlVersionGTE(utilversion.MustParseSemantic("v1.9.0-alpha.2"))
+				Expect(err).NotTo(HaveOccurred())
+
 				output := framework.RunKubectlOrDie("describe", "pod", pod.Name, nsFlag)
 				requiredStrings := [][]string{
 					{"Name:", "redis-master-"},
@@ -857,12 +862,17 @@ metadata:
 					{"Annotations:"},
 					{"Status:", "Running"},
 					{"IP:"},
-					{"Created By:", "ReplicationController/redis-master"},
+				}
+				// Skip this line if either server version or client version is greater than 1.9.0.
+				if !servergte && !kubectlgte {
+					requiredStrings = append(requiredStrings, []string{"Created By:", "ReplicationController/redis-master"})
+				}
+				requiredStrings = append(requiredStrings, [][]string{
 					{"Controlled By:", "ReplicationController/redis-master"},
 					{"Image:", redisImage},
 					{"State:", "Running"},
 					{"QoS Class:", "BestEffort"},
-				}
+				}...)
 				checkOutput(output, requiredStrings)
 			})
 
