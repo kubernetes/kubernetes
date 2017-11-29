@@ -1272,6 +1272,7 @@ func updatePVCStatusCapacity(pvcName string, pvc *v1.PersistentVolumeClaim, capa
 	}
 
 	pvcCopy.Status.Capacity = capacity
+	pvcCopy.Status.Conditions = []v1.PersistentVolumeClaimCondition{}
 	newData, err := json.Marshal(pvcCopy)
 
 	if err != nil {
