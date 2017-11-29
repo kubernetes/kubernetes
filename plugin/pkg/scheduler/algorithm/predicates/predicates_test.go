@@ -17,7 +17,6 @@ limitations under the License.
 package predicates
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -31,46 +30,6 @@ import (
 	schedulertesting "k8s.io/kubernetes/plugin/pkg/scheduler/testing"
 	schedutil "k8s.io/kubernetes/plugin/pkg/scheduler/util"
 )
-
-type FakeNodeInfo v1.Node
-
-func (n FakeNodeInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
-	node := v1.Node(n)
-	return &node, nil
-}
-
-type FakeNodeListInfo []v1.Node
-
-func (nodes FakeNodeListInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
-	for _, node := range nodes {
-		if node.Name == nodeName {
-			return &node, nil
-		}
-	}
-	return nil, fmt.Errorf("Unable to find node: %s", nodeName)
-}
-
-type FakePersistentVolumeClaimInfo []v1.PersistentVolumeClaim
-
-func (pvcs FakePersistentVolumeClaimInfo) GetPersistentVolumeClaimInfo(namespace string, pvcID string) (*v1.PersistentVolumeClaim, error) {
-	for _, pvc := range pvcs {
-		if pvc.Name == pvcID && pvc.Namespace == namespace {
-			return &pvc, nil
-		}
-	}
-	return nil, fmt.Errorf("Unable to find persistent volume claim: %s/%s", namespace, pvcID)
-}
-
-type FakePersistentVolumeInfo []v1.PersistentVolume
-
-func (pvs FakePersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*v1.PersistentVolume, error) {
-	for _, pv := range pvs {
-		if pv.Name == pvID {
-			return &pv, nil
-		}
-	}
-	return nil, fmt.Errorf("Unable to find persistent volume: %s", pvID)
-}
 
 var (
 	opaqueResourceA   = v1helper.OpaqueIntResourceName("AAA")
