@@ -887,3 +887,33 @@ func TestMetadataParsing(t *testing.T) {
 		t.Errorf("Unexpected inequality:\n%#v\nvs\n%#v", network, networkJSON)
 	}
 }
+
+func TestGenerateStorageAccountName(t *testing.T) {
+	tests := []struct {
+		prefix string
+	}{
+		{
+			prefix: "",
+		},
+		{
+			prefix: "pvc",
+		},
+		{
+			prefix: "1234512345123451234512345",
+		},
+	}
+
+	for _, test := range tests {
+		accountName := generateStorageAccountName(test.prefix)
+		if len(accountName) > storageAccountNameMaxLength || len(accountName) < 3 {
+			t.Errorf("input prefix: %s, output account name: %s, length not in [3,%d]", test.prefix, accountName, storageAccountNameMaxLength)
+		}
+
+		for _, char := range accountName {
+			if (char < 'a' || char > 'z') && (char < '0' || char > '9') {
+				t.Errorf("input prefix: %s, output account name: %s, there is non-digit or non-letter(%q)", test.prefix, accountName, char)
+				break
+			}
+		}
+	}
+}
