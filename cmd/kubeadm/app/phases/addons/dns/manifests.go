@@ -156,8 +156,8 @@ spec:
         args:
         - --v=2
         - --logtostderr
-        - --probe=kubedns,{{ .DNSBindAddr }}:10053,kubernetes.default.svc.{{ .DNSDomain }},5,{{ .DNSProbeType }}
-        - --probe=dnsmasq,{{ .DNSBindAddr }}:53,kubernetes.default.svc.{{ .DNSDomain }},5,{{ .DNSProbeType }}
+        - --probe=kubedns,{{ .DNSProbeAddr }}:10053,kubernetes.default.svc.{{ .DNSDomain }},5,{{ .DNSProbeType }}
+        - --probe=dnsmasq,{{ .DNSProbeAddr }}:53,kubernetes.default.svc.{{ .DNSDomain }},5,{{ .DNSProbeType }}
         ports:
         - containerPort: 10054
           name: metrics
