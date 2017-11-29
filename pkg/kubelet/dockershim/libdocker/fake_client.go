@@ -376,6 +376,21 @@ func (f *FakeDockerClient) popError(op string) error {
 	return nil
 }
 
+func toDockerContainerState(state string) string {
+	// Convert the state of a container returned by ListContainers
+	// to docker container status
+	switch {
+	case strings.HasPrefix(state, StatusCreatedPrefix):
+		return "created"
+	case strings.HasPrefix(state, StatusRunningPrefix):
+		return "running"
+	case strings.HasPrefix(state, StatusExitedPrefix):
+		return "exited"
+	default:
+		return "unknown"
+	}
+}
+
 // ListContainers is a test-spy implementation of Interface.ListContainers.
 // It adds an entry "list" to the internal method call record.
 func (f *FakeDockerClient) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
@@ -410,7 +425,7 @@ func (f *FakeDockerClient) ListContainers(options dockertypes.ContainerListOptio
 		var filtered []dockertypes.Container
 		for _, container := range containerList {
 			for _, statusFilter := range statusFilters {
-				if container.Status == statusFilter {
+				if statusFilter == toDockerContainerState(container.Status) {
 					filtered = append(filtered, container)
 					break
 				}
@@ -725,7 +740,26 @@ func (f *FakeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dock
 	defer f.Unlock()
 	f.appendCalled(calledDetail{name: "list_images"})
 	err := f.popError("list_images")
-	return f.Images, err
+	imageRefs := opts.Filters.Get("reference")
+	if len(imageRefs) == 0 {
+		return f.Images, err
+	}
+
+	images := make([]dockertypes.ImageSummary, 0)
+	for _, image := range f.Images {
+		if image.ID == imageRefs[0] {
+			images = append(images, image)
+			continue
+		}
+
+		for _, digest := range image.RepoDigests {
+			if digest == imageRefs[0] {
+				images = append(images, image)
+				break
+			}
+		}
+	}
+	return images, err
 }
 
 func (f *FakeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDeleteResponseItem, error) {
