@@ -85,7 +85,7 @@ func getDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
 // will be cancelled and throw out an error. If requestTimeout is 0, a default
 // value will be applied.
 func ConnectToDockerOrDie(dockerEndpoint string, requestTimeout, imagePullProgressDeadline time.Duration,
-	withTraceDisabled bool, enableSleep bool) Interface {
+	headers map[string]string, withTraceDisabled bool, enableSleep bool) Interface {
 	if dockerEndpoint == FakeDockerEndpoint {
 		fakeClient := NewFakeDockerClient()
 		if withTraceDisabled {
@@ -101,6 +101,7 @@ func ConnectToDockerOrDie(dockerEndpoint string, requestTimeout, imagePullProgre
 	if err != nil {
 		glog.Fatalf("Couldn't connect to docker: %v", err)
 	}
+	client.SetCustomHTTPHeaders(headers)
 	glog.Infof("Start docker client with request timeout=%v", requestTimeout)
 	return newKubeDockerClient(client, requestTimeout, imagePullProgressDeadline)
 }

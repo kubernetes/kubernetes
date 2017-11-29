@@ -352,6 +352,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 			DockerEndpoint:            s.DockerEndpoint,
 			RuntimeRequestTimeout:     s.RuntimeRequestTimeout.Duration,
 			ImagePullProgressDeadline: s.ImagePullProgressDeadline.Duration,
+			CustomHTTPHeaders:         s.DockerCustomHTTPHeaders,
 		}
 	}
 
@@ -1115,6 +1116,7 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 		DockerEndpoint:            r.DockerEndpoint,
 		RuntimeRequestTimeout:     c.RuntimeRequestTimeout.Duration,
 		ImagePullProgressDeadline: r.ImagePullProgressDeadline.Duration,
+		CustomHTTPHeaders:         r.DockerCustomHTTPHeaders,
 	}
 
 	// Initialize network plugin settings.
