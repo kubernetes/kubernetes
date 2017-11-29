@@ -185,7 +185,7 @@ func (p *Pruner) pruneMapping(namespace string, mapping *meta.RESTMapping, visit
 				return err
 			}
 		}
-		//cmdutil.Factory.PrintSuccess(p.Mapper, p.ShortOutput, p.Out, mapping.Resource, name, p.DryRun, "pruned")
+		p.printSuccess(mapping.Resource, name, "pruned")
 	}
 	return nil
 }
@@ -222,4 +222,27 @@ func (p *Pruner) delete(namespace, name string, mapping *meta.RESTMapping) error
 		return err
 	}
 	return nil
+}
+
+func (p *Pruner) printSuccess(resource, name string, operation string) {
+	resource, _ = p.Mapper.ResourceSingularizer(resource)
+	dryRunMsg := ""
+	if p.DryRun {
+		dryRunMsg = " (dry run)"
+	}
+	if p.ShortOutput {
+		// -o name: prints resource/name
+		if len(resource) > 0 {
+			fmt.Fprintf(p.Out, "%s/%s\n", resource, name)
+		} else {
+			fmt.Fprintf(p.Out, "%s\n", name)
+		}
+	} else {
+		// understandable output by default
+		if len(resource) > 0 {
+			fmt.Fprintf(p.Out, "%s \"%s\" %s%s\n", resource, name, operation, dryRunMsg)
+		} else {
+			fmt.Fprintf(p.Out, "\"%s\" %s%s\n", name, operation, dryRunMsg)
+		}
+	}
 }
