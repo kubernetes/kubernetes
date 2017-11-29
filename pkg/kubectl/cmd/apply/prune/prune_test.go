@@ -26,7 +26,7 @@ func TestParseGvks(t *testing.T) {
 
 	// Create the fake RESTMapper from the fake factory.
 	f, _, _, _ := cmdtesting.NewAPIFactory()
-	mapper, _, _ := f.UnstructuredObject()
+	mapper, _ := f.Object()
 
 	tests := []struct {
 		gvks     []string
