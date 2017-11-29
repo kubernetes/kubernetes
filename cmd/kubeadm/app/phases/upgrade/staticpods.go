@@ -127,6 +127,12 @@ func (spm *KubeStaticPodPathManager) BackupEtcdDir() string {
 }
 
 func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.MasterConfiguration, beforePodHash string, recoverManifests map[string]string) error {
+	// Special treatment is required for etcd case, when rollbackOldManifests should roll back etcd
+	// manifests only for the case when component is Etcd
+	recoverEtcd := false
+	if component == constants.Etcd {
+		recoverEtcd = true
+	}
 	// The old manifest is here; in the /etc/kubernetes/manifests/
 	currentManifestPath := pathMgr.RealManifestPath(component)
 	// The new, upgraded manifest will be written here
@@ -140,12 +146,12 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 
 	// Move the old manifest into the old-manifests directory
 	if err := pathMgr.MoveFile(currentManifestPath, backupManifestPath); err != nil {
-		return rollbackOldManifests(recoverManifests, err, pathMgr)
+		return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
 	}
 
 	// Move the new manifest into the manifests directory
 	if err := pathMgr.MoveFile(newManifestPath, currentManifestPath); err != nil {
-		return rollbackOldManifests(recoverManifests, err, pathMgr)
+		return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
 	}
 
 	fmt.Printf("[upgrade/staticpods] Moved upgraded manifest to %q and backed up old manifest to %q\n", currentManifestPath, backupManifestPath)
@@ -156,12 +162,12 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 	// If we don't do this, there is a case where we remove the Static Pod manifest, kubelet is slow to react, kubeadm checks the
 	// API endpoint below of the OLD Static Pod component and proceeds quickly enough, which might lead to unexpected results.
 	if err := waiter.WaitForStaticPodControlPlaneHashChange(cfg.NodeName, component, beforePodHash); err != nil {
-		return rollbackOldManifests(recoverManifests, err, pathMgr)
+		return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
 	}
 
 	// Wait for the static pod component to come up and register itself as a mirror pod
 	if err := waiter.WaitForPodsWithLabel("component=" + component); err != nil {
-		return rollbackOldManifests(recoverManifests, err, pathMgr)
+		return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
 	}
 
 	fmt.Printf("[upgrade/staticpods] Component %q upgraded successfully!\n", component)
@@ -212,20 +218,59 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 		return true, fmt.Errorf("fail to get etcd pod's hash: %v", err)
 	}
 
-	// Write the updated etcd static Pod manifest into the temporary directory
+	// Write the updated etcd static Pod manifest into the temporary directory, at this point no etcd change
+	// has occured in any aspects.
 	if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.TempManifestDir(), cfg); err != nil {
-		return true, rollbackEtcdData(cfg, fmt.Errorf("error creating local etcd static pod manifest file: %v", err), pathMgr)
+		return true, fmt.Errorf("error creating local etcd static pod manifest file: %v", err)
 	}
 
 	// Perform etcd upgrade using common to all control plane components function
 	if err := upgradeComponent(constants.Etcd, waiter, pathMgr, cfg, beforeEtcdPodHash, recoverManifests); err != nil {
-		return true, rollbackEtcdData(cfg, err, pathMgr)
+		// Since etcd upgrade component failed, the old manifest has been restored
+		// now we need to check the heatlth of etcd cluster if it came back up with old manifest
+		if _, err := etcdCluster.GetEtcdClusterStatus(); err != nil {
+			// At this point we know that etcd cluster is dead and it is safe to copy backup datastore and to rollback old etcd manifest
+			if err := rollbackEtcdData(cfg, fmt.Errorf("etcd cluster is not healthy after upgrade: %v rolling back", err), pathMgr); err != nil {
+				// Even copying back datastore failed, no options for recovery left, bailing out
+				return true, fmt.Errorf("fatal error upgrading local etcd cluster: %v, the backup of etcd database is stored here:(%s)", err, backupEtcdDir)
+			}
+			// Old datastore has been copied, rolling back old manifests
+			if err := rollbackOldManifests(recoverManifests, err, pathMgr, true); err != nil {
+				// Rolling back to old manifests failed, no options for recovery left, bailing out
+				return true, fmt.Errorf("fatal error upgrading local etcd cluster: %v, the backup of etcd database is stored here:(%s)", err, backupEtcdDir)
+			}
+			// Since rollback of the old etcd manifest was successful, checking again the status of etcd cluster
+			if _, err := etcdCluster.GetEtcdClusterStatus(); err != nil {
+				// Nothing else left to try to recover etcd cluster
+				return true, fmt.Errorf("fatal error upgrading local etcd cluster: %v, the backup of etcd database is stored here:(%s)", err, backupEtcdDir)
+			}
+
+			return true, fmt.Errorf("fatal error upgrading local etcd cluster: %v, rolled the state back to pre-upgrade state", err)
+		}
+		// Since etcd cluster came back up with the old manifest
+		return true, fmt.Errorf("fatal error when trying to upgrade the etcd cluster: %v, rolled the state back to pre-upgrade state", err)
 	}
 
 	// Checking health state of etcd after the upgrade
-	etcdStatus, err = etcdCluster.GetEtcdClusterStatus()
-	if err != nil {
-		return true, rollbackEtcdData(cfg, fmt.Errorf("etcd cluster is not healthy after upgrade: %v rolling back", err), pathMgr)
+	if _, err = etcdCluster.GetEtcdClusterStatus(); err != nil {
+		// Despite the fact that upgradeComponent was sucessfull, there is something wrong with etcd cluster
+		// First step is to restore back up of datastore
+		if err := rollbackEtcdData(cfg, fmt.Errorf("etcd cluster is not healthy after upgrade: %v rolling back", err), pathMgr); err != nil {
+			// Even copying back datastore failed, no options for recovery left, bailing out
+			return true, fmt.Errorf("fatal error upgrading local etcd cluster: %v, the backup of etcd database is stored here:(%s)", err, backupEtcdDir)
+		}
+		// Old datastore has been copied, rolling back old manifests
+		if err := rollbackOldManifests(recoverManifests, err, pathMgr, true); err != nil {
+			// Rolling back to old manifests failed, no options for recovery left, bailing out
+			return true, fmt.Errorf("fatal error upgrading local etcd cluster: %v, the backup of etcd database is stored here:(%s)", err, backupEtcdDir)
+		}
+		// Since rollback of the old etcd manifest was successful, checking again the status of etcd cluster
+		if _, err := etcdCluster.GetEtcdClusterStatus(); err != nil {
+			// Nothing else left to try to recover etcd cluster
+			return true, fmt.Errorf("fatal error upgrading local etcd cluster: %v, the backup of etcd database is stored here:(%s)", err, backupEtcdDir)
+		}
+
+		return true, fmt.Errorf("fatal error upgrading local etcd cluster: %v, rolled the state back to pre-upgrade state", err)
 	}
 
 	return false, nil
@@ -276,9 +321,13 @@ func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager
 }
 
 // rollbackOldManifests rolls back the backuped manifests if something went wrong
-func rollbackOldManifests(oldManifests map[string]string, origErr error, pathMgr StaticPodPathManager) error {
+func rollbackOldManifests(oldManifests map[string]string, origErr error, pathMgr StaticPodPathManager, restoreEtcd bool) error {
 	errs := []error{origErr}
 	for component, backupPath := range oldManifests {
+		// Will restore etcd manifest only if it was explicitely requested by setting restoreEtcd to True
+		if component == constants.Etcd && !restoreEtcd {
+			continue
+		}
 		// Where we should put back the backed up manifest
 		realManifestPath := pathMgr.RealManifestPath(component)
 
