@@ -943,7 +943,7 @@ run_create_secret_tests() {
     set +o errexit
 }
 
-# Runs all pod related tests.
+# Runs all "kubectl apply --prune" tests
 run_kubectl_apply_prune_tests() {
   set -o nounset
   set -o errexit
