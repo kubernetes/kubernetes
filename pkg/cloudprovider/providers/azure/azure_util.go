@@ -33,6 +33,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
 )
 
 const (
@@ -52,6 +53,8 @@ const (
 
 	// nodeLabelRole specifies the role of a node
 	nodeLabelRole = "kubernetes.io/role"
+
+	storageAccountNameMaxLength = 24
 )
 
 var providerIDRE = regexp.MustCompile(`^` + CloudProviderName + `://(?:.*)/Microsoft.Compute/virtualMachines/(.+)$`)
@@ -515,4 +518,14 @@ func ExtractDiskData(diskData interface{}) (provisioningState string, diskState 
 		diskState = ref.(string)
 	}
 	return provisioningState, diskState, nil
+}
+
+// get a storage account by UUID
+func generateStorageAccountName(accountNamePrefix string) string {
+	uniqueID := strings.Replace(string(uuid.NewUUID()), "-", "", -1)
+	accountName := strings.ToLower(accountNamePrefix + uniqueID)
+	if len(accountName) > storageAccountNameMaxLength {
+		return accountName[:storageAccountNameMaxLength-1]
+	}
+	return accountName
 }

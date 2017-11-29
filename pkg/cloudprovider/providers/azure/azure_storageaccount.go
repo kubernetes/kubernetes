@@ -27,8 +27,8 @@ type accountWithLocation struct {
 	Name, StorageType, Location string
 }
 
-// getStorageAccounts gets the storage accounts' name, type, location in a resource group
-func (az *Cloud) getStorageAccounts() ([]accountWithLocation, error) {
+// getStorageAccounts gets name, type, location of all storage accounts in a resource group which matches matchingAccountType
+func (az *Cloud) getStorageAccounts(matchingAccountType, matchingLocation string) ([]accountWithLocation, error) {
 	az.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("StorageAccountClient.ListByResourceGroup(%v): start", az.ResourceGroup)
 	result, err := az.StorageAccountClient.ListByResourceGroup(az.ResourceGroup)
@@ -37,22 +37,22 @@ func (az *Cloud) getStorageAccounts() ([]accountWithLocation, error) {
 		return nil, err
 	}
 	if result.Value == nil {
-		return nil, fmt.Errorf("no storage accounts from resource group %s", az.ResourceGroup)
+		return nil, fmt.Errorf("unexpected error when listing storage accounts from resource group %s", az.ResourceGroup)
 	}
 
 	accounts := []accountWithLocation{}
 	for _, acct := range *result.Value {
-		if acct.Name != nil {
-			name := *acct.Name
-			loc := ""
-			if acct.Location != nil {
-				loc = *acct.Location
+		if acct.Name != nil && acct.Location != nil && acct.Sku != nil {
+			storageType := string((*acct.Sku).Name)
+			if matchingAccountType != "" && !strings.EqualFold(matchingAccountType, storageType) {
+				continue
 			}
-			storageType := ""
-			if acct.Sku != nil {
-				storageType = string((*acct.Sku).Name)
+
+			location := *acct.Location
+			if matchingLocation != "" && !strings.EqualFold(matchingLocation, location) {
+				continue
 			}
-			accounts = append(accounts, accountWithLocation{Name: name, StorageType: storageType, Location: loc})
+			accounts = append(accounts, accountWithLocation{Name: *acct.Name, StorageType: storageType, Location: location})
 		}
 	}
 

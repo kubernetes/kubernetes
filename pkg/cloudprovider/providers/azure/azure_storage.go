@@ -19,56 +19,75 @@ package azure
 import (
 	"fmt"
 
+	"github.com/Azure/azure-sdk-for-go/arm/storage"
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/glog"
 )
 
+const (
+	defaultStorageAccountType  = string(storage.StandardLRS)
+	fileShareAccountNamePrefix = "f"
+)
+
 // CreateFileShare creates a file share, using a matching storage account
-func (az *Cloud) CreateFileShare(name, storageAccount, storageType, location string, requestGB int) (string, string, error) {
-	var err error
-	accounts := []accountWithLocation{}
-	if len(storageAccount) > 0 {
-		accounts = append(accounts, accountWithLocation{Name: storageAccount})
-	} else {
-		// find a storage account
-		accounts, err = az.getStorageAccounts()
+func (az *Cloud) CreateFileShare(shareName, accountName, accountType, location string, requestGiB int) (string, string, error) {
+	if len(accountName) == 0 {
+		// find a storage account that matches accountType
+		accounts, err := az.getStorageAccounts(accountType, location)
 		if err != nil {
-			// TODO: create a storage account and container
-			return "", "", err
+			return "", "", fmt.Errorf("could not list storage accounts for account type %s: %v", accountType, err)
 		}
-	}
-	for _, account := range accounts {
-		glog.V(4).Infof("account %s type %s location %s", account.Name, account.StorageType, account.Location)
-		if ((storageType == "" || account.StorageType == storageType) && (location == "" || account.Location == location)) || len(storageAccount) > 0 {
-			// find the access key with this account
-			key, err := az.getStorageAccesskey(account.Name)
-			if err != nil {
-				err = fmt.Errorf("could not get storage key for storage account %s: %v", account.Name, err)
-				continue
+
+		if len(accounts) > 0 {
+			accountName = accounts[0].Name
+			glog.V(4).Infof("found a matching account %s type %s location %s", accounts[0].Name, accounts[0].StorageType, accounts[0].Location)
+		}
+
+		if len(accountName) == 0 {
+			// not found a matching account, now create a new account in current resource group
+			accountName = generateStorageAccountName(fileShareAccountNamePrefix)
+			if location == "" {
+				location = az.Location
+			}
+			if accountType == "" {
+				accountType = defaultStorageAccountType
 			}
 
-			err = az.createFileShare(account.Name, key, name, requestGB)
+			glog.V(2).Infof("azureFile - no matching account found, begin to create a new account %s in resource group %s, location: %s, accountType: %s",
+				accountName, az.ResourceGroup, location, accountType)
+			cp := storage.AccountCreateParameters{
+				Sku:      &storage.Sku{Name: storage.SkuName(accountType)},
+				Tags:     &map[string]*string{"created-by": to.StringPtr("azure-file")},
+				Location: &location}
+			cancel := make(chan struct{})
+
+			_, errchan := az.StorageAccountClient.Create(az.ResourceGroup, accountName, cp, cancel)
+			err := <-errchan
 			if err != nil {
-				err = fmt.Errorf("failed to create share %s in account %s: %v", name, account.Name, err)
-				continue
+				return "", "", fmt.Errorf(fmt.Sprintf("Failed to create storage account %s, error: %s", accountName, err))
 			}
-			glog.V(4).Infof("created share %s in account %s", name, account.Name)
-			return account.Name, key, err
 		}
 	}
 
-	if err == nil {
-		err = fmt.Errorf("failed to find a matching storage account")
+	// find the access key with this account
+	accountKey, err := az.getStorageAccesskey(accountName)
+	if err != nil {
+		return "", "", fmt.Errorf("could not get storage key for storage account %s: %v", accountName, err)
 	}
-	return "", "", err
+
+	if err := az.createFileShare(accountName, accountKey, shareName, requestGiB); err != nil {
+		return "", "", fmt.Errorf("failed to create share %s in account %s: %v", shareName, accountName, err)
+	}
+	glog.V(4).Infof("created share %s in account %s", shareName, accountName)
+	return accountName, accountKey, nil
 }
 
 // DeleteFileShare deletes a file share using storage account name and key
-func (az *Cloud) DeleteFileShare(accountName, key, name string) error {
-	err := az.deleteFileShare(accountName, key, name)
-	if err != nil {
+func (az *Cloud) DeleteFileShare(accountName, accountKey, shareName string) error {
+	if err := az.deleteFileShare(accountName, accountKey, shareName); err != nil {
 		return err
 	}
-	glog.V(4).Infof("share %s deleted", name)
+	glog.V(4).Infof("share %s deleted", shareName)
 	return nil
 
 }
