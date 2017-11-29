@@ -53,7 +53,7 @@ func (r *Routes) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) 
 	glog.V(4).Infof("ListRoutes(%v)", clusterName)
 
 	nodeNamesByAddr := make(map[string]types.NodeName)
-	err := foreachServer(r.compute, servers.ListOpts{Status: "ACTIVE"}, func(srv *servers.Server) (bool, error) {
+	err := foreachServer(r.compute, servers.ListOpts{}, func(srv *servers.Server) (bool, error) {
 		addrs, err := nodeAddresses(srv)
 		if err != nil {
 			return false, err
@@ -77,9 +77,11 @@ func (r *Routes) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) 
 
 	var routes []*cloudprovider.Route
 	for _, item := range router.Routes {
+		nodeName, foundNode := nodeNamesByAddr[item.NextHop]
 		route := cloudprovider.Route{
 			Name:            item.DestinationCIDR,
-			TargetNode:      nodeNamesByAddr[item.NextHop], //empty if NextHop is unknown
+			TargetNode:      nodeName, //empty if NextHop is unknown
+			Blackhole:       !foundNode,
 			DestinationCIDR: item.DestinationCIDR,
 		}
 		routes = append(routes, &route)
