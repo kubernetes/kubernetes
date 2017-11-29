@@ -138,19 +138,29 @@ func cadvisorInfoToNetworkStats(name string, info *cadvisorapiv2.ContainerInfo) 
 	if !found {
 		return nil
 	}
-	for _, inter := range cstat.Network.Interfaces {
-		if inter.Name == network.DefaultInterfaceName {
-			return &statsapi.NetworkStats{
-				Time:     metav1.NewTime(cstat.Timestamp),
-				RxBytes:  &inter.RxBytes,
-				RxErrors: &inter.RxErrors,
-				TxBytes:  &inter.TxBytes,
-				TxErrors: &inter.TxErrors,
-			}
-		}
+
+	iStats := statsapi.NetworkStats{
+		Time: metav1.NewTime(cstat.Timestamp),
 	}
-	glog.V(4).Infof("Missing default interface %q for %s", network.DefaultInterfaceName, name)
-	return nil
+
+	for i := range cstat.Network.Interfaces {
+		inter := cstat.Network.Interfaces[i]
+		iStat := statsapi.InterfaceStats{
+			Name:     inter.Name,
+			RxBytes:  &inter.RxBytes,
+			RxErrors: &inter.RxErrors,
+			TxBytes:  &inter.TxBytes,
+			TxErrors: &inter.TxErrors,
+		}
+
+		if inter.Name == network.DefaultInterfaceName {
+			iStats.InterfaceStats = iStat
+		}
+
+		iStats.Interfaces = append(iStats.Interfaces, iStat)
+	}
+
+	return &iStats
 }
 
 // cadvisorInfoToUserDefinedMetrics returns the statsapi.UserDefinedMetric

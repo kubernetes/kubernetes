@@ -20,6 +20,8 @@ import (
 	"net"
 	"testing"
 
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
@@ -37,14 +39,18 @@ func TestRoutes(t *testing.T) {
 		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
 	}
 
+	// Pick the first router and server to try a test with
+	os.routeOpts.RouterId = getRouters(os)[0].ID
+	servername := getServers(os)[0].Name
+
 	r, ok := os.Routes()
 	if !ok {
-		t.Fatalf("Routes() returned false - perhaps your stack doens't support Neutron?")
+		t.Skip("Routes() returned false - perhaps your stack does not support Neutron extraroute extension?")
 	}
 
 	newroute := cloudprovider.Route{
 		DestinationCIDR: "10.164.2.0/24",
-		TargetNode:      types.NodeName("testinstance"),
+		TargetNode:      types.NodeName(servername),
 	}
 	err = r.CreateRoute(clusterName, "myhint", &newroute)
 	if err != nil {
@@ -68,4 +74,40 @@ func TestRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DeleteRoute error: %v", err)
 	}
+}
+
+func getServers(os *OpenStack) []servers.Server {
+	c, err := os.NewComputeV2()
+	allPages, err := servers.List(c, servers.ListOpts{}).AllPages()
+	if err != nil {
+		panic(err)
+	}
+	allServers, err := servers.ExtractServers(allPages)
+	if err != nil {
+		panic(err)
+	}
+	if len(allServers) == 0 {
+		panic("No servers to test with")
+	}
+	return allServers
+}
+
+func getRouters(os *OpenStack) []routers.Router {
+	listOpts := routers.ListOpts{}
+	n, err := os.NewNetworkV2()
+	if err != nil {
+		panic(err)
+	}
+	allPages, err := routers.List(n, listOpts).AllPages()
+	if err != nil {
+		panic(err)
+	}
+	allRouters, err := routers.ExtractRouters(allPages)
+	if err != nil {
+		panic(err)
+	}
+	if len(allRouters) == 0 {
+		panic("No routers to test with")
+	}
+	return allRouters
 }
