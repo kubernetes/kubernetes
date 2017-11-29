@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/configuration"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
@@ -69,7 +68,6 @@ func Register(plugins *admission.Plugins) {
 
 // WebhookSource can list dynamic webhook plugins.
 type WebhookSource interface {
-	Run(stopCh <-chan struct{})
 	Webhooks() (*v1beta1.MutatingWebhookConfiguration, error)
 }
 
@@ -146,7 +144,6 @@ func (a *MutatingWebhook) SetScheme(scheme *runtime.Scheme) {
 // WantsExternalKubeClientSet defines a function which sets external ClientSet for admission plugins that need it
 func (a *MutatingWebhook) SetExternalKubeClientSet(client clientset.Interface) {
 	a.namespaceMatcher.Client = client
-	a.hookSource = configuration.NewMutatingWebhookConfigurationManager(client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations())
 }
 
 // SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
@@ -154,6 +151,7 @@ func (a *MutatingWebhook) SetExternalKubeInformerFactory(f informers.SharedInfor
 	namespaceInformer := f.Core().V1().Namespaces()
 	a.namespaceMatcher.NamespaceLister = namespaceInformer.Lister()
 	a.SetReadyFunc(namespaceInformer.Informer().HasSynced)
+	a.hookSource = configuration.NewMutatingWebhookConfigurationManager(f.Admissionregistration().V1beta1().MutatingWebhookConfigurations())
 }
 
 // ValidateInitialization implements the InitializationValidator interface.
@@ -176,16 +174,11 @@ func (a *MutatingWebhook) ValidateInitialization() error {
 	if a.defaulter == nil {
 		return fmt.Errorf("MutatingWebhook.defaulter is not properly setup")
 	}
-	go a.hookSource.Run(wait.NeverStop)
 	return nil
 }
 
 func (a *MutatingWebhook) loadConfiguration(attr admission.Attributes) (*v1beta1.MutatingWebhookConfiguration, error) {
 	hookConfig, err := a.hookSource.Webhooks()
-	// if Webhook configuration is disabled, fail open
-	if err == configuration.ErrDisabled {
-		return &v1beta1.MutatingWebhookConfiguration{}, nil
-	}
 	if err != nil {
 		e := apierrors.NewServerTimeout(attr.GetResource().GroupResource(), string(attr.GetOperation()), 1)
 		e.ErrStatus.Message = fmt.Sprintf("Unable to refresh the Webhook configuration: %v", err)
