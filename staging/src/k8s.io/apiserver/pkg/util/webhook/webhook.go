@@ -47,7 +47,8 @@ func NewGenericWebhook(registry *registered.APIRegistrationManager, codecFactory
 	return newGenericWebhook(registry, codecFactory, kubeConfigFile, groupVersions, initialBackoff, defaultRequestTimeout)
 }
 
-func newGenericWebhook(registry *registered.APIRegistrationManager, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, initialBackoff, requestTimeout time.Duration) (*GenericWebhook, error) {
+// NewRestConfig creates a new webhook REST configuration from the specified kubeconfig file.
+func NewRestConfig(registry *registered.APIRegistrationManager, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, requestTimeout time.Duration) (*rest.Config, error) {
 	for _, groupVersion := range groupVersions {
 		if !registry.IsEnabledVersion(groupVersion) {
 			return nil, fmt.Errorf("webhook plugin requires enabling extension resource: %s", groupVersion)
@@ -73,6 +74,14 @@ func newGenericWebhook(registry *registered.APIRegistrationManager, codecFactory
 	codec := codecFactory.LegacyCodec(groupVersions...)
 	clientConfig.ContentConfig.NegotiatedSerializer = runtimeserializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 
+	return clientConfig, nil
+}
+
+func newGenericWebhook(registry *registered.APIRegistrationManager, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, initialBackoff, requestTimeout time.Duration) (*GenericWebhook, error) {
+	clientConfig, err := NewRestConfig(registry, codecFactory, kubeConfigFile, groupVersions, requestTimeout)
+	if err != nil {
+		return nil, err
+	}
 	restClient, err := rest.UnversionedRESTClientFor(clientConfig)
 	if err != nil {
 		return nil, err

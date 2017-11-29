@@ -19,12 +19,12 @@ package authorizer
 import (
 	"errors"
 	"fmt"
+	"net"
 	"time"
 
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/pkg/authorization/union"
-	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -50,6 +50,9 @@ type AuthorizationConfig struct {
 	WebhookCacheAuthorizedTTL time.Duration
 	// TTL for caching of unauthorized responses from the webhook server.
 	WebhookCacheUnauthorizedTTL time.Duration
+	// The dialer used to establish the connection to the webhook authorizer.
+	// Most of the time it is a default dialer function.
+	WebhookDialer func(network, address string) (net.Conn, error)
 
 	InformerFactory informers.SharedInformerFactory
 }
@@ -105,11 +108,13 @@ func (config AuthorizationConfig) New() (authorizer.Authorizer, authorizer.RuleR
 			if config.WebhookConfigFile == "" {
 				return nil, nil, errors.New("Webhook's configuration file not passed")
 			}
-			webhookAuthorizer, err := webhook.New(config.WebhookConfigFile,
+			webhookAuthorizer, err := NewWebhookAuthorizer(
+				config.WebhookConfigFile,
 				config.WebhookCacheAuthorizedTTL,
-				config.WebhookCacheUnauthorizedTTL)
+				config.WebhookCacheUnauthorizedTTL,
+				config.WebhookDialer)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, fmt.Errorf("while creating webhook authorizer: %v", err)
 			}
 			authorizers = append(authorizers, webhookAuthorizer)
 			ruleResolvers = append(ruleResolvers, webhookAuthorizer)
