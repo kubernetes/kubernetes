@@ -24,7 +24,6 @@ import (
 	"github.com/golang/glog"
 	grpctx "golang.org/x/net/context"
 	api "k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1alpha1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -77,11 +76,18 @@ func (c *csiMountMgr) SetUp(fsGroup *int64) error {
 func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	glog.V(4).Infof(log("Mounter.SetUpAt(%s)", dir))
 
+	csiSource, err := getCSISourceFromSpec(c.spec)
+	if err != nil {
+		glog.Error(log("mounter.SetupAt failed to get CSI persistent source: %v", err))
+		return err
+	}
+
 	ctx, cancel := grpctx.WithTimeout(grpctx.Background(), csiTimeout)
 	defer cancel()
 
 	csi := c.csiClient
-	pvName := c.spec.PersistentVolume.GetName()
+	nodeName := string(c.plugin.host.GetNodeName())
+	attachID := getAttachmentName(csiSource.VolumeHandle, csiSource.Driver, nodeName)
 
 	// ensure version is supported
 	if err := csi.AssertSupportedVersion(ctx, csiVersion); err != nil {
@@ -92,25 +98,14 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	// search for attachment by VolumeAttachment.Spec.Source.PersistentVolumeName
 	if c.volumeInfo == nil {
 
-		//TODO (vladimirvivien) consider using VolumesAttachments().Get() to retrieve
-		//the object directly. This requires the ability to reconstruct the ID using volumeName+nodeName (nodename may not be avilable)
-		attachList, err := c.k8s.StorageV1alpha1().VolumeAttachments().List(meta.ListOptions{})
+		attachment, err := c.k8s.StorageV1alpha1().VolumeAttachments().Get(attachID, meta.GetOptions{})
 		if err != nil {
-			glog.Error(log("failed to get volume attachments: %v", err))
+			glog.Error(log("mounter.SetupAt failed while getting volume attachment [id=%v]: %v", attachID, err))
 			return err
 		}
 
-		var attachment *storage.VolumeAttachment
-		for _, attach := range attachList.Items {
-			if attach.Spec.Source.PersistentVolumeName != nil &&
-				*attach.Spec.Source.PersistentVolumeName == pvName {
-				attachment = &attach
-				break
-			}
-		}
-
 		if attachment == nil {
-			glog.Error(log("unable to find VolumeAttachment with PV.name = %s", pvName))
+			glog.Error(log("unable to find VolumeAttachment [id=%s]", attachID))
 			return errors.New("no existing VolumeAttachment found")
 		}
 		c.volumeInfo = attachment.Status.AttachmentMetadata
@@ -122,7 +117,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		accessMode = c.spec.PersistentVolume.Spec.AccessModes[0]
 	}
 
-	err := csi.NodePublishVolume(
+	err = csi.NodePublishVolume(
 		ctx,
 		c.volumeID,
 		c.readOnly,
@@ -133,7 +128,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	)
 
 	if err != nil {
-		glog.Errorf(log("Mounter.Setup failed: %v", err))
+		glog.Errorf(log("Mounter.SetupAt failed: %v", err))
 		return err
 	}
 	glog.V(4).Infof(log("successfully mounted %s", dir))

@@ -143,6 +143,12 @@ func NodeRules() []rbac.PolicyRule {
 		pvcStatusPolicyRule := rbac.NewRule("get", "update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims/status").RuleOrDie()
 		nodePolicyRules = append(nodePolicyRules, pvcStatusPolicyRule)
 	}
+
+	// CSI
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
+		volAttachRule := rbac.NewRule("get").Groups(storageGroup).Resources("volumeattachments").RuleOrDie()
+		nodePolicyRules = append(nodePolicyRules, volAttachRule)
+	}
 	return nodePolicyRules
 }
 
