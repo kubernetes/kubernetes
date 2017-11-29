@@ -471,9 +471,11 @@ func (c *configFactory) onPvcDelete(obj interface{}) {
 
 func (c *configFactory) invalidatePredicatesForPvc(pvc *v1.PersistentVolumeClaim) {
 	// We need to do this here because the ecache uses PVC uid as part of equivalence hash of pod
-	// The binded volume type may change
+
+	// The bound volume type may change
 	invalidPredicates := sets.NewString(maxPDVolumeCountPredicateKeys...)
-	// // The binded volume's label may change
+
+	// The bound volume's label may change
 	invalidPredicates.Insert("NoVolumeZoneConflict")
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
@@ -491,9 +493,9 @@ func (c *configFactory) invalidatePredicatesForPvcUpdate(old, new *v1.Persistent
 			// PVC volume binding has changed
 			invalidPredicates.Insert(predicates.CheckVolumeBinding)
 		}
-		// The binded volume type may change
+		// The bound volume type may change
 		invalidPredicates.Insert(maxPDVolumeCountPredicateKeys...)
-		// The binded volume's label may change
+		// The bound volume's label may change
 		invalidPredicates.Insert("NoVolumeZoneConflict")
 	}
 
@@ -588,8 +590,8 @@ func (c *configFactory) updatePodInCache(oldObj, newObj interface{}) {
 
 func (c *configFactory) invalidateCachedPredicatesOnUpdatePod(newPod *v1.Pod, oldPod *v1.Pod) {
 	if c.enableEquivalenceClassCache {
-		// if the pod does not have binded node, updating equivalence cache is meaningless;
-		// if pod's binded node has been changed, that case should be handled by pod add & delete.
+		// if the pod does not have bound node, updating equivalence cache is meaningless;
+		// if pod's bound node has been changed, that case should be handled by pod add & delete.
 		if len(newPod.Spec.NodeName) != 0 && newPod.Spec.NodeName == oldPod.Spec.NodeName {
 			if !reflect.DeepEqual(oldPod.GetLabels(), newPod.GetLabels()) {
 				// MatchInterPodAffinity need to be reconsidered for this node,
@@ -920,8 +922,14 @@ func (f *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 	}
 
 	// Init equivalence class cache
-	if f.enableEquivalenceClassCache && getEquivalencePodFunc != nil {
-		f.equivalencePodCache = core.NewEquivalenceCache(getEquivalencePodFunc)
+	if f.enableEquivalenceClassCache && getEquivalencePodFuncFactory != nil {
+		pluginArgs, err := f.getPluginArgs()
+		if err != nil {
+			return nil, err
+		}
+		f.equivalencePodCache = core.NewEquivalenceCache(
+			getEquivalencePodFuncFactory(*pluginArgs),
+		)
 		glog.Info("Created equivalence class cache")
 	}
 
