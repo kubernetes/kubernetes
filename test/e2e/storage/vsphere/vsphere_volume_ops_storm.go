@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storage
+package vsphere
 
 import (
 	"fmt"
@@ -29,6 +29,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 /*
@@ -47,7 +48,7 @@ import (
 		10. Delete storage class.
 */
 
-var _ = SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-ops-storm")
 	const DEFAULT_VOLUME_OPS_SCALE = 30
 	var (

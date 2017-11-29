@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storage
+package vsphere
 
 import (
 	"time"
@@ -24,6 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 /*
@@ -43,7 +44,7 @@ import (
    9. delete pvc_vvol
 
 */
-var _ = SIGDescribe("PersistentVolumes [Feature:LabelSelector]", func() {
+var _ = utils.SIGDescribe("PersistentVolumes [Feature:LabelSelector]", func() {
 	f := framework.NewDefaultFramework("pvclabelselector")
 	var (
 		c          clientset.Interface
@@ -68,7 +69,7 @@ var _ = SIGDescribe("PersistentVolumes [Feature:LabelSelector]", func() {
 
 	})
 
-	SIGDescribe("Selector-Label Volume Binding:vsphere", func() {
+	utils.SIGDescribe("Selector-Label Volume Binding:vsphere", func() {
 		AfterEach(func() {
 			By("Running clean up actions")
 			if framework.ProviderIs("vsphere") {

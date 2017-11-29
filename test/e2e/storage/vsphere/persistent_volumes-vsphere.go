@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storage
+package vsphere
 
 import (
 	"time"
@@ -28,10 +28,11 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 // Testing configurations of single a PV/PVC pair attached to a vSphere Disk
-var _ = SIGDescribe("PersistentVolumes:vsphere", func() {
+var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 	var (
 		c          clientset.Interface
 		ns         string
@@ -182,7 +183,7 @@ var _ = SIGDescribe("PersistentVolumes:vsphere", func() {
 		3. Verify that written file is accessible after kubelet restart
 	*/
 	It("should test that a file written to the vspehre volume mount before kubelet restart can be read after restart [Disruptive]", func() {
-		testKubeletRestartsAndRestoresMount(c, f, clientPod, pvc, pv)
+		utils.TestKubeletRestartsAndRestoresMount(c, f, clientPod, pvc, pv)
 	})
 
 	/*
@@ -197,7 +198,7 @@ var _ = SIGDescribe("PersistentVolumes:vsphere", func() {
 		5. Verify that volume mount not to be found.
 	*/
 	It("should test that a vspehre volume mounted to a pod that is deleted while the kubelet is down unmounts when the kubelet returns [Disruptive]", func() {
-		testVolumeUnmountsFromDeletedPod(c, f, clientPod, pvc, pv)
+		utils.TestVolumeUnmountsFromDeletedPod(c, f, clientPod, pvc, pv)
 	})
 
 	/*

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storage
+package vsphere
 
 import (
 	"fmt"
@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 /*
@@ -52,7 +53,7 @@ type NodeSelector struct {
 	labelValue string
 }
 
-var _ = SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
+var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 	f := framework.NewDefaultFramework("vcp-at-scale")
 
 	var (

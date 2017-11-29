@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storage
+package vsphere
 
 import (
 	"fmt"
@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 /*
@@ -49,7 +50,7 @@ const (
 	storageclassname = "nginx-sc"
 )
 
-var _ = SIGDescribe("vsphere statefulset", func() {
+var _ = utils.SIGDescribe("vsphere statefulset", func() {
 	f := framework.NewDefaultFramework("vsphere-statefulset")
 	var (
 		namespace string

@@ -30,6 +30,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 const (
@@ -51,7 +53,7 @@ const (
 	wrappedVolumeRaceRCNamePrefix            = "wrapped-volume-race-"
 )
 
-var _ = SIGDescribe("EmptyDir wrapper volumes", func() {
+var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 	f := framework.NewDefaultFramework("emptydir-wrapper")
 
 	It("should not conflict", func() {
