@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -512,6 +513,11 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 			config := framework.VolumeTestConfig{
 				Namespace: namespace.Name,
 				Prefix:    "pd",
+				// PD will be created in framework.TestContext.CloudConfig.Zone zone,
+				// so pods should be also scheduled there.
+				NodeSelector: map[string]string{
+					kubeletapis.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
+				},
 			}
 
 			By("creating a test gce pd volume")

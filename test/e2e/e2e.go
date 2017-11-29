@@ -72,19 +72,35 @@ func setupProviderConfig() error {
 		var err error
 		framework.Logf("Fetching cloud provider for %q\r\n", framework.TestContext.Provider)
 		zone := framework.TestContext.CloudConfig.Zone
-		region, err := gcecloud.GetGCERegion(zone)
-		if err != nil {
-			return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
+		region := framework.TestContext.CloudConfig.Region
+
+		if region == "" {
+			region, err = gcecloud.GetGCERegion(zone)
+			if err != nil {
+				return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
+			}
 		}
 		managedZones := []string{} // Manage all zones in the region
 		if !framework.TestContext.CloudConfig.MultiZone {
 			managedZones = []string{zone}
 		}
-		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID,
+
+		gceCloud, err := gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID,
 			region, zone, managedZones, "" /* networkUrl */, "" /* subnetworkUrl */, nil, /* nodeTags */
 			"" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
 		if err != nil {
 			return fmt.Errorf("Error building GCE/GKE provider: %v", err)
+		}
+
+		cloudConfig.Provider = gceCloud
+
+		if cloudConfig.Zone == "" && framework.TestContext.CloudConfig.MultiZone {
+			zones, err := gceCloud.GetAllZones()
+			if err != nil {
+				return err
+			}
+
+			cloudConfig.Zone, _ = zones.PopAny()
 		}
 
 	case "aws":
