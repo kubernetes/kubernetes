@@ -94,11 +94,6 @@ function create-master-instance-internal() {
     preemptible_master="--preemptible --maintenance-policy TERMINATE"
   fi
 
-  local min_cpu_platform=""
-  if [[ -n "${MASTER_MIN_CPU_ARCHITECTURE:-}" ]]; then
-    min_cpu_platform="--min-cpu-platform=${MASTER_MIN_CPU_ARCHITECTURE}"
-  fi
-
   local network=$(make-gcloud-network-argument \
     "${NETWORK_PROJECT}" "${REGION}" "${NETWORK}" "${SUBNETWORK:-}" \
     "${address:-}" "${ENABLE_IP_ALIASES:-}" "${IP_ALIAS_SIZE:-}")
@@ -131,8 +126,8 @@ function create-master-instance-internal() {
       --metadata-from-file "${metadata}" \
       --disk "${disk}" \
       --boot-disk-size "${MASTER_ROOT_DISK_SIZE}" \
+      ${MASTER_MIN_CPU_ARCHITECTURE:+"--min-cpu-platform=${MASTER_MIN_CPU_ARCHITECTURE}"} \
       ${preemptible_master} \
-      ${min_cpu_platform} \
       ${network} 2>&1); then
       echo "${result}" >&2
       return 0
