@@ -23,6 +23,9 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // awsVolumeRegMatch represents Regex Match for AWS volume.
@@ -45,6 +48,16 @@ func (i awsVolumeID) awsString() *string {
 //  * aws:///<awsVolumeId>
 //  * <awsVolumeId>
 type KubernetesVolumeID string
+
+// DiskInfo returns aws disk information in easy to use manner
+type diskInfo struct {
+	ec2Instance     *ec2.Instance
+	nodeName        types.NodeName
+	volumeState     string
+	attachmentState string
+	hasAttachment   bool
+	disk            *awsDisk
+}
 
 // mapToAWSVolumeID extracts the awsVolumeID from the KubernetesVolumeID
 func (name KubernetesVolumeID) mapToAWSVolumeID() (awsVolumeID, error) {
@@ -84,4 +97,56 @@ func (name KubernetesVolumeID) mapToAWSVolumeID() (awsVolumeID, error) {
 	}
 
 	return awsVolumeID(awsID), nil
+}
+
+func GetAWSVolumeID(kubeVolumeID string) (string, error) {
+	kid := KubernetesVolumeID(kubeVolumeID)
+	awsID, err := kid.mapToAWSVolumeID()
+	return string(awsID), err
+}
+
+func (c *Cloud) checkIfAttachedToNode(diskName KubernetesVolumeID, nodeName types.NodeName) (*diskInfo, bool, error) {
+	disk, err := newAWSDisk(c, diskName)
+
+	if err != nil {
+		return nil, true, err
+	}
+
+	awsDiskInfo := &diskInfo{
+		disk: disk,
+	}
+
+	info, err := disk.describeVolume()
+
+	if err != nil {
+		describeError := fmt.Errorf("Error describing volume %s with %v", diskName, err)
+		glog.Warning(describeError)
+		awsDiskInfo.volumeState = "unknown"
+		return awsDiskInfo, false, describeError
+	}
+
+	awsDiskInfo.volumeState = aws.StringValue(info.State)
+
+	if len(info.Attachments) > 0 {
+		attachment := info.Attachments[0]
+		awsDiskInfo.attachmentState = aws.StringValue(attachment.State)
+		instanceID := aws.StringValue(attachment.InstanceId)
+		instanceInfo, err := c.getInstanceByID(instanceID)
+
+		// This should never happen but if it does it could mean there was a race and instance
+		// has been deleted
+		if err != nil {
+			fetchErr := fmt.Errorf("Error fetching instance %s for volume %s", instanceID, diskName)
+			glog.Warning(fetchErr)
+			return awsDiskInfo, false, fetchErr
+		}
+
+		awsDiskInfo.ec2Instance = instanceInfo
+		awsDiskInfo.nodeName = mapInstanceToNodeName(instanceInfo)
+		awsDiskInfo.hasAttachment = true
+		if awsDiskInfo.nodeName == nodeName {
+			return awsDiskInfo, true, nil
+		}
+	}
+	return awsDiskInfo, false, nil
 }
