@@ -206,6 +206,12 @@ const (
 	// alpha: v1.9
 	// Postpone deletion of a persistent volume claim in case it is used by a pod
 	PVCProtection utilfeature.Feature = "PVCProtection"
+
+	// owner: @aveshagarwal
+	// alpha: v1.9
+	//
+	// Enable resource limits priority function
+	ResourceLimitsPriorityFunction utilfeature.Feature = "ResourceLimitsPriorityFunction"
 )
 
 func init() {
@@ -244,6 +250,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	CustomPodDNS:                                {Default: false, PreRelease: utilfeature.Alpha},
 	BlockVolume:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	PVCProtection:                               {Default: false, PreRelease: utilfeature.Alpha},
+	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
