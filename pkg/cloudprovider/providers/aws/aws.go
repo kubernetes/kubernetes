@@ -2021,26 +2021,24 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 
 // DetachDisk implements Volumes.DetachDisk
 func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName) (string, error) {
-	disk, err := newAWSDisk(c, diskName)
-	if err != nil {
+	diskInfo, attached, err := c.checkIfAttachedToNode(diskName, nodeName)
+
+	if diskInfo == nil {
 		return "", err
 	}
 
-	awsInstance, info, err := c.getFullInstance(nodeName)
-	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
-			// If instance no longer exists, safe to assume volume is not attached.
-			glog.Warningf(
-				"Instance %q does not exist. DetachDisk will assume disk %q is not attached to it.",
-				nodeName,
-				diskName)
-			return "", nil
-		}
-
-		return "", err
+	if !attached && diskInfo.ec2Instance != nil {
+		glog.Warningf("DetachDisk %s called for node %s but volume is attached to node %s", diskName, nodeName, diskInfo.nodeName)
+		return "", nil
 	}
 
-	mountDevice, alreadyAttached, err := c.getMountDevice(awsInstance, info, disk.awsID, false)
+	if !attached {
+		return "", nil
+	}
+
+	awsInstance := newAWSInstance(c.ec2, diskInfo.ec2Instance)
+
+	mountDevice, alreadyAttached, err := c.getMountDevice(awsInstance, diskInfo.ec2Instance, diskInfo.disk.awsID, false)
 	if err != nil {
 		return "", err
 	}
@@ -2052,18 +2050,19 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 
 	request := ec2.DetachVolumeInput{
 		InstanceId: &awsInstance.awsID,
-		VolumeId:   disk.awsID.awsString(),
+		VolumeId:   diskInfo.disk.awsID.awsString(),
 	}
 
 	response, err := c.ec2.DetachVolume(&request)
 	if err != nil {
-		return "", fmt.Errorf("error detaching EBS volume %q from %q: %q", disk.awsID, awsInstance.awsID, err)
+		return "", fmt.Errorf("error detaching EBS volume %q from %q: %q", diskInfo.disk.awsID, awsInstance.awsID, err)
 	}
+
 	if response == nil {
 		return "", errors.New("no response from DetachVolume")
 	}
 
-	attachment, err := disk.waitForAttachmentStatus("detached")
+	attachment, err := diskInfo.disk.waitForAttachmentStatus("detached")
 	if err != nil {
 		return "", err
 	}
@@ -2076,7 +2075,7 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 	}
 
 	if mountDevice != "" {
-		c.endAttaching(awsInstance, disk.awsID, mountDevice)
+		c.endAttaching(awsInstance, diskInfo.disk.awsID, mountDevice)
 		// We don't check the return value - we don't really expect the attachment to have been
 		// in progress, though it might have been
 	}
@@ -2320,32 +2319,13 @@ func (c *Cloud) GetDiskPath(volumeName KubernetesVolumeID) (string, error) {
 
 // DiskIsAttached implements Volumes.DiskIsAttached
 func (c *Cloud) DiskIsAttached(diskName KubernetesVolumeID, nodeName types.NodeName) (bool, error) {
-	_, instance, err := c.getFullInstance(nodeName)
-	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
-			// If instance no longer exists, safe to assume volume is not attached.
-			glog.Warningf(
-				"Instance %q does not exist. DiskIsAttached will assume disk %q is not attached to it.",
-				nodeName,
-				diskName)
-			return false, nil
-		}
+	diskInfo, attached, err := c.checkIfAttachedToNode(diskName, nodeName)
 
-		return false, err
+	if diskInfo == nil {
+		return true, err
 	}
 
-	diskID, err := diskName.mapToAWSVolumeID()
-	if err != nil {
-		return false, fmt.Errorf("error mapping volume spec %q to aws id: %v", diskName, err)
-	}
-
-	for _, blockDevice := range instance.BlockDeviceMappings {
-		id := awsVolumeID(aws.StringValue(blockDevice.Ebs.VolumeId))
-		if id == diskID {
-			return true, nil
-		}
-	}
-	return false, nil
+	return attached, nil
 }
 
 func (c *Cloud) DisksAreAttached(nodeDisks map[types.NodeName][]KubernetesVolumeID) (map[types.NodeName]map[KubernetesVolumeID]bool, error) {
