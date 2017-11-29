@@ -254,19 +254,6 @@ func RegisterPredicateMetadataProducerFactory(factory PredicateMetadataProducerF
 	predicateMetadataProducer = factory
 }
 
-// DEPRECATED
-// Use Map-Reduce pattern for priority functions.
-// Registers a priority function with the algorithm registry. Returns the name,
-// with which the function was registered.
-func RegisterPriorityFunction(name string, function algorithm.PriorityFunction, weight int) string {
-	return RegisterPriorityConfigFactory(name, PriorityConfigFactory{
-		Function: func(PluginFactoryArgs) algorithm.PriorityFunction {
-			return function
-		},
-		Weight: weight,
-	})
-}
-
 // RegisterPriorityFunction2 registers a priority function with the algorithm registry. Returns the name,
 // with which the function was registered.
 // FIXME: Rename to PriorityFunctionFactory.
