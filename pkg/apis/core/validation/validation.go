@@ -3596,6 +3596,10 @@ func validateServiceExternalTrafficFieldsValue(service *core.Service) field.Erro
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("externalTrafficPolicy"), service.Spec.ExternalTrafficPolicy,
 			fmt.Sprintf("ExternalTrafficPolicy must be empty, %v or %v", core.ServiceExternalTrafficPolicyTypeCluster, core.ServiceExternalTrafficPolicyTypeLocal)))
 	}
+	if service.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal &&
+		!utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "externalTrafficPolicy"), "externalTrafficPolicy: Local may only be set if the AllowExtTrafficLocalEndpoints feature gate is enabled)"))
+	}
 	if service.Spec.HealthCheckNodePort < 0 {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("healthCheckNodePort"), service.Spec.HealthCheckNodePort,
 			"HealthCheckNodePort must be not less than 0"))
