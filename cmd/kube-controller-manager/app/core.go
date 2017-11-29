@@ -145,7 +145,11 @@ func startRouteController(ctx ControllerContext) (bool, error) {
 	if err != nil {
 		glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.Options.ClusterCIDR, err)
 	}
-	routeController := routecontroller.New(routes, ctx.ClientBuilder.ClientOrDie("route-controller"), ctx.InformerFactory.Core().V1().Nodes(), ctx.Options.ClusterName, clusterCIDR)
+	routeController, err := routecontroller.New(routes, ctx.ClientBuilder.ClientOrDie("route-controller"), ctx.InformerFactory.Core().V1().Nodes(), ctx.Options.ClusterName, clusterCIDR)
+	if err != nil {
+		return true, err
+	}
+
 	go routeController.Run(ctx.Stop, ctx.Options.RouteReconciliationPeriod.Duration)
 	return true, nil
 }
@@ -214,12 +218,16 @@ func startVolumeExpandController(ctx ControllerContext) (bool, error) {
 }
 
 func startEndpointController(ctx ControllerContext) (bool, error) {
-	go endpointcontroller.NewEndpointController(
+	endpointController, endpointControllerErr := endpointcontroller.NewEndpointController(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Services(),
 		ctx.InformerFactory.Core().V1().Endpoints(),
 		ctx.ClientBuilder.ClientOrDie("endpoint-controller"),
-	).Run(int(ctx.Options.ConcurrentEndpointSyncs), ctx.Stop)
+	)
+	if endpointControllerErr != nil {
+		return true, fmt.Errorf("Failed to start endpoint controller : %v", endpointControllerErr)
+	}
+	go endpointController.Run(int(ctx.Options.ConcurrentEndpointSyncs), ctx.Stop)
 	return true, nil
 }
 
@@ -234,11 +242,16 @@ func startReplicationController(ctx ControllerContext) (bool, error) {
 }
 
 func startPodGCController(ctx ControllerContext) (bool, error) {
-	go podgc.NewPodGC(
+	podGCController, podGCControllerErr := podgc.NewPodGC(
 		ctx.ClientBuilder.ClientOrDie("pod-garbage-collector"),
 		ctx.InformerFactory.Core().V1().Pods(),
 		int(ctx.Options.TerminatedPodGCThreshold),
-	).Run(ctx.Stop)
+	)
+	if podGCControllerErr != nil {
+		return true, fmt.Errorf("Failed to start pod GC controller : %v", podGCControllerErr)
+	}
+
+	go podGCController.Run(ctx.Stop)
 	return true, nil
 }
 
@@ -292,7 +305,7 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 
 	discoverResourcesFn := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
 
-	namespaceController := namespacecontroller.NewNamespaceController(
+	namespaceController, namespaceControllerErr := namespacecontroller.NewNamespaceController(
 		namespaceKubeClient,
 		namespaceClientPool,
 		discoverResourcesFn,
@@ -300,6 +313,9 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 		ctx.Options.NamespaceSyncPeriod.Duration,
 		v1.FinalizerKubernetes,
 	)
+	if namespaceControllerErr != nil {
+		return true, fmt.Errorf("Failed to start namespaces controller : %v", namespaceControllerErr)
+	}
 	go namespaceController.Run(int(ctx.Options.ConcurrentNamespaceSyncs), ctx.Stop)
 
 	return true, nil
@@ -380,11 +396,15 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 
 func startPVCProtectionController(ctx ControllerContext) (bool, error) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.PVCProtection) {
-		go pvcprotection.NewPVCProtectionController(
+		protectionController, protectionControllerErr := pvcprotection.NewPVCProtectionController(
 			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
 			ctx.InformerFactory.Core().V1().Pods(),
 			ctx.ClientBuilder.ClientOrDie("pvc-protection-controller"),
-		).Run(1, ctx.Stop)
+		)
+		if protectionControllerErr != nil {
+			return true, fmt.Errorf("Failed to start the PVC protection collector: %v", protectionControllerErr)
+		}
+		go protectionController.Run(1, ctx.Stop)
 		return true, nil
 	}
 	return false, nil
