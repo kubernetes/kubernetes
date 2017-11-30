@@ -63,22 +63,25 @@ func kubeDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interfac
 		return err
 	}
 
-	var dnsBindAddr string
+	var dnsBindAddr, dnsProbeAddr string
 	if dnsip.To4() == nil {
 		dnsBindAddr = "::1"
+		dnsProbeAddr = "[" + dnsBindAddr + "]"
 	} else {
 		dnsBindAddr = "127.0.0.1"
+		dnsProbeAddr = dnsBindAddr
 	}
 
 	// Get the YAML manifest conditionally based on the k8s version
 	kubeDNSDeploymentBytes := GetKubeDNSManifest(k8sVersion)
 	dnsDeploymentBytes, err := kubeadmutil.ParseTemplate(kubeDNSDeploymentBytes,
-		struct{ ImageRepository, Arch, Version, DNSBindAddr, DNSDomain, DNSProbeType, MasterTaintKey string }{
+		struct{ ImageRepository, Arch, Version, DNSBindAddr, DNSProbeAddr, DNSDomain, DNSProbeType, MasterTaintKey string }{
 			ImageRepository: cfg.ImageRepository,
 			Arch:            runtime.GOARCH,
 			// Get the kube-dns version conditionally based on the k8s version
 			Version:        GetDNSVersion(k8sVersion, kubeadmconstants.KubeDNS),
 			DNSBindAddr:    dnsBindAddr,
+			DNSProbeAddr:   dnsProbeAddr,
 			DNSDomain:      cfg.Networking.DNSDomain,
 			DNSProbeType:   GetKubeDNSProbeType(k8sVersion),
 			MasterTaintKey: kubeadmconstants.LabelNodeRoleMaster,
