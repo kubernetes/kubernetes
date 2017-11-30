@@ -343,6 +343,20 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		return nil
 	}
 
+	// it is possible that reclaimNodeLevelResources suceeded but didn't realise. Let's check the actual situation
+	// before we start evicting pods
+	observations, _, err = makeSignalObservations(m.summaryProvider, capacityProvider, activePods)
+	if err != nil {
+		glog.Errorf("eviction manager: unexpected err: %v", err)
+		return nil
+	}
+
+	debugLogObservations("observations", observations)
+	if len(thresholdsMet(m.thresholdsMet, observations, true)) == 0 {
+		glog.Infof("eviction manager: able to reduce %v pressure without evicting pods.", resourceToReclaim)
+		return nil
+	}
+
 	glog.Infof("eviction manager: must evict pod(s) to reclaim %v", resourceToReclaim)
 
 	// rank the pods for eviction
