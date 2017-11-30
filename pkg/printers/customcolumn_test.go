@@ -323,3 +323,45 @@ foo       baz           <none>
 		}
 	}
 }
+
+// this mimics how resource/get.go calls the customcolumn printer
+func TestIndividualPrintObjOnExistingTabWriter(t *testing.T) {
+	columns := []printers.Column{
+		{
+			Header:    "NAME",
+			FieldSpec: "{.metadata.name}",
+		},
+		{
+			Header:    "LONG COLUMN NAME", // name is longer than all values of label1
+			FieldSpec: "{.metadata.labels.label1}",
+		},
+		{
+			Header:    "LABEL 2",
+			FieldSpec: "{.metadata.labels.label2}",
+		},
+	}
+	objects := []*v1.Pod{
+		{ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{"label1": "foo", "label2": "foo"}}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "bar", Labels: map[string]string{"label1": "bar", "label2": "bar"}}},
+	}
+	expectedOutput := `NAME      LONG COLUMN NAME   LABEL 2
+foo       foo                foo
+bar       bar                bar
+`
+
+	buffer := &bytes.Buffer{}
+	tabWriter := printers.GetNewTabWriter(buffer)
+	printer := &printers.CustomColumnsPrinter{
+		Columns: columns,
+		Decoder: legacyscheme.Codecs.UniversalDecoder(),
+	}
+	for _, obj := range objects {
+		if err := printer.PrintObj(obj, tabWriter); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	}
+	tabWriter.Flush()
+	if buffer.String() != expectedOutput {
+		t.Errorf("\nexpected:\n'%s'\nsaw\n'%s'\n", expectedOutput, buffer.String())
+	}
+}
