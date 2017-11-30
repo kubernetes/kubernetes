@@ -50,7 +50,8 @@ message StorageClass {
   map<string, string> parameters = 3;
 
   // Dynamically provisioned PersistentVolumes of this storage class are
-  // created with this reclaimPolicy. Defaults to Delete.
+  // created with this reclaimPolicy. Valid options are `Retain` and
+  // `Delete` (default).
   // +optional
   optional string reclaimPolicy = 4;
 
