@@ -31,13 +31,13 @@ const (
 // FileClient is the interface for creating file shares, interface for test
 // injection.
 type FileClient interface {
-	createFileShare(accountName, accountKey, name string, sizeGB int) error
+	createFileShare(accountName, accountKey, name string, sizeGiB int) error
 	deleteFileShare(accountName, accountKey, name string) error
 }
 
 // create file share
-func (az *Cloud) createFileShare(accountName, accountKey, name string, sizeGB int) error {
-	return az.FileClient.createFileShare(accountName, accountKey, name, sizeGB)
+func (az *Cloud) createFileShare(accountName, accountKey, name string, sizeGiB int) error {
+	return az.FileClient.createFileShare(accountName, accountKey, name, sizeGiB)
 }
 
 func (az *Cloud) deleteFileShare(accountName, accountKey, name string) error {
@@ -48,7 +48,7 @@ type azureFileClient struct {
 	env azure.Environment
 }
 
-func (f *azureFileClient) createFileShare(accountName, accountKey, name string, sizeGB int) error {
+func (f *azureFileClient) createFileShare(accountName, accountKey, name string, sizeGiB int) error {
 	fileClient, err := f.getFileSvcClient(accountName, accountKey)
 	if err != nil {
 		return err
@@ -62,7 +62,7 @@ func (f *azureFileClient) createFileShare(accountName, accountKey, name string, 
 	if err = share.Create(nil); err != nil {
 		return fmt.Errorf("failed to create file share, err: %v", err)
 	}
-	share.Properties.Quota = sizeGB
+	share.Properties.Quota = sizeGiB
 	if err = share.SetProperties(nil); err != nil {
 		if err := share.Delete(nil); err != nil {
 			glog.Errorf("Error deleting share: %v", err)

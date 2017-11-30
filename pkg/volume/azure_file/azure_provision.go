@@ -38,9 +38,11 @@ var _ volume.ProvisionableVolumePlugin = &azureFilePlugin{}
 // azure cloud provider should implement it
 type azureCloudProvider interface {
 	// create a file share
-	CreateFileShare(name, storageAccount, storageType, location string, requestGB int) (string, string, error)
+	CreateFileShare(name, storageAccount, storageType, location string, requestGiB int) (string, string, error)
 	// delete a file share
 	DeleteFileShare(accountName, key, name string) error
+	// resize a file share
+	ResizeFileShare(accountName, accountKey, name string, sizeGiB int) error
 }
 
 type azureFileDeleter struct {
@@ -141,7 +143,7 @@ func (a *azureFileProvisioner) Provision() (*v1.PersistentVolume, error) {
 	name = strings.Replace(name, "--", "-", -1)
 	capacity := a.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestBytes := capacity.Value()
-	requestGB := int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
+	requestGiB := int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
 	secretNamespace := a.options.PVC.Namespace
 	// Apply ProvisionerParameters (case-insensitive). We leave validation of
 	// the values to the cloud provider.
@@ -164,7 +166,7 @@ func (a *azureFileProvisioner) Provision() (*v1.PersistentVolume, error) {
 		return nil, fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on Azure file")
 	}
 
-	account, key, err := a.azureProvider.CreateFileShare(name, account, sku, location, requestGB)
+	account, key, err := a.azureProvider.CreateFileShare(name, account, sku, location, requestGiB)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +189,7 @@ func (a *azureFileProvisioner) Provision() (*v1.PersistentVolume, error) {
 			PersistentVolumeReclaimPolicy: a.options.PersistentVolumeReclaimPolicy,
 			AccessModes:                   a.options.PVC.Spec.AccessModes,
 			Capacity: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", requestGB)),
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", requestGiB)),
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				AzureFile: &v1.AzureFilePersistentVolumeSource{

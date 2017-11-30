@@ -23,7 +23,7 @@ import (
 )
 
 // CreateFileShare creates a file share, using a matching storage account
-func (az *Cloud) CreateFileShare(name, storageAccount, storageType, location string, requestGB int) (string, string, error) {
+func (az *Cloud) CreateFileShare(name, storageAccount, storageType, location string, requestGiB int) (string, string, error) {
 	var errResult error
 	accounts := []accountWithLocation{}
 	if len(storageAccount) > 0 {
@@ -46,7 +46,7 @@ func (az *Cloud) CreateFileShare(name, storageAccount, storageType, location str
 				continue
 			}
 
-			if innerErr = az.createFileShare(account.Name, key, name, requestGB); innerErr != nil {
+			if innerErr = az.createFileShare(account.Name, key, name, requestGiB); innerErr != nil {
 				errResult = fmt.Errorf("failed to create share %s in account %s: %v", name, account.Name, innerErr)
 				continue
 			}
@@ -67,5 +67,26 @@ func (az *Cloud) DeleteFileShare(accountName, key, name string) error {
 		return err
 	}
 	glog.V(4).Infof("share %s deleted", name)
+	return nil
+}
+
+// ResizeFileShare resizes a file share
+func (az *Cloud) ResizeFileShare(accountName, accountKey, name string, sizeGiB int) error {
+	fileClient, err := az.getFileSvcClient(accountName, accountKey)
+	if err != nil {
+		return err
+	}
+
+	share := fileClient.GetShareReference(name)
+	if share.Properties.Quota >= sizeGiB {
+		glog.Warningf("file share size(%dGi) is already greater or equal than requested size(%dGi), accountName: %s, shareName: %s",
+			share.Properties.Quota, sizeGiB, accountName, name)
+		return nil
+	}
+	share.Properties.Quota = sizeGiB
+	if err = share.SetProperties(nil); err != nil {
+		return fmt.Errorf("failed to set quota on file share %s, err: %v", name, err)
+	}
+	glog.V(4).Infof("resize file share completed, accountName: %s, shareName: %s, sizeGiB: %d", accountName, name, sizeGiB)
 	return nil
 }
