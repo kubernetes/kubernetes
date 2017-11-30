@@ -33,12 +33,14 @@ var DefaultBasePeerDirs = []string{
 
 // CustomArgs is used by the gengo framework to pass args specific to this generator.
 type CustomArgs struct {
-	// Base peer dirs which nearly everybody will use, i.e. outside of Kubernetes core.
+	// Base peer dirs which nearly everybody will use, i.e. outside of Kubernetes core. Peer dirs
+	// are declared to make the generator pick up manually written conversion funcs from external
+	// packages.
 	BasePeerDirs []string
 
-	// Custom peer dirs which are application specific. Always consider these as
-	// last-ditch possibilities for conversions.
-	ExtraPeerDirs []string //
+	// Custom peer dirs which are application specific. Peer dirs are declared to make the
+	// generator pick up manually written conversion funcs from external packages.
+	ExtraPeerDirs []string
 
 	// Skipunsafe indicates whether to generate unsafe conversions to improve the efficiency
 	// of these operations. The unsafe operation is a direct pointer assignment via unsafe
