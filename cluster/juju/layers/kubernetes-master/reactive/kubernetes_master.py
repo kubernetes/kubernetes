@@ -414,7 +414,7 @@ def start_master(etcd):
     configure_apiserver(etcd)
     configure_controller_manager()
     configure_scheduler()
-
+    set_state('kubernetes-master.components.started')
     hookenv.open_port(6443)
 
 
@@ -554,7 +554,7 @@ def kick_api_server(tls):
     if data_changed('cert', tls.get_server_cert()):
         # certificate changed, so restart the api server
         hookenv.log("Certificate information changed, restarting api server")
-        set_state('kube-apiserver.do-restart')
+        restart_apiserver()
     tls_client.reset_certificate_write_flag('server')
 
 
@@ -837,42 +837,25 @@ def shutdown():
     service_stop('snap.kube-scheduler.daemon')
 
 
-@when('kube-apiserver.do-restart')
 def restart_apiserver():
     prev_state, prev_msg = hookenv.status_get()
     hookenv.status_set('maintenance', 'Restarting kube-apiserver')
     host.service_restart('snap.kube-apiserver.daemon')
     hookenv.status_set(prev_state, prev_msg)
-    remove_state('kube-apiserver.do-restart')
-    set_state('kube-apiserver.started')
 
 
-@when('kube-controller-manager.do-restart')
 def restart_controller_manager():
     prev_state, prev_msg = hookenv.status_get()
     hookenv.status_set('maintenance', 'Restarting kube-controller-manager')
     host.service_restart('snap.kube-controller-manager.daemon')
     hookenv.status_set(prev_state, prev_msg)
-    remove_state('kube-controller-manager.do-restart')
-    set_state('kube-controller-manager.started')
 
 
-@when('kube-scheduler.do-restart')
 def restart_scheduler():
     prev_state, prev_msg = hookenv.status_get()
     hookenv.status_set('maintenance', 'Restarting kube-scheduler')
     host.service_restart('snap.kube-scheduler.daemon')
     hookenv.status_set(prev_state, prev_msg)
-    remove_state('kube-scheduler.do-restart')
-    set_state('kube-scheduler.started')
-
-
-@when_all('kube-apiserver.started',
-          'kube-controller-manager.started',
-          'kube-scheduler.started')
-@when_not('kubernetes-master.components.started')
-def componenets_started():
-    set_state('kubernetes-master.components.started')
 
 
 def arch():
@@ -1088,8 +1071,7 @@ def configure_apiserver(etcd):
     api_opts['admission-control'] = ','.join(admission_control)
 
     configure_kubernetes_service('kube-apiserver', api_opts, 'api-extra-args')
-
-    set_state('kube-apiserver.do-restart')
+    restart_apiserver()
 
 
 def configure_controller_manager():
@@ -1111,8 +1093,7 @@ def configure_controller_manager():
 
     configure_kubernetes_service('kube-controller-manager', controller_opts,
                                  'controller-manager-extra-args')
-
-    set_state('kube-controller-manager.do-restart')
+    restart_controller_manager()
 
 
 def configure_scheduler():
@@ -1125,7 +1106,7 @@ def configure_scheduler():
     configure_kubernetes_service('kube-scheduler', scheduler_opts,
                                  'scheduler-extra-args')
 
-    set_state('kube-scheduler.do-restart')
+    restart_scheduler()
 
 
 def setup_basic_auth(password=None, username='admin', uid='admin',
