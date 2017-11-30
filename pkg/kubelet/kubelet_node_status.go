@@ -25,7 +25,9 @@ import (
 	"strings"
 	"time"
 
+	"errors"
 	"github.com/golang/glog"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -55,6 +57,9 @@ const (
 	// maxNamesPerImageInNodeStatus is max number of names per image stored in
 	// the node status.
 	maxNamesPerImageInNodeStatus = 5
+
+	// max timeout for cadvisor calls.
+	cadvisorTimeout = time.Second * 5
 )
 
 // registerWithAPIServer registers the node with the cluster master. It is safe
@@ -655,14 +660,30 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 
 // Set versioninfo for the node.
 func (kl *Kubelet) setNodeStatusVersionInfo(node *v1.Node) {
-	verinfo, err := kl.cadvisor.VersionInfo()
-	if err != nil {
-		glog.Errorf("Error getting version info: %v", err)
+	// Abandon cadvisor call if it takes too long.
+	type r struct {
+		info *cadvisorapi.VersionInfo
+		err  error
+	}
+	c := make(chan r, 1)
+	go func() {
+		verinfo, err := kl.cadvisor.VersionInfo()
+		c <- r{verinfo, err}
+	}()
+	var verinfo r
+	select {
+	case verinfo = <-c:
+	case <-time.After(cadvisorTimeout):
+		verinfo.err = errors.New("timed out retrieving version info")
+	}
+
+	if verinfo.err != nil {
+		glog.Errorf("Error getting version info: %v", verinfo.err)
 		return
 	}
 
-	node.Status.NodeInfo.KernelVersion = verinfo.KernelVersion
-	node.Status.NodeInfo.OSImage = verinfo.ContainerOsVersion
+	node.Status.NodeInfo.KernelVersion = verinfo.info.KernelVersion
+	node.Status.NodeInfo.OSImage = verinfo.info.ContainerOsVersion
 
 	runtimeVersion := "Unknown"
 	if runtimeVer, err := kl.containerRuntime.Version(); err == nil {
