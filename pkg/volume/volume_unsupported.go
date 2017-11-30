@@ -25,3 +25,7 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
 func IsSameFSGroup(dir string, fsGroup int64) (bool, int, error) {
 	return true, int(fsGroup), nil
 }
+
+func IsSameFS(path1, path2 string) (bool, error) {
+	return true, nil
+}
