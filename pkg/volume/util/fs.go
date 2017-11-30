@@ -57,7 +57,7 @@ func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 func Du(path string) (*resource.Quantity, error) {
 	// Uses the same niceness level as cadvisor.fs does when running du
 	// Uses -B 1 to always scale to a blocksize of 1 byte
-	out, err := exec.Command("nice", "-n", "19", "du", "-s", "-B", "1", path).CombinedOutput()
+	out, err := exec.Command("nice", "-n", "19", "du", "--apparent-size", "-s", "-B", "1", path).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("failed command 'du' ($ nice -n 19 du -s -B 1) on path %s with error %v", path, err)
 	}
