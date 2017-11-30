@@ -122,6 +122,8 @@ type KubeGenericRuntime interface {
 	kubecontainer.Runtime
 	kubecontainer.IndirectStreamingRuntime
 	kubecontainer.ContainerCommandRunner
+
+	GetRuntimeService() internalapi.RuntimeService
 }
 
 // LegacyLogProvider gives the ability to use unsupported docker log drivers (e.g. journald)
@@ -922,4 +924,8 @@ func (m *kubeGenericRuntimeManager) UpdatePodCIDR(podCIDR string) error {
 				PodCidr: podCIDR,
 			},
 		})
+}
+
+func (m *kubeGenericRuntimeManager) GetRuntimeService() internalapi.RuntimeService {
+	return m.runtimeService
 }
