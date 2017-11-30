@@ -439,6 +439,9 @@ func (UnstructuredObjectConverter) Convert(in, out, context interface{}) error {
 func (UnstructuredObjectConverter) ConvertToVersion(in runtime.Object, target runtime.GroupVersioner) (runtime.Object, error) {
 	if kind := in.GetObjectKind().GroupVersionKind(); !kind.Empty() {
 		gvk, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{kind})
+		// if gvk.GroupVersion().Version == runtime.APIVersionInternal {
+		// 	return in, nil
+		// }
 		if !ok {
 			// TODO: should this be a typed error?
 			return nil, fmt.Errorf("%v is unstructured and is not suitable for converting to %q", kind, target)

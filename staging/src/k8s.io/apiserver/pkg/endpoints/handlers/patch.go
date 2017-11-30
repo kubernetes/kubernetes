@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -239,12 +240,16 @@ func patchResource(
 					return nil, err
 				}
 				// Convert the object back to unversioned.
-				gvk := kind.GroupKind().WithVersion(runtime.APIVersionInternal)
-				unversionedObjToUpdate, err := unsafeConvertor.ConvertToVersion(versionedObjToUpdate, gvk.GroupVersion())
-				if err != nil {
-					return nil, err
+				// Unstructured doesn't have an internal version, so skip the conversion
+				if _, ok := versionedObjToUpdate.(*unstructured.Unstructured); !ok {
+					gvk := kind.GroupKind().WithVersion(runtime.APIVersionInternal)
+					objToUpdate, err = unsafeConvertor.ConvertToVersion(versionedObjToUpdate, gvk.GroupVersion())
+					if err != nil {
+						return nil, err
+					}
+				} else {
+					objToUpdate = versionedObjToUpdate
 				}
-				objToUpdate = unversionedObjToUpdate
 				// Store unstructured representation for possible retries.
 				originalObjMap = originalMap
 				// Make a getter that can return a fresh strategic patch map if needed for conflict retries
@@ -336,6 +341,10 @@ func patchResource(
 			}
 			if err := applyPatchToObject(codec, defaulter, currentObjMap, originalPatchMap, versionedObjToUpdate, versionedObj); err != nil {
 				return nil, err
+			}
+			// Unstructured doesn't have an internal version, so skip the conversion
+			if _, ok := versionedObjToUpdate.(*unstructured.Unstructured); ok {
+				return versionedObjToUpdate, nil
 			}
 			// Convert the object back to unversioned.
 			gvk := kind.GroupKind().WithVersion(runtime.APIVersionInternal)
@@ -469,7 +478,7 @@ func applyPatchToObject(
 // interpretPatchError interprets the error type and returns an error with appropriate HTTP code.
 func interpretPatchError(err error) error {
 	switch err {
-	case mergepatch.ErrBadJSONDoc, mergepatch.ErrBadPatchFormatForPrimitiveList, mergepatch.ErrBadPatchFormatForRetainKeys, mergepatch.ErrBadPatchFormatForSetElementOrderList, mergepatch.ErrUnsupportedStrategicMergePatchFormat:
+	case mergepatch.ErrBadJSONDoc, mergepatch.ErrBadPatchFormatForPrimitiveList, mergepatch.ErrBadPatchFormatForRetainKeys, mergepatch.ErrBadPatchFormatForSetElementOrderList, mergepatch.ErrUnsupportedStrategicMergePatchFormat, mergepatch.ErrOnlySupportMetadataStrategicMergePatch:
 		return errors.NewBadRequest(err.Error())
 	case mergepatch.ErrNoListOfLists, mergepatch.ErrPatchContentNotMatchRetainKeys:
 		return errors.NewGenericServerResponse(http.StatusUnprocessableEntity, "", schema.GroupResource{}, "", err.Error(), 0, false)

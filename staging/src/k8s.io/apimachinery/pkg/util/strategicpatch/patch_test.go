@@ -26,6 +26,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ghodss/yaml"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
@@ -6744,5 +6745,102 @@ func TestUnknownField(t *testing.T) {
 				}
 			}()
 		}
+	}
+}
+
+func TestStrategicMergePatchUnstructured(t *testing.T) {
+	originalJson := `{
+	"apiVersion": "stable.example.com/v1",
+	"kind": "CronTab",
+	"metadata": {
+		"finalizers": [
+			"xxx",
+			"yyy"
+		],
+		"ownerReferences": [
+			{
+				"apiVersion": "",
+				"kind": "",
+				"name": "aaa",
+				"uid": "111"
+			},
+			{
+				"apiVersion": "",
+				"kind": "",
+				"name": "bbb",
+				"uid": "222"
+			}
+		],
+		"name": "my-new-cron-object"
+	},
+	"spec": {
+		"cronSpec": "* * * * */5",
+		"image": "my-awesome-cron-image"
+	}
+}`
+	expectedJson := `{
+	"apiVersion": "stable.example.com/v1",
+	"kind": "CronTab",
+	"metadata": {
+		"finalizers": [
+			"xxx"
+		],
+		"ownerReferences": [
+			{
+				"apiVersion": "",
+				"kind": "",
+				"name": "aaa",
+				"uid": "111"
+			}
+		],
+		"name": "my-new-cron-object"
+	},
+	"spec": {
+		"cronSpec": "* * * * */5",
+		"image": "my-awesome-cron-image"
+	}
+}`
+
+	originalJsonMap := JSONMap(make(map[string]interface{}))
+	expectedJsonMap := JSONMap(make(map[string]interface{}))
+	if err := json.Unmarshal([]byte(originalJson), &originalJsonMap); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(expectedJson), &expectedJsonMap); err != nil {
+		t.Fatal(err)
+	}
+	table := map[string]struct {
+		patch       string
+		expectedErr string
+	}{
+		"correct patch": {
+			patch:       `{"metadata":{"$deleteFromPrimitiveList/finalizers":["yyy"],"ownerReferences":[{"$patch":"delete","uid":"222"}]}}`,
+			expectedErr: "",
+		},
+		"patch contains fields other than metadata": {
+			patch:       `{"metadata":{"$deleteFromPrimitiveList/finalizers":["yyy"],"ownerReferences":[{"$patch":"delete","uid":"222"}]},"spec":{"image": "another-image"}}`,
+			expectedErr: mergepatch.ErrOnlySupportMetadataStrategicMergePatch.Error(),
+		},
+	}
+	for name, tc := range table {
+		t.Run(name, func(t *testing.T) {
+			patchJsonMap := make(map[string]interface{})
+			if err := json.Unmarshal([]byte(tc.patch), &patchJsonMap); err != nil {
+				t.Fatal(err)
+			}
+			patchedJsonMap, err := StrategicMergeMapPatch(originalJsonMap, patchJsonMap, &unstructured.Unstructured{})
+			switch {
+			case len(tc.expectedErr) != 0 && err == nil:
+				t.Errorf("expected %v, got %v", tc.expectedErr, err)
+			case len(tc.expectedErr) != 0 && err != nil && tc.expectedErr != err.Error():
+				t.Errorf("expected %v, got %v", tc.expectedErr, err)
+			case len(tc.expectedErr) == 0 && err != nil:
+				t.Errorf("unexpected err: %v", err)
+			case len(tc.expectedErr) == 0 && err == nil:
+				if !reflect.DeepEqual(patchedJsonMap, expectedJsonMap) {
+					t.Errorf("expected:\n%#v\ngot:\n%#v\n", expectedJsonMap, patchedJsonMap)
+				}
+			}
+		})
 	}
 }

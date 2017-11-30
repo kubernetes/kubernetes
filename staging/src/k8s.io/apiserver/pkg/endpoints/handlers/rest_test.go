@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
@@ -133,24 +134,73 @@ func TestPatchCustomResource(t *testing.T) {
 			"apiVersion": "mygroup.example.com/v1beta1",
 			"kind":       "Noxu",
 			"metadata": map[string]interface{}{
-				"namespace": "Namespaced",
-				"name":      "foo",
+				"namespace":  "Namespaced",
+				"name":       "foo",
+				"finalizers": []interface{}{"xxx", "yyy"},
+				"ownerReferences": []interface{}{
+					map[string]interface{}{"name": "aaa", "uid": "111"},
+					map[string]interface{}{"name": "bbb", "uid": "222"},
+				},
 			},
 			"spec": map[string]interface{}{
 				"num": "10",
 			},
 		},
 	}
-	patch := `{"spec":{"num":"20"}}`
-	expectedError := "strategic merge patch format is not supported"
 
-	actual := &unstructured.Unstructured{}
-	err := strategicPatchObject(codec, defaulter, original, []byte(patch), actual, &unstructured.Unstructured{})
-	if !apierrors.IsBadRequest(err) {
-		t.Errorf("expected HTTP status: BadRequest, got: %#v", apierrors.ReasonForError(err))
+	expected := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "mygroup.example.com/v1beta1",
+			"kind":       "Noxu",
+			"metadata": map[string]interface{}{
+				"namespace":  "Namespaced",
+				"name":       "foo",
+				"finalizers": []interface{}{"xxx"},
+				"ownerReferences": []interface{}{
+					map[string]interface{}{"name": "aaa", "uid": "111"},
+				},
+			},
+			"spec": map[string]interface{}{
+				"num": "10",
+			},
+		},
 	}
-	if err.Error() != expectedError {
-		t.Errorf("expected %#v, got %#v", expectedError, err.Error())
+
+	table := map[string]struct {
+		patch       string
+		expectedErr string
+	}{
+		"correct patch": {
+			patch: `{"metadata":{"$deleteFromPrimitiveList/finalizers":["yyy"],"ownerReferences":[{"$patch":"delete","uid":"222"}]}}`,
+		},
+		"patch contains fields other than metadata": {
+			patch:       `{"metadata":{"$deleteFromPrimitiveList/finalizers":["yyy"],"ownerReferences":[{"$patch":"delete","uid":"222"}]},"spec":{"num":"20"}}`,
+			expectedErr: mergepatch.ErrOnlySupportMetadataStrategicMergePatch.Error(),
+		},
+	}
+
+	for name, tc := range table {
+		t.Run(name, func(t *testing.T) {
+			actual := &unstructured.Unstructured{}
+			err := strategicPatchObject(codec, defaulter, original, []byte(tc.patch), actual, &unstructured.Unstructured{})
+			switch {
+			case len(tc.expectedErr) != 0 && err == nil:
+				t.Errorf("expected %v, got %v", tc.expectedErr, err)
+			case len(tc.expectedErr) != 0 && err != nil:
+				if !apierrors.IsBadRequest(err) {
+					t.Errorf("expected HTTP status: BadRequest, got: %#v", apierrors.ReasonForError(err))
+				}
+				if err.Error() != tc.expectedErr {
+					t.Errorf("expected %#v, got %#v", tc.expectedErr, err.Error())
+				}
+			case len(tc.expectedErr) == 0 && err != nil:
+				t.Errorf("unexpected err: %v", err)
+			case len(tc.expectedErr) == 0 && err == nil:
+				if !reflect.DeepEqual(actual, expected) {
+					t.Errorf("expected\n%#v\ngot\n%#v\n", expected, actual)
+				}
+			}
+		})
 	}
 }
 
