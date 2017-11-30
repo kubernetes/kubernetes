@@ -37,7 +37,7 @@ const (
 	repairTimeout  = 20 * time.Minute
 )
 
-var _ = SIGDescribe("Node Auto Repairs [Slow] [Disruptive]", func() {
+var _ = SIGDescribe("Node Auto Repairs [Serial][Disruptive]", func() {
 	f := framework.NewDefaultFramework("lifecycle")
 	var c clientset.Interface
 	var originalNodes map[string]string
