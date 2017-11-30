@@ -248,7 +248,7 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 		Do()
 
 	if options.IgnoreNotFound {
-		r.IgnoreErrors(kapierrors.IsNotFound)
+		r = r.IgnoreErrors(kapierrors.IsNotFound)
 	}
 	if err := r.Err(); err != nil {
 		return err
