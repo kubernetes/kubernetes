@@ -57,9 +57,6 @@ var AllowedModes = []string{
 
 const (
 	// Default configuration values for ModeBatch.
-	//
-	// TODO(ericchiang): Make these value configurable. Maybe through a
-	// kubeconfig extension?
 	defaultBatchBufferSize = 10000            // Buffer up to 10000 events before starting discarding.
 	defaultBatchMaxSize    = 400              // Only send up to 400 events at a time.
 	defaultBatchMaxWait    = 30 * time.Second // Send events at least twice a minute.
@@ -72,13 +69,49 @@ const (
 // The plugin name reported in error metrics.
 const pluginName = "webhook"
 
+// BatchBackendConfig represents batching webhook audit backend configuration.
+type BatchBackendConfig struct {
+	// BufferSize defines a size of the buffering queue.
+	BufferSize int
+	// MaxBatchSize defines maximum size of a batch.
+	MaxBatchSize int
+	// MaxBatchWait defines maximum amount of time to wait for MaxBatchSize
+	// events to be accumulated in the buffer before forcibly sending what's
+	// being accumulated.
+	MaxBatchWait time.Duration
+
+	// ThrottleQPS defines the allowed rate of batches per second sent to the webhook.
+	ThrottleQPS float32
+	// ThrottleBurst defines the maximum rate of batches per second sent to the webhook in case
+	// the capacity defined by ThrottleQPS was not utilized.
+	ThrottleBurst int
+
+	// InitialBackoff defines the amount of time to wait before retrying the requests
+	// to the webhook for the first time.
+	InitialBackoff time.Duration
+}
+
+// NewDefaultBatchBackendConfig returns new BatchBackendConfig objects populated by default values.
+func NewDefaultBatchBackendConfig() BatchBackendConfig {
+	return BatchBackendConfig{
+		BufferSize:   defaultBatchBufferSize,
+		MaxBatchSize: defaultBatchMaxSize,
+		MaxBatchWait: defaultBatchMaxWait,
+
+		ThrottleQPS:   defaultBatchThrottleQPS,
+		ThrottleBurst: defaultBatchThrottleBurst,
+
+		InitialBackoff: defaultInitialBackoff,
+	}
+}
+
 // NewBackend returns an audit backend that sends events over HTTP to an external service.
 // The mode indicates the caching behavior of the webhook. Either blocking (ModeBlocking)
 // or buffered with batch POSTs (ModeBatch).
-func NewBackend(kubeConfigFile string, mode string, groupVersion schema.GroupVersion) (audit.Backend, error) {
+func NewBackend(kubeConfigFile string, mode string, groupVersion schema.GroupVersion, config BatchBackendConfig) (audit.Backend, error) {
 	switch mode {
 	case ModeBatch:
-		return newBatchWebhook(kubeConfigFile, groupVersion)
+		return newBatchWebhook(kubeConfigFile, groupVersion, config)
 	case ModeBlocking:
 		return newBlockingWebhook(kubeConfigFile, groupVersion)
 	default:
@@ -105,13 +138,13 @@ func init() {
 	install.Install(groupFactoryRegistry, registry, audit.Scheme)
 }
 
-func loadWebhook(configFile string, groupVersion schema.GroupVersion) (*webhook.GenericWebhook, error) {
+func loadWebhook(configFile string, groupVersion schema.GroupVersion, initialBackoff time.Duration) (*webhook.GenericWebhook, error) {
 	return webhook.NewGenericWebhook(registry, audit.Codecs, configFile,
-		[]schema.GroupVersion{groupVersion}, defaultInitialBackoff)
+		[]schema.GroupVersion{groupVersion}, initialBackoff)
 }
 
 func newBlockingWebhook(configFile string, groupVersion schema.GroupVersion) (*blockingBackend, error) {
-	w, err := loadWebhook(configFile, groupVersion)
+	w, err := loadWebhook(configFile, groupVersion, defaultInitialBackoff)
 	if err != nil {
 		return nil, err
 	}
@@ -146,19 +179,19 @@ func (b *blockingBackend) processEvents(ev ...*auditinternal.Event) error {
 	return b.w.RestClient.Post().Body(&list).Do().Error()
 }
 
-func newBatchWebhook(configFile string, groupVersion schema.GroupVersion) (*batchBackend, error) {
-	w, err := loadWebhook(configFile, groupVersion)
+func newBatchWebhook(configFile string, groupVersion schema.GroupVersion, config BatchBackendConfig) (*batchBackend, error) {
+	w, err := loadWebhook(configFile, groupVersion, config.InitialBackoff)
 	if err != nil {
 		return nil, err
 	}
 
 	return &batchBackend{
 		w:            w,
-		buffer:       make(chan *auditinternal.Event, defaultBatchBufferSize),
-		maxBatchSize: defaultBatchMaxSize,
-		maxBatchWait: defaultBatchMaxWait,
+		buffer:       make(chan *auditinternal.Event, config.BufferSize),
+		maxBatchSize: config.MaxBatchSize,
+		maxBatchWait: config.MaxBatchWait,
 		shutdownCh:   make(chan struct{}),
-		throttle:     flowcontrol.NewTokenBucketRateLimiter(defaultBatchThrottleQPS, defaultBatchThrottleBurst),
+		throttle:     flowcontrol.NewTokenBucketRateLimiter(config.ThrottleQPS, config.ThrottleBurst),
 	}, nil
 }
 
