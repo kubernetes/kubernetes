@@ -50,6 +50,52 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 )
 
+func TestMakeAbsolutePath(t *testing.T) {
+	tests := []struct {
+		goos         string
+		path         string
+		expectedPath string
+		name         string
+	}{
+		{
+			goos:         "linux",
+			path:         "non-absolute/path",
+			expectedPath: "/non-absolute/path",
+			name:         "basic linux",
+		},
+		{
+			goos:         "windows",
+			path:         "some\\path",
+			expectedPath: "c:\\some\\path",
+			name:         "basic windows",
+		},
+		{
+			goos:         "windows",
+			path:         "/some/path",
+			expectedPath: "c:/some/path",
+			name:         "linux path on windows",
+		},
+		{
+			goos:         "windows",
+			path:         "\\some\\path",
+			expectedPath: "c:\\some\\path",
+			name:         "windows path no drive",
+		},
+		{
+			goos:         "windows",
+			path:         "\\:\\some\\path",
+			expectedPath: "\\:\\some\\path",
+			name:         "windows path with colon",
+		},
+	}
+	for _, test := range tests {
+		path := makeAbsolutePath(test.goos, test.path)
+		if path != test.expectedPath {
+			t.Errorf("[%s] Expected %s saw %s", test.name, test.expectedPath, path)
+		}
+	}
+}
+
 func TestMakeMounts(t *testing.T) {
 	bTrue := true
 	propagationHostToContainer := v1.MountPropagationHostToContainer

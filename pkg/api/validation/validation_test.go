@@ -3655,7 +3655,6 @@ func TestValidateVolumeMounts(t *testing.T) {
 		"empty name":                             {{Name: "", MountPath: "/foo"}},
 		"name not found":                         {{Name: "", MountPath: "/foo"}},
 		"empty mountpath":                        {{Name: "abc", MountPath: ""}},
-		"relative mountpath":                     {{Name: "abc", MountPath: "bar"}},
 		"mountpath collision":                    {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
 		"absolute subpath":                       {{Name: "abc", MountPath: "/bar", SubPath: "/baz"}},
 		"subpath in ..":                          {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},
