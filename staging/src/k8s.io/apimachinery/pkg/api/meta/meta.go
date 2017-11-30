@@ -36,34 +36,33 @@ var errNotList = fmt.Errorf("object does not implement the List interfaces")
 
 var errNotCommon = fmt.Errorf("object does not implement the common interface for accessing the SelfLink")
 
-// CommonAccessor returns a Common interface for the provided object or an error if the object does
-// not provide List.
-// TODO: return bool instead of error
-func CommonAccessor(obj interface{}) (metav1.Common, error) {
+// CommonAccessor returns a Common interface for the provided object or a boolean value wether the object to
+// provide List.
+func CommonAccessor(obj interface{}) (metav1.Common, bool) {
 	switch t := obj.(type) {
 	case List:
-		return t, nil
+		return t, true
 	case metav1.ListInterface:
-		return t, nil
+		return t, true
 	case ListMetaAccessor:
 		if m := t.GetListMeta(); m != nil {
-			return m, nil
+			return m, true
 		}
-		return nil, errNotCommon
+		return nil, false
 	case metav1.ListMetaAccessor:
 		if m := t.GetListMeta(); m != nil {
-			return m, nil
+			return m, true
 		}
-		return nil, errNotCommon
+		return nil, false
 	case metav1.Object:
-		return t, nil
+		return t, true
 	case metav1.ObjectMetaAccessor:
 		if m := t.GetObjectMeta(); m != nil {
-			return m, nil
+			return m, true
 		}
-		return nil, errNotCommon
+		return nil, false
 	default:
-		return nil, errNotCommon
+		return nil, false
 	}
 }
 

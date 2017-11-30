@@ -65,8 +65,8 @@ func GetReference(scheme *runtime.Scheme, obj runtime.Object) (*v1.ObjectReferen
 	var listMeta metav1.Common
 	objectMeta, err := meta.Accessor(obj)
 	if err != nil {
-		listMeta, err = meta.CommonAccessor(obj)
-		if err != nil {
+		listMeta, boolean = meta.CommonAccessor(obj)
+		if !boolean {
 			return nil, err
 		}
 	} else {

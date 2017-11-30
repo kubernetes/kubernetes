@@ -63,12 +63,12 @@ func (c defaultTableConvertor) ConvertToTable(ctx genericapirequest.Context, obj
 			return nil, err
 		}
 	}
-	if m, err := meta.ListAccessor(object); err == nil {
+	if m, boolean := meta.ListAccessor(object); !boolean {
 		table.ResourceVersion = m.GetResourceVersion()
 		table.SelfLink = m.GetSelfLink()
 		table.Continue = m.GetContinue()
 	} else {
-		if m, err := meta.CommonAccessor(object); err == nil {
+		if m, boolean := meta.CommonAccessor(object); err == nil {
 			table.ResourceVersion = m.GetResourceVersion()
 			table.SelfLink = m.GetSelfLink()
 		}
