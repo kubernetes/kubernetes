@@ -1958,6 +1958,10 @@ message NodeStatus {
   // List of volumes that are attached to the node.
   // +optional
   repeated AttachedVolume volumesAttached = 10;
+
+  // List of ports currently used on the Node
+  // +optional
+  repeated UsedPort usedPorts = 11;
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
@@ -4345,6 +4349,18 @@ message Toleration {
   // negative values will be treated as 0 (evict immediately) by the system.
   // +optional
   optional int64 tolerationSeconds = 5;
+}
+
+message UsedPort {
+  // Protocol for port. Must be UDP or TCP.
+  optional string protocol = 1;
+
+  // Port number
+  optional int32 port = 2;
+
+  // What host IP to bind the port to.
+  // +optional
+  optional string hostIP = 3;
 }
 
 // Volume represents a named volume in a pod that may be accessed by any container in the pod.

@@ -108,6 +108,7 @@ go_library(
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
         "//third_party/forked/golang/expansion:go_default_library",
+        "//vendor/github.com/drael/GOnetstat:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/golang/groupcache/lru:go_default_library",
         "//vendor/github.com/google/cadvisor/events:go_default_library",
