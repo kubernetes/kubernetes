@@ -210,7 +210,14 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			}
 			perm := fileinfo.Mode()
 
-			hostPath = filepath.Join(hostPath, mount.SubPath)
+			newPath := filepath.Join(hostPath, mount.SubPath)
+			// exit if newPath is in a different filesystem than the host path
+			sameFS, fsErr := volume.IsSameFS(hostPath, newPath)
+			if fsErr != nil || !sameFS {
+				return nil, fmt.Errorf("SubPath %q is different from parent path %q", mount.SubPath, hostPath)
+			}
+
+			hostPath = newPath
 
 			if subPathExists, err := utilfile.FileOrSymlinkExists(hostPath); err != nil {
 				glog.Errorf("Could not determine if subPath %s exists; will not attempt to change its permissions", hostPath)

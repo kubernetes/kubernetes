@@ -103,3 +103,21 @@ func IsSameFSGroup(dir string, fsGroup int64) (bool, int, error) {
 	s := info.Sys().(*syscall.Stat_t)
 	return int(s.Gid) == int(fsGroup), int(s.Gid), nil
 }
+
+// IsSameFS tests if two paths are in the same filesystem (i.e. have the same FSID)
+func IsSameFS(path1, path2 string) (bool, error) {
+	buf := new(syscall.Statfs_t)
+	err := syscall.Statfs(path1, buf)
+	if err != nil {
+		return false, err
+	}
+	fsId1 := buf.Fsid
+
+	err = syscall.Statfs(path2, buf)
+	if err != nil {
+		return false, err
+	}
+
+	fsId2 := buf.Fsid
+	return fsId1 == fsId2, nil
+}
