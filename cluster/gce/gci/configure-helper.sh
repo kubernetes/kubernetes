@@ -1807,8 +1807,10 @@ function start-kube-controller-manager {
   if [[ -n "${CLUSTER_SIGNING_DURATION:-}" ]]; then
     params+=" --experimental-cluster-signing-duration=$CLUSTER_SIGNING_DURATION"
   fi
-  # disable using HPA metrics REST clients if metrics-server isn't enabled
-  if [[ "${ENABLE_METRICS_SERVER:-}" != "true" ]]; then
+  # Disable using HPA metrics REST clients if metrics-server isn't enabled,
+  # or if we want to explicitly disable it by setting HPA_USE_REST_CLIENT.
+  if [[ "${ENABLE_METRICS_SERVER:-}" != "true" ]] ||
+     [[ "${HPA_USE_REST_CLIENTS:-}" == "false" ]]; then
     params+=" --horizontal-pod-autoscaler-use-rest-clients=false"
   fi
 

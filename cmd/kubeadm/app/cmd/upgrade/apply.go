@@ -64,7 +64,7 @@ func NewCmdApply(parentFlags *cmdUpgradeFlags) *cobra.Command {
 	flags := &applyFlags{
 		parent:           parentFlags,
 		imagePullTimeout: 15 * time.Minute,
-		etcdUpgrade:      false,
+		etcdUpgrade:      true,
 	}
 
 	cmd := &cobra.Command{

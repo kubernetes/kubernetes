@@ -315,7 +315,7 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 
 	mixedInvalidFlags := []string{}
 	flag.Visit(func(f *pflag.Flag) {
-		if f.Name == "config" || strings.HasPrefix(f.Name, "ignore-checks-") || strings.HasPrefix(f.Name, "skip-") || f.Name == "dry-run" || f.Name == "kubeconfig" {
+		if f.Name == "config" || f.Name == "ignore-preflight-errors" || strings.HasPrefix(f.Name, "skip-") || f.Name == "dry-run" || f.Name == "kubeconfig" {
 			// "--skip-*" flags or other whitelisted flags can be set with --config
 			return
 		}

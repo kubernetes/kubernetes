@@ -34,6 +34,7 @@ const (
 	caCertsVolumePath       = "/etc/ssl/certs"
 	caCertsPkiVolumeName    = "ca-certs-etc-pki"
 	flexvolumeDirVolumeName = "flexvolume-dir"
+	cloudConfigVolumeName   = "cloud-config"
 	flexvolumeDirVolumePath = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec"
 )
 
@@ -70,6 +71,13 @@ func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.MasterConfiguration) c
 	// Read-only mount for the controller manager kubeconfig file
 	controllerManagerKubeConfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName)
 	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeConfigVolumeName, controllerManagerKubeConfigFile, controllerManagerKubeConfigFile, true, &hostPathFileOrCreate)
+	// Read-only mount of the cloud config file if present
+	if cfg.CloudProvider != "" {
+		if _, err := os.Stat(DefaultCloudConfigPath); err == nil {
+			mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, cloudConfigVolumeName, DefaultCloudConfigPath, DefaultCloudConfigPath, true, &hostPathFileOrCreate)
+			mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, cloudConfigVolumeName, DefaultCloudConfigPath, DefaultCloudConfigPath, true, &hostPathFileOrCreate)
+		}
+	}
 	// Mount for the flexvolume directory (/usr/libexec/kubernetes/kubelet-plugins/volume/exec) directory
 	// Flexvolume dir must NOT be readonly as it is used for third-party plugins to integrate with their storage backends via unix domain socket.
 	if stat, err := os.Stat(flexvolumeDirVolumePath); err == nil && stat.IsDir() {
