@@ -181,6 +181,7 @@ items:
     - deployments/rollback
     - deployments/scale
     - ingresses
+    - networkpolicies
     - replicasets
     - replicasets/scale
     - replicationcontrollers/scale
@@ -197,6 +198,19 @@ items:
     - policy
     resources:
     - poddisruptionbudgets
+    verbs:
+    - create
+    - delete
+    - deletecollection
+    - get
+    - list
+    - patch
+    - update
+    - watch
+  - apiGroups:
+    - networking.k8s.io
+    resources:
+    - networkpolicies
     verbs:
     - create
     - delete
@@ -359,6 +373,7 @@ items:
     - deployments/rollback
     - deployments/scale
     - ingresses
+    - networkpolicies
     - replicasets
     - replicasets/scale
     - replicationcontrollers/scale
@@ -375,6 +390,19 @@ items:
     - policy
     resources:
     - poddisruptionbudgets
+    verbs:
+    - create
+    - delete
+    - deletecollection
+    - get
+    - list
+    - patch
+    - update
+    - watch
+  - apiGroups:
+    - networking.k8s.io
+    resources:
+    - networkpolicies
     verbs:
     - create
     - delete
@@ -471,6 +499,7 @@ items:
     - deployments
     - deployments/scale
     - ingresses
+    - networkpolicies
     - replicasets
     - replicasets/scale
     - replicationcontrollers/scale
@@ -482,6 +511,14 @@ items:
     - policy
     resources:
     - poddisruptionbudgets
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - networking.k8s.io
+    resources:
+    - networkpolicies
     verbs:
     - get
     - list

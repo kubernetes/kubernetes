@@ -48,6 +48,7 @@ const (
 	storageGroup        = "storage.k8s.io"
 	resMetricsGroup     = "metrics.k8s.io"
 	customMetricsGroup  = "custom.metrics.k8s.io"
+	networkingGroup     = "networking.k8s.io"
 )
 
 func addDefaultMetadata(obj runtime.Object) {
@@ -231,9 +232,12 @@ func ClusterRoles() []rbac.ClusterRole {
 
 				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets",
 					"deployments", "deployments/scale", "deployments/rollback", "ingresses",
-					"replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
+					"replicasets", "replicasets/scale", "replicationcontrollers/scale",
+					"networkpolicies").RuleOrDie(),
 
 				rbac.NewRule(ReadWrite...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
+
+				rbac.NewRule(ReadWrite...).Groups(networkingGroup).Resources("networkpolicies").RuleOrDie(),
 
 				// additional admin powers
 				rbac.NewRule("create").Groups(authorizationGroup).Resources("localsubjectaccessreviews").RuleOrDie(),
@@ -267,9 +271,12 @@ func ClusterRoles() []rbac.ClusterRole {
 
 				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets",
 					"deployments", "deployments/scale", "deployments/rollback", "ingresses",
-					"replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
+					"replicasets", "replicasets/scale", "replicationcontrollers/scale",
+					"networkpolicies").RuleOrDie(),
 
 				rbac.NewRule(ReadWrite...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
+
+				rbac.NewRule(ReadWrite...).Groups(networkingGroup).Resources("networkpolicies").RuleOrDie(),
 			},
 		},
 		{
@@ -295,9 +302,12 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule(Read...).Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
 
 				rbac.NewRule(Read...).Groups(extensionsGroup).Resources("daemonsets", "deployments", "deployments/scale",
-					"ingresses", "replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
+					"ingresses", "replicasets", "replicasets/scale", "replicationcontrollers/scale",
+					"networkpolicies").RuleOrDie(),
 
 				rbac.NewRule(Read...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
+
+				rbac.NewRule(Read...).Groups(networkingGroup).Resources("networkpolicies").RuleOrDie(),
 			},
 		},
 		{
