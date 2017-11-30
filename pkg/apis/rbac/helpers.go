@@ -18,6 +18,7 @@ package rbac
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -89,7 +90,8 @@ func ResourceNameMatches(rule *PolicyRule, requestedName string) bool {
 	}
 
 	for _, ruleName := range rule.ResourceNames {
-		if ruleName == requestedName {
+		valid, err := regexp.MatchString(ruleName, requestedName)
+		if err == nil && valid {
 			return true
 		}
 	}

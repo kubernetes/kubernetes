@@ -175,3 +175,28 @@ func TestResourceMatches(t *testing.T) {
 		})
 	}
 }
+
+func TestResourceNameMatches(t *testing.T) {
+	requestName := "my-pod-xyz"
+	rules := []rbac.PolicyRule{
+		{
+			ResourceNames: []string{"my-pod"},
+		},
+		{
+			ResourceNames: []string{"my-pod*"},
+		},
+		{
+			ResourceNames: []string{"^my-pod"},
+		},
+		{
+			ResourceNames: []string{"^my-pod-xyz$"},
+		},
+	}
+
+	for idx, rule := range rules {
+		matched := rbac.ResourceNameMatches(&rule, requestName)
+		if !matched {
+			t.Fatalf("%d: not matched", idx)
+		}
+	}
+}
