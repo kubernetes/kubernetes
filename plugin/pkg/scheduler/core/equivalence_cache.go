@@ -188,6 +188,23 @@ func (ec *EquivalenceCache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, 
 
 	// GeneralPredicates: will always be affected by adding a new pod
 	invalidPredicates := sets.NewString("GeneralPredicates")
+
+	// MaxPDVolumeCountPredicate: we check the volumes of pod to make decision.
+	for _, vol := range pod.Spec.Volumes {
+		if vol.PersistentVolumeClaim != nil {
+			invalidPredicates.Insert("MaxEBSVolumeCount", "MaxGCEPDVolumeCount", "MaxAzureDiskVolumeCount")
+		} else {
+			if vol.AWSElasticBlockStore != nil {
+				invalidPredicates.Insert("MaxEBSVolumeCount")
+			}
+			if vol.GCEPersistentDisk != nil {
+				invalidPredicates.Insert("MaxGCEPDVolumeCount")
+			}
+			if vol.AzureDisk != nil {
+				invalidPredicates.Insert("MaxAzureDiskVolumeCount")
+			}
+		}
+	}
 	ec.InvalidateCachedPredicateItem(nodeName, invalidPredicates)
 }
 

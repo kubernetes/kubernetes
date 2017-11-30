@@ -61,11 +61,11 @@ const (
 )
 
 var (
-	serviceAffinitySet           = sets.NewString("ServiceAffinity")
-	maxPDVolumeCountPredicateSet = sets.NewString("MaxPDVolumeCountPredicate")
-	matchInterPodAffinitySet     = sets.NewString("MatchInterPodAffinity")
-	generalPredicatesSets        = sets.NewString("GeneralPredicates")
-	noDiskConflictSet            = sets.NewString("NoDiskConflict")
+	serviceAffinitySet            = sets.NewString("ServiceAffinity")
+	matchInterPodAffinitySet      = sets.NewString("MatchInterPodAffinity")
+	generalPredicatesSets         = sets.NewString("GeneralPredicates")
+	noDiskConflictSet             = sets.NewString("NoDiskConflict")
+	maxPDVolumeCountPredicateKeys = []string{"MaxGCEPDVolumeCount", "MaxAzureDiskVolumeCount", "MaxEBSVolumeCount"}
 )
 
 // ConfigFactory is the default implementation of the scheduler.Configurator interface.
@@ -292,7 +292,11 @@ func (c *ConfigFactory) onPvDelete(obj interface{}) {
 }
 
 func (c *ConfigFactory) invalidatePredicatesForPv(pv *v1.PersistentVolume) {
-	invalidPredicates := sets.NewString("MaxPDVolumeCountPredicate")
+	// You could have a PVC that points to a PV, but the PV object doesn't exist.
+	// So when the PV object gets added, we can recount.
+	invalidPredicates := sets.NewString()
+
+	// PV types which impact MaxPDVolumeCountPredicate
 	if pv.Spec.AWSElasticBlockStore != nil {
 		invalidPredicates.Insert("MaxEBSVolumeCount")
 	}
@@ -302,6 +306,15 @@ func (c *ConfigFactory) invalidatePredicatesForPv(pv *v1.PersistentVolume) {
 	if pv.Spec.AzureDisk != nil {
 		invalidPredicates.Insert("MaxAzureDiskVolumeCount")
 	}
+
+	// If PV contains zone related label, it may impact cached NoVolumeZoneConflict
+	for k := range pv.ObjectMeta.Labels {
+		if k == kubeletapis.LabelZoneFailureDomain || k == kubeletapis.LabelZoneRegion {
+			invalidPredicates.Insert("NoVolumeZoneConflict")
+			break
+		}
+	}
+
 	c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(invalidPredicates)
 }
 
@@ -338,9 +351,26 @@ func (c *ConfigFactory) onPvcDelete(obj interface{}) {
 }
 
 func (c *ConfigFactory) invalidatePredicatesForPvc(pvc *v1.PersistentVolumeClaim) {
-	if pvc.Spec.VolumeName != "" {
-		c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(maxPDVolumeCountPredicateSet)
+	// We need to do this here because the ecache uses PVC uid as part of equivalence hash of pod
+	// The binded volume type may change
+	invalidPredicates := sets.NewString(maxPDVolumeCountPredicateKeys...)
+	// // The binded volume's label may change
+	invalidPredicates.Insert("NoVolumeZoneConflict")
+
+	c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(invalidPredicates)
+}
+
+func (c *ConfigFactory) invalidatePredicatesForPvcUpdate(old, new *v1.PersistentVolumeClaim) {
+	invalidPredicates := sets.NewString()
+
+	if old.Spec.VolumeName != new.Spec.VolumeName {
+		// The binded volume type may change
+		invalidPredicates.Insert(maxPDVolumeCountPredicateKeys...)
+		// The binded volume's label may change
+		invalidPredicates.Insert("NoVolumeZoneConflict")
 	}
+
+	c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(invalidPredicates)
 }
 
 func (c *ConfigFactory) onServiceAdd(obj interface{}) {
@@ -400,7 +430,7 @@ func (c *ConfigFactory) addPodToCache(obj interface{}) {
 		glog.Errorf("scheduler cache AddPod failed: %v", err)
 	}
 	// NOTE: Updating equivalence cache of addPodToCache has been
-	// handled optimistically in InvalidateCachedPredicateItemForPodAdd.
+	// handled optimistically in: plugin/pkg/scheduler/scheduler.go#assume()
 }
 
 func (c *ConfigFactory) updatePodInCache(oldObj, newObj interface{}) {
