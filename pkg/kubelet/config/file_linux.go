@@ -42,6 +42,7 @@ const (
 
 func (s *sourceFile) watch() error {
 	_, err := os.Stat(s.path)
+	glog.Errorf("[DEBUG] watch(): o.Stat(%s) returns %s", s.path, err)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return err
@@ -102,12 +103,15 @@ func (s *sourceFile) processEvent(e *inotify.Event) error {
 	case (e.Mask & inotify.IN_MOVED_FROM) > 0:
 		eventType = podDelete
 	case (e.Mask & inotify.IN_DELETE_SELF) > 0:
+		glog.Errorf("[DEBUG] IN_DELETE_SELF event for %q", e.Name)
 		return fmt.Errorf("the watched path is deleted")
 	default:
 		// Ignore rest events
+		glog.Errorf("[DEBUG] received an ignorable event for %q: %+v", e.Name, e)
 		return nil
 	}
 
+	glog.Errorf("[DEBUG] received an %d event for %q", eventType, e.Name)
 	switch eventType {
 	case podAdd, podModify:
 		if pod, err := s.extractFromFile(e.Name); err != nil {
