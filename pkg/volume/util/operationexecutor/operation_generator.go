@@ -544,6 +544,7 @@ func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, devi
 		glog.V(6).Infof("Resizing is not enabled for this volume %s", volumeToMount.VolumeName)
 		return nil
 	}
+
 	mounter := og.volumePluginMgr.Host.GetMounter(pluginName)
 	// Get expander, if possible
 	expandableVolumePlugin, _ :=
@@ -564,6 +565,13 @@ func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, devi
 		if pvcStatusCap.Cmp(pvSpecCap) < 0 {
 			// File system resize was requested, proceed
 			glog.V(4).Infof(volumeToMount.GenerateMsgDetailed("MountVolume.resizeFileSystem entering", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath)))
+
+			if volumeToMount.VolumeSpec.ReadOnly {
+				simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MountVolume.resizeFileSystem failed", "requested read-only file system")
+				glog.Warningf(detailedMsg)
+				og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FileSystemResizeFailed, simpleMsg)
+				return nil
+			}
 
 			diskFormatter := &mount.SafeFormatAndMount{
 				Interface: mounter,
@@ -1272,6 +1280,7 @@ func updatePVCStatusCapacity(pvcName string, pvc *v1.PersistentVolumeClaim, capa
 	}
 
 	pvcCopy.Status.Capacity = capacity
+	pvcCopy.Status.Conditions = []v1.PersistentVolumeClaimCondition{}
 	newData, err := json.Marshal(pvcCopy)
 
 	if err != nil {
