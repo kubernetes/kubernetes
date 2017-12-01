@@ -78,6 +78,7 @@ go_library(
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/apply/parse:go_default_library",
         "//pkg/kubectl/apply/strategy:go_default_library",
+        "//pkg/kubectl/cmd/apply/prune:go_default_library",
         "//pkg/kubectl/cmd/auth:go_default_library",
         "//pkg/kubectl/cmd/config:go_default_library",
         "//pkg/kubectl/cmd/resource:go_default_library",
@@ -265,6 +266,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/kubectl/cmd/apply/prune:all-srcs",
         "//pkg/kubectl/cmd/auth:all-srcs",
         "//pkg/kubectl/cmd/config:all-srcs",
         "//pkg/kubectl/cmd/resource:all-srcs",
