@@ -467,6 +467,7 @@ message IDRange {
   optional int64 max = 2;
 }
 
+// DEPRECATED 1.9 - This group version of IPBlock is deprecated by networking/v1/IPBlock.
 // IPBlock describes a particular CIDR (Ex. "192.168.1.1/24") that is allowed to the pods
 // matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should
 // not be included within this rule.
@@ -608,6 +609,7 @@ message IngressTLS {
   optional string secretName = 2;
 }
 
+// DEPRECATED 1.9 - This group version of NetworkPolicy is deprecated by networking/v1/NetworkPolicy.
 // NetworkPolicy describes what network traffic is allowed for a set of Pods
 message NetworkPolicy {
   // Standard object's metadata.
@@ -620,6 +622,7 @@ message NetworkPolicy {
   optional NetworkPolicySpec spec = 2;
 }
 
+// DEPRECATED 1.9 - This group version of NetworkPolicyEgressRule is deprecated by networking/v1/NetworkPolicyEgressRule.
 // NetworkPolicyEgressRule describes a particular set of traffic that is allowed out of pods
 // matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and to.
 // This type is beta-level in 1.8
@@ -641,6 +644,7 @@ message NetworkPolicyEgressRule {
   repeated NetworkPolicyPeer to = 2;
 }
 
+// DEPRECATED 1.9 - This group version of NetworkPolicyIngressRule is deprecated by networking/v1/NetworkPolicyIngressRule.
 // This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both ports AND from.
 message NetworkPolicyIngressRule {
   // List of ports which should be made accessible on the pods selected for this rule.
@@ -660,6 +664,7 @@ message NetworkPolicyIngressRule {
   repeated NetworkPolicyPeer from = 2;
 }
 
+// DEPRECATED 1.9 - This group version of NetworkPolicyList is deprecated by networking/v1/NetworkPolicyList.
 // Network Policy List is a list of NetworkPolicy objects.
 message NetworkPolicyList {
   // Standard list metadata.
@@ -671,6 +676,7 @@ message NetworkPolicyList {
   repeated NetworkPolicy items = 2;
 }
 
+// DEPRECATED 1.9 - This group version of NetworkPolicyPeer is deprecated by networking/v1/NetworkPolicyPeer.
 message NetworkPolicyPeer {
   // This is a label selector which selects Pods in this namespace.
   // This field follows standard label selector semantics.
@@ -690,6 +696,7 @@ message NetworkPolicyPeer {
   optional IPBlock ipBlock = 3;
 }
 
+// DEPRECATED 1.9 - This group version of NetworkPolicyPort is deprecated by networking/v1/NetworkPolicyPort.
 message NetworkPolicyPort {
   // Optional.  The protocol (TCP or UDP) which traffic must match.
   // If not specified, this field defaults to TCP.
@@ -705,6 +712,7 @@ message NetworkPolicyPort {
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 2;
 }
 
+// DEPRECATED 1.9 - This group version of NetworkPolicySpec is deprecated by networking/v1/NetworkPolicySpec.
 message NetworkPolicySpec {
   // Selects the pods to which this NetworkPolicy object applies.  The array of ingress rules
   // is applied to any pods selected by this field. Multiple network policies can select the

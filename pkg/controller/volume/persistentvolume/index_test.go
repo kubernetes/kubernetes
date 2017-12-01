@@ -1218,7 +1218,7 @@ func TestFindMatchVolumeWithNode(t *testing.T) {
 				pvc.Spec.StorageClassName = &classWait
 				pvc.Name = "claim02"
 			}),
-			node: node2,
+			node: node3,
 		},
 		"success-bad-and-good-node-affinity": {
 			expectedMatch: "affinity-pv3",

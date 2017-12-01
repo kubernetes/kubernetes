@@ -59,8 +59,8 @@ type diskInfo struct {
 	disk            *awsDisk
 }
 
-// mapToAWSVolumeID extracts the awsVolumeID from the KubernetesVolumeID
-func (name KubernetesVolumeID) mapToAWSVolumeID() (awsVolumeID, error) {
+// MapToAWSVolumeID extracts the awsVolumeID from the KubernetesVolumeID
+func (name KubernetesVolumeID) MapToAWSVolumeID() (awsVolumeID, error) {
 	// name looks like aws://availability-zone/awsVolumeId
 
 	// The original idea of the URL-style name was to put the AZ into the
@@ -101,7 +101,7 @@ func (name KubernetesVolumeID) mapToAWSVolumeID() (awsVolumeID, error) {
 
 func GetAWSVolumeID(kubeVolumeID string) (string, error) {
 	kid := KubernetesVolumeID(kubeVolumeID)
-	awsID, err := kid.mapToAWSVolumeID()
+	awsID, err := kid.MapToAWSVolumeID()
 	return string(awsID), err
 }
 

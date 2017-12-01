@@ -88,10 +88,10 @@ docker_pull(
 
 docker_pull(
     name = "debian-hyperkube-base-amd64",
-    digest = "sha256:1a05a58432254268c31ef5c8d9c21f3d01a40611b14707de6ac2772c0793bd13",
+    digest = "sha256:fc1b461367730660ac5a40c1eb2d1b23221829acf8a892981c12361383b3742b",
     registry = "gcr.io",
     repository = "google-containers/debian-hyperkube-base-amd64",
-    tag = "0.7",  # ignored, but kept here for documentation
+    tag = "0.8",  # ignored, but kept here for documentation
 )
 
 docker_pull(

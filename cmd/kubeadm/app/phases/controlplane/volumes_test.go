@@ -521,7 +521,9 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		if _, ok := mounts.volumeMounts[kubeadmconstants.KubeControllerManager][flexvolumeDirVolumeName]; ok {
 			delete(mounts.volumeMounts[kubeadmconstants.KubeControllerManager], flexvolumeDirVolumeName)
 		}
-
+		if _, ok := mounts.volumeMounts[kubeadmconstants.KubeControllerManager][cloudConfigVolumeName]; ok {
+			delete(mounts.volumeMounts[kubeadmconstants.KubeControllerManager], cloudConfigVolumeName)
+		}
 		if !reflect.DeepEqual(mounts.volumes, rt.vol) {
 			t.Errorf(
 				"failed getHostPathVolumesForTheControlPlane:\n\texpected: %v\n\t  actual: %v",

@@ -628,7 +628,7 @@ func inodeConsumingPod(name string, volumeSource *v1.VolumeSource) *v1.Pod {
 
 func diskConsumingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeSource, resources v1.ResourceRequirements) *v1.Pod {
 	// Each iteration writes 1 Mb, so do diskConsumedMB iterations.
-	return podWithCommand(volumeSource, resources, name, fmt.Sprintf("i=0; while [ $i -lt %d ];", diskConsumedMB)+" do dd if=/dev/urandom of=%s${i} bs=1048576 count=1; i=$(($i+1)); done; while true; do sleep 5; done")
+	return podWithCommand(volumeSource, resources, name, fmt.Sprintf("i=0; while [ $i -lt %d ];", diskConsumedMB)+" do dd if=/dev/urandom of=%s${i} bs=1048576 count=1 2>/dev/null ; i=$(($i+1)); done; while true; do sleep 5; done")
 }
 
 // podWithCommand returns a pod with the provided volumeSource and resourceRequirements.

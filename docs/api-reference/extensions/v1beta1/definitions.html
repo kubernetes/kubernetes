@@ -1395,7 +1395,7 @@ Examples: <code>/foo</code> would allow <code>/foo</code>, <code>/foo/</code> an
 <div class="sect2">
 <h3 id="_v1beta1_networkpolicylist">v1beta1.NetworkPolicyList</h3>
 <div class="paragraph">
-<p>Network Policy List is a list of NetworkPolicy objects.</p>
+<p>DEPRECATED 1.9 - This group version of NetworkPolicyList is deprecated by networking/v1/NetworkPolicyList. Network Policy List is a list of NetworkPolicy objects.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3280,7 +3280,7 @@ When an object is created, the system will populate this list with the current s
 <div class="sect2">
 <h3 id="_v1beta1_ipblock">v1beta1.IPBlock</h3>
 <div class="paragraph">
-<p>IPBlock describes a particular CIDR (Ex. "192.168.1.1/24") that is allowed to the pods matched by a NetworkPolicySpec&#8217;s podSelector. The except entry describes CIDRs that should not be included within this rule.</p>
+<p>DEPRECATED 1.9 - This group version of IPBlock is deprecated by networking/v1/IPBlock. IPBlock describes a particular CIDR (Ex. "192.168.1.1/24") that is allowed to the pods matched by a NetworkPolicySpec&#8217;s podSelector. The except entry describes CIDRs that should not be included within this rule.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -4496,7 +4496,7 @@ When an object is created, the system will populate this list with the current s
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">dnsPolicy</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Set DNS policy for the pod. Defaults to "ClusterFirst". Valid values are <em>ClusterFirstWithHostNet</em>, <em>ClusterFirst</em>, <em>Default</em> or <em>None</em>. DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy. To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to <em>ClusterFirstWithHostNet</em>.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Set DNS policy for the pod. Defaults to "ClusterFirst". Valid values are <em>ClusterFirstWithHostNet</em>, <em>ClusterFirst</em>, <em>Default</em> or <em>None</em>. DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy. To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to <em>ClusterFirstWithHostNet</em>. Note that <em>None</em> policy is an alpha feature introduced in v1.9 and CustomPodDNS feature gate must be enabled to use it.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4629,7 +4629,7 @@ When an object is created, the system will populate this list with the current s
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">dnsConfig</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies the DNS parameters of a pod. Parameters specified here will be merged to the generated DNS configuration based on DNSPolicy.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies the DNS parameters of a pod. Parameters specified here will be merged to the generated DNS configuration based on DNSPolicy. This is an alpha feature introduced in v1.9 and CustomPodDNS feature gate must be enabled to use it.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_poddnsconfig">v1.PodDNSConfig</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -5329,7 +5329,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1beta1_networkpolicy">v1beta1.NetworkPolicy</h3>
 <div class="paragraph">
-<p>NetworkPolicy describes what network traffic is allowed for a set of Pods</p>
+<p>DEPRECATED 1.9 - This group version of NetworkPolicy is deprecated by networking/v1/NetworkPolicy. NetworkPolicy describes what network traffic is allowed for a set of Pods</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -5611,6 +5611,9 @@ Examples:<br>
 </div>
 <div class="sect2">
 <h3 id="_v1beta1_networkpolicyspec">v1beta1.NetworkPolicySpec</h3>
+<div class="paragraph">
+<p>DEPRECATED 1.9 - This group version of NetworkPolicySpec is deprecated by networking/v1/NetworkPolicySpec.</p>
+</div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:20%;">
@@ -6104,6 +6107,9 @@ Both these may change in the future. Incoming requests are matched against the h
 </div>
 <div class="sect2">
 <h3 id="_v1beta1_networkpolicypeer">v1beta1.NetworkPolicyPeer</h3>
+<div class="paragraph">
+<p>DEPRECATED 1.9 - This group version of NetworkPolicyPeer is deprecated by networking/v1/NetworkPolicyPeer.</p>
+</div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:20%;">
@@ -6553,7 +6559,7 @@ Both these may change in the future. Incoming requests are matched against the h
 <div class="sect2">
 <h3 id="_v1beta1_networkpolicyingressrule">v1beta1.NetworkPolicyIngressRule</h3>
 <div class="paragraph">
-<p>This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both ports AND from.</p>
+<p>DEPRECATED 1.9 - This group version of NetworkPolicyIngressRule is deprecated by networking/v1/NetworkPolicyIngressRule. This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both ports AND from.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -7007,7 +7013,7 @@ Both these may change in the future. Incoming requests are matched against the h
 <div class="sect2">
 <h3 id="_v1beta1_networkpolicyegressrule">v1beta1.NetworkPolicyEgressRule</h3>
 <div class="paragraph">
-<p>NetworkPolicyEgressRule describes a particular set of traffic that is allowed out of pods matched by a NetworkPolicySpec&#8217;s podSelector. The traffic must match both ports and to. This type is beta-level in 1.8</p>
+<p>DEPRECATED 1.9 - This group version of NetworkPolicyEgressRule is deprecated by networking/v1/NetworkPolicyEgressRule. NetworkPolicyEgressRule describes a particular set of traffic that is allowed out of pods matched by a NetworkPolicySpec&#8217;s podSelector. The traffic must match both ports and to. This type is beta-level in 1.8</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -7822,6 +7828,9 @@ Both these may change in the future. Incoming requests are matched against the h
 </div>
 <div class="sect2">
 <h3 id="_v1beta1_networkpolicyport">v1beta1.NetworkPolicyPort</h3>
+<div class="paragraph">
+<p>DEPRECATED 1.9 - This group version of NetworkPolicyPort is deprecated by networking/v1/NetworkPolicyPort.</p>
+</div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:20%;">

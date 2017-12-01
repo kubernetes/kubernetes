@@ -77377,11 +77377,11 @@
       "x-kubernetes-patch-strategy": "merge"
      },
      "dnsConfig": {
-      "description": "Specifies the DNS parameters of a pod. Parameters specified here will be merged to the generated DNS configuration based on DNSPolicy.",
+      "description": "Specifies the DNS parameters of a pod. Parameters specified here will be merged to the generated DNS configuration based on DNSPolicy. This is an alpha feature introduced in v1.9 and CustomPodDNS feature gate must be enabled to use it.",
       "$ref": "#/definitions/io.k8s.api.core.v1.PodDNSConfig"
      },
      "dnsPolicy": {
-      "description": "Set DNS policy for the pod. Defaults to \"ClusterFirst\". Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'. DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy. To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.",
+      "description": "Set DNS policy for the pod. Defaults to \"ClusterFirst\". Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'. DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy. To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'. Note that 'None' policy is an alpha feature introduced in v1.9 and CustomPodDNS feature gate must be enabled to use it.",
       "type": "string"
      },
      "hostAliases": {
@@ -79780,7 +79780,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.IPBlock": {
-    "description": "IPBlock describes a particular CIDR (Ex. \"192.168.1.1/24\") that is allowed to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should not be included within this rule.",
+    "description": "DEPRECATED 1.9 - This group version of IPBlock is deprecated by networking/v1/IPBlock. IPBlock describes a particular CIDR (Ex. \"192.168.1.1/24\") that is allowed to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should not be included within this rule.",
     "required": [
      "cidr"
     ],
@@ -79942,7 +79942,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.NetworkPolicy": {
-    "description": "NetworkPolicy describes what network traffic is allowed for a set of Pods",
+    "description": "DEPRECATED 1.9 - This group version of NetworkPolicy is deprecated by networking/v1/NetworkPolicy. NetworkPolicy describes what network traffic is allowed for a set of Pods",
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -79970,7 +79970,7 @@
     ]
    },
    "io.k8s.api.extensions.v1beta1.NetworkPolicyEgressRule": {
-    "description": "NetworkPolicyEgressRule describes a particular set of traffic that is allowed out of pods matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and to. This type is beta-level in 1.8",
+    "description": "DEPRECATED 1.9 - This group version of NetworkPolicyEgressRule is deprecated by networking/v1/NetworkPolicyEgressRule. NetworkPolicyEgressRule describes a particular set of traffic that is allowed out of pods matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and to. This type is beta-level in 1.8",
     "properties": {
      "ports": {
       "description": "List of destination ports for outgoing traffic. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.",
@@ -79989,7 +79989,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.NetworkPolicyIngressRule": {
-    "description": "This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both ports AND from.",
+    "description": "DEPRECATED 1.9 - This group version of NetworkPolicyIngressRule is deprecated by networking/v1/NetworkPolicyIngressRule. This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both ports AND from.",
     "properties": {
      "from": {
       "description": "List of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all sources (traffic not restricted by source). If this field is present and contains at least on item, this rule allows traffic only if the traffic matches at least one item in the from list.",
@@ -80008,7 +80008,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.NetworkPolicyList": {
-    "description": "Network Policy List is a list of NetworkPolicy objects.",
+    "description": "DEPRECATED 1.9 - This group version of NetworkPolicyList is deprecated by networking/v1/NetworkPolicyList. Network Policy List is a list of NetworkPolicy objects.",
     "required": [
      "items"
     ],
@@ -80042,6 +80042,7 @@
     ]
    },
    "io.k8s.api.extensions.v1beta1.NetworkPolicyPeer": {
+    "description": "DEPRECATED 1.9 - This group version of NetworkPolicyPeer is deprecated by networking/v1/NetworkPolicyPeer.",
     "properties": {
      "ipBlock": {
       "description": "IPBlock defines policy on a particular IPBlock",
@@ -80058,6 +80059,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.NetworkPolicyPort": {
+    "description": "DEPRECATED 1.9 - This group version of NetworkPolicyPort is deprecated by networking/v1/NetworkPolicyPort.",
     "properties": {
      "port": {
       "description": "If specified, the port on the given protocol.  This can either be a numerical or named port on a pod.  If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.",
@@ -80070,6 +80072,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.NetworkPolicySpec": {
+    "description": "DEPRECATED 1.9 - This group version of NetworkPolicySpec is deprecated by networking/v1/NetworkPolicySpec.",
     "required": [
      "podSelector"
     ],
