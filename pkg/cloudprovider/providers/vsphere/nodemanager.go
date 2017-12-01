@@ -18,13 +18,14 @@ package vsphere
 
 import (
 	"fmt"
+	"strings"
+	"sync"
+
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
-	"strings"
-	"sync"
 )
 
 // Stores info about the kubernetes node
@@ -241,6 +242,10 @@ func (nm *NodeManager) removeNode(node *v1.Node) {
 	nm.registeredNodesLock.Lock()
 	delete(nm.registeredNodes, node.ObjectMeta.Name)
 	nm.registeredNodesLock.Unlock()
+
+	nm.nodeInfoLock.Lock()
+	delete(nm.nodeInfoMap, node.ObjectMeta.Name)
+	nm.nodeInfoLock.Unlock()
 }
 
 // GetNodeInfo returns a NodeInfo which datacenter, vm and vc server ip address.
