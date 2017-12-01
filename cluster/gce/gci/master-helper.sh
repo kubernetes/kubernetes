@@ -62,7 +62,17 @@ function replicate-master-instance() {
   kube_env="$(echo "${kube_env}" | grep -v "ETCD_PEER_CERT")"
   kube_env="$(echo -e "${kube_env}\nETCD_PEER_CERT: '${ETCD_PEER_CERT_BASE64}'")"
 
-  echo "${kube_env}" > ${KUBE_TEMP}/master-kube-env.yaml
+  kube_env="$(echo "${kube_env}" | grep -v "_HASH")"
+
+  # Add default kube-env parameters when they are not presented in ${kube_env}
+  # It might happen when we adding master with different version (skewed cluster).
+  build-kube-env true "${KUBE_TEMP}/master-kube-env-default.yaml"
+  echo "${kube_env}" > "${KUBE_TEMP}/master-kube-env-existing.yaml"
+  awk -F: 'NR==FNR{a[$1];print;next} !($1 in a)'\
+      "${KUBE_TEMP}/master-kube-env-existing.yaml" \
+      "${KUBE_TEMP}/master-kube-env-default.yaml" \
+      > "${KUBE_TEMP}/master-kube-env.yaml"
+
   get-metadata "${existing_master_zone}" "${existing_master_name}" cluster-name > "${KUBE_TEMP}/cluster-name.txt"
   get-metadata "${existing_master_zone}" "${existing_master_name}" gci-update-strategy > "${KUBE_TEMP}/gci-update.txt"
   get-metadata "${existing_master_zone}" "${existing_master_name}" gci-ensure-gke-docker > "${KUBE_TEMP}/gci-ensure-gke-docker.txt"
