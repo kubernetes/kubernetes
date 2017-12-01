@@ -36,11 +36,15 @@ import (
 	"github.com/evanphx/json-patch"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/golang/glog"
 )
 
 var (
 	watchTestTimeout int64 = 1
 	auditTestUser          = "kubecfg"
+
+	// Number of times that log file is going to be read, until reporting an error.
+	retries = 5
 
 	crd          = testserver.NewRandomNameCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
 	crdName      = strings.SplitN(crd.Name, ".", 2)[0]
@@ -653,24 +657,38 @@ func expectAuditLines(f *framework.Framework, expected []auditEvent) {
 		expectations[event] = false
 	}
 
+	var err error
 	// Fetch the log stream.
-	stream, err := f.ClientSet.CoreV1().RESTClient().Get().AbsPath("/logs/kube-apiserver-audit.log").Stream()
-	framework.ExpectNoError(err, "could not read audit log")
-	defer stream.Close()
+	for i := 0; i < retries; i++ {
+		err = func() error {
+			stream, err := f.ClientSet.CoreV1().RESTClient().Get().AbsPath("/logs/kube-apiserver-audit.log").Stream()
+			defer stream.Close()
+			if err != nil {
+				return err
+			}
 
-	scanner := bufio.NewScanner(stream)
-	for scanner.Scan() {
-		line := scanner.Text()
-		event, err := parseAuditLine(line)
-		framework.ExpectNoError(err)
+			scanner := bufio.NewScanner(stream)
+			for scanner.Scan() {
+				line := scanner.Text()
+				event, err := parseAuditLine(line)
 
-		// If the event was expected, mark it as found.
-		if _, found := expectations[event]; found {
-			expectations[event] = true
+				if err != nil {
+					continue
+				}
+				// If the event was expected, mark it as found.
+				if _, found := expectations[event]; found {
+					expectations[event] = true
+				}
+			}
+			return scanner.Err()
+		}()
+		if err == nil {
+			break
 		}
+		glog.Errorf("error during log reading in attempt %d: %v", i, err)
 	}
-	framework.ExpectNoError(scanner.Err(), "error reading audit log")
 
+	framework.ExpectNoError(err, "error reading audit log")
 	for event, found := range expectations {
 		Expect(found).To(BeTrue(), "Event %#v not found!", event)
 	}

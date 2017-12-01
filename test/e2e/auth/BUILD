@@ -26,6 +26,7 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/k8s.io/api/batch/v1:go_default_library",
