@@ -19,7 +19,6 @@ package deviceplugin
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -38,6 +37,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
+	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
@@ -77,6 +78,9 @@ type ManagerImpl struct {
 
 	// allocation contains pod to allocated device mapping.
 	allocation devAllocation
+
+	// store is used for backing checkpoint data
+	store utilstore.Store
 }
 
 type sourcesReadyStub struct{}
@@ -111,6 +115,11 @@ func newManagerImpl(socketPath string) (*ManagerImpl, error) {
 	// Before that, initializes them to perform no-op operations.
 	manager.activePods = func() []*v1.Pod { return []*v1.Pod{} }
 	manager.sourcesReady = &sourcesReadyStub{}
+	var err error
+	manager.store, err = utilstore.NewFileStore(dir, utilfs.DefaultFs{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize device plugin checkpointing store: %+v", err)
+	}
 
 	return manager, nil
 }
@@ -384,21 +393,26 @@ func (m *ManagerImpl) writeCheckpoint() error {
 	if err != nil {
 		return err
 	}
-	filepath := m.checkpointFile()
-	return ioutil.WriteFile(filepath, dataJSON, 0644)
+	err = m.store.Write(kubeletDevicePluginCheckpoint, dataJSON)
+	if err != nil {
+		return fmt.Errorf("failed to write deviceplugin checkpoint file %q: %v", kubeletDevicePluginCheckpoint, err)
+	}
+	return nil
 }
 
 // Reads device to container allocation information from disk
 func (m *ManagerImpl) readCheckpoint() error {
-	filepath := m.checkpointFile()
-	content, err := ioutil.ReadFile(filepath)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to read checkpoint file %q: %v", filepath, err)
+	content, err := m.store.Read(kubeletDevicePluginCheckpoint)
+	if err != nil {
+		if err == utilstore.ErrKeyNotFound {
+			return nil
+		}
+		return fmt.Errorf("failed to read checkpoint file %q: %v", kubeletDevicePluginCheckpoint, err)
 	}
-	glog.V(2).Infof("Read checkpoint file %s\n", filepath)
+	glog.V(4).Infof("read checkpoint file %s\n", kubeletDevicePluginCheckpoint)
 	var data checkpointData
 	if err := json.Unmarshal(content, &data); err != nil {
-		return fmt.Errorf("failed to unmarshal checkpoint data: %v", err)
+		return fmt.Errorf("failed to unmarshal deviceplugin checkpoint data: %v", err)
 	}
 
 	m.mutex.Lock()
@@ -416,6 +430,9 @@ func (m *ManagerImpl) readCheckpoint() error {
 // Allocate allocates a set of device resources for the Pod given.
 // TODO: invoke endpoint handler to lock it during device allocation.
 func (m *ManagerImpl) Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
+	var err error
+	pod := attrs.Pod
+
 	// Purge allocations by active Pods
 	if m.sourcesReady.AllReady() {
 		activePods := sets.NewString()
@@ -425,28 +442,33 @@ func (m *ManagerImpl) Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.P
 		m.allocation.purge(activePods)
 	}
 
-	pod := attrs.Pod
-	var err error
-	request, _ := m.getPodRequests(pod)
-	selected, err := m.allocation.reserve(m.allDevices, request)
+	devicesKnown := m.snapshotAllDevices()
+	request, _ := m.getPodRequests(pod, devicesKnown)
+	reservation, err := m.allocation.reserve(devicesKnown, request)
 	if err != nil {
 		return err
 	}
 
-	responses := make(map[string]*pluginapi.AllocateResponse)
-	for resource, devs := range selected {
-		ep, ok := m.endpoints[resource]
-		if !ok {
-			err = fmt.Errorf("device endpoint for resource %s disappeared", resource)
-			break
+	// device allocation requests are issued on a per-container, per-resource basis
+	for container, rmap := range reservation {
+		for resource, dinfo := range rmap {
+			ep, ok := m.endpoints[resource]
+			if !ok {
+				err = fmt.Errorf("device endpoint for resource %s disappeared", resource)
+				break
+			}
+			startRPCTime := time.Now()
+			resp, err := ep.allocate(dinfo.ids.List())
+			metrics.DevicePluginAllocationLatency.WithLabelValues(resource).Observe(metrics.SinceInMicroseconds(startRPCTime))
+			if err != nil {
+				break
+			}
+			reservation[container][resource] = deviceInfo{
+				status:    dinfo.status,
+				ids:       dinfo.ids,
+				allocResp: resp,
+			}
 		}
-		startRPCTime := time.Now()
-		resp, err := ep.allocate(devs.List())
-		metrics.DevicePluginAllocationLatency.WithLabelValues(resource).Observe(metrics.SinceInMicroseconds(startRPCTime))
-		if err != nil {
-			break
-		}
-		responses[resource] = resp
 	}
 	if err != nil {
 		m.allocation.rollback(string(pod.UID))
@@ -454,26 +476,40 @@ func (m *ManagerImpl) Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.P
 	}
 
 	m.mutex.Lock()
-	m.allocation.confirm(request, responses)
+	m.allocation.confirm(string(pod.UID), reservation)
 	m.sanitizeNodeAllocatable(node, string(pod.UID))
 	m.mutex.Unlock()
 	m.writeCheckpoint()
 	return nil
 }
 
+// snapshotAllDevices creates a snapshot of all devices known to the manager
+// at the time of Pod creation i.e. device allocation.
+func (m *ManagerImpl) snapshotAllDevices() map[string]sets.String {
+	snapshot := make(map[string]sets.String)
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	for r, dset := range m.allDevices {
+		devs := dset.UnsortedList()
+		snapshot[r] = sets.NewString(devs...)
+	}
+	return snapshot
+}
+
 // getPodRequests summarizes the device resource requests from the given Pod.
-func (m *ManagerImpl) getPodRequests(pod *v1.Pod) (*allocRequest, error) {
+func (m *ManagerImpl) getPodRequests(pod *v1.Pod, devices map[string]sets.String) (*allocRequest, error) {
 	req := &allocRequest{
 		pod:        string(pod.UID),
 		inits:      make(map[string]map[string]int),
 		containers: make(map[string]map[string]int),
 	}
 	for _, c := range pod.Spec.InitContainers {
-		req.inits[c.Name] = m.getContainerRequest(&c)
+		req.inits[c.Name] = m.getContainerRequest(&c, devices)
 	}
 
 	for _, c := range pod.Spec.Containers {
-		req.containers[c.Name] = m.getContainerRequest(&c)
+		req.containers[c.Name] = m.getContainerRequest(&c, devices)
 	}
 	return req, nil
 }
@@ -481,13 +517,12 @@ func (m *ManagerImpl) getPodRequests(pod *v1.Pod) (*allocRequest, error) {
 // getContainerRequest returns device resource requests in a map.
 // We filter the requests (defaulted to limits) by resources known to the
 // device plugin manager
-func (m *ManagerImpl) getContainerRequest(container *v1.Container) map[string]int {
+func (m *ManagerImpl) getContainerRequest(container *v1.Container, devices map[string]sets.String) map[string]int {
 	req := make(map[string]int)
 	for k, v := range container.Resources.Requests {
 		resource := string(k)
 		count := int(v.Value())
-		// TODO: consult endpoint handler for known devices
-		if _, found := m.allDevices[resource]; !found {
+		if _, found := devices[resource]; !found {
 			continue
 		}
 		req[resource] = count

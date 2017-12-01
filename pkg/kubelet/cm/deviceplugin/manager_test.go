@@ -35,6 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
+	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
@@ -271,6 +273,7 @@ func TestCheckpoint(t *testing.T) {
 		allDevices: make(map[string]sets.String),
 		allocation: newAllocation(),
 	}
+	testManager.store, _ = utilstore.NewFileStore("/tmp", utilfs.DefaultFs{})
 
 	testManager.allocation.insert("pod1", "con1", resourceName1,
 		constructDevices([]string{"dev1", "dev2"}),
@@ -301,7 +304,6 @@ func TestCheckpoint(t *testing.T) {
 	testManager.allDevices[resourceName2].Insert("dev2")
 
 	allocation := testManager.allocation
-	// expectedAllocatedDevices := testManager.allocation.devices()
 	expectedAllDevices := testManager.allDevices
 
 	err = testManager.writeCheckpoint()
@@ -381,13 +383,13 @@ func makePod(requests v1.ResourceList) *v1.Pod {
 func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestResource) *ManagerImpl {
 	monitorCallback := func(resourceName string, added, updated, deleted []pluginapi.Device) {}
 	testManager := &ManagerImpl{
-		socketdir:        tmpDir,
-		callback:         monitorCallback,
-		allDevices:       make(map[string]sets.String),
-		endpoints:        make(map[string]endpoint),
-		allocation:       newAllocation(),
-		activePods:       activePods,
-		sourcesReady:     &sourcesReadyStub{},
+		socketdir:    tmpDir,
+		callback:     monitorCallback,
+		allDevices:   make(map[string]sets.String),
+		endpoints:    make(map[string]endpoint),
+		allocation:   newAllocation(),
+		activePods:   activePods,
+		sourcesReady: &sourcesReadyStub{},
 	}
 	testManager.store, _ = utilstore.NewFileStore("/tmp/", utilfs.DefaultFs{})
 	for _, res := range testRes {
@@ -540,7 +542,7 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 			expectedContainerOptsLen:  nil,
 			expectedAllocatedResName1: 2,
 			expectedAllocatedResName2: 1,
-			expErr: fmt.Errorf("requested number of devices unavailable for domain1.com/resource1. Requested: 1, Available: 0"),
+			expErr: fmt.Errorf("insufficient resource domain1.com/resource1: requested=1, available=0"),
 		},
 		{
 			description:               "Successfull allocation of all available Res1 resources and Res2 resources",
@@ -569,8 +571,8 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 			as.Equal(len(runContainerOpts.Mounts), testCase.expectedContainerOptsLen[1])
 			as.Equal(len(runContainerOpts.Envs), testCase.expectedContainerOptsLen[2])
 		}
-		as.Equal(testCase.expectedAllocatedResName1, testManager.allocatedDevices[res1.resourceName].Len())
-		as.Equal(testCase.expectedAllocatedResName2, testManager.allocatedDevices[res2.resourceName].Len())
+		as.Equal(testCase.expectedAllocatedResName1, testManager.allocation.devices()[res1.resourceName].Len())
+		as.Equal(testCase.expectedAllocatedResName2, testManager.allocation.devices()[res2.resourceName].Len())
 	}
 
 }
@@ -654,10 +656,10 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 	initCont2 := podWithPluginResourcesInInitContainers.Spec.InitContainers[1].Name
 	normalCont1 := podWithPluginResourcesInInitContainers.Spec.Containers[0].Name
 	normalCont2 := podWithPluginResourcesInInitContainers.Spec.Containers[1].Name
-	initCont1Devices := testManager.podDevices.containerDevices(podUID, initCont1, res1.resourceName)
-	initCont2Devices := testManager.podDevices.containerDevices(podUID, initCont2, res1.resourceName)
-	normalCont1Devices := testManager.podDevices.containerDevices(podUID, normalCont1, res1.resourceName)
-	normalCont2Devices := testManager.podDevices.containerDevices(podUID, normalCont2, res1.resourceName)
+	initCont1Devices := testManager.allocation.devicesByContainer(podUID, initCont1, res1.resourceName)
+	initCont2Devices := testManager.allocation.devicesByContainer(podUID, initCont2, res1.resourceName)
+	normalCont1Devices := testManager.allocation.devicesByContainer(podUID, normalCont1, res1.resourceName)
+	normalCont2Devices := testManager.allocation.devicesByContainer(podUID, normalCont2, res1.resourceName)
 	as.True(initCont2Devices.IsSuperset(initCont1Devices))
 	as.True(initCont2Devices.IsSuperset(normalCont1Devices))
 	as.True(initCont2Devices.IsSuperset(normalCont2Devices))
@@ -675,6 +677,7 @@ func TestSanitizeNodeAllocatable(t *testing.T) {
 		allDevices: make(map[string]sets.String),
 		allocation: newAllocation(),
 	}
+	testManager.store, _ = utilstore.NewFileStore("/tmp/", utilfs.DefaultFs{})
 	testManager.allocation.insert("p1", "c1", resourceName1, constructDevices([]string{"dev1", "dev2"}), nil)
 	testManager.allocation.insert("p1", "c2", resourceName2, constructDevices([]string{"dev3"}), nil)
 
