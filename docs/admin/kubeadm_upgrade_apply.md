@@ -14,7 +14,7 @@ kubeadm upgrade apply [version]
 
 ```
       --dry-run                       Do not change any state, just output what actions would be performed.
-      --etcd-upgrade                  Perform the upgrade of etcd.
+      --etcd-upgrade                  Perform the upgrade of etcd. (default true)
   -f, --force                         Force upgrading although some requirements might not be met. This also implies non-interactive mode.
       --image-pull-timeout duration   The maximum amount of time to wait for the control plane pods to be downloaded. (default 15m0s)
   -y, --yes                           Perform the upgrade and do not prompt for confirmation (non-interactive mode).
