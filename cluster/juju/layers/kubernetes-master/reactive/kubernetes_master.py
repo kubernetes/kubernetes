@@ -114,7 +114,6 @@ def check_for_upgrade_needed():
         set_upgrade_needed(forced=True)
 
 
-
 def snap_resources_changed():
     '''
     Check if the snapped resources have changed. The first time this method is
