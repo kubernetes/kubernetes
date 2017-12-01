@@ -484,8 +484,16 @@ func (b *Builder) ReplaceAliases(input string) string {
 	replaced := []string{}
 	for _, arg := range strings.Split(input, ",") {
 		if resources, ok := b.categoryExpander.Expand(arg); ok {
+			seen := sets.NewString()
 			asStrings := []string{}
 			for _, resource := range resources {
+				// prevent a resource in multiple groups from
+				// being expanded more than once per alias
+				if seen.Has(resource.Resource) {
+					continue
+				}
+				seen.Insert(resource.Resource)
+
 				if len(resource.Group) == 0 {
 					asStrings = append(asStrings, resource.Resource)
 					continue
