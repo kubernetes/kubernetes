@@ -1475,12 +1475,12 @@ func (c *VolumeBindingChecker) predicate(pod *v1.Pod, meta algorithm.PredicateMe
 
 	failReasons := []algorithm.PredicateFailureReason{}
 	if !boundSatisfied {
-		glog.V(5).Info("Bound PVs not satisfied for pod %v/%v, node %q", pod.Namespace, pod.Name, node.Name)
+		glog.V(5).Infof("Bound PVs not satisfied for pod %v/%v, node %q", pod.Namespace, pod.Name, node.Name)
 		failReasons = append(failReasons, ErrVolumeNodeConflict)
 	}
 
 	if !unboundSatisfied {
-		glog.V(5).Info("Couldn't find matching PVs for pod %v/%v, node %q", pod.Namespace, pod.Name, node.Name)
+		glog.V(5).Infof("Couldn't find matching PVs for pod %v/%v, node %q", pod.Namespace, pod.Name, node.Name)
 		failReasons = append(failReasons, ErrVolumeBindConflict)
 	}
 
@@ -1489,6 +1489,6 @@ func (c *VolumeBindingChecker) predicate(pod *v1.Pod, meta algorithm.PredicateMe
 	}
 
 	// All volumes bound or matching PVs found for all unbound PVCs
-	glog.V(5).Info("All PVCs found matches for pod %v/%v, node %q", pod.Namespace, pod.Name, node.Name)
+	glog.V(5).Infof("All PVCs found matches for pod %v/%v, node %q", pod.Namespace, pod.Name, node.Name)
 	return true, nil, nil
 }
