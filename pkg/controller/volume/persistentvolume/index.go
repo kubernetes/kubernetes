@@ -169,12 +169,13 @@ func findMatchingVolume(
 			continue
 		}
 
+		nodeAffinityValid := true
 		if node != nil {
 			// Scheduler path, check that the PV NodeAffinity
 			// is satisfied by the node
 			err := volumeutil.CheckNodeAffinity(volume, node.Labels)
 			if err != nil {
-				continue
+				nodeAffinityValid = false
 			}
 		}
 
@@ -185,6 +186,14 @@ func findMatchingVolume(
 			if volumeQty.Cmp(requestedQty) < 0 {
 				continue
 			}
+
+			// If PV node affinity is invalid, return no match.
+			// This means the prebound PV (and therefore PVC)
+			// is not suitable for this node.
+			if !nodeAffinityValid {
+				return nil, nil
+			}
+
 			return volume, nil
 		}
 
@@ -199,12 +208,16 @@ func findMatchingVolume(
 		// - volumes bound to another claim
 		// - volumes whose labels don't match the claim's selector, if specified
 		// - volumes in Class that is not requested
+		// - volumes whose NodeAffinity does not match the node
 		if volume.Spec.ClaimRef != nil {
 			continue
 		} else if selector != nil && !selector.Matches(labels.Set(volume.Labels)) {
 			continue
 		}
 		if v1helper.GetPersistentVolumeClass(volume) != requestedClass {
+			continue
+		}
+		if !nodeAffinityValid {
 			continue
 		}
 
