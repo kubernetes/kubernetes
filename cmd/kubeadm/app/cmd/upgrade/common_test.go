@@ -52,8 +52,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  keyFile: ""
 	imageRepository: ""
 	kubeProxy: {}
-	kubeletConfiguration:
-	  baseConfig: null
+	kubeletConfiguration: {}
 	kubernetesVersion: v1.7.1
 	networking:
 	  dnsDomain: ""
@@ -86,8 +85,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  keyFile: ""
 	imageRepository: ""
 	kubeProxy: {}
-	kubeletConfiguration:
-	  baseConfig: null
+	kubeletConfiguration: {}
 	kubernetesVersion: v1.7.1
 	networking:
 	  dnsDomain: ""
@@ -130,8 +128,7 @@ func TestPrintConfiguration(t *testing.T) {
 	    operatorVersion: v0.1.0
 	imageRepository: ""
 	kubeProxy: {}
-	kubeletConfiguration:
-	  baseConfig: null
+	kubeletConfiguration: {}
 	kubernetesVersion: v1.7.1
 	networking:
 	  dnsDomain: ""

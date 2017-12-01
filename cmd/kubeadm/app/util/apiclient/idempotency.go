@@ -107,6 +107,15 @@ func DeleteDaemonSetForeground(client clientset.Interface, namespace, name strin
 	return client.AppsV1beta2().DaemonSets(namespace).Delete(name, deleteOptions)
 }
 
+// DeleteDeploymentForeground deletes the specified Deployment in foreground mode; i.e. it blocks until/makes sure all the managed Pods are deleted
+func DeleteDeploymentForeground(client clientset.Interface, namespace, name string) error {
+	foregroundDelete := metav1.DeletePropagationForeground
+	deleteOptions := &metav1.DeleteOptions{
+		PropagationPolicy: &foregroundDelete,
+	}
+	return client.AppsV1beta2().Deployments(namespace).Delete(name, deleteOptions)
+}
+
 // CreateOrUpdateRole creates a Role if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateRole(client clientset.Interface, role *rbac.Role) error {
 	if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Create(role); err != nil {

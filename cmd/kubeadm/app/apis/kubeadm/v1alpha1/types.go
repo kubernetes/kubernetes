@@ -147,7 +147,7 @@ type NodeConfiguration struct {
 
 // KubeletConfiguration contains elements describing initial remote configuration of kubelet
 type KubeletConfiguration struct {
-	BaseConfig *kubeletconfigv1alpha1.KubeletConfiguration `json:"baseConfig"`
+	BaseConfig *kubeletconfigv1alpha1.KubeletConfiguration `json:"baseConfig,omitempty"`
 }
 
 // HostPathMount contains elements describing volumes that are mounted from the
