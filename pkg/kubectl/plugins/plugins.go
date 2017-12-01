@@ -65,7 +65,7 @@ func (p Plugin) Validate() error {
 	if len(p.Name) == 0 || len(p.ShortDesc) == 0 || (len(p.Command) == 0 && len(p.Tree) == 0) {
 		return ErrIncompletePlugin
 	}
-	if strings.Index(p.Name, " ") > -1 {
+	if strings.Contains(p.Name, " ") {
 		return ErrInvalidPluginName
 	}
 	for _, flag := range p.Flags {
@@ -102,7 +102,7 @@ func (f Flag) Validate() error {
 	if len(f.Name) == 0 || len(f.Desc) == 0 {
 		return ErrIncompleteFlag
 	}
-	if strings.Index(f.Name, " ") > -1 {
+	if strings.Contains(f.Name, " ") {
 		return ErrInvalidFlagName
 	}
 	return f.ValidateShorthand()
