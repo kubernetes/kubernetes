@@ -156,7 +156,7 @@ func NewOptions() (*Options, error) {
 
 func (o *Options) Complete() error {
 	if len(o.ConfigFile) == 0 {
-		glog.Warning("WARNING: all flags than --config are deprecated. Please begin using a config file ASAP.")
+		glog.Warning("WARNING: all flags other than --config are deprecated. Please begin using a config file ASAP.")
 		o.applyDeprecatedHealthzAddressToConfig()
 		o.applyDeprecatedHealthzPortToConfig()
 		o.applyDeprecatedAlgorithmSourceOptionsToConfig()
