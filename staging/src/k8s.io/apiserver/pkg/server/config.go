@@ -188,8 +188,12 @@ type Config struct {
 	PublicAddress net.IP
 }
 
+type AdmissionInitializersInitFunc func() (admission.PluginInitializer, error)
+
 type RecommendedConfig struct {
 	Config
+
+	ExtraAdmissionInitializersInitFunc []AdmissionInitializersInitFunc
 
 	// SharedInformerFactory provides shared informers for Kubernetes resources. This value is set by
 	// RecommendedOptions.CoreAPI.ApplyTo called by RecommendedOptions.ApplyTo. It uses an in-cluster client config
@@ -259,6 +263,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 func NewRecommendedConfig(codecs serializer.CodecFactory) *RecommendedConfig {
 	return &RecommendedConfig{
 		Config: *NewConfig(codecs),
+		ExtraAdmissionInitializersInitFunc: make([]AdmissionInitializersInitFunc, 0),
 	}
 }
 

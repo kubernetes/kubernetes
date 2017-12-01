@@ -100,6 +100,10 @@ func (a *AdmissionOptions) ApplyTo(
 	scheme *runtime.Scheme,
 	pluginInitializers ...admission.PluginInitializer,
 ) error {
+	if a == nil {
+		return nil
+	}
+
 	pluginNames := a.PluginNames
 	if len(a.PluginNames) == 0 {
 		pluginNames = a.enabledPluginNames()

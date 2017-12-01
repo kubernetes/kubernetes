@@ -17,9 +17,12 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
@@ -35,6 +38,7 @@ type RecommendedOptions struct {
 	Audit          *AuditOptions
 	Features       *FeatureOptions
 	CoreAPI        *CoreAPIOptions
+	Admission      *AdmissionOptions
 }
 
 func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptions {
@@ -46,6 +50,7 @@ func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptio
 		Audit:          NewAuditOptions(),
 		Features:       NewFeatureOptions(),
 		CoreAPI:        NewCoreAPIOptions(),
+		Admission:      NewAdmissionOptions(),
 	}
 }
 
@@ -57,9 +62,13 @@ func (o *RecommendedOptions) AddFlags(fs *pflag.FlagSet) {
 	o.Audit.AddFlags(fs)
 	o.Features.AddFlags(fs)
 	o.CoreAPI.AddFlags(fs)
+	o.Admission.AddFlags(fs)
 }
 
-func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
+// ApplyTo adds RecommendedOptions to the server configuration.
+// scheme is the scheme of the apiserver types that are sent to the admission chain.
+// pluginInitializers can be empty, it is only need for additional initializers.
+func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig, scheme *runtime.Scheme) error {
 	if err := o.Etcd.ApplyTo(&config.Config); err != nil {
 		return err
 	}
@@ -81,6 +90,36 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	if err := o.CoreAPI.ApplyTo(config); err != nil {
 		return err
 	}
+	if o.Admission != nil {
+		// Admission depends on CoreAPI to set SharedInformerFactory and ClientConfig.
+		if o.CoreAPI == nil {
+			return fmt.Errorf("admission depends on CoreAPI, so it must be set")
+		}
+		// Admission need scheme to construct admission initializer.
+		if scheme == nil {
+			return fmt.Errorf("admission depends on shceme, so it must be set")
+		}
+
+		pluginInitializers := []admission.PluginInitializer{}
+		for _, initFunc := range config.ExtraAdmissionInitializersInitFunc {
+			intializer, err := initFunc()
+			if err != nil {
+				return err
+			}
+			pluginInitializers = append(pluginInitializers, intializer)
+		}
+
+		err := o.Admission.ApplyTo(
+			&config.Config,
+			config.SharedInformerFactory,
+			config.ClientConfig,
+			scheme,
+			pluginInitializers...)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -93,6 +132,7 @@ func (o *RecommendedOptions) Validate() []error {
 	errors = append(errors, o.Audit.Validate()...)
 	errors = append(errors, o.Features.Validate()...)
 	errors = append(errors, o.CoreAPI.Validate()...)
+	errors = append(errors, o.Admission.Validate()...)
 
 	return errors
 }
