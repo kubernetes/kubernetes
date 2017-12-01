@@ -65,7 +65,7 @@ type Flavor struct {
 	VCPUs int `json:"vcpus"`
 
 	// IsPublic indicates whether the flavor is public.
-	IsPublic bool `json:"is_public"`
+	IsPublic bool `json:"os-flavor-access:is_public"`
 }
 
 func (r *Flavor) UnmarshalJSON(b []byte) error {

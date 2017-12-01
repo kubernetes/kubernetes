@@ -56,11 +56,12 @@ func NewClient(endpoint string) (*gophercloud.ProviderClient, error) {
 	endpoint = gophercloud.NormalizeURL(endpoint)
 	base = gophercloud.NormalizeURL(base)
 
-	return &gophercloud.ProviderClient{
-		IdentityBase:     base,
-		IdentityEndpoint: endpoint,
-	}, nil
+	p := new(gophercloud.ProviderClient)
+	p.IdentityBase = base
+	p.IdentityEndpoint = endpoint
+	p.UseTokenLock()
 
+	return p, nil
 }
 
 /*

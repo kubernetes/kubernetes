@@ -37,3 +37,7 @@ func teminateConnectionURL(c *gophercloud.ServiceClient, id string) string {
 func extendSizeURL(c *gophercloud.ServiceClient, id string) string {
 	return attachURL(c, id)
 }
+
+func forceDeleteURL(c *gophercloud.ServiceClient, id string) string {
+	return attachURL(c, id)
+}
