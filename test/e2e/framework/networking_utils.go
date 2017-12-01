@@ -935,7 +935,9 @@ func TestHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout
 // This function executes commands on a node so it will work only for some
 // environments.
 func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1.Node, testFunc func()) {
-	host := GetNodeExternalIP(node)
+	externalIP := GetNodeExternalIP(node)
+	internalIP := GetNodeInternalIP(node)
+
 	master := GetMasterAddress(c)
 	By(fmt.Sprintf("block network traffic from node %s to the master", node.Name))
 	defer func() {
@@ -944,14 +946,16 @@ func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1
 		// had been inserted. (yes, we could look at the error code and ssh error
 		// separately, but I prefer to stay on the safe side).
 		By(fmt.Sprintf("Unblock network traffic from node %s to the master", node.Name))
-		UnblockNetwork(host, master)
+		UnblockNetwork(externalIP, master)
+		UnblockNetwork(internalIP, master)
 	}()
 
 	Logf("Waiting %v to ensure node %s is ready before beginning test...", resizeNodeReadyTimeout, node.Name)
 	if !WaitForNodeToBe(c, node.Name, v1.NodeReady, true, resizeNodeReadyTimeout) {
 		Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 	}
-	BlockNetwork(host, master)
+	BlockNetwork(externalIP, master)
+	BlockNetwork(internalIP, master)
 
 	Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)
 	if !WaitForNodeToBe(c, node.Name, v1.NodeReady, false, resizeNodeNotReadyTimeout) {
