@@ -19,6 +19,7 @@ package kubelet
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"sort"
 	"testing"
@@ -37,10 +38,14 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/capabilities"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -2170,3 +2175,78 @@ type podsByUID []*v1.Pod
 func (p podsByUID) Len() int           { return len(p) }
 func (p podsByUID) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p podsByUID) Less(i, j int) bool { return p[i].UID < p[j].UID }
+
+func TestQueryCloudIpsAndNames(t *testing.T) {
+	type input struct {
+		cloud    cloudprovider.Interface
+		hostName string
+	}
+
+	type expect struct {
+		result     bool
+		nodeName   types.NodeName
+		cloudIPs   []net.IP
+		cloudNames []string
+	}
+
+	type testcase struct {
+		in     input
+		expect expect
+	}
+
+	fakeCloud := &fakecloud.FakeCloud{
+		InstanceTypes: map[types.NodeName]string{
+			types.NodeName("node0"): "t1.micro",
+		},
+		Addresses: []v1.NodeAddress{
+			{
+				Type:    v1.NodeHostName,
+				Address: "node0.cloud.internal",
+			},
+			{
+				Type:    v1.NodeInternalIP,
+				Address: "10.0.0.1",
+			},
+			{
+				Type:    v1.NodeExternalIP,
+				Address: "132.143.154.163",
+			},
+		},
+		Err: nil,
+	}
+
+	for _, item := range []testcase{
+		{
+			in: input{
+				cloud:    nil,
+				hostName: "",
+			},
+			expect: expect{
+				result:     true,
+				nodeName:   types.NodeName(""),
+				cloudIPs:   []net.IP{},
+				cloudNames: []string{},
+			},
+		},
+		{
+			in: input{
+				cloud:    fakeCloud,
+				hostName: "node0",
+			},
+			expect: expect{
+				result:     true,
+				nodeName:   types.NodeName("node0"),
+				cloudIPs:   []net.IP{net.IPv4(10, 0, 0, 1), net.IPv4(132, 143, 154, 163)},
+				cloudNames: []string{"node0.cloud.internal"},
+			},
+		},
+	} {
+		utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.RotateKubeletServerCertificate))
+		err, nodeName, cloudIPs, cloudNames := queryCloudIpsAndNames(item.in.cloud, item.in.hostName)
+
+		assert.Equal(t, item.expect.nodeName, nodeName, "queryCloudIpsAndNames return wrong nodeName")
+		assert.Equal(t, item.expect.cloudIPs, *cloudIPs, "queryCloudIpsAndNames return wrong cloudIPs")
+		assert.Equal(t, item.expect.cloudNames, *cloudNames, "queryCloudIpsAndNames return wrong cloudNames")
+		assert.Equal(t, item.expect.result, err == nil, "queryCloudIpsAndNames return wrong result.")
+	}
+}

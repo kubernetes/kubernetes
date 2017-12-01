@@ -328,6 +328,51 @@ func getRuntimeAndImageServices(remoteRuntimeEndpoint string, remoteImageEndpoin
 	return rs, is, err
 }
 
+// queryCloudIpsAndNames query nodeName, cloudIPs, cloudNames
+func queryCloudIpsAndNames(cloud cloudprovider.Interface, hostName string) (error, types.NodeName, *[]net.IP, *[]string) {
+	nodeName := types.NodeName(hostName)
+	cloudIPs := []net.IP{}
+	cloudNames := []string{}
+	var err error
+
+	if cloud != nil {
+		instances, ok := cloud.Instances()
+		if !ok {
+			return fmt.Errorf("failed to get instances from cloud provider"),
+				nodeName, &cloudIPs, &cloudNames
+		}
+
+		nodeName, err = instances.CurrentNodeName(hostName)
+		if err != nil {
+			return fmt.Errorf("error fetching current instance name from cloud provider: %v", err),
+				nodeName, &cloudIPs, &cloudNames
+		}
+
+		glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
+			nodeAddresses, err := instances.NodeAddresses(nodeName)
+			if err != nil {
+				return fmt.Errorf("failed to get the addresses of the current instance from the cloud provider: %v", err),
+					nodeName, &cloudIPs, &cloudNames
+			}
+			for _, nodeAddress := range nodeAddresses {
+				switch nodeAddress.Type {
+				case v1.NodeExternalIP, v1.NodeInternalIP:
+					ip := net.ParseIP(nodeAddress.Address)
+					if ip != nil && !ip.IsLoopback() {
+						cloudIPs = append(cloudIPs, ip)
+					}
+				case v1.NodeExternalDNS, v1.NodeInternalDNS, v1.NodeHostName:
+					cloudNames = append(cloudNames, nodeAddress.Address)
+				}
+			}
+		}
+	}
+
+	return nil, nodeName, &cloudIPs, &cloudNames
+}
+
 // NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
 // No initialization of Kubelet and its modules should happen here.
 func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
@@ -382,41 +427,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	hostname := nodeutil.GetHostname(hostnameOverride)
 	// Query the cloud provider for our node name, default to hostname
-	nodeName := types.NodeName(hostname)
-	cloudIPs := []net.IP{}
-	cloudNames := []string{}
-	if kubeDeps.Cloud != nil {
-		var err error
-		instances, ok := kubeDeps.Cloud.Instances()
-		if !ok {
-			return nil, fmt.Errorf("failed to get instances from cloud provider")
-		}
-
-		nodeName, err = instances.CurrentNodeName(hostname)
-		if err != nil {
-			return nil, fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
-		}
-
-		glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
-
-		if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
-			nodeAddresses, err := instances.NodeAddresses(nodeName)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get the addresses of the current instance from the cloud provider: %v", err)
-			}
-			for _, nodeAddress := range nodeAddresses {
-				switch nodeAddress.Type {
-				case v1.NodeExternalIP, v1.NodeInternalIP:
-					ip := net.ParseIP(nodeAddress.Address)
-					if ip != nil && !ip.IsLoopback() {
-						cloudIPs = append(cloudIPs, ip)
-					}
-				case v1.NodeExternalDNS, v1.NodeInternalDNS, v1.NodeHostName:
-					cloudNames = append(cloudNames, nodeAddress.Address)
-				}
-			}
-		}
-
+	err, nodeName, cloudIPs, cloudNames := queryCloudIpsAndNames(kubeDeps.Cloud, hostname)
+	if err != nil {
+		return nil, err
 	}
 
 	if kubeDeps.PodConfig == nil {
@@ -788,8 +801,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			ips = []net.IP{cfgAddress}
 		}
 
-		ips = append(ips, cloudIPs...)
-		names := append([]string{klet.GetHostname(), hostnameOverride}, cloudNames...)
+		ips = append(ips, *cloudIPs...)
+		names := append([]string{klet.GetHostname(), hostnameOverride}, *cloudNames...)
 		klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, ips, names, certDirectory)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize certificate manager: %v", err)
