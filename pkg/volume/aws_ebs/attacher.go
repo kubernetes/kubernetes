@@ -169,7 +169,7 @@ func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, d
 		case <-ticker.C:
 			glog.V(5).Infof("Checking AWS Volume %q is attached.", volumeID)
 			if devicePath != "" {
-				devicePaths := getDiskByIdPaths(partition, devicePath)
+				devicePaths := getDiskByIdPaths(aws.KubernetesVolumeID(volumeSource.VolumeID), partition, devicePath)
 				path, err := verifyDevicePath(devicePaths)
 				if err != nil {
 					// Log error, if any, and continue checking periodically. See issue #11321
