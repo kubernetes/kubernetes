@@ -698,7 +698,7 @@ func CanUseIPVSProxier(ipsetver IPSetVersioner) (bool, error) {
 		err := utilexec.New().Command("modprobe", "--", kmod).Run()
 		if err != nil {
 			glog.Warningf("Failed to load kernel module %v with modprobe. "+
-				"You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", kmod)
+				"You can ignore this message when kube-proxy is running inside container", kmod)
 		}
 	}
 
