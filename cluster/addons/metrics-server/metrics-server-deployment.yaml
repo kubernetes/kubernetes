@@ -7,6 +7,23 @@ metadata:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: metrics-server-config
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+data:
+  NannyConfiguration: |-
+    apiVersion: nannyconfig/v1alpha1
+    kind: NannyConfiguration
+    baseCPU: 40m
+    cpuPerNode: 0.5m
+    baseMemory: 140Mi
+    memoryPerNode: 4Mi
+---
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
@@ -43,7 +60,7 @@ spec:
           name: https
           protocol: TCP
       - name: metrics-server-nanny
-        image: gcr.io/google_containers/addon-resizer:1.7
+        image: gcr.io/google_containers/addon-resizer:1.8.0
         resources:
           limits:
             cpu: 100m
@@ -60,17 +77,21 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
+        volumeMounts:
+        - name: metrics-server-config-volume
+          mountPath: /etc/config
         command:
           - /pod_nanny
-          - --cpu=40m
-          - --extra-cpu=0.5m
-          - --memory=140Mi
-          - --extra-memory=4Mi
+          - --config-dir=/etc/config
           - --threshold=5
           - --deployment=metrics-server-v0.2.0
           - --container=metrics-server
           - --poll-period=300000
           - --estimator=exponential
+      volumes:
+        - name: metrics-server-config-volume
+          configMap:
+            name: metrics-server-config
       tolerations:
         - key: "CriticalAddonsOnly"
           operator: "Exists"
