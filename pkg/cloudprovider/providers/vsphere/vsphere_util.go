@@ -32,12 +32,13 @@ import (
 
 	"fmt"
 
+	"path/filepath"
+
 	"github.com/vmware/govmomi/vim25/mo"
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib/diskmanagers"
-	"path/filepath"
 )
 
 const (
@@ -199,13 +200,18 @@ func getSharedDatastoresInK8SCluster(ctx context.Context, dc *vclib.Datacenter, 
 		return nil, fmt.Errorf(msg)
 	}
 	var sharedDatastores []*vclib.DatastoreInfo
-	for index, nodeVmDetail := range nodeVmDetails {
+	for _, nodeVmDetail := range nodeVmDetails {
 		glog.V(9).Infof("Getting accessible datastores for node %s", nodeVmDetail.NodeName)
 		accessibleDatastores, err := getAccessibleDatastores(ctx, &nodeVmDetail, nodeManager)
 		if err != nil {
+			if err == vclib.ErrNoVMFound {
+				glog.V(9).Infof("Got NoVMFound error for node %s", nodeVmDetail.NodeName)
+				continue
+			}
 			return nil, err
 		}
-		if index == 0 {
+
+		if len(sharedDatastores) == 0 {
 			sharedDatastores = accessibleDatastores
 		} else {
 			sharedDatastores = intersect(sharedDatastores, accessibleDatastores)
