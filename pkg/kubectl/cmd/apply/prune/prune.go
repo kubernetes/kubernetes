@@ -32,6 +32,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
+// Pruner enscapsulates items necessary to delete resources which should be
+// removed during apply with the "--prune" flag
 type Pruner struct {
 	Mapper               meta.RESTMapper
 	GroupVersionKinds    []*meta.RESTMapping
@@ -46,7 +48,9 @@ type Pruner struct {
 	ShortOutput          bool
 }
 
-// Param: gvks array of groupVersionKind passed in --prune-whitelist or empty array if no flag.
+// ParseGvks returns an array of RestMappings for the GVK's to prune.
+// param: mapper to create RESTMappings.
+// param: gvks array of groupVersionKind passed in --prune-whitelist or empty array if no flag.
 // Returns default groupVersionKind mappings to prune, unless overriden by --prune-whitelist flag.
 func ParseGvks(mapper meta.RESTMapper, gvks []string) ([]*meta.RESTMapping, error) {
 
@@ -218,10 +222,8 @@ func (p *Pruner) delete(namespace, name string, mapping *meta.RESTMapping) error
 		options = metav1.NewDeleteOptions(int64(p.GracePeriod))
 	}
 	stopTimeout := 2 * time.Minute
-	if err := r.Stop(namespace, name, stopTimeout, options); err != nil {
-		return err
-	}
-	return nil
+	err = r.Stop(namespace, name, stopTimeout, options)
+	return err
 }
 
 func (p *Pruner) printSuccess(resource, name string, operation string) {
