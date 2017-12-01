@@ -2349,6 +2349,10 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 					{PathPrefix: "/foo/bar"},
 					{PathPrefix: "/baz/"},
 				},
+				HostNetwork: true,
+				HostPorts: []extensions.HostPortRange{
+					{Min: 1024, Max: 65535},
+				},
 			},
 		}
 	}
@@ -2456,6 +2460,9 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 
 	nonEmptyFlexVolumes := validPSP()
 	nonEmptyFlexVolumes.Spec.AllowedFlexVolumes = []extensions.AllowedFlexVolume{{Driver: "example/driver"}}
+
+	invalidHostPort := validPSP()
+	invalidHostPort.Spec.HostPorts = []extensions.HostPortRange{{Min: 1024, Max: 1}}
 
 	type testCase struct {
 		psp         *extensions.PodSecurityPolicy
@@ -2592,6 +2599,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			psp:         emptyFlexDriver,
 			errorType:   field.ErrorTypeRequired,
 			errorDetail: "must specify a driver",
+		},
+		"invalid host port min greater than max": {
+			psp:         invalidHostPort,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "min cannot be greater than max",
 		},
 	}
 
