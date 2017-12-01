@@ -242,7 +242,7 @@ func (t *dnsTestCommon) createDNSServer(aRecords map[string]string) {
 			Containers: []v1.Container{
 				{
 					Name:  "dns",
-					Image: "k8s.gcr.io/k8s-dns-dnsmasq-amd64:1.14.5",
+					Image: imageutils.GetE2EImage(imageutils.DNSMasq),
 					Command: []string{
 						"/usr/sbin/dnsmasq",
 						"-u", "root",

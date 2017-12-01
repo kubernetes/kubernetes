@@ -25,6 +25,7 @@ import (
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var (
@@ -98,7 +99,7 @@ func stackdriverExporterPodSpec(metricName string, metricValue int64) corev1.Pod
 		Containers: []corev1.Container{
 			{
 				Name:            "stackdriver-exporter",
-				Image:           "k8s.gcr.io/sd-dummy-exporter:v0.1.0",
+				Image:           imageutils.GetE2EImage(imageutils.SDDummyExporter),
 				ImagePullPolicy: corev1.PullPolicy("Always"),
 				Command:         []string{"/sd_dummy_exporter", "--pod-id=$(POD_ID)", "--metric-name=" + metricName, fmt.Sprintf("--metric-value=%v", metricValue)},
 				Env: []corev1.EnvVar{
