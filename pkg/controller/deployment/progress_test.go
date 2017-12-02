@@ -163,13 +163,15 @@ func TestRequeueStuckDeployment(t *testing.T) {
 	dc.enqueueDeployment = dc.enqueue
 
 	for _, test := range tests {
-		if test.nowFn != nil {
-			nowFn = test.nowFn
-		}
-		got := dc.requeueStuckDeployment(test.d, test.status)
-		if got != test.expected {
-			t.Errorf("%s: got duration: %v, expected duration: %v", test.name, got, test.expected)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			if test.nowFn != nil {
+				nowFn = test.nowFn
+			}
+			got := dc.requeueStuckDeployment(test.d, test.status)
+			if got != test.expected {
+				t.Errorf("%s: got duration: %v, expected duration: %v", test.name, got, test.expected)
+			}
+		})
 	}
 }
 
@@ -310,32 +312,34 @@ func TestSyncRolloutStatus(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		fake := fake.Clientset{}
-		dc := &DeploymentController{
-			client: &fake,
-		}
-
-		if test.newRS != nil {
-			test.allRSs = append(test.allRSs, test.newRS)
-		}
-
-		err := dc.syncRolloutStatus(test.allRSs, test.newRS, test.d)
-		if err != nil {
-			t.Error(err)
-		}
-
-		newCond := util.GetDeploymentCondition(test.d.Status, test.conditionType)
-		switch {
-		case newCond == nil:
-			if test.d.Spec.ProgressDeadlineSeconds != nil {
-				t.Errorf("%s: expected deployment condition: %s", test.name, test.conditionType)
+		t.Run(test.name, func(t *testing.T) {
+			fake := fake.Clientset{}
+			dc := &DeploymentController{
+				client: &fake,
 			}
-		case newCond.Status != test.conditionStatus || newCond.Reason != test.conditionReason:
-			t.Errorf("%s: DeploymentProgressing has status %s with reason %s. Expected %s with %s.", test.name, newCond.Status, newCond.Reason, test.conditionStatus, test.conditionReason)
-		case !test.lastUpdate.IsZero() && test.lastUpdate != testTime:
-			t.Errorf("%s: LastUpdateTime was changed to %s but expected %s;", test.name, test.lastUpdate, testTime)
-		case !test.lastTransition.IsZero() && test.lastTransition != testTime:
-			t.Errorf("%s: LastTransitionTime was changed to %s but expected %s;", test.name, test.lastTransition, testTime)
-		}
+
+			if test.newRS != nil {
+				test.allRSs = append(test.allRSs, test.newRS)
+			}
+
+			err := dc.syncRolloutStatus(test.allRSs, test.newRS, test.d)
+			if err != nil {
+				t.Error(err)
+			}
+
+			newCond := util.GetDeploymentCondition(test.d.Status, test.conditionType)
+			switch {
+			case newCond == nil:
+				if test.d.Spec.ProgressDeadlineSeconds != nil {
+					t.Errorf("%s: expected deployment condition: %s", test.name, test.conditionType)
+				}
+			case newCond.Status != test.conditionStatus || newCond.Reason != test.conditionReason:
+				t.Errorf("%s: DeploymentProgressing has status %s with reason %s. Expected %s with %s.", test.name, newCond.Status, newCond.Reason, test.conditionStatus, test.conditionReason)
+			case !test.lastUpdate.IsZero() && test.lastUpdate != testTime:
+				t.Errorf("%s: LastUpdateTime was changed to %s but expected %s;", test.name, test.lastUpdate, testTime)
+			case !test.lastTransition.IsZero() && test.lastTransition != testTime:
+				t.Errorf("%s: LastTransitionTime was changed to %s but expected %s;", test.name, test.lastTransition, testTime)
+			}
+		})
 	}
 }
