@@ -662,7 +662,6 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLBTraffic(actualGroups []*ec2.Se
 
 			if clientTraffic {
 				clientRuleAnnotation := fmt.Sprintf("%s=%s", NLBClientRuleDescription, lbName)
-				mtuRuleAnnotation := fmt.Sprintf("%s=%s", NLBMtuDiscoveryRuleDescription, lbName)
 				// Client Traffic
 				permission := &ec2.IpPermission{
 					FromPort:   aws.Int64(port),
@@ -674,26 +673,6 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLBTraffic(actualGroups []*ec2.Se
 					ranges = append(ranges, &ec2.IpRange{
 						CidrIp:      aws.String(cidr),
 						Description: aws.String(clientRuleAnnotation),
-					})
-				}
-				permission.IpRanges = ranges
-				if add {
-					adds = append(adds, permission)
-				} else {
-					removes = append(removes, permission)
-				}
-
-				// MTU discovery
-				permission = &ec2.IpPermission{
-					IpProtocol: aws.String("icmp"),
-					FromPort:   aws.Int64(3),
-					ToPort:     aws.Int64(4),
-				}
-				ranges = []*ec2.IpRange{}
-				for _, cidr := range clientCidrs {
-					ranges = append(ranges, &ec2.IpRange{
-						CidrIp:      aws.String(cidr),
-						Description: aws.String(mtuRuleAnnotation),
 					})
 				}
 				permission.IpRanges = ranges
@@ -725,8 +704,8 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLBTraffic(actualGroups []*ec2.Se
 					removes = append(removes, permission)
 				}
 			}
-
 		}
+
 		if len(adds) > 0 {
 			changed, err := c.addSecurityGroupIngress(instanceSecurityGroupID, adds)
 			if err != nil {
@@ -736,6 +715,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLBTraffic(actualGroups []*ec2.Se
 				glog.Warning("Allowing ingress was not needed; concurrent change? groupId=", instanceSecurityGroupID)
 			}
 		}
+
 		if len(removes) > 0 {
 			changed, err := c.removeSecurityGroupIngress(instanceSecurityGroupID, removes)
 			if err != nil {
@@ -743,6 +723,70 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLBTraffic(actualGroups []*ec2.Se
 			}
 			if !changed {
 				glog.Warning("Revoking ingress was not needed; concurrent change? groupId=", instanceSecurityGroupID)
+			}
+		}
+
+		if clientTraffic {
+			// MTU discovery
+			mtuRuleAnnotation := fmt.Sprintf("%s=%s", NLBMtuDiscoveryRuleDescription, lbName)
+			mtuPermission := &ec2.IpPermission{
+				IpProtocol: aws.String("icmp"),
+				FromPort:   aws.Int64(3),
+				ToPort:     aws.Int64(4),
+			}
+			ranges := []*ec2.IpRange{}
+			for _, cidr := range clientCidrs {
+				ranges = append(ranges, &ec2.IpRange{
+					CidrIp:      aws.String(cidr),
+					Description: aws.String(mtuRuleAnnotation),
+				})
+			}
+			mtuPermission.IpRanges = ranges
+
+			group, err := c.findSecurityGroup(instanceSecurityGroupID)
+			if err != nil {
+				glog.Warningf("Error retrieving security group: %q", err)
+				return err
+			}
+
+			if group == nil {
+				glog.Warning("Security group not found: ", instanceSecurityGroupID)
+				return nil
+			}
+
+			icmpExists := false
+			permCount := 0
+			for _, perm := range group.IpPermissions {
+				if *perm.IpProtocol == "icmp" {
+					icmpExists = true
+					continue
+				}
+
+				if perm.FromPort != nil {
+					permCount++
+				}
+			}
+
+			if !icmpExists && permCount > 0 {
+				// the icmp permission is missing
+				changed, err := c.addSecurityGroupIngress(instanceSecurityGroupID, []*ec2.IpPermission{mtuPermission})
+				if err != nil {
+					glog.Warningf("Error adding MTU permission to security group: %q", err)
+					return err
+				}
+				if !changed {
+					glog.Warning("Allowing ingress was not needed; concurrent change? groupId=", instanceSecurityGroupID)
+				}
+			} else if icmpExists && permCount == 0 {
+				// there is no additional permissions, remove icmp
+				changed, err := c.removeSecurityGroupIngress(instanceSecurityGroupID, []*ec2.IpPermission{mtuPermission})
+				if err != nil {
+					glog.Warningf("Error removing MTU permission to security group: %q", err)
+					return err
+				}
+				if !changed {
+					glog.Warning("Revoking ingress was not needed; concurrent change? groupId=", instanceSecurityGroupID)
+				}
 			}
 		}
 	}
