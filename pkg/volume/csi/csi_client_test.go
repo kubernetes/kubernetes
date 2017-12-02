@@ -90,6 +90,7 @@ func TestClientNodePublishVolume(t *testing.T) {
 			tc.targetPath,
 			api.ReadWriteOnce,
 			map[string]string{"device": "/dev/null"},
+			map[string]string{"attr0": "val0"},
 			tc.fsType,
 		)
 

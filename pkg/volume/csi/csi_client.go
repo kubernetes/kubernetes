@@ -39,6 +39,7 @@ type csiClient interface {
 		targetPath string,
 		accessMode api.PersistentVolumeAccessMode,
 		volumeInfo map[string]string,
+		volumeAttribs map[string]string,
 		fsType string,
 	) error
 	NodeUnpublishVolume(ctx grpctx.Context, volID string, targetPath string) error
@@ -141,6 +142,7 @@ func (c *csiDriverClient) NodePublishVolume(
 	targetPath string,
 	accessMode api.PersistentVolumeAccessMode,
 	volumeInfo map[string]string,
+	volumeAttribs map[string]string,
 	fsType string,
 ) error {
 
@@ -161,6 +163,7 @@ func (c *csiDriverClient) NodePublishVolume(
 		TargetPath:        targetPath,
 		Readonly:          readOnly,
 		PublishVolumeInfo: volumeInfo,
+		VolumeAttributes:  volumeAttribs,
 
 		VolumeCapability: &csipb.VolumeCapability{
 			AccessMode: &csipb.VolumeCapability_AccessMode{
