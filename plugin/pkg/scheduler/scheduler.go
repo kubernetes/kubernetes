@@ -317,16 +317,16 @@ func (sched *Scheduler) scheduleOne() {
 
 	// Tell the cache to assume that a pod now is running on a given node, even though it hasn't been bound yet.
 	// This allows us to keep scheduling without waiting on binding to occur.
-	assumedPod := *pod
+	assumedPod := pod.DeepCopy()
 	// assume modifies `assumedPod` by setting NodeName=suggestedHost
-	err = sched.assume(&assumedPod, suggestedHost)
+	err = sched.assume(assumedPod, suggestedHost)
 	if err != nil {
 		return
 	}
 
 	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
 	go func() {
-		err := sched.bind(&assumedPod, &v1.Binding{
+		err := sched.bind(assumedPod, &v1.Binding{
 			ObjectMeta: metav1.ObjectMeta{Namespace: assumedPod.Namespace, Name: assumedPod.Name, UID: assumedPod.UID},
 			Target: v1.ObjectReference{
 				Kind: "Node",
