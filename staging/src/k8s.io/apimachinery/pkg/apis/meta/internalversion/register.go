@@ -72,7 +72,7 @@ func addToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 	)
 	// ListOptions is the only options struct which needs conversion (it exposes labels and fields
 	// as selectors for convenience). The other types have only a single representation today.
-	scheme.AddKnownTypes(SchemeGroupVersion,
+	scheme.AddKnownTypes(groupVersion,
 		&ListOptions{},
 		&metav1.GetOptions{},
 		&metav1.ExportOptions{},
@@ -91,7 +91,7 @@ func addToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		&metav1alpha1.PartialObjectMetadataList{},
 	)
 	// Allow delete options to be decoded across all version in this scheme (we may want to be more clever than this)
-	scheme.AddUnversionedTypes(SchemeGroupVersion, &metav1.DeleteOptions{})
+	scheme.AddUnversionedTypes(groupVersion, &metav1.DeleteOptions{})
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
 	return nil
 }
