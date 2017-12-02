@@ -43,7 +43,7 @@ import (
 
 // CreateBaseKubeletConfiguration creates base kubelet configuration for dynamic kubelet configuration feature.
 func CreateBaseKubeletConfiguration(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
-	fmt.Printf("[kubelet] Uploading a ConfigMap %q in namespace %s with base configuration for the kubelets in the cluster",
+	fmt.Printf("[kubelet] Uploading a ConfigMap %q in namespace %s with base configuration for the kubelets in the cluster\n",
 		kubeadmconstants.KubeletBaseConfigurationConfigMap, metav1.NamespaceSystem)
 
 	_, kubeletCodecs, err := kubeletconfigscheme.NewSchemeAndCodecs()
@@ -95,7 +95,7 @@ func ConsumeBaseKubeletConfiguration(nodeName string) error {
 
 // updateNodeWithConfigMap updates node ConfigSource with KubeletBaseConfigurationConfigMap
 func updateNodeWithConfigMap(client clientset.Interface, nodeName string) error {
-	fmt.Printf("[kubelet] Using Dynamic Kubelet Config for node %q; config sourced from ConfigMap %q in namespace %s",
+	fmt.Printf("[kubelet] Using Dynamic Kubelet Config for node %q; config sourced from ConfigMap %q in namespace %s\n",
 		nodeName, kubeadmconstants.KubeletBaseConfigurationConfigMap, metav1.NamespaceSystem)
 
 	// Loop on every falsy return. Return with an error if raised. Exit successfully if true is returned.
@@ -203,7 +203,7 @@ func getLocalNodeTLSBootstrappedClient() (clientset.Interface, error) {
 
 // WriteInitKubeletConfigToDiskOnMaster writes base kubelet configuration to disk on master.
 func WriteInitKubeletConfigToDiskOnMaster(cfg *kubeadmapi.MasterConfiguration) error {
-	fmt.Printf("[kubelet] Writing base configuration of kubelets to disk on master node %s", cfg.NodeName)
+	fmt.Printf("[kubelet] Writing base configuration of kubelets to disk on master node %s\n", cfg.NodeName)
 
 	_, kubeletCodecs, err := kubeletconfigscheme.NewSchemeAndCodecs()
 	if err != nil {

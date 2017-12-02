@@ -30,7 +30,9 @@ import (
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
+// TODO: Maybe move these constants elsewhere in future releases
 var v190 = version.MustParseSemantic("v1.9.0")
+var v190alpha3 = version.MustParseSemantic("v1.9.0-alpha.3")
 var expiry = 180 * 24 * time.Hour
 
 // backupAPIServerCertAndKey backups the old cert and key of kube-apiserver to a specified directory.
