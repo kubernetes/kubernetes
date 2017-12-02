@@ -18,16 +18,18 @@ package apps
 
 import (
 	"flag"
+	"log"
 	"testing"
 
-	common "k8s.io/kubernetes/test/integration/apps/common_types"
+	v1 "k8s.io/api/core/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/integration/apps/core"
 	"k8s.io/kubernetes/test/integration/apps/hrcontrollers"
 	"k8s.io/kubernetes/test/integration/apps/podconfig"
 	"k8s.io/kubernetes/test/integration/apps/podcontrollers"
 	"k8s.io/kubernetes/test/integration/apps/upgrades"
+	controlplane "k8s.io/kubernetes/test/integration/fixtures/controlplane"
 	"k8s.io/kubernetes/test/integration/framework"
-	//"time"
 )
 
 //RunBySuite Below flag will be set to 'True' if run the by the script via go test -ldflags
@@ -41,6 +43,8 @@ var Tests = []testing.InternalTest{
 	{Name: upgrades.Name, F: upgrades.RunTests},
 }
 
+var CP *controlplane.ControlPlane
+
 func TestMain(m *testing.M) {
 	flag.Parse()
 	framework.EtcdMain(m.Run)
@@ -48,32 +52,47 @@ func TestMain(m *testing.M) {
 
 func Setup(t *testing.T) error {
 	//Wait for kube components
-	common.Initialize(t)
+	CP = controlplane.NewControlPlane("Apps")
+	CP.Start(t)
 	return nil
 }
 
 func TearDown(t *testing.T) error {
 
-	//t.Logf("Finsiesed TearDown\n")
+	CP.TearDown(t)
 	return nil
 }
 
 func TestApps(t *testing.T) {
 
-	if RunBySuite != "True" {
-		t.Skipf("Sikkping the tests...only run by the script")
-		t.SkipNow()
-	}
-
-	//Setup
 	Setup(t)
 	defer TearDown(t)
+
+	NSOpt := meta_v1.ListOptions{}
+	NS := v1.Namespace{}
+	NS.Name = "testing"
+	NS.ObjectMeta.Name = "testing"
+
+	ns, err := CP.Cli.Core().Namespaces().Create(&NS)
+
+	if err != nil {
+		t.Fatalf("Error creating namespace =%v", err)
+	}
+
+	log.Printf("Namespance created is %v", ns)
+
+	nsList, err := CP.Cli.Core().Namespaces().List(NSOpt)
+	if err != nil {
+		t.Fatalf("Error Listing namespace =%v", err)
+	}
+
+	log.Printf("There are %d Namespaces", len(nsList.Items))
+	for _, n := range nsList.Items {
+		log.Printf("%s", n.Name)
+	}
 
 	for _, tst := range Tests {
 		t.Run(tst.Name, tst.F)
 	}
-
-	//TODO: Remove this unnessary wait for an hour as the clusters
-	//time.Sleep(time.Second)
 
 }

@@ -2,11 +2,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["common_types.go"],
+    srcs = ["hollow_nodes.go"],
+    importpath = "k8s.io/kubernetes/test/integration/fixtures/hollownode",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/kubelet/cadvisor/testing:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
+        "//pkg/kubelet/dockershim:go_default_library",
         "//pkg/kubelet/dockershim/libdocker:go_default_library",
         "//pkg/kubemark:go_default_library",
         "//pkg/volume:go_default_library",

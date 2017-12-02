@@ -19,21 +19,24 @@ package upgrades
 import (
 	"fmt"
 	"testing"
+	"time"
 
-	//v1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	common "k8s.io/kubernetes/test/integration/apps/common_types"
-	"time"
+	controlplane "k8s.io/kubernetes/test/integration/fixtures/controlplane"
 )
 
-// Name of the package
-var Name = "Upgrades"
-
-// Cfg create a shortcut
-var Cfg = &common.Cfg
+// Some global variables
+var (
+	//Name of the package
+	Name = "Upgrades"
+	//Namespace the one used for this testing pkg
+	Namespace = "testing"
+	//Try to look up the control plane as its not passed around to sub-tests
+	CP *controlplane.ControlPlane
+)
 
 //Tests List of internal tests.
 var Tests = []testing.InternalTest{
@@ -58,6 +61,10 @@ func RunTests(t *testing.T) {
 }
 
 func setup(t *testing.T) {
+	CP = controlplane.LookupControllPlane("Apps")
+	if CP == nil {
+		t.Fatalf("Unable to find the Control Plane")
+	}
 	return
 }
 
@@ -72,20 +79,20 @@ func statefulsetUpgrades(t *testing.T) {
 	replica := 5
 
 	ssSrvInput := framework.CreateStatefulSetService(svcName, labels)
-	ssInput := framework.NewStatefulSet(ssName, Cfg.NameSpace, svcName, int32(replica), []v1.VolumeMount{}, []v1.VolumeMount{}, labels)
+	ssInput := framework.NewStatefulSet(ssName, Namespace, svcName, int32(replica), []v1.VolumeMount{}, []v1.VolumeMount{}, labels)
 
-	_, err := Cfg.Cli.Core().Services(Cfg.NameSpace).Create(ssSrvInput)
-	common.CheckErrors(t, err, "While Creating headless service")
+	_, err := CP.Cli.Core().Services(Namespace).Create(ssSrvInput)
+	controlplane.CheckErrors(t, err, "While Creating headless service")
 
-	_, err = Cfg.Cli.AppsV1beta1().StatefulSets(Cfg.NameSpace).Create(ssInput)
-	common.CheckErrors(t, err, "While Creating statefulset")
+	_, err = CP.Cli.AppsV1beta1().StatefulSets(Namespace).Create(ssInput)
+	controlplane.CheckErrors(t, err, "While Creating statefulset")
 
 	//Wait for a while as it takes some time to for the pods to get created
 	//time.Sleep(time.Second * 10)
 
 	for {
-		pods, err := Cfg.Cli.Core().Pods(Cfg.NameSpace).List(v1meta.ListOptions{LabelSelector: "app=test"})
-		common.CheckErrors(t, err, "While trying to list the pods")
+		pods, err := CP.Cli.Core().Pods(Namespace).List(v1meta.ListOptions{LabelSelector: "app=test"})
+		controlplane.CheckErrors(t, err, "While trying to list the pods")
 		if len(pods.Items) == replica {
 			break
 		}
@@ -99,8 +106,8 @@ func statefulsetUpgrades(t *testing.T) {
 
 		//Change the image
 		ssInput.Spec.Template.Spec.Containers[0].Image = "new-image:latest"
-		_, err = Cfg.Cli.AppsV1beta1().StatefulSets(Cfg.NameSpace).Update(ssInput)
-		common.CheckErrors(t, err, "While trying to update the statefulset image")
+		_, err = CP.Cli.AppsV1beta1().StatefulSets(Namespace).Update(ssInput)
+		controlplane.CheckErrors(t, err, "While trying to update the statefulset image")
 
 		continueLoop := true
 		retry := 1000
@@ -109,8 +116,8 @@ func statefulsetUpgrades(t *testing.T) {
 			continueLoop = false
 			time.Sleep(time.Millisecond * 100)
 
-			pods, err := Cfg.Cli.Core().Pods(Cfg.NameSpace).List(v1meta.ListOptions{LabelSelector: "app=test"})
-			common.CheckErrors(t, err, "While trying to list the pods")
+			pods, err := CP.Cli.Core().Pods(Namespace).List(v1meta.ListOptions{LabelSelector: "app=test"})
+			controlplane.CheckErrors(t, err, "While trying to list the pods")
 
 			for _, p := range pods.Items {
 				for _, c := range p.Spec.Containers {
@@ -131,8 +138,8 @@ func statefulsetUpgrades(t *testing.T) {
 	t.Run("Default-VerifyOrderinalCreationOrder", func(t *testing.T) {
 
 		podOrdinalMap := make(map[string]time.Time)
-		pods, err := Cfg.Cli.Core().Pods(Cfg.NameSpace).List(v1meta.ListOptions{LabelSelector: "app=test"})
-		common.CheckErrors(t, err, "While trying to list the pods")
+		pods, err := CP.Cli.Core().Pods(Namespace).List(v1meta.ListOptions{LabelSelector: "app=test"})
+		controlplane.CheckErrors(t, err, "While trying to list the pods")
 
 		for _, p := range pods.Items {
 			podOrdinalMap[p.Name] = p.CreationTimestamp.Time
