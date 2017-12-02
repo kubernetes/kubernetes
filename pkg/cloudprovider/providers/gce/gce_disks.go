@@ -207,18 +207,14 @@ func (gce *GCECloud) DisksAreAttached(diskNames []string, nodeName types.NodeNam
 // JSON in Description field.
 func (gce *GCECloud) CreateDisk(
 	name string, diskType string, zone string, sizeGb int64, tags map[string]string) error {
-
-	// Do not allow creation of PDs in zones that are not managed. Such PDs
-	// then cannot be deleted by DeleteDisk.
-	isManaged := false
-	for _, managedZone := range gce.managedZones {
-		if zone == managedZone {
-			isManaged = true
-			break
-		}
+	// Do not allow creation of PDs in zones that are do not have nodes. Such PDs
+	// are not currently usable.
+	curZones, err := gce.GetAllCurrentZones()
+	if err != nil {
+		return err
 	}
-	if !isManaged {
-		return fmt.Errorf("kubernetes does not manage zone %q", zone)
+	if !curZones.Has(zone) {
+		return fmt.Errorf("kubernetes does not have a node in zone %q", zone)
 	}
 
 	tagsStr, err := gce.encodeDiskTags(tags)

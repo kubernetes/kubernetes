@@ -95,7 +95,7 @@ func setupProviderConfig() error {
 		cloudConfig.Provider = gceCloud
 
 		if cloudConfig.Zone == "" && framework.TestContext.CloudConfig.MultiZone {
-			zones, err := gceCloud.GetAllZones()
+			zones, err := gceCloud.GetAllZonesFromCloudProvider()
 			if err != nil {
 				return err
 			}

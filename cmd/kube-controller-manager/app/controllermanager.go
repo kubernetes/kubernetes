@@ -403,6 +403,10 @@ func CreateControllerContext(s *options.CMServer, rootClientBuilder, clientBuild
 		return ControllerContext{}, fmt.Errorf("cloud provider could not be initialized: %v", err)
 	}
 
+	if informerUserCloud, ok := cloud.(cloudprovider.InformerUser); ok {
+		informerUserCloud.SetInformers(sharedInformers)
+	}
+
 	ctx := ControllerContext{
 		ClientBuilder:      clientBuilder,
 		InformerFactory:    sharedInformers,

@@ -116,7 +116,7 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 
 	var zones sets.String
 	if !zonePresent && !zonesPresent {
-		zones, err = cloud.GetAllZones()
+		zones, err = cloud.GetAllCurrentZones()
 		if err != nil {
 			glog.V(2).Infof("error getting zone information from GCE: %v", err)
 			return "", 0, nil, err
