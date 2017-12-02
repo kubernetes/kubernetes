@@ -345,7 +345,9 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			Out:                  out,
 			ShortOutput:          shortOutput,
 		}
-		pruner.Prune(visitedNamespaces, visitedUids)
+		if err := pruner.Prune(visitedNamespaces, visitedUids); err != nil {
+			return err
+		}
 	}
 
 	return nil
