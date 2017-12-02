@@ -2149,8 +2149,10 @@ type ContainerStatus struct {
 	ExitCode int32 `protobuf:"varint,7,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
 	// Spec of the image.
 	Image *ImageSpec `protobuf:"bytes,8,opt,name=image" json:"image,omitempty"`
-	// Reference to the image in use. For most runtimes, this should be an
-	// image ID
+	// Reference to the image in use. This should be a user readable image
+	// reference. Kubelet will provide it for user to consume.
+	// TODO(random-liu): Define another field for the readable image reference,
+	// and keep image id here.
 	ImageRef string `protobuf:"bytes,9,opt,name=image_ref,json=imageRef,proto3" json:"image_ref,omitempty"`
 	// Brief CamelCase string explaining why container is in its current state.
 	Reason string `protobuf:"bytes,10,opt,name=reason,proto3" json:"reason,omitempty"`

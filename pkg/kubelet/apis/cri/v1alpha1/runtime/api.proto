@@ -776,8 +776,10 @@ message ContainerStatus {
     int32 exit_code = 7;
     // Spec of the image.
     ImageSpec image = 8;
-    // Reference to the image in use. For most runtimes, this should be an
-    // image ID
+    // Reference to the image in use. This should be a user readable image
+    // reference. Kubelet will provide it for user to consume.
+    // TODO(random-liu): Define another field for the readable image reference,
+    // and keep image id here.
     string image_ref = 9;
     // Brief CamelCase string explaining why container is in its current state.
     string reason = 10;
