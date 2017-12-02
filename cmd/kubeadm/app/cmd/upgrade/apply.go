@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -119,13 +120,10 @@ func NewCmdApply(parentFlags *cmdUpgradeFlags) *cobra.Command {
 func RunApply(flags *applyFlags) error {
 
 	// Start with the basics, verify that the cluster is healthy and get the configuration from the cluster (using the ConfigMap)
-	upgradeVars, err := enforceRequirements(flags.parent.featureGatesString, flags.parent.kubeConfigPath, flags.parent.cfgPath, flags.parent.printConfig, flags.dryRun, flags.parent.ignorePreflightErrorsSet)
+	upgradeVars, err := enforceRequirements(flags.parent, flags.dryRun, flags.newK8sVersionStr)
 	if err != nil {
 		return err
 	}
-
-	// Set the upgraded version on the external config object now
-	upgradeVars.cfg.KubernetesVersion = flags.newK8sVersionStr
 
 	// Grab the external, versioned configuration and convert it to the internal type for usage here later
 	internalcfg := &kubeadmapi.MasterConfiguration{}
@@ -143,6 +141,10 @@ func RunApply(flags *applyFlags) error {
 		return fmt.Errorf("unable to parse normalized version %q as a semantic version", flags.newK8sVersionStr)
 	}
 	flags.newK8sVersion = k8sVer
+
+	if err := features.ValidateVersion(features.InitFeatureGates, internalcfg.FeatureGates, internalcfg.KubernetesVersion); err != nil {
+		return err
+	}
 
 	// Enforce the version skew policies
 	if err := EnforceVersionPolicies(flags, upgradeVars.versionGetter); err != nil {
@@ -167,7 +169,7 @@ func RunApply(flags *applyFlags) error {
 	}
 
 	// Upgrade RBAC rules and addons.
-	if err := upgrade.PerformPostUpgradeTasks(upgradeVars.client, internalcfg, flags.newK8sVersion); err != nil {
+	if err := upgrade.PerformPostUpgradeTasks(upgradeVars.client, internalcfg, flags.newK8sVersion, flags.dryRun); err != nil {
 		return fmt.Errorf("[upgrade/postupgrade] FATAL post-upgrade error: %v", err)
 	}
 
