@@ -39,6 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper/qos"
+	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 )
@@ -60,17 +61,20 @@ func (podStrategy) NamespaceScoped() bool {
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (podStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
-	pod := obj.(*api.Pod)
-	pod.Status = api.PodStatus{
+	newPod := obj.(*api.Pod)
+	pod.DropDisabledAlphaFields(&newPod.Spec)
+	newPod.Status = api.PodStatus{
 		Phase:    api.PodPending,
-		QOSClass: qos.GetPodQOS(pod),
+		QOSClass: qos.GetPodQOS(newPod),
 	}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (podStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 	newPod := obj.(*api.Pod)
+	pod.DropDisabledAlphaFields(&newPod.Spec)
 	oldPod := old.(*api.Pod)
+	pod.DropDisabledAlphaFields(&oldPod.Spec)
 	newPod.Status = oldPod.Status
 }
 
