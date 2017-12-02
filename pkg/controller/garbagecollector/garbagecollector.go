@@ -559,14 +559,14 @@ func (gc *GarbageCollector) attemptToOrphanWorker() bool {
 
 	err := gc.orphanDependents(owner.identity, dependents)
 	if err != nil {
-		glog.V(5).Infof("orphanDependents for %s failed with %v", owner.identity, err)
+		utilruntime.HandleError(fmt.Errorf("orphanDependents for %s failed with %v", owner.identity, err))
 		gc.attemptToOrphan.AddRateLimited(item)
 		return true
 	}
 	// update the owner, remove "orphaningFinalizer" from its finalizers list
 	err = gc.removeFinalizer(owner, metav1.FinalizerOrphanDependents)
 	if err != nil {
-		glog.V(5).Infof("removeOrphanFinalizer for %s failed with %v", owner.identity, err)
+		utilruntime.HandleError(fmt.Errorf("removeOrphanFinalizer for %s failed with %v", owner.identity, err))
 		gc.attemptToOrphan.AddRateLimited(item)
 	}
 	return true
