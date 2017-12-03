@@ -153,8 +153,11 @@ func (az *Cloud) listLoadBalancers() (lbListResult network.LoadBalancerListResul
 	return lbListResult, exists, err
 }
 
-func (az *Cloud) getPublicIPAddress(name string) (pip network.PublicIPAddress, exists bool, err error) {
-	var realErr error
+func (az *Cloud) getPublicIPAddress(pipResourceGroup string, pipName string) (pip network.PublicIPAddress, exists bool, err error) {
+	resourceGroup := az.ResourceGroup
+	if pipResourceGroup != "" {
+		resourceGroup = pipResourceGroup
+	}
 
 	var realErr error
 	az.operationPollRateLimiter.Accept()
