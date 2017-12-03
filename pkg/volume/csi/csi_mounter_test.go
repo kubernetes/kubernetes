@@ -26,8 +26,10 @@ import (
 	storage "k8s.io/api/storage/v1alpha1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	fakeclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/fake"
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 var (
@@ -68,7 +70,14 @@ func TestMounterGetPath(t *testing.T) {
 func TestMounterSetUp(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t)
 	defer os.RemoveAll(tmpDir)
-
+	fakeClient := fakeclient.NewSimpleClientset()
+	host := volumetest.NewFakeVolumeHostWithNodeName(
+		tmpDir,
+		fakeClient,
+		nil,
+		"fakeNode",
+	)
+	plug.host = host
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 	pvName := pv.GetName()
 
@@ -88,9 +97,11 @@ func TestMounterSetUp(t *testing.T) {
 	csiMounter := mounter.(*csiMountMgr)
 	csiMounter.csiClient = setupClient(t)
 
+	attachID := getAttachmentName(csiMounter.volumeID, csiMounter.driverName, string(plug.host.GetNodeName()))
+
 	attachment := &storage.VolumeAttachment{
 		ObjectMeta: meta.ObjectMeta{
-			Name: "pv-1234556775313",
+			Name: attachID,
 		},
 		Spec: storage.VolumeAttachmentSpec{
 			NodeName: "test-node",

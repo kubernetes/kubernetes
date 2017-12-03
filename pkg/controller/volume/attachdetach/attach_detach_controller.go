@@ -603,3 +603,7 @@ func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.N
 func (adc *attachDetachController) GetNodeLabels() (map[string]string, error) {
 	return nil, fmt.Errorf("GetNodeLabels() unsupported in Attach/Detach controller")
 }
+
+func (adc *attachDetachController) GetNodeName() types.NodeName {
+	return ""
+}

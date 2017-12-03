@@ -188,6 +188,10 @@ func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
 	return node.Labels, nil
 }
 
+func (kvh *kubeletVolumeHost) GetNodeName() types.NodeName {
+	return kvh.kubelet.nodeName
+}
+
 func (kvh *kubeletVolumeHost) GetExec(pluginName string) mount.Exec {
 	exec, err := kvh.getMountExec(pluginName)
 	if err != nil {

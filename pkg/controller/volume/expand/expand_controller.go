@@ -277,3 +277,7 @@ func (expc *expandController) GetConfigMapFunc() func(namespace, name string) (*
 func (expc *expandController) GetNodeLabels() (map[string]string, error) {
 	return nil, fmt.Errorf("GetNodeLabels unsupported in expandController")
 }
+
+func (expc *expandController) GetNodeName() types.NodeName {
+	return ""
+}
