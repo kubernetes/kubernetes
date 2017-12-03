@@ -60,6 +60,16 @@ type Clusters interface {
 // TODO(#6812): Use a shorter name that's less likely to be longer than cloud
 // providers' name length limits.
 func GetLoadBalancerName(service *v1.Service) string {
+        // Check if annotation for custom loadbalancer name is defined
+        lbname, ok := service.Annotations["load-balancer-name"]
+	if ok {
+                //AWS requires that the name of a load balancer is shorter than 32 bytes.
+	        if len(lbname) > 32 {
+		  lbname = lbname[:32]
+	        }
+		return lbname
+	}
+
 	//GCE requires that the name of a load balancer starts with a lower case letter.
 	ret := "a" + string(service.UID)
 	ret = strings.Replace(ret, "-", "", -1)
