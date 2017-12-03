@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"time"
 
+	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
@@ -463,6 +464,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha versions in the list.
 	ret.EnableVersions(
 		apiv1.SchemeGroupVersion,
+		admissionregistrationv1beta1.SchemeGroupVersion,
 		extensionsapiv1beta1.SchemeGroupVersion,
 		batchapiv1.SchemeGroupVersion,
 		batchapiv1beta1.SchemeGroupVersion,
