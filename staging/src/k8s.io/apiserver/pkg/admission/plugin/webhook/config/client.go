@@ -111,7 +111,9 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 	}
 
 	complete := func(cfg *rest.Config) (*rest.RESTClient, error) {
-		cfg.TLSClientConfig.CAData = h.ClientConfig.CABundle
+		if len(h.ClientConfig.CABundle) != 0 {
+			cfg.TLSClientConfig.CAData = h.ClientConfig.CABundle
+		}
 		cfg.ContentConfig.NegotiatedSerializer = cm.negotiatedSerializer
 		cfg.ContentConfig.ContentType = runtime.ContentTypeJSON
 		client, err := rest.UnversionedRESTClientFor(cfg)
@@ -129,11 +131,15 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 		}
 		cfg := rest.CopyConfig(restConfig)
 		host := serverName + ":443"
-		cfg.Host = "https://" + host
+		if len(cfg.Host) == 0 {
+			cfg.Host = "https://" + host
+		}
+		if len(cfg.TLSClientConfig.ServerName) == 0 {
+			cfg.TLSClientConfig.ServerName = serverName
+		}
 		if svc.Path != nil {
 			cfg.APIPath = *svc.Path
 		}
-		cfg.TLSClientConfig.ServerName = serverName
 
 		delegateDialer := cfg.Dial
 		if delegateDialer == nil {
@@ -168,7 +174,9 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 	}
 
 	cfg := rest.CopyConfig(restConfig)
-	cfg.Host = u.Host
+	if len(cfg.Host) == 0 {
+		cfg.Host = u.Host
+	}
 	cfg.APIPath = u.Path
 
 	return complete(cfg)
