@@ -328,6 +328,41 @@ func getRuntimeAndImageServices(remoteRuntimeEndpoint string, remoteImageEndpoin
 	return rs, is, err
 }
 
+func initCertificateManager(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
+	kubeDeps *Dependencies,
+	klet *Kubelet,
+	cloudIPs []net.IP,
+	cloudNames []string,
+	hostnameOverride,
+	certDirectory string) (err error) {
+	var ips []net.IP
+	cfgAddress := net.ParseIP(kubeCfg.Address)
+	if cfgAddress == nil || cfgAddress.IsUnspecified() {
+		localIPs, err := allLocalIPsWithoutLoopback()
+		if err != nil {
+			return err
+		}
+		ips = localIPs
+	} else {
+		ips = []net.IP{cfgAddress}
+	}
+
+	ips = append(ips, cloudIPs...)
+	names := append([]string{klet.GetHostname(), hostnameOverride}, cloudNames...)
+	klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, ips, names, certDirectory)
+	if err != nil {
+		return fmt.Errorf("failed to initialize certificate manager: %v", err)
+	}
+	kubeDeps.TLSOptions.Config.GetCertificate = func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+		cert := klet.serverCertificateManager.Current()
+		if cert == nil {
+			return nil, fmt.Errorf("no certificate available")
+		}
+		return cert, nil
+	}
+	return
+}
+
 // NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
 // No initialization of Kubelet and its modules should happen here.
 func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
@@ -776,30 +811,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) && kubeDeps.TLSOptions != nil {
-		var ips []net.IP
-		cfgAddress := net.ParseIP(kubeCfg.Address)
-		if cfgAddress == nil || cfgAddress.IsUnspecified() {
-			localIPs, err := allLocalIPsWithoutLoopback()
-			if err != nil {
-				return nil, err
-			}
-			ips = localIPs
-		} else {
-			ips = []net.IP{cfgAddress}
-		}
-
-		ips = append(ips, cloudIPs...)
-		names := append([]string{klet.GetHostname(), hostnameOverride}, cloudNames...)
-		klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, ips, names, certDirectory)
-		if err != nil {
-			return nil, fmt.Errorf("failed to initialize certificate manager: %v", err)
-		}
-		kubeDeps.TLSOptions.Config.GetCertificate = func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
-			cert := klet.serverCertificateManager.Current()
-			if cert == nil {
-				return nil, fmt.Errorf("no certificate available")
-			}
-			return cert, nil
+		if err = initCertificateManager(kubeCfg, kubeDeps, klet, cloudIPs, cloudNames, hostnameOverride, certDirectory); err != nil {
+			return nil, err
 		}
 	}
 
