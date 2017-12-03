@@ -530,7 +530,7 @@ func (h *HumanReadablePrinter) PrintTable(obj runtime.Object, options PrintOptio
 		table.SelfLink = m.GetSelfLink()
 		table.Continue = m.GetContinue()
 	} else {
-		if m, err := meta.CommonAccessor(obj); err == nil {
+		if m, boolean := meta.CommonAccessor(obj); boolean {
 			table.ResourceVersion = m.GetResourceVersion()
 			table.SelfLink = m.GetSelfLink()
 		}
