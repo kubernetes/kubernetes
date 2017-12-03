@@ -814,7 +814,7 @@ func (kl *Kubelet) killPod(pod *v1.Pod, runningPod *kubecontainer.Pod, status *k
 	if runningPod != nil {
 		p = *runningPod
 	} else if status != nil {
-		p = kubecontainer.ConvertPodStatusToRunningPod(kl.GetRuntime().Type(), status)
+		p = kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), status)
 	} else {
 		return fmt.Errorf("one of the two arguments must be non-nil: runningPod, status")
 	}
@@ -1231,10 +1231,8 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName string, lo
 	return kl.containerRuntime.GetContainerLogs(pod, containerID, logOptions, stdout, stderr)
 }
 
-// GetPhase returns the phase of a pod given its container info.
-// This func is exported to simplify integration with 3rd party kubelet
-// integrations like kubernetes-mesos.
-func GetPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
+// getPhase returns the phase of a pod given its container info.
+func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 	initialized := 0
 	pendingInitialization := 0
 	failedInitialization := 0
@@ -1364,7 +1362,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	// Assume info is ready to process
 	spec := &pod.Spec
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
-	s.Phase = GetPhase(spec, allStatus)
+	s.Phase = getPhase(spec, allStatus)
 	kl.probeManager.UpdatePodStatus(pod.UID, s)
 	s.Conditions = append(s.Conditions, status.GeneratePodInitializedCondition(spec, s.InitContainerStatuses, s.Phase))
 	s.Conditions = append(s.Conditions, status.GeneratePodReadyCondition(spec, s.ContainerStatuses, s.Phase))

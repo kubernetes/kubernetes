@@ -65,7 +65,7 @@ func (nh *networkHost) GetKubeClient() clientset.Interface {
 }
 
 func (nh *networkHost) GetRuntime() kubecontainer.Runtime {
-	return nh.kubelet.GetRuntime()
+	return nh.kubelet.getRuntime()
 }
 
 func (nh *networkHost) SupportsLegacyFeatures() bool {
@@ -88,7 +88,7 @@ type criNetworkHost struct {
 // Any network plugin invoked by a cri must implement NamespaceGetter
 // to talk directly to the runtime instead.
 func (c *criNetworkHost) GetNetNS(containerID string) (string, error) {
-	return c.kubelet.GetRuntime().GetNetNS(kubecontainer.ContainerID{Type: "", ID: containerID})
+	return c.kubelet.getRuntime().GetNetNS(kubecontainer.ContainerID{Type: "", ID: containerID})
 }
 
 // NoOpLegacyHost implements the network.LegacyHost interface for the remote
@@ -106,7 +106,7 @@ func (n *NoOpLegacyHost) GetKubeClient() clientset.Interface {
 	return nil
 }
 
-// GetRuntime always returns "nil" for 'NoOpLegacyHost'
+// getRuntime always returns "nil" for 'NoOpLegacyHost'
 func (n *NoOpLegacyHost) GetRuntime() kubecontainer.Runtime {
 	return nil
 }
@@ -188,7 +188,7 @@ func (kl *Kubelet) updatePodCIDR(cidr string) {
 
 	// kubelet -> generic runtime -> runtime shim -> network plugin
 	// docker/rkt non-cri implementations have a passthrough UpdatePodCIDR
-	if err := kl.GetRuntime().UpdatePodCIDR(cidr); err != nil {
+	if err := kl.getRuntime().UpdatePodCIDR(cidr); err != nil {
 		glog.Errorf("Failed to update pod CIDR: %v", err)
 		return
 	}
