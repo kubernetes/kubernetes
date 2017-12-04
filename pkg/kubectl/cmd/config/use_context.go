@@ -88,7 +88,7 @@ func (o *useContextOptions) complete(cmd *cobra.Command) error {
 
 func (o useContextOptions) validate(config *clientcmdapi.Config) error {
 	if len(o.contextName) == 0 {
-		return errors.New("you must specify a current-context")
+		return errors.New("empty context names are not allowed")
 	}
 
 	for name := range config.Contexts {
