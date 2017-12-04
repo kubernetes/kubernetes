@@ -140,12 +140,6 @@ const (
 	// 'MemoryPressure', 'OutOfDisk' and 'DiskPressure'.
 	TaintNodesByCondition utilfeature.Feature = "TaintNodesByCondition"
 
-	// owner: @haibinxie
-	// alpha: v1.8
-	//
-	// Implement IPVS-based in-cluster service load balancing
-	SupportIPVSProxyMode utilfeature.Feature = "SupportIPVSProxyMode"
-
 	// owner: @jsafrane
 	// alpha: v1.8
 	//
@@ -212,6 +206,12 @@ const (
 	//
 	// Enable resource limits priority function
 	ResourceLimitsPriorityFunction utilfeature.Feature = "ResourceLimitsPriorityFunction"
+
+	// owner: @m1093782566
+	// beta: v1.9
+	//
+	// Implement IPVS-based in-cluster service load balancing
+	SupportIPVSProxyMode utilfeature.Feature = "SupportIPVSProxyMode"
 )
 
 func init() {
@@ -251,6 +251,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	BlockVolume:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	PVCProtection:                               {Default: false, PreRelease: utilfeature.Alpha},
 	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
+	SupportIPVSProxyMode:                        {Default: false, PreRelease: utilfeature.Beta},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
@@ -263,5 +264,4 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
 	apiextensionsfeatures.CustomResourceValidation: {Default: true, PreRelease: utilfeature.Beta},
-	SupportIPVSProxyMode:                           {Default: false, PreRelease: utilfeature.Alpha},
 }
