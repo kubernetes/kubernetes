@@ -54,8 +54,8 @@ func NewCmdPlan(parentFlags *cmdUpgradeFlags) *cobra.Command {
 
 // RunPlan takes care of outputting available versions to upgrade to for the user
 func RunPlan(parentFlags *cmdUpgradeFlags) error {
-	// Start with the basics, verify that the cluster is healthy, build a client and a versionGetter. Never set dry-run for plan.
-	upgradeVars, err := enforceRequirements(parentFlags.featureGatesString, parentFlags.kubeConfigPath, parentFlags.cfgPath, parentFlags.printConfig, false, parentFlags.ignorePreflightErrorsSet)
+	// Start with the basics, verify that the cluster is healthy, build a client and a versionGetter. Never dry-run when planning.
+	upgradeVars, err := enforceRequirements(parentFlags, false, "")
 	if err != nil {
 		return err
 	}

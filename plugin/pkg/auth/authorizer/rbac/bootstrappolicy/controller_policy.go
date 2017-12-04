@@ -58,16 +58,25 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 	// controllerRoleBindings is a slice of roles used for controllers
 	controllerRoleBindings := []rbac.ClusterRoleBinding{}
 
-	addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "attachdetach-controller"},
-		Rules: []rbac.PolicyRule{
-			rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("persistentvolumes", "persistentvolumeclaims").RuleOrDie(),
-			rbac.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
-			rbac.NewRule("patch", "update").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
-			rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-			eventsRule(),
-		},
-	})
+	addControllerRole(&controllerRoles, &controllerRoleBindings, func() rbac.ClusterRole {
+		role := rbac.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "attachdetach-controller"},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("persistentvolumes", "persistentvolumeclaims").RuleOrDie(),
+				rbac.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+				rbac.NewRule("patch", "update").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
+				rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+				eventsRule(),
+			},
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
+			role.Rules = append(role.Rules, rbac.NewRule("get", "create", "delete", "list", "watch").Groups(storageGroup).Resources("volumeattachments").RuleOrDie())
+		}
+
+		return role
+	}())
+
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "clusterrole-aggregation-controller"},
 		Rules: []rbac.PolicyRule{

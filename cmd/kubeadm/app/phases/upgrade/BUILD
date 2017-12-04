@@ -36,6 +36,7 @@ go_library(
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//cmd/kubeadm/app/util/config:go_default_library",
+        "//cmd/kubeadm/app/util/dryrun:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/util/version:go_default_library",
         "//pkg/version:go_default_library",

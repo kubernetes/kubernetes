@@ -28,6 +28,7 @@ import (
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilconfig "k8s.io/apiserver/pkg/util/flag"
+	auditwebhook "k8s.io/apiserver/plugin/pkg/audit/webhook"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
@@ -55,6 +56,12 @@ func TestAddFlags(t *testing.T) {
 		"--audit-policy-file=/policy",
 		"--audit-webhook-config-file=/webhook-config",
 		"--audit-webhook-mode=blocking",
+		"--audit-webhook-batch-buffer-size=42",
+		"--audit-webhook-batch-max-size=43",
+		"--audit-webhook-batch-max-wait=1s",
+		"--audit-webhook-batch-throttle-qps=43.5",
+		"--audit-webhook-batch-throttle-burst=44",
+		"--audit-webhook-batch-initial-backoff=2s",
 		"--authentication-token-webhook-cache-ttl=3m",
 		"--authentication-token-webhook-config-file=/token-webhook-config",
 		"--authorization-mode=AlwaysDeny",
@@ -170,6 +177,14 @@ func TestAddFlags(t *testing.T) {
 			WebhookOptions: apiserveroptions.AuditWebhookOptions{
 				Mode:       "blocking",
 				ConfigFile: "/webhook-config",
+				BatchConfig: auditwebhook.BatchBackendConfig{
+					BufferSize:     42,
+					MaxBatchSize:   43,
+					MaxBatchWait:   1 * time.Second,
+					ThrottleQPS:    43.5,
+					ThrottleBurst:  44,
+					InitialBackoff: 2 * time.Second,
+				},
 			},
 			PolicyFile: "/policy",
 		},

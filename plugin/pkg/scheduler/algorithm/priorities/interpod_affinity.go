@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	"k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
@@ -137,6 +138,10 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 	processPod := func(existingPod *v1.Pod) error {
 		existingPodNode, err := ipa.info.GetNodeInfo(existingPod.Spec.NodeName)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				glog.Errorf("Node not found, %v", existingPod.Spec.NodeName)
+				return nil
+			}
 			return err
 		}
 		existingPodAffinity := existingPod.Spec.Affinity
@@ -189,19 +194,21 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 	}
 	processNode := func(i int) {
 		nodeInfo := nodeNameToInfo[allNodeNames[i]]
-		if hasAffinityConstraints || hasAntiAffinityConstraints {
-			// We need to process all the nodes.
-			for _, existingPod := range nodeInfo.Pods() {
-				if err := processPod(existingPod); err != nil {
-					pm.setError(err)
+		if nodeInfo.Node() != nil {
+			if hasAffinityConstraints || hasAntiAffinityConstraints {
+				// We need to process all the nodes.
+				for _, existingPod := range nodeInfo.Pods() {
+					if err := processPod(existingPod); err != nil {
+						pm.setError(err)
+					}
 				}
-			}
-		} else {
-			// The pod doesn't have any constraints - we need to check only existing
-			// ones that have some.
-			for _, existingPod := range nodeInfo.PodsWithAffinity() {
-				if err := processPod(existingPod); err != nil {
-					pm.setError(err)
+			} else {
+				// The pod doesn't have any constraints - we need to check only existing
+				// ones that have some.
+				for _, existingPod := range nodeInfo.PodsWithAffinity() {
+					if err := processPod(existingPod); err != nil {
+						pm.setError(err)
+					}
 				}
 			}
 		}

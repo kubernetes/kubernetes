@@ -26,8 +26,10 @@ import (
 	storage "k8s.io/api/storage/v1alpha1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	fakeclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/fake"
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 var (
@@ -68,7 +70,14 @@ func TestMounterGetPath(t *testing.T) {
 func TestMounterSetUp(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t)
 	defer os.RemoveAll(tmpDir)
-
+	fakeClient := fakeclient.NewSimpleClientset()
+	host := volumetest.NewFakeVolumeHostWithNodeName(
+		tmpDir,
+		fakeClient,
+		nil,
+		"fakeNode",
+	)
+	plug.host = host
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 	pvName := pv.GetName()
 
@@ -88,9 +97,11 @@ func TestMounterSetUp(t *testing.T) {
 	csiMounter := mounter.(*csiMountMgr)
 	csiMounter.csiClient = setupClient(t)
 
+	attachID := getAttachmentName(csiMounter.volumeID, csiMounter.driverName, string(plug.host.GetNodeName()))
+
 	attachment := &storage.VolumeAttachment{
 		ObjectMeta: meta.ObjectMeta{
-			Name: "pv-1234556775313",
+			Name: attachID,
 		},
 		Spec: storage.VolumeAttachmentSpec{
 			NodeName: "test-node",
@@ -149,4 +160,51 @@ func TestUnmounterTeardown(t *testing.T) {
 		t.Error("csi server may not have received NodeUnpublishVolume call")
 	}
 
+}
+
+func TestGetVolAttribsFromSpec(t *testing.T) {
+	testCases := []struct {
+		name        string
+		annotations map[string]string
+		attribs     map[string]string
+		shouldFail  bool
+	}{
+		{
+			name:        "attribs ok",
+			annotations: map[string]string{"key0": "val0", csiVolAttribsAnnotationKey: `{"k0":"attr0","k1":"attr1","k2":"attr2"}`, "keyN": "valN"},
+			attribs:     map[string]string{"k0": "attr0", "k1": "attr1", "k2": "attr2"},
+		},
+
+		{
+			name:        "missing attribs",
+			annotations: map[string]string{"key0": "val0", "keyN": "valN"},
+		},
+		{
+			name: "missing annotations",
+		},
+		{
+			name:        "bad json",
+			annotations: map[string]string{"key0": "val0", csiVolAttribsAnnotationKey: `{"k0""attr0","k1":"attr1,"k2":"attr2"`, "keyN": "valN"},
+			attribs:     map[string]string{"k0": "attr0", "k1": "attr1", "k2": "attr2"},
+			shouldFail:  true,
+		},
+	}
+	spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, testDriver, testVol), false)
+	for _, tc := range testCases {
+		t.Log("test case:", tc.name)
+		spec.PersistentVolume.Annotations = tc.annotations
+		attribs, err := getVolAttribsFromSpec(spec)
+		if !tc.shouldFail && err != nil {
+			t.Error("test case should not fail, but err != nil", err)
+		}
+		eq := true
+		for k, v := range attribs {
+			if tc.attribs[k] != v {
+				eq = false
+			}
+		}
+		if !eq {
+			t.Errorf("expecting attribs %#v, but got %#v", tc.attribs, attribs)
+		}
+	}
 }

@@ -74,6 +74,7 @@ go_test(
         "//vendor/k8s.io/apiserver/pkg/server/options:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
+        "//vendor/k8s.io/apiserver/plugin/pkg/audit/webhook:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
 )
