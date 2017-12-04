@@ -56,7 +56,8 @@ var _ = SIGDescribe("Advanced Audit", func() {
 		framework.SkipUnlessProviderIs("gce")
 	})
 
-	It("should audit API calls", func() {
+	// TODO: Get rid of [DisabledForLargeClusters] when feature request #53455 is ready.
+	It("should audit API calls [DisabledForLargeClusters]", func() {
 		namespace := f.Namespace.Name
 
 		config, err := framework.LoadConfig()
