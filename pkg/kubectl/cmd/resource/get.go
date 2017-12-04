@@ -61,10 +61,11 @@ type GetOptions struct {
 	Namespace         string
 	ExplicitNamespace bool
 
-	IgnoreNotFound bool
-	ShowKind       bool
-	LabelColumns   []string
-	Export         bool
+	IgnoreForbidden bool
+	IgnoreNotFound  bool
+	ShowKind        bool
+	LabelColumns    []string
+	Export          bool
 }
 
 var (
@@ -181,6 +182,10 @@ func (options *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 		return nil
 	}
 
+	if len(args) > 0 && args[0] == "all" {
+		options.IgnoreForbidden = true
+	}
+
 	var err error
 	options.Namespace, options.ExplicitNamespace, err = f.DefaultNamespace()
 	if err != nil {
@@ -246,6 +251,12 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 		Latest().
 		Flatten().
 		Do()
+
+	if options.IgnoreForbidden {
+		// ignore permission errors as we do not know if any api groups
+		// such as "all" contain resources that cannot be listed by a user
+		r.IgnoreErrors(kapierrors.IsForbidden)
+	}
 
 	if options.IgnoreNotFound {
 		r.IgnoreErrors(kapierrors.IsNotFound)

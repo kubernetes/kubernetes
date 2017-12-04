@@ -688,6 +688,72 @@ func TestGetListComponentStatus(t *testing.T) {
 	}
 }
 
+func TestIgnoreForbiddenErrors(t *testing.T) {
+	initTestErrorHandler(t)
+
+	forbiddenResponse := &metav1.Status{
+		TypeMeta: metav1.TypeMeta{},
+		Status:   "Failure",
+		Message:  "User Anonymous cannot list pods in the namespace \"test\"",
+		Reason:   "Forbidden",
+		Details: &metav1.StatusDetails{
+			Kind: "pods",
+			Causes: []metav1.StatusCause{
+				{
+					Type:    metav1.CauseTypeUnexpectedServerResponse,
+					Message: "User Anonymous cannot list pods in the namespace \"test\"",
+				},
+			},
+		},
+		Code: 403,
+	}
+
+	respData, err := encjson.Marshal(forbiddenResponse)
+	if err != nil {
+		t.Fatalf("unable to encode forbidden server response: %v", err)
+	}
+
+	f, tf, _, _ := cmdtesting.NewAPIFactory()
+	tf.Printer = &testPrinter{GenericPrinter: true}
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch req.URL.Path {
+			case "/namespaces/test/pods":
+				return &http.Response{StatusCode: 403, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader(respData))}, nil
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	tf.Namespace = "test"
+	tf.ClientConfig = defaultClientConfig()
+	buf := bytes.NewBuffer([]byte{})
+	errBuf := bytes.NewBuffer([]byte{})
+
+	opts := GetOptions{
+		Out:    buf,
+		ErrOut: errBuf,
+	}
+
+	args := []string{"pod"}
+
+	cmd := NewCmdGet(f, buf, errBuf)
+	opts.Complete(f, cmd, args)
+	opts.IgnoreForbidden = true
+	err = opts.Run(f, cmd, args)
+
+	if len(buf.String()) == 0 {
+		t.Error("unexpected empty output")
+	}
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestGetMixedGenericObjects(t *testing.T) {
 	initTestErrorHandler(t)
 
