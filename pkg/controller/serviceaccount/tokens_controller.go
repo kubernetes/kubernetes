@@ -173,13 +173,14 @@ func (e *TokensController) Run(workers int, stopCh <-chan struct{}) {
 		return
 	}
 
-	glog.V(5).Infof("Starting workers")
+	glog.V(5).Infof("Starting token controller")
+	defer glog.V(1).Infof("Shutting down token controller")
 	for i := 0; i < workers; i++ {
 		go wait.Until(e.syncServiceAccount, 0, stopCh)
 		go wait.Until(e.syncSecret, 0, stopCh)
 	}
 	<-stopCh
-	glog.V(1).Infof("Shutting down")
+
 }
 
 func (e *TokensController) queueServiceAccountSync(obj interface{}) {
