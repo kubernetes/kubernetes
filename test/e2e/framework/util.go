@@ -4925,23 +4925,6 @@ func GetNodeExternalIP(node *v1.Node) string {
 	return host
 }
 
-// GetNodeInternalIP returns node internal IP concatenated with port 22 for ssh
-// e.g. 1.2.3.4:22
-func GetNodeInternalIP(node *v1.Node) string {
-	Logf("Getting internal IP address for %s", node.Name)
-	host := ""
-	for _, a := range node.Status.Addresses {
-		if a.Type == v1.NodeInternalIP {
-			host = net.JoinHostPort(a.Address, sshPort)
-			break
-		}
-	}
-	if host == "" {
-		Failf("Couldn't get the internal IP of host %s with addresses %v", node.Name, node.Status.Addresses)
-	}
-	return host
-}
-
 // SimpleGET executes a get on the given url, returns error if non-200 returned.
 func SimpleGET(c *http.Client, url, host string) (string, error) {
 	req, err := http.NewRequest("GET", url, nil)
