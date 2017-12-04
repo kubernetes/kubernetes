@@ -73,6 +73,30 @@ cluster's shared state through which all other components interact.
     Path to the file that defines the audit policy configuration. Requires the 'AdvancedAuditing' feature gate. With AdvancedAuditing, a profile is required to enable auditing.
 
 .PP
+\fB\-\-audit\-webhook\-batch\-buffer\-size\fP=10000
+    The size of the buffer to store events before batching and sending to the webhook. Only used in batch mode.
+
+.PP
+\fB\-\-audit\-webhook\-batch\-initial\-backoff\fP=10s
+    The amount of time to wait before retrying the first failed requests. Only used in batch mode.
+
+.PP
+\fB\-\-audit\-webhook\-batch\-max\-size\fP=400
+    The maximum size of a batch sent to the webhook. Only used in batch mode.
+
+.PP
+\fB\-\-audit\-webhook\-batch\-max\-wait\fP=30s
+    The amount of time to wait before force sending the batch that hadn't reached the max size. Only used in batch mode.
+
+.PP
+\fB\-\-audit\-webhook\-batch\-throttle\-burst\fP=15
+    Maximum number of requests sent at the same moment if ThrottleQPS was not utilized before. Only used in batch mode.
+
+.PP
+\fB\-\-audit\-webhook\-batch\-throttle\-qps\fP=10
+    Maximum average number of requests per second. Only used in batch mode.
+
+.PP
 \fB\-\-audit\-webhook\-config\-file\fP=""
     Path to a kubeconfig formatted file that defines the audit webhook configuration. Requires the 'AdvancedAuditing' feature gate.
 

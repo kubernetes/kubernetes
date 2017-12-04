@@ -33,7 +33,6 @@ kubeadm alpha phase controlplane all
       --feature-gates string                 A set of key=value pairs that describe feature gates for various features. Options are:
 CoreDNS=true|false (ALPHA - default=false)
 DynamicKubeletConfig=true|false (ALPHA - default=false)
-HighAvailability=true|false (ALPHA - default=false)
 SelfHosting=true|false (BETA - default=false)
 StoreCertsInSecrets=true|false (ALPHA - default=false)
       --kubernetes-version string            Choose a specific Kubernetes version for the control plane (default "stable-1.8")
