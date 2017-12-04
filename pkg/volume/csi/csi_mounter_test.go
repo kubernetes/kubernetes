@@ -161,3 +161,50 @@ func TestUnmounterTeardown(t *testing.T) {
 	}
 
 }
+
+func TestGetVolAttribsFromSpec(t *testing.T) {
+	testCases := []struct {
+		name        string
+		annotations map[string]string
+		attribs     map[string]string
+		shouldFail  bool
+	}{
+		{
+			name:        "attribs ok",
+			annotations: map[string]string{"key0": "val0", csiVolAttribsAnnotationKey: `{"k0":"attr0","k1":"attr1","k2":"attr2"}`, "keyN": "valN"},
+			attribs:     map[string]string{"k0": "attr0", "k1": "attr1", "k2": "attr2"},
+		},
+
+		{
+			name:        "missing attribs",
+			annotations: map[string]string{"key0": "val0", "keyN": "valN"},
+		},
+		{
+			name: "missing annotations",
+		},
+		{
+			name:        "bad json",
+			annotations: map[string]string{"key0": "val0", csiVolAttribsAnnotationKey: `{"k0""attr0","k1":"attr1,"k2":"attr2"`, "keyN": "valN"},
+			attribs:     map[string]string{"k0": "attr0", "k1": "attr1", "k2": "attr2"},
+			shouldFail:  true,
+		},
+	}
+	spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, testDriver, testVol), false)
+	for _, tc := range testCases {
+		t.Log("test case:", tc.name)
+		spec.PersistentVolume.Annotations = tc.annotations
+		attribs, err := getVolAttribsFromSpec(spec)
+		if !tc.shouldFail && err != nil {
+			t.Error("test case should not fail, but err != nil", err)
+		}
+		eq := true
+		for k, v := range attribs {
+			if tc.attribs[k] != v {
+				eq = false
+			}
+		}
+		if !eq {
+			t.Errorf("expecting attribs %#v, but got %#v", tc.attribs, attribs)
+		}
+	}
+}

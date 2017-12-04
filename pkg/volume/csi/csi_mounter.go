@@ -17,6 +17,7 @@ limitations under the License.
 package csi
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path"
@@ -111,6 +112,15 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		c.volumeInfo = attachment.Status.AttachmentMetadata
 	}
 
+	// get volume attributes
+	// TODO: for alpha vol atttributes are passed via PV.Annotations
+	// Beta will fix that
+	attribs, err := getVolAttribsFromSpec(c.spec)
+	if err != nil {
+		glog.Error(log("mounter.SetUpAt failed to extract volume attributes from PV annotations: %v", err))
+		return err
+	}
+
 	//TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
 	accessMode := api.ReadWriteOnce
 	if c.spec.PersistentVolume.Spec.AccessModes != nil {
@@ -124,6 +134,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		dir,
 		accessMode,
 		c.volumeInfo,
+		attribs,
 		"ext4", //TODO needs to be sourced from PV or somewhere else
 	)
 
@@ -186,4 +197,27 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 	glog.V(4).Infof(log("successfully unmounted %s", dir))
 
 	return nil
+}
+
+// getVolAttribsFromSpec exracts CSI VolumeAttributes information from PV.Annotations
+// using key csi.kubernetes.io/volume-attributes.  The annotation value is expected
+// to be a JSON-encoded object of form {"key0":"val0",...,"keyN":"valN"}
+func getVolAttribsFromSpec(spec *volume.Spec) (map[string]string, error) {
+	if spec == nil {
+		return nil, errors.New("missing volume spec")
+	}
+	annotations := spec.PersistentVolume.GetAnnotations()
+	if annotations == nil {
+		return nil, nil // no annotations found
+	}
+	jsonAttribs := annotations[csiVolAttribsAnnotationKey]
+	if jsonAttribs == "" {
+		return nil, nil // csi annotation not found
+	}
+	attribs := map[string]string{}
+	if err := json.Unmarshal([]byte(jsonAttribs), &attribs); err != nil {
+		glog.Error(log("error parsing csi PV.Annotation [%s]=%s: %v", csiVolAttribsAnnotationKey, jsonAttribs, err))
+		return nil, err
+	}
+	return attribs, nil
 }

@@ -36,7 +36,7 @@ func makeTestAttachment(attachID, nodeName, pvName string) *storage.VolumeAttach
 		},
 		Spec: storage.VolumeAttachmentSpec{
 			NodeName: nodeName,
-			Attacher: csiPluginName,
+			Attacher: "mock",
 			Source: storage.VolumeAttachmentSource{
 				PersistentVolumeName: &pvName,
 			},

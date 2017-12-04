@@ -65,7 +65,7 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		},
 		Spec: storage.VolumeAttachmentSpec{
 			NodeName: node,
-			Attacher: csiPluginName,
+			Attacher: csiSource.Driver,
 			Source: storage.VolumeAttachmentSource{
 				PersistentVolumeName: &pvName,
 			},
