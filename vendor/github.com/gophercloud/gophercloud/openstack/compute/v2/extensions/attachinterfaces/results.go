@@ -1,8 +1,28 @@
 package attachinterfaces
 
 import (
+	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/pagination"
 )
+
+type attachInterfaceResult struct {
+	gophercloud.Result
+}
+
+// Extract interprets any attachInterfaceResult as an Interface, if possible.
+func (r attachInterfaceResult) Extract() (*Interface, error) {
+	var s struct {
+		Interface *Interface `json:"interfaceAttachment"`
+	}
+	err := r.ExtractInto(&s)
+	return s.Interface, err
+}
+
+// GetResult is the response from a Get operation. Call its Extract
+// method to interpret it as a Interface.
+type GetResult struct {
+	attachInterfaceResult
+}
 
 // FixedIP represents a Fixed IP Address.
 type FixedIP struct {

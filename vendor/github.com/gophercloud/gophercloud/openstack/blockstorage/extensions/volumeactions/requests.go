@@ -261,3 +261,9 @@ func UploadImage(client *gophercloud.ServiceClient, id string, opts UploadImageO
 	})
 	return
 }
+
+// ForceDelete will delete the volume regardless of state.
+func ForceDelete(client *gophercloud.ServiceClient, id string) (r ForceDeleteResult) {
+	_, r.Err = client.Post(forceDeleteURL(client, id), map[string]interface{}{"os-force_delete": ""}, nil, nil)
+	return
+}
