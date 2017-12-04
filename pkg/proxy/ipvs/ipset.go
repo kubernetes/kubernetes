@@ -153,5 +153,5 @@ func checkMinVersion(vstring string) bool {
 		glog.Errorf("MinCheckVersion (%s) is not a valid version string: %v", MinIPSetCheckVersion, err)
 		return false
 	}
-	return !version.LessThan(minVersion)
+	return version.AtLeast(minVersion)
 }

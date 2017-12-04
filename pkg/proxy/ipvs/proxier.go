@@ -723,7 +723,7 @@ func CanUseIPVSProxier(ipsetver IPSetVersioner) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("error getting ipset version, error: %v", err)
 	}
-	if !checkMinVersion(versionString) {
+	if checkMinVersion(versionString) {
 		return false, fmt.Errorf("ipset version: %s is less than min required version: %s", versionString, MinIPSetCheckVersion)
 	}
 	return true, nil
