@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/golang/glog"
@@ -123,8 +124,20 @@ func (hr *HandlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 			return "", err
 		}
 	}
-	url := fmt.Sprintf("http://%s/%s", net.JoinHostPort(host, strconv.Itoa(port)), handler.HTTPGet.Path)
-	resp, err := hr.httpGetter.Get(url)
+	u := &url.URL{
+		Path: handler.HTTPGet.Path,
+		Host: net.JoinHostPort(host, strconv.Itoa(port)),
+	}
+	switch handler.HTTPGet.Scheme {
+	case v1.URISchemeHTTP:
+		u.Scheme = "http"
+	case v1.URISchemeHTTPS:
+		u.Scheme = "https"
+	default:
+		// Defaulting to http when the scheme is unspecified
+		u.Scheme = "http"
+	}
+	resp, err := hr.httpGetter.Get(u.String())
 	return getHttpRespBody(resp), err
 }
 
