@@ -23,8 +23,8 @@ go_test(
         "undelta_store_test.go",
     ],
     embed = [":go_default_library"],
-    features = ["-race"],
     importpath = "k8s.io/client-go/tools/cache",
+    race = "off",
     deps = [
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

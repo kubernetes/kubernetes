@@ -120,8 +120,8 @@ go_test(
         "master_test.go",
     ],
     embed = [":go_default_library"],
-    features = ["-race"],
     importpath = "k8s.io/kubernetes/pkg/master",
+    race = "off",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
