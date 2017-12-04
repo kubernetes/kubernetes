@@ -116,7 +116,7 @@ func newWebhook(t *testing.T, endpoint string, mode string, groupVersion schema.
 	// NOTE(ericchiang): Do we need to use a proper serializer?
 	require.NoError(t, stdjson.NewEncoder(f).Encode(config), "writing kubeconfig")
 
-	backend, err := NewBackend(f.Name(), mode, groupVersion)
+	backend, err := NewBackend(f.Name(), mode, groupVersion, NewDefaultBatchBackendConfig())
 	require.NoError(t, err, "initializing backend")
 
 	return backend
