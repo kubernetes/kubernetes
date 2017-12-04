@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -125,15 +126,12 @@ func TestCreateFromConfig(t *testing.T) {
 			{"name" : "PriorityOne", "weight" : 2},
 			{"name" : "PriorityTwo", "weight" : 1}		]
 	}`)
-	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
-		t.Errorf("Invalid configuration: %v", err)
-	}
+	err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy)
+	require.NoError(t, err, "Invalid configuration: %v", err)
 
 	factory.CreateFromConfig(policy)
 	hpa := factory.GetHardPodAffinitySymmetricWeight()
-	if hpa != v1.DefaultHardPodAffinitySymmetricWeight {
-		t.Errorf("Wrong hardPodAffinitySymmetricWeight, ecpected: %d, got: %d", v1.DefaultHardPodAffinitySymmetricWeight, hpa)
-	}
+	require.Equal(t, v1.DefaultHardPodAffinitySymmetricWeight, hpa, "Wrong hardPodAffinitySymmetricWeight, ecpected: %d, got: %d", v1.DefaultHardPodAffinitySymmetricWeight, hpa)
 }
 
 func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
@@ -188,14 +186,12 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 		],
 		"hardPodAffinitySymmetricWeight" : 10
 	}`)
-	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
-		t.Errorf("Invalid configuration: %v", err)
-	}
+	err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy)
+	require.NoError(t, err, "Invalid configuration: %v", err)
+
 	factory.CreateFromConfig(policy)
 	hpa := factory.GetHardPodAffinitySymmetricWeight()
-	if hpa != 10 {
-		t.Errorf("Wrong hardPodAffinitySymmetricWeight, ecpected: %d, got: %d", 10, hpa)
-	}
+	require.Equal(t, int32(10), hpa, "Wrong hardPodAffinitySymmetricWeight, ecpected: %d, got: %d", int32(10), hpa)
 }
 
 func TestCreateFromEmptyConfig(t *testing.T) {
@@ -229,9 +225,8 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	)
 
 	configData = []byte(`{}`)
-	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
-		t.Errorf("Invalid configuration: %v", err)
-	}
+	err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy)
+	require.NoError(t, err, "Invalid configuration: %v", err)
 
 	factory.CreateFromConfig(policy)
 }
@@ -301,9 +296,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 			continue
 		}
 		handler.ValidateRequest(t, util.Test.ResourcePath(string(v1.ResourcePods), "bar", "foo"), "GET", nil)
-		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
-			t.Errorf("Expected %v, got %v", e, a)
-		}
+		require.True(t, reflect.DeepEqual(testPod, got), "Expected %v, got %v", testPod, got)
 		break
 	}
 }
@@ -318,17 +311,11 @@ func TestNodeEnumerator(t *testing.T) {
 	}
 	me := nodeEnumerator{testList}
 
-	if e, a := 3, me.Len(); e != a {
-		t.Fatalf("expected %v, got %v", e, a)
-	}
+	require.Equal(t, 3, me.Len(), "expected %v, got %v", 3, me.Len())
 	for i := range testList.Items {
 		gotObj := me.Get(i)
-		if e, a := testList.Items[i].Name, gotObj.(*v1.Node).Name; e != a {
-			t.Errorf("Expected %v, got %v", e, a)
-		}
-		if e, a := &testList.Items[i], gotObj; !reflect.DeepEqual(e, a) {
-			t.Errorf("Expected %#v, got %v#", e, a)
-		}
+		require.Equal(t, testList.Items[i].Name, gotObj.(*v1.Node).Name, "Expected %v, got %v", testList.Items[i].Name, gotObj.(*v1.Node).Name)
+		require.True(t, reflect.DeepEqual(&testList.Items[i], gotObj), "Expected %#v, got %v#", &testList.Items[i], gotObj)
 	}
 }
 
@@ -358,10 +345,8 @@ func TestBind(t *testing.T) {
 		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 		b := binder{client}
 
-		if err := b.Bind(item.binding); err != nil {
-			t.Errorf("Unexpected error: %v", err)
-			continue
-		}
+		err := b.Bind(item.binding)
+		require.NoError(t, err, "Unexpected error: %v", err)
 		expectedBody := runtime.EncodeOrDie(util.Test.Codec(), item.binding)
 		handler.ValidateRequest(t,
 			util.Test.SubResourcePath(string(v1.ResourcePods), metav1.NamespaceDefault, "foo", "binding"),
@@ -376,8 +361,7 @@ func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
 		T:            t,
 	}
 	server := httptest.NewServer(&handler)
-	// TODO: Uncomment when fix #19254
-	// defer server.Close()
+	defer server.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	// factory of "default-scheduler"
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
@@ -398,9 +382,7 @@ func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
 		enableEquivalenceCache,
 	)
 	_, err := factory.Create()
-	if err == nil {
-		t.Errorf("expected err: invalid hardPodAffinitySymmetricWeight, got nothing")
-	}
+	require.Error(t, err, "expected err: invalid hardPodAffinitySymmetricWeight, got nothing")
 }
 
 func TestInvalidFactoryArgs(t *testing.T) {
@@ -446,9 +428,7 @@ func TestInvalidFactoryArgs(t *testing.T) {
 			enableEquivalenceCache,
 		)
 		_, err := factory.Create()
-		if err == nil {
-			t.Errorf("expected err: %s, got nothing", test.expectErr)
-		}
+		require.Errorf(t, err, "expected err: %s, got nothing", test.expectErr)
 	}
 
 }
@@ -537,8 +517,6 @@ func TestSkipPodUpdate(t *testing.T) {
 			},
 		}
 		got := c.skipPodUpdate(test.pod)
-		if got != test.expected {
-			t.Errorf("skipPodUpdate() = %t, expected = %t", got, test.expected)
-		}
+		require.Equal(t, test.expected, got, "skipPodUpdate() = %t, expected = %t", got, test.expected)
 	}
 }

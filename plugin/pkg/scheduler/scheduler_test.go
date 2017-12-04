@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -221,21 +222,11 @@ func TestScheduler(t *testing.T) {
 		})
 		s.scheduleOne()
 		<-called
-		if e, a := item.expectAssumedPod, gotAssumedPod; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v: assumed pod: wanted %v, got %v", i, e, a)
-		}
-		if e, a := item.expectErrorPod, gotPod; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v: error pod: wanted %v, got %v", i, e, a)
-		}
-		if e, a := item.expectForgetPod, gotForgetPod; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v: forget pod: wanted %v, got %v", i, e, a)
-		}
-		if e, a := item.expectError, gotError; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v: error: wanted %v, got %v", i, e, a)
-		}
-		if e, a := item.expectBind, gotBinding; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v: error: %s", i, diff.ObjectDiff(e, a))
-		}
+		require.True(t, reflect.DeepEqual(item.expectAssumedPod, gotAssumedPod), "%v: assumed pod: wanted %v, got %v", i, item.expectAssumedPod, gotAssumedPod)
+		require.True(t, reflect.DeepEqual(item.expectErrorPod, gotPod), "%v: error pod: wanted %v, got %v", i, item.expectErrorPod, gotPod)
+		require.True(t, reflect.DeepEqual(item.expectForgetPod, gotForgetPod), "%v: forget pod: wanted %v, got %v", i, item.expectForgetPod, gotForgetPod)
+		require.True(t, reflect.DeepEqual(item.expectError, gotError), "%v: error: wanted %v, got %v", i, item.expectError, gotError)
+		require.True(t, reflect.DeepEqual(item.expectBind, gotBinding), "%v: error: %s", i, diff.ObjectDiff(item.expectBind, gotBinding))
 		events.Stop()
 	}
 }
@@ -262,9 +253,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 			default:
 			}
 			pods, err := scache.List(labels.Everything())
-			if err != nil {
-				t.Fatalf("cache.List failed: %v", err)
-			}
+			require.NoError(t, err, "cache.List failed: %v", err)
 			if len(pods) == 0 {
 				close(waitPodExpireChan)
 				return
@@ -290,9 +279,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 			Target:     v1.ObjectReference{Kind: "Node", Name: node.Name},
 		}
-		if !reflect.DeepEqual(expectBinding, b) {
-			t.Errorf("binding want=%v, get=%v", expectBinding, b)
-		}
+		require.True(t, reflect.DeepEqual(expectBinding, b), "binding want=%v, get=%v", expectBinding, b)
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("timeout in binding after %v", wait.ForeverTestTimeout)
 	}
@@ -324,9 +311,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 			NumAllNodes:      1,
 			FailedPredicates: core.FailedPredicateMap{node.Name: []algorithm.PredicateFailureReason{predicates.ErrPodNotFitsHostPorts}},
 		}
-		if !reflect.DeepEqual(expectErr, err) {
-			t.Errorf("err want=%v, get=%v", expectErr, err)
-		}
+		require.True(t, reflect.DeepEqual(expectErr, err), "err want=%v, get=%v", expectErr, err)
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("timeout in fitting after %v", wait.ForeverTestTimeout)
 	}
@@ -336,12 +321,11 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	// and would be removed itself (without any explicit actions on schedulercache). Even in that case,
 	// explicitly AddPod will as well correct the behavior.
 	firstPod.Spec.NodeName = node.Name
-	if err := scache.AddPod(firstPod); err != nil {
-		t.Fatalf("err: %v", err)
-	}
-	if err := scache.RemovePod(firstPod); err != nil {
-		t.Fatalf("err: %v", err)
-	}
+	err := scache.AddPod(firstPod)
+	require.NoError(t, err, "err: %v", err)
+
+	err = scache.RemovePod(firstPod)
+	require.NoError(t, err, "err: %v", err)
 
 	queuedPodStore.Add(secondPod)
 	scheduler.scheduleOne()
@@ -351,9 +335,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 			Target:     v1.ObjectReference{Kind: "Node", Name: node.Name},
 		}
-		if !reflect.DeepEqual(expectBinding, b) {
-			t.Errorf("binding want=%v, get=%v", expectBinding, b)
-		}
+		require.True(t, reflect.DeepEqual(expectBinding, b), "binding want=%v, get=%v", expectBinding, b)
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("timeout in binding after %v", wait.ForeverTestTimeout)
 	}
@@ -412,9 +394,7 @@ func TestSchedulerErrorWithLongBinding(t *testing.T) {
 				finished = true
 			}
 		}
-		if !reflect.DeepEqual(resultBindings, test.Expected) {
-			t.Errorf("Result binding are not equal to expected. %v != %v", resultBindings, test.Expected)
-		}
+		require.True(t, reflect.DeepEqual(resultBindings, test.Expected), "Result binding are not equal to expected. %v != %v", resultBindings, test.Expected)
 	}
 }
 
@@ -439,9 +419,7 @@ func setupTestSchedulerWithOnePodOnNode(t *testing.T, queuedPodStore *clientcach
 			ObjectMeta: metav1.ObjectMeta{Name: pod.Name},
 			Target:     v1.ObjectReference{Kind: "Node", Name: node.Name},
 		}
-		if !reflect.DeepEqual(expectBinding, b) {
-			t.Errorf("binding want=%v, get=%v", expectBinding, b)
-		}
+		require.True(t, reflect.DeepEqual(expectBinding, b), "binding want=%v, get=%v", expectBinding, b)
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("timeout after %v", wait.ForeverTestTimeout)
 	}
@@ -509,12 +487,8 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 			NumAllNodes:      len(nodes),
 			FailedPredicates: failedPredicatesMap,
 		}
-		if len(fmt.Sprint(expectErr)) > 150 {
-			t.Errorf("message is too spammy ! %v ", len(fmt.Sprint(expectErr)))
-		}
-		if !reflect.DeepEqual(expectErr, err) {
-			t.Errorf("\n err \nWANT=%+v,\nGOT=%+v", expectErr, err)
-		}
+		require.False(t, len(fmt.Sprint(expectErr)) > 150, "message is too spammy ! %v ", len(fmt.Sprint(expectErr)))
+		require.True(t, reflect.DeepEqual(expectErr, err), "\n err \nWANT=%+v,\nGOT=%+v", expectErr, err)
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("timeout after %v", wait.ForeverTestTimeout)
 	}

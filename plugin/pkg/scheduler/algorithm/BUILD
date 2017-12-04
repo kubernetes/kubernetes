@@ -35,6 +35,7 @@ go_test(
     library = ":go_default_library",
     deps = [
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
     ],

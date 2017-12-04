@@ -21,6 +21,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
@@ -113,14 +114,10 @@ func TestNewNodeLabelPriority(t *testing.T) {
 			presence: test.presence,
 		}
 		list, err := priorityFunction(labelPrioritizer.CalculateNodeLabelPriorityMap, nil, nil)(nil, nodeNameToInfo, test.nodes)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
+		require.NoError(t, err, "unexpected error: %v", err)
 		// sort the two lists to avoid failures on account of different ordering
 		sort.Sort(test.expectedList)
 		sort.Sort(list)
-		if !reflect.DeepEqual(test.expectedList, list) {
-			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
-		}
+		require.True(t, reflect.DeepEqual(test.expectedList, list), "%s: expected %#v, got %#v", test.test, test.expectedList, list)
 	}
 }

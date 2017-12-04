@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
@@ -160,8 +161,6 @@ func TestPriorityMetadata(t *testing.T) {
 		schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}))
 	for _, test := range tests {
 		ptData := mataDataProducer(test.pod, nil)
-		if !reflect.DeepEqual(test.expected, ptData) {
-			t.Errorf("%s: expected %#v, got %#v", test.test, test.expected, ptData)
-		}
+		require.True(t, reflect.DeepEqual(test.expected, ptData), "%s: expected %#v, got %#v", test.test, test.expected, ptData)
 	}
 }

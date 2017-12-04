@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/util"
@@ -74,23 +75,25 @@ func TestPriorityQueue_Add(t *testing.T) {
 	q.Add(&medPriorityPod)
 	q.Add(&unschedulablePod)
 	q.Add(&highPriorityPod)
-	if p, err := q.Pop(); err != nil || p != &highPriorityPod {
-		t.Errorf("Expected: %v after Pop, but got: %v", highPriorityPod.Name, p.Name)
-	}
-	if p, err := q.Pop(); err != nil || p != &medPriorityPod {
-		t.Errorf("Expected: %v after Pop, but got: %v", medPriorityPod.Name, p.Name)
-	}
-	if p, err := q.Pop(); err != nil || p != &unschedulablePod {
-		t.Errorf("Expected: %v after Pop, but got: %v", unschedulablePod.Name, p.Name)
-	}
+	p, err := q.Pop()
+	require.NoError(t, err, "Unexpected error: %v", err)
+	require.Equal(t, &highPriorityPod, p, "Expected: %v after Pop, but got: %v", highPriorityPod.Name, p.Name)
+
+	p, err = q.Pop()
+	require.NoError(t, err, "Unexpected error: %v", err)
+	require.Equal(t, &medPriorityPod, p, "Expected: %v after Pop, but got: %v", medPriorityPod.Name, p.Name)
+
+	p, err = q.Pop()
+	require.NoError(t, err, "Unexpected error: %v", err)
+	require.Equal(t, &unschedulablePod, p, "Expected: %v after Pop, but got: %v", unschedulablePod.Name, p.Name)
 }
 
 func TestPriorityQueue_Pop(t *testing.T) {
 	q := NewPriorityQueue()
 	go func() {
-		if p, err := q.Pop(); err != nil || p != &highPriorityPod {
-			t.Errorf("Expected: %v after Pop, but got: %v", highPriorityPod.Name, p.Name)
-		}
+		p, err := q.Pop()
+		require.NoError(t, err, "Unexpected error: %v", err)
+		require.Equal(t, &highPriorityPod, p, "Expected: %v after Pop, but got: %v", highPriorityPod.Name, p.Name)
 	}()
 	q.Add(&highPriorityPod)
 }
@@ -102,9 +105,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 		t.Errorf("Expected %v to be added to activeQ.", highPriorityPod.Name)
 	}
 	q.Update(&highPriorityPod)
-	if q.activeQ.data.Len() != 1 {
-		t.Error("Expected only one item in activeQ.")
-	}
+	require.Equal(t, 1, q.activeQ.data.Len(), "Expected only one item in activeQ.")
 	// Updating an unschedulable pod which is not in any of the two queues, should
 	// add the pod to activeQ.
 	q.Update(&unschedulablePod)
@@ -130,12 +131,11 @@ func TestPriorityQueue_Delete(t *testing.T) {
 	q.Update(&highPriorityPod)
 	q.Add(&unschedulablePod)
 	q.Delete(&highPriorityPod)
-	if _, exists, _ := q.activeQ.Get(&unschedulablePod); !exists {
-		t.Errorf("Expected %v to be in activeQ.", unschedulablePod.Name)
-	}
-	if _, exists, _ := q.activeQ.Get(&highPriorityPod); exists {
-		t.Errorf("Didn't expect %v to be in activeQ.", highPriorityPod.Name)
-	}
+	_, exists, _ := q.activeQ.Get(&unschedulablePod)
+	require.True(t, exists, "Expected %v to be in activeQ.", unschedulablePod.Name)
+
+	_, exists, _ = q.activeQ.Get(&highPriorityPod)
+	require.False(t, exists, "Didn't expect %v to be in activeQ.", highPriorityPod.Name)
 }
 
 func TestPriorityQueue_MoveAllToActiveQueue(t *testing.T) {
@@ -144,9 +144,7 @@ func TestPriorityQueue_MoveAllToActiveQueue(t *testing.T) {
 	q.unschedulableQ.Add(&unschedulablePod)
 	q.unschedulableQ.Add(&highPriorityPod)
 	q.MoveAllToActiveQueue()
-	if q.activeQ.data.Len() != 3 {
-		t.Error("Expected all items to be in activeQ.")
-	}
+	require.Equal(t, 3, q.activeQ.data.Len(), "Expected all items to be in activeQ.")
 }
 
 // TestPriorityQueue_AssignedPodAdded tests AssignedPodAdded. It checks that
@@ -193,16 +191,11 @@ func TestPriorityQueue_AssignedPodAdded(t *testing.T) {
 	// Simulate addition of an assigned pod. The pod has matching labels for
 	// affinityPod. So, affinityPod should go to activeQ.
 	q.AssignedPodAdded(&labelPod)
-	if q.unschedulableQ.Get(affinityPod) != nil {
-		t.Error("affinityPod is still in the unschedulableQ.")
-	}
-	if _, exists, _ := q.activeQ.Get(affinityPod); !exists {
-		t.Error("affinityPod is not moved to activeQ.")
-	}
+	require.Nil(t, q.unschedulableQ.Get(affinityPod), "affinityPod is still in the unschedulableQ.")
+	_, exists, _ := q.activeQ.Get(affinityPod)
+	require.True(t, exists, "affinityPod is not moved to activeQ.")
 	// Check that the other pod is still in the unschedulableQ.
-	if q.unschedulableQ.Get(&unschedulablePod) == nil {
-		t.Error("unschedulablePod is not in the unschedulableQ.")
-	}
+	require.NotNil(t, q.unschedulableQ.Get(&unschedulablePod), "unschedulablePod is not in the unschedulableQ.")
 }
 
 func TestUnschedulablePodsMap(t *testing.T) {
@@ -349,41 +342,33 @@ func TestUnschedulablePodsMap(t *testing.T) {
 		for _, p := range test.podsToAdd {
 			upm.Add(p)
 		}
-		if !reflect.DeepEqual(upm.pods, test.expectedMapAfterAdd) {
-			t.Errorf("#%d: Unexpected map after adding pods. Expected: %v, got: %v",
-				i, test.expectedMapAfterAdd, upm.pods)
-		}
-		if !reflect.DeepEqual(upm.nominatedPods, test.expectedNominatedAfterAdd) {
-			t.Errorf("#%d: Unexpected nominated map after adding pods. Expected: %v, got: %v",
-				i, test.expectedNominatedAfterAdd, upm.nominatedPods)
-		}
+		require.True(t, reflect.DeepEqual(upm.pods, test.expectedMapAfterAdd),
+			"#%d: Unexpected map after adding pods. Expected: %v, got: %v",
+			i, test.expectedMapAfterAdd, upm.pods)
+		require.True(t, reflect.DeepEqual(upm.nominatedPods, test.expectedNominatedAfterAdd),
+			"#%d: Unexpected nominated map after adding pods. Expected: %v, got: %v",
+			i, test.expectedNominatedAfterAdd, upm.nominatedPods)
 		if len(test.podsToUpdate) > 0 {
 			for _, p := range test.podsToUpdate {
 				upm.Update(p)
 			}
-			if !reflect.DeepEqual(upm.pods, test.expectedMapAfterUpdate) {
-				t.Errorf("#%d: Unexpected map after updating pods. Expected: %v, got: %v",
-					i, test.expectedMapAfterUpdate, upm.pods)
-			}
-			if !reflect.DeepEqual(upm.nominatedPods, test.expectedNominatedAfterUpdate) {
-				t.Errorf("#%d: Unexpected nominated map after updating pods. Expected: %v, got: %v",
-					i, test.expectedNominatedAfterUpdate, upm.nominatedPods)
-			}
+			require.True(t, reflect.DeepEqual(upm.pods, test.expectedMapAfterUpdate),
+				"#%d: Unexpected map after updating pods. Expected: %v, got: %v",
+				i, test.expectedMapAfterUpdate, upm.pods)
+			require.True(t, reflect.DeepEqual(upm.nominatedPods, test.expectedNominatedAfterUpdate),
+				"#%d: Unexpected nominated map after updating pods. Expected: %v, got: %v",
+				i, test.expectedNominatedAfterUpdate, upm.nominatedPods)
 		}
 		for _, p := range test.podsToDelete {
 			upm.Delete(p)
 		}
-		if !reflect.DeepEqual(upm.pods, test.expectedMapAfterDelete) {
-			t.Errorf("#%d: Unexpected map after deleting pods. Expected: %v, got: %v",
-				i, test.expectedMapAfterDelete, upm.pods)
-		}
-		if !reflect.DeepEqual(upm.nominatedPods, test.expectedNominatedAfterDelete) {
-			t.Errorf("#%d: Unexpected nominated map after deleting pods. Expected: %v, got: %v",
-				i, test.expectedNominatedAfterDelete, upm.nominatedPods)
-		}
+		require.True(t, reflect.DeepEqual(upm.pods, test.expectedMapAfterDelete),
+			"#%d: Unexpected map after deleting pods. Expected: %v, got: %v",
+			i, test.expectedMapAfterDelete, upm.pods)
+		require.True(t, reflect.DeepEqual(upm.nominatedPods, test.expectedNominatedAfterDelete),
+			"#%d: Unexpected nominated map after deleting pods. Expected: %v, got: %v",
+			i, test.expectedNominatedAfterDelete, upm.nominatedPods)
 		upm.Clear()
-		if len(upm.pods) != 0 {
-			t.Errorf("Expected the map to be empty, but has %v elements.", len(upm.pods))
-		}
+		require.Len(t, upm.pods, 0, "Expected the map to be empty, but has %v elements.", len(upm.pods))
 	}
 }

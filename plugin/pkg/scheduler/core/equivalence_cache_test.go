@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -93,16 +94,12 @@ func TestUpdateCachedPredicateItem(t *testing.T) {
 		)
 
 		value, ok := ecache.algorithmCache[test.nodeName].predicatesCache.Get(test.predicateKey)
-		if !ok {
-			t.Errorf("Failed: %s, can't find expected cache item: %v",
-				test.name, test.expectCacheItem)
-		} else {
-			cachedMapItem := value.(PredicateMap)
-			if !reflect.DeepEqual(cachedMapItem[test.equivalenceHash], test.expectCacheItem) {
-				t.Errorf("Failed: %s, expected cached item: %v, but got: %v",
-					test.name, test.expectCacheItem, cachedMapItem[test.equivalenceHash])
-			}
-		}
+		require.True(t, ok, "Failed: %s, can't find expected cache item: %v",
+			test.name, test.expectCacheItem)
+		cachedMapItem := value.(PredicateMap)
+		require.True(t, reflect.DeepEqual(cachedMapItem[test.equivalenceHash], test.expectCacheItem),
+			"Failed: %s, expected cached item: %v, but got: %v", test.name,
+			test.expectCacheItem, cachedMapItem[test.equivalenceHash])
 	}
 }
 
@@ -216,24 +213,20 @@ func TestPredicateWithECache(t *testing.T) {
 		)
 		// returned invalid should match expectedInvalidPredicateKey or expectedInvalidEquivalenceHash
 		if test.equivalenceHashForUpdatePredicate != test.equivalenceHashForCalPredicate {
-			if invalid != test.expectedInvalidEquivalenceHash {
-				t.Errorf("Failed: %s, expected invalid: %v, but got: %v",
-					test.name, test.expectedInvalidEquivalenceHash, invalid)
-			}
+			require.Equal(t, test.expectedInvalidEquivalenceHash, invalid,
+				"Failed: %s, expected invalid: %v, but got: %v",
+				test.name, test.expectedInvalidEquivalenceHash, invalid)
 		} else {
-			if invalid != test.expectedInvalidPredicateKey {
-				t.Errorf("Failed: %s, expected invalid: %v, but got: %v",
-					test.name, test.expectedInvalidPredicateKey, invalid)
-			}
+			require.Equal(t, test.expectedInvalidPredicateKey, invalid,
+				"Failed: %s, expected invalid: %v, but got: %v",
+				test.name, test.expectedInvalidPredicateKey, invalid)
 		}
 		// returned predicate result should match expected predicate item
-		if fit != test.expectedPredicateItem.fit {
-			t.Errorf("Failed: %s, expected fit: %v, but got: %v", test.name, test.cachedItem.fit, fit)
-		}
-		if !reflect.DeepEqual(reasons, test.expectedPredicateItem.reasons) {
-			t.Errorf("Failed: %s, expected reasons: %v, but got: %v",
-				test.name, test.cachedItem.reasons, reasons)
-		}
+		require.Equal(t, test.expectedPredicateItem.fit, fit,
+			"Failed: %s, expected fit: %v, but got: %v", test.name, test.cachedItem.fit, fit)
+		require.True(t, reflect.DeepEqual(reasons, test.expectedPredicateItem.reasons),
+			"Failed: %s, expected reasons: %v, but got: %v",
+			test.name, test.cachedItem.reasons, reasons)
 	}
 }
 
@@ -291,13 +284,8 @@ func TestGetHashEquivalencePod(t *testing.T) {
 	hash2, _ := ecache.getHashEquivalencePod(pod2)
 	hash3, _ := ecache.getHashEquivalencePod(pod3)
 
-	if hash1 != hash2 {
-		t.Errorf("Failed: pod %v and %v is expected to be equivalent", pod1.Name, pod2.Name)
-	}
-
-	if hash2 == hash3 {
-		t.Errorf("Failed: pod %v and %v is not expected to be equivalent", pod2.Name, pod3.Name)
-	}
+	require.Equal(t, hash1, hash2, "Failed: pod %v and %v is expected to be equivalent", pod1.Name, pod2.Name)
+	require.NotEqual(t, hash2, hash3, "Failed: pod %v and %v is not expected to be equivalent", pod2.Name, pod3.Name)
 
 	// pod4 is a pod without controller ref
 	pod4 := &v1.Pod{
@@ -306,10 +294,8 @@ func TestGetHashEquivalencePod(t *testing.T) {
 		},
 	}
 	_, found := ecache.getHashEquivalencePod(pod4)
-	if found {
-		t.Errorf("Failed: equivalence hash of pod %v is not expected to be found, but got: %v",
-			pod4.Name, found)
-	}
+	require.False(t, found, "Failed: equivalence hash of pod %v is not expected to be found, but got: %v",
+		pod4.Name, found)
 }
 
 func TestInvalidateCachedPredicateItemOfAllNodes(t *testing.T) {
@@ -375,11 +361,9 @@ func TestInvalidateCachedPredicateItemOfAllNodes(t *testing.T) {
 	// there should be no cached predicate any more
 	for _, test := range tests {
 		if algorithmCache, exist := ecache.algorithmCache[test.nodeName]; exist {
-			if _, exist := algorithmCache.predicatesCache.Get(testPredicate); exist {
-				t.Errorf("Failed: cached item for predicate key: %v on node: %v should be invalidated",
-					testPredicate, test.nodeName)
-				break
-			}
+			_, exist := algorithmCache.predicatesCache.Get(testPredicate)
+			require.False(t, exist, "Failed: cached item for predicate key: %v on node: %v should be invalidated",
+				testPredicate, test.nodeName)
 		}
 	}
 }
@@ -440,9 +424,7 @@ func TestInvalidateAllCachedPredicateItemOfNode(t *testing.T) {
 	for _, test := range tests {
 		// invalidate cached predicate for all nodes
 		ecache.InvalidateAllCachedPredicateItemOfNode(test.nodeName)
-		if _, exist := ecache.algorithmCache[test.nodeName]; exist {
-			t.Errorf("Failed: cached item for node: %v should be invalidated", test.nodeName)
-			break
-		}
+		_, exist := ecache.algorithmCache[test.nodeName]
+		require.False(t, exist, "Failed: cached item for node: %v should be invalidated", test.nodeName)
 	}
 }

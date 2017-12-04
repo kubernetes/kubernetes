@@ -19,6 +19,7 @@ package algorithm
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 )
 
@@ -33,28 +34,18 @@ type schedulerTester struct {
 // Call if you know exactly where pod should get scheduled.
 func (st *schedulerTester) expectSchedule(pod *v1.Pod, expected string) {
 	actual, err := st.scheduler.Schedule(pod, st.nodeLister)
-	if err != nil {
-		st.t.Errorf("Unexpected error %v\nTried to schedule: %#v", err, pod)
-		return
-	}
-	if actual != expected {
-		st.t.Errorf("Unexpected scheduling value: %v, expected %v", actual, expected)
-	}
+	require.NoError(st.t, err, "Unexpected error %v\nTried to schedule: %#v", err, pod)
+	require.Equal(st.t, expected, actual, "Unexpected scheduling value: %v, expected %v", actual, expected)
 }
 
 // Call if you can't predict where pod will be scheduled.
 func (st *schedulerTester) expectSuccess(pod *v1.Pod) {
 	_, err := st.scheduler.Schedule(pod, st.nodeLister)
-	if err != nil {
-		st.t.Errorf("Unexpected error %v\nTried to schedule: %#v", err, pod)
-		return
-	}
+	require.NoError(st.t, err, "Unexpected error %v\nTried to schedule: %#v", err, pod)
 }
 
 // Call if pod should *not* schedule.
 func (st *schedulerTester) expectFailure(pod *v1.Pod) {
 	_, err := st.scheduler.Schedule(pod, st.nodeLister)
-	if err == nil {
-		st.t.Error("Unexpected non-error")
-	}
+	require.Error(st.t, err, "Unexpected non-error")
 }

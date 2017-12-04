@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
@@ -165,16 +166,10 @@ func TestSelectHost(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			got, err := scheduler.selectHost(test.list)
 			if test.expectsErr {
-				if err == nil {
-					t.Error("Unexpected non-error")
-				}
+				require.Errorf(t, err, "Unexpected non-error")
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				if !test.possibleHosts.Has(got) {
-					t.Errorf("got %s is not in the possible map %v", got, test.possibleHosts)
-				}
+				require.NoError(t, err, "Unexpected error: %v", err)
+				require.Contains(t, test.possibleHosts, got, "got %s is not in the possible map %v", got, test.possibleHosts)
 			}
 		}
 	}
@@ -314,11 +309,9 @@ func TestGenericScheduler(t *testing.T) {
 			cache, nil, NewSchedulingQueue(), test.predicates, algorithm.EmptyPredicateMetadataProducer, test.prioritizers, algorithm.EmptyMetadataProducer, []algorithm.SchedulerExtender{}, nil)
 		machine, err := scheduler.Schedule(test.pod, schedulertesting.FakeNodeLister(makeNodeList(test.nodes)))
 
-		if !reflect.DeepEqual(err, test.wErr) {
-			t.Errorf("Failed : %s, Unexpected error: %v, expected: %v", test.name, err, test.wErr)
-		}
-		if test.expectedHosts != nil && !test.expectedHosts.Has(machine) {
-			t.Errorf("Failed : %s, Expected: %s, got: %s", test.name, test.expectedHosts, machine)
+		require.True(t, reflect.DeepEqual(err, test.wErr), "Failed : %s, Unexpected error: %v, expected: %v", test.name, err, test.wErr)
+		if test.expectedHosts != nil {
+			require.Contains(t, test.expectedHosts, machine, "Failed : %s, Expected: %s, got: %s", test.name, test.expectedHosts, machine)
 		}
 	}
 }
@@ -333,19 +326,12 @@ func TestFindFitAllError(t *testing.T) {
 	}
 	_, predicateMap, err := findNodesThatFit(&v1.Pod{}, nodeNameToInfo, makeNodeList(nodes), predicates, nil, algorithm.EmptyPredicateMetadataProducer, nil, nil)
 
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if len(predicateMap) != len(nodes) {
-		t.Errorf("unexpected failed predicate map: %v", predicateMap)
-	}
+	require.NoError(t, err, "unexpected error: %v", err)
+	require.Equal(t, len(predicateMap), len(nodes), "unexpected failed predicate map: %v", predicateMap)
 
 	for _, node := range nodes {
 		failures, found := predicateMap[node]
-		if !found {
-			t.Errorf("failed to find node: %s in %v", node, predicateMap)
-		}
+		require.True(t, found, "failed to find node: %s in %v", node, predicateMap)
 		if len(failures) != 1 || failures[0] != algorithmpredicates.ErrFakePredicate {
 			t.Errorf("unexpected failures: %v", failures)
 		}
@@ -366,22 +352,15 @@ func TestFindFitSomeError(t *testing.T) {
 	}
 
 	_, predicateMap, err := findNodesThatFit(pod, nodeNameToInfo, makeNodeList(nodes), predicates, nil, algorithm.EmptyPredicateMetadataProducer, nil, nil)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if len(predicateMap) != (len(nodes) - 1) {
-		t.Errorf("unexpected failed predicate map: %v", predicateMap)
-	}
+	require.NoError(t, err, "unexpected error: %v", err)
+	require.Equal(t, len(predicateMap), len(nodes)-1, "unexpected failed predicate map: %v", predicateMap)
 
 	for _, node := range nodes {
 		if node == pod.Name {
 			continue
 		}
 		failures, found := predicateMap[node]
-		if !found {
-			t.Errorf("failed to find node: %s in %v", node, predicateMap)
-		}
+		require.True(t, found, "failed to find node: %s in %v", node, predicateMap)
 		if len(failures) != 1 || failures[0] != algorithmpredicates.ErrFakePredicate {
 			t.Errorf("unexpected failures: %v", failures)
 		}
@@ -543,18 +522,13 @@ func TestZeroRequest(t *testing.T) {
 		list, err := PrioritizeNodes(
 			test.pod, nodeNameToInfo, mataData, priorityConfigs,
 			schedulertesting.FakeNodeLister(test.nodes), []algorithm.SchedulerExtender{})
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
+
+		require.NoError(t, err, "unexpected error: %v", err)
 		for _, hp := range list {
 			if test.test == "test priority of larger pod with machine with zero-request pod" {
-				if hp.Score == expectedPriority {
-					t.Errorf("%s: expected non-%d for all priorities, got list %#v", test.test, expectedPriority, list)
-				}
+				require.NotEqual(t, expectedPriority, hp.Score, "%s: expected non-%d for all priorities, got list %#v", test.test, expectedPriority, list)
 			} else {
-				if hp.Score != expectedPriority {
-					t.Errorf("%s: expected %d for all priorities, got list %#v", test.test, expectedPriority, list)
-				}
+				require.Equal(t, expectedPriority, hp.Score, "%s: expected %d for all priorities, got list %#v", test.test, expectedPriority, list)
 			}
 		}
 	}
@@ -791,12 +765,10 @@ func TestSelectNodesForPreemption(t *testing.T) {
 		}
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, nodes)
 		nodeToPods, err := selectNodesForPreemption(test.pod, nodeNameToInfo, nodes, test.predicates, PredicateMetadata, nil, nil)
-		if err != nil {
-			t.Error(err)
-		}
-		if err := checkPreemptionVictims(test.name, test.expected, nodeToPods); err != nil {
-			t.Error(err)
-		}
+		require.NoError(t, err, "unexpected error: %v", err)
+
+		err = checkPreemptionVictims(test.name, test.expected, nodeToPods)
+		require.NoError(t, err, "unexpected error: %v", err)
 	}
 }
 
@@ -956,9 +928,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 				break
 			}
 		}
-		if !found {
-			t.Errorf("test [%v]: unexpected node: %v", test.name, node)
-		}
+		require.True(t, found, "test [%v]: unexpected node: %v", test.name, node)
 	}
 }
 
@@ -1069,13 +1039,10 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 
 	for _, test := range tests {
 		nodes := nodesWherePreemptionMightHelp(test.pod, makeNodeList(nodeNames), test.failedPredMap)
-		if len(test.expected) != len(nodes) {
-			t.Errorf("test [%v]:number of nodes is not the same as expected. exptectd: %d, got: %d. Nodes: %v", test.name, len(test.expected), len(nodes), nodes)
-		}
+		require.Equal(t, len(test.expected), len(nodes), "test [%v]:number of nodes is not the same as expected. exptectd: %d, got: %d. Nodes: %v", test.name, len(test.expected), len(nodes), nodes)
 		for _, node := range nodes {
-			if _, found := test.expected[node.Name]; !found {
-				t.Errorf("test [%v]: node %v is not expected.", test.name, node.Name)
-			}
+			_, found := test.expected[node.Name]
+			require.True(t, found, "test [%v]: node %v is not expected.", test.name, node.Name)
 		}
 	}
 }
@@ -1193,15 +1160,11 @@ func TestPreempt(t *testing.T) {
 			cache, nil, NewSchedulingQueue(), map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources}, algorithm.EmptyPredicateMetadataProducer, []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}}, algorithm.EmptyMetadataProducer, extenders, nil)
 		// Call Preempt and check the expected results.
 		node, victims, _, err := scheduler.Preempt(test.pod, schedulertesting.FakeNodeLister(makeNodeList(nodeNames)), error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))
-		if err != nil {
-			t.Errorf("test [%v]: unexpected error in preemption: %v", test.name, err)
-		}
+		require.NoError(t, err, "test [%v]: unexpected error in preemption: %v", test.name, err)
 		if (node != nil && node.Name != test.expectedNode) || (node == nil && len(test.expectedNode) != 0) {
 			t.Errorf("test [%v]: expected node: %v, got: %v", test.name, test.expectedNode, node)
 		}
-		if len(victims) != len(test.expectedPods) {
-			t.Errorf("test [%v]: expected %v pods, got %v.", test.name, len(test.expectedPods), len(victims))
-		}
+		require.Equal(t, len(test.expectedPods), len(victims), "test [%v]: expected %v pods, got %v.", test.name, len(test.expectedPods), len(victims))
 		for _, victim := range victims {
 			found := false
 			for _, expPod := range test.expectedPods {
@@ -1210,9 +1173,7 @@ func TestPreempt(t *testing.T) {
 					break
 				}
 			}
-			if !found {
-				t.Errorf("test [%v]: pod %v is not expected to be a victim.", test.name, victim.Name)
-			}
+			require.True(t, found, "test [%v]: pod %v is not expected to be a victim.", test.name, victim.Name)
 			// Mark the victims for deletion and record the preemptor's nominated node name.
 			now := metav1.Now()
 			victim.DeletionTimestamp = &now
@@ -1221,11 +1182,9 @@ func TestPreempt(t *testing.T) {
 		}
 		// Call preempt again and make sure it doesn't preempt any more pods.
 		node, victims, _, err = scheduler.Preempt(test.pod, schedulertesting.FakeNodeLister(makeNodeList(nodeNames)), error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))
-		if err != nil {
-			t.Errorf("test [%v]: unexpected error in preemption: %v", test.name, err)
-		}
-		if node != nil && len(victims) > 0 {
-			t.Errorf("test [%v]: didn't expect any more preemption. Node %v is selected for preemption.", test.name, node)
+		require.NoError(t, err, "test [%v]: unexpected error in preemption: %v", test.name, err)
+		if node != nil {
+			require.Len(t, victims, 0, "test [%v]: didn't expect any more preemption. Node %v is selected for preemption.", test.name, node)
 		}
 		close(stop)
 	}

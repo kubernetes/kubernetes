@@ -19,6 +19,7 @@ package factory
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
@@ -34,14 +35,10 @@ func TestAlgorithmNameValidation(t *testing.T) {
 		"Some,Alg:orithm",
 	}
 	for _, name := range algorithmNamesShouldValidate {
-		if !validName.MatchString(name) {
-			t.Errorf("%v should be a valid algorithm name but is not valid.", name)
-		}
+		require.True(t, validName.MatchString(name), "%v should be a valid algorithm name but is not valid.", name)
 	}
 	for _, name := range algorithmNamesShouldNotValidate {
-		if validName.MatchString(name) {
-			t.Errorf("%v should be an invalid algorithm name but is valid.", name)
-		}
+		require.False(t, validName.MatchString(name), "%v should be an invalid algorithm name but is valid.", name)
 	}
 }
 
@@ -70,13 +67,9 @@ func TestValidatePriorityConfigOverFlow(t *testing.T) {
 	for _, test := range tests {
 		err := validateSelectedConfigs(test.configs)
 		if test.expected {
-			if err == nil {
-				t.Errorf("Expected Overflow for %s", test.description)
-			}
+			require.Errorf(t, err, "Expected Overflow for %s", test.description)
 		} else {
-			if err != nil {
-				t.Errorf("Did not expect an overflow for %s", test.description)
-			}
+			require.NoError(t, err, "Did not expect an overflow for %s", test.description)
 		}
 	}
 }

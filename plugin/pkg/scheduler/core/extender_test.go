@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -321,17 +322,10 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		podIgnored := &v1.Pod{}
 		machine, err := scheduler.Schedule(podIgnored, schedulertesting.FakeNodeLister(makeNodeList(test.nodes)))
 		if test.expectsErr {
-			if err == nil {
-				t.Errorf("Unexpected non-error for %s, machine %s", test.name, machine)
-			}
+			require.Errorf(t, err, "Unexpected non-error for %s, machine %s", test.name, machine)
 		} else {
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-				continue
-			}
-			if test.expectedHost != machine {
-				t.Errorf("Failed : %s, Expected: %s, Saw: %s", test.name, test.expectedHost, machine)
-			}
+			require.NoError(t, err, "Unexpected error: %v", err)
+			require.Equal(t, test.expectedHost, machine, "Failed : %s, Expected: %s, Saw: %s", test.name, test.expectedHost, machine)
 		}
 	}
 }
