@@ -50,6 +50,7 @@ func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, cmdOut io.Writer) *cobra
 		Long:    pdbLong,
 		Example: pdbExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.ValidateOutputArgs(cmd, cmdutil.KubectlCreate)
 			err := CreatePodDisruptionBudget(f, cmdOut, cmd, args)
 			cmdutil.CheckErr(err)
 		},

@@ -44,6 +44,7 @@ func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, cmdOut io.Writer) *cobra.
 		Long:    clusterRoleBindingLong,
 		Example: clusterRoleBindingExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.ValidateOutputArgs(cmd, cmdutil.KubectlCreate)
 			err := CreateClusterRoleBinding(f, cmdOut, cmd, args)
 			cmdutil.CheckErr(err)
 		},

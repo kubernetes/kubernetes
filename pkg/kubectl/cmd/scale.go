@@ -69,7 +69,7 @@ func NewCmdScale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    scaleLong,
 		Example: scaleExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
+			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd, cmdutil.KubectlScale))
 			shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
 			err := RunScale(f, out, cmd, args, shortOutput, options)
 			cmdutil.CheckErr(err)

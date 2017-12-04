@@ -66,6 +66,7 @@ func NewCmdCreateConfigMap(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 		Long:    configMapLong,
 		Example: configMapExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.ValidateOutputArgs(cmd, cmdutil.KubectlCreate)
 			err := CreateConfigMap(f, cmdOut, cmd, args)
 			cmdutil.CheckErr(err)
 		},

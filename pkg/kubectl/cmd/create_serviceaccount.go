@@ -45,6 +45,7 @@ func NewCmdCreateServiceAccount(f cmdutil.Factory, cmdOut io.Writer) *cobra.Comm
 		Long:    serviceAccountLong,
 		Example: serviceAccountExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.ValidateOutputArgs(cmd, cmdutil.KubectlCreate)
 			err := CreateServiceAccount(f, cmdOut, cmd, args)
 			cmdutil.CheckErr(err)
 		},

@@ -211,15 +211,9 @@ func (options *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 // Validate checks the set of flags provided by the user.
 func (options *GetOptions) Validate(cmd *cobra.Command) error {
 	if len(options.Raw) > 0 && (options.Watch || options.WatchOnly || len(options.LabelSelector) > 0 || options.Export) {
-		return fmt.Errorf("--raw may not be specified with other flags that filter the server request or alter the output")
+		return cmdutil.UsageErrorf(cmd, "--raw may not be specified with other flags that filter the server request or alter the output")
 	}
-	if cmdutil.GetFlagBool(cmd, "show-labels") {
-		outputOption := cmd.Flags().Lookup("output").Value.String()
-		if outputOption != "" && outputOption != "wide" {
-			return fmt.Errorf("--show-labels option cannot be used with %s printer", outputOption)
-		}
-	}
-	return nil
+	return cmdutil.ValidateOutputArgs(cmd, cmdutil.KubectlGet)
 }
 
 // Run performs the get operation.

@@ -69,7 +69,7 @@ func NewCmdReplace(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    replaceLong,
 		Example: replaceExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
+			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd, cmdutil.KubectlReplace))
 			err := RunReplace(f, out, cmd, args, options)
 			cmdutil.CheckErr(err)
 		},
