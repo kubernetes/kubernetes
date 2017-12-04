@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -34,53 +35,59 @@ const (
 	FormatJson = "json"
 )
 
+// The plugin name reported in error metrics.
+const pluginName = "log"
+
 // AllowedFormats are the formats known by log backend.
 var AllowedFormats = []string{
 	FormatLegacy,
 	FormatJson,
 }
 
-type backend struct {
-	out          io.Writer
-	format       string
-	groupVersion schema.GroupVersion
-}
-
-var _ audit.Backend = &backend{}
-
 func NewBackend(out io.Writer, format string, groupVersion schema.GroupVersion) audit.Backend {
 	return &backend{
 		out:          out,
 		format:       format,
 		groupVersion: groupVersion,
+		mu:           sync.Mutex{},
 	}
 }
+
+type backend struct {
+	out          io.Writer
+	format       string
+	groupVersion schema.GroupVersion
+	mu           sync.Mutex
+}
+
+var _ audit.Backend = &backend{}
 
 func (b *backend) ProcessEvents(events ...*auditinternal.Event) {
-	for _, ev := range events {
-		b.logEvent(ev)
-	}
-}
-
-func (b *backend) logEvent(ev *auditinternal.Event) {
 	line := ""
 	switch b.format {
 	case FormatLegacy:
-		line = audit.EventString(ev) + "\n"
-	case FormatJson:
-		bs, err := runtime.Encode(audit.Codecs.LegacyCodec(b.groupVersion), ev)
-		if err != nil {
-			audit.HandlePluginError("log", err, ev)
-			return
+		for _, ev := range events {
+			line += audit.EventString(ev) + "\n"
 		}
-		line = string(bs[:])
+	case FormatJson:
+		for _, ev := range events {
+			bs, err := runtime.Encode(audit.Codecs.LegacyCodec(b.groupVersion), ev)
+			if err != nil {
+				audit.HandlePluginError(pluginName, err, ev)
+				return
+			}
+			line += string(bs[:])
+		}
 	default:
-		audit.HandlePluginError("log", fmt.Errorf("log format %q is not in list of known formats (%s)",
-			b.format, strings.Join(AllowedFormats, ",")), ev)
+		audit.HandlePluginError(pluginName, fmt.Errorf("log format %q is not in list of known formats (%s)",
+			b.format, strings.Join(AllowedFormats, ",")), events...)
 		return
 	}
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	if _, err := fmt.Fprint(b.out, line); err != nil {
-		audit.HandlePluginError("log", err, ev)
+		audit.HandlePluginError(pluginName, err, events...)
 	}
 }
 
