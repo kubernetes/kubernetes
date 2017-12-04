@@ -100,7 +100,7 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
 		allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
 	}
 	return allPlugins
