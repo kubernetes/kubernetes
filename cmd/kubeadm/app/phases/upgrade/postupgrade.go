@@ -18,6 +18,8 @@ package upgrade
 
 import (
 	"fmt"
+	"os"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -31,14 +33,16 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptoken "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
 // Note that the markmaster phase is left out, not needed, and no token is created as that doesn't belong to the upgrade
-func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration, newK8sVer *version.Version) error {
+func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration, newK8sVer *version.Version, dryRun bool) error {
 	errs := []error{}
 
 	// Upload currently used configuration to the cluster
@@ -60,6 +64,11 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 
 	// Create/update RBAC rules that makes the 1.8.0+ nodes to rotate certificates and get their CSRs approved automatically
 	if err := nodebootstraptoken.AutoApproveNodeCertificateRotation(client); err != nil {
+		errs = append(errs, err)
+	}
+
+	// Upgrade to a self-hosted control plane if possible
+	if err := upgradeToSelfHosting(client, cfg, newK8sVer, dryRun); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -92,9 +101,11 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 	if err := dns.EnsureDNSAddon(cfg, client); err != nil {
 		errs = append(errs, err)
 	}
-
-	if err := coreDNSDeployment(cfg, client); err != nil {
-		errs = append(errs, err)
+	// Remove the old kube-dns deployment if coredns is now used
+	if !dryRun {
+		if err := removeOldKubeDNSDeploymentIfCoreDNSIsUsed(cfg, client); err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	if err := proxy.EnsureProxyAddon(cfg, client); err != nil {
@@ -103,22 +114,41 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 	return errors.NewAggregate(errs)
 }
 
-func coreDNSDeployment(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
+func removeOldKubeDNSDeploymentIfCoreDNSIsUsed(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
 	if features.Enabled(cfg.FeatureGates, features.CoreDNS) {
 		return apiclient.TryRunCommand(func() error {
-			getCoreDNS, err := client.AppsV1beta2().Deployments(metav1.NamespaceSystem).Get(kubeadmconstants.CoreDNS, metav1.GetOptions{})
+			coreDNSDeployment, err := client.AppsV1beta2().Deployments(metav1.NamespaceSystem).Get(kubeadmconstants.CoreDNS, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
-			if getCoreDNS.Status.ReadyReplicas == 0 {
+			if coreDNSDeployment.Status.ReadyReplicas == 0 {
 				return fmt.Errorf("the CodeDNS deployment isn't ready yet")
 			}
-			err = client.AppsV1beta2().Deployments(metav1.NamespaceSystem).Delete(kubeadmconstants.KubeDNS, nil)
-			if err != nil {
-				return err
-			}
-			return nil
-		}, 5)
+			return apiclient.DeleteDeploymentForeground(client, metav1.NamespaceSystem, kubeadmconstants.KubeDNS)
+		}, 10)
 	}
 	return nil
+}
+
+func upgradeToSelfHosting(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration, newK8sVer *version.Version, dryRun bool) error {
+	if features.Enabled(cfg.FeatureGates, features.SelfHosting) && !IsControlPlaneSelfHosted(client) && newK8sVer.AtLeast(v190alpha3) {
+
+		waiter := getWaiter(dryRun, client)
+
+		// kubeadm will now convert the static Pod-hosted control plane into a self-hosted one
+		fmt.Println("[self-hosted] Creating self-hosted control plane.")
+		if err := selfhosting.CreateSelfHostedControlPlane(kubeadmconstants.GetStaticPodDirectory(), kubeadmconstants.KubernetesDir, cfg, client, waiter, dryRun); err != nil {
+			return fmt.Errorf("error creating self hosted control plane: %v", err)
+		}
+	}
+	return nil
+}
+
+// getWaiter gets the right waiter implementation for the right occasion
+// TODO: Consolidate this with what's in init.go?
+func getWaiter(dryRun bool, client clientset.Interface) apiclient.Waiter {
+	if dryRun {
+		return dryrunutil.NewWaiter()
+	}
+	return apiclient.NewKubeWaiter(client, 30*time.Minute, os.Stdout)
 }

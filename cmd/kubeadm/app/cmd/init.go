@@ -433,7 +433,7 @@ func (i *Init) Run(out io.Writer) error {
 		// Temporary control plane is up, now we create our self hosted control
 		// plane components and remove the static manifests:
 		fmt.Println("[self-hosted] Creating self-hosted control plane.")
-		if err := selfhostingphase.CreateSelfHostedControlPlane(manifestDir, kubeConfigDir, i.cfg, client, waiter); err != nil {
+		if err := selfhostingphase.CreateSelfHostedControlPlane(manifestDir, kubeConfigDir, i.cfg, client, waiter, i.dryRun); err != nil {
 			return fmt.Errorf("error creating self hosted control plane: %v", err)
 		}
 	}

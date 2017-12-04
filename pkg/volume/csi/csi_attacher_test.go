@@ -17,13 +17,11 @@ limitations under the License.
 package csi
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"os"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1alpha1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +36,7 @@ func makeTestAttachment(attachID, nodeName, pvName string) *storage.VolumeAttach
 		},
 		Spec: storage.VolumeAttachmentSpec{
 			NodeName: nodeName,
-			Attacher: csiPluginName,
+			Attacher: "mock",
 			Source: storage.VolumeAttachmentSource{
 				PersistentVolumeName: &pvName,
 			},
@@ -64,47 +62,93 @@ func TestAttacherAttach(t *testing.T) {
 
 	testCases := []struct {
 		name       string
-		pv         *v1.PersistentVolume
 		nodeName   string
-		attachHash [32]byte
+		driverName string
+		volumeName string
+		attachID   string
 		shouldFail bool
 	}{
 		{
 			name:       "test ok 1",
-			pv:         makeTestPV("test-pv-001", 10, testDriver, "test-vol-1"),
-			nodeName:   "test-node",
-			attachHash: sha256.Sum256([]byte(fmt.Sprintf("%s%s", "test-vol-1", "test-node"))),
+			nodeName:   "testnode-01",
+			driverName: "testdriver-01",
+			volumeName: "testvol-01",
+			attachID:   getAttachmentName("testvol-01", "testdriver-01", "testnode-01"),
 		},
 		{
 			name:       "test ok 2",
-			pv:         makeTestPV("test-pv-002", 10, testDriver, "test-vol-002"),
-			nodeName:   "test-node",
-			attachHash: sha256.Sum256([]byte(fmt.Sprintf("%s%s", "test-vol-002", "test-node"))),
+			nodeName:   "node02",
+			driverName: "driver02",
+			volumeName: "vol02",
+			attachID:   getAttachmentName("vol02", "driver02", "node02"),
 		},
 		{
-			name:       "missing spec",
-			pv:         nil,
-			nodeName:   "test-node",
-			attachHash: sha256.Sum256([]byte(fmt.Sprintf("%s%s", "test-vol-3", "test-node"))),
+			name:       "mismatch vol",
+			nodeName:   "node02",
+			driverName: "driver02",
+			volumeName: "vol01",
+			attachID:   getAttachmentName("vol02", "driver02", "node02"),
+			shouldFail: true,
+		},
+		{
+			name:       "mismatch driver",
+			nodeName:   "node02",
+			driverName: "driver000",
+			volumeName: "vol02",
+			attachID:   getAttachmentName("vol02", "driver02", "node02"),
+			shouldFail: true,
+		},
+		{
+			name:       "mismatch node",
+			nodeName:   "node000",
+			driverName: "driver000",
+			volumeName: "vol02",
+			attachID:   getAttachmentName("vol02", "driver02", "node02"),
 			shouldFail: true,
 		},
 	}
 
-	for _, tc := range testCases {
-		var spec *volume.Spec
-		if tc.pv != nil {
-			spec = volume.NewSpecFromPersistentVolume(tc.pv, tc.pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
+	// attacher loop
+	for i, tc := range testCases {
+		t.Log("test case: ", tc.name)
+		spec := volume.NewSpecFromPersistentVolume(makeTestPV(fmt.Sprintf("test-pv%d", i), 10, tc.driverName, tc.volumeName), false)
+
+		go func(id, nodename string, fail bool) {
+			attachID, err := csiAttacher.Attach(spec, types.NodeName(nodename))
+			if !fail && err != nil {
+				t.Error("was not expecting failure, but got err: ", err)
+			}
+			if attachID != id && !fail {
+				t.Errorf("expecting attachID %v, got %v", id, attachID)
+			}
+		}(tc.attachID, tc.nodeName, tc.shouldFail)
+
+		// update attachment to avoid long waitForAttachment
+		ticker := time.NewTicker(10 * time.Millisecond)
+		defer ticker.Stop()
+		// wait for attachment to be saved
+		var attach *storage.VolumeAttachment
+		for i := 0; i < 100; i++ {
+			attach, err = csiAttacher.k8s.StorageV1alpha1().VolumeAttachments().Get(tc.attachID, meta.GetOptions{})
+			if err != nil {
+				if apierrs.IsNotFound(err) {
+					<-ticker.C
+					continue
+				}
+				t.Error(err)
+			}
+			if attach != nil {
+				break
+			}
 		}
 
-		attachID, err := csiAttacher.Attach(spec, types.NodeName(tc.nodeName))
-		if tc.shouldFail && err == nil {
-			t.Error("expected failure, but got nil err")
+		if attach == nil {
+			t.Error("attachment not found")
 		}
-		if attachID != "" {
-			expectedID := fmt.Sprintf("pv-%x", tc.attachHash)
-			if attachID != expectedID {
-				t.Errorf("expecting attachID %v, got %v", expectedID, attachID)
-			}
+		attach.Status.Attached = true
+		_, err = csiAttacher.k8s.StorageV1alpha1().VolumeAttachments().Update(attach)
+		if err != nil {
+			t.Error(err)
 		}
 	}
 }
@@ -136,8 +180,8 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 	for i, tc := range testCases {
 		t.Logf("running test: %v", tc.name)
 		pvName := fmt.Sprintf("test-pv-%d", i)
-		attachID := fmt.Sprintf("pv-%s", hashAttachmentName(pvName, nodeName))
-
+		volID := fmt.Sprintf("test-vol-%d", i)
+		attachID := getAttachmentName(volID, testDriver, nodeName)
 		attachment := makeTestAttachment(attachID, nodeName, pvName)
 		attachment.Status.Attached = tc.attached
 		attachment.Status.AttachError = tc.attachErr
@@ -150,7 +194,7 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 			}
 		}()
 
-		retID, err := csiAttacher.waitForVolumeAttachment("test-vol", attachID, tc.timeout)
+		retID, err := csiAttacher.waitForVolumeAttachment(volID, attachID, tc.timeout)
 		if tc.shouldFail && err == nil {
 			t.Error("expecting failure, but err is nil")
 		}
@@ -192,7 +236,7 @@ func TestAttacherVolumesAreAttached(t *testing.T) {
 			pv := makeTestPV("test-pv", 10, testDriver, volName)
 			spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
 			specs = append(specs, spec)
-			attachID := getAttachmentName(volName, nodeName)
+			attachID := getAttachmentName(volName, testDriver, nodeName)
 			attachment := makeTestAttachment(attachID, nodeName, pv.GetName())
 			attachment.Status.Attached = stat
 			_, err := csiAttacher.k8s.StorageV1alpha1().VolumeAttachments().Create(attachment)
@@ -239,9 +283,9 @@ func TestAttacherDetach(t *testing.T) {
 		attachID   string
 		shouldFail bool
 	}{
-		{name: "normal test", volID: "vol-001", attachID: fmt.Sprintf("pv-%s", hashAttachmentName("vol-001", nodeName))},
-		{name: "normal test 2", volID: "vol-002", attachID: fmt.Sprintf("pv-%s", hashAttachmentName("vol-002", nodeName))},
-		{name: "object not found", volID: "vol-001", attachID: fmt.Sprintf("pv-%s", hashAttachmentName("vol-002", nodeName)), shouldFail: true},
+		{name: "normal test", volID: "vol-001", attachID: getAttachmentName("vol-001", testDriver, nodeName)},
+		{name: "normal test 2", volID: "vol-002", attachID: getAttachmentName("vol-002", testDriver, nodeName)},
+		{name: "object not found", volID: "vol-001", attachID: getAttachmentName("vol-002", testDriver, nodeName), shouldFail: true},
 	}
 
 	for _, tc := range testCases {

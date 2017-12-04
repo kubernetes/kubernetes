@@ -46,23 +46,21 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			},
 			newK8sVersion: "v1.9.0",
 		},
-		{ // downgrades not supported
+		{ // downgrades ok
 			vg: &fakeVersionGetter{
 				clusterVersion: "v1.8.3",
 				kubeletVersion: "v1.8.3",
 				kubeadmVersion: "v1.8.3",
 			},
-			newK8sVersion:         "v1.8.2",
-			expectedSkippableErrs: 1,
+			newK8sVersion: "v1.8.2",
 		},
-		{ // upgrades without bumping the version number not supported yet. TODO: Change this?
+		{ // upgrades without bumping the version number ok
 			vg: &fakeVersionGetter{
 				clusterVersion: "v1.8.3",
 				kubeletVersion: "v1.8.3",
 				kubeadmVersion: "v1.8.3",
 			},
-			newK8sVersion:         "v1.8.3",
-			expectedSkippableErrs: 1,
+			newK8sVersion: "v1.8.3",
 		},
 		{ // new version must be higher than v1.8.0
 			vg: &fakeVersionGetter{
@@ -72,7 +70,6 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			},
 			newK8sVersion:         "v1.7.10",
 			expectedMandatoryErrs: 1, // version must be higher than v1.8.0
-			expectedSkippableErrs: 1, // version shouldn't be downgraded
 		},
 		{ // upgrading two minor versions in one go is not supported
 			vg: &fakeVersionGetter{
@@ -83,6 +80,15 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			newK8sVersion:         "v1.10.0",
 			expectedMandatoryErrs: 1, // can't upgrade two minor versions
 			expectedSkippableErrs: 1, // kubelet <-> apiserver skew too large
+		},
+		{ // downgrading two minor versions in one go is not supported
+			vg: &fakeVersionGetter{
+				clusterVersion: "v1.10.3",
+				kubeletVersion: "v1.10.3",
+				kubeadmVersion: "v1.10.0",
+			},
+			newK8sVersion:         "v1.8.3",
+			expectedMandatoryErrs: 1, // can't downgrade two minor versions
 		},
 		{ // kubeadm version must be higher than the new kube version. However, patch version skews may be forced
 			vg: &fakeVersionGetter{

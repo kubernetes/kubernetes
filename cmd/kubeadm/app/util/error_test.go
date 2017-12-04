@@ -64,13 +64,13 @@ func TestFormatErrMsg(t *testing.T) {
 				fmt.Errorf(errMsg1),
 				fmt.Errorf(errMsg2),
 			},
-			expect: "\t-" + errMsg1 + "\n" + "\t-" + errMsg2 + "\n",
+			expect: "\t- " + errMsg1 + "\n" + "\t- " + errMsg2 + "\n",
 		},
 		{
 			errs: []error{
 				fmt.Errorf(errMsg1),
 			},
-			expect: "\t-" + errMsg1 + "\n",
+			expect: "\t- " + errMsg1 + "\n",
 		},
 	}
 
