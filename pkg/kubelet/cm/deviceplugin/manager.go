@@ -240,16 +240,19 @@ func (m *ManagerImpl) Devices() map[string][]pluginapi.Device {
 // from the registered device plugins.
 func (m *ManagerImpl) Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 	pod := attrs.Pod
+	devicesToReuse := make(map[string]sets.String)
 	// TODO: Reuse devices between init containers and regular containers.
 	for _, container := range pod.Spec.InitContainers {
-		if err := m.allocateContainerResources(pod, &container); err != nil {
+		if err := m.allocateContainerResources(pod, &container, devicesToReuse); err != nil {
 			return err
 		}
+		m.podDevices.addContainerAllocatedResources(string(pod.UID), container.Name, devicesToReuse)
 	}
 	for _, container := range pod.Spec.Containers {
-		if err := m.allocateContainerResources(pod, &container); err != nil {
+		if err := m.allocateContainerResources(pod, &container, devicesToReuse); err != nil {
 			return err
 		}
+		m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, devicesToReuse)
 	}
 
 	m.mutex.Lock()
@@ -471,7 +474,7 @@ func (m *ManagerImpl) updateAllocatedDevices(activePods []*v1.Pod) {
 
 // Returns list of device Ids we need to allocate with Allocate rpc call.
 // Returns empty list in case we don't need to issue the Allocate rpc call.
-func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, required int) (sets.String, error) {
+func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, required int, reusableDevices sets.String) (sets.String, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	needed := required
@@ -497,6 +500,14 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 		return nil, fmt.Errorf("can't allocate unregistered device %v", resource)
 	}
 	devices = sets.NewString()
+	// Allocates from reusableDevices list first.
+	for device := range reusableDevices {
+		devices.Insert(device)
+		needed--
+		if needed == 0 {
+			return devices, nil
+		}
+	}
 	// Needs to allocate additional devices.
 	if m.allocatedDevices[resource] == nil {
 		m.allocatedDevices[resource] = sets.NewString()
@@ -523,7 +534,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 // plugin resources for the input container, issues an Allocate rpc request
 // for each new device resource requirement, processes their AllocateResponses,
 // and updates the cached containerDevices on success.
-func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Container) error {
+func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Container, devicesToReuse map[string]sets.String) error {
 	podUID := string(pod.UID)
 	contName := container.Name
 	allocatedDevicesUpdated := false
@@ -544,7 +555,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 			m.updateAllocatedDevices(m.activePods())
 			allocatedDevicesUpdated = true
 		}
-		allocDevices, err := m.devicesToAllocate(podUID, contName, resource, needed)
+		allocDevices, err := m.devicesToAllocate(podUID, contName, resource, needed, devicesToReuse[resource])
 		if err != nil {
 			return err
 		}
