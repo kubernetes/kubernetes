@@ -630,8 +630,18 @@ func defaultOptions(s *options.ServerRunOptions) error {
 	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts(s.GenericServerRunOptions.AdvertiseAddress.String(), []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}, []net.IP{apiServerServiceIP}); err != nil {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
-	if err := s.CloudProvider.DefaultExternalHost(s.GenericServerRunOptions); err != nil {
-		return fmt.Errorf("error setting the external host value: %v", err)
+
+	if len(s.GenericServerRunOptions.ExternalHost) == 0 {
+		if len(s.GenericServerRunOptions.AdvertiseAddress) > 0 {
+			s.GenericServerRunOptions.ExternalHost = s.GenericServerRunOptions.AdvertiseAddress.String()
+		} else {
+			if hostname, err := os.Hostname(); err == nil {
+				s.GenericServerRunOptions.ExternalHost = hostname
+			} else {
+				return fmt.Errorf("error finding host name: %v", err)
+			}
+		}
+		glog.Infof("external host was not specified, using %v", s.GenericServerRunOptions.ExternalHost)
 	}
 
 	s.Authentication.ApplyAuthorization(s.Authorization)
