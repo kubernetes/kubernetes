@@ -20,19 +20,19 @@ import (
 	"fmt"
 	"strings"
 
-	jose "github.com/square/go-jose"
+	jose "gopkg.in/square/go-jose.v2"
 )
 
 // computeDetachedSig takes content and token details and computes a detached
 // JWS signature.  This is described in Appendix F of RFC 7515.  Basically, this
 // is a regular JWS with the content part of the signature elided.
 func computeDetachedSig(content, tokenID, tokenSecret string) (string, error) {
-	jwk := &jose.JsonWebKey{
+	jwk := &jose.JSONWebKey{
 		Key:   []byte(tokenSecret),
 		KeyID: tokenID,
 	}
 
-	signer, err := jose.NewSigner(jose.HS256, jwk)
+	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.HS256, Key: jwk}, nil)
 	if err != nil {
 		return "", fmt.Errorf("can't make a HS256 signer from the given token: %v", err)
 	}
