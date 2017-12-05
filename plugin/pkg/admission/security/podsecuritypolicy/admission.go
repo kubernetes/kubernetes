@@ -122,8 +122,8 @@ func (c *PodSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 
 	pod := a.GetObject().(*api.Pod)
 
-	// compute the context
-	allowedPod, pspName, validationErrs, err := c.computeSecurityContext(a, pod, true)
+	// compute the context. Mutation is allowed. ValidatedPSPAnnotation is not taken into account.
+	allowedPod, pspName, validationErrs, err := c.computeSecurityContext(a, pod, true, "")
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
@@ -152,8 +152,8 @@ func (c *PodSecurityPolicyPlugin) Validate(a admission.Attributes) error {
 
 	pod := a.GetObject().(*api.Pod)
 
-	// compute the context. Mutation is not allowed.
-	allowedPod, _, validationErrs, err := c.computeSecurityContext(a, pod, false)
+	// compute the context. Mutation is not allowed. ValidatedPSPAnnotation is used as a hint to gain same speed-up.
+	allowedPod, _, validationErrs, err := c.computeSecurityContext(a, pod, false, pod.ObjectMeta.Annotations[psputil.ValidatedPSPAnnotation])
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
@@ -193,8 +193,9 @@ func shouldIgnore(a admission.Attributes) (bool, error) {
 
 // computeSecurityContext derives a valid security context while trying to avoid any changes to the given pod. I.e.
 // if there is a matching policy with the same security context as given, it will be reused. If there is no
-// matching policy the returned pod will be nil and the pspName empty.
-func (c *PodSecurityPolicyPlugin) computeSecurityContext(a admission.Attributes, pod *api.Pod, specMutationAllowed bool) (*api.Pod, string, field.ErrorList, error) {
+// matching policy the returned pod will be nil and the pspName empty. validatedPSPHint is the validated psp name
+// saved in kubernetes.io/psp annotation. This psp is usually the one we are looking for.
+func (c *PodSecurityPolicyPlugin) computeSecurityContext(a admission.Attributes, pod *api.Pod, specMutationAllowed bool, validatedPSPHint string) (*api.Pod, string, field.ErrorList, error) {
 	// get all constraints that are usable by the user
 	glog.V(4).Infof("getting pod security policies for pod %s (generate: %s)", pod.Name, pod.GenerateName)
 	var saInfo user.Info
@@ -213,9 +214,18 @@ func (c *PodSecurityPolicyPlugin) computeSecurityContext(a admission.Attributes,
 		return pod, "", nil, nil
 	}
 
-	// sort by name to make order deterministic
+	// sort policies by name to make order deterministic
+	// If mutation is not allowed and validatedPSPHint is provided, check the validated policy first.
 	// TODO(liggitt): add priority field to allow admins to bucket differently
 	sort.SliceStable(policies, func(i, j int) bool {
+		if !specMutationAllowed {
+			if policies[i].Name == validatedPSPHint {
+				return true
+			}
+			if policies[j].Name == validatedPSPHint {
+				return false
+			}
+		}
 		return strings.Compare(policies[i].Name, policies[j].Name) < 0
 	})
 
@@ -244,7 +254,6 @@ func (c *PodSecurityPolicyPlugin) computeSecurityContext(a admission.Attributes,
 		}
 
 		// the entire pod validated
-
 		mutated := !apiequality.Semantic.DeepEqual(pod, podCopy)
 		if mutated && !specMutationAllowed {
 			continue
