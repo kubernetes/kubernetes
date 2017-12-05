@@ -2,7 +2,7 @@
   "swagger": "2.0",
   "info": {
    "title": "Kubernetes",
-   "version": "v1.10.0"
+   "version": "v0.16.2"
   },
   "paths": {
    "/api/": {
@@ -74033,6 +74033,10 @@
      "suspend": {
       "description": "This flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
       "type": "boolean"
+     },
+     "timeZone": {
+      "description": "The time zone to be used when scheduling the job given the schedule specified above. Valid options include anything in the IANA Time Zone database.",
+      "type": "string"
      }
     }
    },
@@ -74168,6 +74172,10 @@
      "suspend": {
       "description": "This flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
       "type": "boolean"
+     },
+     "timeZone": {
+      "description": "The time zone to be used when scheduling the job given the schedule specified above. Valid options include anything in the IANA Time Zone database.",
+      "type": "string"
      }
     }
    },
