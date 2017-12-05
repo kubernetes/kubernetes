@@ -293,7 +293,29 @@ func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 
 	mountOptions := volume.JoinMountOptions(cephfsVolume.mountOptions, opt)
 	if err := cephfsVolume.mounter.Mount(src, mountpoint, "ceph", mountOptions); err != nil {
-		return fmt.Errorf("CephFS: mount failed: %v", err)
+		notMnt, mntErr := cephfsVolume.mounter.IsLikelyNotMountPoint(mountpoint)
+		if mntErr != nil {
+			glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+			return err
+		}
+		if !notMnt {
+			if mntErr = cephfsVolume.mounter.Unmount(mountpoint); mntErr != nil {
+				glog.Errorf("Failed to unmount: %v", mntErr)
+				return err
+			}
+			notMnt, mntErr := cephfsVolume.mounter.IsLikelyNotMountPoint(mountpoint)
+			if mntErr != nil {
+				glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+				return err
+			}
+			if !notMnt {
+				// This is very odd, we don't expect it.  We'll try again next sync loop.
+				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", mountpoint)
+				return err
+			}
+		}
+		os.Remove(mountpoint)
+		return err
 	}
 
 	return nil
