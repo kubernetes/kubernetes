@@ -381,17 +381,17 @@ func TestGetCurrentTimeInZone(t *testing.T) {
 	var one int64 = 1
 	var no bool = false
 
-	sj := batchv2alpha1.CronJob{
+	sj := batchv1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mycronjob",
 			Namespace: "snazzycats",
 			UID:       types.UID("1a2b3c"),
 			SelfLink:  "/apis/batch/v1/namespaces/snazzycats/jobs/mycronjob",
 		},
-		Spec: batchv2alpha1.CronJobSpec{
+		Spec: batchv1beta1.CronJobSpec{
 			Schedule:          "* * * * ?",
-			ConcurrencyPolicy: batchv2alpha1.AllowConcurrent,
-			JobTemplate: batchv2alpha1.JobTemplateSpec{
+			ConcurrencyPolicy: batchv1beta1.AllowConcurrent,
+			JobTemplate: batchv1beta1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      map[string]string{"a": "b"},
 					Annotations: map[string]string{"x": "y"},
