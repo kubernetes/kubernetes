@@ -69,7 +69,7 @@ process_content () {
 
   # Start search at package root
   case ${package} in
-    github.com/*|golang.org/*|bitbucket.org/*)
+    github.com/*|golang.org/*|bitbucket.org/*|gopkg.in/square/*)
      package_root=$(echo ${package} |awk -F/ '{ print $1"/"$2"/"$3 }')
      ;;
     go4.org/*)
