@@ -338,38 +338,8 @@ func (o *DrainOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error {
 	return err
 }
 
-func (o *DrainOptions) getController(namespace string, controllerRef *metav1.OwnerReference) (interface{}, error) {
-	switch controllerRef.Kind {
-	case "ReplicationController":
-		return o.client.CoreV1().ReplicationControllers(namespace).Get(controllerRef.Name, metav1.GetOptions{})
-	case "DaemonSet":
-		return o.client.ExtensionsV1beta1().DaemonSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
-	case "Job":
-		return o.client.BatchV1().Jobs(namespace).Get(controllerRef.Name, metav1.GetOptions{})
-	case "ReplicaSet":
-		return o.client.ExtensionsV1beta1().ReplicaSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
-	case "StatefulSet":
-		return o.client.AppsV1beta1().StatefulSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
-	}
-	return nil, fmt.Errorf("Unknown controller kind %q", controllerRef.Kind)
-}
-
-func (o *DrainOptions) getPodController(pod corev1.Pod) (*metav1.OwnerReference, error) {
-	controllerRef := metav1.GetControllerOf(&pod)
-	if controllerRef == nil {
-		return nil, nil
-	}
-
-	// We assume the only reason for an error is because the controller is
-	// gone/missing, not for any other cause.
-	// TODO(mml): something more sophisticated than this
-	// TODO(juntee): determine if it's safe to remove getController(),
-	// so that drain can work for controller types that we don't know about
-	_, err := o.getController(pod.Namespace, controllerRef)
-	if err != nil {
-		return nil, err
-	}
-	return controllerRef, nil
+func (o *DrainOptions) getPodController(pod corev1.Pod) *metav1.OwnerReference {
+	return metav1.GetControllerOf(&pod)
 }
 
 func (o *DrainOptions) unreplicatedFilter(pod corev1.Pod) (bool, *warning, *fatal) {
@@ -378,21 +348,15 @@ func (o *DrainOptions) unreplicatedFilter(pod corev1.Pod) (bool, *warning, *fata
 		return true, nil, nil
 	}
 
-	controllerRef, err := o.getPodController(pod)
-	if err != nil {
-		// if we're forcing, remove orphaned pods with a warning
-		if apierrors.IsNotFound(err) && o.Force {
-			return true, &warning{err.Error()}, nil
-		}
-		return false, nil, &fatal{err.Error()}
-	}
+	controllerRef := o.getPodController(pod)
 	if controllerRef != nil {
 		return true, nil, nil
 	}
-	if !o.Force {
-		return false, nil, &fatal{kUnmanagedFatal}
+	if o.Force {
+		return true, &warning{kUnmanagedWarning}, nil
 	}
-	return true, &warning{kUnmanagedWarning}, nil
+
+	return false, nil, &fatal{kUnmanagedFatal}
 }
 
 func (o *DrainOptions) daemonsetFilter(pod corev1.Pod) (bool, *warning, *fatal) {
@@ -403,23 +367,23 @@ func (o *DrainOptions) daemonsetFilter(pod corev1.Pod) (bool, *warning, *fatal) 
 	// The exception is for pods that are orphaned (the referencing
 	// management resource - including DaemonSet - is not found).
 	// Such pods will be deleted if --force is used.
-	controllerRef, err := o.getPodController(pod)
-	if err != nil {
-		// if we're forcing, remove orphaned pods with a warning
+	controllerRef := o.getPodController(pod)
+	if controllerRef == nil || controllerRef.Kind != "DaemonSet" {
+		return true, nil, nil
+	}
+
+	if _, err := o.client.ExtensionsV1beta1().DaemonSets(pod.Namespace).Get(controllerRef.Name, metav1.GetOptions{}); err != nil {
+		// remove orphaned pods with a warning if --force is used
 		if apierrors.IsNotFound(err) && o.Force {
 			return true, &warning{err.Error()}, nil
 		}
 		return false, nil, &fatal{err.Error()}
 	}
-	if controllerRef == nil || controllerRef.Kind != "DaemonSet" {
-		return true, nil, nil
-	}
-	if _, err := o.client.ExtensionsV1beta1().DaemonSets(pod.Namespace).Get(controllerRef.Name, metav1.GetOptions{}); err != nil {
-		return false, nil, &fatal{err.Error()}
-	}
+
 	if !o.IgnoreDaemonsets {
 		return false, nil, &fatal{kDaemonsetFatal}
 	}
+
 	return false, &warning{kDaemonsetWarning}, nil
 }
 
