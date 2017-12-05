@@ -19,6 +19,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/configuration:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/initializer:go_default_library",
@@ -29,8 +30,10 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/request:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/rules:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/versioned:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/types:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1:go_default_library",
     ],
 )
 

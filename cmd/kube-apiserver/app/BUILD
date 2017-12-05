@@ -72,6 +72,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/server/options:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/options/encryptionconfig:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/storage:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/types:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/etcd3/preflight:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
