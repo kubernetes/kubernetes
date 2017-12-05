@@ -57,7 +57,7 @@ multizone = true
 		NetworkName:        "my-network",
 		SubnetworkName:     "my-subnetwork",
 		SecondaryRangeName: "my-secondary-range",
-		NodeTags:           []string{"my-node-tag1"},
+		NodeTags:           "my-node-tag1",
 		NodeInstancePrefix: "my-prefix",
 		Multizone:          true,
 	}}
@@ -364,12 +364,12 @@ func TestGenerateCloudConfigs(t *testing.T) {
 		NetworkName:        "network-name",
 		SubnetworkName:     "",
 		SecondaryRangeName: "",
-		NodeTags:           []string{"node-tag"},
+		NodeTags:           "node-tag",
 		NodeInstancePrefix: "node-prefix",
 		Multizone:          false,
 		ApiEndpoint:        "",
 		LocalZone:          "us-central1-a",
-		AlphaFeatures:      []string{},
+		AlphaFeatures:      "",
 	}
 
 	cloudBoilerplate := CloudConfig{
