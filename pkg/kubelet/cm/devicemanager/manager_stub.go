@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package deviceplugin
+package devicemanager
 
 import (
 	"k8s.io/api/core/v1"

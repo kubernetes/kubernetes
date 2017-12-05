@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
-	dp "k8s.io/kubernetes/pkg/kubelet/cm/deviceplugin"
+	dm "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -69,7 +69,7 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin] [Serial] [D
 
 			socketPath := pluginapi.DevicePluginPath + "dp." + fmt.Sprintf("%d", time.Now().Unix())
 
-			dp1 := dp.NewDevicePluginStub(devs, socketPath)
+			dp1 := dm.NewDevicePluginStub(devs, socketPath)
 			dp1.SetAllocFunc(stubAllocFunc)
 			err := dp1.Start()
 			framework.ExpectNoError(err)
@@ -107,7 +107,7 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin] [Serial] [D
 			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
 
 			By("Re-Register resources")
-			dp1 = dp.NewDevicePluginStub(devs, socketPath)
+			dp1 = dm.NewDevicePluginStub(devs, socketPath)
 			dp1.SetAllocFunc(stubAllocFunc)
 			err = dp1.Start()
 			framework.ExpectNoError(err)

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package deviceplugin
+package devicemanager
 
 import (
 	"encoding/json"
@@ -187,13 +187,13 @@ func (m *ManagerImpl) removeContents(dir string) error {
 }
 
 const (
-	// kubeletDevicePluginCheckpoint is the file name of device plugin checkpoint
-	kubeletDevicePluginCheckpoint = "kubelet_internal_checkpoint"
+	// kubeletDeviceManagerCheckpoint is the file name of device plugin checkpoint
+	kubeletDeviceManagerCheckpoint = "kubelet_internal_checkpoint"
 )
 
 // checkpointFile returns device plugin checkpoint file path.
 func (m *ManagerImpl) checkpointFile() string {
-	return filepath.Join(m.socketdir, kubeletDevicePluginCheckpoint)
+	return filepath.Join(m.socketdir, kubeletDeviceManagerCheckpoint)
 }
 
 // Start starts the Device Plugin Manager amd start initialization of
@@ -456,9 +456,9 @@ func (m *ManagerImpl) writeCheckpoint() error {
 	if err != nil {
 		return err
 	}
-	err = m.store.Write(kubeletDevicePluginCheckpoint, dataJSON)
+	err = m.store.Write(kubeletDeviceManagerCheckpoint, dataJSON)
 	if err != nil {
-		return fmt.Errorf("failed to write deviceplugin checkpoint file %q: %v", kubeletDevicePluginCheckpoint, err)
+		return fmt.Errorf("failed to write deviceplugin checkpoint file %q: %v", kubeletDeviceManagerCheckpoint, err)
 	}
 	return nil
 }
@@ -466,14 +466,14 @@ func (m *ManagerImpl) writeCheckpoint() error {
 // Reads device to container allocation information from disk, and populates
 // m.allocatedDevices accordingly.
 func (m *ManagerImpl) readCheckpoint() error {
-	content, err := m.store.Read(kubeletDevicePluginCheckpoint)
+	content, err := m.store.Read(kubeletDeviceManagerCheckpoint)
 	if err != nil {
 		if err == utilstore.ErrKeyNotFound {
 			return nil
 		}
-		return fmt.Errorf("failed to read checkpoint file %q: %v", kubeletDevicePluginCheckpoint, err)
+		return fmt.Errorf("failed to read checkpoint file %q: %v", kubeletDeviceManagerCheckpoint, err)
 	}
-	glog.V(4).Infof("Read checkpoint file %s\n", kubeletDevicePluginCheckpoint)
+	glog.V(4).Infof("Read checkpoint file %s\n", kubeletDeviceManagerCheckpoint)
 	var data checkpointData
 	if err := json.Unmarshal(content, &data); err != nil {
 		return fmt.Errorf("failed to unmarshal deviceplugin checkpoint data: %v", err)
@@ -611,7 +611,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 			continue
 		}
 		startRPCTime := time.Now()
-		// devicePluginManager.Allocate involves RPC calls to device plugin, which
+		// Manager.Allocate involves RPC calls to device plugin, which
 		// could be heavy-weight. Therefore we want to perform this operation outside
 		// mutex lock. Note if Allocate call fails, we may leave container resources
 		// partially allocated for the failed container. We rely on updateAllocatedDevices()
