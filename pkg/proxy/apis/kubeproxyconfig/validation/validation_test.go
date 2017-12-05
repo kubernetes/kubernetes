@@ -510,7 +510,7 @@ func TestValidateProxyMode(t *testing.T) {
 	}{
 		{
 			mode: kubeproxyconfig.ProxyMode("non-existing"),
-			msg:  "or blank (blank means the best-available proxy [currently iptables])",
+			msg:  "or blank (blank means the",
 		},
 	}
 

@@ -142,23 +142,38 @@ func validateKubeProxyConntrackConfiguration(config kubeproxyconfig.KubeProxyCon
 }
 
 func validateProxyMode(mode kubeproxyconfig.ProxyMode, fldPath *field.Path) field.ErrorList {
+	if runtime.GOOS == "windows" {
+		return validateProxyModeWindows(mode, fldPath)
+	}
+
+	return validateProxyModeLinux(mode, fldPath)
+}
+
+func validateProxyModeLinux(mode kubeproxyconfig.ProxyMode, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+
 	switch mode {
 	case kubeproxyconfig.ProxyModeUserspace:
 	case kubeproxyconfig.ProxyModeIPTables:
 	case kubeproxyconfig.ProxyModeIPVS:
 	case "":
-	case kubeproxyconfig.ProxyModeKernelspace:
-		if runtime.GOOS != "windows" {
-			errMsg := fmt.Sprintf("%s is only supported on Windows", string(kubeproxyconfig.ProxyModeKernelspace))
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("ProxyMode"), string(mode), errMsg))
-		}
 	default:
 		modes := []string{string(kubeproxyconfig.ProxyModeUserspace), string(kubeproxyconfig.ProxyModeIPTables), string(kubeproxyconfig.ProxyModeIPVS)}
-		if runtime.GOOS == "windows" {
-			modes = append(modes, string(kubeproxyconfig.ProxyModeKernelspace))
-		}
 		errMsg := fmt.Sprintf("must be %s or blank (blank means the best-available proxy [currently iptables])", strings.Join(modes, ","))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("ProxyMode"), string(mode), errMsg))
+	}
+	return allErrs
+}
+
+func validateProxyModeWindows(mode kubeproxyconfig.ProxyMode, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	switch mode {
+	case kubeproxyconfig.ProxyModeUserspace:
+	case kubeproxyconfig.ProxyModeKernelspace:
+	default:
+		modes := []string{string(kubeproxyconfig.ProxyModeUserspace), string(kubeproxyconfig.ProxyModeKernelspace)}
+		errMsg := fmt.Sprintf("must be %s or blank (blank means the most-available proxy [currently userspace])", strings.Join(modes, ","))
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("ProxyMode"), string(mode), errMsg))
 	}
 	return allErrs
