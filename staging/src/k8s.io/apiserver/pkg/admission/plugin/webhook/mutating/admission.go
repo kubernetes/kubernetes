@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/configuration"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
@@ -47,6 +48,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/versioned"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	admissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1"
 )
 
 const (
@@ -111,6 +113,7 @@ type MutatingWebhook struct {
 	clientManager    config.ClientManager
 	convertor        versioned.Convertor
 	jsonSerializer   runtime.Serializer
+	configclient     admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface
 }
 
 var (
@@ -142,6 +145,7 @@ func (a *MutatingWebhook) SetScheme(scheme *runtime.Scheme) {
 // WantsExternalKubeClientSet defines a function which sets external ClientSet for admission plugins that need it
 func (a *MutatingWebhook) SetExternalKubeClientSet(client clientset.Interface) {
 	a.namespaceMatcher.Client = client
+	a.configclient = client.AdmissionregistrationV1beta1()
 }
 
 // SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
@@ -311,4 +315,25 @@ func (a *MutatingWebhook) callAttrMutatingHook(ctx context.Context, h *v1beta1.W
 		return apierrors.NewInternalError(err)
 	}
 	return nil
+}
+
+const postStartHookName = "mutatingwebhookconfigurations"
+const configurationBootstrapTimeout = 30 * time.Second
+
+// TODO: move the hook to the configuration manager
+func (a *MutatingWebhook) PostStartHook() (string, types.PostStartHookFunc, error) {
+	checkAPIEnabled := func(hookContext types.PostStartHookContext) error {
+		err := wait.Poll(1*time.Second, configurationBootstrapTimeout, func() (done bool, err error) {
+			if _, err := a.configclient.MutatingWebhookConfigurations().List(metav1.ListOptions{}); err != nil {
+				utilruntime.HandleError(fmt.Errorf("unable to retrieve mutating webhook configurations: %v", err))
+				return false, nil
+			}
+			return true, nil
+		})
+		if err != nil {
+			return fmt.Errorf("MutatingWebhook admission controller is enabled but the mutatingwebhookconfiguration api is not. Please either disable the MutatingWebhook admission controller or enable the admissionregistration/v1beta1/mutatingwebhookconfiguration API: %v", err)
+		}
+		return nil
+	}
+	return postStartHookName, checkAPIEnabled, nil
 }

@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/configuration"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
@@ -46,8 +47,10 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/request"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/rules"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/versioned"
+	"k8s.io/apiserver/pkg/server/types"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	admissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1"
 )
 
 const (
@@ -114,6 +117,7 @@ type ValidatingAdmissionWebhook struct {
 	namespaceMatcher namespace.Matcher
 	clientManager    config.ClientManager
 	convertor        versioned.Convertor
+	configclient     admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface
 }
 
 var (
@@ -144,6 +148,7 @@ func (a *ValidatingAdmissionWebhook) SetScheme(scheme *runtime.Scheme) {
 // WantsExternalKubeClientSet defines a function which sets external ClientSet for admission plugins that need it
 func (a *ValidatingAdmissionWebhook) SetExternalKubeClientSet(client clientset.Interface) {
 	a.namespaceMatcher.Client = client
+	a.configclient = client.AdmissionregistrationV1beta1()
 }
 
 // SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
@@ -316,4 +321,25 @@ func (a *ValidatingAdmissionWebhook) callHook(ctx context.Context, h *v1beta1.We
 		return nil
 	}
 	return webhookerrors.ToStatusErr(h.Name, response.Response.Result)
+}
+
+const postStartHookName = "validatingwebhookconfigurations"
+const configurationBootstrapTimeout = 30 * time.Second
+
+// TODO: move the hook to the configuration manager
+func (a *ValidatingAdmissionWebhook) PostStartHook() (string, types.PostStartHookFunc, error) {
+	checkAPIEnabled := func(hookContext types.PostStartHookContext) error {
+		err := wait.Poll(1*time.Second, configurationBootstrapTimeout, func() (done bool, err error) {
+			if _, err := a.configclient.ValidatingWebhookConfigurations().List(metav1.ListOptions{}); err != nil {
+				utilruntime.HandleError(fmt.Errorf("unable to retrieve validating webhook configurations: %v", err))
+				return false, nil
+			}
+			return true, nil
+		})
+		if err != nil {
+			return fmt.Errorf("ValidatingWebhook admission controller is enabled but the validatingwebhookconfiguration API is not. Please either disable the ValidatingWebhook admission controller or enable the admissionregistration/v1beta1/validatingwebhookconfiguration API: %v", err)
+		}
+		return nil
+	}
+	return postStartHookName, checkAPIEnabled, nil
 }

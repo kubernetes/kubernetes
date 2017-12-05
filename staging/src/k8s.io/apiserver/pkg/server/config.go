@@ -94,8 +94,9 @@ type Config struct {
 	RuleResolver authorizer.RuleResolver
 	// AdmissionControl performs deep inspection of a given request (including content)
 	// to set values and determine whether its allowed
-	AdmissionControl      admission.Interface
-	CorsAllowedOriginList []string
+	AdmissionControl        admission.Interface
+	AdmissionPostStartHooks []admission.PostStartHookFuncAndName
+	CorsAllowedOriginList   []string
 
 	EnableSwaggerUI bool
 	EnableIndex     bool
@@ -489,6 +490,14 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		})
 		if err != nil {
 			return nil, err
+		}
+	}
+
+	for _, hook := range c.AdmissionPostStartHooks {
+		if !s.isPostStartHookRegistered(hook.Name) {
+			if err := s.AddPostStartHook(hook.Name, hook.Func); err != nil {
+				return nil, err
+			}
 		}
 	}
 

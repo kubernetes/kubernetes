@@ -26,6 +26,7 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/server"
 
 	"github.com/golang/glog"
 )
@@ -132,10 +133,16 @@ func splitStream(config io.Reader) (io.Reader, io.Reader, error) {
 
 type Decorator func(handler Interface, name string) Interface
 
+type PostStartHookFuncAndName struct {
+	Func server.PostStartHookFunc
+	Name string
+}
+
 // NewFromPlugins returns an admission.Interface that will enforce admission control decisions of all
 // the given plugins.
-func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigProvider, pluginInitializer PluginInitializer, decorator Decorator) (Interface, error) {
+func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigProvider, pluginInitializer PluginInitializer, decorator Decorator) (Interface, []PostStartHookFuncAndName, error) {
 	handlers := []Interface{}
+	var hooks []PostStartHookFuncAndName
 	for _, pluginName := range pluginNames {
 		pluginConfig, err := configProvider.ConfigFor(pluginName)
 		if err != nil {
@@ -153,8 +160,18 @@ func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigPro
 				handlers = append(handlers, plugin)
 			}
 		}
+		if postHookProvider, ok := plugin.(server.PostStartHookProvider); ok {
+			name, hook, err := postHookProvider.PostStartHook()
+			if err != nil {
+				glog.Fatalf("Error building PostStartHook: %v", err)
+			}
+			hooks = append(hooks, PostStartHookFuncAndName{
+				Name: name,
+				Func: hook,
+			})
+		}
 	}
-	return chainAdmissionHandler(handlers), nil
+	return chainAdmissionHandler(handlers), hooks, nil
 }
 
 // InitPlugin creates an instance of the named interface.

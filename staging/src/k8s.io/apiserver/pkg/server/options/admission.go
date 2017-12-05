@@ -119,12 +119,13 @@ func (a *AdmissionOptions) ApplyTo(
 	pluginInitializers = append(pluginInitializers, genericInitializer)
 	initializersChain = append(initializersChain, pluginInitializers...)
 
-	admissionChain, err := a.Plugins.NewFromPlugins(pluginNames, pluginsConfigProvider, initializersChain, admissionmetrics.WithControllerMetrics)
+	admissionChain, postStartHooks, err := a.Plugins.NewFromPlugins(pluginNames, pluginsConfigProvider, initializersChain, admissionmetrics.WithControllerMetrics)
 	if err != nil {
 		return err
 	}
 
 	c.AdmissionControl = admissionmetrics.WithStepMetrics(admissionChain)
+	c.AdmissionPostStartHooks = postStartHooks
 	return nil
 }
 
