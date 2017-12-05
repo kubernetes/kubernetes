@@ -1811,6 +1811,10 @@ function start-kube-controller-manager {
      [[ "${HPA_USE_REST_CLIENTS:-}" == "false" ]]; then
     params+=" --horizontal-pod-autoscaler-use-rest-clients=false"
   fi
+  if [[ -n "${PV_RECYCLER_OVERRIDE_TEMPLATE:-}" ]]; then
+    params+=" --pv-recycler-pod-template-filepath-nfs=$PV_RECYCLER_OVERRIDE_TEMPLATE"
+    params+=" --pv-recycler-pod-template-filepath-hostpath=$PV_RECYCLER_OVERRIDE_TEMPLATE"
+  fi
 
   local -r kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
   local container_env=""
@@ -1830,6 +1834,8 @@ function start-kube-controller-manager {
   sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_mount}}@@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_volume}}@@g" "${src_file}"
+  sed -i -e "s@{{pv_recycler_mount}}@${PV_RECYCLER_MOUNT}@g" "${src_file}"
+  sed -i -e "s@{{pv_recycler_volume}}@${PV_RECYCLER_VOLUME}@g" "${src_file}"
   cp "${src_file}" /etc/kubernetes/manifests
 }
 
@@ -2282,11 +2288,47 @@ function override-kubectl {
     echo "export PATH=${KUBE_HOME}/bin:\$PATH" > /etc/profile.d/kube_env.sh
 }
 
+function override-pv-recycler {
+  if [[ -z "${PV_RECYCLER_OVERRIDE_TEMPLATE:-}" ]]; then
+    echo "PV_RECYCLER_OVERRIDE_TEMPLATE is not set"
+    exit 1
+  fi
+
+  PV_RECYCLER_VOLUME="{\"name\": \"pv-recycler-mount\",\"hostPath\": {\"path\": \"${PV_RECYCLER_OVERRIDE_TEMPLATE}\", \"type\": \"FileOrCreate\"}},"
+  PV_RECYCLER_MOUNT="{\"name\": \"pv-recycler-mount\",\"mountPath\": \"${PV_RECYCLER_OVERRIDE_TEMPLATE}\", \"readOnly\": true},"
+
+  cat > ${PV_RECYCLER_OVERRIDE_TEMPLATE} <<EOF
+version: v1
+kind: Pod
+metadata:
+  generateName: pv-recycler-
+  namespace: default
+spec:
+  activeDeadlineSeconds: 60
+  restartPolicy: Never
+  volumes:
+  - name: vol
+  containers:
+  - name: pv-recycler
+    image: gcr.io/google_containers/busybox:1.27
+    command:
+    - /bin/sh
+    args:
+    - -c
+    - test -e /scrub && rm -rf /scrub/..?* /scrub/.[!.]* /scrub/* && test -z $(ls -A /scrub) || exit 1
+    volumeMounts:
+    - name: vol
+      mountPath: /scrub
+EOF
+}
+
 ########### Main Function ###########
 echo "Start to configure instance for kubernetes"
 
 KUBE_HOME="/home/kubernetes"
 CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
+PV_RECYCLER_OVERRIDE_TEMPLATE="${KUBE_HOME}/kube-manifests/kubernetes/pv-recycler-template.yaml"
+
 if [[ ! -e "${KUBE_HOME}/kube-env" ]]; then
   echo "The ${KUBE_HOME}/kube-env file does not exist!! Terminate cluster initialization."
   exit 1
@@ -2322,6 +2364,7 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   create-master-auth
   create-master-kubelet-auth
   create-master-etcd-auth
+  override-pv-recycler
 else
   create-node-pki
   create-kubelet-kubeconfig ${KUBERNETES_MASTER_NAME}
