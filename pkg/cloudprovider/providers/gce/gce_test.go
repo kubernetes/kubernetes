@@ -42,6 +42,8 @@ secondary-range-name = my-secondary-range
 node-tags = my-node-tag1
 node-instance-prefix = my-prefix
 multizone = true
+alpha-features = feature1,feature2
+alpha-features = feature3
    `
 	reader := strings.NewReader(s)
 	config, err := readConfig(reader)
@@ -60,6 +62,7 @@ multizone = true
 		NodeTags:           []string{"my-node-tag1"},
 		NodeInstancePrefix: "my-prefix",
 		Multizone:          true,
+		AlphaFeatures:      []string{"feature1", "feature2", "feature3"},
 	}}
 
 	if !reflect.DeepEqual(expected, config) {
