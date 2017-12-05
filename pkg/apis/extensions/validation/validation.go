@@ -656,6 +656,7 @@ func ValidatePodSecurityPolicySpec(spec *extensions.PodSecurityPolicySpec, fldPa
 	allErrs = append(allErrs, validatePSPDefaultAllowPrivilegeEscalation(fldPath.Child("defaultAllowPrivilegeEscalation"), spec.DefaultAllowPrivilegeEscalation, spec.AllowPrivilegeEscalation)...)
 	allErrs = append(allErrs, validatePSPAllowedHostPaths(fldPath.Child("allowedHostPaths"), spec.AllowedHostPaths)...)
 	allErrs = append(allErrs, validatePSPAllowedFlexVolumes(fldPath.Child("allowedFlexVolumes"), spec.AllowedFlexVolumes)...)
+	allErrs = append(allErrs, validatePSPHostPorts(fldPath.Child("hostPorts"), spec.HostPorts)...)
 
 	return allErrs
 }
@@ -719,6 +720,16 @@ func validatePSPAllowedHostPaths(fldPath *field.Path, allowedHostPaths []extensi
 		}
 	}
 
+	return allErrs
+}
+
+// validatePSPHostPorts checks the host ports range
+func validatePSPHostPorts(fldPath *field.Path, hostPorts []extensions.HostPortRange) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// validate range settings
+	for idx, rng := range hostPorts {
+		allErrs = append(allErrs, validateHostPortRange(fldPath.Index(idx), rng)...)
+	}
 	return allErrs
 }
 
@@ -865,6 +876,10 @@ func validateUserIDRange(fldPath *field.Path, rng extensions.UserIDRange) field.
 }
 
 func validateGroupIDRange(fldPath *field.Path, rng extensions.GroupIDRange) field.ErrorList {
+	return validateIDRanges(fldPath, int64(rng.Min), int64(rng.Max))
+}
+
+func validateHostPortRange(fldPath *field.Path, rng extensions.HostPortRange) field.ErrorList {
 	return validateIDRanges(fldPath, int64(rng.Min), int64(rng.Max))
 }
 
