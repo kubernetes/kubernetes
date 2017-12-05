@@ -1026,9 +1026,6 @@ ExecStart=${kubelet_bin} \$KUBELET_OPTS
 WantedBy=multi-user.target
 EOF
 
-  # Flush iptables nat table
-  iptables -t nat -F || true
-
   systemctl start kubelet.service
 }
 
