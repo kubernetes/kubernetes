@@ -604,42 +604,44 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 	var lookupPatchMeta strategicpatch.LookupPatchMeta
 	var schema oapi.Schema
 	createPatchErrFormat := "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor:"
-	// Try to use openapi first if the openapi spec is available and can successfully calculate the patch.
-	// Otherwise, fall back to baked-in types.
-	if p.openapiSchema != nil {
-		if schema = p.openapiSchema.LookupResource(p.mapping.GroupVersionKind); schema != nil {
-			lookupPatchMeta = strategicpatch.PatchMetaFromOpenAPI{Schema: schema}
-			if openapiPatch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, lookupPatchMeta, p.overwrite); err != nil {
-				fmt.Fprintf(errOut, "warning: error calculating patch from openapi spec: %v\n", err)
-			} else {
-				patchType = types.StrategicMergePatchType
-				patch = openapiPatch
+
+	// Create the versioned struct from the type defined in the restmapping
+	// (which is the API version we'll be submitting the patch to)
+	versionedObject, err := scheme.Scheme.New(p.mapping.GroupVersionKind)
+	switch {
+	case runtime.IsNotRegisteredError(err):
+		// fall back to generic JSON merge patch
+		patchType = types.MergePatchType
+		preconditions := []mergepatch.PreconditionFunc{mergepatch.RequireKeyUnchanged("apiVersion"),
+			mergepatch.RequireKeyUnchanged("kind"), mergepatch.RequireMetadataKeyUnchanged("name")}
+		patch, err = jsonmergepatch.CreateThreeWayJSONMergePatch(original, modified, current, preconditions...)
+		if err != nil {
+			if mergepatch.IsPreconditionFailed(err) {
+				return nil, nil, fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed")
+			}
+			return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf(createPatchErrFormat, original, modified, current), source, err)
+		}
+	case err != nil:
+		return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf("getting instance of versioned object for %v:", p.mapping.GroupVersionKind), source, err)
+	case err == nil:
+		// Compute a three way strategic merge patch to send to server.
+		patchType = types.StrategicMergePatchType
+
+		// Try to use openapi first if the openapi spec is available and can successfully calculate the patch.
+		// Otherwise, fall back to baked-in types.
+		if p.openapiSchema != nil {
+			if schema = p.openapiSchema.LookupResource(p.mapping.GroupVersionKind); schema != nil {
+				lookupPatchMeta = strategicpatch.PatchMetaFromOpenAPI{Schema: schema}
+				if openapiPatch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, lookupPatchMeta, p.overwrite); err != nil {
+					fmt.Fprintf(errOut, "warning: error calculating patch from openapi spec: %v\n", err)
+				} else {
+					patchType = types.StrategicMergePatchType
+					patch = openapiPatch
+				}
 			}
 		}
-	}
 
-	if patch == nil {
-		// Create the versioned struct from the type defined in the restmapping
-		// (which is the API version we'll be submitting the patch to)
-		versionedObject, err := scheme.Scheme.New(p.mapping.GroupVersionKind)
-		switch {
-		case runtime.IsNotRegisteredError(err):
-			// fall back to generic JSON merge patch
-			patchType = types.MergePatchType
-			preconditions := []mergepatch.PreconditionFunc{mergepatch.RequireKeyUnchanged("apiVersion"),
-				mergepatch.RequireKeyUnchanged("kind"), mergepatch.RequireMetadataKeyUnchanged("name")}
-			patch, err = jsonmergepatch.CreateThreeWayJSONMergePatch(original, modified, current, preconditions...)
-			if err != nil {
-				if mergepatch.IsPreconditionFailed(err) {
-					return nil, nil, fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed")
-				}
-				return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf(createPatchErrFormat, original, modified, current), source, err)
-			}
-		case err != nil:
-			return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf("getting instance of versioned object for %v:", p.mapping.GroupVersionKind), source, err)
-		case err == nil:
-			// Compute a three way strategic merge patch to send to server.
-			patchType = types.StrategicMergePatchType
+		if patch == nil {
 			lookupPatchMeta, err = strategicpatch.NewPatchMetaFromStruct(versionedObject)
 			if err != nil {
 				return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf(createPatchErrFormat, original, modified, current), source, err)

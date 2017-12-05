@@ -4499,7 +4499,7 @@ func LaunchWebserverPod(f *Framework, podName, nodeName string) (ip string) {
 	ExpectNoError(f.WaitForPodRunning(podName))
 	createdPod, err := podClient.Get(podName, metav1.GetOptions{})
 	ExpectNoError(err)
-	ip = fmt.Sprintf("%s:%d", createdPod.Status.PodIP, port)
+	ip = net.JoinHostPort(createdPod.Status.PodIP, strconv.Itoa(port))
 	Logf("Target pod IP:port is %s", ip)
 	return
 }
@@ -4921,23 +4921,6 @@ func GetNodeExternalIP(node *v1.Node) string {
 	}
 	if host == "" {
 		Failf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
-	}
-	return host
-}
-
-// GetNodeInternalIP returns node internal IP concatenated with port 22 for ssh
-// e.g. 1.2.3.4:22
-func GetNodeInternalIP(node *v1.Node) string {
-	Logf("Getting internal IP address for %s", node.Name)
-	host := ""
-	for _, a := range node.Status.Addresses {
-		if a.Type == v1.NodeInternalIP {
-			host = net.JoinHostPort(a.Address, sshPort)
-			break
-		}
-	}
-	if host == "" {
-		Failf("Couldn't get the internal IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 	}
 	return host
 }
