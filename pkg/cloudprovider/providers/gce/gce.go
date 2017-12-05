@@ -89,6 +89,8 @@ const (
 
 	gceComputeAPIEndpoint      = "https://www.googleapis.com/compute/v1/"
 	gceComputeAPIEndpointAlpha = "https://www.googleapis.com/compute/alpha/"
+
+	configValueDelimiter = ","
 )
 
 // gceObject is an abstraction of all GCE API object in go client
@@ -174,7 +176,7 @@ type ConfigGlobal struct {
 	// blank, then the local zone will be discovered via the metadata server.
 	LocalZone string `gcfg:"local-zone"`
 	// Possible values: List of api names separated by comma. Default to none.
-	// For example: MyFeatureFlag
+	// For example: MyFeature1,MyFeature2
 	AlphaFeatures []string `gcfg:"alpha-features"`
 }
 
@@ -243,7 +245,26 @@ func readConfig(reader io.Reader) (*ConfigFile, error) {
 		glog.Errorf("Couldn't read config: %v", err)
 		return nil, err
 	}
+
+	// gcfg expects a multi-value field to be set multiple times in the config
+	// file, and does not handle comma-separated values. E.g., a config file
+	// with the content below will be read into `[]string{"foo,bar", "xyz"}`.
+	//    node-tags = foo,bar
+	//    node-tags = xyz
+	//
+	// We need to parse those values ourselves to properly generate
+	// []string{"foo", "bar", "xyz"}
+	cfg.Global.NodeTags = parseDelimitedStrings(cfg.Global.NodeTags)
+	cfg.Global.AlphaFeatures = parseDelimitedStrings(cfg.Global.AlphaFeatures)
 	return cfg, nil
+}
+
+func parseDelimitedStrings(rawStrings []string) []string {
+	values := []string{}
+	for _, s := range rawStrings {
+		values = append(values, strings.Split(s, configValueDelimiter)...)
+	}
+	return values
 }
 
 func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err error) {
