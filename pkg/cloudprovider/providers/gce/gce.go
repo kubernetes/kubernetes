@@ -162,10 +162,12 @@ type ConfigGlobal struct {
 	// SecondaryRangeName is the name of the secondary range to allocate IP
 	// aliases. The secondary range must be present on the subnetwork the
 	// cluster is attached to.
-	SecondaryRangeName string   `gcfg:"secondary-range-name"`
-	NodeTags           []string `gcfg:"node-tags"`
-	NodeInstancePrefix string   `gcfg:"node-instance-prefix"`
-	Multizone          bool     `gcfg:"multizone"`
+	SecondaryRangeName string `gcfg:"secondary-range-name"`
+	// Possible values: List of node tags separated by comma. Default to none.
+	// For example: minion1,node1
+	NodeTags           string `gcfg:"node-tags"`
+	NodeInstancePrefix string `gcfg:"node-instance-prefix"`
+	Multizone          bool   `gcfg:"multizone"`
 	// ApiEndpoint is the GCE compute API endpoint to use. If this is blank,
 	// then the default endpoint is used.
 	ApiEndpoint string `gcfg:"api-endpoint"`
@@ -174,8 +176,8 @@ type ConfigGlobal struct {
 	// blank, then the local zone will be discovered via the metadata server.
 	LocalZone string `gcfg:"local-zone"`
 	// Possible values: List of api names separated by comma. Default to none.
-	// For example: MyFeatureFlag
-	AlphaFeatures []string `gcfg:"alpha-features"`
+	// For example: MyFeatureFlag1,MyFeatureFlag2
+	AlphaFeatures string `gcfg:"alpha-features"`
 }
 
 // ConfigFile is the struct used to parse the /etc/gce.conf configuration file.
@@ -269,10 +271,16 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 			}
 		}
 
-		cloudConfig.NodeTags = configFile.Global.NodeTags
+		if len(configFile.Global.NodeTags) > 0 {
+			cloudConfig.NodeTags = strings.Split(configFile.Global.NodeTags, ",")
+		}
 		cloudConfig.NodeInstancePrefix = configFile.Global.NodeInstancePrefix
 
-		alphaFeatureGate, err := NewAlphaFeatureGate(configFile.Global.AlphaFeatures)
+		var tmpAlphaFeatures []string
+		if len(configFile.Global.AlphaFeatures) > 0 {
+			tmpAlphaFeatures = strings.Split(configFile.Global.AlphaFeatures, ",")
+		}
+		alphaFeatureGate, err := NewAlphaFeatureGate(tmpAlphaFeatures)
 		if err != nil {
 			glog.Errorf("Encountered error for creating alpha feature gate: %v", err)
 		}
