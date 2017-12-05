@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -61,6 +62,7 @@ type DrainOptions struct {
 	backOff            clockwork.Clock
 	DeleteLocalData    bool
 	Selector           string
+	PodSelector        string
 	mapper             meta.RESTMapper
 	nodeInfos          []*resource.Info
 	Out                io.Writer
@@ -197,6 +199,8 @@ func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.Flags().IntVar(&options.GracePeriodSeconds, "grace-period", -1, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
 	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "The length of time to wait before giving up, zero means infinite")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
+	cmd.Flags().StringVarP(&options.PodSelector, "pod-selector", "", options.PodSelector, "Label selector to filter pods on the node")
+
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
@@ -221,6 +225,12 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 
 	if o.client, err = o.Factory.KubernetesClientSet(); err != nil {
 		return err
+	}
+
+	if len(o.PodSelector) > 0 {
+		if _, err := labels.Parse(o.PodSelector); err != nil {
+			return errors.New("--pod-selector=<pod_selector> must be a valid label selector")
+		}
 	}
 
 	o.restClient, err = o.Factory.RESTClient()
@@ -455,7 +465,13 @@ func (ps podStatuses) Message() string {
 // getPodsForDeletion receives resource info for a node, and returns all the pods from the given node that we
 // are planning on deleting. If there are any pods preventing us from deleting, we return that list in an error.
 func (o *DrainOptions) getPodsForDeletion(nodeInfo *resource.Info) (pods []corev1.Pod, err error) {
+	labelSelector, err := labels.Parse(o.PodSelector)
+	if err != nil {
+		return pods, err
+	}
+
 	podList, err := o.client.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{
+		LabelSelector: labelSelector.String(),
 		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeInfo.Name}).String()})
 	if err != nil {
 		return pods, err
