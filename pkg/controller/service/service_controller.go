@@ -544,7 +544,8 @@ func portSlicesEqualForLB(x, y []*v1.ServicePort) bool {
 }
 
 func portEqualForLB(x, y *v1.ServicePort) bool {
-	// TODO: Should we check name?  (In theory, an LB could expose it)
+	// Note: Fields for uniqueness checking include Name、Protocol and NodePort
+	// Name(In theory, an LB could expose it, so we check it)
 	if x.Name != y.Name {
 		return false
 	}
@@ -552,7 +553,7 @@ func portEqualForLB(x, y *v1.ServicePort) bool {
 	if x.Protocol != y.Protocol {
 		return false
 	}
-
+	// Ignore differences in TargetPort as it is not relevant for load balancing.
 	if x.Port != y.Port {
 		return false
 	}
@@ -560,9 +561,6 @@ func portEqualForLB(x, y *v1.ServicePort) bool {
 	if x.NodePort != y.NodePort {
 		return false
 	}
-
-	// We don't check TargetPort; that is not relevant for load balancing
-	// TODO: Should we blank it out?  Or just check it anyway?
 
 	return true
 }
