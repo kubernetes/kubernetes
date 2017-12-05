@@ -26,6 +26,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/server/types"
 	"k8s.io/sample-apiserver/pkg/admission/plugin/banflunder"
 	"k8s.io/sample-apiserver/pkg/admission/wardleinitializer"
 	"k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
@@ -141,7 +142,7 @@ func (o WardleServerOptions) RunWardleServer(stopCh <-chan struct{}) error {
 		return err
 	}
 
-	server.GenericAPIServer.AddPostStartHook("start-sample-server-informers", func(context genericapiserver.PostStartHookContext) error {
+	server.GenericAPIServer.AddPostStartHook("start-sample-server-informers", func(context types.PostStartHookContext) error {
 		config.GenericConfig.SharedInformerFactory.Start(context.StopCh)
 		return nil
 	})

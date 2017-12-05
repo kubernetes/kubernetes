@@ -26,7 +26,7 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/types"
 
 	"github.com/golang/glog"
 )
@@ -134,7 +134,7 @@ func splitStream(config io.Reader) (io.Reader, io.Reader, error) {
 type Decorator func(handler Interface, name string) Interface
 
 type PostStartHookFuncAndName struct {
-	Func server.PostStartHookFunc
+	Func types.PostStartHookFunc
 	Name string
 }
 
@@ -146,12 +146,12 @@ func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigPro
 	for _, pluginName := range pluginNames {
 		pluginConfig, err := configProvider.ConfigFor(pluginName)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		plugin, err := ps.InitPlugin(pluginName, pluginConfig, pluginInitializer)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if plugin != nil {
 			if decorator != nil {
@@ -160,7 +160,7 @@ func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigPro
 				handlers = append(handlers, plugin)
 			}
 		}
-		if postHookProvider, ok := plugin.(server.PostStartHookProvider); ok {
+		if postHookProvider, ok := plugin.(types.PostStartHookProvider); ok {
 			name, hook, err := postHookProvider.PostStartHook()
 			if err != nil {
 				glog.Fatalf("Error building PostStartHook: %v", err)

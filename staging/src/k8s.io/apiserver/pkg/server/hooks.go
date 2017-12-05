@@ -26,49 +26,22 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/server/healthz"
-	restclient "k8s.io/client-go/rest"
+	"k8s.io/apiserver/pkg/server/types"
 )
 
-// PostStartHookFunc is a function that is called after the server has started.
-// It must properly handle cases like:
-//  1. asynchronous start in multiple API server processes
-//  2. conflicts between the different processes all trying to perform the same action
-//  3. partially complete work (API server crashes while running your hook)
-//  4. API server access **BEFORE** your hook has completed
-// Think of it like a mini-controller that is super privileged and gets to run in-process
-// If you use this feature, tag @deads2k on github who has promised to review code for anyone's PostStartHook
-// until it becomes easier to use.
-type PostStartHookFunc func(context PostStartHookContext) error
-
-// PreShutdownHookFunc is a function that can be added to the shutdown logic.
-type PreShutdownHookFunc func() error
-
-// PostStartHookContext provides information about this API server to a PostStartHookFunc
-type PostStartHookContext struct {
-	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
-	LoopbackClientConfig *restclient.Config
-	// StopCh is the channel that will be closed when the server stops
-	StopCh <-chan struct{}
-}
-
-// PostStartHookProvider is an interface in addition to provide a post start hook for the api server
-type PostStartHookProvider interface {
-	PostStartHook() (string, PostStartHookFunc, error)
-}
-
 type postStartHookEntry struct {
-	hook PostStartHookFunc
+	hook types.PostStartHookFunc
 
 	// done will be closed when the postHook is finished
 	done chan struct{}
 }
 
 type preShutdownHookEntry struct {
-	hook PreShutdownHookFunc
+	hook types.PreShutdownHookFunc
 }
 
 // AddPostStartHook allows you to add a PostStartHook.
-func (s *GenericAPIServer) AddPostStartHook(name string, hook PostStartHookFunc) error {
+func (s *GenericAPIServer) AddPostStartHook(name string, hook types.PostStartHookFunc) error {
 	if len(name) == 0 {
 		return fmt.Errorf("missing name")
 	}
@@ -99,14 +72,14 @@ func (s *GenericAPIServer) AddPostStartHook(name string, hook PostStartHookFunc)
 }
 
 // AddPostStartHookOrDie allows you to add a PostStartHook, but dies on failure
-func (s *GenericAPIServer) AddPostStartHookOrDie(name string, hook PostStartHookFunc) {
+func (s *GenericAPIServer) AddPostStartHookOrDie(name string, hook types.PostStartHookFunc) {
 	if err := s.AddPostStartHook(name, hook); err != nil {
 		glog.Fatalf("Error registering PostStartHook %q: %v", name, err)
 	}
 }
 
 // AddPreShutdownHook allows you to add a PreShutdownHook.
-func (s *GenericAPIServer) AddPreShutdownHook(name string, hook PreShutdownHookFunc) error {
+func (s *GenericAPIServer) AddPreShutdownHook(name string, hook types.PreShutdownHookFunc) error {
 	if len(name) == 0 {
 		return fmt.Errorf("missing name")
 	}
@@ -130,7 +103,7 @@ func (s *GenericAPIServer) AddPreShutdownHook(name string, hook PreShutdownHookF
 }
 
 // AddPreShutdownHookOrDie allows you to add a PostStartHook, but dies on failure
-func (s *GenericAPIServer) AddPreShutdownHookOrDie(name string, hook PreShutdownHookFunc) {
+func (s *GenericAPIServer) AddPreShutdownHookOrDie(name string, hook types.PreShutdownHookFunc) {
 	if err := s.AddPreShutdownHook(name, hook); err != nil {
 		glog.Fatalf("Error registering PreShutdownHook %q: %v", name, err)
 	}
@@ -142,7 +115,7 @@ func (s *GenericAPIServer) RunPostStartHooks(stopCh <-chan struct{}) {
 	defer s.postStartHookLock.Unlock()
 	s.postStartHooksCalled = true
 
-	context := PostStartHookContext{
+	context := types.PostStartHookContext{
 		LoopbackClientConfig: s.LoopbackClientConfig,
 		StopCh:               stopCh,
 	}
@@ -176,7 +149,7 @@ func (s *GenericAPIServer) isPostStartHookRegistered(name string) bool {
 	return exists
 }
 
-func runPostStartHook(name string, entry postStartHookEntry, context PostStartHookContext) {
+func runPostStartHook(name string, entry postStartHookEntry, context types.PostStartHookContext) {
 	var err error
 	func() {
 		// don't let the hook *accidentally* panic and kill the server

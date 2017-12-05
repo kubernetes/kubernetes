@@ -35,6 +35,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/server/types"
 	kubeexternalinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
@@ -107,7 +108,7 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 		apiExtensionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions(),
 		autoRegistrationController)
 
-	aggregatorServer.GenericAPIServer.AddPostStartHook("kube-apiserver-autoregistration", func(context genericapiserver.PostStartHookContext) error {
+	aggregatorServer.GenericAPIServer.AddPostStartHook("kube-apiserver-autoregistration", func(context types.PostStartHookContext) error {
 		go crdRegistrationController.Run(5, context.StopCh)
 		go func() {
 			// let the CRD controller process the initial set of CRDs before starting the autoregistration controller.

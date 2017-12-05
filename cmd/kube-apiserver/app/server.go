@@ -52,6 +52,7 @@ import (
 	serveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	"k8s.io/apiserver/pkg/server/types"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	openapi "k8s.io/kube-openapi/pkg/common"
 
@@ -204,7 +205,7 @@ func CreateKubeAPIServer(kubeAPIServerConfig *master.Config, delegateAPIServer g
 	if err != nil {
 		return nil, err
 	}
-	kubeAPIServer.GenericAPIServer.AddPostStartHook("start-kube-apiserver-informers", func(context genericapiserver.PostStartHookContext) error {
+	kubeAPIServer.GenericAPIServer.AddPostStartHook("start-kube-apiserver-informers", func(context types.PostStartHookContext) error {
 		sharedInformers.Start(context.StopCh)
 		return nil
 	})

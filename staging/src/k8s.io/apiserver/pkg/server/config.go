@@ -57,6 +57,7 @@ import (
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
+	"k8s.io/apiserver/pkg/server/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
@@ -484,7 +485,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 	genericApiServerHookName := "generic-apiserver-start-informers"
 	if c.SharedInformerFactory != nil && !s.isPostStartHookRegistered(genericApiServerHookName) {
-		err := s.AddPostStartHook(genericApiServerHookName, func(context PostStartHookContext) error {
+		err := s.AddPostStartHook(genericApiServerHookName, func(context types.PostStartHookContext) error {
 			c.SharedInformerFactory.Start(context.StopCh)
 			return nil
 		})

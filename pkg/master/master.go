@@ -52,6 +52,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	"k8s.io/apiserver/pkg/server/types"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -416,7 +417,7 @@ func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceCo
 		}
 		glog.V(1).Infof("Enabling API group %q.", groupName)
 
-		if postHookProvider, ok := restStorageBuilder.(genericapiserver.PostStartHookProvider); ok {
+		if postHookProvider, ok := restStorageBuilder.(types.PostStartHookProvider); ok {
 			name, hook, err := postHookProvider.PostStartHook()
 			if err != nil {
 				glog.Fatalf("Error building PostStartHook: %v", err)

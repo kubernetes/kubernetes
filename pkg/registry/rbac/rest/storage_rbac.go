@@ -36,6 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	"k8s.io/apiserver/pkg/server/types"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/rbac"
@@ -64,7 +65,7 @@ type RESTStorageProvider struct {
 	Authorizer authorizer.Authorizer
 }
 
-var _ genericapiserver.PostStartHookProvider = RESTStorageProvider{}
+var _ types.PostStartHookProvider = RESTStorageProvider{}
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(rbac.GroupName, legacyscheme.Registry, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
@@ -133,7 +134,7 @@ func (p RESTStorageProvider) storage(version schema.GroupVersion, apiResourceCon
 	return storage
 }
 
-func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {
+func (p RESTStorageProvider) PostStartHook() (string, types.PostStartHookFunc, error) {
 	policy := &PolicyData{
 		ClusterRoles:            append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...),
 		ClusterRoleBindings:     append(bootstrappolicy.ClusterRoleBindings(), bootstrappolicy.ControllerRoleBindings()...),
@@ -153,8 +154,8 @@ type PolicyData struct {
 	ClusterRolesToAggregate map[string]string
 }
 
-func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
-	return func(hookContext genericapiserver.PostStartHookContext) error {
+func (p *PolicyData) EnsureRBACPolicy() types.PostStartHookFunc {
+	return func(hookContext types.PostStartHookContext) error {
 		// intializing roles is really important.  On some e2e runs, we've seen cases where etcd is down when the server
 		// starts, the roles don't initialize, and nothing works.
 		err := wait.Poll(1*time.Second, 30*time.Second, func() (done bool, err error) {

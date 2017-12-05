@@ -28,7 +28,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/types"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
@@ -107,7 +107,7 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 	}
 }
 
-func (c *Controller) PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
+func (c *Controller) PostStartHook(hookContext types.PostStartHookContext) error {
 	c.Start()
 	return nil
 }
