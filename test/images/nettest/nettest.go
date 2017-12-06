@@ -52,7 +52,7 @@ import (
 
 var (
 	port          = flag.Int("port", 8080, "Port number to serve at.")
-	peerCount     = flag.Int("peers", 8, "Must find at least this many peers for the test to pass.")
+	peerCount     = flag.Int("peers", 8, "Must find at least this many peers for the test to pass. A zero or negative value will run the server in stand-alone mode.")
 	service       = flag.String("service", "nettest", "Service to find other network test pods in.")
 	namespace     = flag.String("namespace", "default", "Namespace of this pod. TODO: kubernetes should make this discoverable.")
 	delayShutdown = flag.Int("delay-shutdown", 0, "Number of seconds to delay shutdown when receiving SIGTERM.")
@@ -231,6 +231,11 @@ func contactOthers(state *State) {
 		timeout = time.Duration(*peerCount) * time.Second
 	}
 	defer state.doneContactingPeers()
+
+	if *peerCount <= 0 {
+		// Server is running in stand-alone mode; No expected peers to contact.
+		return
+	}
 
 	config, err := restclient.InClusterConfig()
 	if err != nil {
