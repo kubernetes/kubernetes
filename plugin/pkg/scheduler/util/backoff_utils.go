@@ -135,3 +135,7 @@ func (p *PodBackoff) Gc() {
 		}
 	}
 }
+
+func (p *PodBackoff) GetPerPodBackoff() map[ktypes.NamespacedName]*backoffEntry {
+	return p.perPodBackoff
+}

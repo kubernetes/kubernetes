@@ -33,6 +33,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ktypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
@@ -166,6 +167,8 @@ type PriorityQueue struct {
 	// pod was in flight (we were trying to schedule it). In such a case, we put
 	// the pod back into the activeQ if it is determined unschedulable.
 	receivedMoveRequest bool
+
+	podBackoff *util.PodBackoff
 }
 
 // Making sure that PriorityQueue implements SchedulingQueue.
@@ -175,6 +178,7 @@ func NewPriorityQueue() *PriorityQueue {
 	pq := &PriorityQueue{
 		activeQ:        newHeap(cache.MetaNamespaceKeyFunc, util.HigherPriorityPod),
 		unschedulableQ: newUnschedulablePodsMap(),
+		podBackoff:     util.CreateDefaultPodBackoff(),
 	}
 	pq.cond.L = &pq.lock
 	return pq
@@ -337,21 +341,50 @@ func (p *PriorityQueue) AssignedPodUpdated(pod *v1.Pod) {
 // function adds all pods and then signals the condition variable to ensure that
 // if Pop() is waiting for an item, it receives it after all the pods are in the
 // queue and the head is the highest priority pod.
-// TODO(bsalamat): We should add a back-off mechanism here so that a high priority
-// pod which is unschedulable does not go to the head of the queue frequently. For
-// example in a cluster where a lot of pods being deleted, such a high priority
-// pod can deprive other pods from getting scheduled.
+// We add a back-off mechanism here so that a high priority pod which is
+// unschedulable does not go to the head of the queue frequently. For example
+// in a cluster where a lot of pods being deleted, such a high priority pod
+// can deprive other pods from getting scheduled.
 func (p *PriorityQueue) MoveAllToActiveQueue() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	var unschedulablePods []interface{}
+
+	p.podBackoff.Gc()
+
 	for _, pod := range p.unschedulableQ.pods {
-		unschedulablePods = append(unschedulablePods, pod)
+		podID := ktypes.NamespacedName{
+			Namespace: pod.Namespace,
+			Name:      pod.Name,
+		}
+		_, ok := p.podBackoff.GetPerPodBackoff()[podID]
+		if !ok {
+			unschedulablePods = append(unschedulablePods, pod)
+			p.podBackoff.GetEntry(podID)
+		} else {
+			go func() {
+				entry := p.podBackoff.GetEntry(podID)
+				if !entry.TryWait(p.podBackoff.MaxDuration()) {
+					glog.Warningf("Request for pod %v already in flight, abandoning", podID)
+					return
+				}
+				p.activeQ.Add(pod)
+				p.unschedulableQ.Delete(pod)
+				p.receivedMoveRequest = true
+				p.cond.Broadcast()
+			}()
+		}
 	}
-	p.activeQ.BulkAdd(unschedulablePods)
-	p.unschedulableQ.Clear()
-	p.receivedMoveRequest = true
-	p.cond.Broadcast()
+
+	if len(unschedulablePods) > 0 {
+		p.activeQ.BulkAdd(unschedulablePods)
+		for _, obj := range unschedulablePods {
+			pod, _ := obj.(*v1.Pod)
+			p.unschedulableQ.Delete(pod)
+		}
+		p.receivedMoveRequest = true
+		p.cond.Broadcast()
+	}
 }
 
 func (p *PriorityQueue) movePodsToActiveQueue(pods []*v1.Pod) {
