@@ -661,6 +661,15 @@ func (f *FakeDockerClient) RemoveContainer(id string, opts dockertypes.Container
 		}
 
 	}
+	for i := range f.RunningContainerList {
+		// allow removal of running containers which are not running
+		if f.RunningContainerList[i].ID == id && !f.ContainerMap[id].State.Running {
+			delete(f.ContainerMap, id)
+			f.RunningContainerList = append(f.RunningContainerList[:i], f.RunningContainerList[i+1:]...)
+			f.appendContainerTrace("Removed", id)
+			return nil
+		}
+	}
 	// To be a good fake, report error if container is not stopped.
 	return fmt.Errorf("container not stopped")
 }

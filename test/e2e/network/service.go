@@ -20,6 +20,8 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
+	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1632,7 +1634,9 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 				// Confirm traffic can reach backend through LB before checking healthcheck nodeport.
 				jig.TestReachableHTTP(ingressIP, svcTCPPort, framework.KubeProxyLagTimeout)
 				expectedSuccess := nodes.Items[n].Name == endpointNodeName
-				framework.Logf("Health checking %s, http://%s:%d%s, expectedSuccess %v", nodes.Items[n].Name, publicIP, healthCheckNodePort, path, expectedSuccess)
+				port := strconv.Itoa(healthCheckNodePort)
+				ipPort := net.JoinHostPort(publicIP, port)
+				framework.Logf("Health checking %s, http://%s%s, expectedSuccess %v", nodes.Items[n].Name, ipPort, path, expectedSuccess)
 				Expect(jig.TestHTTPHealthCheckNodePort(publicIP, healthCheckNodePort, path, framework.KubeProxyEndpointLagTimeout, expectedSuccess, threshold)).NotTo(HaveOccurred())
 			}
 			framework.ExpectNoError(framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, namespace, serviceName))
@@ -1653,7 +1657,9 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		}()
 
 		ingressIP := framework.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
-		path := fmt.Sprintf("%s:%d/clientip", ingressIP, int(svc.Spec.Ports[0].Port))
+		port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
+		ipPort := net.JoinHostPort(ingressIP, port)
+		path := fmt.Sprintf("%s/clientip", ipPort)
 		nodeName := nodes.Items[0].Name
 		podName := "execpod-sourceip"
 
@@ -1804,9 +1810,10 @@ func execSourceipTest(f *framework.Framework, c clientset.Interface, ns, nodeNam
 	framework.ExpectNoError(err)
 
 	var stdout string
+	serviceIPPort := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
 	timeout := 2 * time.Minute
-	framework.Logf("Waiting up to %v wget %s:%d", timeout, serviceIP, servicePort)
-	cmd := fmt.Sprintf(`wget -T 30 -qO- %s:%d | grep client_address`, serviceIP, servicePort)
+	framework.Logf("Waiting up to %v wget %s", timeout, serviceIPPort)
+	cmd := fmt.Sprintf(`wget -T 30 -qO- %s | grep client_address`, serviceIPPort)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2) {
 		stdout, err = framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 		if err != nil {
