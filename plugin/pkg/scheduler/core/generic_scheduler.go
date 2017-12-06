@@ -395,14 +395,20 @@ func podFitsOnNode(
 	var (
 		equivalenceHash  uint64
 		failedPredicates []algorithm.PredicateFailureReason
-		eCacheAvailable  bool
-		invalid          bool
-		fit              bool
-		reasons          []algorithm.PredicateFailureReason
-		err              error
+
+		eCacheAvailable bool
+		invalid         bool
+		fit             bool
+		reasons         []algorithm.PredicateFailureReason
+		err             error
 	)
 	predicateResults := make(map[string]HostPredicate)
-
+	failedPredicatesChannel := make(chan []algorithm.PredicateFailureReason, len(predicateFuncs))
+	errorsChannel := make(chan error, len(predicateFuncs))
+	defer func() {
+		close(failedPredicatesChannel)
+		close(errorsChannel)
+	}()
 	if ecache != nil {
 		// getHashEquivalencePod will return immediately if no equivalence pod found
 		equivalenceHash, eCacheAvailable = ecache.getHashEquivalencePod(pod)
@@ -438,36 +444,42 @@ func podFitsOnNode(
 		// TODO(bsalamat): consider using eCache and adding proper eCache invalidations
 		// when pods are nominated or their nominations change.
 		eCacheAvailable = eCacheAvailable && !podsAdded
+		var wg sync.WaitGroup
 		for predicateKey, predicate := range predicateFuncs {
-			if eCacheAvailable {
-				// PredicateWithECache will return its cached predicate results.
-				fit, reasons, invalid = ecache.PredicateWithECache(pod.GetName(), info.Node().GetName(), predicateKey, equivalenceHash)
-			}
-
-			// TODO(bsalamat): When one predicate fails and fit is false, why do we continue
-			// checking other predicates?
-			if !eCacheAvailable || invalid {
-				// we need to execute predicate functions since equivalence cache does not work
-				fit, reasons, err = predicate(pod, metaToUse, nodeInfoToUse)
-				if err != nil {
-					return false, []algorithm.PredicateFailureReason{}, err
-				}
+			wg.Add(1)
+			go func(predicateKey string, predicate algorithm.FitPredicate) {
 				if eCacheAvailable {
-					// Store data to update eCache after this loop.
-					if res, exists := predicateResults[predicateKey]; exists {
-						res.Fit = res.Fit && fit
-						res.FailReasons = append(res.FailReasons, reasons...)
-						predicateResults[predicateKey] = res
-					} else {
-						predicateResults[predicateKey] = HostPredicate{Fit: fit, FailReasons: reasons}
+					// PredicateWithECache will return its cached predicate results.
+					fit, reasons, invalid = ecache.PredicateWithECache(pod.GetName(), info.Node().GetName(), predicateKey, equivalenceHash)
+				}
+
+				// TODO(bsalamat): When one predicate fails and fit is false, why do we continue
+				// checking other predicates?
+				if !eCacheAvailable || invalid {
+					// we need to execute predicate functions since equivalence cache does not work
+					fit, reasons, err = predicate(pod, metaToUse, nodeInfoToUse)
+					if err != nil {
+						errorsChannel <- err
+					}
+					if eCacheAvailable {
+						// Store data to update eCache after this loop.
+						if res, exists := predicateResults[predicateKey]; exists {
+							res.Fit = res.Fit && fit
+							res.FailReasons = append(res.FailReasons, reasons...)
+							predicateResults[predicateKey] = res
+						} else {
+							predicateResults[predicateKey] = HostPredicate{Fit: fit, FailReasons: reasons}
+						}
 					}
 				}
-			}
-			if !fit {
-				// eCache is available and valid, and predicates result is unfit, record the fail reasons
-				failedPredicates = append(failedPredicates, reasons...)
-			}
+				if !fit {
+					// eCache is available and valid, and predicates result is unfit, record the fail reasons
+					failedPredicatesChannel <- reasons
+				}
+				wg.Done()
+			}(predicateKey, predicate)
 		}
+		wg.Wait()
 	}
 
 	// TODO(bsalamat): This way of updating equiv. cache has a race condition against
@@ -482,6 +494,23 @@ func podFitsOnNode(
 			ecache.UpdateCachedPredicateItem(pod.GetName(), nodeName, predKey, result.Fit, result.FailReasons, equivalenceHash)
 		}
 	}
+
+	if len(errorsChannel) != 0 {
+		length := len(errorsChannel)
+		errs := make([]string, length)
+		for i := 0; length > i; i++ {
+			errs[i] = fmt.Sprintf("%s", <-errorsChannel)
+		}
+		return false, []algorithm.PredicateFailureReason{}, fmt.Errorf("%s", strings.Join(errs, ";"))
+	}
+
+	if len(failedPredicatesChannel) != 0 {
+		length := len(failedPredicatesChannel)
+		for ; length > 0; length-- {
+			failedPredicates = append(failedPredicates, (<-failedPredicatesChannel)...)
+		}
+	}
+
 	return len(failedPredicates) == 0, failedPredicates, nil
 }
 
