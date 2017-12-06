@@ -149,6 +149,7 @@ type GCECloud struct {
 	AlphaFeatureGate *AlphaFeatureGate
 }
 
+// TODO: replace gcfg with json
 type ConfigGlobal struct {
 	TokenURL  string `gcfg:"token-url"`
 	TokenBody string `gcfg:"token-body"`
@@ -173,7 +174,7 @@ type ConfigGlobal struct {
 	// located in (i.e. where the controller will be running). If this is
 	// blank, then the local zone will be discovered via the metadata server.
 	LocalZone string `gcfg:"local-zone"`
-	// Possible values: List of api names separated by comma. Default to none.
+	// Default to none.
 	// For example: MyFeatureFlag
 	AlphaFeatures []string `gcfg:"alpha-features"`
 }
