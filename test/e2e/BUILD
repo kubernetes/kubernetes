@@ -97,6 +97,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//test/e2e/apicoverage:all-srcs",
         "//test/e2e/apimachinery:all-srcs",
         "//test/e2e/apps:all-srcs",
         "//test/e2e/auth:all-srcs",
