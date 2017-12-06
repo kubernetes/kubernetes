@@ -1013,7 +1013,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1beta2_controllerrevision">v1beta2.ControllerRevision</h3>
 <div class="paragraph">
-<p>ControllerRevision implements an immutable snapshot of state data. Clients are responsible for serializing and deserializing the objects that contain their internal state. Once a ControllerRevision has been successfully created, it can not be updated. The API Server will fail validation of all requests that attempt to mutate the Data field. ControllerRevisions may, however, be deleted. Note that, due to its use by both the DaemonSet and StatefulSet controllers for update and rollback, this object is beta. However, it may be subject to name and representation changes in future releases, and clients should not depend on its stability. It is primarily for internal use by controllers.</p>
+<p>DEPRECATED - This group version of ControllerRevision is deprecated by apps/v1/ControllerRevision. See the release notes for more information. ControllerRevision implements an immutable snapshot of state data. Clients are responsible for serializing and deserializing the objects that contain their internal state. Once a ControllerRevision has been successfully created, it can not be updated. The API Server will fail validation of all requests that attempt to mutate the Data field. ControllerRevisions may, however, be deleted. Note that, due to its use by both the DaemonSet and StatefulSet controllers for update and rollback, this object is beta. However, it may be subject to name and representation changes in future releases, and clients should not depend on its stability. It is primarily for internal use by controllers.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3188,7 +3188,7 @@ When an object is created, the system will populate this list with the current s
 <div class="sect2">
 <h3 id="_v1beta2_daemonset">v1beta2.DaemonSet</h3>
 <div class="paragraph">
-<p>DaemonSet represents the configuration of a daemon set.</p>
+<p>DEPRECATED - This group version of DaemonSet is deprecated by apps/v1/DaemonSet. See the release notes for more information. DaemonSet represents the configuration of a daemon set.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3725,7 +3725,7 @@ When an object is created, the system will populate this list with the current s
 <div class="sect2">
 <h3 id="_v1beta2_statefulset">v1beta2.StatefulSet</h3>
 <div class="paragraph">
-<p>StatefulSet represents a set of pods with consistent identities. Identities are defined as:<br>
+<p>DEPRECATED - This group version of StatefulSet is deprecated by apps/v1/StatefulSet. See the release notes for more information. StatefulSet represents a set of pods with consistent identities. Identities are defined as:<br>
  - Network: A single stable DNS and hostname.<br>
  - Storage: As many VolumeClaims as requested.<br>
 The StatefulSet guarantees that a given network identity will always map to the same storage identity.</p>
@@ -5207,7 +5207,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1beta2_replicaset">v1beta2.ReplicaSet</h3>
 <div class="paragraph">
-<p>ReplicaSet ensures that a specified number of pod replicas are running at any given time.</p>
+<p>DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1/ReplicaSet. See the release notes for more information. ReplicaSet ensures that a specified number of pod replicas are running at any given time.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6683,7 +6683,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1beta2_deployment">v1beta2.Deployment</h3>
 <div class="paragraph">
-<p>Deployment enables declarative updates for Pods and ReplicaSets.</p>
+<p>DEPRECATED - This group version of Deployment is deprecated by apps/v1/Deployment. See the release notes for more information. Deployment enables declarative updates for Pods and ReplicaSets.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
