@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/framework"
 
+	"github.com/blang/semver"
 	. "github.com/onsi/ginkgo"
 )
 
@@ -122,6 +123,18 @@ func checkDockerConfig() error {
 		}
 		missing = map[string]bool{}
 	)
+
+	// Whitelists CONFIG_DEVPTS_MULTIPLE_INSTANCES (meaning allowing it to be
+	// absent) if the kernel version is >= 4.8, because this option has been
+	// removed from the 4.8 kernel.
+	kernelVersion, err := getKernelVersion()
+	if err != nil {
+		return err
+	}
+	if kernelVersion.GTE(semver.MustParse("4.8.0")) {
+		whitelist["CONFIG_DEVPTS_MULTIPLE_INSTANCES"] = true
+	}
+
 	for _, bin := range bins {
 		if _, err := os.Stat(bin); os.IsNotExist(err) {
 			continue
@@ -399,4 +412,19 @@ func getCmdToProcessMap() (map[string][]process, error) {
 		result[cmd] = append(result[cmd], process{pid, ppid})
 	}
 	return result, nil
+}
+
+// getKernelVersion returns the kernel version in the semantic version format.
+func getKernelVersion() (*semver.Version, error) {
+	output, err := runCommand("uname", "-r")
+	if err != nil {
+		return nil, err
+	}
+	// An example 'output' could be "4.13.0-1001-gke".
+	v := strings.TrimSpace(strings.Split(output, "-")[0])
+	kernelVersion, err := semver.Make(v)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert %q to semantic version: %s", v, err)
+	}
+	return &kernelVersion, nil
 }

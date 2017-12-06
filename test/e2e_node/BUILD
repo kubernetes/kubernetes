@@ -137,6 +137,7 @@ go_test(
         "//test/e2e_node/services:go_default_library",
         "//test/e2e_node/system:go_default_library",
         "//test/utils/image:go_default_library",
+        "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/coreos/go-systemd/util:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

@@ -5,7 +5,9 @@ os: Linux
 kernelSpec:
   versions:
   # GKE requires kernel version 4.4+.
-  - 4\.[4-9].*
+  - '4\.[4-9].*'
+  - '4\.[1-9][0-9].*'
+  - '[5-9].*'
 
   # Required kernel configurations -- the configuration must be set to "y" or
   # "m".

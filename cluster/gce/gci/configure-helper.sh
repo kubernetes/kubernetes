@@ -57,18 +57,11 @@ function config-ip-firewall {
     iptables -A FORWARD -w -p ICMP -j ACCEPT
   fi
 
-  iptables -w -N KUBE-METADATA-SERVER
-  iptables -w -I FORWARD -p tcp -d 169.254.169.254 --dport 80 -j KUBE-METADATA-SERVER
-
-  if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]]; then
-    iptables -w -A KUBE-METADATA-SERVER -j DROP
-  fi
-
   # Flush iptables nat table
   iptables -w -t nat -F || true
 
-  echo "Add rules for ip masquerade"
   if [[ "${NON_MASQUERADE_CIDR:-}" == "0.0.0.0/0" ]]; then
+    echo "Add rules for ip masquerade"
     iptables -w -t nat -N IP-MASQ
     iptables -w -t nat -A POSTROUTING -m comment --comment "ip-masq: ensure nat POSTROUTING directs all non-LOCAL destination traffic to our custom IP-MASQ chain" -m addrtype ! --dst-type LOCAL -j IP-MASQ
     iptables -w -t nat -A IP-MASQ -d 169.254.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
@@ -76,6 +69,11 @@ function config-ip-firewall {
     iptables -w -t nat -A IP-MASQ -d 172.16.0.0/12 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
     iptables -w -t nat -A IP-MASQ -d 192.168.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
     iptables -w -t nat -A IP-MASQ -m comment --comment "ip-masq: outbound traffic is subject to MASQUERADE (must be last in chain)" -j MASQUERADE
+  fi
+
+  if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]]; then
+    echo "Add rule for metadata concealment"
+    iptables -w -t nat -I PREROUTING -p tcp -d 169.254.169.254 --dport 80 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j DNAT --to-destination 127.0.0.1:988
   fi
 }
 
@@ -585,14 +583,19 @@ EOF
   if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
     use_cloud_config="true"
     if [[ -n "${NODE_TAGS:-}" ]]; then
-      local -r node_tags="${NODE_TAGS}"
+      # split NODE_TAGS into an array by comma.
+      IFS=',' read -r -a node_tags <<< ${NODE_TAGS}
     else
       local -r node_tags="${NODE_INSTANCE_PREFIX}"
     fi
     cat <<EOF >>/etc/gce.conf
-node-tags = ${node_tags}
 node-instance-prefix = ${NODE_INSTANCE_PREFIX}
 EOF
+    for tag in ${node_tags[@]}; do
+      cat <<EOF >>/etc/gce.conf
+node-tags = ${tag}
+EOF
+    done
   fi
   if [[ -n "${MULTIZONE:-}" ]]; then
     use_cloud_config="true"
@@ -602,9 +605,13 @@ EOF
   fi
   if [[ -n "${GCE_ALPHA_FEATURES:-}" ]]; then
     use_cloud_config="true"
-    cat <<EOF >>/etc/gce.conf
-alpha-features = ${GCE_ALPHA_FEATURES}
+    # split GCE_ALPHA_FEATURES into an array by comma.
+    IFS=',' read -r -a alpha_features <<< ${GCE_ALPHA_FEATURES}
+    for feature in ${alpha_features[@]}; do
+      cat <<EOF >>/etc/gce.conf
+alpha-features = ${feature}
 EOF
+    done
   fi
   if [[ -n "${SECONDARY_RANGE_NAME:-}" ]]; then
     use_cloud_config="true"
@@ -2116,10 +2123,10 @@ EOF
       metadata_agent_cpu_request="${METADATA_AGENT_CPU_REQUEST:-40m}"
       metadata_agent_memory_request="${METADATA_AGENT_MEMORY_REQUEST:-50Mi}"
       setup-addon-manifests "addons" "metadata-agent/stackdriver"
-      deployment_yaml="${dst_dir}/metadata-agent/stackdriver/metadata-agent.yaml"
-      sed -i -e "s@{{ metadata_agent_version }}@${METADATA_AGENT_VERSION}@g" "${deployment_yaml}"
-      sed -i -e "s@{{ metadata_agent_cpu_request }}@${metadata_agent_cpu_request}@g" "${deployment_yaml}"
-      sed -i -e "s@{{ metadata_agent_memory_request }}@${metadata_agent_memory_request}@g" "${deployment_yaml}"
+      daemon_set_yaml="${dst_dir}/metadata-agent/stackdriver/metadata-agent.yaml"
+      sed -i -e "s@{{ metadata_agent_version }}@${METADATA_AGENT_VERSION}@g" "${daemon_set_yaml}"
+      sed -i -e "s@{{ metadata_agent_cpu_request }}@${metadata_agent_cpu_request}@g" "${daemon_set_yaml}"
+      sed -i -e "s@{{ metadata_agent_memory_request }}@${metadata_agent_memory_request}@g" "${daemon_set_yaml}"
     fi
   fi
   if [[ "${ENABLE_METRICS_SERVER:-}" == "true" ]]; then

@@ -4499,7 +4499,7 @@ func LaunchWebserverPod(f *Framework, podName, nodeName string) (ip string) {
 	ExpectNoError(f.WaitForPodRunning(podName))
 	createdPod, err := podClient.Get(podName, metav1.GetOptions{})
 	ExpectNoError(err)
-	ip = fmt.Sprintf("%s:%d", createdPod.Status.PodIP, port)
+	ip = net.JoinHostPort(createdPod.Status.PodIP, strconv.Itoa(port))
 	Logf("Target pod IP:port is %s", ip)
 	return
 }

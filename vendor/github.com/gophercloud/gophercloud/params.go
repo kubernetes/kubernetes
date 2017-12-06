@@ -347,12 +347,21 @@ func BuildQueryString(opts interface{}) (*url.URL, error) {
 								params.Add(tags[0], v.Index(i).String())
 							}
 						}
+					case reflect.Map:
+						if v.Type().Key().Kind() == reflect.String && v.Type().Elem().Kind() == reflect.String {
+							var s []string
+							for _, k := range v.MapKeys() {
+								value := v.MapIndex(k).String()
+								s = append(s, fmt.Sprintf("'%s':'%s'", k.String(), value))
+							}
+							params.Add(tags[0], fmt.Sprintf("{%s}", strings.Join(s, ", ")))
+						}
 					}
 				} else {
 					// Otherwise, the field is not set.
 					if len(tags) == 2 && tags[1] == "required" {
 						// And the field is required. Return an error.
-						return nil, fmt.Errorf("Required query parameter [%s] not set.", f.Name)
+						return &url.URL{}, fmt.Errorf("Required query parameter [%s] not set.", f.Name)
 					}
 				}
 			}
