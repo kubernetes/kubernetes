@@ -27,10 +27,12 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/capabilities"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/security/apparmor"
+	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
 type HandlerRunner struct {
@@ -229,4 +231,114 @@ func noNewPrivsRequired(pod *v1.Pod) bool {
 		}
 	}
 	return false
+}
+
+func NewCapabilityAdmitHandler() PodAdmitHandler {
+	return &capabilityAdmitHandler{}
+}
+
+type capabilityAdmitHandler struct {
+}
+
+type allow func(pod *v1.Pod) (bool, error)
+
+type specHostCheckItem struct {
+	enabled   bool
+	checkFunc allow
+	msg       string
+}
+
+func (handler *capabilityAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+	pod := attrs.Pod
+	if !capabilities.Get().AllowPrivileged {
+		for _, container := range pod.Spec.Containers {
+			if securitycontext.HasPrivilegedRequest(&container) {
+				return PodAdmitResult{
+					Admit:   false,
+					Reason:  "Forbidden",
+					Message: fmt.Sprintf("pod with UID %q specified privileged container, but is disallowed", pod.UID),
+				}
+			}
+		}
+		for _, container := range pod.Spec.InitContainers {
+			if securitycontext.HasPrivilegedRequest(&container) {
+				return PodAdmitResult{
+					Admit:   false,
+					Reason:  "Forbidden",
+					Message: fmt.Sprintf("pod with UID %q specified privileged init container, but is disallowed", pod.UID),
+				}
+			}
+		}
+	}
+
+	for _, item := range []specHostCheckItem{
+		{pod.Spec.HostNetwork, allowHostNetwork, "pod with UID %q specified host networking, but is disallowed"},
+		{pod.Spec.HostPID, allowHostPID, "pod with UID %q specified host PID, but is disallowed"},
+		{pod.Spec.HostIPC, allowHostIPC, "pod with UID %q specified host ipc, but is disallowed"},
+	} {
+		if err := checkSpecHostItems(item.enabled, pod, item.checkFunc, item.msg); err != nil {
+			return PodAdmitResult{
+				Admit:   false,
+				Reason:  "Forbidden",
+				Message: err.Error(),
+			}
+		}
+	}
+
+	return PodAdmitResult{Admit: true}
+}
+
+func checkSpecHostItems(enabled bool, pod *v1.Pod, checkFunc allow, msg string) error {
+	if enabled {
+		allowed, err := checkFunc(pod)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			return fmt.Errorf(msg, pod.UID)
+		}
+	}
+	return nil
+}
+
+// Determined whether the specified pod is allowed to use host networking
+func allowHostNetwork(pod *v1.Pod) (bool, error) {
+	podSource, err := kubetypes.GetPodSource(pod)
+	if err != nil {
+		return false, err
+	}
+	for _, source := range capabilities.Get().PrivilegedSources.HostNetworkSources {
+		if source == podSource {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// Determined whether the specified pod is allowed to use host PID
+func allowHostPID(pod *v1.Pod) (bool, error) {
+	podSource, err := kubetypes.GetPodSource(pod)
+	if err != nil {
+		return false, err
+	}
+	for _, source := range capabilities.Get().PrivilegedSources.HostPIDSources {
+		if source == podSource {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// Determined whether the specified pod is allowed to use host ipc
+func allowHostIPC(pod *v1.Pod) (bool, error) {
+	podSource, err := kubetypes.GetPodSource(pod)
+	if err != nil {
+		return false, err
+	}
+	for _, source := range capabilities.Get().PrivilegedSources.HostIPCSources {
+		if source == podSource {
+			return true, nil
+		}
+	}
+	return false, nil
 }

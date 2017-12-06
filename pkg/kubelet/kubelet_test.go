@@ -286,6 +286,7 @@ func newTestKubeletWithImageList(
 	kubelet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
 	// Add this as cleanup predicate pod admitter
 	kubelet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kubelet.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub(), kubelet.containerManager.UpdatePluginResources))
+	kubelet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewCapabilityAdmitHandler())
 
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
