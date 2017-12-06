@@ -97,7 +97,7 @@ func (c *CachedNodeInfo) GetNodeInfo(id string) (*v1.Node, error) {
 	node, err := c.Get(id)
 
 	if apierrors.IsNotFound(err) {
-		return nil, fmt.Errorf("node '%v' not found", id)
+		return nil, err
 	}
 
 	if err != nil {
@@ -1133,6 +1133,10 @@ func (c *PodAffinityChecker) getMatchingAntiAffinityTerms(pod *v1.Pod, allPods [
 		if affinity != nil && affinity.PodAntiAffinity != nil {
 			existingPodNode, err := c.info.GetNodeInfo(existingPod.Spec.NodeName)
 			if err != nil {
+				if apierrors.IsNotFound(err) {
+					glog.Errorf("Node not found, %v", existingPod.Spec.NodeName)
+					continue
+				}
 				return nil, err
 			}
 			existingPodMatchingTerms, err := getMatchingAntiAffinityTermsOfExistingPod(pod, existingPod, existingPodNode)
