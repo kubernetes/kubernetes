@@ -571,30 +571,28 @@ func (oe *operationExecutor) IsOperationPending(volumeName v1.UniqueVolumeName, 
 func (oe *operationExecutor) AttachVolume(
 	volumeToAttach VolumeToAttach,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
-	attachFunc, plugin, err :=
+	generatedOperations, err :=
 		oe.operationGenerator.GenerateAttachVolumeFunc(volumeToAttach, actualStateOfWorld)
 	if err != nil {
 		return err
 	}
 
-	opCompleteFunc := util.OperationCompleteHook(plugin, "volume_attach")
 	return oe.pendingOperations.Run(
-		volumeToAttach.VolumeName, "" /* podName */, attachFunc, opCompleteFunc)
+		volumeToAttach.VolumeName, "" /* podName */, generatedOperations)
 }
 
 func (oe *operationExecutor) DetachVolume(
 	volumeToDetach AttachedVolume,
 	verifySafeToDetach bool,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
-	detachFunc, plugin, err :=
+	generatedOperations, err :=
 		oe.operationGenerator.GenerateDetachVolumeFunc(volumeToDetach, verifySafeToDetach, actualStateOfWorld)
 	if err != nil {
 		return err
 	}
 
-	opCompleteFunc := util.OperationCompleteHook(plugin, "volume_detach")
 	return oe.pendingOperations.Run(
-		volumeToDetach.VolumeName, "" /* podName */, detachFunc, opCompleteFunc)
+		volumeToDetach.VolumeName, "" /* podName */, generatedOperations)
 }
 
 func (oe *operationExecutor) VerifyVolumesAreAttached(
@@ -661,7 +659,7 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 	}
 
 	for pluginName, pluginNodeVolumes := range bulkVerifyPluginsByNode {
-		bulkVerifyVolumeFunc, err := oe.operationGenerator.GenerateBulkVolumeVerifyFunc(
+		generatedOperations, err := oe.operationGenerator.GenerateBulkVolumeVerifyFunc(
 			pluginNodeVolumes,
 			pluginName,
 			volumeSpecMapByPlugin[pluginName],
@@ -670,10 +668,9 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 			glog.Errorf("BulkVerifyVolumes.GenerateBulkVolumeVerifyFunc error bulk verifying volumes for plugin %q with  %v", pluginName, err)
 		}
 
-		opCompleteFunc := util.OperationCompleteHook(pluginName, "verify_volumes_are_attached")
 		// Ugly hack to ensure - we don't do parallel bulk polling of same volume plugin
 		uniquePluginName := v1.UniqueVolumeName(pluginName)
-		err = oe.pendingOperations.Run(uniquePluginName, "" /* Pod Name */, bulkVerifyVolumeFunc, opCompleteFunc)
+		err = oe.pendingOperations.Run(uniquePluginName, "" /* Pod Name */, generatedOperations)
 		if err != nil {
 			glog.Errorf("BulkVerifyVolumes.Run Error bulk volume verification for plugin %q  with %v", pluginName, err)
 		}
@@ -684,15 +681,14 @@ func (oe *operationExecutor) VerifyVolumesAreAttachedPerNode(
 	attachedVolumes []AttachedVolume,
 	nodeName types.NodeName,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
-	volumesAreAttachedFunc, err :=
+	generatedOperations, err :=
 		oe.operationGenerator.GenerateVolumesAreAttachedFunc(attachedVolumes, nodeName, actualStateOfWorld)
 	if err != nil {
 		return err
 	}
 
-	opCompleteFunc := util.OperationCompleteHook("<n/a>", "verify_volumes_are_attached_per_node")
 	// Give an empty UniqueVolumeName so that this operation could be executed concurrently.
-	return oe.pendingOperations.Run("" /* volumeName */, "" /* podName */, volumesAreAttachedFunc, opCompleteFunc)
+	return oe.pendingOperations.Run("" /* volumeName */, "" /* podName */, generatedOperations)
 }
 
 func (oe *operationExecutor) MountVolume(
@@ -700,7 +696,7 @@ func (oe *operationExecutor) MountVolume(
 	volumeToMount VolumeToMount,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
 	isRemount bool) error {
-	mountFunc, plugin, err := oe.operationGenerator.GenerateMountVolumeFunc(
+	generatedOperations, err := oe.operationGenerator.GenerateMountVolumeFunc(
 		waitForAttachTimeout, volumeToMount, actualStateOfWorld, isRemount)
 	if err != nil {
 		return err
@@ -715,16 +711,15 @@ func (oe *operationExecutor) MountVolume(
 	}
 
 	// TODO mount_device
-	opCompleteFunc := util.OperationCompleteHook(plugin, "volume_mount")
 	return oe.pendingOperations.Run(
-		volumeToMount.VolumeName, podName, mountFunc, opCompleteFunc)
+		volumeToMount.VolumeName, podName, generatedOperations)
 }
 
 func (oe *operationExecutor) UnmountVolume(
 	volumeToUnmount MountedVolume,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
 
-	unmountFunc, plugin, err :=
+	generatedOperations, err :=
 		oe.operationGenerator.GenerateUnmountVolumeFunc(volumeToUnmount, actualStateOfWorld)
 	if err != nil {
 		return err
@@ -734,42 +729,40 @@ func (oe *operationExecutor) UnmountVolume(
 	// same volume in parallel
 	podName := volumetypes.UniquePodName(volumeToUnmount.PodUID)
 
-	opCompleteFunc := util.OperationCompleteHook(plugin, "volume_unmount")
 	return oe.pendingOperations.Run(
-		volumeToUnmount.VolumeName, podName, unmountFunc, opCompleteFunc)
+		volumeToUnmount.VolumeName, podName, generatedOperations)
 }
 
 func (oe *operationExecutor) UnmountDevice(
 	deviceToDetach AttachedVolume,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
 	mounter mount.Interface) error {
-	unmountDeviceFunc, plugin, err :=
+	generatedOperations, err :=
 		oe.operationGenerator.GenerateUnmountDeviceFunc(deviceToDetach, actualStateOfWorld, mounter)
 	if err != nil {
 		return err
 	}
 
-	opCompleteFunc := util.OperationCompleteHook(plugin, "unmount_device")
 	return oe.pendingOperations.Run(
-		deviceToDetach.VolumeName, "" /* podName */, unmountDeviceFunc, opCompleteFunc)
+		deviceToDetach.VolumeName, "" /* podName */, generatedOperations)
 }
 
 func (oe *operationExecutor) ExpandVolume(pvcWithResizeRequest *expandcache.PVCWithResizeRequest, resizeMap expandcache.VolumeResizeMap) error {
-	expandFunc, pluginName, err := oe.operationGenerator.GenerateExpandVolumeFunc(pvcWithResizeRequest, resizeMap)
+	generatedOperations, err := oe.operationGenerator.GenerateExpandVolumeFunc(pvcWithResizeRequest, resizeMap)
 
 	if err != nil {
 		return err
 	}
 	uniqueVolumeKey := v1.UniqueVolumeName(pvcWithResizeRequest.UniquePVCKey())
-	opCompleteFunc := util.OperationCompleteHook(pluginName, "expand_volume")
-	return oe.pendingOperations.Run(uniqueVolumeKey, "", expandFunc, opCompleteFunc)
+
+	return oe.pendingOperations.Run(uniqueVolumeKey, "", generatedOperations)
 }
 
 func (oe *operationExecutor) MapVolume(
 	waitForAttachTimeout time.Duration,
 	volumeToMount VolumeToMount,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
-	mapFunc, plugin, err := oe.operationGenerator.GenerateMapVolumeFunc(
+	generatedOperations, err := oe.operationGenerator.GenerateMapVolumeFunc(
 		waitForAttachTimeout, volumeToMount, actualStateOfWorld)
 	if err != nil {
 		return err
@@ -785,15 +778,14 @@ func (oe *operationExecutor) MapVolume(
 		podName = volumehelper.GetUniquePodName(volumeToMount.Pod)
 	}
 
-	opCompleteFunc := util.OperationCompleteHook(plugin, "map_volume")
 	return oe.pendingOperations.Run(
-		volumeToMount.VolumeName, podName, mapFunc, opCompleteFunc)
+		volumeToMount.VolumeName, podName, generatedOperations)
 }
 
 func (oe *operationExecutor) UnmapVolume(
 	volumeToUnmount MountedVolume,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
-	unmapFunc, plugin, err :=
+	generatedOperations, err :=
 		oe.operationGenerator.GenerateUnmapVolumeFunc(volumeToUnmount, actualStateOfWorld)
 	if err != nil {
 		return err
@@ -803,16 +795,15 @@ func (oe *operationExecutor) UnmapVolume(
 	// same volume in parallel
 	podName := volumetypes.UniquePodName(volumeToUnmount.PodUID)
 
-	opCompleteFunc := util.OperationCompleteHook(plugin, "unmap_volume")
 	return oe.pendingOperations.Run(
-		volumeToUnmount.VolumeName, podName, unmapFunc, opCompleteFunc)
+		volumeToUnmount.VolumeName, podName, generatedOperations)
 }
 
 func (oe *operationExecutor) UnmapDevice(
 	deviceToDetach AttachedVolume,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
 	mounter mount.Interface) error {
-	unmapDeviceFunc, plugin, err :=
+	generatedOperations, err :=
 		oe.operationGenerator.GenerateUnmapDeviceFunc(deviceToDetach, actualStateOfWorld, mounter)
 	if err != nil {
 		return err
@@ -822,24 +813,22 @@ func (oe *operationExecutor) UnmapDevice(
 	// the same volume in parallel
 	podName := nestedpendingoperations.EmptyUniquePodName
 
-	opCompleteFunc := util.OperationCompleteHook(plugin, "unmap_device")
 	return oe.pendingOperations.Run(
-		deviceToDetach.VolumeName, podName, unmapDeviceFunc, opCompleteFunc)
+		deviceToDetach.VolumeName, podName, generatedOperations)
 }
 
 func (oe *operationExecutor) VerifyControllerAttachedVolume(
 	volumeToMount VolumeToMount,
 	nodeName types.NodeName,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
-	verifyControllerAttachedVolumeFunc, plugin, err :=
+	generatedOperations, err :=
 		oe.operationGenerator.GenerateVerifyControllerAttachedVolumeFunc(volumeToMount, nodeName, actualStateOfWorld)
 	if err != nil {
 		return err
 	}
 
-	opCompleteFunc := util.OperationCompleteHook(plugin, "verify_controller_attached_volume")
 	return oe.pendingOperations.Run(
-		volumeToMount.VolumeName, "" /* podName */, verifyControllerAttachedVolumeFunc, opCompleteFunc)
+		volumeToMount.VolumeName, "" /* podName */, generatedOperations)
 }
 
 // VolumeStateHandler defines a set of operations for handling mount/unmount/detach/reconstruct volume-related operations
