@@ -31,17 +31,13 @@ import (
 
 // MutatingWebhookConfigurationManager collects the mutating webhook objects so that they can be called.
 type MutatingWebhookConfigurationManager struct {
-	ready         int32
 	configuration *atomic.Value
-	hasSynced     func() bool
 	lister        admissionregistrationlisters.MutatingWebhookConfigurationLister
 }
 
 func NewMutatingWebhookConfigurationManager(informer admissionregistrationinformers.MutatingWebhookConfigurationInformer) *MutatingWebhookConfigurationManager {
 	manager := &MutatingWebhookConfigurationManager{
-		ready:         0,
 		configuration: &atomic.Value{},
-		hasSynced:     informer.Informer().HasSynced,
 		lister:        informer.Lister(),
 	}
 
@@ -59,16 +55,8 @@ func NewMutatingWebhookConfigurationManager(informer admissionregistrationinform
 }
 
 // Webhooks returns the merged MutatingWebhookConfiguration.
-func (m *MutatingWebhookConfigurationManager) Webhooks() (*v1beta1.MutatingWebhookConfiguration, error) {
-	if atomic.LoadInt32(&m.ready) == 0 {
-		if !m.hasSynced() {
-			// Return an error until we've synced
-			return nil, fmt.Errorf("mutating webhook configuration is not ready")
-		}
-		// Remember we're ready
-		atomic.StoreInt32(&m.ready, 1)
-	}
-	return m.configuration.Load().(*v1beta1.MutatingWebhookConfiguration), nil
+func (m *MutatingWebhookConfigurationManager) Webhooks() *v1beta1.MutatingWebhookConfiguration {
+	return m.configuration.Load().(*v1beta1.MutatingWebhookConfiguration)
 }
 
 func (m *MutatingWebhookConfigurationManager) updateConfiguration() {

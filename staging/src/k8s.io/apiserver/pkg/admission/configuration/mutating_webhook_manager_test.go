@@ -43,7 +43,6 @@ func (f *fakeMutatingWebhookConfigSharedInformer) Lister() admissionregistration
 
 type fakeMutatingWebhookConfigInformer struct {
 	eventHandler cache.ResourceEventHandler
-	hasSynced    bool
 }
 
 func (f *fakeMutatingWebhookConfigInformer) AddEventHandler(handler cache.ResourceEventHandler) {
@@ -63,7 +62,7 @@ func (f *fakeMutatingWebhookConfigInformer) Run(stopCh <-chan struct{}) {
 	panic("unsupported")
 }
 func (f *fakeMutatingWebhookConfigInformer) HasSynced() bool {
-	return f.hasSynced
+	panic("unsupported")
 }
 func (f *fakeMutatingWebhookConfigInformer) LastSyncResourceVersion() string {
 	panic("unsupported")
@@ -92,43 +91,33 @@ func TestGetMutatingWebhookConfig(t *testing.T) {
 		lister:   &fakeMutatingWebhookConfigLister{},
 	}
 
-	// unsynced, error retrieving list
-	informer.informer.hasSynced = false
+	// no configurations
 	informer.lister.list = nil
-	informer.lister.err = fmt.Errorf("mutating webhook configuration is not ready")
 	manager := NewMutatingWebhookConfigurationManager(informer)
-	if _, err := manager.Webhooks(); err == nil {
-		t.Errorf("expected err, but got none")
+	if configurations := manager.Webhooks(); len(configurations.Webhooks) != 0 {
+		t.Errorf("expected empty webhooks, but got %v", configurations.Webhooks)
 	}
 
-	// list found, still unsynced
-	informer.informer.hasSynced = false
-	informer.lister.list = []*v1beta1.MutatingWebhookConfiguration{}
-	informer.lister.err = nil
-	if _, err := manager.Webhooks(); err == nil {
-		t.Errorf("expected err, but got none")
-	}
-
-	// items populated, still unsynced
-	webhookContainer := &v1beta1.MutatingWebhookConfiguration{
+	// list err
+	webhookConfiguration := &v1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "webhook1"},
 		Webhooks:   []v1beta1.Webhook{{Name: "webhook1.1"}},
 	}
-	informer.informer.hasSynced = false
-	informer.lister.list = []*v1beta1.MutatingWebhookConfiguration{webhookContainer.DeepCopy()}
-	informer.lister.err = nil
-	informer.informer.eventHandler.OnAdd(webhookContainer.DeepCopy())
-	if _, err := manager.Webhooks(); err == nil {
-		t.Errorf("expected err, but got none")
+	informer.lister.list = []*v1beta1.MutatingWebhookConfiguration{webhookConfiguration.DeepCopy()}
+	informer.lister.err = fmt.Errorf("mutating webhook configuration list error")
+	informer.informer.eventHandler.OnAdd(webhookConfiguration.DeepCopy())
+	if configurations := manager.Webhooks(); len(configurations.Webhooks) != 0 {
+		t.Errorf("expected empty webhooks, but got %v", configurations.Webhooks)
 	}
 
-	// sync completed
-	informer.informer.hasSynced = true
-	hooks, err := manager.Webhooks()
-	if err != nil {
-		t.Errorf("unexpected err: %v", err)
+	// configuration populated
+	informer.lister.err = nil
+	informer.informer.eventHandler.OnAdd(webhookConfiguration.DeepCopy())
+	configurations := manager.Webhooks()
+	if len(configurations.Webhooks) == 0 {
+		t.Errorf("expected non empty webhooks")
 	}
-	if !reflect.DeepEqual(hooks.Webhooks, webhookContainer.Webhooks) {
-		t.Errorf("Expected\n%#v\ngot\n%#v", webhookContainer.Webhooks, hooks.Webhooks)
+	if !reflect.DeepEqual(configurations.Webhooks, webhookConfiguration.Webhooks) {
+		t.Errorf("Expected\n%#v\ngot\n%#v", webhookConfiguration.Webhooks, configurations.Webhooks)
 	}
 }

@@ -30,7 +30,6 @@ import (
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/api/admissionregistration/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -67,7 +66,7 @@ func Register(plugins *admission.Plugins) {
 
 // WebhookSource can list dynamic webhook plugins.
 type WebhookSource interface {
-	Webhooks() (*v1beta1.ValidatingWebhookConfiguration, error)
+	Webhooks() *v1beta1.ValidatingWebhookConfiguration
 }
 
 // NewValidatingAdmissionWebhook returns a generic admission webhook plugin.
@@ -145,8 +144,11 @@ func (a *ValidatingAdmissionWebhook) SetExternalKubeClientSet(client clientset.I
 func (a *ValidatingAdmissionWebhook) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().V1().Namespaces()
 	a.namespaceMatcher.NamespaceLister = namespaceInformer.Lister()
-	a.SetReadyFunc(namespaceInformer.Informer().HasSynced)
-	a.hookSource = configuration.NewValidatingWebhookConfigurationManager(f.Admissionregistration().V1beta1().ValidatingWebhookConfigurations())
+	validatingWebhookConfigurationsInformer := f.Admissionregistration().V1beta1().ValidatingWebhookConfigurations()
+	a.hookSource = configuration.NewValidatingWebhookConfigurationManager(validatingWebhookConfigurationsInformer)
+	a.SetReadyFunc(func() bool {
+		return namespaceInformer.Informer().HasSynced() && validatingWebhookConfigurationsInformer.Informer().HasSynced()
+	})
 }
 
 // ValidateInitialization implements the InitializationValidator interface.
@@ -166,27 +168,16 @@ func (a *ValidatingAdmissionWebhook) ValidateInitialization() error {
 	return nil
 }
 
-func (a *ValidatingAdmissionWebhook) loadConfiguration(attr admission.Attributes) (*v1beta1.ValidatingWebhookConfiguration, error) {
-	hookConfig, err := a.hookSource.Webhooks()
-	if err != nil {
-		e := apierrors.NewServerTimeout(attr.GetResource().GroupResource(), string(attr.GetOperation()), 1)
-		e.ErrStatus.Message = fmt.Sprintf("Unable to refresh the Webhook configuration: %v", err)
-		e.ErrStatus.Reason = "LoadingConfiguration"
-		e.ErrStatus.Details.Causes = append(e.ErrStatus.Details.Causes, metav1.StatusCause{
-			Type:    "ValidatingWebhookConfigurationFailure",
-			Message: "An error has occurred while refreshing the ValidatingWebhook configuration, no resources can be created/updated/deleted/connected until a refresh succeeds.",
-		})
-		return nil, e
-	}
-	return hookConfig, nil
+func (a *ValidatingAdmissionWebhook) loadConfiguration(attr admission.Attributes) *v1beta1.ValidatingWebhookConfiguration {
+	return a.hookSource.Webhooks()
 }
 
 // Validate makes an admission decision based on the request attributes.
 func (a *ValidatingAdmissionWebhook) Validate(attr admission.Attributes) error {
-	hookConfig, err := a.loadConfiguration(attr)
-	if err != nil {
-		return err
+	if !a.WaitForReady() {
+		return admission.NewForbidden(attr, fmt.Errorf("not yet ready to handle request"))
 	}
+	hookConfig := a.loadConfiguration(attr)
 	hooks := hookConfig.Webhooks
 	ctx := context.TODO()
 

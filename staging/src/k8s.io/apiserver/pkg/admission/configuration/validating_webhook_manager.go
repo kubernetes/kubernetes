@@ -31,17 +31,13 @@ import (
 
 // ValidatingWebhookConfigurationManager collects the validating webhook objects so that they can be called.
 type ValidatingWebhookConfigurationManager struct {
-	ready         int32
 	configuration *atomic.Value
-	hasSynced     func() bool
 	lister        admissionregistrationlisters.ValidatingWebhookConfigurationLister
 }
 
 func NewValidatingWebhookConfigurationManager(informer admissionregistrationinformers.ValidatingWebhookConfigurationInformer) *ValidatingWebhookConfigurationManager {
 	manager := &ValidatingWebhookConfigurationManager{
-		ready:         0,
 		configuration: &atomic.Value{},
-		hasSynced:     informer.Informer().HasSynced,
 		lister:        informer.Lister(),
 	}
 
@@ -59,16 +55,8 @@ func NewValidatingWebhookConfigurationManager(informer admissionregistrationinfo
 }
 
 // Webhooks returns the merged ValidatingWebhookConfiguration.
-func (v *ValidatingWebhookConfigurationManager) Webhooks() (*v1beta1.ValidatingWebhookConfiguration, error) {
-	if atomic.LoadInt32(&v.ready) == 0 {
-		if !v.hasSynced() {
-			// Return an error until we've synced
-			return nil, fmt.Errorf("validating webhook configuration is not ready")
-		}
-		// Remember we're ready
-		atomic.StoreInt32(&v.ready, 1)
-	}
-	return v.configuration.Load().(*v1beta1.ValidatingWebhookConfiguration), nil
+func (v *ValidatingWebhookConfigurationManager) Webhooks() *v1beta1.ValidatingWebhookConfiguration {
+	return v.configuration.Load().(*v1beta1.ValidatingWebhookConfiguration)
 }
 
 func (v *ValidatingWebhookConfigurationManager) updateConfiguration() {
