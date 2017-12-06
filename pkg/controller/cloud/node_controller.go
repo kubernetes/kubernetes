@@ -337,12 +337,11 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 		// Since there are node taints, do we still need this?
 		// This condition marks the node as unusable until routes are initialized in the cloud provider
 		if cnc.cloud.ProviderName() == "gce" {
-			curNode.Status.Conditions = append(node.Status.Conditions, v1.NodeCondition{
-				Type:               v1.NodeNetworkUnavailable,
-				Status:             v1.ConditionTrue,
-				Reason:             "NoRouteCreated",
-				Message:            "Node created without a route",
-				LastTransitionTime: metav1.Now(),
+			now := metav1.Now()
+			curNode.Spec.Taints = append(node.Spec.Taints, v1.Taint{
+				Key:       algorithm.TaintNodeNetworkUnavailable,
+				Effect:    v1.TaintEffectNoExecute,
+				TimeAdded: &now,
 			})
 		}
 

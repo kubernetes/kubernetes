@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 const (
@@ -188,6 +189,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 						glog.Error(msg)
 
 					} else {
+						rc.updateNetworkingTaint(node)
 						glog.Infof("Created route for node %s %s with hint %s after %v", nodeName, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
 						return
 					}
@@ -199,7 +201,10 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 			if condition == nil || condition.Status != v1.ConditionFalse {
 				rc.updateNetworkingCondition(types.NodeName(node.Name), true)
 			}
+
+			rc.updateNetworkingTaint(node)
 		}
+
 		nodeCIDRs[nodeName] = node.Spec.PodCIDR
 	}
 	for _, route := range routes {
@@ -223,6 +228,16 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 	}
 	wg.Wait()
 	return nil
+}
+
+// remove network unavailable taint (e.g might be added by cloud/node_controller)
+func (rc *RouteController) updateNetworkingTaint(node *v1.Node) {
+	taintToRemove := &v1.Taint{
+		Key:    algorithm.TaintNodeNetworkUnavailable,
+		Effect: v1.TaintEffectNoExecute,
+	}
+	controller.RemoveTaintOffNode(rc.kubeClient, node.Name, node, taintToRemove)
+
 }
 
 func (rc *RouteController) updateNetworkingCondition(nodeName types.NodeName, routeCreated bool) error {
