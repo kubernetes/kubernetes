@@ -17,6 +17,7 @@ limitations under the License.
 package openstack
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"path"
@@ -26,6 +27,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	k8s_volume "k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
 	"github.com/gophercloud/gophercloud"
 	volumeexpand "github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
@@ -317,8 +319,33 @@ func (os *OpenStack) AttachDisk(instanceID, volumeID string) (string, error) {
 		if instanceID == volume.AttachedServerId {
 			glog.V(4).Infof("Disk %s is already attached to instance %s", volumeID, instanceID)
 			return volume.ID, nil
+		} else {
+			nodeName, err := os.GetNodeNameByID(volume.AttachedServerId)
+			attachErr := fmt.Sprintf("disk %s path %s is attached to a different instance (%s)", volumeID, volume.AttachedDevice, volume.AttachedServerId)
+			if err != nil {
+				glog.Error(attachErr)
+				return "", errors.New(attachErr)
+			}
+			// using volume.AttachedDevice may cause problems because cinder does not report device path correctly see issue #33128
+			devicePath := volume.AttachedDevice
+			danglingErr := volumeutil.NewDanglingError(attachErr, nodeName, devicePath)
+			glog.V(4).Infof("volume %s is already attached to node %s path %s", volumeID, nodeName, devicePath)
+			// check special case, if node is deleted from cluster but exist still in openstack
+			// we need to check can we detach the cinder, node is deleted from cluster if state is not ACTIVE
+			srv, err := getServerByName(cClient, nodeName, false)
+			if err != nil {
+				return "", err
+			}
+			if srv.Status != "ACTIVE" {
+				err = os.DetachDisk(volume.AttachedServerId, volumeID)
+				if err != nil {
+					glog.Error(err)
+					return "", err
+				}
+				glog.V(4).Infof("detached volume %s node state was %s", volumeID, srv.Status)
+			}
+			return "", danglingErr
 		}
-		return "", fmt.Errorf("disk %s is attached to a different instance (%s)", volumeID, volume.AttachedServerId)
 	}
 
 	startTime := time.Now()
