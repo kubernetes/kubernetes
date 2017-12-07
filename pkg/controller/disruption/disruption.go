@@ -128,22 +128,9 @@ func NewDisruptionController(
 
 	dc.getUpdater = func() updater { return dc.writePdbStatus }
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    dc.addPod,
-		UpdateFunc: dc.updatePod,
-		DeleteFunc: dc.deletePod,
-	})
 	dc.podLister = podInformer.Lister()
 	dc.podListerSynced = podInformer.Informer().HasSynced
 
-	pdbInformer.Informer().AddEventHandlerWithResyncPeriod(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    dc.addDb,
-			UpdateFunc: dc.updateDb,
-			DeleteFunc: dc.removeDb,
-		},
-		30*time.Second,
-	)
 	dc.pdbLister = pdbInformer.Lister()
 	dc.pdbListerSynced = pdbInformer.Informer().HasSynced
 
@@ -158,6 +145,21 @@ func NewDisruptionController(
 
 	dc.ssLister = ssInformer.Lister()
 	dc.ssListerSynced = ssInformer.Informer().HasSynced
+
+	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    dc.addPod,
+		UpdateFunc: dc.updatePod,
+		DeleteFunc: dc.deletePod,
+	})
+
+	pdbInformer.Informer().AddEventHandlerWithResyncPeriod(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    dc.addDb,
+			UpdateFunc: dc.updateDb,
+			DeleteFunc: dc.removeDb,
+		},
+		30*time.Second,
+	)
 
 	return dc
 }
