@@ -549,8 +549,6 @@ type EmptyDirVolumeSource struct {
 type StorageMedium string
 
 const (
-	StorageMediumDefault   StorageMedium = ""          // use whatever the default is for the node
-	StorageMediumMemory    StorageMedium = "Memory"    // use memory (tmpfs)
 	StorageMediumHugePages StorageMedium = "HugePages" // use hugepages
 )
 
@@ -2095,11 +2093,6 @@ const (
 	PodReady PodConditionType = "Ready"
 	// PodInitialized means that all init containers in the pod have started successfully.
 	PodInitialized PodConditionType = "Initialized"
-	// PodReasonUnschedulable reason in PodScheduled PodCondition means that the scheduler
-	// can't schedule the pod right now, for example due to insufficient resources in the cluster.
-	PodReasonUnschedulable = "Unschedulable"
-	// ContainersReady indicates whether all containers in the pod are ready.
-	ContainersReady PodConditionType = "ContainersReady"
 )
 
 type PodCondition struct {
@@ -3570,16 +3563,6 @@ type ContainerImage struct {
 
 type NodePhase string
 
-// These are the valid phases of node.
-const (
-	// NodePending means the node has been created/added by the system, but not configured.
-	NodePending NodePhase = "Pending"
-	// NodeRunning means the node has been configured and has Kubernetes components running.
-	NodeRunning NodePhase = "Running"
-	// NodeTerminated means the node has been removed from the cluster.
-	NodeTerminated NodePhase = "Terminated"
-)
-
 type NodeConditionType string
 
 // These are valid conditions of node. Currently, we don't have enough information to decide
@@ -3588,15 +3571,6 @@ type NodeConditionType string
 const (
 	// NodeReady means kubelet is healthy and ready to accept pods.
 	NodeReady NodeConditionType = "Ready"
-	// NodeOutOfDisk means the kubelet will not accept new pods due to insufficient free disk
-	// space on the node.
-	NodeOutOfDisk NodeConditionType = "OutOfDisk"
-	// NodeMemoryPressure means the kubelet is under pressure due to insufficient available memory.
-	NodeMemoryPressure NodeConditionType = "MemoryPressure"
-	// NodeDiskPressure means the kubelet is under pressure due to insufficient available disk.
-	NodeDiskPressure NodeConditionType = "DiskPressure"
-	// NodeNetworkUnavailable means that network for the node is not correctly configured.
-	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
 )
 
 type NodeCondition struct {
@@ -3660,8 +3634,6 @@ const (
 	ResourceDefaultNamespacePrefix = "kubernetes.io/"
 	// Name prefix for huge page resources (alpha).
 	ResourceHugePagesPrefix = "hugepages-"
-	// Name prefix for storage resource limits
-	ResourceAttachableVolumesPrefix = "attachable-volumes-"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.
@@ -4055,12 +4027,6 @@ type EventSeries struct {
 
 type EventSeriesState string
 
-const (
-	EventSeriesStateOngoing  EventSeriesState = "Ongoing"
-	EventSeriesStateFinished EventSeriesState = "Finished"
-	EventSeriesStateUnknown  EventSeriesState = "Unknown"
-)
-
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // EventList is a list of events.
@@ -4338,12 +4304,6 @@ const (
 	ServiceAccountUIDKey = "kubernetes.io/service-account.uid"
 	// ServiceAccountTokenKey is the key of the required data for SecretTypeServiceAccountToken secrets
 	ServiceAccountTokenKey = "token"
-	// ServiceAccountKubeconfigKey is the key of the optional kubeconfig data for SecretTypeServiceAccountToken secrets
-	ServiceAccountKubeconfigKey = "kubernetes.kubeconfig"
-	// ServiceAccountRootCAKey is the key of the optional root certificate authority for SecretTypeServiceAccountToken secrets
-	ServiceAccountRootCAKey = "ca.crt"
-	// ServiceAccountNamespaceKey is the key of the optional namespace to use as the default for namespaced API calls
-	ServiceAccountNamespaceKey = "namespace"
 
 	// SecretTypeDockercfg contains a dockercfg file that follows the same format rules as ~/.dockercfg
 	//
