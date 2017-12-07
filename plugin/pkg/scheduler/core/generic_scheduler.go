@@ -88,16 +88,17 @@ func (f *FitError) Error() string {
 }
 
 type genericScheduler struct {
-	cache                 schedulercache.Cache
-	equivalenceCache      *EquivalenceCache
-	schedulingQueue       SchedulingQueue
-	predicates            map[string]algorithm.FitPredicate
-	priorityMetaProducer  algorithm.MetadataProducer
-	predicateMetaProducer algorithm.PredicateMetadataProducer
-	prioritizers          []algorithm.PriorityConfig
-	extenders             []algorithm.SchedulerExtender
-	lastNodeIndexLock     sync.Mutex
-	lastNodeIndex         uint64
+	cache                           schedulercache.Cache
+	equivalenceCache                *EquivalenceCache
+	schedulingQueue                 SchedulingQueue
+	predicates                      map[string]algorithm.FitPredicate
+	priorityMetaProducer            algorithm.MetadataProducer
+	predicateMetaProducer           algorithm.PredicateMetadataProducer
+	prioritizers                    []algorithm.PriorityConfig
+	extenders                       []algorithm.SchedulerExtender
+	lastNodeIndexLock               sync.Mutex
+	lastNodeIndex                   uint64
+	enablePodFitsOnNodeOptimization bool
 
 	cachedNodeInfoMap map[string]*schedulercache.NodeInfo
 	volumeBinder      *volumebinder.VolumeBinder
@@ -125,7 +126,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 	}
 
 	trace.Step("Computing predicates")
-	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, g.cachedNodeInfoMap, nodes, g.predicates, g.extenders, g.predicateMetaProducer, g.equivalenceCache, g.schedulingQueue)
+	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, g.cachedNodeInfoMap, nodes, g.predicates, g.extenders, g.predicateMetaProducer, g.equivalenceCache, g.schedulingQueue, g.enablePodFitsOnNodeOptimization)
 	if err != nil {
 		return "", err
 	}
@@ -284,6 +285,7 @@ func findNodesThatFit(
 	metadataProducer algorithm.PredicateMetadataProducer,
 	ecache *EquivalenceCache,
 	schedulingQueue SchedulingQueue,
+	enablePodFitsOnNodeOptimization bool,
 ) ([]*v1.Node, FailedPredicateMap, error) {
 	var filtered []*v1.Node
 	failedPredicateMap := FailedPredicateMap{}
@@ -302,7 +304,7 @@ func findNodesThatFit(
 		meta := metadataProducer(pod, nodeNameToInfo)
 		checkNode := func(i int) {
 			nodeName := nodes[i].Name
-			fits, failedPredicates, err := podFitsOnNode(pod, meta, nodeNameToInfo[nodeName], predicateFuncs, ecache, schedulingQueue)
+			fits, failedPredicates, err := podFitsOnNode(pod, meta, nodeNameToInfo[nodeName], predicateFuncs, ecache, schedulingQueue, enablePodFitsOnNodeOptimization)
 			if err != nil {
 				predicateResultLock.Lock()
 				errs[err.Error()]++
@@ -317,6 +319,7 @@ func findNodesThatFit(
 				predicateResultLock.Unlock()
 			}
 		}
+
 		workqueue.Parallelize(16, len(nodes), checkNode)
 		filtered = filtered[:filteredLen]
 		if len(errs) > 0 {
@@ -391,24 +394,19 @@ func podFitsOnNode(
 	predicateFuncs map[string]algorithm.FitPredicate,
 	ecache *EquivalenceCache,
 	queue SchedulingQueue,
+	enablePodFitsOnNodeOptimization bool,
 ) (bool, []algorithm.PredicateFailureReason, error) {
 	var (
 		equivalenceHash  uint64
 		failedPredicates []algorithm.PredicateFailureReason
-
-		eCacheAvailable bool
-		invalid         bool
-		fit             bool
-		reasons         []algorithm.PredicateFailureReason
-		err             error
+		eCacheAvailable  bool
+		invalid          bool
+		fit              bool
+		reasons          []algorithm.PredicateFailureReason
+		err              error
 	)
 	predicateResults := make(map[string]HostPredicate)
-	failedPredicatesChannel := make(chan []algorithm.PredicateFailureReason, len(predicateFuncs))
-	errorsChannel := make(chan error, len(predicateFuncs))
-	defer func() {
-		close(failedPredicatesChannel)
-		close(errorsChannel)
-	}()
+
 	if ecache != nil {
 		// getHashEquivalencePod will return immediately if no equivalence pod found
 		equivalenceHash, eCacheAvailable = ecache.getHashEquivalencePod(pod)
@@ -444,42 +442,39 @@ func podFitsOnNode(
 		// TODO(bsalamat): consider using eCache and adding proper eCache invalidations
 		// when pods are nominated or their nominations change.
 		eCacheAvailable = eCacheAvailable && !podsAdded
-		var wg sync.WaitGroup
 		for predicateKey, predicate := range predicateFuncs {
-			wg.Add(1)
-			go func(predicateKey string, predicate algorithm.FitPredicate) {
-				if eCacheAvailable {
-					// PredicateWithECache will return its cached predicate results.
-					fit, reasons, invalid = ecache.PredicateWithECache(pod.GetName(), info.Node().GetName(), predicateKey, equivalenceHash)
-				}
+			if eCacheAvailable {
+				// PredicateWithECache will return its cached predicate results.
+				fit, reasons, invalid = ecache.PredicateWithECache(pod.GetName(), info.Node().GetName(), predicateKey, equivalenceHash)
+			}
 
-				// TODO(bsalamat): When one predicate fails and fit is false, why do we continue
-				// checking other predicates?
-				if !eCacheAvailable || invalid {
-					// we need to execute predicate functions since equivalence cache does not work
-					fit, reasons, err = predicate(pod, metaToUse, nodeInfoToUse)
-					if err != nil {
-						errorsChannel <- err
-					}
-					if eCacheAvailable {
-						// Store data to update eCache after this loop.
-						if res, exists := predicateResults[predicateKey]; exists {
-							res.Fit = res.Fit && fit
-							res.FailReasons = append(res.FailReasons, reasons...)
-							predicateResults[predicateKey] = res
-						} else {
-							predicateResults[predicateKey] = HostPredicate{Fit: fit, FailReasons: reasons}
-						}
+			// TODO(bsalamat): When one predicate fails and fit is false, why do we continue
+			// checking other predicates?
+			if !eCacheAvailable || invalid {
+				// we need to execute predicate functions since equivalence cache does not work
+				fit, reasons, err = predicate(pod, metaToUse, nodeInfoToUse)
+				if err != nil {
+					return false, []algorithm.PredicateFailureReason{}, err
+				}
+				if eCacheAvailable {
+					// Store data to update eCache after this loop.
+					if res, exists := predicateResults[predicateKey]; exists {
+						res.Fit = res.Fit && fit
+						res.FailReasons = append(res.FailReasons, reasons...)
+						predicateResults[predicateKey] = res
+					} else {
+						predicateResults[predicateKey] = HostPredicate{Fit: fit, FailReasons: reasons}
 					}
 				}
-				if !fit {
-					// eCache is available and valid, and predicates result is unfit, record the fail reasons
-					failedPredicatesChannel <- reasons
+			}
+			if !fit {
+				// eCache is available and valid, and predicates result is unfit, record the fail reasons
+				failedPredicates = append(failedPredicates, reasons...)
+				if enablePodFitsOnNodeOptimization {
+					break
 				}
-				wg.Done()
-			}(predicateKey, predicate)
+			}
 		}
-		wg.Wait()
 	}
 
 	// TODO(bsalamat): This way of updating equiv. cache has a race condition against
@@ -494,23 +489,6 @@ func podFitsOnNode(
 			ecache.UpdateCachedPredicateItem(pod.GetName(), nodeName, predKey, result.Fit, result.FailReasons, equivalenceHash)
 		}
 	}
-
-	if len(errorsChannel) != 0 {
-		length := len(errorsChannel)
-		errs := make([]string, length)
-		for i := 0; length > i; i++ {
-			errs[i] = fmt.Sprintf("%s", <-errorsChannel)
-		}
-		return false, []algorithm.PredicateFailureReason{}, fmt.Errorf("%s", strings.Join(errs, ";"))
-	}
-
-	if len(failedPredicatesChannel) != 0 {
-		length := len(failedPredicatesChannel)
-		for ; length > 0; length-- {
-			failedPredicates = append(failedPredicates, (<-failedPredicatesChannel)...)
-		}
-	}
-
 	return len(failedPredicates) == 0, failedPredicates, nil
 }
 
@@ -932,7 +910,7 @@ func selectVictimsOnNode(
 	// that we should check is if the "pod" is failing to schedule due to pod affinity
 	// failure.
 	// TODO(bsalamat): Consider checking affinity to lower priority pods if feasible with reasonable performance.
-	if fits, _, err := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil, queue); !fits {
+	if fits, _, err := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil, queue, false); !fits {
 		if err != nil {
 			glog.Warningf("Encountered error while selecting victims on node %v: %v", nodeInfo.Node().Name, err)
 		}
@@ -946,7 +924,7 @@ func selectVictimsOnNode(
 	violatingVictims, nonViolatingVictims := filterPodsWithPDBViolation(potentialVictims.Items, pdbs)
 	reprievePod := func(p *v1.Pod) bool {
 		addPod(p)
-		fits, _, _ := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil, queue)
+		fits, _, _ := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil, queue, false)
 		if !fits {
 			removePod(p)
 			victims = append(victims, p)
@@ -1033,17 +1011,19 @@ func NewGenericScheduler(
 	prioritizers []algorithm.PriorityConfig,
 	priorityMetaProducer algorithm.MetadataProducer,
 	extenders []algorithm.SchedulerExtender,
-	volumeBinder *volumebinder.VolumeBinder) algorithm.ScheduleAlgorithm {
+	volumeBinder *volumebinder.VolumeBinder,
+	enablePodFitsOnNodeOptimization bool) algorithm.ScheduleAlgorithm {
 	return &genericScheduler{
-		cache:                 cache,
-		equivalenceCache:      eCache,
-		schedulingQueue:       podQueue,
-		predicates:            predicates,
-		predicateMetaProducer: predicateMetaProducer,
-		prioritizers:          prioritizers,
-		priorityMetaProducer:  priorityMetaProducer,
-		extenders:             extenders,
-		cachedNodeInfoMap:     make(map[string]*schedulercache.NodeInfo),
-		volumeBinder:          volumeBinder,
+		cache:                           cache,
+		equivalenceCache:                eCache,
+		schedulingQueue:                 podQueue,
+		predicates:                      predicates,
+		predicateMetaProducer:           predicateMetaProducer,
+		prioritizers:                    prioritizers,
+		priorityMetaProducer:            priorityMetaProducer,
+		extenders:                       extenders,
+		cachedNodeInfoMap:               make(map[string]*schedulercache.NodeInfo),
+		volumeBinder:                    volumeBinder,
+		enablePodFitsOnNodeOptimization: enablePodFitsOnNodeOptimization,
 	}
 }

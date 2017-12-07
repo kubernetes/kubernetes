@@ -130,6 +130,9 @@ type configFactory struct {
 
 	// Handles volume binding decisions
 	volumeBinder *volumebinder.VolumeBinder
+
+	// Enable short circuit all predicates if one predicate fails
+	enablePodFitsOnNodeOptimization bool
 }
 
 // NewConfigFactory initializes the default implementation of a Configurator To encourage eventual privatization of the struct type, we only
@@ -148,7 +151,8 @@ func NewConfigFactory(
 	pdbInformer policyinformers.PodDisruptionBudgetInformer,
 	storageClassInformer storageinformers.StorageClassInformer,
 	hardPodAffinitySymmetricWeight int32,
-	enableEquivalenceClassCache bool,
+	enableEquivalenceClassCache,
+	enablePodFitsOnNodeOptimization bool,
 ) scheduler.Configurator {
 	stopEverything := make(chan struct{})
 	schedulerCache := schedulercache.New(30*time.Second, stopEverything)
@@ -160,22 +164,23 @@ func NewConfigFactory(
 	}
 
 	c := &configFactory{
-		client:                         client,
-		podLister:                      schedulerCache,
-		podQueue:                       core.NewSchedulingQueue(),
-		pVLister:                       pvInformer.Lister(),
-		pVCLister:                      pvcInformer.Lister(),
-		serviceLister:                  serviceInformer.Lister(),
-		controllerLister:               replicationControllerInformer.Lister(),
-		replicaSetLister:               replicaSetInformer.Lister(),
-		statefulSetLister:              statefulSetInformer.Lister(),
-		pdbLister:                      pdbInformer.Lister(),
-		storageClassLister:             storageClassLister,
-		schedulerCache:                 schedulerCache,
-		StopEverything:                 stopEverything,
-		schedulerName:                  schedulerName,
-		hardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,
-		enableEquivalenceClassCache:    enableEquivalenceClassCache,
+		client:                          client,
+		podLister:                       schedulerCache,
+		podQueue:                        core.NewSchedulingQueue(),
+		pVLister:                        pvInformer.Lister(),
+		pVCLister:                       pvcInformer.Lister(),
+		serviceLister:                   serviceInformer.Lister(),
+		controllerLister:                replicationControllerInformer.Lister(),
+		replicaSetLister:                replicaSetInformer.Lister(),
+		statefulSetLister:               statefulSetInformer.Lister(),
+		pdbLister:                       pdbInformer.Lister(),
+		storageClassLister:              storageClassLister,
+		schedulerCache:                  schedulerCache,
+		StopEverything:                  stopEverything,
+		schedulerName:                   schedulerName,
+		hardPodAffinitySymmetricWeight:  hardPodAffinitySymmetricWeight,
+		enableEquivalenceClassCache:     enableEquivalenceClassCache,
+		enablePodFitsOnNodeOptimization: enablePodFitsOnNodeOptimization,
 	}
 
 	c.scheduledPodsHasSynced = podInformer.Informer().HasSynced
@@ -933,7 +938,7 @@ func (f *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		glog.Info("Created equivalence class cache")
 	}
 
-	algo := core.NewGenericScheduler(f.schedulerCache, f.equivalencePodCache, f.podQueue, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders, f.volumeBinder)
+	algo := core.NewGenericScheduler(f.schedulerCache, f.equivalencePodCache, f.podQueue, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders, f.volumeBinder, f.enablePodFitsOnNodeOptimization)
 
 	podBackoff := util.CreateDefaultPodBackoff()
 	return &scheduler.Config{

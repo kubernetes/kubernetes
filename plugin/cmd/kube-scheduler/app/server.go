@@ -118,6 +118,7 @@ func AddFlags(options *Options, fs *pflag.FlagSet) {
 	fs.BoolVar(&options.useLegacyPolicyConfig, "use-legacy-policy-config", false, "When set to true, scheduler will ignore policy ConfigMap and uses policy config file")
 	fs.BoolVar(&options.config.EnableProfiling, "profiling", options.config.EnableProfiling, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.BoolVar(&options.config.EnableContentionProfiling, "contention-profiling", options.config.EnableContentionProfiling, "Enable lock contention profiling, if profiling is enabled")
+	fs.BoolVar(&options.config.EnablePodFitsOnNodeOptimization, "pod-fits-on-node-optimization", options.config.EnablePodFitsOnNodeOptimization, "Enable short circuit all predicates if one predicate fails")
 	fs.StringVar(&options.master, "master", options.master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&options.config.ClientConnection.KubeConfigFile, "kubeconfig", options.config.ClientConnection.KubeConfigFile, "Path to kubeconfig file with authorization and master location information.")
 	fs.StringVar(&options.config.ClientConnection.ContentType, "kube-api-content-type", options.config.ClientConnection.ContentType, "Content type of requests sent to apiserver.")
@@ -353,15 +354,16 @@ through the API as necessary.`,
 // SchedulerServer represents all the parameters required to start the
 // Kubernetes scheduler server.
 type SchedulerServer struct {
-	SchedulerName                  string
-	Client                         clientset.Interface
-	InformerFactory                informers.SharedInformerFactory
-	PodInformer                    coreinformers.PodInformer
-	AlgorithmSource                componentconfig.SchedulerAlgorithmSource
-	HardPodAffinitySymmetricWeight int32
-	EventClient                    v1core.EventsGetter
-	Recorder                       record.EventRecorder
-	Broadcaster                    record.EventBroadcaster
+	SchedulerName                   string
+	Client                          clientset.Interface
+	InformerFactory                 informers.SharedInformerFactory
+	PodInformer                     coreinformers.PodInformer
+	AlgorithmSource                 componentconfig.SchedulerAlgorithmSource
+	HardPodAffinitySymmetricWeight  int32
+	EventClient                     v1core.EventsGetter
+	Recorder                        record.EventRecorder
+	Broadcaster                     record.EventBroadcaster
+	EnablePodFitsOnNodeOptimization bool
 	// LeaderElection is optional.
 	LeaderElection *leaderelection.LeaderElectionConfig
 	// HealthzServer is optional.
@@ -417,18 +419,19 @@ func NewSchedulerServer(config *componentconfig.KubeSchedulerConfiguration, mast
 	}
 
 	return &SchedulerServer{
-		SchedulerName:                  config.SchedulerName,
-		Client:                         client,
-		InformerFactory:                informers.NewSharedInformerFactory(client, 0),
-		PodInformer:                    factory.NewPodInformer(client, 0, config.SchedulerName),
-		AlgorithmSource:                config.AlgorithmSource,
-		HardPodAffinitySymmetricWeight: config.HardPodAffinitySymmetricWeight,
-		EventClient:                    eventClient,
-		Recorder:                       recorder,
-		Broadcaster:                    eventBroadcaster,
-		LeaderElection:                 leaderElectionConfig,
-		HealthzServer:                  healthzServer,
-		MetricsServer:                  metricsServer,
+		SchedulerName:                   config.SchedulerName,
+		Client:                          client,
+		InformerFactory:                 informers.NewSharedInformerFactory(client, 0),
+		PodInformer:                     factory.NewPodInformer(client, 0, config.SchedulerName),
+		AlgorithmSource:                 config.AlgorithmSource,
+		HardPodAffinitySymmetricWeight:  config.HardPodAffinitySymmetricWeight,
+		EnablePodFitsOnNodeOptimization: config.EnablePodFitsOnNodeOptimization,
+		EventClient:                     eventClient,
+		Recorder:                        recorder,
+		Broadcaster:                     eventBroadcaster,
+		LeaderElection:                  leaderElectionConfig,
+		HealthzServer:                   healthzServer,
+		MetricsServer:                   metricsServer,
 	}, nil
 }
 
@@ -647,6 +650,7 @@ func (s *SchedulerServer) SchedulerConfig() (*scheduler.Config, error) {
 		storageClassInformer,
 		s.HardPodAffinitySymmetricWeight,
 		utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
+		s.EnablePodFitsOnNodeOptimization,
 	)
 
 	source := s.AlgorithmSource
