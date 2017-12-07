@@ -17,6 +17,7 @@ limitations under the License.
 package benchmark
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -27,28 +28,19 @@ import (
 	"github.com/golang/glog"
 )
 
-// BenchmarkScheduling100Nodes0Pods benchmarks the scheduling rate
-// when the cluster has 100 nodes and 0 scheduled pods
-func BenchmarkScheduling100Nodes0Pods(b *testing.B) {
-	benchmarkScheduling(100, 0, b)
-}
-
-// BenchmarkScheduling100Nodes1000Pods benchmarks the scheduling rate
-// when the cluster has 100 nodes and 1000 scheduled pods
-func BenchmarkScheduling100Nodes1000Pods(b *testing.B) {
-	benchmarkScheduling(100, 1000, b)
-}
-
-// BenchmarkScheduling1000Nodes0Pods benchmarks the scheduling rate
-// when the cluster has 1000 nodes and 0 scheduled pods
-func BenchmarkScheduling1000Nodes0Pods(b *testing.B) {
-	benchmarkScheduling(1000, 0, b)
-}
-
-// BenchmarkScheduling1000Nodes1000Pods benchmarks the scheduling rate
-// when the cluster has 1000 nodes and 1000 scheduled pods
-func BenchmarkScheduling1000Nodes1000Pods(b *testing.B) {
-	benchmarkScheduling(1000, 1000, b)
+// BenchmarkScheduling benchmarks the scheduling rate when the cluster has
+// various quantities of nodes and scheduled pods.
+func BenchmarkScheduling(b *testing.B) {
+	tests := []struct{ nodes, pods int }{
+		{nodes: 100, pods: 0},
+		{nodes: 100, pods: 1000},
+		{nodes: 1000, pods: 0},
+		{nodes: 1000, pods: 1000},
+	}
+	for _, test := range tests {
+		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.pods)
+		b.Run(name, func(b *testing.B) { benchmarkScheduling(test.nodes, test.pods, b) })
+	}
 }
 
 // benchmarkScheduling benchmarks scheduling rate with specific number of nodes
