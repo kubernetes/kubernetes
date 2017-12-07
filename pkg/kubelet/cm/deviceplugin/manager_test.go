@@ -19,6 +19,8 @@ package deviceplugin
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"reflect"
 	"sync/atomic"
 	"testing"
@@ -260,7 +262,12 @@ func TestCheckpoint(t *testing.T) {
 	resourceName1 := "domain1.com/resource1"
 	resourceName2 := "domain2.com/resource2"
 
+	as := assert.New(t)
+	tmpDir, err := ioutil.TempDir("", "checkpoint")
+	as.Nil(err)
+	defer os.RemoveAll(tmpDir)
 	testManager := &ManagerImpl{
+		socketdir:        tmpDir,
 		allDevices:       make(map[string]sets.String),
 		allocatedDevices: make(map[string]sets.String),
 		podDevices:       make(podDevices),
@@ -298,8 +305,7 @@ func TestCheckpoint(t *testing.T) {
 	expectedAllocatedDevices := testManager.podDevices.devices()
 	expectedAllDevices := testManager.allDevices
 
-	err := testManager.writeCheckpoint()
-	as := assert.New(t)
+	err = testManager.writeCheckpoint()
 
 	as.Nil(err)
 	testManager.podDevices = make(podDevices)
@@ -385,7 +391,11 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 	nodeInfo := &schedulercache.NodeInfo{}
 	nodeInfo.SetNode(cachedNode)
 
+	tmpDir, err := ioutil.TempDir("", "checkpoint")
+	as.Nil(err)
+	defer os.RemoveAll(tmpDir)
 	testManager := &ManagerImpl{
+		socketdir:        tmpDir,
 		callback:         monitorCallback,
 		allDevices:       make(map[string]sets.String),
 		allocatedDevices: make(map[string]sets.String),
@@ -485,7 +495,7 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 	}
 
 	podsStub.updateActivePods([]*v1.Pod{pod})
-	err := testManager.Allocate(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: pod})
+	err = testManager.Allocate(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: pod})
 	as.Nil(err)
 	runContainerOpts := testManager.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
 	as.NotNil(runContainerOpts)
