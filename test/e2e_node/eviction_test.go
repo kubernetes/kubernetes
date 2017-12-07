@@ -225,6 +225,10 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 					EmptyDir: &v1.EmptyDirVolumeSource{SizeLimit: &sizeLimit},
 				}, v1.ResourceRequirements{}),
 			},
+			{
+				evictionPriority: 0, // This pod should not be evicted because it uses less than its limit
+				pod:              diskConsumingPod("container-disk-below-sizelimit", useUnderLimit, nil, v1.ResourceRequirements{Limits: containerLimit}),
+			},
 		})
 	})
 })
@@ -306,7 +310,8 @@ var _ = framework.KubeDescribe("PriorityLocalStorageEvictionOrdering [Slow] [Ser
 			},
 			{
 				evictionPriority: 0,
-				pod: diskConsumingPod("guaranteed-disk", 299 /* Mb */, nil, v1.ResourceRequirements{
+				// Only require 99% accuracy (297/300 Mb) because on some OS distributions, the file itself (excluding contents), consumes disk space.
+				pod: diskConsumingPod("guaranteed-disk", 297 /* Mb */, nil, v1.ResourceRequirements{
 					Requests: v1.ResourceList{
 						v1.ResourceEphemeralStorage: resource.MustParse("300Mi"),
 					},
