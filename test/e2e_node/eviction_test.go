@@ -227,7 +227,7 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 			},
 			{
 				evictionPriority: 0, // This pod should not be evicted because it uses less than its limit
-				pod:              diskConsumingPod("emptydir-disk-below-sizelimit", useUnderLimit, nil, v1.ResourceRequirements{Limits: containerLimit}),
+				pod:              diskConsumingPod("container-disk-below-sizelimit", useUnderLimit, nil, v1.ResourceRequirements{Limits: containerLimit}),
 			},
 		})
 	})
