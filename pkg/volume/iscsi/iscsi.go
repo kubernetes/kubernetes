@@ -213,12 +213,29 @@ func (plugin *iscsiPlugin) newUnmounterInternal(volName string, podUID types.UID
 }
 
 func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	mounter := plugin.host.GetMounter(plugin.GetPluginName())
+	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
+	sourceName, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
+	if err != nil {
+		return nil, err
+	}
+	str := strings.Split(sourceName, "-lun-")
+	index := strings.Index(str[0], "-")
+	if len(str) != 2 || index == -1 {
+		return nil, fmt.Errorf("sourceName %s wrong, should be portal+\"-\"+iqn+\"-lun-\"+lun", sourceName)
+	}
+	lun, err := strconv.ParseInt(str[1], 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("parse sourceName %s error: %v", sourceName, err)
+	}
+
 	iscsiVolume := &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
 			ISCSI: &v1.ISCSIVolumeSource{
-				TargetPortal: volumeName,
-				IQN:          volumeName,
+				TargetPortal: str[0][:index],
+				IQN:          str[0][index+1:],
+				Lun:          int32(lun),
 			},
 		},
 	}
