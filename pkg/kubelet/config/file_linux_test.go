@@ -20,11 +20,13 @@ package config
 
 import (
 	"fmt"
+	"golang.org/x/exp/inotify"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -112,7 +114,7 @@ func TestReadPodsFromFileExistLater(t *testing.T) {
 }
 
 func TestReadPodsFromFileChanged(t *testing.T) {
-	watchFileChanged(false, t)
+	watchFileChanged(false, t, "test_read_pods_from_file_changed")
 }
 
 func TestReadPodsFromFileInDirAdded(t *testing.T) {
@@ -120,7 +122,7 @@ func TestReadPodsFromFileInDirAdded(t *testing.T) {
 }
 
 func TestReadPodsFromFileInDirChanged(t *testing.T) {
-	watchFileChanged(true, t)
+	watchFileChanged(true, t, "test_read_pods_from_file_in_dir_changed")
 }
 
 func TestExtractFromBadDataFile(t *testing.T) {
@@ -288,11 +290,18 @@ func watchFileAdded(watchDir bool, t *testing.T) {
 	}
 }
 
-func watchFileChanged(watchDir bool, t *testing.T) {
+func watchFileChanged(watchDir bool, t *testing.T, fileNamePre string) {
 	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
-	fileNamePre := "test_pod_manifest"
+	printFileInfos := func(finfos []os.FileInfo) string {
+		items := []string{}
+		for _, f := range finfos {
+			items = append(items, fmt.Sprintf("%s-%d-%v", f.Name(), f.Size(), f.ModTime()))
+		}
+		return strings.Join(items, " ")
+	}
+
 	for index, testCase := range testCases {
 		func() {
 			dirName, err := utiltesting.MkTmpdir("dir-test")
@@ -304,7 +313,7 @@ func watchFileChanged(watchDir bool, t *testing.T) {
 
 			var file string
 			lock := &sync.Mutex{}
-			ch := make(chan interface{})
+			ch := make(chan interface{}, 3)
 			func() {
 				lock.Lock()
 				defer lock.Unlock()
@@ -320,6 +329,16 @@ func watchFileChanged(watchDir bool, t *testing.T) {
 			} else {
 				NewSourceFile(file, hostname, 100*time.Millisecond, ch)
 			}
+
+			{
+				// DEBUG
+				fs, err := ioutil.ReadDir(dirName)
+				if err != nil {
+					t.Logf("[DEBUG]: unable to read dir %s", dirName)
+				} else {
+					t.Logf("[DEBUG]: files in %q: %+v", dirName, printFileInfos(fs))
+				}
+			}
 			// expect an update by SourceFile.resetStoreFromPath()
 			expectUpdate(t, ch, testCase)
 
@@ -329,14 +348,23 @@ func watchFileChanged(watchDir bool, t *testing.T) {
 				defer lock.Unlock()
 
 				pod := testCase.pod.(*v1.Pod)
-				pod.Spec.Containers[0].Name = "image2"
+				pod.Spec.Containers[0].Name = "image23456"
 
-				testCase.expected.Pods[0].Spec.Containers[0].Name = "image2"
+				testCase.expected.Pods[0].Spec.Containers[0].Name = "image23456"
 				testCase.writeToFile(dirName, fileName, t)
 			}
 
-			go changeFile()
+			changeFile()
 			// expect an update by MODIFY inotify event
+			{
+				// DEBUG
+				fs, err := ioutil.ReadDir(dirName)
+				if err != nil {
+					t.Logf("[DEBUG, after change]: unable to read dir %s", dirName)
+				} else {
+					t.Logf("[DEBUG, after change]: files in %q: %+v", dirName, printFileInfos(fs))
+				}
+			}
 			expectUpdate(t, ch, testCase)
 
 			if watchDir {
@@ -365,7 +393,7 @@ func deleteFile(dir, file string, ch chan interface{}, t *testing.T) {
 }
 
 func expectUpdate(t *testing.T, ch chan interface{}, testCase *testCase) {
-	timer := time.After(5 * time.Second)
+	timer := time.After(wait.ForeverTestTimeout)
 	for {
 		select {
 		case got := <-ch:
@@ -428,4 +456,75 @@ func changeFileName(dir, from, to string, t *testing.T) {
 	if err := exec.Command("mv", fromPath, toPath).Run(); err != nil {
 		t.Errorf("Fail to change file name: %s", err)
 	}
+}
+
+func formatEvent(e *inotify.Event) string {
+	var eventType string
+	switch {
+	case (e.Mask & inotify.IN_ISDIR) > 0:
+		eventType = "Directory"
+	case (e.Mask & inotify.IN_CREATE) > 0:
+		eventType = "FileCreateion"
+	case (e.Mask & inotify.IN_MOVED_TO) > 0:
+		eventType = "FileMovedTo"
+	case (e.Mask & inotify.IN_MODIFY) > 0:
+		eventType = "FileModified"
+	case (e.Mask & inotify.IN_DELETE) > 0:
+		eventType = "FileDeleted"
+	case (e.Mask & inotify.IN_MOVED_FROM) > 0:
+		eventType = "FileMovedFrom"
+	case (e.Mask & inotify.IN_DELETE_SELF) > 0:
+		eventType = "FileDeletedSelf"
+	default:
+		eventType = fmt.Sprintf("Irrelevant(%d)", e.Mask)
+	}
+	return fmt.Sprintf("%s: %s", eventType, e.Name)
+}
+
+func waitForEvent(w *inotify.Watcher, timeout time.Duration) (string, error) {
+	timeoutCh := time.After(timeout)
+	select {
+	case event := <-w.Event:
+		return formatEvent(event), nil
+	case err := <-w.Error:
+		return "", fmt.Errorf("error from the watcher: %v", err)
+	case <-timeoutCh:
+		return "", fmt.Errorf("timed out")
+	}
+}
+
+func TestInotifyWatchFile(t *testing.T) {
+	// Create directory and write file in it.
+	fileName := "file-under-test"
+	dirName, err := utiltesting.MkTmpdir("dir-test-inotify")
+	if err != nil {
+		t.Fatalf("unable to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(dirName)
+	testCases := getTestCases("random-hostname")
+	testCase := testCases[0]
+	fPath := testCase.writeToFile(dirName, fileName, t)
+
+	// Start a inotify watcher.
+	w, err := inotify.NewWatcher()
+	if err != nil {
+		t.Fatalf("unable to create inotify: %v", err)
+	}
+	defer w.Close()
+	err = w.AddWatch(fPath, inotify.IN_DELETE_SELF|inotify.IN_CREATE|inotify.IN_MOVED_TO|inotify.IN_MODIFY|inotify.IN_MOVED_FROM|inotify.IN_DELETE)
+	if err != nil {
+		t.Fatalf("unable to create inotify for path %q: %v", fPath, err)
+	}
+
+	// Make change to the file.
+	pod := testCase.pod.(*v1.Pod)
+	pod.Spec.Containers[0].Name = "image23456"
+	testCase.writeToFile(dirName, fileName, t)
+
+	// Expect to receive an event from the watcher.
+	event, err := waitForEvent(w, time.Second*5)
+	if err != nil {
+		t.Fatalf("Error waiting for an event: %v", err)
+	}
+	t.Logf("Got event %s", event)
 }

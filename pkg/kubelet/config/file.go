@@ -49,7 +49,7 @@ func NewSourceFile(path string, nodeName types.NodeName, period time.Duration, u
 	path = strings.TrimRight(path, string(os.PathSeparator))
 
 	config := new(path, nodeName, period, updates)
-	glog.V(1).Infof("Watching path %q", path)
+	glog.Errorf("[DEBUG] Watching path %q with period %v", path, period)
 	go wait.Forever(config.run, period)
 }
 
@@ -84,13 +84,14 @@ func (s *sourceFile) applyDefaults(pod *api.Pod, source string) error {
 func (s *sourceFile) resetStoreFromPath() error {
 	path := s.path
 	statInfo, err := os.Stat(path)
+	glog.Errorf("[DEBUG] statInfo: o.Stat(%s) returns %v", s.path, err)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
 		// Emit an update with an empty PodList to allow FileSource to be marked as seen
 		s.updates <- kubetypes.PodUpdate{Pods: []*v1.Pod{}, Op: kubetypes.SET, Source: kubetypes.FileSource}
-		return fmt.Errorf("path does not exist, ignoring")
+		return fmt.Errorf("resetStoreFromPath(): path does not exist, ignoring")
 	}
 
 	switch {
