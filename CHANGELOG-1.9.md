@@ -1,39 +1,118 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-- [v1.9.0-beta.1](#v190-beta1)
-  - [Downloads for v1.9.0-beta.1](#downloads-for-v190-beta1)
+- [v1.9.0-beta.2](#v190-beta2)
+  - [Downloads for v1.9.0-beta.2](#downloads-for-v190-beta2)
     - [Client Binaries](#client-binaries)
     - [Server Binaries](#server-binaries)
     - [Node Binaries](#node-binaries)
-  - [Changelog since v1.9.0-alpha.3](#changelog-since-v190-alpha3)
-    - [Action Required](#action-required)
+  - [Changelog since v1.9.0-beta.1](#changelog-since-v190-beta1)
     - [Other notable changes](#other-notable-changes)
-- [v1.9.0-alpha.3](#v190-alpha3)
-  - [Downloads for v1.9.0-alpha.3](#downloads-for-v190-alpha3)
+- [v1.9.0-beta.1](#v190-beta1)
+  - [Downloads for v1.9.0-beta.1](#downloads-for-v190-beta1)
     - [Client Binaries](#client-binaries-1)
     - [Server Binaries](#server-binaries-1)
     - [Node Binaries](#node-binaries-1)
-  - [Changelog since v1.9.0-alpha.2](#changelog-since-v190-alpha2)
-    - [Action Required](#action-required-1)
+  - [Changelog since v1.9.0-alpha.3](#changelog-since-v190-alpha3)
+    - [Action Required](#action-required)
     - [Other notable changes](#other-notable-changes-1)
-- [v1.9.0-alpha.2](#v190-alpha2)
-  - [Downloads for v1.9.0-alpha.2](#downloads-for-v190-alpha2)
+- [v1.9.0-alpha.3](#v190-alpha3)
+  - [Downloads for v1.9.0-alpha.3](#downloads-for-v190-alpha3)
     - [Client Binaries](#client-binaries-2)
     - [Server Binaries](#server-binaries-2)
     - [Node Binaries](#node-binaries-2)
-  - [Changelog since v1.8.0](#changelog-since-v180)
-    - [Action Required](#action-required-2)
+  - [Changelog since v1.9.0-alpha.2](#changelog-since-v190-alpha2)
+    - [Action Required](#action-required-1)
     - [Other notable changes](#other-notable-changes-2)
-- [v1.9.0-alpha.1](#v190-alpha1)
-  - [Downloads for v1.9.0-alpha.1](#downloads-for-v190-alpha1)
+- [v1.9.0-alpha.2](#v190-alpha2)
+  - [Downloads for v1.9.0-alpha.2](#downloads-for-v190-alpha2)
     - [Client Binaries](#client-binaries-3)
     - [Server Binaries](#server-binaries-3)
     - [Node Binaries](#node-binaries-3)
+  - [Changelog since v1.8.0](#changelog-since-v180)
+    - [Action Required](#action-required-2)
+    - [Other notable changes](#other-notable-changes-3)
+- [v1.9.0-alpha.1](#v190-alpha1)
+  - [Downloads for v1.9.0-alpha.1](#downloads-for-v190-alpha1)
+    - [Client Binaries](#client-binaries-4)
+    - [Server Binaries](#server-binaries-4)
+    - [Node Binaries](#node-binaries-4)
   - [Changelog since v1.8.0-alpha.3](#changelog-since-v180-alpha3)
     - [Action Required](#action-required-3)
-    - [Other notable changes](#other-notable-changes-3)
+    - [Other notable changes](#other-notable-changes-4)
 <!-- END MUNGE: GENERATED_TOC -->
 
 <!-- NEW RELEASE NOTES ENTRY -->
+
+
+# v1.9.0-beta.2
+
+[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.9/examples)
+
+## Downloads for v1.9.0-beta.2
+
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes.tar.gz) | `e5c88addf6aca01635f283021a72e05be99daf3e87fd3cda92477d0ed63c2d11`
+[kubernetes-src.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-src.tar.gz) | `2419a0ef3681460b64eefc083d07377786b308f6cc62d0618a5c74dfb4729b03`
+
+### Client Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-client-darwin-386.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-client-darwin-386.tar.gz) | `68d971576c3e9a16fb736f06c07ce53b8371fc67c2f37fb60e9f3a366cd37a80`
+[kubernetes-client-darwin-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-client-darwin-amd64.tar.gz) | `36251b7b6043adb79706ac115181aa7ecf365ced9198a4c192f1fbc2817d030c`
+[kubernetes-client-linux-386.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-client-linux-386.tar.gz) | `585a3dd6a3440988bce3f83ea14fb9a0a18011bc62e28959301861faa06d6da9`
+[kubernetes-client-linux-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-client-linux-amd64.tar.gz) | `169769d6030d8c1d9d9bc01408b62ea3275d4632a7de85392fc95a48feeba522`
+[kubernetes-client-linux-arm64.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-client-linux-arm64.tar.gz) | `7841c2af49be9ae04cda305165b172021c0e72d809c2271d05061330c220256b`
+[kubernetes-client-linux-arm.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-client-linux-arm.tar.gz) | `9ab32843cec68b036de83f54a68c2273a913be5180dc20b5cf1e084b314a9a2d`
+[kubernetes-client-linux-ppc64le.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-client-linux-ppc64le.tar.gz) | `5a2bb39b78ef381382f9b8aac17d5dbcbef08a80ad3518ff2cf6c65bd7a6d07d`
+[kubernetes-client-linux-s390x.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-client-linux-s390x.tar.gz) | `ddf4b3780f5879b9fb9115353cc26234cfc3a6db63a3cd39122340189a4bf0ca`
+[kubernetes-client-windows-386.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-client-windows-386.tar.gz) | `5960a0a50c92a788e90eca9d85a1d12ff1d41264816b55b3a1a28ffd3f6acf93`
+[kubernetes-client-windows-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-client-windows-amd64.tar.gz) | `d85778ace9bf25f5d3626aef3a9419a2c4aaa3847d5e0c2bf34d4dd8ae6b5205`
+
+### Server Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-server-linux-amd64.tar.gz) | `43e16b3d79c2805d712fd61ed6fd110d9db09a60d39584ef78c24821eb32b77a`
+[kubernetes-server-linux-arm64.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-server-linux-arm64.tar.gz) | `8580e454e6c467a30687ff5c85248919b3c0d2d0114e28cb3bf64d2e8998ff00`
+[kubernetes-server-linux-arm.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-server-linux-arm.tar.gz) | `d2e767be85ebf7c6c537c8e796e8fe0ce8a3f2ca526984490646acd30bf5e6fc`
+[kubernetes-server-linux-ppc64le.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-server-linux-ppc64le.tar.gz) | `81dd9072e805c181b4db2dfd00fe2bdb43c00da9e07b50285bce703bfd0d75ba`
+[kubernetes-server-linux-s390x.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-server-linux-s390x.tar.gz) | `f432c816c755d05e62cb5d5e8ac08dcb60d0df6d5121e1adaf42a32de65d6174`
+
+### Node Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-node-linux-amd64.tar.gz) | `2bf2268735ca4ecbdca1a692b25329d6d9d4805963cbe0cfcbb92fc725c42481`
+[kubernetes-node-linux-arm64.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-node-linux-arm64.tar.gz) | `3bb4a695fd2e4fca1c77283c1ad6c2914d12b33d9c5f64ac9c630a42d5e30ab2`
+[kubernetes-node-linux-arm.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-node-linux-arm.tar.gz) | `331c1efadf99dcb634c8da301349e3be63d27a5c5f06cc124b59fcc8b8a91cb0`
+[kubernetes-node-linux-ppc64le.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-node-linux-ppc64le.tar.gz) | `ab036fdb64ed4702d7dbbadddf77af90de35f73aa13854bb5accf82acc95c7e6`
+[kubernetes-node-linux-s390x.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-node-linux-s390x.tar.gz) | `8257af566f98325549de320d2167c1f56fd137b6225c70f6c1e34507ba124a1f`
+[kubernetes-node-windows-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release-dashpole/release/v1.9.0-beta.2/kubernetes-node-windows-amd64.tar.gz) | `4146fcb5bb6bf3e04641b27e4aa8501649178716fa16bd9bcb7f1fe3449db7f2`
+
+## Changelog since v1.9.0-beta.1
+
+### Other notable changes
+
+* Add pvc as part of equivalence hash ([#56577](https://github.com/kubernetes/kubernetes/pull/56577), [@resouer](https://github.com/resouer))
+* Fix port number and default Stackdriver Metadata Agent in daemon set configuration. ([#56576](https://github.com/kubernetes/kubernetes/pull/56576), [@kawych](https://github.com/kawych))
+* Declare ipvs proxier beta ([#56623](https://github.com/kubernetes/kubernetes/pull/56623), [@m1093782566](https://github.com/m1093782566))
+* Enable admissionregistration.k8s.io/v1beta1 by default in kube-apiserver. ([#56687](https://github.com/kubernetes/kubernetes/pull/56687), [@sttts](https://github.com/sttts))
+* Support autoprobing floating-network-id for openstack cloud provider ([#52013](https://github.com/kubernetes/kubernetes/pull/52013), [@FengyunPan](https://github.com/FengyunPan))
+* Audit webhook batching parameters are now configurable via command-line flags in the apiserver. ([#56638](https://github.com/kubernetes/kubernetes/pull/56638), [@crassirostris](https://github.com/crassirostris))
+* Update kubectl to the stable version ([#54345](https://github.com/kubernetes/kubernetes/pull/54345), [@zouyee](https://github.com/zouyee))
+* [scheduler] Fix issue new pod with affinity stuck at `creating` because node had been deleted but its pod still exists. ([#53647](https://github.com/kubernetes/kubernetes/pull/53647), [@wenlxie](https://github.com/wenlxie))
+* Updated Dashboard add-on to version 1.8.0: The Dashboard add-on now deploys with https enabled. The Dashboard can be accessed via kubectl proxy at http://localhost:8001/api/v1/namespaces/kube-system/services/https:kubernetes-dashboard:/proxy/. The /ui redirect is deprecated and will be removed in 1.10. ([#53046](https://github.com/kubernetes/kubernetes/pull/53046), [@maciaszczykm](https://github.com/maciaszczykm))
+* AWS: Detect EBS volumes mounted via NVME and mount them ([#56607](https://github.com/kubernetes/kubernetes/pull/56607), [@justinsb](https://github.com/justinsb))
+* fix CreateVolume func: use search mode instead ([#54687](https://github.com/kubernetes/kubernetes/pull/54687), [@andyzhangx](https://github.com/andyzhangx))
+* kubelet: fix bug where `runAsUser: MustRunAsNonRoot` strategy didn't reject a pod with a non-numeric `USER`. ([#56503](https://github.com/kubernetes/kubernetes/pull/56503), [@php-coder](https://github.com/php-coder))
+* kube-proxy addon tolerates all NoExecute and NoSchedule taints by default. ([#56589](https://github.com/kubernetes/kubernetes/pull/56589), [@mindprince](https://github.com/mindprince))
+* Do not do file system resize on read-only mounts ([#56587](https://github.com/kubernetes/kubernetes/pull/56587), [@gnufied](https://github.com/gnufied))
+* Mark v1beta1 NetworkPolicy types as deprecated ([#56425](https://github.com/kubernetes/kubernetes/pull/56425), [@cmluciano](https://github.com/cmluciano))
+* Fix problem with /bin/bash ending up linked to dash  ([#55018](https://github.com/kubernetes/kubernetes/pull/55018), [@dims](https://github.com/dims))
+* Modifying etcd recovery steps for the case of failed upgrade ([#56500](https://github.com/kubernetes/kubernetes/pull/56500), [@sbezverk](https://github.com/sbezverk))
+
 
 
 # v1.9.0-beta.1
