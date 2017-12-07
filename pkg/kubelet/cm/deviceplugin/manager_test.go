@@ -19,6 +19,7 @@ package deviceplugin
 import (
 	"flag"
 	"fmt"
+	"os"
 	"reflect"
 	"sync/atomic"
 	"testing"
@@ -299,6 +300,7 @@ func TestCheckpoint(t *testing.T) {
 	expectedAllDevices := testManager.allDevices
 
 	err := testManager.writeCheckpoint()
+	defer os.Remove(testManager.checkpointFile())
 	as := assert.New(t)
 
 	as.Nil(err)
