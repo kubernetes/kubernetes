@@ -110,21 +110,11 @@ kubernetes.tar.gz
 # generated files in any directory
 # TODO(thockin): uncomment this when we stop committing the generated files.
 #zz_generated.*
-zz_generated.openapi.go
-zz_generated_*_test.go
-
-# TODO(roycaihw): remove this when we stop committing the generated definition
-!staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi/zz_generated.openapi.go
-# low-change blueprint in code-generator to notice changes
-!staging/src/k8s.io/code-generator/_examples/apiserver/openapi/zz_generated.openapi.go
-# low-change sample-apiserver spec to be compilable when published
-!staging/src/k8s.io/sample-apiserver/pkg/generated/openapi/zz_generated.openapi.go
 
 # make-related metadata
 /.make/
 
 # Just in time generated data in the source, should never be committed
-/test/e2e/generated/bindata.go
 
 # This file used by some vendor repos (e.g. github.com/go-openapi/...) to store secret variables and should not be ignored
 !\.drone\.sec
