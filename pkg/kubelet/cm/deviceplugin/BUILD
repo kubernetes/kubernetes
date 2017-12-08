@@ -52,11 +52,13 @@ go_test(
     srcs = [
         "endpoint_test.go",
         "manager_test.go",
+        "pod_devices_test.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/cm/deviceplugin",
     library = ":go_default_library",
     deps = [
         "//pkg/kubelet/apis/deviceplugin/v1alpha:go_default_library",
+        "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
