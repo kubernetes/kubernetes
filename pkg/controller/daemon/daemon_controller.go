@@ -182,6 +182,16 @@ func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInfo
 	dsc.historyLister = historyInformer.Lister()
 	dsc.historyStoreSynced = historyInformer.Informer().HasSynced
 
+	dsc.podLister = podInformer.Lister()
+	dsc.podStoreSynced = podInformer.Informer().HasSynced
+
+	dsc.nodeStoreSynced = nodeInformer.Informer().HasSynced
+	dsc.nodeLister = nodeInformer.Lister()
+
+	dsc.syncHandler = dsc.syncDaemonSet
+	dsc.enqueueDaemonSet = dsc.enqueue
+	dsc.enqueueDaemonSetRateLimited = dsc.enqueueRateLimited
+
 	// Watch for creation/deletion of pods. The reason we watch is that we don't want a daemon set to create/delete
 	// more pods until all the effects (expectations) of a daemon set's create/delete have been observed.
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -189,20 +199,12 @@ func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInfo
 		UpdateFunc: dsc.updatePod,
 		DeleteFunc: dsc.deletePod,
 	})
-	dsc.podLister = podInformer.Lister()
-	dsc.podStoreSynced = podInformer.Informer().HasSynced
 
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    dsc.addNode,
 		UpdateFunc: dsc.updateNode,
-	},
-	)
-	dsc.nodeStoreSynced = nodeInformer.Informer().HasSynced
-	dsc.nodeLister = nodeInformer.Lister()
+	})
 
-	dsc.syncHandler = dsc.syncDaemonSet
-	dsc.enqueueDaemonSet = dsc.enqueue
-	dsc.enqueueDaemonSetRateLimited = dsc.enqueueRateLimited
 	return dsc, nil
 }
 
