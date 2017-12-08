@@ -56,6 +56,7 @@ func (e discoveryCategoryExpander) Expand(category string) ([]schema.GroupResour
 	}
 
 	discoveredExpansions := map[string][]schema.GroupResource{}
+	foundCategories := false
 
 	for _, apiResourceList := range apiResourceLists {
 		gv, err := schema.ParseGroupVersion(apiResourceList.GroupVersion)
@@ -65,18 +66,24 @@ func (e discoveryCategoryExpander) Expand(category string) ([]schema.GroupResour
 
 		for _, apiResource := range apiResourceList.APIResources {
 			if categories := apiResource.Categories; len(categories) > 0 {
-				for _, category := range categories {
+				// Indicate whether we need to fallback
+				foundCategories = true
+				for _, cg := range categories {
+					// No need to append other categories
+					if cg != category {
+						continue
+					}
 					groupResource := schema.GroupResource{
 						Group:    gv.Group,
 						Resource: apiResource.Name,
 					}
-					discoveredExpansions[category] = append(discoveredExpansions[category], groupResource)
+					discoveredExpansions[cg] = append(discoveredExpansions[cg], groupResource)
 				}
 			}
 		}
 	}
 
-	if len(discoveredExpansions) == 0 {
+	if len(discoveredExpansions) == 0 && !foundCategories {
 		// We don't know if the server really don't have any resource with categories,
 		// or we're on a cluster version prior to categories support. Anyways, fallback.
 		return e.fallbackExpander.Expand(category)
