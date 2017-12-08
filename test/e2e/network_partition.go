@@ -117,6 +117,9 @@ var _ = framework.KubeDescribe("[sig-apps] Network Partition [Disruptive] [Slow]
 		systemPods, err := framework.GetPodsInNamespace(c, ns, ignoreLabels)
 		Expect(err).NotTo(HaveOccurred())
 		systemPodsNo = int32(len(systemPods))
+
+		// TODO(foxish): Re-enable testing on gce after kubernetes#56787 is fixed.
+		framework.SkipUnlessProviderIs("gke", "aws")
 		if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
 			framework.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
 		} else {
@@ -127,7 +130,6 @@ var _ = framework.KubeDescribe("[sig-apps] Network Partition [Disruptive] [Slow]
 	framework.KubeDescribe("Pods", func() {
 		Context("should return to running and ready state after network partition is healed", func() {
 			BeforeEach(func() {
-				framework.SkipUnlessProviderIs("gce", "gke", "aws")
 				framework.SkipUnlessNodeCountIsAtLeast(2)
 			})
 
@@ -348,7 +350,8 @@ var _ = framework.KubeDescribe("[sig-apps] Network Partition [Disruptive] [Slow]
 		headlessSvcName := "test"
 
 		BeforeEach(func() {
-			framework.SkipUnlessProviderIs("gce", "gke")
+			// TODO(foxish): Re-enable testing on gce after kubernetes#56787 is fixed.
+			framework.SkipUnlessProviderIs("gke")
 			By("creating service " + headlessSvcName + " in namespace " + f.Namespace.Name)
 			headlessService := framework.CreateServiceSpec(headlessSvcName, "", true, labels)
 			_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(headlessService)
@@ -462,7 +465,6 @@ var _ = framework.KubeDescribe("[sig-apps] Network Partition [Disruptive] [Slow]
 	framework.KubeDescribe("Pods", func() {
 		Context("should be evicted from unready Node", func() {
 			BeforeEach(func() {
-				framework.SkipUnlessProviderIs("gce", "gke", "aws")
 				framework.SkipUnlessNodeCountIsAtLeast(2)
 			})
 
