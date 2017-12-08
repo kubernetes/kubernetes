@@ -489,11 +489,6 @@ func (az *Cloud) Routes() (cloudprovider.Routes, bool) {
 	return az, true
 }
 
-// ScrubDNS provides an opportunity for cloud-provider-specific code to process DNS settings for pods.
-func (az *Cloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
-	return nameservers, searches
-}
-
 // HasClusterID returns true if the cluster has a clusterID
 func (az *Cloud) HasClusterID() bool {
 	return true

@@ -689,11 +689,6 @@ func (vs *VSphere) Routes() (cloudprovider.Routes, bool) {
 	return nil, false
 }
 
-// ScrubDNS filters DNS settings for pods.
-func (vs *VSphere) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
-	return nameservers, searches
-}
-
 // AttachDisk attaches given virtual disk volume to the compute running kubelet.
 func (vs *VSphere) AttachDisk(vmDiskPath string, storagePolicyName string, nodeName k8stypes.NodeName) (diskUUID string, err error) {
 	attachDiskInternal := func(vmDiskPath string, storagePolicyName string, nodeName k8stypes.NodeName) (diskUUID string, err error) {
