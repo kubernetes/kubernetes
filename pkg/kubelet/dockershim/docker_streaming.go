@@ -149,6 +149,7 @@ func attachContainer(client libdocker.Interface, containerID string, stdin io.Re
 		Stdin:  stdin != nil,
 		Stdout: stdout != nil,
 		Stderr: stderr != nil,
+		Logs:   true,
 	}
 	sopts := libdocker.StreamOptions{
 		InputStream:  stdin,
