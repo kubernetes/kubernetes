@@ -55,6 +55,18 @@ func (kl *Kubelet) RunOnce(updates <-chan kubetypes.PodUpdate) ([]RunPodResult, 
 		}
 	}
 
+	node, err := kl.getNodeAnyWay()
+	if err != nil {
+		glog.Errorf("Fail to get the node: %s", err)
+		return nil, err
+	}
+	kl.containerManager.Start(node, kl.GetActivePods, kl.sourcesReady, kl.statusManager, kl.runtimeService)
+
+	// Start volume manager
+	stopCh := make(chan struct{})
+	go kl.volumeManager.Run(kl.sourcesReady, stopCh)
+	defer func(stopCh chan struct{}) { stopCh <- struct{}{} }(stopCh)
+
 	select {
 	case u := <-updates:
 		glog.Infof("processing manifest with %d pods", len(u.Pods))
@@ -126,6 +138,7 @@ func (kl *Kubelet) runPod(pod *v1.Pod, retryDelay time.Duration) error {
 			glog.Errorf("Failed creating a mirror pod %q: %v", format.Pod(pod), err)
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
+		kl.podManager.UpdatePod(pod)
 		if err = kl.syncPod(syncPodOptions{
 			pod:        pod,
 			mirrorPod:  mirrorPod,
