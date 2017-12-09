@@ -17,9 +17,9 @@ limitations under the License.
 package kubectl
 
 import (
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
@@ -35,7 +35,7 @@ func GetOriginalConfiguration(mapping *meta.RESTMapping, obj runtime.Object) ([]
 		return nil, nil
 	}
 
-	original, ok := annots[api.LastAppliedConfigAnnotation]
+	original, ok := annots[v1.LastAppliedConfigAnnotation]
 	if !ok {
 		return nil, nil
 	}
@@ -60,7 +60,7 @@ func SetOriginalConfiguration(info *resource.Info, original []byte) error {
 		annots = map[string]string{}
 	}
 
-	annots[api.LastAppliedConfigAnnotation] = string(original)
+	annots[v1.LastAppliedConfigAnnotation] = string(original)
 	return info.Mapping.MetadataAccessor.SetAnnotations(info.Object, annots)
 }
 
@@ -85,8 +85,8 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.
 		annots = map[string]string{}
 	}
 
-	original := annots[api.LastAppliedConfigAnnotation]
-	delete(annots, api.LastAppliedConfigAnnotation)
+	original := annots[v1.LastAppliedConfigAnnotation]
+	delete(annots, v1.LastAppliedConfigAnnotation)
 	if err := accessor.SetAnnotations(info.Object, annots); err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.
 	}
 
 	if annotate {
-		annots[api.LastAppliedConfigAnnotation] = string(modified)
+		annots[v1.LastAppliedConfigAnnotation] = string(modified)
 		if err := info.Mapping.MetadataAccessor.SetAnnotations(info.Object, annots); err != nil {
 			return nil, err
 		}
@@ -109,7 +109,7 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.
 	}
 
 	// Restore the object to its original condition.
-	annots[api.LastAppliedConfigAnnotation] = original
+	annots[v1.LastAppliedConfigAnnotation] = original
 	if err := info.Mapping.MetadataAccessor.SetAnnotations(info.Object, annots); err != nil {
 		return nil, err
 	}
