@@ -328,6 +328,68 @@ func getRuntimeAndImageServices(remoteRuntimeEndpoint string, remoteImageEndpoin
 	return rs, is, err
 }
 
+func addAdmitHandlers(kubeCfg *kubeletconfiginternal.KubeletConfiguration, klet *Kubelet,
+	recorder record.EventRecorder, nodeRef *v1.ObjectReference, containerRuntime string,
+	experimentalKernelMemcgNotification bool, experimentalNodeAllocatableIgnoreEvictionThreshold bool,
+	allowedUnsafeSysctls []string) error {
+
+	enforceNodeAllocatable := kubeCfg.EnforceNodeAllocatable
+	if experimentalNodeAllocatableIgnoreEvictionThreshold {
+		// Do not provide kubeCfg.EnforceNodeAllocatable to eviction threshold parsing if we are not enforcing Evictions
+		enforceNodeAllocatable = []string{}
+	}
+	thresholds, err := eviction.ParseThresholdConfig(enforceNodeAllocatable, kubeCfg.EvictionHard, kubeCfg.EvictionSoft,
+		kubeCfg.EvictionSoftGracePeriod, kubeCfg.EvictionMinimumReclaim)
+	if err != nil {
+		return err
+	}
+	evictionConfig := eviction.Config{
+		PressureTransitionPeriod: kubeCfg.EvictionPressureTransitionPeriod.Duration,
+		MaxPodGracePeriodSeconds: int64(kubeCfg.EvictionMaxPodGracePeriod),
+		Thresholds:               thresholds,
+		KernelMemcgNotification:  experimentalKernelMemcgNotification,
+	}
+
+	// setup eviction manager
+	evictionManager, evictionAdmitHandler := eviction.NewManager(klet.resourceAnalyzer, evictionConfig,
+		killPodNow(klet.podWorkers, recorder), klet.imageManager, klet.containerGC,
+		recorder, nodeRef, klet.clock)
+
+	klet.evictionManager = evictionManager
+	klet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
+
+	// add sysctl admission
+	runtimeSupport, err := sysctl.NewRuntimeAdmitHandler(klet.containerRuntime)
+	if err != nil {
+		return err
+	}
+	safeWhitelist, err := sysctl.NewWhitelist(sysctl.SafeSysctlWhitelist(), v1.SysctlsPodAnnotationKey)
+	if err != nil {
+		return err
+	}
+	// Safe, whitelisted sysctls can always be used as unsafe sysctls in the spec
+	// Hence, we concatenate those two lists.
+	safeAndUnsafeSysctls := append(sysctl.SafeSysctlWhitelist(), allowedUnsafeSysctls...)
+	unsafeWhitelist, err := sysctl.NewWhitelist(safeAndUnsafeSysctls, v1.UnsafeSysctlsPodAnnotationKey)
+	if err != nil {
+		return err
+	}
+	klet.admitHandlers.AddPodAdmitHandler(runtimeSupport)
+	klet.admitHandlers.AddPodAdmitHandler(safeWhitelist)
+	klet.admitHandlers.AddPodAdmitHandler(unsafeWhitelist)
+
+	criticalPodAdmissionHandler := preemption.NewCriticalPodAdmissionHandler(klet.GetActivePods,
+		killPodNow(klet.podWorkers, recorder), recorder)
+	klet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(klet.getNodeAnyWay,
+		criticalPodAdmissionHandler, klet.containerManager.UpdatePluginResources))
+
+	klet.appArmorValidator = apparmor.NewValidator(containerRuntime)
+	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
+	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewNoNewPrivsAdmitHandler(klet.containerRuntime))
+
+	return nil
+}
+
 // NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
 // No initialization of Kubelet and its modules should happen here.
 func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
@@ -441,22 +503,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		MinAge:               kubeCfg.ImageMinimumGCAge.Duration,
 		HighThresholdPercent: int(kubeCfg.ImageGCHighThresholdPercent),
 		LowThresholdPercent:  int(kubeCfg.ImageGCLowThresholdPercent),
-	}
-
-	enforceNodeAllocatable := kubeCfg.EnforceNodeAllocatable
-	if experimentalNodeAllocatableIgnoreEvictionThreshold {
-		// Do not provide kubeCfg.EnforceNodeAllocatable to eviction threshold parsing if we are not enforcing Evictions
-		enforceNodeAllocatable = []string{}
-	}
-	thresholds, err := eviction.ParseThresholdConfig(enforceNodeAllocatable, kubeCfg.EvictionHard, kubeCfg.EvictionSoft, kubeCfg.EvictionSoftGracePeriod, kubeCfg.EvictionMinimumReclaim)
-	if err != nil {
-		return nil, err
-	}
-	evictionConfig := eviction.Config{
-		PressureTransitionPeriod: kubeCfg.EvictionPressureTransitionPeriod.Duration,
-		MaxPodGracePeriodSeconds: int64(kubeCfg.EvictionMaxPodGracePeriod),
-		Thresholds:               thresholds,
-		KernelMemcgNotification:  experimentalKernelMemcgNotification,
 	}
 
 	serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
@@ -853,50 +899,16 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.podKillingCh = make(chan *kubecontainer.PodPair, podKillingChannelCapacity)
 	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
 
-	// setup eviction manager
-	evictionManager, evictionAdmitHandler := eviction.NewManager(klet.resourceAnalyzer, evictionConfig, killPodNow(klet.podWorkers, kubeDeps.Recorder), klet.imageManager, klet.containerGC, kubeDeps.Recorder, nodeRef, klet.clock)
-
-	klet.evictionManager = evictionManager
-	klet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
-
-	// add sysctl admission
-	runtimeSupport, err := sysctl.NewRuntimeAdmitHandler(klet.containerRuntime)
-	if err != nil {
+	if err = addAdmitHandlers(kubeCfg, klet, kubeDeps.Recorder, nodeRef, containerRuntime, experimentalKernelMemcgNotification,
+		experimentalNodeAllocatableIgnoreEvictionThreshold, allowedUnsafeSysctls); err != nil {
 		return nil, err
 	}
-	safeWhitelist, err := sysctl.NewWhitelist(sysctl.SafeSysctlWhitelist(), v1.SysctlsPodAnnotationKey)
-	if err != nil {
-		return nil, err
-	}
-	// Safe, whitelisted sysctls can always be used as unsafe sysctls in the spec
-	// Hence, we concatenate those two lists.
-	safeAndUnsafeSysctls := append(sysctl.SafeSysctlWhitelist(), allowedUnsafeSysctls...)
-	unsafeWhitelist, err := sysctl.NewWhitelist(safeAndUnsafeSysctls, v1.UnsafeSysctlsPodAnnotationKey)
-	if err != nil {
-		return nil, err
-	}
-	klet.admitHandlers.AddPodAdmitHandler(runtimeSupport)
-	klet.admitHandlers.AddPodAdmitHandler(safeWhitelist)
-	klet.admitHandlers.AddPodAdmitHandler(unsafeWhitelist)
 
-	// enable active deadline handler
-	activeDeadlineHandler, err := newActiveDeadlineHandler(klet.statusManager, kubeDeps.Recorder, klet.clock)
-	if err != nil {
-		return nil, err
-	}
-	klet.AddPodSyncLoopHandler(activeDeadlineHandler)
-	klet.AddPodSyncHandler(activeDeadlineHandler)
-
-	criticalPodAdmissionHandler := preemption.NewCriticalPodAdmissionHandler(klet.GetActivePods, killPodNow(klet.podWorkers, kubeDeps.Recorder), kubeDeps.Recorder)
-	klet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(klet.getNodeAnyWay, criticalPodAdmissionHandler, klet.containerManager.UpdatePluginResources))
 	// apply functional Option's
 	for _, opt := range kubeDeps.Options {
 		opt(klet)
 	}
 
-	klet.appArmorValidator = apparmor.NewValidator(containerRuntime)
-	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
-	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewNoNewPrivsAdmitHandler(klet.containerRuntime))
 	if utilfeature.DefaultFeatureGate.Enabled(features.Accelerators) {
 		if containerRuntime == kubetypes.DockerContainerRuntime {
 			if klet.gpuManager, err = nvidia.NewNvidiaGPUManager(klet, kubeDeps.DockerClientConfig); err != nil {
