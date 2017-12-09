@@ -18,6 +18,7 @@ package clientcmd
 
 import (
 	"io"
+	"reflect"
 	"sync"
 
 	"github.com/golang/glog"
@@ -104,28 +105,47 @@ func (config *DeferredLoadingClientConfig) ClientConfig() (*restclient.Config, e
 	// load the configuration and return on non-empty errors and if the
 	// content differs from the default config
 	mergedConfig, err := mergedClientConfig.ClientConfig()
-	switch {
-	case err != nil:
+	if err != nil {
 		if !IsEmptyConfig(err) {
 			// return on any error except empty config
 			return nil, err
 		}
-	case mergedConfig != nil:
-		// the configuration is valid, but if this is equal to the defaults we should try
-		// in-cluster configuration
-		if !config.loader.IsDefaultConfig(mergedConfig) {
-			return mergedConfig, nil
-		}
 	}
-
-	// check for in-cluster configuration and use it
-	if config.icc.Possible() {
+	// the configuration is valid, but if this is equal to the defaults we should try
+	// in-cluster configuration
+	if config.isInClusterConfig(mergedConfig) {
 		glog.V(4).Infof("Using in-cluster configuration")
 		return config.icc.ClientConfig()
 	}
-
-	// return the result of the merged client config
 	return mergedConfig, err
+}
+
+func (config *DeferredLoadingClientConfig) isInClusterConfig(mergedConfig *restclient.Config) bool {
+	if !config.icc.Possible() {
+		return false
+	}
+	if mergedConfig == nil {
+		return true
+	}
+
+	defaultClientConfig, err := DefaultClientConfig.ClientConfig()
+	if err != nil {
+		return false
+	}
+	// compare with the DefaultClientConfig, but we ignore the following command line overrides:
+	// --request-timeout, --as, --as-group.
+	// If the mergedConfig differs from the DefaultClientConfig only in these fields, that means
+	// user want to apply these overrides to in-cluster config.
+	if len(config.overrides.Timeout) > 0 {
+		timeout, err := ParseTimeout(config.overrides.Timeout)
+		if err != nil {
+			return false
+		}
+		defaultClientConfig.Timeout = timeout
+	}
+	defaultClientConfig.Impersonate = mergedConfig.Impersonate
+	// compare all other parts, if any of them specified, use mergedConfig.
+	return reflect.DeepEqual(mergedConfig, defaultClientConfig)
 }
 
 // Namespace implements KubeConfig
