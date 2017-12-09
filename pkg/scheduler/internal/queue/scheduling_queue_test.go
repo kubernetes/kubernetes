@@ -199,7 +199,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 	}
 	// Update highPriorityPod and add a nominatedNodeName to it.
 	q.Update(&highPriorityPod, &highPriNominatedPod)
-	if q.activeQ.data.Len() != 1 {
+	if q.activeQ.Len() != 1 {
 		t.Error("Expected only one item in activeQ.")
 	}
 	if len(q.nominatedPods) != 1 {
@@ -250,7 +250,7 @@ func TestPriorityQueue_MoveAllToActiveQueue(t *testing.T) {
 	q.unschedulableQ.addOrUpdate(&unschedulablePod)
 	q.unschedulableQ.addOrUpdate(&highPriorityPod)
 	q.MoveAllToActiveQueue()
-	if q.activeQ.data.Len() != 3 {
+	if q.activeQ.Len() != 3 {
 		t.Error("Expected all items to be in activeQ.")
 	}
 }
