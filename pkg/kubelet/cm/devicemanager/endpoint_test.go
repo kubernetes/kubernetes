@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
+	"reflect"
 )
 
 var (
@@ -121,6 +122,40 @@ func TestGetDevices(t *testing.T) {
 	require.Len(t, devs, 1)
 }
 
+func TestAllocate(t *testing.T) {
+	socket := path.Join("/tmp", esocketName)
+
+	devs := []*pluginapi.Device{
+		{ID: "ADeviceId", Health: pluginapi.Healthy},
+		{ID: "AnotherDeviceId", Health: pluginapi.Healthy},
+	}
+
+	p, e := esetup(t, devs, socket, "mock", func(n string, a, u, r []pluginapi.Device) {
+	})
+	defer ecleanup(t, p, e)
+
+	setupAllocFunc(p)
+
+	response, _ := e.allocate([]string{"ADeviceId", "AnotherDeviceId"})
+
+	expectedResponse := &pluginapi.AllocateResponse{
+		Devices: []*pluginapi.DeviceSpec{
+			{
+				ContainerPath: "ADeviceId",
+				HostPath:      "ADeviceId",
+			},
+			{
+				ContainerPath: "AnotherDeviceId",
+				HostPath:      "AnotherDeviceId",
+			},
+		},
+	}
+
+	if !reflect.DeepEqual(response, expectedResponse) {
+		t.Errorf("unexpected allocate response, expected: %v, actual: %v", expectedResponse, response)
+	}
+}
+
 func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback monitorCallback) (*Stub, *endpointImpl) {
 	p := NewDevicePluginStub(devs, socket)
 
@@ -136,4 +171,19 @@ func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string,
 func ecleanup(t *testing.T, p *Stub, e *endpointImpl) {
 	p.Stop()
 	e.stop()
+}
+
+func setupAllocFunc(p *Stub) {
+	p.allocFunc = func(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Device) (*pluginapi.AllocateResponse, error) {
+		var specs []*pluginapi.DeviceSpec
+		for _, requestID := range r.DevicesIDs {
+			spec := &pluginapi.DeviceSpec{}
+			spec.ContainerPath = requestID
+			spec.HostPath = requestID
+			specs = append(specs, spec)
+		}
+
+		response := pluginapi.AllocateResponse{Devices: specs}
+		return &response, nil
+	}
 }
