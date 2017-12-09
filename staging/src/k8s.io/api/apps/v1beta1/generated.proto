@@ -476,6 +476,7 @@ message StatefulSetStatus {
 // necessary to perform the update for the indicated strategy.
 message StatefulSetUpdateStrategy {
   // Type indicates the type of the StatefulSetUpdateStrategy.
+  // Default is OnDelete.
   optional string type = 1;
 
   // RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.

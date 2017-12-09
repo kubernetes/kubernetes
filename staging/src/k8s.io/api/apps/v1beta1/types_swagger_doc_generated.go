@@ -262,7 +262,7 @@ func (StatefulSetStatus) SwaggerDoc() map[string]string {
 
 var map_StatefulSetUpdateStrategy = map[string]string{
 	"":              "StatefulSetUpdateStrategy indicates the strategy that the StatefulSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
-	"type":          "Type indicates the type of the StatefulSetUpdateStrategy.",
+	"type":          "Type indicates the type of the StatefulSetUpdateStrategy. Default is OnDelete.",
 	"rollingUpdate": "RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.",
 }
 

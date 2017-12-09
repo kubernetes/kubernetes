@@ -71345,7 +71345,7 @@
       "$ref": "#/definitions/io.k8s.api.apps.v1beta1.RollingUpdateStatefulSetStrategy"
      },
      "type": {
-      "description": "Type indicates the type of the StatefulSetUpdateStrategy.",
+      "description": "Type indicates the type of the StatefulSetUpdateStrategy. Default is OnDelete.",
       "type": "string"
      }
     }

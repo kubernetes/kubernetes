@@ -6726,7 +6726,7 @@
     "properties": {
      "type": {
       "type": "string",
-      "description": "Type indicates the type of the StatefulSetUpdateStrategy."
+      "description": "Type indicates the type of the StatefulSetUpdateStrategy. Default is OnDelete."
      },
      "rollingUpdate": {
       "$ref": "v1beta1.RollingUpdateStatefulSetStrategy",
