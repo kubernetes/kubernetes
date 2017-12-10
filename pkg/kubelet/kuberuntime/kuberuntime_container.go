@@ -483,7 +483,7 @@ func (m *kubeGenericRuntimeManager) executePreStopHook(pod *v1.Pod, containerID 
 	glog.V(3).Infof("Running preStop hook for container %q", containerID.String())
 
 	start := metav1.Now()
-	done := make(chan struct{})
+	done := make(chan bool)
 	go func() {
 		defer close(done)
 		defer utilruntime.HandleCrash()
@@ -491,6 +491,7 @@ func (m *kubeGenericRuntimeManager) executePreStopHook(pod *v1.Pod, containerID 
 			glog.Errorf("preStop hook for container %q failed: %v", containerSpec.Name, err)
 			m.recordContainerEvent(pod, containerSpec, containerID.ID, v1.EventTypeWarning, events.FailedPreStopHook, msg)
 		}
+		done <- true
 	}()
 
 	select {
