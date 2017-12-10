@@ -172,7 +172,7 @@ func (spc *realStatefulPodControl) recordClaimEvent(verb string, set *apps.State
 	}
 }
 
-// createPersistentVolumeClaims creates all of the required PersistentVolumeClaims for pod, which mush be a member of
+// createPersistentVolumeClaims creates all of the required PersistentVolumeClaims for pod, which must be a member of
 // set. If all of the claims for Pod are successfully created, the returned error is nil. If creation fails, this method
 // may be called again until no error is returned, indicating the PersistentVolumeClaims for pod are consistent with
 // set's Spec.
