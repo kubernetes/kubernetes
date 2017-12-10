@@ -11,7 +11,6 @@ go_test(
     srcs = [
         "backoff_utils_test.go",
         "heap_test.go",
-        "testutil_test.go",
         "utils_test.go",
     ],
     embed = [":go_default_library"],
@@ -28,7 +27,6 @@ go_library(
     srcs = [
         "backoff_utils.go",
         "heap.go",
-        "testutil.go",
         "utils.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/util",

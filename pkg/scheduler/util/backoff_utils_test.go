@@ -64,7 +64,7 @@ func TestBackoff(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		duration := backoff.GetEntry(test.podID).getBackoff(backoff.maxDuration)
+		duration := backoff.BackoffPod(test.podID)
 		if duration != test.expectedDuration {
 			t.Errorf("expected: %s, got %s for %s", test.expectedDuration.String(), duration.String(), test.podID)
 		}
@@ -72,14 +72,15 @@ func TestBackoff(t *testing.T) {
 		backoff.Gc()
 	}
 	fooID := ktypes.NamespacedName{Namespace: "default", Name: "foo"}
-	backoff.perPodBackoff[fooID].backoff = 60 * time.Second
-	duration := backoff.GetEntry(fooID).getBackoff(backoff.maxDuration)
+	be := backoff.getEntry(fooID)
+	be.backoff = 60 * time.Second
+	duration := backoff.BackoffPod(fooID)
 	if duration != 60*time.Second {
 		t.Errorf("expected: 60, got %s", duration.String())
 	}
 	// Verify that we split on namespaces correctly, same name, different namespace
 	fooID.Namespace = "other"
-	duration = backoff.GetEntry(fooID).getBackoff(backoff.maxDuration)
+	duration = backoff.BackoffPod(fooID)
 	if duration != 1*time.Second {
 		t.Errorf("expected: 1, got %s", duration.String())
 	}
