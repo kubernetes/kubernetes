@@ -19,6 +19,7 @@ package csi
 import (
 	"fmt"
 	"os"
+	"path"
 	"testing"
 
 	api "k8s.io/api/core/v1"
@@ -27,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
-	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -140,17 +140,31 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 
 	testCases := []struct {
 		name       string
-		driverName string
-		volID      string
+		specVolID  string
+		data       map[string]string
 		shouldFail bool
 	}{
-		{"valid driver and vol", "test.csi-driver", "abc-cde", false},
-		{"valid driver + vol with slash", "test.csi-driver", "a/b/c/d", false},
-		{"invalid driver name", "_test.csi.driver>", "a/b/c/d", true},
+		{
+			name:      "valid spec name",
+			specVolID: "test.vol.id",
+			data:      map[string]string{volDataKey.specVolID: "test.vol.id", volDataKey.volHandle: "test-vol0", volDataKey.driverName: "test-driver0"},
+		},
 	}
 
 	for _, tc := range testCases {
-		dir := getTargetPath(testPodUID, tc.driverName, tc.volID, plug.host)
+		t.Logf("test case: %s", tc.name)
+		dir := getTargetPath(testPodUID, tc.specVolID, plug.host)
+
+		// create the data file
+		if tc.data != nil {
+			mountDir := path.Join(getTargetPath(testPodUID, tc.specVolID, plug.host), "/mount")
+			if err := os.MkdirAll(mountDir, 0755); err != nil && !os.IsNotExist(err) {
+				t.Errorf("failed to create dir [%s]: %v", mountDir, err)
+			}
+			if err := saveVolumeData(plug, testPodUID, tc.specVolID, tc.data); err != nil {
+				t.Fatal(err)
+			}
+		}
 
 		// rebuild spec
 		spec, err := plug.ConstructVolumeSpec("test-pv", dir)
@@ -161,13 +175,12 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 			continue
 		}
 
-		volID := spec.PersistentVolume.Spec.CSI.VolumeHandle
-		unsanitizedVolID := kstrings.UnescapeQualifiedNameForDisk(tc.volID)
-		if volID != unsanitizedVolID {
-			t.Errorf("expected unsanitized volID %s, got volID %s", unsanitizedVolID, volID)
+		volHandle := spec.PersistentVolume.Spec.CSI.VolumeHandle
+		if volHandle != tc.data[volDataKey.volHandle] {
+			t.Errorf("expected volID %s, got volID %s", tc.data[volDataKey.volHandle], volHandle)
 		}
 
-		if spec.Name() != "test-pv" {
+		if spec.Name() != tc.specVolID {
 			t.Errorf("Unexpected spec name %s", spec.Name())
 		}
 	}
