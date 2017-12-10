@@ -395,15 +395,6 @@ func NewDiscoveryClient(c restclient.Interface) *DiscoveryClient {
 	return &DiscoveryClient{restClient: c, LegacyPrefix: "/api"}
 }
 
-func stringDoesntExistIn(str string, slice []string) bool {
-	for _, s := range slice {
-		if s == str {
-			return false
-		}
-	}
-	return true
-}
-
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *DiscoveryClient) RESTClient() restclient.Interface {
