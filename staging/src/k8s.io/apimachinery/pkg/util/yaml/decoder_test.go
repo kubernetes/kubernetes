@@ -22,11 +22,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"reflect"
 	"strings"
 	"testing"
 )
+
+func TestYAMLDecoder(t *testing.T) {
+	d := `---
+stuff: 1
+	test-foo: 1
+`
+	s := NewDocumentDecoder(ioutil.NopCloser(bytes.NewReader([]byte(d))))
+	b := make([]byte, len(d))
+	n, err := s.Read(b)
+	if err != nil || n != len(d) {
+		t.Fatalf("unexpected body: %d / %v", n, err)
+	}
+}
 
 func TestSplitYAMLDocument(t *testing.T) {
 	testCases := []struct {
