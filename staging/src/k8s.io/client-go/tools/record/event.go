@@ -130,6 +130,7 @@ func recordToSink(sink EventSink, event *v1.Event, eventCorrelator *EventCorrela
 	result, err := eventCorrelator.EventCorrelate(event)
 	if err != nil {
 		utilruntime.HandleError(err)
+		return
 	}
 	if result.Skip {
 		return
