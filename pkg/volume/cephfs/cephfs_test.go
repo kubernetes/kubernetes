@@ -52,6 +52,25 @@ func TestCanSupport(t *testing.T) {
 	}
 }
 
+func TestGetAccessModes(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("cephfs_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+
+	plug, err := plugMgr.FindPersistentPluginByName(cephfsPluginName)
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	if !volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadWriteMany) || !volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadWriteOnce) || !volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadOnlyMany) {
+		t.Errorf("Expected three AccessModeTypes:  %s, %s, and %s", v1.ReadWriteMany, v1.ReadWriteOnce, v1.ReadOnlyMany)
+	}
+}
+
 func TestPlugin(t *testing.T) {
 	tmpDir, err := utiltesting.MkTmpdir("cephTest")
 	if err != nil {

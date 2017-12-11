@@ -76,6 +76,10 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Po
 		return err
 	}
 
+	// before create pod, check validity of recycle pod template
+	if err := ValidateRecyclerPodTemplate(pod); err != nil {
+		return fmt.Errorf("%s/%s pod's volume was not defined in the recycle pod template", pod.Namespace, pod.Name)
+	}
 	// Start the pod
 	_, err = recyclerClient.CreatePod(pod)
 	if err != nil {
@@ -87,9 +91,9 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Po
 			// Recycler will try again and the old pod will be hopefuly deleted
 			// at that time.
 			return fmt.Errorf("old recycler pod found, will retry later")
-		} else {
-			return fmt.Errorf("unexpected error creating recycler pod:  %+v\n", err)
 		}
+		return fmt.Errorf("unexpected error creating recycler pod:  %+v", err)
+
 	}
 	err = waitForPod(pod, recyclerClient, podCh)
 
@@ -137,9 +141,8 @@ func waitForPod(pod *v1.Pod, recyclerClient recyclerClient, podCh <-chan watch.E
 				if pod.Status.Phase == v1.PodFailed {
 					if pod.Status.Message != "" {
 						return fmt.Errorf(pod.Status.Message)
-					} else {
-						return fmt.Errorf("pod failed, pod.Status.Message unknown.")
 					}
+					return fmt.Errorf("pod failed, pod.Status.Message unknown")
 				}
 
 			case watch.Deleted:
@@ -274,9 +277,8 @@ func CalculateTimeoutForVolume(minimumTimeout, timeoutIncrement int, pv *v1.Pers
 	timeout := (pvSize / giSize) * int64(timeoutIncrement)
 	if timeout < int64(minimumTimeout) {
 		return int64(minimumTimeout)
-	} else {
-		return timeout
 	}
+	return timeout
 }
 
 // RoundUpSize calculates how many allocation units are needed to accommodate
