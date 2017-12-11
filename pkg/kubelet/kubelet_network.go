@@ -87,8 +87,8 @@ type criNetworkHost struct {
 // that are directly invoked by the kubelet (aka: legacy, pre-cri).
 // Any network plugin invoked by a cri must implement NamespaceGetter
 // to talk directly to the runtime instead.
-func (c *criNetworkHost) GetNetNS(containerID string) (string, error) {
-	return c.kubelet.GetRuntime().GetNetNS(kubecontainer.ContainerID{Type: "", ID: containerID})
+func (c *criNetworkHost) GetNetNS(podID string) (string, error) {
+	return c.kubelet.GetRuntime().GetNetNS(podID)
 }
 
 // NoOpLegacyHost implements the network.LegacyHost interface for the remote

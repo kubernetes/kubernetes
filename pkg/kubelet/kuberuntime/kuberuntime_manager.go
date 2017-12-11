@@ -889,7 +889,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 //
 // For CRI, container network is handled by the runtime completely and this
 // function should never be called.
-func (m *kubeGenericRuntimeManager) GetNetNS(_ kubecontainer.ContainerID) (string, error) {
+func (m *kubeGenericRuntimeManager) GetNetNS(_ string) (string, error) {
 	return "", fmt.Errorf("not supported")
 }
 

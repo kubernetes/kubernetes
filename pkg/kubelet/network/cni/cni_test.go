@@ -145,8 +145,8 @@ func (fnh *fakeNetworkHost) GetRuntime() kubecontainer.Runtime {
 	return fnh.runtime
 }
 
-func (fnh *fakeNetworkHost) GetNetNS(containerID string) (string, error) {
-	return fnh.GetRuntime().GetNetNS(kubecontainer.ContainerID{Type: "test", ID: containerID})
+func (fnh *fakeNetworkHost) GetNetNS(podID string) (string, error) {
+	return fnh.GetRuntime().GetNetNS(podID)
 }
 
 func (fnh *fakeNetworkHost) SupportsLegacyFeatures() bool {

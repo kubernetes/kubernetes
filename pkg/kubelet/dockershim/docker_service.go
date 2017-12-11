@@ -123,8 +123,8 @@ type namespaceGetter struct {
 	ds *dockerService
 }
 
-func (n *namespaceGetter) GetNetNS(containerID string) (string, error) {
-	return n.ds.GetNetNS(containerID)
+func (n *namespaceGetter) GetNetNS(podID string) (string, error) {
+	return n.ds.GetNetNS(podID)
 }
 
 // portMappingGetter is a wrapper around the dockerService that implements

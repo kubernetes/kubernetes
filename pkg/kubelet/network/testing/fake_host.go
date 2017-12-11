@@ -60,7 +60,7 @@ type fakeNamespaceGetter struct {
 	ns string
 }
 
-func (nh *fakeNamespaceGetter) GetNetNS(containerID string) (string, error) {
+func (nh *fakeNamespaceGetter) GetNetNS(podID string) (string, error) {
 	return nh.ns, nil
 }
 
