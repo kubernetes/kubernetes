@@ -109,6 +109,17 @@ func (f *NodeClient) NodePublishVolume(ctx grpctx.Context, req *csipb.NodePublis
 	return &csipb.NodePublishVolumeResponse{}, nil
 }
 
+// NodeProbe implements csi NodeProbe
+func (f *NodeClient) NodeProbe(ctx context.Context, req *csipb.NodeProbeRequest, opts ...grpc.CallOption) (*csipb.NodeProbeResponse, error) {
+	if f.nextErr != nil {
+		return nil, f.nextErr
+	}
+	if req.Version == nil {
+		return nil, errors.New("missing version")
+	}
+	return &csipb.NodeProbeResponse{}, nil
+}
+
 // NodeUnpublishVolume implements csi method
 func (f *NodeClient) NodeUnpublishVolume(ctx context.Context, req *csipb.NodeUnpublishVolumeRequest, opts ...grpc.CallOption) (*csipb.NodeUnpublishVolumeResponse, error) {
 	if f.nextErr != nil {
@@ -127,11 +138,6 @@ func (f *NodeClient) NodeUnpublishVolume(ctx context.Context, req *csipb.NodeUnp
 
 // GetNodeID implements method
 func (f *NodeClient) GetNodeID(ctx context.Context, in *csipb.GetNodeIDRequest, opts ...grpc.CallOption) (*csipb.GetNodeIDResponse, error) {
-	return nil, nil
-}
-
-// NodeProbe implements csi method
-func (f *NodeClient) NodeProbe(ctx context.Context, in *csipb.NodeProbeRequest, opts ...grpc.CallOption) (*csipb.NodeProbeResponse, error) {
 	return nil, nil
 }
 

@@ -44,6 +44,7 @@ type instanceInfo struct {
 // GetZone returns the Zone containing the current failure zone and locality region that the program is running in
 func (az *Cloud) GetZone() (cloudprovider.Zone, error) {
 	faultMutex.Lock()
+	defer faultMutex.Unlock()
 	if faultDomain == nil {
 		var err error
 		faultDomain, err = fetchFaultDomain()
@@ -55,7 +56,6 @@ func (az *Cloud) GetZone() (cloudprovider.Zone, error) {
 		FailureDomain: *faultDomain,
 		Region:        az.Location,
 	}
-	faultMutex.Unlock()
 	return zone, nil
 }
 
