@@ -154,7 +154,7 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 		return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
 	}
 
-	fmt.Printf("[upgrade/staticpods] Moved upgraded manifest to %q and backed up old manifest to %q\n", currentManifestPath, backupManifestPath)
+	fmt.Printf("[upgrade/staticpods] Moved new manifest to %q and backed up old manifest to %q\n", currentManifestPath, backupManifestPath)
 	fmt.Println("[upgrade/staticpods] Waiting for the kubelet to restart the component")
 
 	// Wait for the mirror Pod hash to change; otherwise we'll run into race conditions here when the kubelet hasn't had time to
@@ -178,7 +178,7 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.MasterConfiguration, recoverManifests map[string]string) (bool, error) {
 	// Add etcd static pod spec only if external etcd is not configured
 	if len(cfg.Etcd.Endpoints) != 0 {
-		return false, fmt.Errorf("external etcd cannot be upgraded with kubeadm")
+		return false, fmt.Errorf("external etcd detected, won't try to change any etcd state")
 	}
 	// Checking health state of etcd before proceeding with the upgrtade
 	etcdCluster := util.LocalEtcdCluster{}
@@ -191,7 +191,7 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 	backupEtcdDir := pathMgr.BackupEtcdDir()
 	runningEtcdDir := cfg.Etcd.DataDir
 	if err := util.CopyDir(runningEtcdDir, backupEtcdDir); err != nil {
-		return true, fmt.Errorf("fail to back up etcd data with %v", err)
+		return true, fmt.Errorf("fail to back up etcd data: %v", err)
 	}
 
 	// Need to check currently used version and version from constants, if differs then upgrade
@@ -206,7 +206,7 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 
 	// Comparing current etcd version with desired to catch the same version or downgrade condition and fail on them.
 	if desiredEtcdVersion.LessThan(currentEtcdVersion) {
-		return true, fmt.Errorf("the requested etcd version (%s) for Kubernetes v(%s) is lower than the currently running version (%s)", desiredEtcdVersion.String(), cfg.KubernetesVersion, currentEtcdVersion.String())
+		return false, fmt.Errorf("the desired etcd version for this Kubernetes version %q is %q, but the current etcd version is %q. Won't downgrade etcd, instead just continue", cfg.KubernetesVersion, desiredEtcdVersion.String(), currentEtcdVersion.String())
 	}
 	// For the case when desired etcd version is the same as current etcd version
 	if strings.Compare(desiredEtcdVersion.String(), currentEtcdVersion.String()) == 0 {
@@ -288,7 +288,7 @@ func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager
 			if fatal {
 				return err
 			}
-			fmt.Printf("[etcd] non fatal issue encountered during upgrade: %v\n", err)
+			fmt.Printf("[upgrade/etcd] non fatal issue encountered during upgrade: %v\n", err)
 		}
 	}
 
@@ -298,7 +298,7 @@ func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager
 	}
 
 	// Write the updated static Pod manifests into the temporary directory
-	fmt.Printf("[upgrade/staticpods] Writing upgraded Static Pod manifests to %q\n", pathMgr.TempManifestDir())
+	fmt.Printf("[upgrade/staticpods] Writing new Static Pod manifests to %q\n", pathMgr.TempManifestDir())
 	err = controlplane.CreateInitStaticPodManifestFiles(pathMgr.TempManifestDir(), cfg)
 	if err != nil {
 		return fmt.Errorf("error creating init static pod manifest files: %v", err)
