@@ -24,6 +24,10 @@ import (
 	"github.com/golang/glog"
 )
 
+const (
+	defaultGPUTaintKey = "node-role.qiniu.com/gpu"
+)
+
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register("DecorateGPUPod", func(config io.Reader) (admission.Interface, error) {
@@ -51,8 +55,8 @@ func checkNeedGPU(pod *api.Pod) bool {
 	// check if pod spec has defined gpu limitation
 	containers := pod.Spec.Containers
 	for _, container := range containers {
-		gpu_limit, ok := container.Resources.Limits.NvidiaGPU().AsInt64()
-		if ok && gpu_limit > 0 {
+		gpuLimit, ok := container.Resources.Limits.NvidiaGPU().AsInt64()
+		if ok && gpuLimit > 0 {
 			isNeed = true
 			break
 		}
@@ -122,9 +126,7 @@ func (p *plugin) Admit(a admission.Attributes) (err error) {
 	}
 
 	toleration := api.Toleration{
-		Key: "dedicated",
-		Operator: api.TolerationOpEqual,
-		Value: "gpu",
+		Key: defaultGPUTaintKey,
 		Effect: api.TaintEffectNoSchedule,
 	}
 
