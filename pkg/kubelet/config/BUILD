@@ -7,7 +7,6 @@ go_library(
         "common.go",
         "config.go",
         "defaults.go",
-        "doc.go",
         "file.go",
         "file_unsupported.go",
         "flags.go",
