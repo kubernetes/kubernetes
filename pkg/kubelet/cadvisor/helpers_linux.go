@@ -43,7 +43,7 @@ func (i *imageFsInfoProvider) ImageFsInfoLabel() (string, error) {
 		// This is a temporary workaround to get stats for cri-o from cadvisor
 		// and should be removed.
 		// Related to https://github.com/kubernetes/kubernetes/issues/51798
-		if i.runtimeEndpoint == "/var/run/crio.sock" {
+		if i.runtimeEndpoint == CrioSocket {
 			return cadvisorfs.LabelCrioImages, nil
 		}
 	}
