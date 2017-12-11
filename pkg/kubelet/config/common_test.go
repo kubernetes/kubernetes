@@ -31,10 +31,132 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
 func noDefault(*api.Pod) error { return nil }
+
+func TestApplyDefaults(t *testing.T) {
+	testcases := []struct {
+		name        string
+		isNilUID    bool
+		nodeName    string
+		fileName    string
+		isFile      bool
+		inputObj    *api.Pod
+		expectedObj *api.Pod
+		expectedErr error
+	}{
+		{
+			name:     "empty namespace",
+			isNilUID: false,
+			nodeName: "node1",
+			fileName: "",
+			isFile:   false,
+			inputObj: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test1",
+					UID:       "12345",
+					Namespace: "",
+				},
+			},
+			expectedObj: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test1-node1",
+					UID:         "12345",
+					Namespace:   metav1.NamespaceDefault,
+					SelfLink:    "/api/v1/namespaces/default/pods/test1-node1",
+					Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "12345"},
+				},
+				Spec: api.PodSpec{
+					NodeName: "node1",
+				},
+				Status: api.PodStatus{
+					Phase: api.PodPending,
+				},
+			},
+		},
+		{
+			name:     "nil UID and not empty namespace",
+			isNilUID: true,
+			nodeName: "node2",
+			fileName: "",
+			isFile:   false,
+			inputObj: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test2",
+					Namespace: "namespace1",
+				},
+			},
+			expectedObj: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test2-node2",
+					Namespace: "namespace1",
+					SelfLink:  "/api/v1/namespaces/namespace1/pods/test2-node2",
+				},
+				Spec: api.PodSpec{
+					NodeName: "node2",
+				},
+				Status: api.PodStatus{
+					Phase: api.PodPending,
+				},
+			},
+		},
+		{
+			name:     "with filename",
+			isNilUID: false,
+			nodeName: "node3",
+			fileName: "file1",
+			isFile:   true,
+			inputObj: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test3",
+					UID:       "12345",
+					Namespace: "namespace2",
+				},
+			},
+			expectedObj: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test3-node3",
+					UID:         "12345",
+					Namespace:   "namespace2",
+					SelfLink:    "/api/v1/namespaces/namespace2/pods/test3-node3",
+					Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "12345"},
+				},
+				Spec: api.PodSpec{
+					NodeName: "node3",
+					Tolerations: []api.Toleration{{
+						Operator: "Exists",
+						Effect:   api.TaintEffectNoExecute}},
+				},
+				Status: api.PodStatus{
+					Phase: api.PodPending,
+				},
+			},
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			err := applyDefaults(testcase.inputObj, testcase.fileName, testcase.isFile, types.NodeName(testcase.nodeName))
+			if testcase.isNilUID {
+				if len(testcase.inputObj.UID) == 0 {
+					t.Errorf("unexpected UID, expected: not nil, actual: %v", testcase.inputObj.UID)
+				} else {
+					testcase.expectedObj.UID = testcase.inputObj.UID
+					testcase.expectedObj.Annotations = map[string]string{kubetypes.ConfigHashAnnotationKey: string(testcase.inputObj.UID)}
+				}
+			}
+			if !reflect.DeepEqual(testcase.expectedErr, err) {
+				t.Errorf("unexpected error, expected: %v, actual: %v", testcase.expectedErr, err)
+			}
+			if !reflect.DeepEqual(testcase.expectedObj, testcase.inputObj) {
+				t.Errorf("unexpected pod, expected: %v, actual: %v", testcase.expectedObj, testcase.inputObj)
+			}
+		})
+	}
+}
 
 func TestDecodeSinglePod(t *testing.T) {
 	grace := int64(30)
