@@ -123,14 +123,14 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 		containerID := stats.Attributes.Id
 		container, found := containerMap[containerID]
 		if !found {
-			glog.Errorf("Unknown id %q in container map.", containerID)
+			glog.Errorf("Unable to find container id %q in container stats list", containerID)
 			continue
 		}
 
 		podSandboxID := container.PodSandboxId
 		podSandbox, found := podSandboxMap[podSandboxID]
 		if !found {
-			glog.Errorf("Unknown id %q in pod sandbox map.", podSandboxID)
+			glog.Errorf("Unable to find pod sandbox id %q in pod stats list", podSandboxID)
 			continue
 		}
 
@@ -142,7 +142,7 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 			// Fill stats from cadvisor is available for full set of required pod stats
 			caPodSandbox, found := caInfos[podSandboxID]
 			if !found {
-				glog.V(4).Info("Unable to find cadvisor stats for sandbox %q", podSandboxID)
+				glog.V(4).Infof("Unable to find cadvisor stats for sandbox %q", podSandboxID)
 			} else {
 				p.addCadvisorPodStats(ps, &caPodSandbox)
 			}
@@ -153,7 +153,7 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 		// container stats
 		caStats, caFound := caInfos[containerID]
 		if !caFound {
-			glog.V(4).Info("Unable to find cadvisor stats for %q", containerID)
+			glog.V(4).Infof("Unable to find cadvisor stats for %q", containerID)
 		} else {
 			p.addCadvisorContainerStats(cs, &caStats)
 		}
