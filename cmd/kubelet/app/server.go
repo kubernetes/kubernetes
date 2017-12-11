@@ -139,7 +139,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 	mounter := mount.New(s.ExperimentalMounterPath)
 	var writer kubeio.Writer = &kubeio.StdWriter{}
 	if s.Containerized {
-		glog.V(2).Info("Running kubelet in containerized mode (experimental)")
+		glog.V(2).Info("Running kubelet in containerized mode")
 		mounter = mount.NewNsenterMounter()
 		writer = &kubeio.NsenterWriter{}
 	}
