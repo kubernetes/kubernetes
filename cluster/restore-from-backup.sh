@@ -62,6 +62,9 @@ ETCD_API="$(echo $VERSION_CONTENTS | cut -d '/' -f 2)"
 # NOTE: NAME HAS TO BE EQUAL TO WHAT WE USE IN --name flag when starting etcd.
 NAME="${NAME:-etcd-$(hostname)}"
 
+INITIAL_CLUSTER="${INITIAL_CLUSTER:-${NAME}=http://localhost:2380}"
+INITIAL_ADVERTISE_PEER_URLS="${INITIAL_ADVERTISE_PEER_URLS:-http://localhost:2380}"
+
 # Port on which etcd is exposed.
 etcd_port=2379
 event_etcd_port=4002
@@ -101,7 +104,7 @@ wait_for_cluster_healthy() {
 # Wait until etcd and apiserver pods are down.
 wait_for_etcd_and_apiserver_down() {
   for i in $(seq 120); do
-    etcd=$(docker ps | grep etcd | grep -v etcd-empty-dir | grep -v etcd-monitor | wc -l)
+    etcd=$(docker ps | grep etcd-server | wc -l)
     apiserver=$(docker ps | grep apiserver | wc -l)
     # TODO: Theoretically it is possible, that apiserver and or etcd
     # are currently down, but Kubelet is now restarting them and they
@@ -133,6 +136,8 @@ if ! wait_for_etcd_and_apiserver_down; then
   echo "Downing etcd and apiserver failed"
   exit 1
 fi
+
+read -rsp $'Press enter when all etcd instances are down...\n'
 
 # Create the sort of directory structure that etcd expects.
 # If this directory already exists, remove it.
@@ -185,15 +190,13 @@ elif [ "${ETCD_API}" == "etcd3" ]; then
 
   # Run etcdctl snapshot restore command and wait until it is finished.
   # setting with --name in the etcd manifest file and then it seems to work.
-  # TODO(jsz): This command may not work in case of HA.
-  image=$(docker run -d -v ${BACKUP_DIR}:/var/tmp/backup --env ETCDCTL_API=3 \
+  docker run -v ${BACKUP_DIR}:/var/tmp/backup --env ETCDCTL_API=3 \
     "gcr.io/google_containers/etcd:${ETCD_VERSION}" /bin/sh -c \
-    "/usr/local/bin/etcdctl snapshot restore ${BACKUP_DIR}/${snapshot} --name ${NAME} --initial-cluster ${NAME}=http://localhost:2380; mv /${NAME}.etcd/member /var/tmp/backup/")
+    "/usr/local/bin/etcdctl snapshot restore ${BACKUP_DIR}/${snapshot} --name ${NAME} --initial-cluster ${INITIAL_CLUSTER} --initial-advertise-peer-urls ${INITIAL_ADVERTISE_PEER_URLS}; mv /${NAME}.etcd/member /var/tmp/backup/"
   if [ "$?" -ne "0" ]; then
     echo "Docker container didn't started correctly"
     exit 1
   fi
-  echo "Prepare container exit code: $(docker wait ${image})"
 
   rm -f "${BACKUP_DIR}/${snapshot}"
 fi

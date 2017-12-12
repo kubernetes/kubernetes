@@ -59,6 +59,8 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 				Skip("Nvidia GPUs do not exist on the node. Skipping test.")
 			}
 
+			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
+
 			By("Creating the Google Device Plugin pod for NVIDIA GPU in GKE")
 			devicePluginPod = f.PodClient().CreateSync(framework.NVIDIADevicePlugin(f.Namespace.Name))
 
@@ -111,7 +113,9 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			f.PodClient().Delete(devicePluginPod.Name, &metav1.DeleteOptions{})
 			By("Waiting for GPUs to become unavailable on the local node")
 			Eventually(func() bool {
-				return framework.NumberOfNVIDIAGPUs(getLocalNode(f)) <= 0
+				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				return framework.NumberOfNVIDIAGPUs(node) <= 0
 			}, 10*time.Minute, framework.Poll).Should(BeTrue())
 			By("Checking that scheduled pods can continue to run even after we delete device plugin.")
 			count1, devIdRestart1 = getDeviceId(f, p1.Name, p1.Name, count1+1)

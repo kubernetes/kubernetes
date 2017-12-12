@@ -542,14 +542,6 @@ func (c *BlobDiskController) createStorageAccount(storageAccountName string, sto
 		c.addAccountState(storageAccountName, newAccountState)
 	}
 
-	if !bExist {
-		// SA Accounts takes time to be provisioned
-		// so if this account was just created allow it sometime
-		// before polling
-		glog.V(2).Infof("azureDisk - storage account %s was just created, allowing time before polling status", storageAccountName)
-		time.Sleep(25 * time.Second) // as observed 25 is the average time for SA to be provisioned
-	}
-
 	// finally, make sure that we default container is created
 	// before handing it back over
 	return c.ensureDefaultContainer(storageAccountName)
