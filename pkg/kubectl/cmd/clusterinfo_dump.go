@@ -167,6 +167,14 @@ func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, out io.Writer) error
 			return err
 		}
 
+		statefulSets, err := clientset.Apps().StatefulSets(namespace).List(metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		if err := printer.PrintObj(statefulSets, setupOutputWriter(cmd, out, path.Join(namespace, "statefulsets.json"))); err != nil {
+			return err
+		}
+
 		deps, err := clientset.Extensions().Deployments(namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return err
