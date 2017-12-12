@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
 
 func EtcdUpgrade(target_storage, target_version string) error {
@@ -40,10 +41,10 @@ func EtcdUpgrade(target_storage, target_version string) error {
 	}
 }
 
-func MasterUpgrade(v string) error {
+func MasterUpgrade(v string, isUpgrade bool) error {
 	switch TestContext.Provider {
 	case "gce":
-		return masterUpgradeGCE(v, false)
+		return masterUpgradeGCE(v, isUpgrade, false)
 	case "gke":
 		return masterUpgradeGKE(v)
 	case "kubernetes-anywhere":
@@ -65,18 +66,28 @@ func etcdUpgradeGCE(target_storage, target_version string) error {
 }
 
 // TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
-func MasterUpgradeGCEWithKubeProxyDaemonSet(v string, enableKubeProxyDaemonSet bool) error {
-	return masterUpgradeGCE(v, enableKubeProxyDaemonSet)
+func MasterUpgradeGCEWithKubeProxyDaemonSet(v string, isUpgrade bool, enableKubeProxyDaemonSet bool) error {
+	return masterUpgradeGCE(v, isUpgrade, enableKubeProxyDaemonSet)
 }
 
 // TODO(mrhohn): Remove 'enableKubeProxyDaemonSet' when kube-proxy is run as a DaemonSet by default.
-func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
+func masterUpgradeGCE(rawV string, isUpgrade bool, enableKubeProxyDaemonSet bool) error {
 	env := append(os.Environ(), fmt.Sprintf("KUBE_PROXY_DAEMONSET=%v", enableKubeProxyDaemonSet))
 	// TODO: Remove these variables when they're no longer needed for downgrades.
 	if TestContext.EtcdUpgradeVersion != "" && TestContext.EtcdUpgradeStorage != "" {
 		env = append(env,
 			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
 			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
+			"TEST_ETCD_IMAGE=3.1.10")
+	}
+
+	// TODO(xiangpengzhao): this is a workaround. When it's a downgrade test and the target version is at least 1.8.0,
+	// set the target etcd version to be 3.1.10 (assuming the original etcd version is already 3.1.10).
+	// See: https://github.com/kubernetes/kubernetes/issues/57013
+	targetVersion := utilversion.MustParseGeneric(rawV)
+	if !isUpgrade && targetVersion.AtLeast(utilversion.MustParseGeneric("1.8.0")) {
+		env = append(env,
+			"TEST_ETCD_VERSION=3.1.10",
 			"TEST_ETCD_IMAGE=3.1.10")
 	}
 
