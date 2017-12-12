@@ -127,7 +127,7 @@ func (p *plugin) Admit(a admission.Attributes) (err error) {
 
 	toleration := api.Toleration{
 		Key: defaultGPUTaintKey,
-		Effect: api.TaintEffectNoSchedule,
+		Operator: api.TolerationOpExists,
 	}
 
 	if !checkNeedGPU(pod) {
