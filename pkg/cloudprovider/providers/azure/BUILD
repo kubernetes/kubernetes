@@ -59,6 +59,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "azure_loadbalancer_test.go",
         "azure_test.go",
         "azure_util_test.go",
     ],
