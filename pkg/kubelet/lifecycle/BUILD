@@ -39,6 +39,7 @@ go_test(
     library = ":go_default_library",
     deps = [
         "//pkg/kubelet/container:go_default_library",
+        "//pkg/kubelet/util/format:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
     ],
