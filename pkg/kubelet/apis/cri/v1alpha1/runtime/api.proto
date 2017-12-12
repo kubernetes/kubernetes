@@ -560,6 +560,26 @@ message LinuxContainerConfig {
     LinuxContainerSecurityContext security_context = 2;
 }
 
+// WindowsContainerConfig contains platform-specific configuration for
+// Windows-based containers.
+message WindowsContainerConfig {
+    // Resources specification for the container.
+    WindowsContainerResources resources = 1;
+}
+
+// WindowsContainerResources specifies Windows specific configuration for
+// resources.
+message WindowsContainerResources {
+    // CPU shares (relative weight vs. other containers). Default: 0 (not specified).
+    int64 cpu_shares = 1;
+    // Number of CPUs available to the container. Default: 0 (not specified).
+    int64 cpu_count = 2;
+    // Specifies the portion of processor cycles that this container can use as a percentage times 100.
+    int64 cpu_maximum = 3;
+    // Memory limit in bytes. Default: 0 (not specified).
+    int64 memory_limit_in_bytes = 4;
+}
+
 // ContainerMetadata holds all necessary information for building the container
 // name. The container runtime is encouraged to expose the metadata in its user
 // interface for better user experience. E.g., runtime can construct a unique
@@ -647,6 +667,8 @@ message ContainerConfig {
 
     // Configuration specific to Linux containers.
     LinuxContainerConfig linux = 15;
+   // Configuration specific to Windows containers.
+   WindowsContainerConfig windows = 16;
 }
 
 message CreateContainerRequest {
