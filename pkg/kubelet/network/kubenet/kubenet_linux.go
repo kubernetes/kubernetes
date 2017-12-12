@@ -78,7 +78,7 @@ type kubenetNetworkPlugin struct {
 	cniConfig       libcni.CNI
 	bandwidthShaper bandwidth.BandwidthShaper
 	mu              sync.Mutex //Mutex for protecting podIPs map, netConfig, and shaper initialization
-	podIPs          map[kubecontainer.ContainerID]string
+	podIPs          map[string]string
 	mtu             int
 	execer          utilexec.Interface
 	nsenterPath     string
@@ -106,7 +106,7 @@ func NewPlugin(networkPluginDir string) network.NetworkPlugin {
 	sysctl := utilsysctl.New()
 	iptInterface := utiliptables.New(execer, dbus, protocol)
 	return &kubenetNetworkPlugin{
-		podIPs:            make(map[kubecontainer.ContainerID]string),
+		podIPs:            make(map[string]string),
 		execer:            utilexec.New(),
 		iptables:          iptInterface,
 		sysctl:            sysctl,
@@ -353,7 +353,7 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 		plugin.syncEbtablesDedupRules(link.Attrs().HardwareAddr)
 	}
 
-	plugin.podIPs[id] = ip4.String()
+	plugin.podIPs[id.ID] = ip4.String()
 
 	// The first SetUpPod call creates the bridge; get a shaper for the sake of initialization
 	// TODO: replace with CNI traffic shaper plugin
@@ -423,7 +423,7 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 
 	if err := plugin.setup(namespace, name, id, pod, annotations); err != nil {
 		// Make sure everything gets cleaned up on errors
-		podIP, _ := plugin.podIPs[id]
+		podIP, _ := plugin.podIPs[id.ID]
 		if err := plugin.teardown(namespace, name, id, podIP); err != nil {
 			// Not a hard error or warning
 			glog.V(4).Infof("Failed to clean up %s/%s after SetUpPod failure: %v", namespace, name, err)
@@ -467,7 +467,7 @@ func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id k
 			glog.V(4).Infof("Failed to remove pod IP %s from shaper: %v", podIP, err)
 		}
 
-		delete(plugin.podIPs, id)
+		delete(plugin.podIPs, id.ID)
 	}
 
 	if err := plugin.delContainerFromNetwork(plugin.netConfig, network.DefaultInterfaceName, namespace, name, id); err != nil {
@@ -521,7 +521,7 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 	}
 
 	// no cached IP is Ok during teardown
-	podIP, _ := plugin.podIPs[id]
+	podIP, _ := plugin.podIPs[id.ID]
 	if err := plugin.teardown(namespace, name, id, podIP); err != nil {
 		return err
 	}
@@ -540,7 +540,7 @@ func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name s
 	plugin.mu.Lock()
 	defer plugin.mu.Unlock()
 	// Assuming the ip of pod does not change. Try to retrieve ip from kubenet map first.
-	if podIP, ok := plugin.podIPs[id]; ok {
+	if podIP, ok := plugin.podIPs[id.ID]; ok {
 		return &network.PodNetworkStatus{IP: net.ParseIP(podIP)}, nil
 	}
 
@@ -556,7 +556,7 @@ func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name s
 		return nil, err
 	}
 
-	plugin.podIPs[id] = ip.String()
+	plugin.podIPs[id.ID] = ip.String()
 	return &network.PodNetworkStatus{IP: ip}, nil
 }
 
@@ -688,7 +688,7 @@ func (plugin *kubenetNetworkPlugin) ipamGarbageCollection() {
 			continue
 		}
 
-		runningContainerIDs.Insert(strings.TrimSpace(containerID.ID))
+		runningContainerIDs.Insert(strings.TrimSpace(containerID))
 	}
 
 	// release leaked ips

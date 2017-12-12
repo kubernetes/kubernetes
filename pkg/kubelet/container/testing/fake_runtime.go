@@ -423,12 +423,12 @@ func (f *FakeRuntime) GetNetNS(containerID ContainerID) (string, error) {
 	return "", f.Err
 }
 
-func (f *FakeRuntime) GetPodContainerID(pod *Pod) (ContainerID, error) {
+func (f *FakeRuntime) GetPodContainerID(pod *Pod) (string, error) {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "GetPodContainerID")
-	return ContainerID{}, f.Err
+	return "", f.Err
 }
 
 func (f *FakeRuntime) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool, evictNonDeletedPods bool) error {

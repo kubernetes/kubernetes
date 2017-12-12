@@ -899,15 +899,15 @@ func (m *kubeGenericRuntimeManager) GarbageCollect(gcPolicy kubecontainer.Contai
 }
 
 // GetPodContainerID gets pod sandbox ID
-func (m *kubeGenericRuntimeManager) GetPodContainerID(pod *kubecontainer.Pod) (kubecontainer.ContainerID, error) {
+func (m *kubeGenericRuntimeManager) GetPodContainerID(pod *kubecontainer.Pod) (string, error) {
 	formattedPod := kubecontainer.FormatPod(pod)
 	if len(pod.Sandboxes) == 0 {
 		glog.Errorf("No sandboxes are found for pod %q", formattedPod)
-		return kubecontainer.ContainerID{}, fmt.Errorf("sandboxes for pod %q not found", formattedPod)
+		return "", fmt.Errorf("sandboxes for pod %q not found", formattedPod)
 	}
 
 	// return sandboxID of the first sandbox since it is the latest one
-	return pod.Sandboxes[0].ID, nil
+	return pod.Sandboxes[0].ID.ID, nil
 }
 
 // UpdatePodCIDR is just a passthrough method to update the runtimeConfig of the shim
