@@ -344,8 +344,8 @@ type MockEndpoint struct {
 func (m *MockEndpoint) stop() {}
 func (m *MockEndpoint) run()  {}
 
-func (m *MockEndpoint) getDevices() []pluginapi.Device {
-	return []pluginapi.Device{}
+func (m *MockEndpoint) getDevices() map[string]pluginapi.Device {
+	return make(map[string]pluginapi.Device)
 }
 
 func (m *MockEndpoint) callback(resourceName string, added, updated, deleted []pluginapi.Device) {}

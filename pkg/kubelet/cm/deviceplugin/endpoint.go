@@ -26,6 +26,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
 )
 
@@ -36,7 +37,7 @@ type endpoint interface {
 	run()
 	stop()
 	allocate(devs []string) (*pluginapi.AllocateResponse, error)
-	getDevices() []pluginapi.Device
+	getDevices() map[string]pluginapi.Device
 	callback(resourceName string, added, updated, deleted []pluginapi.Device)
 }
 
@@ -77,24 +78,22 @@ func (e *endpointImpl) callback(resourceName string, added, updated, deleted []p
 	e.cb(resourceName, added, updated, deleted)
 }
 
-func (e *endpointImpl) getDevices() []pluginapi.Device {
+// getDevices makes a deep copy of the ID->Device mapping
+func (e *endpointImpl) getDevices() map[string]pluginapi.Device {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
-	var devs []pluginapi.Device
+	devs := make(map[string]pluginapi.Device)
 
-	for _, d := range e.devices {
-		devs = append(devs, d)
+	for id, dev := range e.devices {
+		devs[id] = dev
 	}
 
 	return devs
 }
 
-// run initializes ListAndWatch gRPC call for the device plugin and
-// blocks on receiving ListAndWatch gRPC stream updates. Each ListAndWatch
-// stream update contains a new list of device states. listAndWatch compares the new
-// device states with its cached states to get list of new, updated, and deleted devices.
-// It then issues a callback to pass this information to the device manager which
-// will adjust the resource available information accordingly.
+// run initializes ListAndWatch gRPC call to the device plugin and blocks on
+// receiving gRPC stream updates. Each stream update contains a new list of
+// device states.
 func (e *endpointImpl) run() {
 	stream, err := e.client.ListAndWatch(context.Background(), &pluginapi.Empty{})
 	if err != nil {
@@ -103,14 +102,6 @@ func (e *endpointImpl) run() {
 		return
 	}
 
-	devices := make(map[string]pluginapi.Device)
-
-	e.mutex.Lock()
-	for _, d := range e.devices {
-		devices[d.ID] = d
-	}
-	e.mutex.Unlock()
-
 	for {
 		response, err := stream.Recv()
 		if err != nil {
@@ -118,57 +109,62 @@ func (e *endpointImpl) run() {
 			return
 		}
 
-		devs := response.Devices
-		glog.V(2).Infof("State pushed for device plugin %s", e.resourceName)
-
-		newDevs := make(map[string]*pluginapi.Device)
-		var added, updated []pluginapi.Device
-
-		for _, d := range devs {
-			dOld, ok := devices[d.ID]
-			newDevs[d.ID] = d
-
-			if !ok {
-				glog.V(2).Infof("New device for Endpoint %s: %v", e.resourceName, d)
-
-				devices[d.ID] = *d
-				added = append(added, *d)
-
-				continue
-			}
-
-			if d.Health == dOld.Health {
-				continue
-			}
-
-			if d.Health == pluginapi.Unhealthy {
-				glog.Errorf("Device %s is now Unhealthy", d.ID)
-			} else if d.Health == pluginapi.Healthy {
-				glog.V(2).Infof("Device %s is now Healthy", d.ID)
-			}
-
-			devices[d.ID] = *d
-			updated = append(updated, *d)
-		}
-
-		var deleted []pluginapi.Device
-		for id, d := range devices {
-			if _, ok := newDevs[id]; ok {
-				continue
-			}
-
-			glog.Errorf("Device %s was deleted", d.ID)
-
-			deleted = append(deleted, d)
-			delete(devices, id)
-		}
-
-		e.mutex.Lock()
-		e.devices = devices
-		e.mutex.Unlock()
-
-		e.callback(e.resourceName, added, updated, deleted)
+		glog.V(4).Infof("new device states received for %s", e.resourceName)
+		e.reconcileDevices(response.Devices)
 	}
+}
+
+// reconcileDevices compares the new device states with the cached states to
+// get lists of new, updated and deleted devices.
+// It then passes this information via a callback to the device manager which
+// will adjust the resource available information accordingly.
+func (e *endpointImpl) reconcileDevices(devs []*pluginapi.Device) {
+	devices := e.getDevices()
+	var added, updated, deleted []pluginapi.Device
+
+	newDevs := sets.NewString()
+	for _, d := range devs {
+		devOld, found := devices[d.ID]
+		newDevs.Insert(d.ID)
+
+		if !found {
+			glog.V(4).Infof("new device for endpoint %s: %v", e.resourceName, d)
+			devices[d.ID] = *d
+			added = append(added, *d)
+
+			continue
+		}
+
+		if d.Health == devOld.Health {
+			continue
+		}
+
+		if d.Health == pluginapi.Unhealthy {
+			glog.Warningf("device %s is now unhealthy", d.ID)
+		} else if d.Health == pluginapi.Healthy {
+			glog.V(4).Infof("device %s is now healthy", d.ID)
+		}
+
+		devices[d.ID] = *d
+		updated = append(updated, *d)
+	}
+
+	// detect device deletion
+	for id, d := range devices {
+		if newDevs.Has(id) {
+			continue
+		}
+
+		glog.Warningf("device %s is deleted", d.ID)
+		deleted = append(deleted, d)
+		delete(devices, id)
+	}
+
+	e.mutex.Lock()
+	e.devices = devices
+	e.mutex.Unlock()
+
+	e.callback(e.resourceName, added, updated, deleted)
 }
 
 // allocate issues Allocate gRPC call to the device plugin.
@@ -178,6 +174,7 @@ func (e *endpointImpl) allocate(devs []string) (*pluginapi.AllocateResponse, err
 	})
 }
 
+// stop closes the connection to the device plugin
 func (e *endpointImpl) stop() {
 	e.clientConn.Close()
 }
