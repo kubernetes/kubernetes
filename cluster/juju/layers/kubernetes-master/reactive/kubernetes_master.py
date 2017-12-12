@@ -438,10 +438,10 @@ def etcd_data_change(etcd):
 @when('cdk-addons.configured')
 def send_cluster_dns_detail(kube_control):
     ''' Send cluster DNS info '''
-    # Note that the DNS server doesn't necessarily exist at this point. We know
-    # where we're going to put it, though, so let's send the info anyway.
-    dns_ip = get_dns_ip()
-    kube_control.set_dns(53, hookenv.config('dns_domain'), dns_ip)
+    enableKubeDNS = hookenv.config('enable-kube-dns')
+    dnsDomain = hookenv.config('dns_domain')
+    dns_ip = None if not enableKubeDNS else get_dns_ip()
+    kube_control.set_dns(53, dnsDomain, dns_ip, enableKubeDNS)
 
 
 @when('kube-control.connected')
@@ -563,11 +563,12 @@ def configure_cdk_addons():
     ''' Configure CDK addons '''
     remove_state('cdk-addons.configured')
     dbEnabled = str(hookenv.config('enable-dashboard-addons')).lower()
+    dnsEnabled = str(hookenv.config('enable-kube-dns')).lower()
     args = [
         'arch=' + arch(),
-        'dns-ip=' + get_dns_ip(),
         'dns-domain=' + hookenv.config('dns_domain'),
-        'enable-dashboard=' + dbEnabled
+        'enable-dashboard=' + dbEnabled,
+        'enable-kube-dns=' + dnsEnabled
     ]
     check_call(['snap', 'set', 'cdk-addons'] + args)
     if not addons_ready():
@@ -951,11 +952,10 @@ def create_kubeconfig(kubeconfig, server, ca, key=None, certificate=None,
 
 
 def get_dns_ip():
-    '''Get an IP address for the DNS server on the provided cidr.'''
-    interface = ipaddress.IPv4Interface(service_cidr())
-    # Add .10 at the end of the network
-    ip = interface.network.network_address + 10
-    return ip.exploded
+    cmd = "kubectl get service --namespace kube-system kube-dns --output json"
+    output = check_output(cmd, shell=True).decode()
+    svc = json.loads(output)
+    return svc['spec']['clusterIP']
 
 
 def get_kubernetes_service_ip():

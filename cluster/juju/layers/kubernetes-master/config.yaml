@@ -3,6 +3,10 @@ options:
     type: boolean
     default: True
     description: Deploy the Kubernetes Dashboard and Heapster addons
+  enable-kube-dns:
+    type: boolean
+    default: True
+    description: Deploy kube-dns addon
   dns_domain:
     type: string
     default: cluster.local
