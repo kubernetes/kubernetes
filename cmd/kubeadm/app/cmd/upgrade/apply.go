@@ -153,6 +153,8 @@ func RunApply(flags *applyFlags) error {
 
 	// If the current session is interactive, ask the user whether they really want to upgrade
 	if flags.SessionIsInteractive() {
+		fmt.Println("[upgrade/note] If you wish to diff the manifests postupgrade, cp -r /etc/kubernetes/ to a different location.")
+		fmt.Println("")
 		if err := InteractivelyConfirmUpgrade("Are you sure you want to proceed with the upgrade?"); err != nil {
 			return err
 		}
