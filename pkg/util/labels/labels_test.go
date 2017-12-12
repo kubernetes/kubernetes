@@ -142,10 +142,9 @@ func TestCloneSelectorAndAddLabel(t *testing.T) {
 			},
 		},
 		{
-			labels:           nil,
-			labelKey:         "foo4",
-			labelValue:       "12",
-			matchExpressions: []metav1.LabelSelectorRequirement{{Key: "foo1", Operator: "in"}},
+			labels:     nil,
+			labelKey:   "foo4",
+			labelValue: "12",
 			want: map[string]string{
 				"foo4": "12",
 			},
