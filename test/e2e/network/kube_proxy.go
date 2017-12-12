@@ -167,25 +167,35 @@ var _ = SIGDescribe("Network", func() {
 
 		<-time.After(time.Duration(1) * time.Second)
 
-		By("Checking /proc/net/nf_conntrack for the timeout")
+		// detect ip_conntrack file existed
+		conntrack := "ip_conntrack"
+		conntrackGrep := "sudo cat /proc/net/ip_conntrack " +
+			"| grep 'CLOSE_WAIT.*dst=%v.*dport=%v' " +
+			"| tail -n 1" +
+			"| awk '{print $3}' "
+		if _, err := framework.IssueSSHCommandWithResult(
+			fmt.Sprintf("sudo cat /proc/net/ip_conntrack"),
+			framework.TestContext.Provider,
+			clientNodeInfo.node); err != nil {
+			conntrack = "nf_conntrack"
+			conntrackGrep = "sudo cat /proc/net/nf_conntrack " +
+				"| grep 'CLOSE_WAIT.*dst=%v.*dport=%v' " +
+				"| tail -n 1" +
+				"| awk '{print $5}' "
+		}
+		By(fmt.Sprintf("Checking /proc/net/%s for the timeout", conntrack))
 		// If test flakes occur here, then this check should be performed
 		// in a loop as there may be a race with the client connecting.
 		framework.IssueSSHCommandWithResult(
-			fmt.Sprintf("sudo cat /proc/net/ip_conntrack | grep 'dport=%v'",
-				testDaemonTcpPort),
+			fmt.Sprintf("sudo cat /proc/net/%s | grep 'dport=%v'",
+				conntrack, testDaemonTcpPort),
 			framework.TestContext.Provider,
 			clientNodeInfo.node)
 
 		// Timeout in seconds is available as the third column from
-		// /proc/net/ip_conntrack.
+		// /proc/net/nf_conntrack or /proc/net/ip_conntrack.
 		result, err := framework.IssueSSHCommandWithResult(
-			fmt.Sprintf(
-				"sudo cat /proc/net/ip_conntrack "+
-					"| grep 'CLOSE_WAIT.*dst=%v.*dport=%v' "+
-					"| tail -n 1"+
-					"| awk '{print $3}' ",
-				serverNodeInfo.nodeIp,
-				testDaemonTcpPort),
+			fmt.Sprintf(conntrackGrep, serverNodeInfo.nodeIp, testDaemonTcpPort),
 			framework.TestContext.Provider,
 			clientNodeInfo.node)
 		framework.ExpectNoError(err)
