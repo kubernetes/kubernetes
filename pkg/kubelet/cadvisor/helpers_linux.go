@@ -20,6 +20,7 @@ package cadvisor
 
 import (
 	"fmt"
+	"strings"
 
 	cadvisorfs "github.com/google/cadvisor/fs"
 )
@@ -43,7 +44,7 @@ func (i *imageFsInfoProvider) ImageFsInfoLabel() (string, error) {
 		// This is a temporary workaround to get stats for cri-o from cadvisor
 		// and should be removed.
 		// Related to https://github.com/kubernetes/kubernetes/issues/51798
-		if i.runtimeEndpoint == "/var/run/crio.sock" {
+		if strings.HasSuffix(i.runtimeEndpoint, "crio.sock") {
 			return cadvisorfs.LabelCrioImages, nil
 		}
 	}

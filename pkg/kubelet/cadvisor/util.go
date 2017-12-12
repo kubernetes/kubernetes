@@ -18,6 +18,7 @@ package cadvisor
 
 import (
 	goruntime "runtime"
+	"strings"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapi2 "github.com/google/cadvisor/info/v2"
@@ -71,5 +72,5 @@ func EphemeralStorageCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceLis
 func UsingLegacyCadvisorStats(runtime, runtimeEndpoint string) bool {
 	return runtime == kubetypes.RktContainerRuntime ||
 		(runtime == kubetypes.DockerContainerRuntime && goruntime.GOOS == "linux") ||
-		runtimeEndpoint == "/var/run/crio.sock"
+		strings.HasSuffix(runtimeEndpoint, "crio.sock")
 }
