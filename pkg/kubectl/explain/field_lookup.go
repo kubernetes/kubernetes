@@ -89,6 +89,12 @@ func (f *fieldLookup) VisitKind(k *proto.Kind) {
 	subSchema.Accept(f)
 }
 
+// VisitArbitrary stops the operation and returns itself as the found
+// schema, even if it had more path to walk.
+func (f *fieldLookup) VisitArbitrary(a *proto.Arbitrary) {
+	f.Schema = a
+}
+
 // VisitReference is mostly a passthrough.
 func (f *fieldLookup) VisitReference(r proto.Reference) {
 	if f.SaveLeafSchema(r) {

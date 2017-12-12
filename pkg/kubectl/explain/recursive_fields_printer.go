@@ -62,6 +62,11 @@ func (f *recursiveFieldsPrinter) VisitPrimitive(p *proto.Primitive) {
 	// Nothing to do.
 }
 
+// VisitArbitrary does nothing, since sub-fields aren't defined in the schema.
+func (f *recursiveFieldsPrinter) VisitArbitrary(r *proto.Arbitrary) {
+	// Nothing to do.
+}
+
 // VisitReference is just a passthrough.
 func (f *recursiveFieldsPrinter) VisitReference(r proto.Reference) {
 	r.SubSchema().Accept(f)

@@ -70,6 +70,11 @@ func TestReferenceTypename(t *testing.T) {
 			path:     []string{"field1", "array"},
 			expected: "[]integer",
 		},
+		{
+			// Arbitrary value
+			path:     []string{"field1", "arbitrary"},
+			expected: "anyType",
+		},
 	}
 
 	for _, tt := range tests {

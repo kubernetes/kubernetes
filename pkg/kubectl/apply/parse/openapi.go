@@ -104,6 +104,12 @@ func (v *baseSchemaVisitor) VisitKind(*proto.Kind) {
 	v.Err = fmt.Errorf("Kind type not expected")
 }
 
+// VisitArbitrary implements openapi
+func (v *baseSchemaVisitor) VisitArbitrary(schema *proto.Arbitrary) {
+	v.Kind = "arbitrary"
+	v.Err = fmt.Errorf("Arbitrary type not expected")
+}
+
 // VisitReference implements openapi
 func (v *baseSchemaVisitor) VisitReference(reference proto.Reference) {
 	v.Kind = "reference"

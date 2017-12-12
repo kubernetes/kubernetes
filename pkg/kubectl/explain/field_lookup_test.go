@@ -64,6 +64,11 @@ func TestFindField(t *testing.T) {
 			path: []string{"field1", ""},
 			err:  `field "" does not exist`,
 		},
+		{
+			name:         "test6",
+			path:         []string{"field1", "arbitrary"},
+			expectedPath: "OtherKind.arbitrary",
+		},
 	}
 
 	for _, tt := range tests {

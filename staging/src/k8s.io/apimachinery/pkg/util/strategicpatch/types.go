@@ -74,6 +74,9 @@ func (item *kindItem) VisitMap(schema *openapi.Map) {
 	item.err = errors.New("expected kind, but got map")
 }
 
+func (item *kindItem) VisitArbitrary(schema *openapi.Arbitrary) {
+}
+
 func (item *kindItem) VisitReference(schema openapi.Reference) {
 	if !item.hasVisitKind {
 		schema.SubSchema().Accept(item)
@@ -139,6 +142,9 @@ func (item *sliceItem) VisitArray(schema *openapi.Array) {
 
 func (item *sliceItem) VisitMap(schema *openapi.Map) {
 	item.err = errors.New("expected slice, but got map")
+}
+
+func (item *sliceItem) VisitArbitrary(schema *openapi.Arbitrary) {
 }
 
 func (item *sliceItem) VisitReference(schema openapi.Reference) {

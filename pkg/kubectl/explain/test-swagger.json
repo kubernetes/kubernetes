@@ -69,6 +69,9 @@
             "type": "string"
           }
         },
+        "arbitrary": {
+          "description": "This can be a primitive, an object, or an array"
+        },
         "primitive": {
           "$ref": "#/definitions/PrimitiveDef"
         }

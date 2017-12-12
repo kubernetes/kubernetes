@@ -79,6 +79,9 @@ DESCRIPTION:
      This is another kind of Kind
 
 FIELDS:
+   arbitrary	<anyType>
+     This can be a primitive, an object, or an array
+
    array	<[]integer>
      This array must be an array of int
 
@@ -119,6 +122,14 @@ DESCRIPTION:
      This is an int in an array
 `,
 			path: []string{"field1", "array"},
+		},
+		{
+			want: `FIELD: arbitrary <anyType>
+
+DESCRIPTION:
+     This can be a primitive, an object, or an array
+`,
+			path: []string{"field1", "arbitrary"},
 		},
 	}
 

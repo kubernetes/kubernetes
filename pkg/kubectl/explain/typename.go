@@ -53,6 +53,11 @@ func (t *typeName) VisitPrimitive(p *proto.Primitive) {
 	t.Name = p.Type
 }
 
+// VisitArbitrary simply returns "anyType"
+func (t *typeName) VisitArbitrary(schema *proto.Arbitrary) {
+	t.Name = "anyType"
+}
+
 // VisitReference is just a passthrough.
 func (t *typeName) VisitReference(r proto.Reference) {
 	r.SubSchema().Accept(t)

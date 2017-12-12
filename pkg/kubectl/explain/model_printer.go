@@ -72,6 +72,16 @@ func (m *modelPrinter) PrintDescription(schema proto.Schema) error {
 	return nil
 }
 
+func (m *modelPrinter) PrintField(schema proto.Schema) error {
+	if m.Type == "" {
+		m.Type = GetTypeName(schema)
+	}
+	if err := m.Writer.Write("FIELD:    %s <%s>\n", m.Name, m.Type); err != nil {
+		return err
+	}
+	return m.PrintDescription(schema)
+}
+
 // VisitArray recurses inside the subtype, while collecting the type if
 // not done yet, and the description.
 func (m *modelPrinter) VisitArray(a *proto.Array) {
@@ -124,14 +134,12 @@ func (m *modelPrinter) VisitPrimitive(p *proto.Primitive) {
 		return
 	}
 
-	if m.Type == "" {
-		m.Type = GetTypeName(p)
-	}
-	if err := m.Writer.Write("FIELD:    %s <%s>\n", m.Name, m.Type); err != nil {
-		m.Error = err
-		return
-	}
-	m.Error = m.PrintDescription(p)
+	m.Error = m.PrintField(p)
+}
+
+// VisitArbitrary prints an Arbitrary field type.
+func (m *modelPrinter) VisitArbitrary(a *proto.Arbitrary) {
+	m.Error = m.PrintField(a)
 }
 
 // VisitReference recurses inside the subtype, while collecting the description.

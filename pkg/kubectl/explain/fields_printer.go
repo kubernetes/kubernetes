@@ -70,6 +70,11 @@ func (f *regularFieldsPrinter) VisitPrimitive(p *proto.Primitive) {
 	// Nothing to do. Shouldn't really happen.
 }
 
+// VisitArbitrary prints an Arbitrary type. It stops the recursion.
+func (f *regularFieldsPrinter) VisitArbitrary(a *proto.Arbitrary) {
+	// Nothing to do. Shouldn't really happen.
+}
+
 // VisitReference prints a Reference type. It is just a passthrough.
 func (f *regularFieldsPrinter) VisitReference(r proto.Reference) {
 	r.SubSchema().Accept(f)

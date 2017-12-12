@@ -34,6 +34,7 @@ func TestRecursiveFields(t *testing.T) {
 	}
 
 	want := `field1	<Object>
+   arbitrary	<anyType>
    array	<[]integer>
    int	<integer>
    object	<map[string]string>
