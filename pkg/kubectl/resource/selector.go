@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 )
 
@@ -35,10 +36,11 @@ type Selector struct {
 	Export               bool
 	IncludeUninitialized bool
 	LimitChunks          int64
+	ExpandedResources    []schema.GroupResource
 }
 
 // NewSelector creates a resource selector which hides details of getting items by their label selector.
-func NewSelector(client RESTClient, mapping *meta.RESTMapping, namespace, labelSelector, fieldSelector string, export, includeUninitialized bool, limitChunks int64) *Selector {
+func NewSelector(client RESTClient, mapping *meta.RESTMapping, namespace, labelSelector, fieldSelector string, expandedResources []schema.GroupResource, export, includeUninitialized bool, limitChunks int64) *Selector {
 	return &Selector{
 		Client:               client,
 		Mapping:              mapping,
@@ -48,6 +50,7 @@ func NewSelector(client RESTClient, mapping *meta.RESTMapping, namespace, labelS
 		Export:               export,
 		IncludeUninitialized: includeUninitialized,
 		LimitChunks:          limitChunks,
+		ExpandedResources:    expandedResources,
 	}
 }
 
@@ -86,6 +89,20 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 				}
 				return fmt.Errorf("Unable to find %q that match label selector %q, field selector %q: %v", r.Mapping.Resource, r.LabelSelector, r.FieldSelector, err)
 			}
+
+			isExpanded := false
+			for _, expanded := range r.ExpandedResources {
+				if expanded.Group == r.Mapping.GroupVersionKind.Group && expanded.Resource == r.Mapping.Resource {
+					isExpanded = true
+					break
+				}
+			}
+
+			// ignore forbidden errors from resources expanded from a group alias
+			if isExpanded && errors.IsForbidden(err) {
+				return nil
+			}
+
 			return err
 		}
 		accessor := r.Mapping.MetadataAccessor

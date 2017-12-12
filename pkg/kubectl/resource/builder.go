@@ -63,7 +63,8 @@ type Builder struct {
 	limitChunks          int64
 	requestTransforms    []RequestTransform
 
-	resources []string
+	expandedResources []schema.GroupResource
+	resources         []string
 
 	namespace    string
 	allNamespace bool
@@ -487,9 +488,11 @@ func (b *Builder) ReplaceAliases(input string) string {
 			asStrings := []string{}
 			for _, resource := range resources {
 				if len(resource.Group) == 0 {
+					b.expandedResources = append(b.expandedResources, resource)
 					asStrings = append(asStrings, resource.Resource)
 					continue
 				}
+				b.expandedResources = append(b.expandedResources, resource)
 				asStrings = append(asStrings, resource.Resource+"."+resource.Group)
 			}
 			arg = strings.Join(asStrings, ",")
@@ -727,7 +730,7 @@ func (b *Builder) visitBySelector() *Result {
 		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 			selectorNamespace = ""
 		}
-		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, labelSelector, fieldSelector, b.export, b.includeUninitialized, b.limitChunks))
+		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, labelSelector, fieldSelector, b.expandedResources, b.export, b.includeUninitialized, b.limitChunks))
 	}
 	if b.continueOnError {
 		result.visitor = EagerVisitorList(visitors)
