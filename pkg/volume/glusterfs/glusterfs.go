@@ -704,10 +704,12 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		glog.Errorf("create volume error: %v.", err)
 		return nil, fmt.Errorf("create volume error: %v", err)
 	}
+	mode := v1.PersistentVolumeFilesystem
 	pv := new(v1.PersistentVolume)
 	pv.Spec.PersistentVolumeSource.Glusterfs = glusterfs
 	pv.Spec.PersistentVolumeReclaimPolicy = p.options.PersistentVolumeReclaimPolicy
 	pv.Spec.AccessModes = p.options.PVC.Spec.AccessModes
+	pv.Spec.VolumeMode = &mode
 	if len(pv.Spec.AccessModes) == 0 {
 		pv.Spec.AccessModes = p.plugin.GetAccessModes()
 	}
