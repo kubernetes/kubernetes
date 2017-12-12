@@ -98,13 +98,13 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
-	if _, err := testClient.Core().Nodes().Create(node); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(node); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
 	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
 
-	if _, err := testClient.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -165,13 +165,13 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
-	if _, err := testClient.Core().Nodes().Create(node); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(node); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
 	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
 
-	if _, err := testClient.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -200,7 +200,7 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 
 	pod.Status.Phase = v1.PodSucceeded
 
-	if _, err := testClient.Core().Pods(ns.Name).UpdateStatus(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).UpdateStatus(pod); err != nil {
 		t.Errorf("Failed to update pod : %v", err)
 	}
 
@@ -233,13 +233,13 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
-	if _, err := testClient.Core().Nodes().Create(node); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(node); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
 	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
 
-	if _, err := testClient.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -268,7 +268,7 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 
 	pod.Status.Phase = v1.PodSucceeded
 
-	if _, err := testClient.Core().Pods(ns.Name).UpdateStatus(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).UpdateStatus(pod); err != nil {
 		t.Errorf("Failed to update pod : %v", err)
 	}
 
@@ -396,13 +396,13 @@ func TestPodAddedByDswp(t *testing.T) {
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
-	if _, err := testClient.Core().Nodes().Create(node); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(node); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
 	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
 
-	if _, err := testClient.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 

@@ -40,7 +40,9 @@ type cephfsPlugin struct {
 	host volume.VolumeHost
 }
 
+// Compile time check to enforce that list implements the necessary interface.
 var _ volume.VolumePlugin = &cephfsPlugin{}
+var _ volume.PersistentVolumePlugin = &cephfsPlugin{}
 
 const (
 	cephfsPluginName = "kubernetes.io/cephfs"
