@@ -17,6 +17,7 @@ limitations under the License.
 package checkpoint
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -89,6 +90,20 @@ func TestRemoteConfigMapUID(t *testing.T) {
 		if uidIn != uidOut {
 			t.Errorf("expect UID() to return %q, but got %q", uidIn, uidOut)
 		}
+	}
+}
+
+func TestRemoteConfigMapAPIPath(t *testing.T) {
+	name := "name"
+	namespace := "namespace"
+	cpt := &remoteConfigMap{
+		&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: name, Namespace: namespace, UID: ""}},
+	}
+	expect := fmt.Sprintf(configMapAPIPathFmt, cpt.source.ConfigMapRef.Namespace, cpt.source.ConfigMapRef.Name)
+	// APIPath() method should return the correct path to the referenced resource
+	path := cpt.APIPath()
+	if expect != path {
+		t.Errorf("expect APIPath() to return %q, but got %q", expect, namespace)
 	}
 }
 
