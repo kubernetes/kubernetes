@@ -1403,6 +1403,26 @@ run_kubectl_get_tests() {
   kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/deployments 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/replicasets 200 OK"
 
+
+  # Test no forbidden errors when expanding "all" in kubectl get all
+  # Command
+  kubectl create -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml "${kube_flags[@]}"
+  # Post-condition: valid-pod POD is created
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
+
+  output_message=$(kubectl --namespace default get all --as anonymous-user "${kube_flags[@]}")
+  kube::test::if_has_not_string "${output_message}" "Forbidden"
+  # Command
+  # assign non-admin role to anonymous-user
+  kubectl create "${kube_flags[@]}" rolebinding viewrole --role=view --user=anonymous-user
+  kube::test::get_object_assert rolebinding/viewrole "{{.roleRef.kind}}" 'Role'
+  # ensure a forbidden message still shows for resources that are not part of "all"
+  output_message=$(kubectl --namespace default get all,node --as system:anonymous "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" "cannot list all nodes in the cluster"
+
+  # cleanup
+  kubectl delete pods valid-pod "${kube_flags[@]}"
+
   ### Test kubectl get chunk size
   output_message=$(kubectl --v=6 get clusterrole --chunk-size=10 2>&1 "${kube_flags[@]}")
   # Post-condition: Check if we get a limit and continue
