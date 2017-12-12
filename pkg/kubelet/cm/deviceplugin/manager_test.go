@@ -539,6 +539,28 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 	as.Nil(err)
 	runContainerOpts3 := testManager.GetDeviceRunContainerOptions(newPod, &newPod.Spec.Containers[0])
 	as.Equal(1, len(runContainerOpts3.Envs))
+
+	// Requesting to create a pod with device plugin resources in init-containers should fail.
+	podWithPluginResourcesInInitContainers := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: uuid.NewUUID(),
+		},
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{
+				{
+					Name: string(uuid.NewUUID()),
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceName(resourceName2): resourceQuantity2,
+						},
+					},
+				},
+			},
+		},
+	}
+	err = testManager.Allocate(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: podWithPluginResourcesInInitContainers})
+	errorMsg := fmt.Errorf("device plugin resources: %s is not permitted in init-containers", resourceName2)
+	as.Equal(errorMsg, err, "expect to fail with error %v; got %v", errorMsg, err)
 }
 
 func TestSanitizeNodeAllocatable(t *testing.T) {

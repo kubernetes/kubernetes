@@ -242,8 +242,15 @@ func (m *ManagerImpl) Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.P
 	pod := attrs.Pod
 	// TODO: Reuse devices between init containers and regular containers.
 	for _, container := range pod.Spec.InitContainers {
-		if err := m.allocateContainerResources(pod, &container); err != nil {
-			return err
+		for resourceKey := range container.Resources.Limits {
+			resource := string(resourceKey)
+			_, registeredResource := m.allDevices[resource]
+			_, allocatedResource := m.allocatedDevices[resource]
+			// Do NOT support requesting device plugin resources in init-containers
+			// until we address the reuse issue #56022
+			if registeredResource || allocatedResource {
+				return fmt.Errorf("device plugin resources: %s is not permitted in init-containers", resource)
+			}
 		}
 	}
 	for _, container := range pod.Spec.Containers {
