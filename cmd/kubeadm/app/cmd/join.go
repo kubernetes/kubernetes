@@ -199,7 +199,6 @@ type Join struct {
 
 // NewJoin instantiates Join struct with given arguments
 func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, ignorePreflightErrors sets.String, criSocket string) (*Join, error) {
-	fmt.Println("[kubeadm] WARNING: kubeadm is currently in beta")
 
 	if cfg.NodeName == "" {
 		cfg.NodeName = nodeutil.GetHostname("")

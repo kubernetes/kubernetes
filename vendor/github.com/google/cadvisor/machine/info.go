@@ -49,7 +49,7 @@ func getInfoFromFiles(filePaths string) string {
 			return strings.TrimSpace(string(id))
 		}
 	}
-	glog.Infof("Couldn't collect info from any of the files in %q", filePaths)
+	glog.Warningf("Couldn't collect info from any of the files in %q", filePaths)
 	return ""
 }
 
