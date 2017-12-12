@@ -19,6 +19,7 @@ package framework
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"sort"
 	"strconv"
 	"strings"
@@ -878,7 +879,8 @@ func (j *ServiceTestJig) GetHTTPContent(host string, port int, timeout time.Dura
 }
 
 func testHTTPHealthCheckNodePort(ip string, port int, request string) (bool, error) {
-	url := fmt.Sprintf("http://%s:%d%s", ip, port, request)
+	ipPort := net.JoinHostPort(ip, strconv.Itoa(port))
+	url := fmt.Sprintf("http://%s%s", ipPort, request)
 	if ip == "" || port == 0 {
 		Failf("Got empty IP for reachability check (%s)", url)
 		return false, fmt.Errorf("Invalid input ip or port")
@@ -1292,8 +1294,9 @@ func VerifyServeHostnameServiceUp(c clientset.Interface, ns, host string, expect
 	// Loop a bunch of times - the proxy is randomized, so we want a good
 	// chance of hitting each backend at least once.
 	buildCommand := func(wget string) string {
-		return fmt.Sprintf("for i in $(seq 1 %d); do %s http://%s:%d 2>&1 || true; echo; done",
-			50*len(expectedPods), wget, serviceIP, servicePort)
+		serviceIPPort := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
+		return fmt.Sprintf("for i in $(seq 1 %d); do %s http://%s 2>&1 || true; echo; done",
+			50*len(expectedPods), wget, serviceIPPort)
 	}
 	commands := []func() string{
 		// verify service from node
@@ -1360,8 +1363,12 @@ func VerifyServeHostnameServiceUp(c clientset.Interface, ns, host string, expect
 }
 
 func VerifyServeHostnameServiceDown(c clientset.Interface, host string, serviceIP string, servicePort int) error {
+	ipPort := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
+	// The current versions of curl included in CentOS and RHEL distros
+	// misinterpret square brackets around IPv6 as globbing, so use the -g
+	// argument to disable globbing to handle the IPv6 case.
 	command := fmt.Sprintf(
-		"curl -s --connect-timeout 2 http://%s:%d && exit 99", serviceIP, servicePort)
+		"curl -g -s --connect-timeout 2 http://%s && exit 99", ipPort)
 
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
 		result, err := SSH(command, host, TestContext.Provider)

@@ -143,6 +143,12 @@ func NodeRules() []rbac.PolicyRule {
 		pvcStatusPolicyRule := rbac.NewRule("get", "update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims/status").RuleOrDie()
 		nodePolicyRules = append(nodePolicyRules, pvcStatusPolicyRule)
 	}
+
+	// CSI
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
+		volAttachRule := rbac.NewRule("get").Groups(storageGroup).Resources("volumeattachments").RuleOrDie()
+		nodePolicyRules = append(nodePolicyRules, volAttachRule)
+	}
 	return nodePolicyRules
 }
 
@@ -423,6 +429,13 @@ func ClusterRoles() []rbac.ClusterRole {
 			},
 		},
 		{
+			ObjectMeta: metav1.ObjectMeta{Name: "system:aws-cloud-provider"},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("get", "patch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+				eventsRule(),
+			},
+		},
+		{
 			// a role making the csrapprover controller approve a node client CSR
 			ObjectMeta: metav1.ObjectMeta{Name: "system:certificates.k8s.io:certificatesigningrequests:nodeclient"},
 			Rules: []rbac.PolicyRule{
@@ -476,6 +489,7 @@ func ClusterRoleBindings() []rbac.ClusterRoleBinding {
 		rbac.NewClusterBinding("system:kube-controller-manager").Users(user.KubeControllerManager).BindingOrDie(),
 		rbac.NewClusterBinding("system:kube-dns").SAs("kube-system", "kube-dns").BindingOrDie(),
 		rbac.NewClusterBinding("system:kube-scheduler").Users(user.KubeScheduler).BindingOrDie(),
+		rbac.NewClusterBinding("system:aws-cloud-provider").SAs("kube-system", "aws-cloud-provider").BindingOrDie(),
 
 		// This default binding of the system:node role to the system:nodes group is deprecated in 1.7 with the availability of the Node authorizer.
 		// This leaves the binding, but with an empty set of subjects, so that tightening reconciliation can remove the subject.

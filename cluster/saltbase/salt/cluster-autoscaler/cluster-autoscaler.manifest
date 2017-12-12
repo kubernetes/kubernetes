@@ -25,7 +25,7 @@
         "containers": [
             {
                 "name": "cluster-autoscaler",
-                "image": "gcr.io/google_containers/cluster-autoscaler:v1.1.0-alpha1",
+                "image": "gcr.io/google_containers/cluster-autoscaler:v1.1.0",
                 "livenessProbe": {
                     "httpGet": {
                         "path": "/health-check",

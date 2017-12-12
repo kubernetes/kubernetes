@@ -48,34 +48,36 @@ type upgradeVariables struct {
 }
 
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
-func enforceRequirements(featureGatesString, kubeConfigPath, cfgPath string, printConfig, dryRun bool, ignoreChecksErrors sets.String) (*upgradeVariables, error) {
-	client, err := getClient(kubeConfigPath, dryRun)
+func enforceRequirements(flags *cmdUpgradeFlags, dryRun bool, newK8sVersion string) (*upgradeVariables, error) {
+	client, err := getClient(flags.kubeConfigPath, dryRun)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't create a Kubernetes client from file %q: %v", kubeConfigPath, err)
+		return nil, fmt.Errorf("couldn't create a Kubernetes client from file %q: %v", flags.kubeConfigPath, err)
 	}
 
 	// Run healthchecks against the cluster
-	if err := upgrade.CheckClusterHealth(client, ignoreChecksErrors); err != nil {
+	if err := upgrade.CheckClusterHealth(client, flags.ignorePreflightErrorsSet); err != nil {
 		return nil, fmt.Errorf("[upgrade/health] FATAL: %v", err)
 	}
 
 	// Fetch the configuration from a file or ConfigMap and validate it
-	cfg, err := upgrade.FetchConfiguration(client, os.Stdout, cfgPath)
+	cfg, err := upgrade.FetchConfiguration(client, os.Stdout, flags.cfgPath)
 	if err != nil {
 		return nil, fmt.Errorf("[upgrade/config] FATAL: %v", err)
+	}
+
+	// If a new k8s version should be set, apply the change before printing the config
+	if len(newK8sVersion) != 0 {
+		cfg.KubernetesVersion = newK8sVersion
 	}
 
 	// If the user told us to print this information out; do it!
-	if printConfig {
+	if flags.printConfig {
 		printConfiguration(cfg, os.Stdout)
 	}
 
-	cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString)
+	cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, flags.featureGatesString)
 	if err != nil {
 		return nil, fmt.Errorf("[upgrade/config] FATAL: %v", err)
-	}
-	if err := features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {
-		return nil, err
 	}
 
 	return &upgradeVariables{

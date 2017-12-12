@@ -80,7 +80,7 @@ func checkErr(prefix string, err error, handleErr func(string, int)) {
 func FormatErrMsg(errs []error) string {
 	var errMsg string
 	for _, err := range errs {
-		errMsg = fmt.Sprintf("%s\t-%s\n", errMsg, err.Error())
+		errMsg = fmt.Sprintf("%s\t- %s\n", errMsg, err.Error())
 	}
 	return errMsg
 }

@@ -1,3 +1,6 @@
+### Version 8.4  (Thu November 30 2017 zou nengren @zouyee)
+ - Update kubectl to v1.8.4.
+
 ### Version 6.4-beta.2  (Mon June 12 2017 Jeff Grafton <jgrafton@google.com>)
  - Update kubectl to v1.6.4.
  - Refresh base images.

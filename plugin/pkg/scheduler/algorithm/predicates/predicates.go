@@ -120,7 +120,7 @@ func (c *CachedNodeInfo) GetNodeInfo(id string) (*v1.Node, error) {
 	node, err := c.Get(id)
 
 	if apierrors.IsNotFound(err) {
-		return nil, fmt.Errorf("node '%v' not found", id)
+		return nil, err
 	}
 
 	if err != nil {
@@ -1214,6 +1214,10 @@ func (c *PodAffinityChecker) getMatchingAntiAffinityTerms(pod *v1.Pod, allPods [
 		if affinity != nil && affinity.PodAntiAffinity != nil {
 			existingPodNode, err := c.info.GetNodeInfo(existingPod.Spec.NodeName)
 			if err != nil {
+				if apierrors.IsNotFound(err) {
+					glog.Errorf("Node not found, %v", existingPod.Spec.NodeName)
+					continue
+				}
 				return nil, err
 			}
 			existingPodMatchingTerms, err := getMatchingAntiAffinityTermsOfExistingPod(pod, existingPod, existingPodNode)
@@ -1475,12 +1479,12 @@ func (c *VolumeBindingChecker) predicate(pod *v1.Pod, meta algorithm.PredicateMe
 
 	failReasons := []algorithm.PredicateFailureReason{}
 	if !boundSatisfied {
-		glog.V(5).Info("Bound PVs not satisfied for pod %v/%v, node %q", pod.Namespace, pod.Name, node.Name)
+		glog.V(5).Infof("Bound PVs not satisfied for pod %v/%v, node %q", pod.Namespace, pod.Name, node.Name)
 		failReasons = append(failReasons, ErrVolumeNodeConflict)
 	}
 
 	if !unboundSatisfied {
-		glog.V(5).Info("Couldn't find matching PVs for pod %v/%v, node %q", pod.Namespace, pod.Name, node.Name)
+		glog.V(5).Infof("Couldn't find matching PVs for pod %v/%v, node %q", pod.Namespace, pod.Name, node.Name)
 		failReasons = append(failReasons, ErrVolumeBindConflict)
 	}
 
@@ -1489,6 +1493,6 @@ func (c *VolumeBindingChecker) predicate(pod *v1.Pod, meta algorithm.PredicateMe
 	}
 
 	// All volumes bound or matching PVs found for all unbound PVCs
-	glog.V(5).Info("All PVCs found matches for pod %v/%v, node %q", pod.Namespace, pod.Name, node.Name)
+	glog.V(5).Infof("All PVCs found matches for pod %v/%v, node %q", pod.Namespace, pod.Name, node.Name)
 	return true, nil, nil
 }

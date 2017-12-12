@@ -52,19 +52,20 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 	csiSource, err := getCSISourceFromSpec(spec)
 	if err != nil {
 		glog.Error(log("attacher.Attach failed to get CSI persistent source: %v", err))
-		return "", errors.New("missing CSI persistent volume")
+		return "", err
 	}
 
+	node := string(nodeName)
 	pvName := spec.PersistentVolume.GetName()
-	attachID := getAttachmentName(csiSource.VolumeHandle, string(nodeName))
+	attachID := getAttachmentName(csiSource.VolumeHandle, csiSource.Driver, node)
 
 	attachment := &storage.VolumeAttachment{
 		ObjectMeta: meta.ObjectMeta{
 			Name: attachID,
 		},
 		Spec: storage.VolumeAttachmentSpec{
-			NodeName: string(nodeName),
-			Attacher: csiPluginName,
+			NodeName: node,
+			Attacher: csiSource.Driver,
 			Source: storage.VolumeAttachmentSource{
 				PersistentVolumeName: &pvName,
 			},
@@ -72,7 +73,7 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		Status: storage.VolumeAttachmentStatus{Attached: false},
 	}
 
-	attach, err := c.k8s.StorageV1alpha1().VolumeAttachments().Create(attachment)
+	_, err = c.k8s.StorageV1alpha1().VolumeAttachments().Create(attachment)
 	alreadyExist := false
 	if err != nil {
 		if !apierrs.IsAlreadyExists(err) {
@@ -83,18 +84,22 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 	}
 
 	if alreadyExist {
-		glog.V(4).Info(log("attachment [%v] for volume [%v] already exists (will not be recreated)", attach.GetName(), csiSource.VolumeHandle))
+		glog.V(4).Info(log("attachment [%v] for volume [%v] already exists (will not be recreated)", attachID, csiSource.VolumeHandle))
 	} else {
-		glog.V(4).Info(log("attachment [%v] for volume [%v] created successfully, will start probing for updates", attach.GetName(), csiSource.VolumeHandle))
+		glog.V(4).Info(log("attachment [%v] for volume [%v] created successfully", attachID, csiSource.VolumeHandle))
 	}
 
 	// probe for attachment update here
 	// NOTE: any error from waiting for attachment is logged only.  This is because
 	// the primariy intent of the enclosing method is to create VolumeAttachment.
 	// DONOT return that error here as it is mitigated in attacher.WaitForAttach.
+	volAttachmentOK := true
 	if _, err := c.waitForVolumeAttachment(csiSource.VolumeHandle, attachID, csiTimeout); err != nil {
-		glog.Error(log("attacher.Attach encountered error during attachment probing: %v", err))
+		volAttachmentOK = false
+		glog.Error(log("attacher.Attach attempted to wait for attachment to be ready, but failed with: %v", err))
 	}
+
+	glog.V(4).Info(log("attacher.Attach finished OK with VolumeAttachment verified=%t: attachment object [%s]", volAttachmentOK, attachID))
 
 	return attachID, nil
 }
@@ -151,7 +156,7 @@ func (c *csiAttacher) waitForVolumeAttachment(volumeHandle, attachID string, tim
 }
 
 func (c *csiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
-	glog.V(4).Info(log("probing attachment status for %d volumes ", len(specs)))
+	glog.V(4).Info(log("probing attachment status for %d volume(s) ", len(specs)))
 
 	attached := make(map[*volume.Spec]bool)
 
@@ -165,13 +170,15 @@ func (c *csiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.No
 			glog.Error(log("attacher.VolumesAreAttached failed: %v", err))
 			continue
 		}
-		attachID := getAttachmentName(source.VolumeHandle, string(nodeName))
+
+		attachID := getAttachmentName(source.VolumeHandle, source.Driver, string(nodeName))
 		glog.V(4).Info(log("probing attachment status for VolumeAttachment %v", attachID))
 		attach, err := c.k8s.StorageV1alpha1().VolumeAttachments().Get(attachID, meta.GetOptions{})
 		if err != nil {
 			glog.Error(log("attacher.VolumesAreAttached failed for attach.ID=%v: %v", attachID, err))
 			continue
 		}
+		glog.V(4).Info(log("attacher.VolumesAreAttached attachment [%v] has status.attached=%t", attachID, attach.Status.Attached))
 		attached[spec] = attach.Status.Attached
 	}
 
@@ -201,10 +208,11 @@ func (c *csiAttacher) Detach(volumeName string, nodeName types.NodeName) error {
 		glog.Error(log("detacher.Detach insufficient info encoded in volumeName"))
 		return errors.New("volumeName missing expected data")
 	}
+
+	driverName := parts[0]
 	volID := parts[1]
-	attachID := getAttachmentName(volID, string(nodeName))
-	err := c.k8s.StorageV1alpha1().VolumeAttachments().Delete(attachID, nil)
-	if err != nil {
+	attachID := getAttachmentName(volID, driverName, string(nodeName))
+	if err := c.k8s.StorageV1alpha1().VolumeAttachments().Delete(attachID, nil); err != nil {
 		glog.Error(log("detacher.Detach failed to delete VolumeAttachment [%s]: %v", attachID, err))
 		return err
 	}
@@ -257,12 +265,8 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	return nil
 }
 
-func hashAttachmentName(volName, nodeName string) string {
-	result := sha256.Sum256([]byte(fmt.Sprintf("%s%s", volName, nodeName)))
-	return fmt.Sprintf("%x", result)
-}
-
-func getAttachmentName(volName, nodeName string) string {
-	// TODO consider using a different prefix for attachment
-	return fmt.Sprintf("pv-%s", hashAttachmentName(volName, nodeName))
+// getAttachmentName returns csi-<sha252(volName,csiDriverName,NodeName>
+func getAttachmentName(volName, csiDriverName, nodeName string) string {
+	result := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", volName, csiDriverName, nodeName)))
+	return fmt.Sprintf("csi-%x", result)
 }

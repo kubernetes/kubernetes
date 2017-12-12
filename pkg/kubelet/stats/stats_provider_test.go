@@ -531,10 +531,26 @@ func testTime(base time.Time, seed int) time.Time {
 func checkNetworkStats(t *testing.T, label string, seed int, stats *statsapi.NetworkStats) {
 	assert.NotNil(t, stats)
 	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".Net.Time")
+	assert.EqualValues(t, "eth0", stats.Name, "default interface name is not eth0")
 	assert.EqualValues(t, seed+offsetNetRxBytes, *stats.RxBytes, label+".Net.RxBytes")
 	assert.EqualValues(t, seed+offsetNetRxErrors, *stats.RxErrors, label+".Net.RxErrors")
 	assert.EqualValues(t, seed+offsetNetTxBytes, *stats.TxBytes, label+".Net.TxBytes")
 	assert.EqualValues(t, seed+offsetNetTxErrors, *stats.TxErrors, label+".Net.TxErrors")
+
+	assert.EqualValues(t, 2, len(stats.Interfaces), "network interfaces should contain 2 elements")
+
+	assert.EqualValues(t, "eth0", stats.Interfaces[0].Name, "default interface name is ont eth0")
+	assert.EqualValues(t, seed+offsetNetRxBytes, *stats.Interfaces[0].RxBytes, label+".Net.TxErrors")
+	assert.EqualValues(t, seed+offsetNetRxErrors, *stats.Interfaces[0].RxErrors, label+".Net.TxErrors")
+	assert.EqualValues(t, seed+offsetNetTxBytes, *stats.Interfaces[0].TxBytes, label+".Net.TxErrors")
+	assert.EqualValues(t, seed+offsetNetTxErrors, *stats.Interfaces[0].TxErrors, label+".Net.TxErrors")
+
+	assert.EqualValues(t, "cbr0", stats.Interfaces[1].Name, "cbr0 interface name is ont cbr0")
+	assert.EqualValues(t, 100, *stats.Interfaces[1].RxBytes, label+".Net.TxErrors")
+	assert.EqualValues(t, 100, *stats.Interfaces[1].RxErrors, label+".Net.TxErrors")
+	assert.EqualValues(t, 100, *stats.Interfaces[1].TxBytes, label+".Net.TxErrors")
+	assert.EqualValues(t, 100, *stats.Interfaces[1].TxErrors, label+".Net.TxErrors")
+
 }
 
 func checkCPUStats(t *testing.T, label string, seed int, stats *statsapi.CPUStats) {

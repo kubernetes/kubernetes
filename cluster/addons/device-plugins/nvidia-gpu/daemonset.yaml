@@ -22,6 +22,10 @@ spec:
             - matchExpressions:
               - key: cloud.google.com/gke-accelerator
                 operator: Exists
+      tolerations:
+      - key: "nvidia.com/gpu"
+        effect: "NoSchedule"
+        operator: "Exists"
       hostNetwork: true
       hostPID: true
       volumes:
@@ -32,7 +36,7 @@ spec:
         hostPath:
           path: /dev
       containers:
-      - image: "gcr.io/google-containers/nvidia-gpu-device-plugin@sha256:943a62949cd80c26e7371d4e123dac61b4cc7281390721aaa95f265171094842"
+      - image: "gcr.io/google-containers/nvidia-gpu-device-plugin@sha256:5e3837c3ab99e90d4c19053998ad86239591de4264bc177faad75642b64b723d"
         command: ["/usr/bin/nvidia-gpu-device-plugin", "-logtostderr"]
         name: nvidia-gpu-device-plugin
         resources:

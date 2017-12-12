@@ -231,8 +231,7 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, sk
 }
 
 // NewInit validates given arguments and instantiates Init struct with provided information.
-func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, ignorePreflightErrors sets.String, skipTokenPrint, dryRun bool, criSocket string, verbosityLevel int) (*Init, error) {
-	fmt.Println("[kubeadm] WARNING: kubeadm is currently in beta")
+func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, ignorePreflightErrors sets.String, skipTokenPrint, dryRun bool, criSocket string) (*Init, error) {
 
 	if cfgPath != "" {
 		glog.V(0).Infof("Reading config file from : " + cfgPath)
@@ -463,7 +462,7 @@ func (i *Init) Run(out io.Writer) error {
 		// Temporary control plane is up, now we create our self hosted control
 		// plane components and remove the static manifests:
 		fmt.Println("[self-hosted] Creating self-hosted control plane.")
-		if err := selfhostingphase.CreateSelfHostedControlPlane(manifestDir, kubeConfigDir, i.cfg, client, waiter); err != nil {
+		if err := selfhostingphase.CreateSelfHostedControlPlane(manifestDir, kubeConfigDir, i.cfg, client, waiter, i.dryRun); err != nil {
 			return fmt.Errorf("error creating self hosted control plane: %v", err)
 		}
 	}

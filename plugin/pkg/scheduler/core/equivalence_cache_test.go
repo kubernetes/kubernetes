@@ -238,13 +238,37 @@ func TestPredicateWithECache(t *testing.T) {
 }
 
 func TestGetHashEquivalencePod(t *testing.T) {
-	//  use default equivalence class calculator
-	ecache := NewEquivalenceCache(predicates.GetEquivalencePod)
+
+	testNamespace := "test"
+
+	pvcInfo := predicates.FakePersistentVolumeClaimInfo{
+		{
+			ObjectMeta: metav1.ObjectMeta{UID: "someEBSVol1", Name: "someEBSVol1", Namespace: testNamespace},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "someEBSVol1"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{UID: "someEBSVol2", Name: "someEBSVol2", Namespace: testNamespace},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "someNonEBSVol"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{UID: "someEBSVol3-0", Name: "someEBSVol3-0", Namespace: testNamespace},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "pvcWithDeletedPV"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{UID: "someEBSVol3-1", Name: "someEBSVol3-1", Namespace: testNamespace},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "anotherPVCWithDeletedPV"},
+		},
+	}
+
+	// use default equivalence class generator
+	ecache := NewEquivalenceCache(predicates.NewEquivalencePodGenerator(pvcInfo))
 
 	isController := true
+
 	pod1 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "pod1",
+			Name:      "pod1",
+			Namespace: testNamespace,
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: "v1",
@@ -252,6 +276,24 @@ func TestGetHashEquivalencePod(t *testing.T) {
 					Name:       "rc",
 					UID:        "123",
 					Controller: &isController,
+				},
+			},
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "someEBSVol1",
+						},
+					},
+				},
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "someEBSVol2",
+						},
+					},
 				},
 			},
 		},
@@ -259,7 +301,8 @@ func TestGetHashEquivalencePod(t *testing.T) {
 
 	pod2 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "pod2",
+			Name:      "pod2",
+			Namespace: testNamespace,
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: "v1",
@@ -270,11 +313,118 @@ func TestGetHashEquivalencePod(t *testing.T) {
 				},
 			},
 		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "someEBSVol2",
+						},
+					},
+				},
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "someEBSVol1",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	pod3 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "pod3",
+			Name:      "pod3",
+			Namespace: testNamespace,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "ReplicationController",
+					Name:       "rc",
+					UID:        "567",
+					Controller: &isController,
+				},
+			},
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "someEBSVol3-1",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	pod4 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod4",
+			Namespace: testNamespace,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "ReplicationController",
+					Name:       "rc",
+					UID:        "567",
+					Controller: &isController,
+				},
+			},
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "someEBSVol3-0",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	pod5 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod5",
+			Namespace: testNamespace,
+		},
+	}
+
+	pod6 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod6",
+			Namespace: testNamespace,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "ReplicationController",
+					Name:       "rc",
+					UID:        "567",
+					Controller: &isController,
+				},
+			},
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "no-exists-pvc",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	pod7 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod7",
+			Namespace: testNamespace,
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: "v1",
@@ -287,28 +437,73 @@ func TestGetHashEquivalencePod(t *testing.T) {
 		},
 	}
 
-	hash1, _ := ecache.getHashEquivalencePod(pod1)
-	hash2, _ := ecache.getHashEquivalencePod(pod2)
-	hash3, _ := ecache.getHashEquivalencePod(pod3)
-
-	if hash1 != hash2 {
-		t.Errorf("Failed: pod %v and %v is expected to be equivalent", pod1.Name, pod2.Name)
+	type podInfo struct {
+		pod         *v1.Pod
+		hashIsValid bool
 	}
 
-	if hash2 == hash3 {
-		t.Errorf("Failed: pod %v and %v is not expected to be equivalent", pod2.Name, pod3.Name)
-	}
-
-	// pod4 is a pod without controller ref
-	pod4 := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "pod4",
+	tests := []struct {
+		podInfoList  []podInfo
+		isEquivalent bool
+	}{
+		// pods with same controllerRef and same pvc claim
+		{
+			podInfoList: []podInfo{
+				{pod: pod1, hashIsValid: true},
+				{pod: pod2, hashIsValid: true},
+			},
+			isEquivalent: true,
+		},
+		// pods with same controllerRef but different pvc claim
+		{
+			podInfoList: []podInfo{
+				{pod: pod3, hashIsValid: true},
+				{pod: pod4, hashIsValid: true},
+			},
+			isEquivalent: false,
+		},
+		// pod without controllerRef
+		{
+			podInfoList: []podInfo{
+				{pod: pod5, hashIsValid: false},
+			},
+			isEquivalent: false,
+		},
+		// pods with same controllerRef but one has non-exists pvc claim
+		{
+			podInfoList: []podInfo{
+				{pod: pod6, hashIsValid: false},
+				{pod: pod7, hashIsValid: true},
+			},
+			isEquivalent: false,
 		},
 	}
-	_, found := ecache.getHashEquivalencePod(pod4)
-	if found {
-		t.Errorf("Failed: equivalence hash of pod %v is not expected to be found, but got: %v",
-			pod4.Name, found)
+
+	var (
+		targetPodInfo podInfo
+		targetHash    uint64
+	)
+
+	for _, test := range tests {
+		for i, podInfo := range test.podInfoList {
+			testPod := podInfo.pod
+			hash, isValid := ecache.getHashEquivalencePod(testPod)
+			if isValid != podInfo.hashIsValid {
+				t.Errorf("Failed: pod %v is expected to have valid hash", testPod)
+			}
+			// NOTE(harry): the first element will be used as target so
+			// this logic can't verify more than two inequivalent pods
+			if i == 0 {
+				targetHash = hash
+				targetPodInfo = podInfo
+			} else {
+				if targetHash != hash {
+					if test.isEquivalent {
+						t.Errorf("Failed: pod: %v is expected to be equivalent to: %v", testPod, targetPodInfo.pod)
+					}
+				}
+			}
+		}
 	}
 }
 

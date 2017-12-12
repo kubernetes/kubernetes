@@ -80,8 +80,12 @@ func init() {
 	// Fit is determined by node selector query.
 	factory.RegisterFitPredicate("MatchNodeSelector", predicates.PodMatchNodeSelector)
 
-	// Use equivalence class to speed up predicates & priorities
-	factory.RegisterGetEquivalencePodFunction(predicates.GetEquivalencePod)
+	// Use equivalence class to speed up heavy predicates phase.
+	factory.RegisterGetEquivalencePodFunction(
+		func(args factory.PluginFactoryArgs) algorithm.GetEquivalencePodFunc {
+			return predicates.NewEquivalencePodGenerator(args.PVCInfo)
+		},
+	)
 
 	// ServiceSpreadingPriority is a priority config factory that spreads pods by minimizing
 	// the number of pods (belonging to the same service) on the same node.
@@ -106,6 +110,10 @@ func init() {
 	factory.RegisterPriorityFunction2("ImageLocalityPriority", priorities.ImageLocalityPriorityMap, nil, 1)
 	// Optional, cluster-autoscaler friendly priority function - give used nodes higher priority.
 	factory.RegisterPriorityFunction2("MostRequestedPriority", priorities.MostRequestedPriorityMap, nil, 1)
+	// Prioritizes nodes that satisfy pod's resource limits
+	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
+		factory.RegisterPriorityFunction2("ResourceLimitsPriority", priorities.ResourceLimitsPriorityMap, nil, 1)
+	}
 }
 
 func defaultPredicates() sets.String {

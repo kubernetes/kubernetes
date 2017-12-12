@@ -103,7 +103,7 @@ func getSelfhostingSubCommand() *cobra.Command {
 
 			// Converts the Static Pod-hosted control plane into a self-hosted one
 			waiter := apiclient.NewKubeWaiter(client, 2*time.Minute, os.Stdout)
-			err = selfhosting.CreateSelfHostedControlPlane(constants.GetStaticPodDirectory(), constants.KubernetesDir, internalcfg, client, waiter)
+			err = selfhosting.CreateSelfHostedControlPlane(constants.GetStaticPodDirectory(), constants.KubernetesDir, internalcfg, client, waiter, false)
 			kubeadmutil.CheckErr(err)
 		},
 	}

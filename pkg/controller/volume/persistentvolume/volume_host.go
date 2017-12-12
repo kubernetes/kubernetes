@@ -108,3 +108,7 @@ func (adc *PersistentVolumeController) GetExec(pluginName string) mount.Exec {
 func (ctrl *PersistentVolumeController) GetNodeLabels() (map[string]string, error) {
 	return nil, fmt.Errorf("GetNodeLabels() unsupported in PersistentVolumeController")
 }
+
+func (ctrl *PersistentVolumeController) GetNodeName() types.NodeName {
+	return ""
+}

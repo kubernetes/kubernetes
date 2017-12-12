@@ -41,6 +41,6 @@ func New() (CpuLoadReader, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a netlink based cpuload reader: %v", err)
 	}
-	glog.V(3).Info("Using a netlink-based load reader")
+	glog.V(4).Info("Using a netlink-based load reader")
 	return reader, nil
 }

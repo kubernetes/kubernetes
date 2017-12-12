@@ -1134,9 +1134,13 @@ func deduplicate(collection *[]string) *[]string {
 func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, wantLb bool) (*network.PublicIPAddress, error) {
 	isInternal := requiresInternalLoadBalancer(service)
 	serviceName := getServiceName(service)
-	desiredPipName, err := az.determinePublicIPName(clusterName, service)
-	if err != nil {
-		return nil, err
+	var desiredPipName string
+	var err error
+	if !isInternal && wantLb {
+		desiredPipName, err = az.determinePublicIPName(clusterName, service)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	pips, err := az.ListPIPWithRetry()
@@ -1189,7 +1193,7 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, want
 
 func findProbe(probes []network.Probe, probe network.Probe) bool {
 	for _, existingProbe := range probes {
-		if strings.EqualFold(*existingProbe.Name, *probe.Name) {
+		if strings.EqualFold(*existingProbe.Name, *probe.Name) && *existingProbe.Port == *probe.Port {
 			return true
 		}
 	}

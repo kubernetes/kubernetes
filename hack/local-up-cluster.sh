@@ -464,13 +464,6 @@ function start_apiserver {
         RUNTIME_CONFIG+="admissionregistration.k8s.io/v1alpha1"
     fi
 
-    if [[ ${ADMISSION_CONTROL} == *"AdmissionWebhook"* ]]; then
-        if [[ -n "${RUNTIME_CONFIG}" ]]; then
-          RUNTIME_CONFIG+=","
-        fi
-        RUNTIME_CONFIG+="admissionregistration.k8s.io/v1beta1"
-    fi
-
     runtime_config=""
     if [[ -n "${RUNTIME_CONFIG}" ]]; then
       runtime_config="--runtime-config=${RUNTIME_CONFIG}"
@@ -792,8 +785,11 @@ function start_kubedashboard {
     if [[ "${ENABLE_CLUSTER_DASHBOARD}" = true ]]; then
         echo "Creating kubernetes-dashboard"
         # use kubectl to create the dashboard
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-controller.yaml
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-service.yaml
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-secret.yaml
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-configmap.yaml
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-rbac.yaml
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-controller.yaml
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-service.yaml
         echo "kubernetes-dashboard deployment and service successfully deployed."
     fi
 }

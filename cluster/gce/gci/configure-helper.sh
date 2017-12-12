@@ -57,18 +57,11 @@ function config-ip-firewall {
     iptables -A FORWARD -w -p ICMP -j ACCEPT
   fi
 
-  iptables -w -N KUBE-METADATA-SERVER
-  iptables -w -I FORWARD -p tcp -d 169.254.169.254 --dport 80 -j KUBE-METADATA-SERVER
-
-  if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]]; then
-    iptables -w -A KUBE-METADATA-SERVER -j DROP
-  fi
-
   # Flush iptables nat table
   iptables -w -t nat -F || true
 
-  echo "Add rules for ip masquerade"
   if [[ "${NON_MASQUERADE_CIDR:-}" == "0.0.0.0/0" ]]; then
+    echo "Add rules for ip masquerade"
     iptables -w -t nat -N IP-MASQ
     iptables -w -t nat -A POSTROUTING -m comment --comment "ip-masq: ensure nat POSTROUTING directs all non-LOCAL destination traffic to our custom IP-MASQ chain" -m addrtype ! --dst-type LOCAL -j IP-MASQ
     iptables -w -t nat -A IP-MASQ -d 169.254.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
@@ -76,6 +69,11 @@ function config-ip-firewall {
     iptables -w -t nat -A IP-MASQ -d 172.16.0.0/12 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
     iptables -w -t nat -A IP-MASQ -d 192.168.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
     iptables -w -t nat -A IP-MASQ -m comment --comment "ip-masq: outbound traffic is subject to MASQUERADE (must be last in chain)" -j MASQUERADE
+  fi
+
+  if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]]; then
+    echo "Add rule for metadata concealment"
+    iptables -w -t nat -I PREROUTING -p tcp -d 169.254.169.254 --dport 80 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j DNAT --to-destination 127.0.0.1:988
   fi
 }
 
@@ -585,14 +583,19 @@ EOF
   if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
     use_cloud_config="true"
     if [[ -n "${NODE_TAGS:-}" ]]; then
-      local -r node_tags="${NODE_TAGS}"
+      # split NODE_TAGS into an array by comma.
+      IFS=',' read -r -a node_tags <<< ${NODE_TAGS}
     else
       local -r node_tags="${NODE_INSTANCE_PREFIX}"
     fi
     cat <<EOF >>/etc/gce.conf
-node-tags = ${node_tags}
 node-instance-prefix = ${NODE_INSTANCE_PREFIX}
 EOF
+    for tag in ${node_tags[@]}; do
+      cat <<EOF >>/etc/gce.conf
+node-tags = ${tag}
+EOF
+    done
   fi
   if [[ -n "${MULTIZONE:-}" ]]; then
     use_cloud_config="true"
@@ -602,9 +605,13 @@ EOF
   fi
   if [[ -n "${GCE_ALPHA_FEATURES:-}" ]]; then
     use_cloud_config="true"
-    cat <<EOF >>/etc/gce.conf
-alpha-features = ${GCE_ALPHA_FEATURES}
+    # split GCE_ALPHA_FEATURES into an array by comma.
+    IFS=',' read -r -a alpha_features <<< ${GCE_ALPHA_FEATURES}
+    for feature in ${alpha_features[@]}; do
+      cat <<EOF >>/etc/gce.conf
+alpha-features = ${feature}
 EOF
+    done
   fi
   if [[ -n "${SECONDARY_RANGE_NAME:-}" ]]; then
     use_cloud_config="true"
@@ -1605,6 +1612,24 @@ function start-kube-apiserver {
       # Create the audit webhook config file, and mount it into the apiserver pod.
       local -r audit_webhook_config_file="/etc/audit_webhook.config"
       params+=" --audit-webhook-config-file=${audit_webhook_config_file}"
+      if [[ -n "${ADVANCED_AUDIT_WEBHOOK_BUFFER_SIZE:-}" ]]; then
+        params+=" --audit-webhook-batch-buffer-size=${ADVANCED_AUDIT_WEBHOOK_BUFFER_SIZE}"
+      fi
+      if [[ -n "${ADVANCED_AUDIT_WEBHOOK_MAX_BATCH_SIZE:-}" ]]; then
+        params+=" --audit-webhook-batch-max-size=${ADVANCED_AUDIT_WEBHOOK_MAX_BATCH_SIZE}"
+      fi
+      if [[ -n "${ADVANCED_AUDIT_WEBHOOK_MAX_BATCH_WAIT:-}" ]]; then
+        params+=" --audit-webhook-batch-max-wait=${ADVANCED_AUDIT_WEBHOOK_MAX_BATCH_WAIT}"
+      fi
+      if [[ -n "${ADVANCED_AUDIT_WEBHOOK_THROTTLE_QPS:-}" ]]; then
+        params+=" --audit-webhook-batch-throttle-qps=${ADVANCED_AUDIT_WEBHOOK_THROTTLE_QPS}"
+      fi
+      if [[ -n "${ADVANCED_AUDIT_WEBHOOK_THROTTLE_BURST:-}" ]]; then
+        params+=" --audit-webhook-batch-throttle-burst=${ADVANCED_AUDIT_WEBHOOK_THROTTLE_BURST}"
+      fi
+      if [[ -n "${ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF:-}" ]]; then
+        params+=" --audit-webhook-batch-initial-backoff=${ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF}"
+      fi
       create-master-audit-webhook-config "${audit_webhook_config_file}"
       audit_webhook_config_mount="{\"name\": \"auditwebhookconfigmount\",\"mountPath\": \"${audit_webhook_config_file}\", \"readOnly\": true},"
       audit_webhook_config_volume="{\"name\": \"auditwebhookconfigmount\",\"hostPath\": {\"path\": \"${audit_webhook_config_file}\", \"type\": \"FileOrCreate\"}},"
@@ -1807,9 +1832,15 @@ function start-kube-controller-manager {
   if [[ -n "${CLUSTER_SIGNING_DURATION:-}" ]]; then
     params+=" --experimental-cluster-signing-duration=$CLUSTER_SIGNING_DURATION"
   fi
-  # disable using HPA metrics REST clients if metrics-server isn't enabled
-  if [[ "${ENABLE_METRICS_SERVER:-}" != "true" ]]; then
+  # Disable using HPA metrics REST clients if metrics-server isn't enabled,
+  # or if we want to explicitly disable it by setting HPA_USE_REST_CLIENT.
+  if [[ "${ENABLE_METRICS_SERVER:-}" != "true" ]] ||
+     [[ "${HPA_USE_REST_CLIENTS:-}" == "false" ]]; then
     params+=" --horizontal-pod-autoscaler-use-rest-clients=false"
+  fi
+  if [[ -n "${PV_RECYCLER_OVERRIDE_TEMPLATE:-}" ]]; then
+    params+=" --pv-recycler-pod-template-filepath-nfs=$PV_RECYCLER_OVERRIDE_TEMPLATE"
+    params+=" --pv-recycler-pod-template-filepath-hostpath=$PV_RECYCLER_OVERRIDE_TEMPLATE"
   fi
 
   local -r kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
@@ -1830,6 +1861,8 @@ function start-kube-controller-manager {
   sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_mount}}@@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_volume}}@@g" "${src_file}"
+  sed -i -e "s@{{pv_recycler_mount}}@${PV_RECYCLER_MOUNT}@g" "${src_file}"
+  sed -i -e "s@{{pv_recycler_volume}}@${PV_RECYCLER_VOLUME}@g" "${src_file}"
   cp "${src_file}" /etc/kubernetes/manifests
 }
 
@@ -1997,6 +2030,36 @@ function update-prometheus-to-sd-parameters {
    fi
 }
 
+# Sets up the manifests of coreDNS for k8s addons.
+function setup-coredns-manifest {
+  local -r coredns_file="${dst_dir}/dns/coredns.yaml"
+  mv "${dst_dir}/dns/coredns.yaml.in" "${coredns_file}"
+  # Replace the salt configurations with variable values.
+  sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${coredns_file}"
+  sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${coredns_file}"
+  sed -i -e "s@{{ *pillar\['service_cluster_ip_range'\] *}}@${SERVICE_CLUSTER_IP_RANGE}@g" "${coredns_file}"
+}
+
+# Sets up the manifests of kube-dns for k8s addons.
+function setup-kube-dns-manifest {
+  local -r kubedns_file="${dst_dir}/dns/kube-dns.yaml"
+  mv "${dst_dir}/dns/kube-dns.yaml.in" "${kubedns_file}"
+  if [ -n "${CUSTOM_KUBE_DNS_YAML:-}" ]; then
+    # Replace with custom GKE kube-dns deployment.
+    cat > "${kubedns_file}" <<EOF
+$(echo "$CUSTOM_KUBE_DNS_YAML")
+EOF
+    update-prometheus-to-sd-parameters ${kubedns_file}
+  fi
+  # Replace the salt configurations with variable values.
+  sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${kubedns_file}"
+  sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${kubedns_file}"
+
+  if [[ "${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-}" == "true" ]]; then
+    setup-addon-manifests "addons" "dns-horizontal-autoscaler"
+  fi
+}
+
 # Prepares the manifests of k8s addons, and starts the addon manager.
 # Vars assumed:
 #   CLUSTER_NAME
@@ -2084,10 +2147,10 @@ EOF
       metadata_agent_cpu_request="${METADATA_AGENT_CPU_REQUEST:-40m}"
       metadata_agent_memory_request="${METADATA_AGENT_MEMORY_REQUEST:-50Mi}"
       setup-addon-manifests "addons" "metadata-agent/stackdriver"
-      deployment_yaml="${dst_dir}/metadata-agent/stackdriver/metadata-agent.yaml"
-      sed -i -e "s@{{ metadata_agent_version }}@${METADATA_AGENT_VERSION}@g" "${deployment_yaml}"
-      sed -i -e "s@{{ metadata_agent_cpu_request }}@${metadata_agent_cpu_request}@g" "${deployment_yaml}"
-      sed -i -e "s@{{ metadata_agent_memory_request }}@${metadata_agent_memory_request}@g" "${deployment_yaml}"
+      daemon_set_yaml="${dst_dir}/metadata-agent/stackdriver/metadata-agent.yaml"
+      sed -i -e "s@{{ metadata_agent_version }}@${METADATA_AGENT_VERSION}@g" "${daemon_set_yaml}"
+      sed -i -e "s@{{ metadata_agent_cpu_request }}@${metadata_agent_cpu_request}@g" "${daemon_set_yaml}"
+      sed -i -e "s@{{ metadata_agent_memory_request }}@${metadata_agent_memory_request}@g" "${daemon_set_yaml}"
     fi
   fi
   if [[ "${ENABLE_METRICS_SERVER:-}" == "true" ]]; then
@@ -2098,21 +2161,10 @@ EOF
   fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns"
-    local -r kubedns_file="${dst_dir}/dns/kube-dns.yaml"
-    mv "${dst_dir}/dns/kube-dns.yaml.in" "${kubedns_file}"
-    if [ -n "${CUSTOM_KUBE_DNS_YAML:-}" ]; then
-      # Replace with custom GKE kube-dns deployment.
-      cat > "${kubedns_file}" <<EOF
-$(echo "$CUSTOM_KUBE_DNS_YAML")
-EOF
-      update-prometheus-to-sd-parameters ${kubedns_file}
-    fi
-    # Replace the salt configurations with variable values.
-    sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${kubedns_file}"
-    sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${kubedns_file}"
-
-    if [[ "${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-}" == "true" ]]; then
-      setup-addon-manifests "addons" "dns-horizontal-autoscaler"
+    if [[ "${CLUSTER_DNS_CORE_DNS:-}" == "true" ]]; then
+      setup-coredns-manifest
+    else
+      setup-kube-dns-manifest
     fi
   fi
   if [[ "${ENABLE_CLUSTER_REGISTRY:-}" == "true" ]]; then
@@ -2263,11 +2315,47 @@ function override-kubectl {
     echo "export PATH=${KUBE_HOME}/bin:\$PATH" > /etc/profile.d/kube_env.sh
 }
 
+function override-pv-recycler {
+  if [[ -z "${PV_RECYCLER_OVERRIDE_TEMPLATE:-}" ]]; then
+    echo "PV_RECYCLER_OVERRIDE_TEMPLATE is not set"
+    exit 1
+  fi
+
+  PV_RECYCLER_VOLUME="{\"name\": \"pv-recycler-mount\",\"hostPath\": {\"path\": \"${PV_RECYCLER_OVERRIDE_TEMPLATE}\", \"type\": \"FileOrCreate\"}},"
+  PV_RECYCLER_MOUNT="{\"name\": \"pv-recycler-mount\",\"mountPath\": \"${PV_RECYCLER_OVERRIDE_TEMPLATE}\", \"readOnly\": true},"
+
+  cat > ${PV_RECYCLER_OVERRIDE_TEMPLATE} <<EOF
+version: v1
+kind: Pod
+metadata:
+  generateName: pv-recycler-
+  namespace: default
+spec:
+  activeDeadlineSeconds: 60
+  restartPolicy: Never
+  volumes:
+  - name: vol
+  containers:
+  - name: pv-recycler
+    image: gcr.io/google_containers/busybox:1.27
+    command:
+    - /bin/sh
+    args:
+    - -c
+    - test -e /scrub && rm -rf /scrub/..?* /scrub/.[!.]* /scrub/* && test -z $(ls -A /scrub) || exit 1
+    volumeMounts:
+    - name: vol
+      mountPath: /scrub
+EOF
+}
+
 ########### Main Function ###########
 echo "Start to configure instance for kubernetes"
 
 KUBE_HOME="/home/kubernetes"
 CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
+PV_RECYCLER_OVERRIDE_TEMPLATE="${KUBE_HOME}/kube-manifests/kubernetes/pv-recycler-template.yaml"
+
 if [[ ! -e "${KUBE_HOME}/kube-env" ]]; then
   echo "The ${KUBE_HOME}/kube-env file does not exist!! Terminate cluster initialization."
   exit 1
@@ -2303,6 +2391,7 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   create-master-auth
   create-master-kubelet-auth
   create-master-etcd-auth
+  override-pv-recycler
 else
   create-node-pki
   create-kubelet-kubeconfig ${KUBERNETES_MASTER_NAME}

@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/listeners"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/loadbalancers"
@@ -32,6 +33,7 @@ import (
 	v2pools "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/pools"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	neutronports "github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
 
@@ -292,8 +294,14 @@ func popMember(members []v2pools.Member, addr string, port int) []v2pools.Member
 	return members
 }
 
-func getSecurityGroupName(clusterName string, service *v1.Service) string {
-	return fmt.Sprintf("lb-sg-%s-%s-%s", clusterName, service.Namespace, service.Name)
+func getSecurityGroupName(service *v1.Service) string {
+	securityGroupName := fmt.Sprintf("lb-sg-%s-%s-%s", service.UID, service.Namespace, service.Name)
+	//OpenStack requires that the name of a security group is shorter than 255 bytes.
+	if len(securityGroupName) > 255 {
+		securityGroupName = securityGroupName[:255]
+	}
+
+	return securityGroupName
 }
 
 func getSecurityGroupRules(client *gophercloud.ServiceClient, opts rules.ListOpts) ([]rules.SecGroupRule, error) {
@@ -560,6 +568,52 @@ func getNodeSecurityGroupIDForLB(compute *gophercloud.ServiceClient, nodes []*v1
 	return nodeSecurityGroupIDs.List(), nil
 }
 
+// getFloatingNetworkIdForLB returns a floating-network-id for cluster.
+func getFloatingNetworkIdForLB(client *gophercloud.ServiceClient) (string, error) {
+	var floatingNetworkIds []string
+
+	type NetworkWithExternalExt struct {
+		networks.Network
+		external.NetworkExternalExt
+	}
+
+	err := networks.List(client, networks.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+		var externalNetwork []NetworkWithExternalExt
+		err := networks.ExtractNetworksInto(page, &externalNetwork)
+		if err != nil {
+			return false, err
+		}
+
+		for _, externalNet := range externalNetwork {
+			if externalNet.External {
+				floatingNetworkIds = append(floatingNetworkIds, externalNet.ID)
+			}
+		}
+
+		if len(floatingNetworkIds) > 1 {
+			return false, ErrMultipleResults
+		}
+		return true, nil
+	})
+	if err != nil {
+		if isNotFound(err) {
+			return "", ErrNotFound
+		}
+
+		if err == ErrMultipleResults {
+			glog.V(4).Infof("find multiple external networks, pick the first one when there are no explicit configuration.")
+			return floatingNetworkIds[0], nil
+		}
+		return "", err
+	}
+
+	if len(floatingNetworkIds) == 0 {
+		return "", ErrNotFound
+	}
+
+	return floatingNetworkIds[0], nil
+}
+
 // TODO: This code currently ignores 'region' and always creates a
 // loadbalancer in only the current OpenStack region.  We should take
 // a list of regions (from config) and query/create loadbalancers in
@@ -590,7 +644,13 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 	}
 
 	floatingPool := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerFloatingNetworkId, lbaas.opts.FloatingNetworkId)
-	glog.V(4).Infof("EnsureLoadBalancer using floatingPool: %v", floatingPool)
+	if len(floatingPool) == 0 {
+		var err error
+		floatingPool, err = getFloatingNetworkIdForLB(lbaas.network)
+		if err != nil {
+			glog.Warningf("Failed to find floating-network-id for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
+		}
+	}
 
 	var internalAnnotation bool
 	internal := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerInternal, "false")
@@ -600,7 +660,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		internalAnnotation = true
 	case "false":
 		if len(floatingPool) != 0 {
-			glog.V(4).Infof("Ensure an external loadbalancer service.")
+			glog.V(4).Infof("Ensure an external loadbalancer service, using floatingPool: %v", floatingPool)
 			internalAnnotation = false
 		} else {
 			return nil, fmt.Errorf("floating-network-id or loadbalancer.openstack.org/floating-network-id should be specified when ensuring an external loadbalancer service")
@@ -868,6 +928,14 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 			return status, err
 		}
+
+		// delete the old Security Group for the service
+		// Related to #53764
+		// TODO(FengyunPan): Remove it at V1.10
+		err = lbaas.EnsureOldSecurityGroupDeleted(clusterName, apiService)
+		if err != nil {
+			return status, fmt.Errorf("Failed to delete the Security Group for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
+		}
 	}
 
 	return status, nil
@@ -899,7 +967,7 @@ func (lbaas *LbaasV2) ensureSecurityGroup(clusterName string, apiService *v1.Ser
 	}
 
 	// ensure security group for LB
-	lbSecGroupName := getSecurityGroupName(clusterName, apiService)
+	lbSecGroupName := getSecurityGroupName(apiService)
 	lbSecGroupID, err := groups.IDFromName(lbaas.network, lbSecGroupName)
 	if err != nil {
 		// check whether security group does not exist
@@ -914,8 +982,8 @@ func (lbaas *LbaasV2) ensureSecurityGroup(clusterName string, apiService *v1.Ser
 	if len(lbSecGroupID) == 0 {
 		// create security group
 		lbSecGroupCreateOpts := groups.CreateOpts{
-			Name:        getSecurityGroupName(clusterName, apiService),
-			Description: fmt.Sprintf("Securty Group for loadbalancer service %s/%s", apiService.Namespace, apiService.Name),
+			Name:        getSecurityGroupName(apiService),
+			Description: fmt.Sprintf("Security Group for %s/%s Service LoadBalancer in cluster %s", apiService.Namespace, apiService.Name, clusterName),
 		}
 
 		lbSecGroup, err := groups.Create(lbaas.network, lbSecGroupCreateOpts).Extract()
@@ -1174,7 +1242,7 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 	if lbaas.opts.ManageSecurityGroups {
 		err := lbaas.updateSecurityGroup(clusterName, service, nodes, loadbalancer)
 		if err != nil {
-			return fmt.Errorf("failed to update Securty Group for loadbalancer service %s/%s: %v", service.Namespace, service.Name, err)
+			return fmt.Errorf("failed to update Security Group for loadbalancer service %s/%s: %v", service.Namespace, service.Name, err)
 		}
 	}
 
@@ -1197,7 +1265,7 @@ func (lbaas *LbaasV2) updateSecurityGroup(clusterName string, apiService *v1.Ser
 	removals := original.Difference(current)
 
 	// Generate Name
-	lbSecGroupName := getSecurityGroupName(clusterName, apiService)
+	lbSecGroupName := getSecurityGroupName(apiService)
 	lbSecGroupID, err := groups.IDFromName(lbaas.network, lbSecGroupName)
 	if err != nil {
 		return fmt.Errorf("error occurred finding security group: %s: %v", lbSecGroupName, err)
@@ -1368,50 +1436,131 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 
 	// Delete the Security Group
 	if lbaas.opts.ManageSecurityGroups {
-		// Generate Name
-		lbSecGroupName := getSecurityGroupName(clusterName, service)
-		lbSecGroupID, err := groups.IDFromName(lbaas.network, lbSecGroupName)
+		err := lbaas.EnsureSecurityGroupDeleted(clusterName, service)
 		if err != nil {
-			// check whether security group does not exist
-			_, ok := err.(*gophercloud.ErrResourceNotFound)
-			if ok {
-				// It is OK when the security group has been deleted by others.
-				return nil
-			} else {
-				return fmt.Errorf("error occurred finding security group: %s: %v", lbSecGroupName, err)
+			return fmt.Errorf("Failed to delete Security Group for loadbalancer service %s/%s: %v", service.Namespace, service.Name, err)
+		}
+
+		// delete the old Security Group for the service
+		// Related to #53764
+		// TODO(FengyunPan): Remove it at V1.10
+		err = lbaas.EnsureOldSecurityGroupDeleted(clusterName, service)
+		if err != nil {
+			return fmt.Errorf("Failed to delete the Security Group for loadbalancer service %s/%s: %v", service.Namespace, service.Name, err)
+		}
+	}
+
+	return nil
+}
+
+// EnsureSecurityGroupDeleted deleting security group for specific loadbalancer service.
+func (lbaas *LbaasV2) EnsureSecurityGroupDeleted(clusterName string, service *v1.Service) error {
+	// Generate Name
+	lbSecGroupName := getSecurityGroupName(service)
+	lbSecGroupID, err := groups.IDFromName(lbaas.network, lbSecGroupName)
+	if err != nil {
+		// check whether security group does not exist
+		_, ok := err.(*gophercloud.ErrResourceNotFound)
+		if ok {
+			// It is OK when the security group has been deleted by others.
+			return nil
+		} else {
+			return fmt.Errorf("Error occurred finding security group: %s: %v", lbSecGroupName, err)
+		}
+	}
+
+	lbSecGroup := groups.Delete(lbaas.network, lbSecGroupID)
+	if lbSecGroup.Err != nil && !isNotFound(lbSecGroup.Err) {
+		return lbSecGroup.Err
+	}
+
+	if len(lbaas.opts.NodeSecurityGroupIDs) == 0 {
+		// Just happen when nodes have not Security Group, or should not happen
+		// UpdateLoadBalancer and EnsureLoadBalancer can set lbaas.opts.NodeSecurityGroupIDs when it is empty
+		// And service controller call UpdateLoadBalancer to set lbaas.opts.NodeSecurityGroupIDs when controller manager service is restarted.
+		glog.Warningf("Can not find node-security-group from all the nodes of this cluster when delete loadbalancer service %s/%s",
+			service.Namespace, service.Name)
+	} else {
+		// Delete the rules in the Node Security Group
+		for _, nodeSecurityGroupID := range lbaas.opts.NodeSecurityGroupIDs {
+			opts := rules.ListOpts{
+				SecGroupID:    nodeSecurityGroupID,
+				RemoteGroupID: lbSecGroupID,
+			}
+			secGroupRules, err := getSecurityGroupRules(lbaas.network, opts)
+
+			if err != nil && !isNotFound(err) {
+				msg := fmt.Sprintf("Error finding rules for remote group id %s in security group id %s: %v", lbSecGroupID, nodeSecurityGroupID, err)
+				return fmt.Errorf(msg)
+			}
+
+			for _, rule := range secGroupRules {
+				res := rules.Delete(lbaas.network, rule.ID)
+				if res.Err != nil && !isNotFound(res.Err) {
+					return fmt.Errorf("Error occurred deleting security group rule: %s: %v", rule.ID, res.Err)
+				}
 			}
 		}
+	}
 
-		lbSecGroup := groups.Delete(lbaas.network, lbSecGroupID)
-		if lbSecGroup.Err != nil && !isNotFound(lbSecGroup.Err) {
-			return lbSecGroup.Err
-		}
+	return nil
+}
 
-		if len(lbaas.opts.NodeSecurityGroupIDs) == 0 {
-			// Just happen when nodes have not Security Group, or should not happen
-			// UpdateLoadBalancer and EnsureLoadBalancer can set lbaas.opts.NodeSecurityGroupIDs when it is empty
-			// And service controller call UpdateLoadBalancer to set lbaas.opts.NodeSecurityGroupIDs when controller manager service is restarted.
-			glog.Warningf("Can not find node-security-group from all the nodes of this cluser when delete loadbalancer service %s/%s",
-				service.Namespace, service.Name)
+// getOldSecurityGroupName is used to get the old security group name
+// Related to #53764
+// TODO(FengyunPan): Remove it at V1.10
+func getOldSecurityGroupName(clusterName string, service *v1.Service) string {
+	return fmt.Sprintf("lb-sg-%s-%v", clusterName, service.Name)
+}
+
+// EnsureOldSecurityGroupDeleted deleting old security group for specific loadbalancer service.
+// Related to #53764
+// TODO(FengyunPan): Remove it at V1.10
+func (lbaas *LbaasV2) EnsureOldSecurityGroupDeleted(clusterName string, service *v1.Service) error {
+	glog.V(4).Infof("EnsureOldSecurityGroupDeleted(%v, %v)", clusterName, service)
+	// Generate Name
+	lbSecGroupName := getOldSecurityGroupName(clusterName, service)
+	lbSecGroupID, err := groups.IDFromName(lbaas.network, lbSecGroupName)
+	if err != nil {
+		// check whether security group does not exist
+		_, ok := err.(*gophercloud.ErrResourceNotFound)
+		if ok {
+			// It is OK when the security group has been deleted by others.
+			return nil
 		} else {
-			// Delete the rules in the Node Security Group
-			for _, nodeSecurityGroupID := range lbaas.opts.NodeSecurityGroupIDs {
-				opts := rules.ListOpts{
-					SecGroupID:    nodeSecurityGroupID,
-					RemoteGroupID: lbSecGroupID,
-				}
-				secGroupRules, err := getSecurityGroupRules(lbaas.network, opts)
+			return fmt.Errorf("Error occurred finding security group: %s: %v", lbSecGroupName, err)
+		}
+	}
 
-				if err != nil && !isNotFound(err) {
-					msg := fmt.Sprintf("Error finding rules for remote group id %s in security group id %s: %v", lbSecGroupID, nodeSecurityGroupID, err)
-					return fmt.Errorf(msg)
-				}
+	lbSecGroup := groups.Delete(lbaas.network, lbSecGroupID)
+	if lbSecGroup.Err != nil && !isNotFound(lbSecGroup.Err) {
+		return lbSecGroup.Err
+	}
 
-				for _, rule := range secGroupRules {
-					res := rules.Delete(lbaas.network, rule.ID)
-					if res.Err != nil && !isNotFound(res.Err) {
-						return fmt.Errorf("error occurred deleting security group rule: %s: %v", rule.ID, res.Err)
-					}
+	if len(lbaas.opts.NodeSecurityGroupIDs) == 0 {
+		// Just happen when nodes have not Security Group, or should not happen
+		// UpdateLoadBalancer and EnsureLoadBalancer can set lbaas.opts.NodeSecurityGroupIDs when it is empty
+		// And service controller call UpdateLoadBalancer to set lbaas.opts.NodeSecurityGroupIDs when controller manager service is restarted.
+		glog.Warningf("Can not find node-security-group from all the nodes of this cluster when delete loadbalancer service %s/%s",
+			service.Namespace, service.Name)
+	} else {
+		// Delete the rules in the Node Security Group
+		for _, nodeSecurityGroupID := range lbaas.opts.NodeSecurityGroupIDs {
+			opts := rules.ListOpts{
+				SecGroupID:    nodeSecurityGroupID,
+				RemoteGroupID: lbSecGroupID,
+			}
+			secGroupRules, err := getSecurityGroupRules(lbaas.network, opts)
+
+			if err != nil && !isNotFound(err) {
+				msg := fmt.Sprintf("Error finding rules for remote group id %s in security group id %s: %v", lbSecGroupID, nodeSecurityGroupID, err)
+				return fmt.Errorf(msg)
+			}
+
+			for _, rule := range secGroupRules {
+				res := rules.Delete(lbaas.network, rule.ID)
+				if res.Err != nil && !isNotFound(res.Err) {
+					return fmt.Errorf("Error occurred deleting security group rule: %s: %v", rule.ID, res.Err)
 				}
 			}
 		}
