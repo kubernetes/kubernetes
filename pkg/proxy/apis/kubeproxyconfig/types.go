@@ -152,17 +152,20 @@ type KubeProxyConfiguration struct {
 	ConfigSyncPeriod metav1.Duration
 }
 
-// Currently two modes of proxying are available: 'userspace' (older, stable) or 'iptables'
-// (newer, faster). If blank, use the best-available proxy (currently iptables, but may
-// change in future versions).  If the iptables proxy is selected, regardless of how, but
-// the system's kernel or iptables versions are insufficient, this always falls back to the
-// userspace proxy.
+// Currently, four modes of proxying are available total: 'userspace' (older, stable), 'iptables'
+// (newer, faster), 'ipvs', and 'kernelspace' (Windows only, newer).
+//
+// If blank, use the best-available proxy (currently iptables, but may change in
+// future versions). If the iptables proxy is selected, regardless of how, but
+// the system's kernel or iptables versions are insufficient, this always falls
+// back to the userspace proxy.
 type ProxyMode string
 
 const (
-	ProxyModeUserspace ProxyMode = "userspace"
-	ProxyModeIPTables  ProxyMode = "iptables"
-	ProxyModeIPVS      ProxyMode = "ipvs"
+	ProxyModeUserspace   ProxyMode = "userspace"
+	ProxyModeIPTables    ProxyMode = "iptables"
+	ProxyModeIPVS        ProxyMode = "ipvs"
+	ProxyModeKernelspace ProxyMode = "kernelspace"
 )
 
 // IPVSSchedulerMethod is the algorithm for allocating TCP connections and
