@@ -1,35 +1,21 @@
-// Copyright 2016, Google Inc.
-// All rights reserved.
+// Copyright 2016 gRPC authors.
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 syntax = "proto3";
 
 package grpc.lb.v1;
+option go_package = "messages";
 
 message Duration {
   // Signed seconds of the span of time. Must be from -315,576,000,000
@@ -46,7 +32,6 @@ message Duration {
 }
 
 message Timestamp {
-
   // Represents seconds of UTC time since Unix epoch
   // 1970-01-01T00:00:00Z. Must be from 0001-01-01T00:00:00Z to
   // 9999-12-31T23:59:59Z inclusive.
@@ -57,12 +42,6 @@ message Timestamp {
   // that count forward in time. Must be from 0 to 999,999,999
   // inclusive.
   int32 nanos = 2;
-}
-
-service LoadBalancer {
-  // Bidirectional rpc to get a list of servers.
-  rpc BalanceLoad(stream LoadBalanceRequest)
-      returns (stream LoadBalanceResponse);
 }
 
 message LoadBalanceRequest {
@@ -142,11 +121,8 @@ message ServerList {
   // unless instructed otherwise via the client_config.
   repeated Server servers = 1;
 
-  // Indicates the amount of time that the client should consider this server
-  // list as valid. It may be considered stale after waiting this interval of
-  // time after receiving the list. If the interval is not positive, the
-  // client can assume the list is valid until the next list is received.
-  Duration expiration_interval = 3;
+  // Was google.protobuf.Duration expiration_interval.
+  reserved 3;
 }
 
 // Contains server information. When none of the [drop_for_*] fields are true,
