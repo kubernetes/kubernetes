@@ -28,7 +28,15 @@ kube::etcd::validate() {
   }
 
   # validate it is not running
-  if pgrep -x etcd >/dev/null 2>&1; then
+  case "$(uname -s)" in
+    Linux)
+      etcd_running="pgrep --ns $$ --nslist net -x etcd"
+      ;;
+    *)
+      etcd_running="pgrep -x etcd"
+      ;;
+  esac
+  if $etcd_running >/dev/null 2>&1; then
     kube::log::usage "etcd appears to already be running on this machine (`pgrep -xl etcd`) (or its a zombie and you need to kill its parent)."
     kube::log::usage "retry after you resolve this etcd error."
     exit 1
