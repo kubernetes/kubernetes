@@ -35,6 +35,7 @@ import (
 	etcd "github.com/coreos/etcd/client"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/etcdserver"
+	"github.com/coreos/etcd/etcdserver/api/etcdhttp"
 	"github.com/coreos/etcd/etcdserver/api/v2http"
 	"github.com/coreos/etcd/integration"
 	"github.com/coreos/etcd/pkg/testutil"
@@ -154,6 +155,7 @@ func configureTestCluster(t *testing.T, name string, https bool) *EtcdTestServer
 		if err != nil {
 			t.Fatal(err)
 		}
+		m.AuthToken = "simple"
 	} else {
 		cln := newLocalListener(t)
 		m.ClientListeners = []net.Listener{cln}
@@ -189,9 +191,9 @@ func (m *EtcdTestServer) launch(t *testing.T) error {
 	if m.s, err = etcdserver.NewServer(&m.ServerConfig); err != nil {
 		return fmt.Errorf("failed to initialize the etcd server: %v", err)
 	}
-	m.s.SyncTicker = time.Tick(500 * time.Millisecond)
+	m.s.SyncTicker = time.NewTicker(500 * time.Millisecond)
 	m.s.Start()
-	m.raftHandler = &testutil.PauseableHandler{Next: v2http.NewPeerHandler(m.s)}
+	m.raftHandler = &testutil.PauseableHandler{Next: etcdhttp.NewPeerHandler(m.s)}
 	for _, ln := range m.PeerListeners {
 		hs := &httptest.Server{
 			Listener: ln,
