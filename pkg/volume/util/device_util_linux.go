@@ -20,6 +20,7 @@ package util
 
 import (
 	"errors"
+	"path"
 	"strings"
 )
 
@@ -58,4 +59,24 @@ func findDeviceForPath(path string, io IoUtil) (string, error) {
 		return parts[2], nil
 	}
 	return "", errors.New("Illegal path for device " + devicePath)
+}
+
+// FindSlaveDevicesOnMultipath given a dm name like /dev/dm-1, find all devices
+// which are managed by the devicemapper dm-1.
+func (handler *deviceHandler) FindSlaveDevicesOnMultipath(dm string) []string {
+	var devices []string
+	io := handler.get_io
+	// Split path /dev/dm-1 into "", "dev", "dm-1"
+	parts := strings.Split(dm, "/")
+	if len(parts) != 3 || !strings.HasPrefix(parts[1], "dev") {
+		return devices
+	}
+	disk := parts[2]
+	slavesPath := path.Join("/sys/block/", disk, "/slaves/")
+	if files, err := io.ReadDir(slavesPath); err == nil {
+		for _, f := range files {
+			devices = append(devices, path.Join("/dev/", f.Name()))
+		}
+	}
+	return devices
 }
