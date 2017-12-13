@@ -68,53 +68,30 @@ func EnsureProxyAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Inte
 	if err != nil {
 		return fmt.Errorf("couldn't parse kubernetes version %q: %v", cfg.KubernetesVersion, err)
 	}
-	var proxyConfigMapBytes, proxyDaemonSetBytes []byte
-	if k8sVersion.AtLeast(kubeadmconstants.MinimumKubeProxyComponentConfigVersion) {
-		proxyConfigMapBytes, err = kubeadmutil.ParseTemplate(KubeProxyConfigMap19,
-			struct {
-				MasterEndpoint string
-				ProxyConfig    string
-			}{
-				MasterEndpoint: masterEndpoint,
-				ProxyConfig:    proxyBytes,
-			})
-		if err != nil {
-			return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)
-		}
-		proxyDaemonSetBytes, err = kubeadmutil.ParseTemplate(KubeProxyDaemonSet19, struct{ ImageRepository, Arch, Version, ImageOverride, ClusterCIDR, MasterTaintKey, CloudTaintKey string }{
-			ImageRepository: cfg.GetControlPlaneImageRepository(),
-			Arch:            runtime.GOARCH,
-			Version:         kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion),
-			ImageOverride:   cfg.UnifiedControlPlaneImage,
-			MasterTaintKey:  kubeadmconstants.LabelNodeRoleMaster,
-			CloudTaintKey:   algorithm.TaintExternalCloudProvider,
+	if k8sVersion.LessThan(kubeadmconstants.MinimumKubeProxyComponentConfigVersion) {
+		return fmt.Errorf("Kubernetes version %q is lower than kubadm can support. Please upgrade kubelet", k8sVersion)
+	}
+	proxyConfigMapBytes, err := kubeadmutil.ParseTemplate(KubeProxyConfigMap,
+		struct {
+			MasterEndpoint string
+			ProxyConfig    string
+		}{
+			MasterEndpoint: masterEndpoint,
+			ProxyConfig:    proxyBytes,
 		})
-		if err != nil {
-			return fmt.Errorf("error when parsing kube-proxy daemonset template: %v", err)
-		}
-	} else {
-		proxyConfigMapBytes, err = kubeadmutil.ParseTemplate(KubeProxyConfigMap18,
-			struct {
-				MasterEndpoint string
-			}{
-				MasterEndpoint: masterEndpoint,
-			})
-		if err != nil {
-			return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)
-		}
-
-		proxyDaemonSetBytes, err = kubeadmutil.ParseTemplate(KubeProxyDaemonSet18, struct{ ImageRepository, Arch, Version, ImageOverride, ClusterCIDR, MasterTaintKey, CloudTaintKey string }{
-			ImageRepository: cfg.GetControlPlaneImageRepository(),
-			Arch:            runtime.GOARCH,
-			Version:         kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion),
-			ImageOverride:   cfg.UnifiedControlPlaneImage,
-			ClusterCIDR:     getClusterCIDR(cfg.Networking.PodSubnet),
-			MasterTaintKey:  kubeadmconstants.LabelNodeRoleMaster,
-			CloudTaintKey:   algorithm.TaintExternalCloudProvider,
-		})
-		if err != nil {
-			return fmt.Errorf("error when parsing kube-proxy daemonset template: %v", err)
-		}
+	if err != nil {
+		return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)
+	}
+	proxyDaemonSetBytes, err := kubeadmutil.ParseTemplate(KubeProxyDaemonSet, struct{ ImageRepository, Arch, Version, ImageOverride, ClusterCIDR, MasterTaintKey, CloudTaintKey string }{
+		ImageRepository: cfg.GetControlPlaneImageRepository(),
+		Arch:            runtime.GOARCH,
+		Version:         kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion),
+		ImageOverride:   cfg.UnifiedControlPlaneImage,
+		MasterTaintKey:  kubeadmconstants.LabelNodeRoleMaster,
+		CloudTaintKey:   algorithm.TaintExternalCloudProvider,
+	})
+	if err != nil {
+		return fmt.Errorf("error when parsing kube-proxy daemonset template: %v", err)
 	}
 	if err := createKubeProxyAddon(proxyConfigMapBytes, proxyDaemonSetBytes, client); err != nil {
 		return err

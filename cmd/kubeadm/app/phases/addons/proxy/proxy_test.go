@@ -114,16 +114,7 @@ func TestCompileManifests(t *testing.T) {
 		expected bool
 	}{
 		{
-			manifest: KubeProxyConfigMap18,
-			data: struct {
-				MasterEndpoint, ProxyConfig string
-			}{
-				MasterEndpoint: "foo",
-			},
-			expected: true,
-		},
-		{
-			manifest: KubeProxyConfigMap19,
+			manifest: KubeProxyConfigMap,
 			data: struct {
 				MasterEndpoint, ProxyConfig string
 			}{
@@ -133,20 +124,7 @@ func TestCompileManifests(t *testing.T) {
 			expected: true,
 		},
 		{
-			manifest: KubeProxyDaemonSet18,
-			data: struct{ ImageRepository, Arch, Version, ImageOverride, ClusterCIDR, MasterTaintKey, CloudTaintKey string }{
-				ImageRepository: "foo",
-				Arch:            "foo",
-				Version:         "foo",
-				ImageOverride:   "foo",
-				ClusterCIDR:     "foo",
-				MasterTaintKey:  "foo",
-				CloudTaintKey:   "foo",
-			},
-			expected: true,
-		},
-		{
-			manifest: KubeProxyDaemonSet19,
+			manifest: KubeProxyDaemonSet,
 			data: struct{ ImageRepository, Arch, Version, ImageOverride, MasterTaintKey, CloudTaintKey string }{
 				ImageRepository: "foo",
 				Arch:            "foo",
