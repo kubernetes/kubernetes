@@ -78,6 +78,36 @@ func (pdev podDevices) containerDevices(podUID, contName, resource string) sets.
 	return devs.deviceIds
 }
 
+// Populates allocatedResources with the device resources allocated to the specified <podUID, contName>.
+func (pdev podDevices) addContainerAllocatedResources(podUID, contName string, allocatedResources map[string]sets.String) {
+	containers, exists := pdev[podUID]
+	if !exists {
+		return
+	}
+	resources, exists := containers[contName]
+	if !exists {
+		return
+	}
+	for resource, devices := range resources {
+		allocatedResources[resource] = allocatedResources[resource].Union(devices.deviceIds)
+	}
+}
+
+// Removes the device resources allocated to the specified <podUID, contName> from allocatedResources.
+func (pdev podDevices) removeContainerAllocatedResources(podUID, contName string, allocatedResources map[string]sets.String) {
+	containers, exists := pdev[podUID]
+	if !exists {
+		return
+	}
+	resources, exists := containers[contName]
+	if !exists {
+		return
+	}
+	for resource, devices := range resources {
+		allocatedResources[resource] = allocatedResources[resource].Difference(devices.deviceIds)
+	}
+}
+
 // Returns all of devices allocated to the pods being tracked, keyed by resourceName.
 func (pdev podDevices) devices() map[string]sets.String {
 	ret := make(map[string]sets.String)
