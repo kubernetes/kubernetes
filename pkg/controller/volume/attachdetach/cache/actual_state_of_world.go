@@ -630,6 +630,9 @@ func (asw *actualStateOfWorld) GetVolumesToReportAttached() map[types.NodeName][
 }
 
 func (asw *actualStateOfWorld) GetNodesToUpdateStatusFor() map[types.NodeName]nodeToUpdateStatusFor {
+	asw.Lock()
+	defer asw.Unlock()
+	
 	return asw.nodesToUpdateStatusFor
 }
 
