@@ -20,6 +20,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -430,6 +431,21 @@ func getUpgradeContext(c discovery.DiscoveryInterface, upgradeTarget string) (*u
 
 	if len(upgradeTarget) == 0 {
 		return upgCtx, nil
+	}
+
+	// fetch latest available gke version for upgrading target
+	if upgradeTarget == "gke-latest" {
+		// get latest supported master version
+		cmd := exec.Command("gcloud", "container", "get-server-config", fmt.Sprintf("--project=%v", framework.TestContext.CloudConfig.ProjectID), fmt.Sprintf("--zone=%v", framework.TestContext.CloudConfig.Zone), "--format=value(validMasterVersions)")
+		res, err := cmd.CombinedOutput()
+		if err != nil {
+			return nil, err
+		}
+		versions := strings.Split(string(res), ";")
+		if len(versions) == 0 {
+			return nil, fmt.Errorf("invalid gke master version string: %s", string(res))
+		}
+		upgradeTarget = "v" + versions[0]
 	}
 
 	next, err := framework.RealVersion(upgradeTarget)
