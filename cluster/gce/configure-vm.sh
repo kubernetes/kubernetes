@@ -90,6 +90,38 @@ ensure-local-disks() {
 function config-ip-firewall {
   echo "Configuring IP firewall rules"
 
+  # Do not consider loopback addresses as martian source or destination while
+  # routing. This enables the use of 127/8 for local routing purposes.
+  sysctl -w net.ipv4.conf.all.route_localnet=1
+
+  # We need to add rules to accept all TCP/UDP/ICMP packets.
+  if iptables -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
+    echo "Add rules to accept all inbound TCP/UDP/ICMP packets"
+    iptables -A INPUT -p TCP -j ACCEPT
+    iptables -A INPUT -p UDP -j ACCEPT
+    iptables -A INPUT -p ICMP -j ACCEPT
+  fi
+  if iptables -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
+    echo "Add rules to accept all forwarded TCP/UDP/ICMP packets"
+    iptables -A FORWARD -p TCP -j ACCEPT
+    iptables -A FORWARD -p UDP -j ACCEPT
+    iptables -A FORWARD -p ICMP -j ACCEPT
+  fi
+
+  # Flush iptables nat table
+  iptables -t nat -F || true
+
+  if [[ "${NON_MASQUERADE_CIDR:-}" == "0.0.0.0/0" ]]; then
+    echo "Add rules for ip masquerade"
+    iptables -t nat -N IP-MASQ
+    iptables -t nat -A POSTROUTING -m comment --comment "ip-masq: ensure nat POSTROUTING directs all non-LOCAL destination traffic to our custom IP-MASQ chain" -m addrtype ! --dst-type LOCAL -j IP-MASQ
+    iptables -t nat -A IP-MASQ -d 169.254.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -t nat -A IP-MASQ -d 10.0.0.0/8 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -t nat -A IP-MASQ -d 172.16.0.0/12 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -t nat -A IP-MASQ -d 192.168.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -t nat -A IP-MASQ -m comment --comment "ip-masq: outbound traffic is subject to MASQUERADE (must be last in chain)" -j MASQUERADE
+  fi
+  
   iptables -N KUBE-METADATA-SERVER
   iptables -I FORWARD -p tcp -d 169.254.169.254 --dport 80 -j KUBE-METADATA-SERVER
 
@@ -177,7 +209,6 @@ function remove-docker-artifacts() {
   apt-get-install bridge-utils
 
   # Remove docker artifacts on minion nodes, if present
-  iptables -t nat -F || true
   ifconfig docker0 down || true
   brctl delbr docker0 || true
   echo "== Finished deleting docker0 =="
@@ -841,12 +872,12 @@ fi
 if [[ -z "${is_push}" ]]; then
   echo "== kube-up node config starting =="
   set-broken-motd
-  config-ip-firewall
   ensure-basic-networking
   fix-apt-sources
   ensure-install-dir
   ensure-packages
   set-kube-env
+  config-ip-firewall    
   auto-upgrade
   ensure-local-disks
   create-node-pki
