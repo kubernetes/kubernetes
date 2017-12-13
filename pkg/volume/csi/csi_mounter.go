@@ -269,21 +269,21 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 
 	// TODO make all assertion calls private within the client itself
 	if err := csi.AssertSupportedVersion(ctx, csiVersion); err != nil {
-		glog.Errorf(log("mounter.SetUpAt failed to assert version: %v", err))
+		glog.Errorf(log("mounter.TearDownAt failed to assert version: %v", err))
 		return err
 	}
 
 	if err := csi.NodeUnpublishVolume(ctx, volID, dir); err != nil {
-		glog.Errorf(log("mounter.SetUpAt failed: %v", err))
+		glog.Errorf(log("mounter.TearDownAt failed: %v", err))
 		return err
 	}
 
 	// clean mount point dir
 	if err := removeMountDir(c.plugin, dir); err != nil {
-		glog.Error(log("mounter.SetUpAt failed to clean mount dir [%s]: %v", dir, err))
+		glog.Error(log("mounter.TearDownAt failed to clean mount dir [%s]: %v", dir, err))
 		return err
 	}
-	glog.V(4).Infof(log("mounte.SetUpAt successfully unmounted dir [%s]", dir))
+	glog.V(4).Infof(log("mounte.TearDownAt successfully unmounted dir [%s]", dir))
 
 	return nil
 }
