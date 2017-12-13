@@ -65,7 +65,7 @@ func TestObserveAdmissionController(t *testing.T) {
 		"version":     resource.Version,
 		"resource":    resource.Resource,
 		"subresource": "subresource",
-		"type":        "validate",
+		"type":        "admit",
 		"rejected":    "false",
 	}
 	expectHistogramCountTotal(t, "apiserver_admission_controller_admission_latencies_seconds", wantLabels, 1)
@@ -133,7 +133,7 @@ func TestWithMetrics(t *testing.T) {
 			"validate-interfaces-dont-validate",
 			"some-ns",
 			admission.Create,
-			&validatingFakeHandler{admission.NewHandler(admission.Create, admission.Update), true},
+			&validatingFakeHandler{admission.NewHandler(admission.Create, admission.Update), false},
 			true, false,
 		},
 		{
@@ -148,7 +148,7 @@ func TestWithMetrics(t *testing.T) {
 			"some-ns",
 			admission.Create,
 			&mutatingFakeHandler{admission.NewHandler(admission.Create, admission.Update), false},
-			true, false,
+			false, true,
 		},
 	} {
 		Metrics.reset()
@@ -165,7 +165,7 @@ func TestWithMetrics(t *testing.T) {
 			continue
 		}
 
-		filter := map[string]string{"rejected": "false"}
+		filter := map[string]string{"type": "admit", "rejected": "false"}
 		if !test.admit {
 			filter["rejected"] = "true"
 		}
@@ -175,7 +175,7 @@ func TestWithMetrics(t *testing.T) {
 			expectHistogramCountTotal(t, "apiserver_admission_controller_admission_latencies_seconds", filter, 0)
 		}
 
-		if err == nil {
+		if err != nil {
 			// skip validation step if mutation failed
 			continue
 		}
@@ -190,8 +190,8 @@ func TestWithMetrics(t *testing.T) {
 			continue
 		}
 
-		filter = map[string]string{"rejected": "false"}
-		if !test.admit {
+		filter = map[string]string{"type": "validate", "rejected": "false"}
+		if !test.validate {
 			filter["rejected"] = "true"
 		}
 		if _, validating := test.handler.(admission.ValidationInterface); validating {
@@ -239,7 +239,7 @@ type mutatingFakeHandler struct {
 	admit bool
 }
 
-func (h *mutatingFakeHandler) Amit(a admission.Attributes) (err error) {
+func (h *mutatingFakeHandler) Admit(a admission.Attributes) (err error) {
 	if h.admit {
 		return nil
 	}
