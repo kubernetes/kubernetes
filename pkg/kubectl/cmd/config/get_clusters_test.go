@@ -28,20 +28,25 @@ import (
 
 type getClustersTest struct {
 	config   clientcmdapi.Config
+	names    []string
+	noHeader string
+	output   string
 	expected string
 }
 
-func TestGetClusters(t *testing.T) {
+func TestGetClustersAll(t *testing.T) {
 	conf := clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{
 			"minikube": {Server: "https://192.168.0.99"},
 		},
 	}
 	test := getClustersTest{
-		config: conf,
-		expected: `NAME
-minikube
-`,
+		config:   conf,
+		names:    []string{},
+		noHeader: "false",
+		output:   "",
+		expected: `NAME       SERVER
+minikube   https://192.168.0.99` + "\n",
 	}
 
 	test.run(t)
@@ -50,7 +55,76 @@ minikube
 func TestGetClustersEmpty(t *testing.T) {
 	test := getClustersTest{
 		config:   clientcmdapi.Config{},
-		expected: "NAME\n",
+		expected: "NAME      SERVER\n",
+	}
+
+	test.run(t)
+}
+
+func TestGetClustersAllNoHeader(t *testing.T) {
+	conf := clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"minikube": {Server: "https://192.168.0.99"},
+		},
+	}
+	test := getClustersTest{
+		config:   conf,
+		names:    []string{},
+		noHeader: "true",
+		output:   "",
+		expected: "minikube   https://192.168.0.99\n",
+	}
+
+	test.run(t)
+}
+
+func TestGetClustersAllName(t *testing.T) {
+	conf := clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"minikube": {Server: "https://192.168.0.99"},
+		},
+	}
+	test := getClustersTest{
+		config:   conf,
+		names:    []string{},
+		noHeader: "false",
+		output:   "name",
+		expected: "minikube\n",
+	}
+
+	test.run(t)
+}
+
+func TestGetClustersAllNameNoHeader(t *testing.T) {
+	conf := clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"minikube": {Server: "https://192.168.0.99"},
+		},
+	}
+	test := getClustersTest{
+		config:   conf,
+		names:    []string{},
+		noHeader: "true",
+		output:   "name",
+		expected: "minikube\n",
+	}
+
+	test.run(t)
+}
+
+func TestGetClustersSelectOneOfTwo(t *testing.T) {
+	conf := clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"minikube": {Server: "https://192.168.0.99"},
+			"dev":      {Server: "https://192.168.0.100"},
+		},
+	}
+	test := getClustersTest{
+		config:   conf,
+		names:    []string{"minikube"},
+		noHeader: "true",
+		output:   "name",
+		expected: "minikube\n",
 	}
 
 	test.run(t)
@@ -72,12 +146,12 @@ func (test getClustersTest) run(t *testing.T) {
 	pathOptions.EnvVar = ""
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdConfigGetClusters(buf, pathOptions)
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error executing command: %v", err)
-	}
+	cmd.Flags().Set("output", test.output)
+	cmd.Flags().Set("no-headers", test.noHeader)
+	cmd.Run(cmd, test.names)
 	if len(test.expected) != 0 {
 		if buf.String() != test.expected {
-			t.Errorf("expected %v, but got %v", test.expected, buf.String())
+			t.Errorf("expected:\n %v, \nbut got:\n %v", test.expected, buf.String())
 		}
 		return
 	}
