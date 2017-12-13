@@ -36,7 +36,7 @@ const (
 
 var (
 	membersBucketName        = []byte("members")
-	membersRemovedBuckedName = []byte("members_removed")
+	membersRemovedBucketName = []byte("members_removed")
 	clusterBucketName        = []byte("cluster")
 
 	StoreMembersPrefix        = path.Join(storePrefix, "members")
@@ -62,7 +62,7 @@ func mustDeleteMemberFromBackend(be backend.Backend, id types.ID) {
 	tx := be.BatchTx()
 	tx.Lock()
 	tx.UnsafeDelete(membersBucketName, mkey)
-	tx.UnsafePut(membersRemovedBuckedName, mkey, []byte("removed"))
+	tx.UnsafePut(membersRemovedBucketName, mkey, []byte("removed"))
 	tx.Unlock()
 }
 
@@ -164,7 +164,7 @@ func mustCreateBackendBuckets(be backend.Backend) {
 	tx.Lock()
 	defer tx.Unlock()
 	tx.UnsafeCreateBucket(membersBucketName)
-	tx.UnsafeCreateBucket(membersRemovedBuckedName)
+	tx.UnsafeCreateBucket(membersRemovedBucketName)
 	tx.UnsafeCreateBucket(clusterBucketName)
 }
 
