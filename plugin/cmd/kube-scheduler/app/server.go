@@ -70,6 +70,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -342,8 +343,8 @@ through the API as necessary.`,
 		glog.Fatalf("unable to apply config defaults: %v", err)
 	}
 
-	flags := cmd.Flags()
-	AddFlags(opts, flags)
+	AddFlags(opts, pflag.CommandLine)
+	utilflag.InitFlags()
 
 	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
 
