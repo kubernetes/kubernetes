@@ -124,7 +124,7 @@ DESCRIPTION:
 			path: []string{"field1", "array"},
 		},
 		{
-			want: `FIELD: arbitrary <anyType>
+			want: `FIELD:    arbitrary <anyType>
 
 DESCRIPTION:
      This can be a primitive, an object, or an array

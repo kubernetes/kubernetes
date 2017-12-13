@@ -75,6 +75,7 @@ func (item *kindItem) VisitMap(schema *openapi.Map) {
 }
 
 func (item *kindItem) VisitArbitrary(schema *openapi.Arbitrary) {
+	item.err = errors.New("expected kind, but got arbitrary value")
 }
 
 func (item *kindItem) VisitReference(schema openapi.Reference) {
@@ -145,6 +146,7 @@ func (item *sliceItem) VisitMap(schema *openapi.Map) {
 }
 
 func (item *sliceItem) VisitArbitrary(schema *openapi.Arbitrary) {
+	item.err = errors.New("expected slice, but got arbitrary value")
 }
 
 func (item *sliceItem) VisitReference(schema openapi.Reference) {
