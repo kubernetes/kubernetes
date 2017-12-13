@@ -1,6 +1,7 @@
 package jsoniter
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -157,6 +158,8 @@ func (iter *Iterator) readAny() Any {
 		return iter.readArrayAny()
 	case '-':
 		return iter.readNumberAny(false)
+	case 0:
+		return &invalidAny{baseAny{}, errors.New("input is empty")}
 	default:
 		return iter.readNumberAny(true)
 	}
