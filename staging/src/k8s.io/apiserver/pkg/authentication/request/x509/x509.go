@@ -99,7 +99,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		}
 	}
 
-	remaining := req.TLS.PeerCertificates[0].NotAfter.Sub(time.Now())
+	remaining := time.Until(req.TLS.PeerCertificates[0].NotAfter)
 	clientCertificateExpirationHistogram.Observe(remaining.Seconds())
 	chains, err := req.TLS.PeerCertificates[0].Verify(optsCopy)
 	if err != nil {

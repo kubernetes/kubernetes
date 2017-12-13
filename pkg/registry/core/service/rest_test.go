@@ -992,7 +992,7 @@ func TestUpdateServiceWithConflictingNamespace(t *testing.T) {
 	}
 	if err == nil {
 		t.Errorf("Expected an error, but we didn't get one")
-	} else if strings.Index(err.Error(), "Service.Namespace does not match the provided context") == -1 {
+	} else if !strings.Contains(err.Error(), "Service.Namespace does not match the provided context") {
 		t.Errorf("Expected 'Service.Namespace does not match the provided context' error, got '%s'", err.Error())
 	}
 }

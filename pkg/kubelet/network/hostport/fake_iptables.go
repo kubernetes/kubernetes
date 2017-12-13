@@ -203,7 +203,7 @@ func (f *fakeIPTables) EnsureRule(position utiliptables.RulePosition, tableName 
 	ruleArgs := make([]string, 0)
 	for _, arg := range args {
 		// quote args with internal spaces (like comments)
-		if strings.Index(arg, " ") >= 0 {
+		if strings.Contains(arg, " ") {
 			arg = fmt.Sprintf("\"%s\"", arg)
 		}
 		ruleArgs = append(ruleArgs, arg)

@@ -317,7 +317,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface) er
 				fmt.Fprintf(errW, "can't parse expiration time of bootstrap token %s\n", secret.Name)
 				continue
 			}
-			ttl = printers.ShortHumanDuration(expireTime.Sub(time.Now()))
+			ttl = printers.ShortHumanDuration(time.Until(expireTime))
 			expires = expireTime.Format(time.RFC3339)
 		}
 

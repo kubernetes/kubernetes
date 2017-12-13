@@ -500,7 +500,7 @@ func translateTimestamp(timestamp metav1.Time) string {
 	if timestamp.IsZero() {
 		return "<unknown>"
 	}
-	return printers.ShortHumanDuration(time.Now().Sub(timestamp.Time))
+	return printers.ShortHumanDuration(time.Since(timestamp.Time))
 }
 
 var (
