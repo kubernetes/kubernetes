@@ -516,6 +516,14 @@ type FsStats struct {
 	WeightedIoTime uint64 `json:"weighted_io_time"`
 }
 
+// per device GpuStats
+type GpuStats struct {
+	// key is gpu device id
+ 	SMUtils  map[string]string `json:"sm_utils"`
+	MemUtils map[string]string `json:"mem_utils"`
+	FBSize   map[string]string `json:"fb_size"`
+}
+
 type ContainerStats struct {
 	// The time of this stat point.
 	Timestamp time.Time    `json:"timestamp"`
@@ -529,6 +537,9 @@ type ContainerStats struct {
 
 	// Task load stats
 	TaskStats LoadStats `json:"task_stats,omitempty"`
+
+	// GPU statistics, key is device
+	GPU GpuStats `json:"gpu,omitempty"`
 
 	// Custom metrics from all collectors
 	CustomMetrics map[string][]MetricVal `json:"custom_metrics,omitempty"`
