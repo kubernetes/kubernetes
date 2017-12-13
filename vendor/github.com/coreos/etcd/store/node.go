@@ -332,7 +332,6 @@ func (n *node) UpdateTTL(expireTime time.Time) {
 	n.ExpireTime = expireTime
 	// push into ttl heap
 	n.store.ttlKeyHeap.push(n)
-	return
 }
 
 // Compare function compares node index and value with provided ones.

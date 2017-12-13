@@ -18,7 +18,6 @@ go_library(
     deps = [
         "//vendor/github.com/coreos/etcd/pkg/types:go_default_library",
         "//vendor/github.com/coreos/pkg/capnslog:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "//vendor/github.com/coreos/etcd/pkg/cpuutil:go_default_library",

@@ -47,6 +47,7 @@ type RaftStatusGetter interface {
 }
 
 type AuthGetter interface {
+	AuthInfoFromCtx(ctx context.Context) (*auth.AuthInfo, error)
 	AuthStore() auth.AuthStore
 }
 
@@ -152,7 +153,7 @@ type authMaintenanceServer struct {
 }
 
 func (ams *authMaintenanceServer) isAuthenticated(ctx context.Context) error {
-	authInfo, err := ams.ag.AuthStore().AuthInfoFromCtx(ctx)
+	authInfo, err := ams.ag.AuthInfoFromCtx(ctx)
 	if err != nil {
 		return err
 	}
