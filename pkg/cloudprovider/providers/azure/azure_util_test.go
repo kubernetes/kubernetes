@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetVmssInstanceID(t *testing.T) {
+func TestGetScaleSetVMInstanceID(t *testing.T) {
 	tests := []struct {
 		msg                string
 		machineName        string
@@ -43,7 +43,7 @@ func TestGetVmssInstanceID(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		instanceID, err := getVmssInstanceID(test.machineName)
+		instanceID, err := getScaleSetVMInstanceID(test.machineName)
 		if test.expectError {
 			assert.Error(t, err, fmt.Sprintf("TestCase[%d]: %s", i, test.msg))
 		} else {
