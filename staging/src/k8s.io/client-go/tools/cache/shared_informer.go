@@ -305,7 +305,7 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 			resyncPeriod = minimumResyncPeriod
 		}
 
-		if resyncPeriod < s.resyncCheckPeriod {
+		if resyncPeriod < s.resyncCheckPeriod || s.resyncCheckPeriod == 0 {
 			if s.started {
 				glog.Warningf("resyncPeriod %d is smaller than resyncCheckPeriod %d and the informer has already started. Changing it to %d", resyncPeriod, s.resyncCheckPeriod, s.resyncCheckPeriod)
 				resyncPeriod = s.resyncCheckPeriod

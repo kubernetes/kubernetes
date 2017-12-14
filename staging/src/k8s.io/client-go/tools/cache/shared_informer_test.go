@@ -251,3 +251,77 @@ func TestResyncCheckPeriod(t *testing.T) {
 		t.Errorf("expected %d, got %d", e, a)
 	}
 }
+
+func TestUpgradeResyncCheckPeriod(t *testing.T) {
+	source := fcache.NewFakeControllerSource()
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}})
+
+	// create the shared informer and resync every 1s
+	informer := NewSharedInformer(source, &v1.Pod{}, 0).(*sharedIndexInformer)
+
+	clock := clock.NewFakeClock(time.Now())
+	informer.clock = clock
+	informer.processor.clock = clock
+
+	// listener 1, never resync
+	listener1 := newTestListener("listener1", 0, "pod1", "pod2")
+	informer.AddEventHandlerWithResyncPeriod(listener1, listener1.resyncPeriod)
+
+	// listener 2, resync every 2s
+	listener2 := newTestListener("listener2", 2*time.Second, "pod1", "pod2")
+	informer.AddEventHandlerWithResyncPeriod(listener2, listener2.resyncPeriod)
+
+	if e, a := 2*time.Second, informer.resyncCheckPeriod; e != a {
+		t.Errorf("expected %d, got %d", e, a)
+	}
+
+	/*
+		if e, a := time.Duration(0), informer.processor.listeners[0].resyncPeriod; e != a {
+			t.Errorf("expected %d, got %d", e, a)
+		}
+		if e, a := 1*time.Minute, informer.processor.listeners[1].resyncPeriod; e != a {
+			t.Errorf("expected %d, got %d", e, a)
+		}
+		if e, a := 55*time.Second, informer.processor.listeners[2].resyncPeriod; e != a {
+			t.Errorf("expected %d, got %d", e, a)
+		}
+		if e, a := 5*time.Second, informer.processor.listeners[3].resyncPeriod; e != a {
+			t.Errorf("expected %d, got %d", e, a)
+		}
+	*/
+	listeners := []*testListener{listener1, listener2}
+
+	stop := make(chan struct{})
+	defer close(stop)
+
+	go informer.Run(stop)
+
+	// ensure all listeners got the initial List
+	for _, listener := range listeners {
+		if !listener.ok() {
+			t.Errorf("%s: expected %v, got %v", listener.name, listener.expectedItemNames, listener.receivedItemNames)
+		}
+	}
+
+	// reset
+	for _, listener := range listeners {
+		listener.receivedItemNames = []string{}
+	}
+
+	// advance so listener2 gets a resync
+	clock.Step(2 * time.Second)
+
+	// we don't expect any this time
+	listener1.expectedItemNames = sets.String{}
+
+	if !listener1.ok() {
+		t.Errorf("%s: expected %v, got %v", listener1.name, listener1.expectedItemNames, listener1.receivedItemNames)
+	}
+
+	// make sure listener2 got the resync
+	if !listener2.ok() {
+		t.Errorf("%s: expected %v, got %v", listener2.name, listener2.expectedItemNames, listener2.receivedItemNames)
+	}
+
+}
