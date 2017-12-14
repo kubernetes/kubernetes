@@ -46,6 +46,7 @@ import (
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	storageapiv1 "k8s.io/api/storage/v1"
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
@@ -485,6 +486,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		networkingapiv1.SchemeGroupVersion,
 		eventsv1beta1.SchemeGroupVersion,
 		admissionregistrationv1beta1.SchemeGroupVersion,
+		apiextensionsv1beta1.SchemeGroupVersion,
 	)
 
 	// all extensions resources except these are disabled by default
