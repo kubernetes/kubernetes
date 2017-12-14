@@ -257,7 +257,7 @@ func TestUpgradeResyncCheckPeriod(t *testing.T) {
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}})
 
-	// create the shared informer and resync every 1s
+	// create the shared informer with no default resync period
 	informer := NewSharedInformer(source, &v1.Pod{}, 0).(*sharedIndexInformer)
 
 	clock := clock.NewFakeClock(time.Now())
@@ -276,20 +276,6 @@ func TestUpgradeResyncCheckPeriod(t *testing.T) {
 		t.Errorf("expected %d, got %d", e, a)
 	}
 
-	/*
-		if e, a := time.Duration(0), informer.processor.listeners[0].resyncPeriod; e != a {
-			t.Errorf("expected %d, got %d", e, a)
-		}
-		if e, a := 1*time.Minute, informer.processor.listeners[1].resyncPeriod; e != a {
-			t.Errorf("expected %d, got %d", e, a)
-		}
-		if e, a := 55*time.Second, informer.processor.listeners[2].resyncPeriod; e != a {
-			t.Errorf("expected %d, got %d", e, a)
-		}
-		if e, a := 5*time.Second, informer.processor.listeners[3].resyncPeriod; e != a {
-			t.Errorf("expected %d, got %d", e, a)
-		}
-	*/
 	listeners := []*testListener{listener1, listener2}
 
 	stop := make(chan struct{})
