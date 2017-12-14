@@ -187,7 +187,7 @@ func (c clientsetAdapter) ExtensionsV1beta1() extensionsv1beta1client.Extensions
 }
 
 func (c clientsetAdapter) Extensions() extensionsv1beta1client.ExtensionsV1beta1Interface {
-	return conversionExtensionsClient{c.Interface, c.Interface.Extensions()}
+	return conversionExtensionsClient{c.Interface, c.Interface.ExtensionsV1beta1()}
 }
 
 func (c clientsetAdapter) AppsV1beta2() appsv1beta2.AppsV1beta2Interface {

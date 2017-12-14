@@ -333,11 +333,11 @@ func (o *DrainOptions) getController(namespace string, controllerRef *metav1.Own
 	case "ReplicationController":
 		return o.client.CoreV1().ReplicationControllers(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "DaemonSet":
-		return o.client.Extensions().DaemonSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
+		return o.client.ExtensionsV1beta1().DaemonSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "Job":
 		return o.client.Batch().Jobs(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "ReplicaSet":
-		return o.client.Extensions().ReplicaSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
+		return o.client.ExtensionsV1beta1().ReplicaSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "StatefulSet":
 		return o.client.AppsV1beta1().StatefulSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	}
@@ -404,7 +404,7 @@ func (o *DrainOptions) daemonsetFilter(pod corev1.Pod) (bool, *warning, *fatal) 
 	if controllerRef == nil || controllerRef.Kind != "DaemonSet" {
 		return true, nil, nil
 	}
-	if _, err := o.client.Extensions().DaemonSets(pod.Namespace).Get(controllerRef.Name, metav1.GetOptions{}); err != nil {
+	if _, err := o.client.ExtensionsV1beta1().DaemonSets(pod.Namespace).Get(controllerRef.Name, metav1.GetOptions{}); err != nil {
 		return false, nil, &fatal{err.Error()}
 	}
 	if !o.IgnoreDaemonsets {

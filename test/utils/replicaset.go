@@ -34,12 +34,12 @@ func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, 
 	var updateErr error
 	pollErr := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		var err error
-		if rs, err = c.Extensions().ReplicaSets(namespace).Get(name, metav1.GetOptions{}); err != nil {
+		if rs, err = c.ExtensionsV1beta1().ReplicaSets(namespace).Get(name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(rs)
-		if rs, err = c.Extensions().ReplicaSets(namespace).Update(rs); err == nil {
+		if rs, err = c.ExtensionsV1beta1().ReplicaSets(namespace).Update(rs); err == nil {
 			logf("Updating replica set %q", name)
 			return true, nil
 		}
