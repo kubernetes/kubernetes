@@ -26,13 +26,13 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	conditions "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -204,7 +204,7 @@ func (p *AttachOptions) Validate() error {
 // Run executes a validated remote execution against a pod.
 func (p *AttachOptions) Run() error {
 	if p.Pod == nil {
-		pod, err := p.PodClient.Pods(p.Namespace).Get(p.PodName, metav1.GetOptions{})
+		pod, err := waitForPod(p.PodClient, p.Namespace, p.PodName, conditions.PodRunningAndReady)
 		if err != nil {
 			return err
 		}
@@ -214,7 +214,6 @@ func (p *AttachOptions) Run() error {
 		}
 
 		p.Pod = pod
-		// TODO: convert this to a clean "wait" behavior
 	}
 	pod := p.Pod
 
