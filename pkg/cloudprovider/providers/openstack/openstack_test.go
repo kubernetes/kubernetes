@@ -45,14 +45,14 @@ const (
 	// waiting for specified volume status. Starting with 1
 	// seconds, multiplying by 1.2 with each step and taking 13 steps at maximum
 	// it will time out after 32s, which roughly corresponds to 30s
-	volumeStatusInitDealy = 1 * time.Second
+	volumeStatusInitDelay = 1 * time.Second
 	volumeStatusFactor    = 1.2
 	volumeStatusSteps     = 13
 )
 
 func WaitForVolumeStatus(t *testing.T, os *OpenStack, volumeName string, status string) {
 	backoff := wait.Backoff{
-		Duration: volumeStatusInitDealy,
+		Duration: volumeStatusInitDelay,
 		Factor:   volumeStatusFactor,
 		Steps:    volumeStatusSteps,
 	}

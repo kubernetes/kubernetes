@@ -52,7 +52,7 @@ const (
 	// going into ACTIVE loadbalancer provisioning status. Starting with 1
 	// seconds, multiplying by 1.2 with each step and taking 19 steps at maximum
 	// it will time out after 128s, which roughly corresponds to 120s
-	loadbalancerActiveInitDealy = 1 * time.Second
+	loadbalancerActiveInitDelay = 1 * time.Second
 	loadbalancerActiveFactor    = 1.2
 	loadbalancerActiveSteps     = 19
 
@@ -60,7 +60,7 @@ const (
 	// waiting for delete operation to complete. Starting with 1
 	// seconds, multiplying by 1.2 with each step and taking 13 steps at maximum
 	// it will time out after 32s, which roughly corresponds to 30s
-	loadbalancerDeleteInitDealy = 1 * time.Second
+	loadbalancerDeleteInitDelay = 1 * time.Second
 	loadbalancerDeleteFactor    = 1.2
 	loadbalancerDeleteSteps     = 13
 
@@ -328,7 +328,7 @@ func getSecurityGroupRules(client *gophercloud.ServiceClient, opts rules.ListOpt
 
 func waitLoadbalancerActiveProvisioningStatus(client *gophercloud.ServiceClient, loadbalancerID string) (string, error) {
 	backoff := wait.Backoff{
-		Duration: loadbalancerActiveInitDealy,
+		Duration: loadbalancerActiveInitDelay,
 		Factor:   loadbalancerActiveFactor,
 		Steps:    loadbalancerActiveSteps,
 	}
@@ -358,7 +358,7 @@ func waitLoadbalancerActiveProvisioningStatus(client *gophercloud.ServiceClient,
 
 func waitLoadbalancerDeleted(client *gophercloud.ServiceClient, loadbalancerID string) error {
 	backoff := wait.Backoff{
-		Duration: loadbalancerDeleteInitDealy,
+		Duration: loadbalancerDeleteInitDelay,
 		Factor:   loadbalancerDeleteFactor,
 		Steps:    loadbalancerDeleteSteps,
 	}
