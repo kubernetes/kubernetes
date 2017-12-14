@@ -23,11 +23,11 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
@@ -226,7 +226,7 @@ func TestUpdateAnnotations(t *testing.T) {
 		expectErr   bool
 	}{
 		{
-			obj: &api.Pod{
+			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "b"},
 				},
@@ -235,41 +235,41 @@ func TestUpdateAnnotations(t *testing.T) {
 			expectErr:   true,
 		},
 		{
-			obj: &api.Pod{
+			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "b"},
 				},
 			},
 			annotations: map[string]string{"a": "c"},
 			overwrite:   true,
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "c"},
 				},
 			},
 		},
 		{
-			obj: &api.Pod{
+			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "b"},
 				},
 			},
 			annotations: map[string]string{"c": "d"},
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "b", "c": "d"},
 				},
 			},
 		},
 		{
-			obj: &api.Pod{
+			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "b"},
 				},
 			},
 			annotations: map[string]string{"c": "d"},
 			version:     "2",
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations:     map[string]string{"a": "b", "c": "d"},
 					ResourceVersion: "2",
@@ -277,28 +277,28 @@ func TestUpdateAnnotations(t *testing.T) {
 			},
 		},
 		{
-			obj: &api.Pod{
+			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "b"},
 				},
 			},
 			annotations: map[string]string{},
 			remove:      []string{"a"},
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{},
 				},
 			},
 		},
 		{
-			obj: &api.Pod{
+			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "b", "c": "d"},
 				},
 			},
 			annotations: map[string]string{"e": "f"},
 			remove:      []string{"a"},
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"c": "d",
@@ -308,14 +308,14 @@ func TestUpdateAnnotations(t *testing.T) {
 			},
 		},
 		{
-			obj: &api.Pod{
+			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "b", "c": "d"},
 				},
 			},
 			annotations: map[string]string{"e": "f"},
 			remove:      []string{"g"},
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"a": "b",
@@ -326,13 +326,13 @@ func TestUpdateAnnotations(t *testing.T) {
 			},
 		},
 		{
-			obj: &api.Pod{
+			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "b", "c": "d"},
 				},
 			},
 			remove: []string{"e"},
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"a": "b",
@@ -342,11 +342,11 @@ func TestUpdateAnnotations(t *testing.T) {
 			},
 		},
 		{
-			obj: &api.Pod{
+			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{},
 			},
 			annotations: map[string]string{"a": "b"},
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "b"},
 				},
