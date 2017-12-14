@@ -101,6 +101,12 @@ aliases:
   sig-apps-api-approvers:
     - erictune
     - smarterclayton
+  sig-autoscaling-maintainers:
+    - aleksandra-malinowska
+    - bskiba
+    - DirectXMan12
+    - MaciekPytel
+    - mwielgus
   milestone-maintainers:
     - lavalamp
     - deads2k
