@@ -71,7 +71,7 @@ $kube_provider_boxes = {
   :libvirt => {
     'fedora' => {
       :box_name => 'kube-fedora23',
-      :box_url => 'https://dl.fedoraproject.org/pub/fedora/linux/releases/23/Cloud/x86_64/Images/Fedora-Cloud-Base-Vagrant-23-20151030.x86_64.vagrant-libvirt.box'
+      :box_url => 'https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/23/Cloud/x86_64/Images/Fedora-Cloud-Base-Vagrant-23-20151030.x86_64.vagrant-libvirt.box'
     }
   },
   :vmware_desktop => {
