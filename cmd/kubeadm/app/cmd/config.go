@@ -65,7 +65,7 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// NewCmdConfigUpload returs cobra.Command for "kubeadm config upload" command
+// NewCmdConfigUpload returns cobra.Command for "kubeadm config upload" command
 func NewCmdConfigUpload(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upload",
@@ -78,7 +78,7 @@ func NewCmdConfigUpload(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	return cmd
 }
 
-// NewCmdConfigView returs cobra.Command for "kubeadm config view" command
+// NewCmdConfigView returns cobra.Command for "kubeadm config view" command
 func NewCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "view",
@@ -98,7 +98,7 @@ func NewCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	}
 }
 
-// NewCmdConfigUploadFromFile verifies given kubernetes config file and returs cobra.Command for
+// NewCmdConfigUploadFromFile verifies given kubernetes config file and returns cobra.Command for
 // "kubeadm config upload from-file" command
 func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	var cfgPath string
@@ -131,7 +131,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 	return cmd
 }
 
-// NewCmdConfigUploadFromFlags returs cobra.Command for "kubeadm config upload from-flags" command
+// NewCmdConfigUploadFromFlags returns cobra.Command for "kubeadm config upload from-flags" command
 func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	cfg := &kubeadmapiext.MasterConfiguration{}
 	legacyscheme.Scheme.Default(cfg)

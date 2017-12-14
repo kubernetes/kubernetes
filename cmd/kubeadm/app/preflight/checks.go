@@ -79,7 +79,7 @@ func (e *Error) Error() string {
 }
 
 // Checker validates the state of the system to ensure kubeadm will be
-// successful as often as possilble.
+// successful as often as possible.
 type Checker interface {
 	Check() (warnings, errors []error)
 	Name() string
