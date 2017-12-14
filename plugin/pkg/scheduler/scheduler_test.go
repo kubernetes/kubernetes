@@ -43,6 +43,8 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/volumebinder"
 )
 
+var order = []string{"VolumeBindingChecker"}
+
 type fakeBinder struct {
 	b func(binding *v1.Binding) error
 }
@@ -637,6 +639,7 @@ func makePredicateError(failReason string) error {
 }
 
 func TestSchedulerWithVolumeBinding(t *testing.T) {
+	predicates.SetPredicatesOrdering(order)
 	findErr := fmt.Errorf("find err")
 	assumeErr := fmt.Errorf("assume err")
 	bindErr := fmt.Errorf("bind err")

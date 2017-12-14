@@ -42,6 +42,10 @@ import (
 	schedulertesting "k8s.io/kubernetes/plugin/pkg/scheduler/testing"
 )
 
+var (
+	order = []string{"false", "true", "matches", "nopods", predicates.MatchInterPodAffinity}
+)
+
 func falsePredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	return false, []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
 }
@@ -181,6 +185,7 @@ func TestSelectHost(t *testing.T) {
 }
 
 func TestGenericScheduler(t *testing.T) {
+	predicates.SetPredicatesOrdering(order)
 	tests := []struct {
 		name          string
 		predicates    map[string]algorithm.FitPredicate
@@ -401,6 +406,7 @@ func TestGenericScheduler(t *testing.T) {
 }
 
 func TestFindFitAllError(t *testing.T) {
+	predicates.SetPredicatesOrdering(order)
 	nodes := []string{"3", "2", "1"}
 	predicates := map[string]algorithm.FitPredicate{"true": truePredicate, "false": falsePredicate}
 	nodeNameToInfo := map[string]*schedulercache.NodeInfo{
@@ -430,8 +436,9 @@ func TestFindFitAllError(t *testing.T) {
 }
 
 func TestFindFitSomeError(t *testing.T) {
+	predicates.SetPredicatesOrdering(order)
 	nodes := []string{"3", "2", "1"}
-	predicates := map[string]algorithm.FitPredicate{"true": truePredicate, "match": matchesPredicate}
+	predicates := map[string]algorithm.FitPredicate{"true": truePredicate, "matches": matchesPredicate}
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1"}}
 	nodeNameToInfo := map[string]*schedulercache.NodeInfo{
 		"3": schedulercache.NewNodeInfo(),
@@ -741,6 +748,7 @@ var negPriority, lowPriority, midPriority, highPriority, veryHighPriority = int3
 // TestSelectNodesForPreemption tests selectNodesForPreemption. This test assumes
 // that podsFitsOnNode works correctly and is tested separately.
 func TestSelectNodesForPreemption(t *testing.T) {
+	predicates.SetPredicatesOrdering(order)
 	tests := []struct {
 		name                 string
 		predicates           map[string]algorithm.FitPredicate
@@ -879,6 +887,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 
 // TestPickOneNodeForPreemption tests pickOneNodeForPreemption.
 func TestPickOneNodeForPreemption(t *testing.T) {
+	predicates.SetPredicatesOrdering(order)
 	tests := []struct {
 		name       string
 		predicates map[string]algorithm.FitPredicate

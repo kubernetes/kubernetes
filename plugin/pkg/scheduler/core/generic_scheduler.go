@@ -444,34 +444,37 @@ func podFitsOnNode(
 		// TODO(bsalamat): consider using eCache and adding proper eCache invalidations
 		// when pods are nominated or their nominations change.
 		eCacheAvailable = eCacheAvailable && !podsAdded
-		for predicateKey, predicate := range predicateFuncs {
-			if eCacheAvailable {
-				// PredicateWithECache will return its cached predicate results.
-				fit, reasons, invalid = ecache.PredicateWithECache(pod.GetName(), info.Node().GetName(), predicateKey, equivalenceHash)
-			}
-
-			// TODO(bsalamat): When one predicate fails and fit is false, why do we continue
-			// checking other predicates?
-			if !eCacheAvailable || invalid {
-				// we need to execute predicate functions since equivalence cache does not work
-				fit, reasons, err = predicate(pod, metaToUse, nodeInfoToUse)
-				if err != nil {
-					return false, []algorithm.PredicateFailureReason{}, err
-				}
+		for _, predicateKey := range predicates.GetPredicatesOrdering() {
+			//TODO (yastij) : compute average predicate restrictiveness to export it as promethus metric
+			if predicate, exist := predicateFuncs[predicateKey]; exist {
 				if eCacheAvailable {
-					// Store data to update eCache after this loop.
-					if res, exists := predicateResults[predicateKey]; exists {
-						res.Fit = res.Fit && fit
-						res.FailReasons = append(res.FailReasons, reasons...)
-						predicateResults[predicateKey] = res
-					} else {
-						predicateResults[predicateKey] = HostPredicate{Fit: fit, FailReasons: reasons}
+					// PredicateWithECache will return its cached predicate results.
+					fit, reasons, invalid = ecache.PredicateWithECache(pod.GetName(), info.Node().GetName(), predicateKey, equivalenceHash)
+				}
+
+				// TODO(bsalamat): When one predicate fails and fit is false, why do we continue
+				// checking other predicates?
+				if !eCacheAvailable || invalid {
+					// we need to execute predicate functions since equivalence cache does not work
+					fit, reasons, err = predicate(pod, metaToUse, nodeInfoToUse)
+					if err != nil {
+						return false, []algorithm.PredicateFailureReason{}, err
+					}
+					if eCacheAvailable {
+						// Store data to update eCache after this loop.
+						if res, exists := predicateResults[predicateKey]; exists {
+							res.Fit = res.Fit && fit
+							res.FailReasons = append(res.FailReasons, reasons...)
+							predicateResults[predicateKey] = res
+						} else {
+							predicateResults[predicateKey] = HostPredicate{Fit: fit, FailReasons: reasons}
+						}
 					}
 				}
-			}
-			if !fit {
-				// eCache is available and valid, and predicates result is unfit, record the fail reasons
-				failedPredicates = append(failedPredicates, reasons...)
+				if !fit {
+					// eCache is available and valid, and predicates result is unfit, record the fail reasons
+					failedPredicates = append(failedPredicates, reasons...)
+				}
 			}
 		}
 	}
