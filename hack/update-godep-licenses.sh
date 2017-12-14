@@ -75,6 +75,14 @@ process_content () {
     go4.org/*)
      package_root=$(echo ${package} |awk -F/ '{ print $1 }')
      ;;
+    gopkg.in/*)
+     # Root of gopkg.in package always ends with '.v(number)' and my contain
+     # more than two path elements. For example:
+     # - gopkg.in/yaml.v2
+     # - gopkg.in/inf.v0
+     # - gopkg.in/square/go-jose.v2
+     package_root=$(echo ${package} |grep -oh '.*\.v[0-9]')
+     ;;
     *)
      package_root=$(echo ${package} |awk -F/ '{ print $1"/"$2 }')
      ;;
