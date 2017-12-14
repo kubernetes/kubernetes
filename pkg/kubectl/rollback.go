@@ -35,13 +35,13 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
+	kapps "k8s.io/kubernetes/pkg/kubectl/apps"
 	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
@@ -56,16 +56,47 @@ type Rollbacker interface {
 	Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error)
 }
 
+type RollbackVisitor struct {
+	clientset kubernetes.Interface
+	result    Rollbacker
+}
+
+func (v *RollbackVisitor) VisitDeployment(elem kapps.GroupKindElement) {
+	v.result = &DeploymentRollbacker{v.clientset}
+}
+
+func (v *RollbackVisitor) VisitStatefulSet(kind kapps.GroupKindElement) {
+	v.result = &StatefulSetRollbacker{v.clientset}
+}
+
+func (v *RollbackVisitor) VisitDaemonSet(kind kapps.GroupKindElement) {
+	v.result = &DaemonSetRollbacker{v.clientset}
+}
+
+func (v *RollbackVisitor) VisitJob(kind kapps.GroupKindElement)                   {}
+func (v *RollbackVisitor) VisitPod(kind kapps.GroupKindElement)                   {}
+func (v *RollbackVisitor) VisitReplicaSet(kind kapps.GroupKindElement)            {}
+func (v *RollbackVisitor) VisitReplicationController(kind kapps.GroupKindElement) {}
+func (v *RollbackVisitor) VisitCronJob(kind kapps.GroupKindElement)               {}
+
+// RollbackerFor returns an implementation of Rollbacker interface for the given schema kind
 func RollbackerFor(kind schema.GroupKind, c kubernetes.Interface) (Rollbacker, error) {
-	switch kind {
-	case extensions.Kind("Deployment"), apps.Kind("Deployment"):
-		return &DeploymentRollbacker{c}, nil
-	case extensions.Kind("DaemonSet"), apps.Kind("DaemonSet"):
-		return &DaemonSetRollbacker{c}, nil
-	case apps.Kind("StatefulSet"):
-		return &StatefulSetRollbacker{c}, nil
+	elem := kapps.GroupKindElement(kind)
+	visitor := &RollbackVisitor{
+		clientset: c,
 	}
-	return nil, fmt.Errorf("no rollbacker has been implemented for %q", kind)
+
+	err := elem.Accept(visitor)
+
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving rollbacker for %q, %v", kind.String(), err)
+	}
+
+	if visitor.result == nil {
+		return nil, fmt.Errorf("no rollbacker has been implemented for %q", kind)
+	}
+
+	return visitor.result, nil
 }
 
 type DeploymentRollbacker struct {

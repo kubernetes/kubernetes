@@ -23,6 +23,7 @@ go_test(
         "quota_test.go",
         "resource_filter_test.go",
         "rolebinding_test.go",
+        "rollback_test.go",
         "rolling_updater_test.go",
         "rollout_status_test.go",
         "run_test.go",
