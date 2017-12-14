@@ -18,6 +18,7 @@ package flag
 
 import (
 	goflag "flag"
+	"os"
 	"strings"
 
 	"github.com/golang/glog"
@@ -47,6 +48,7 @@ func WarnWordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedNam
 func InitFlags() {
 	pflag.CommandLine.SetNormalizeFunc(WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
+	pflag.CommandLine.SetOutput(os.Stdout)
 	pflag.Parse()
 	pflag.VisitAll(func(flag *pflag.Flag) {
 		glog.V(2).Infof("FLAG: --%s=%q", flag.Name, flag.Value)
