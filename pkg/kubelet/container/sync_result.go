@@ -28,6 +28,9 @@ import (
 // Container Terminated and Kubelet is backing off the restart
 var ErrCrashLoopBackOff = errors.New("CrashLoopBackOff")
 
+// Container RestartCounts is higher than max restart times
+var ErrCrashTooMany = errors.New("CrashTooMany")
+
 var (
 	// ErrContainerNotFound returned when a container in the given pod with the
 	// given container name was not found, amongst those managed by the kubelet.

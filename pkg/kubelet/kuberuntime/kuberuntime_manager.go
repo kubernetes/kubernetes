@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/golang/glog"
@@ -767,6 +768,10 @@ func (m *kubeGenericRuntimeManager) doBackOff(pod *v1.Pod, container *v1.Contain
 		err := fmt.Errorf("Back-off %s restarting failed container=%s pod=%s", backOff.Get(key), container.Name, format.Pod(pod))
 		glog.Infof("%s", err.Error())
 		return true, err.Error(), kubecontainer.ErrCrashLoopBackOff
+	}
+	maxRestartTimes, err := strconv.Atoi(pod.ObjectMeta.Annotations["maxRestartTimes"])
+	if err == nil && cStatus.RestartCount >= maxRestartTimes {
+		return true, "The maxRestartTimes is meeted by RestartCount", kubecontainer.ErrCrashTooMany
 	}
 
 	backOff.Next(key, ts)
