@@ -394,14 +394,14 @@ func configFromEnv() (cfg Config, ok bool) {
 	cfg.Global.Password = os.Getenv("OS_PASSWORD")
 	cfg.Global.Region = os.Getenv("OS_REGION_NAME")
 
-	cfg.Global.TenantName = os.Getenv("OS_TENANT_NAME")
-	if cfg.Global.TenantName == "" {
-		cfg.Global.TenantName = os.Getenv("OS_PROJECT_NAME")
+	cfg.Global.ProjectName = os.Getenv("OS_PROJECT_NAME")
+	if cfg.Global.ProjectName == "" {
+		cfg.Global.ProjectName = os.Getenv("OS_PROJECT_NAME")
 	}
 
-	cfg.Global.TenantId = os.Getenv("OS_TENANT_ID")
-	if cfg.Global.TenantId == "" {
-		cfg.Global.TenantId = os.Getenv("OS_PROJECT_ID")
+	cfg.Global.ProjectId = os.Getenv("OS_PROJECT_ID")
+	if cfg.Global.ProjectId == "" {
+		cfg.Global.ProjectId = os.Getenv("OS_PROJECT_ID")
 	}
 
 	cfg.Global.DomainId = os.Getenv("OS_DOMAIN_ID")
@@ -417,7 +417,7 @@ func configFromEnv() (cfg Config, ok bool) {
 	ok = (cfg.Global.AuthUrl != "" &&
 		cfg.Global.Username != "" &&
 		cfg.Global.Password != "" &&
-		(cfg.Global.TenantId != "" || cfg.Global.TenantName != "" ||
+		(cfg.Global.ProjectId != "" || cfg.Global.TProjectName != "" ||
 			cfg.Global.DomainId != "" || cfg.Global.DomainName != ""))
 
 	cfg.Metadata.SearchOrder = fmt.Sprintf("%s,%s", configDriveID, metadataID)

@@ -126,8 +126,8 @@ type Config struct {
 		Username   string
 		UserId     string `gcfg:"user-id"`
 		Password   string
-		TenantId   string `gcfg:"tenant-id"`
-		TenantName string `gcfg:"tenant-name"`
+		ProjectId   string `gcfg:"project-id"`
+		ProjectName string `gcfg:"project-name"`
 		TrustId    string `gcfg:"trust-id"`
 		DomainId   string `gcfg:"domain-id"`
 		DomainName string `gcfg:"domain-name"`
@@ -158,8 +158,8 @@ func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
 		Username:         cfg.Global.Username,
 		UserID:           cfg.Global.UserId,
 		Password:         cfg.Global.Password,
-		TenantID:         cfg.Global.TenantId,
-		TenantName:       cfg.Global.TenantName,
+		ProjectID:         cfg.Global.ProjectId,
+		ProjectName:       cfg.Global.ProjectName,
 		DomainID:         cfg.Global.DomainId,
 		DomainName:       cfg.Global.DomainName,
 
