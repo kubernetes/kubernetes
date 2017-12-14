@@ -130,7 +130,8 @@ type NodeConfiguration struct {
 	DiscoveryTokenAPIServers []string
 	NodeName                 string
 	TLSBootstrapToken        string
-	Token                    string
+	// Token is deprecated and will be removed when kubeadm API graduates to v1beta1
+	Token string
 
 	// DiscoveryTokenCACertHashes specifies a set of public key pins to verify
 	// when token-based discovery is used. The root CA found during discovery

@@ -124,7 +124,8 @@ type NodeConfiguration struct {
 	DiscoveryTokenAPIServers []string `json:"discoveryTokenAPIServers,omitempty"`
 	NodeName                 string   `json:"nodeName"`
 	TLSBootstrapToken        string   `json:"tlsBootstrapToken"`
-	Token                    string   `json:"token"`
+	// Token is deprecated and will be removed when kubeadm API graduates to v1beta1
+	Token string `json:"token"`
 
 	// DiscoveryTokenCACertHashes specifies a set of public key pins to verify
 	// when token-based discovery is used. The root CA found during discovery
