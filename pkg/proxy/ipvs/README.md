@@ -8,7 +8,7 @@ This document shows how to use kube-proxy ipvs mode.
 Linux kernel.
 
 IPVS runs on a host and acts as a load balancer in front of a cluster of real servers. IPVS can direct requests for TCP
-and UDP-based services to the real servers, and make services of real servers appear as irtual services on a single IP address.
+and UDP-based services to the real servers, and make services of real servers appear as virtual services on a single IP address.
 
 ## How to use
 
