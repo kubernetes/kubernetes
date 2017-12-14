@@ -79,7 +79,7 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (aut
 
 	// Build a detailed log of the denial.
 	// Make the whole block conditional so we don't do a lot of string-building we won't use.
-	if glog.V(2) {
+	if glog.V(5) {
 		var operation string
 		if requestAttributes.IsResourceRequest() {
 			b := &bytes.Buffer{}
