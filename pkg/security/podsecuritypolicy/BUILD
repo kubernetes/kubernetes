@@ -27,7 +27,6 @@ go_library(
         "//pkg/security/podsecuritypolicy/user:go_default_library",
         "//pkg/security/podsecuritypolicy/util:go_default_library",
         "//pkg/securitycontext:go_default_library",
-        "//pkg/util/maps:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
