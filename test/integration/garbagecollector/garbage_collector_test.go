@@ -200,8 +200,10 @@ type testContext struct {
 
 // if workerCount > 0, will start the GC, otherwise it's up to the caller to Run() the GC.
 func setup(t *testing.T, workerCount int) *testContext {
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.SharedEtcd())
+	return setupWithServer(t, kubeapiservertesting.StartTestServerOrDie(t, nil, framework.SharedEtcd()), workerCount)
+}
 
+func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, workerCount int) *testContext {
 	clientSet, err := clientset.NewForConfig(result.ClientConfig)
 	if err != nil {
 		t.Fatalf("error creating clientset: %v", err)

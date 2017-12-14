@@ -32,7 +32,7 @@ import (
 
 // apiResource consults the REST mapper to translate an <apiVersion, kind,
 // namespace> tuple to a unversioned.APIResource struct.
-func (gc *GarbageCollector) apiResource(apiVersion, kind string, namespaced bool) (*metav1.APIResource, error) {
+func (gc *GarbageCollector) apiResource(apiVersion, kind string) (*metav1.APIResource, error) {
 	fqKind := schema.FromAPIVersionAndKind(apiVersion, kind)
 	mapping, err := gc.restMapper.RESTMapping(fqKind.GroupKind(), apiVersion)
 	if err != nil {
@@ -41,7 +41,7 @@ func (gc *GarbageCollector) apiResource(apiVersion, kind string, namespaced bool
 	glog.V(5).Infof("map kind %s, version %s to resource %s", kind, apiVersion, mapping.Resource)
 	resource := metav1.APIResource{
 		Name:       mapping.Resource,
-		Namespaced: namespaced,
+		Namespaced: mapping.Scope == meta.RESTScopeNamespace,
 		Kind:       kind,
 	}
 	return &resource, nil
@@ -53,7 +53,7 @@ func (gc *GarbageCollector) deleteObject(item objectReference, policy *metav1.De
 	if err != nil {
 		return err
 	}
-	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
+	resource, err := gc.apiResource(item.APIVersion, item.Kind)
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func (gc *GarbageCollector) getObject(item objectReference) (*unstructured.Unstr
 	if err != nil {
 		return nil, err
 	}
-	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
+	resource, err := gc.apiResource(item.APIVersion, item.Kind)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func (gc *GarbageCollector) updateObject(item objectReference, obj *unstructured
 	if err != nil {
 		return nil, err
 	}
-	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
+	resource, err := gc.apiResource(item.APIVersion, item.Kind)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (gc *GarbageCollector) patchObject(item objectReference, patch []byte) (*un
 	if err != nil {
 		return nil, err
 	}
-	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
+	resource, err := gc.apiResource(item.APIVersion, item.Kind)
 	if err != nil {
 		return nil, err
 	}

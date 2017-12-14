@@ -9,6 +9,7 @@ go_test(
     name = "go_default_test",
     size = "large",
     srcs = [
+        "cluster_scoped_owner_test.go",
         "garbage_collector_test.go",
         "main_test.go",
     ],
@@ -25,6 +26,7 @@ go_test(
         "//vendor/k8s.io/apiextensions-apiserver/test/integration/testserver:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
