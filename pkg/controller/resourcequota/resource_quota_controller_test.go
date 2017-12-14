@@ -89,7 +89,7 @@ func setupQuotaController(t *testing.T, kubeClient kubernetes.Interface, lister 
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
-		QuotaClient:               kubeClient.Core(),
+		QuotaClient:               kubeClient.CoreV1(),
 		ResourceQuotaInformer:     informerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,

@@ -331,13 +331,13 @@ func (o *DrainOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error {
 func (o *DrainOptions) getController(namespace string, controllerRef *metav1.OwnerReference) (interface{}, error) {
 	switch controllerRef.Kind {
 	case "ReplicationController":
-		return o.client.Core().ReplicationControllers(namespace).Get(controllerRef.Name, metav1.GetOptions{})
+		return o.client.CoreV1().ReplicationControllers(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "DaemonSet":
-		return o.client.Extensions().DaemonSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
+		return o.client.ExtensionsV1beta1().DaemonSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "Job":
 		return o.client.Batch().Jobs(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "ReplicaSet":
-		return o.client.Extensions().ReplicaSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
+		return o.client.ExtensionsV1beta1().ReplicaSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "StatefulSet":
 		return o.client.AppsV1beta1().StatefulSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	}
@@ -404,7 +404,7 @@ func (o *DrainOptions) daemonsetFilter(pod corev1.Pod) (bool, *warning, *fatal) 
 	if controllerRef == nil || controllerRef.Kind != "DaemonSet" {
 		return true, nil, nil
 	}
-	if _, err := o.client.Extensions().DaemonSets(pod.Namespace).Get(controllerRef.Name, metav1.GetOptions{}); err != nil {
+	if _, err := o.client.ExtensionsV1beta1().DaemonSets(pod.Namespace).Get(controllerRef.Name, metav1.GetOptions{}); err != nil {
 		return false, nil, &fatal{err.Error()}
 	}
 	if !o.IgnoreDaemonsets {
@@ -455,7 +455,7 @@ func (ps podStatuses) Message() string {
 // getPodsForDeletion receives resource info for a node, and returns all the pods from the given node that we
 // are planning on deleting. If there are any pods preventing us from deleting, we return that list in an error.
 func (o *DrainOptions) getPodsForDeletion(nodeInfo *resource.Info) (pods []corev1.Pod, err error) {
-	podList, err := o.client.Core().Pods(metav1.NamespaceAll).List(metav1.ListOptions{
+	podList, err := o.client.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{
 		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeInfo.Name}).String()})
 	if err != nil {
 		return pods, err
@@ -497,7 +497,7 @@ func (o *DrainOptions) deletePod(pod corev1.Pod) error {
 		gracePeriodSeconds := int64(o.GracePeriodSeconds)
 		deleteOptions.GracePeriodSeconds = &gracePeriodSeconds
 	}
-	return o.client.Core().Pods(pod.Namespace).Delete(pod.Name, deleteOptions)
+	return o.client.CoreV1().Pods(pod.Namespace).Delete(pod.Name, deleteOptions)
 }
 
 func (o *DrainOptions) evictPod(pod corev1.Pod, policyGroupVersion string) error {
@@ -533,7 +533,7 @@ func (o *DrainOptions) deleteOrEvictPods(pods []corev1.Pod) error {
 	}
 
 	getPodFn := func(namespace, name string) (*corev1.Pod, error) {
-		return o.client.Core().Pods(namespace).Get(name, metav1.GetOptions{})
+		return o.client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
 	}
 
 	if len(policyGroupVersion) > 0 {

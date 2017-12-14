@@ -482,37 +482,6 @@ func AddOrUpdateTolerationInPod(pod *core.Pod, toleration *core.Toleration) bool
 	return true
 }
 
-// TolerationToleratesTaint checks if the toleration tolerates the taint.
-func TolerationToleratesTaint(toleration *core.Toleration, taint *core.Taint) bool {
-	if len(toleration.Effect) != 0 && toleration.Effect != taint.Effect {
-		return false
-	}
-
-	if toleration.Key != taint.Key {
-		return false
-	}
-	// TODO: Use proper defaulting when Toleration becomes a field of PodSpec
-	if (len(toleration.Operator) == 0 || toleration.Operator == core.TolerationOpEqual) && toleration.Value == taint.Value {
-		return true
-	}
-	if toleration.Operator == core.TolerationOpExists {
-		return true
-	}
-	return false
-}
-
-// TaintToleratedByTolerations checks if taint is tolerated by any of the tolerations.
-func TaintToleratedByTolerations(taint *core.Taint, tolerations []core.Toleration) bool {
-	tolerated := false
-	for i := range tolerations {
-		if TolerationToleratesTaint(&tolerations[i], taint) {
-			tolerated = true
-			break
-		}
-	}
-	return tolerated
-}
-
 // GetTaintsFromNodeAnnotations gets the json serialized taints data from Pod.Annotations
 // and converts it to the []Taint type in core.
 func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]core.Taint, error) {

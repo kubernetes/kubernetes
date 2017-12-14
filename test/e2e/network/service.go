@@ -815,7 +815,7 @@ var _ = SIGDescribe("Services", func() {
 		tcpService := jig.CreateTCPServiceOrFail(ns, nil)
 		defer func() {
 			framework.Logf("Cleaning up the updating NodePorts test service")
-			err := cs.Core().Services(ns).Delete(serviceName, nil)
+			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			Expect(err).NotTo(HaveOccurred())
 		}()
 		jig.SanityCheckService(tcpService, v1.ServiceTypeClusterIP)

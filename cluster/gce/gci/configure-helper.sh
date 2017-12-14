@@ -1055,23 +1055,11 @@ function assemble-docker-flags {
 
   echo "DOCKER_OPTS=\"${docker_opts} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
 
-  if [[ "${use_net_plugin}" == "true" ]]; then
-    # If using a network plugin, extend the docker configuration to always remove
-    # the network checkpoint to avoid corrupt checkpoints.
-    # (https://github.com/docker/docker/issues/18283).
-    echo "Extend the docker.service configuration to remove the network checkpiont"
-    mkdir -p /etc/systemd/system/docker.service.d
-    cat <<EOF >/etc/systemd/system/docker.service.d/01network.conf
-[Service]
-ExecStartPre=/bin/sh -x -c "rm -rf /var/lib/docker/network"
-EOF
-  fi
-
   # Ensure TasksMax is sufficient for docker.
   # (https://github.com/kubernetes/kubernetes/issues/51977)
   echo "Extend the docker.service configuration to set a higher pids limit"
   mkdir -p /etc/systemd/system/docker.service.d
-  cat <<EOF >/etc/systemd/system/docker.service.d/02tasksmax.conf
+  cat <<EOF >/etc/systemd/system/docker.service.d/01tasksmax.conf
 [Service]
 TasksMax=infinity
 EOF

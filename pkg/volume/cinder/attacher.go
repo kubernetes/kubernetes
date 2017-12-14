@@ -44,14 +44,15 @@ var _ volume.Attacher = &cinderDiskAttacher{}
 var _ volume.AttachableVolumePlugin = &cinderPlugin{}
 
 const (
-	checkSleepDuration       = 1 * time.Second
-	operationFinishInitDealy = 1 * time.Second
+	probeVolumeInitDelay     = 1 * time.Second
+	probeVolumeFactor        = 2.0
+	operationFinishInitDelay = 1 * time.Second
 	operationFinishFactor    = 1.1
 	operationFinishSteps     = 10
-	diskAttachInitDealy      = 1 * time.Second
+	diskAttachInitDelay      = 1 * time.Second
 	diskAttachFactor         = 1.2
 	diskAttachSteps          = 15
-	diskDetachInitDealy      = 1 * time.Second
+	diskDetachInitDelay      = 1 * time.Second
 	diskDetachFactor         = 1.2
 	diskDetachSteps          = 13
 )
@@ -74,7 +75,7 @@ func (plugin *cinderPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string
 
 func (attacher *cinderDiskAttacher) waitOperationFinished(volumeID string) error {
 	backoff := wait.Backoff{
-		Duration: operationFinishInitDealy,
+		Duration: operationFinishInitDelay,
 		Factor:   operationFinishFactor,
 		Steps:    operationFinishSteps,
 	}
@@ -99,7 +100,7 @@ func (attacher *cinderDiskAttacher) waitOperationFinished(volumeID string) error
 
 func (attacher *cinderDiskAttacher) waitDiskAttached(instanceID, volumeID string) error {
 	backoff := wait.Backoff{
-		Duration: diskAttachInitDealy,
+		Duration: diskAttachInitDelay,
 		Factor:   diskAttachFactor,
 		Steps:    diskAttachSteps,
 	}
@@ -234,11 +235,12 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 		return "", fmt.Errorf("WaitForAttach failed for Cinder disk %q: devicePath is empty.", volumeID)
 	}
 
-	ticker := time.NewTicker(checkSleepDuration)
+	ticker := time.NewTicker(probeVolumeInitDelay)
 	defer ticker.Stop()
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 
+	duration := probeVolumeInitDelay
 	for {
 		select {
 		case <-ticker.C:
@@ -255,6 +257,10 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 			} else {
 				// Log an error, and continue checking periodically
 				glog.Errorf("Error: could not find attached Cinder disk %q (path: %q): %v", volumeID, devicePath, err)
+				// Using exponential backoff instead of linear
+				ticker.Stop()
+				duration = time.Duration(float64(duration) * probeVolumeFactor)
+				ticker = time.NewTicker(duration)
 			}
 		case <-timer.C:
 			return "", fmt.Errorf("Could not find attached Cinder disk %q. Timeout waiting for mount paths to be created.", volumeID)
@@ -328,7 +334,7 @@ func (plugin *cinderPlugin) NewDetacher() (volume.Detacher, error) {
 
 func (detacher *cinderDiskDetacher) waitOperationFinished(volumeID string) error {
 	backoff := wait.Backoff{
-		Duration: operationFinishInitDealy,
+		Duration: operationFinishInitDelay,
 		Factor:   operationFinishFactor,
 		Steps:    operationFinishSteps,
 	}
@@ -353,7 +359,7 @@ func (detacher *cinderDiskDetacher) waitOperationFinished(volumeID string) error
 
 func (detacher *cinderDiskDetacher) waitDiskDetached(instanceID, volumeID string) error {
 	backoff := wait.Backoff{
-		Duration: diskDetachInitDealy,
+		Duration: diskDetachInitDelay,
 		Factor:   diskDetachFactor,
 		Steps:    diskDetachSteps,
 	}

@@ -28,7 +28,6 @@ filegroup(
         "//pkg/api/v1/pod:all-srcs",
         "//pkg/api/v1/resource:all-srcs",
         "//pkg/api/v1/service:all-srcs",
-        "//pkg/apimachinery/tests:all-srcs",
         "//pkg/apis/abac:all-srcs",
         "//pkg/apis/admission:all-srcs",
         "//pkg/apis/admissionregistration:all-srcs",

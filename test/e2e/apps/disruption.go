@@ -330,6 +330,6 @@ func createReplicaSetOrDie(cs kubernetes.Interface, ns string, size int32, exclu
 		},
 	}
 
-	_, err := cs.Extensions().ReplicaSets(ns).Create(rs)
+	_, err := cs.ExtensionsV1beta1().ReplicaSets(ns).Create(rs)
 	framework.ExpectNoError(err, "Creating replica set %q in namespace %q", rs.Name, ns)
 }

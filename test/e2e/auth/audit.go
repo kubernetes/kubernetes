@@ -203,27 +203,27 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					podLabels := map[string]string{"name": "audit-deployment-pod"}
 					d := framework.NewDeployment("audit-deployment", int32(1), podLabels, "redis", imageutils.GetE2EImage(imageutils.Redis), extensions.RecreateDeploymentStrategyType)
 
-					_, err := f.ClientSet.Extensions().Deployments(namespace).Create(d)
+					_, err := f.ClientSet.ExtensionsV1beta1().Deployments(namespace).Create(d)
 					framework.ExpectNoError(err, "failed to create audit-deployment")
 
-					_, err = f.ClientSet.Extensions().Deployments(namespace).Get(d.Name, metav1.GetOptions{})
+					_, err = f.ClientSet.ExtensionsV1beta1().Deployments(namespace).Get(d.Name, metav1.GetOptions{})
 					framework.ExpectNoError(err, "failed to get audit-deployment")
 
-					deploymentChan, err := f.ClientSet.Extensions().Deployments(namespace).Watch(watchOptions)
+					deploymentChan, err := f.ClientSet.ExtensionsV1beta1().Deployments(namespace).Watch(watchOptions)
 					framework.ExpectNoError(err, "failed to create watch for deployments")
 					for range deploymentChan.ResultChan() {
 					}
 
-					_, err = f.ClientSet.Extensions().Deployments(namespace).Update(d)
+					_, err = f.ClientSet.ExtensionsV1beta1().Deployments(namespace).Update(d)
 					framework.ExpectNoError(err, "failed to update audit-deployment")
 
-					_, err = f.ClientSet.Extensions().Deployments(namespace).Patch(d.Name, types.JSONPatchType, patch)
+					_, err = f.ClientSet.ExtensionsV1beta1().Deployments(namespace).Patch(d.Name, types.JSONPatchType, patch)
 					framework.ExpectNoError(err, "failed to patch deployment")
 
-					_, err = f.ClientSet.Extensions().Deployments(namespace).List(metav1.ListOptions{})
+					_, err = f.ClientSet.ExtensionsV1beta1().Deployments(namespace).List(metav1.ListOptions{})
 					framework.ExpectNoError(err, "failed to create list deployments")
 
-					err = f.ClientSet.Extensions().Deployments(namespace).Delete("audit-deployment", &metav1.DeleteOptions{})
+					err = f.ClientSet.ExtensionsV1beta1().Deployments(namespace).Delete("audit-deployment", &metav1.DeleteOptions{})
 					framework.ExpectNoError(err, "failed to delete deployments")
 				},
 				[]auditEvent{

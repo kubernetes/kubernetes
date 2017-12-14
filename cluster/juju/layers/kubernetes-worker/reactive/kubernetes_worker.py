@@ -157,7 +157,7 @@ def shutdown():
     '''
     try:
         if os.path.isfile(kubeconfig_path):
-            kubectl('delete', 'node', gethostname())
+            kubectl('delete', 'node', gethostname().lower())
     except CalledProcessError:
         hookenv.log('Failed to unregister node.')
     service_stop('snap.kubelet.daemon')
@@ -844,14 +844,14 @@ def request_kubelet_and_proxy_credentials(kube_control):
     # The kube-cotrol interface is created to support RBAC.
     # At this point we might as well do the right thing and return the hostname
     # even if it will only be used when we enable RBAC
-    nodeuser = 'system:node:{}'.format(gethostname())
+    nodeuser = 'system:node:{}'.format(gethostname().lower())
     kube_control.set_auth_request(nodeuser)
 
 
 @when('kube-control.connected')
 def catch_change_in_creds(kube_control):
     """Request a service restart in case credential updates were detected."""
-    nodeuser = 'system:node:{}'.format(gethostname())
+    nodeuser = 'system:node:{}'.format(gethostname().lower())
     creds = kube_control.get_auth_credentials(nodeuser)
     if creds \
             and data_changed('kube-control.creds', creds) \
@@ -906,7 +906,8 @@ class ApplyNodeLabelFailed(Exception):
 def _apply_node_label(label, delete=False, overwrite=False):
     ''' Invoke kubectl to apply node label changes '''
 
-    hostname = gethostname()
+    # k8s lowercases hostnames and uses them as node names
+    hostname = gethostname().lower()
     # TODO: Make this part of the kubectl calls instead of a special string
     cmd_base = 'kubectl --kubeconfig={0} label node {1} {2}'
 

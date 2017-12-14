@@ -103,7 +103,7 @@ var _ = SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]", func(
 
 		By("Creating a Deployment")
 		deployment, err := framework.CreateDeployment(client, int32(1), map[string]string{"test": "app"}, namespace, pvclaims, "")
-		defer client.Extensions().Deployments(namespace).Delete(deployment.Name, &metav1.DeleteOptions{})
+		defer client.ExtensionsV1beta1().Deployments(namespace).Delete(deployment.Name, &metav1.DeleteOptions{})
 
 		By("Get pod from the deployement")
 		podList, err := framework.GetPodsForDeployment(client, deployment)
