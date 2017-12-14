@@ -159,7 +159,7 @@ const (
 	HugePages utilfeature.Feature = "HugePages"
 
 	// owner @brendandburns
-	// alpha: v1.8
+	// alpha: v1.9
 	//
 	// Enable nodes to exclude themselves from service load balancers
 	ServiceNodeExclusion utilfeature.Feature = "ServiceNodeExclusion"
