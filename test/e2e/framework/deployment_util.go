@@ -286,7 +286,7 @@ func GetPodsForDeployment(client clientset.Interface, deployment *extensions.Dep
 		return nil, fmt.Errorf("expected a new replica set for deployment %q, found none", deployment.Name)
 	}
 	podListFunc := func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
-		return client.Core().Pods(namespace).List(options)
+		return client.CoreV1().Pods(namespace).List(options)
 	}
 	rsList := []*extensions.ReplicaSet{replicaSet}
 	podList, err := deploymentutil.ListPods(deployment, rsList, podListFunc)

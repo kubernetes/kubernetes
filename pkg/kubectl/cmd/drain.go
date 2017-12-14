@@ -331,7 +331,7 @@ func (o *DrainOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error {
 func (o *DrainOptions) getController(namespace string, controllerRef *metav1.OwnerReference) (interface{}, error) {
 	switch controllerRef.Kind {
 	case "ReplicationController":
-		return o.client.Core().ReplicationControllers(namespace).Get(controllerRef.Name, metav1.GetOptions{})
+		return o.client.CoreV1().ReplicationControllers(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "DaemonSet":
 		return o.client.Extensions().DaemonSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "Job":
@@ -455,7 +455,7 @@ func (ps podStatuses) Message() string {
 // getPodsForDeletion receives resource info for a node, and returns all the pods from the given node that we
 // are planning on deleting. If there are any pods preventing us from deleting, we return that list in an error.
 func (o *DrainOptions) getPodsForDeletion(nodeInfo *resource.Info) (pods []corev1.Pod, err error) {
-	podList, err := o.client.Core().Pods(metav1.NamespaceAll).List(metav1.ListOptions{
+	podList, err := o.client.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{
 		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeInfo.Name}).String()})
 	if err != nil {
 		return pods, err
@@ -497,7 +497,7 @@ func (o *DrainOptions) deletePod(pod corev1.Pod) error {
 		gracePeriodSeconds := int64(o.GracePeriodSeconds)
 		deleteOptions.GracePeriodSeconds = &gracePeriodSeconds
 	}
-	return o.client.Core().Pods(pod.Namespace).Delete(pod.Name, deleteOptions)
+	return o.client.CoreV1().Pods(pod.Namespace).Delete(pod.Name, deleteOptions)
 }
 
 func (o *DrainOptions) evictPod(pod corev1.Pod, policyGroupVersion string) error {
@@ -533,7 +533,7 @@ func (o *DrainOptions) deleteOrEvictPods(pods []corev1.Pod) error {
 	}
 
 	getPodFn := func(namespace, name string) (*corev1.Pod, error) {
-		return o.client.Core().Pods(namespace).Get(name, metav1.GetOptions{})
+		return o.client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
 	}
 
 	if len(policyGroupVersion) > 0 {
