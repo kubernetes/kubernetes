@@ -32,6 +32,7 @@ filegroup(
         "//pkg/apis/abac:all-srcs",
         "//pkg/apis/admission:all-srcs",
         "//pkg/apis/admissionregistration:all-srcs",
+        "//pkg/apis/apiextensions/install:all-srcs",
         "//pkg/apis/apps:all-srcs",
         "//pkg/apis/authentication:all-srcs",
         "//pkg/apis/authorization:all-srcs",
