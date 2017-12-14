@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/settings"
 )
@@ -30,7 +31,7 @@ func TestValidateEmptyPodPreset(t *testing.T) {
 		Spec: settings.PodPresetSpec{},
 	}
 
-	errList := ValidatePodPreset(emptyPodPreset)
+	errList := ValidatePodPreset(emptyPodPreset, feature.NewFeatureGate())
 	if errList == nil {
 		t.Fatal("empty pod preset should return an error")
 	}
@@ -55,7 +56,7 @@ func TestValidateEmptyPodPresetItems(t *testing.T) {
 		},
 	}
 
-	errList := ValidatePodPreset(emptyPodPreset)
+	errList := ValidatePodPreset(emptyPodPreset, feature.NewFeatureGate())
 	if !strings.Contains(errList.ToAggregate().Error(), "must specify at least one") {
 		t.Fatal("empty pod preset with label selector should return an error")
 	}
@@ -95,7 +96,7 @@ func TestValidatePodPresets(t *testing.T) {
 		},
 	}
 
-	errList := ValidatePodPreset(p)
+	errList := ValidatePodPreset(p, feature.NewFeatureGate())
 	if errList != nil {
 		if errList.ToAggregate() != nil {
 			t.Fatalf("errors: %#v", errList.ToAggregate().Error())
@@ -138,7 +139,7 @@ func TestValidatePodPresets(t *testing.T) {
 		},
 	}
 
-	errList = ValidatePodPreset(p)
+	errList = ValidatePodPreset(p, feature.NewFeatureGate())
 	if errList != nil {
 		if errList.ToAggregate() != nil {
 			t.Fatalf("errors: %#v", errList.ToAggregate().Error())
@@ -183,7 +184,7 @@ func TestValidatePodPresetsiVolumeMountError(t *testing.T) {
 		},
 	}
 
-	errList := ValidatePodPreset(p)
+	errList := ValidatePodPreset(p, feature.NewFeatureGate())
 	if !strings.Contains(errList.ToAggregate().Error(), "spec.volumeMounts[0].name: Not found") {
 		t.Fatal("should have returned error for volume that does not exist")
 	}

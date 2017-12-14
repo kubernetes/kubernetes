@@ -22,6 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -96,7 +97,7 @@ func TestValidateJob(t *testing.T) {
 		},
 	}
 	for k, v := range successCases {
-		if errs := ValidateJob(&v); len(errs) != 0 {
+		if errs := ValidateJob(&v, feature.NewFeatureGate()); len(errs) != 0 {
 			t.Errorf("expected success for %s: %v", k, errs)
 		}
 	}
@@ -215,7 +216,7 @@ func TestValidateJob(t *testing.T) {
 	}
 
 	for k, v := range errorCases {
-		errs := ValidateJob(&v)
+		errs := ValidateJob(&v, feature.NewFeatureGate())
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		} else {
@@ -344,7 +345,7 @@ func TestValidateCronJob(t *testing.T) {
 		},
 	}
 	for k, v := range successCases {
-		if errs := ValidateCronJob(&v); len(errs) != 0 {
+		if errs := ValidateCronJob(&v, feature.NewFeatureGate()); len(errs) != 0 {
 			t.Errorf("expected success for %s: %v", k, errs)
 		}
 
@@ -352,7 +353,7 @@ func TestValidateCronJob(t *testing.T) {
 		// copy to avoid polluting the testcase object, set a resourceVersion to allow validating update, and test a no-op update
 		v = *v.DeepCopy()
 		v.ResourceVersion = "1"
-		if errs := ValidateCronJobUpdate(&v, &v); len(errs) != 0 {
+		if errs := ValidateCronJobUpdate(&v, &v, feature.NewFeatureGate()); len(errs) != 0 {
 			t.Errorf("expected success for %s: %v", k, errs)
 		}
 	}
@@ -586,7 +587,7 @@ func TestValidateCronJob(t *testing.T) {
 	}
 
 	for k, v := range errorCases {
-		errs := ValidateCronJob(&v)
+		errs := ValidateCronJob(&v, feature.NewFeatureGate())
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		} else {
@@ -601,7 +602,7 @@ func TestValidateCronJob(t *testing.T) {
 		// copy to avoid polluting the testcase object, set a resourceVersion to allow validating update, and test a no-op update
 		v = *v.DeepCopy()
 		v.ResourceVersion = "1"
-		errs = ValidateCronJobUpdate(&v, &v)
+		errs = ValidateCronJobUpdate(&v, &v, feature.NewFeatureGate())
 		if len(errs) == 0 {
 			if k == "metadata.name: must be no more than 52 characters" {
 				continue

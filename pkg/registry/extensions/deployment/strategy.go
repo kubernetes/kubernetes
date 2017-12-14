@@ -28,6 +28,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -76,7 +77,7 @@ func (deploymentStrategy) PrepareForCreate(ctx genericapirequest.Context, obj ru
 // Validate validates a new deployment.
 func (deploymentStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	deployment := obj.(*extensions.Deployment)
-	return validation.ValidateDeployment(deployment)
+	return validation.ValidateDeployment(deployment, feature.DefaultFeatureGate)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -110,7 +111,7 @@ func (deploymentStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, o
 func (deploymentStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	newDeployment := obj.(*extensions.Deployment)
 	oldDeployment := old.(*extensions.Deployment)
-	allErrs := validation.ValidateDeploymentUpdate(newDeployment, oldDeployment)
+	allErrs := validation.ValidateDeploymentUpdate(newDeployment, oldDeployment, feature.DefaultFeatureGate)
 
 	// Update is not allowed to set Spec.Selector for all groups/versions except extensions/v1beta1.
 	// If RequestInfo is nil, it is better to revert to old behavior (i.e. allow update to set Spec.Selector)

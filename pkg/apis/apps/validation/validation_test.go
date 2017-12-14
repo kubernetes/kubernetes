@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -106,7 +107,7 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 	}
 	for _, successCase := range successCases {
-		if errs := ValidateStatefulSet(&successCase); len(errs) != 0 {
+		if errs := ValidateStatefulSet(&successCase, feature.NewFeatureGate()); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -275,7 +276,7 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateStatefulSet(&v)
+		errs := ValidateStatefulSet(&v, feature.NewFeatureGate())
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}

@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	// TODO: remove this import if
@@ -126,7 +127,8 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 	if err = defaultFn(newPod); err != nil {
 		return true, pod, err
 	}
-	if errs := validation.ValidatePod(newPod); len(errs) > 0 {
+	// TODO this is highlighting a big risk.  If the kubelet and apiserver don't agree on feature gates, this can fail.
+	if errs := validation.ValidatePod(newPod, feature.DefaultFeatureGate); len(errs) > 0 {
 		return true, pod, fmt.Errorf("invalid pod: %v", errs)
 	}
 	v1Pod := &v1.Pod{}
@@ -156,7 +158,8 @@ func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods v1.
 		if err = defaultFn(newPod); err != nil {
 			return true, pods, err
 		}
-		if errs := validation.ValidatePod(newPod); len(errs) > 0 {
+		// TODO this is highlighting a big risk.  If the kubelet and apiserver don't agree on feature gates, this can fail.
+		if errs := validation.ValidatePod(newPod, feature.DefaultFeatureGate); len(errs) > 0 {
 			err = fmt.Errorf("invalid pod: %v", errs)
 			return true, pods, err
 		}

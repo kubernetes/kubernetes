@@ -40,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/apiserver/pkg/util/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
@@ -88,7 +89,7 @@ func (podStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runt
 // Validate validates a new pod.
 func (podStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	pod := obj.(*api.Pod)
-	return validation.ValidatePod(pod)
+	return validation.ValidatePod(pod, feature.DefaultFeatureGate)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -117,7 +118,7 @@ func isUpdatingUninitializedPod(old runtime.Object) (bool, error) {
 
 // ValidateUpdate is the default update validation for an end user.
 func (podStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidatePod(obj.(*api.Pod))
+	errorList := validation.ValidatePod(obj.(*api.Pod), feature.DefaultFeatureGate)
 	uninitializedUpdate, err := isUpdatingUninitializedPod(old)
 	if err != nil {
 		return append(errorList, field.InternalError(field.NewPath("metadata"), err))
@@ -125,7 +126,7 @@ func (podStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtim
 	if uninitializedUpdate {
 		return errorList
 	}
-	return append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))...)
+	return append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), feature.DefaultFeatureGate)...)
 }
 
 // AllowUnconditionalUpdate allows pods to be overwritten
@@ -202,7 +203,7 @@ func (podStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old 
 		return append(errorList, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
 	}
 	// TODO: merge valid fields after update
-	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod))
+	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod), feature.DefaultFeatureGate)
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.

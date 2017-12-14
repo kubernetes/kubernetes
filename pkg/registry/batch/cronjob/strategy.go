@@ -22,6 +22,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -69,7 +70,7 @@ func (cronJobStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old 
 // Validate validates a new scheduled job.
 func (cronJobStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	cronJob := obj.(*batch.CronJob)
-	return validation.ValidateCronJob(cronJob)
+	return validation.ValidateCronJob(cronJob, feature.DefaultFeatureGate)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -87,7 +88,7 @@ func (cronJobStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (cronJobStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateCronJobUpdate(obj.(*batch.CronJob), old.(*batch.CronJob))
+	return validation.ValidateCronJobUpdate(obj.(*batch.CronJob), old.(*batch.CronJob), feature.DefaultFeatureGate)
 }
 
 type cronJobStatusStrategy struct {

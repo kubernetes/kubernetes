@@ -34,6 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/apiserver/pkg/util/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -87,7 +88,7 @@ func (nodeStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old run
 // Validate validates a new node.
 func (nodeStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	node := obj.(*api.Node)
-	return validation.ValidateNode(node)
+	return validation.ValidateNode(node, feature.DefaultFeatureGate)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -96,8 +97,8 @@ func (nodeStrategy) Canonicalize(obj runtime.Object) {
 
 // ValidateUpdate is the default update validation for an end user.
 func (nodeStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidateNode(obj.(*api.Node))
-	return append(errorList, validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node))...)
+	errorList := validation.ValidateNode(obj.(*api.Node), feature.DefaultFeatureGate)
+	return append(errorList, validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node), feature.DefaultFeatureGate)...)
 }
 
 func (nodeStrategy) AllowUnconditionalUpdate() bool {
@@ -138,7 +139,7 @@ func (nodeStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, o
 }
 
 func (nodeStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node))
+	return validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node), feature.DefaultFeatureGate)
 }
 
 // Canonicalize normalizes the object after validation.
