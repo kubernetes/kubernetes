@@ -943,7 +943,7 @@ func printAzureDiskVolumeSource(d *api.AzureDiskVolumeSource, w PrefixWriter) {
 func printVsphereVolumeSource(vsphere *api.VsphereVirtualDiskVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tvSphereVolume (a Persistent Disk resource in vSphere)\n"+
 		"    VolumePath:\t%v\n"+
-		"    FSType:\t%v\n",
+		"    FSType:\t%v\n"+
 		"    StoragePolicyName:\t%v\n",
 		vsphere.VolumePath, vsphere.FSType, vsphere.StoragePolicyName)
 }
@@ -1081,7 +1081,7 @@ func printFlexVolumeSource(flex *api.FlexVolumeSource, w PrefixWriter) {
 		"    Driver:\t%v\n"+
 		"    FSType:\t%v\n"+
 		"    SecretRef:\t%v\n"+
-		"    ReadOnly:\t%v\n",
+		"    ReadOnly:\t%v\n"+
 		"    Options:\t%v\n",
 		flex.Driver, flex.FSType, flex.SecretRef, flex.ReadOnly, flex.Options)
 }
@@ -1096,7 +1096,7 @@ func printFlockerVolumeSource(flocker *api.FlockerVolumeSource, w PrefixWriter) 
 func printCSIPersistentVolumeSource(csi *api.CSIPersistentVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tCSI (a Container Storage Interface (CSI) volume source)\n"+
 		"    Driver:\t%v\n"+
-		"    VolumeHandle:\t%v\n",
+		"    VolumeHandle:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		csi.Driver, csi.VolumeHandle, csi.ReadOnly)
 }
