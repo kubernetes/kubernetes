@@ -114,7 +114,7 @@ func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, out i
 	}
 
 	r := f.NewBuilder().
-		Internal().
+		Unstructured().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, args...).
@@ -127,7 +127,14 @@ func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, out i
 		return err
 	}
 
-	o.Infos, err = r.Infos()
+	err = r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
+		info.Object = info.AsVersioned()
+		o.Infos = append(o.Infos, info)
+		return nil
+	})
 	if err != nil {
 		return err
 	}

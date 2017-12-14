@@ -23,12 +23,14 @@ import (
 
 	"github.com/spf13/cobra"
 
+	rbacv1 "k8s.io/api/rbac/v1"
+	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -50,7 +52,7 @@ var (
 	kubectl create rolebinding admin --role=admin --user=admin -o yaml --dry-run | kubectl set subject --local -f - --user=foo -o yaml`)
 )
 
-type updateSubjects func(existings []rbac.Subject, targets []rbac.Subject) (bool, []rbac.Subject)
+type updateSubjects func(existings []subjectInterface, targets []subjectInterface) (bool, []subjectInterface)
 
 // SubjectOptions is the start of the data required to perform the operation. As new fields are added, add them here instead of
 // referencing the cmd.Flags
@@ -126,7 +128,7 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
-		Internal().
+		Unstructured().
 		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -152,7 +154,9 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	if err != nil {
 		return err
 	}
-
+	for i, info := range o.Infos {
+		o.Infos[i].Object = info.AsVersioned()
+	}
 	return nil
 }
 
@@ -168,9 +172,19 @@ func (o *SubjectOptions) Validate() error {
 		}
 
 		for _, info := range o.Infos {
-			_, ok := info.Object.(*rbac.ClusterRoleBinding)
-			if ok && tokens[0] == "" {
-				return fmt.Errorf("serviceaccount must be <namespace>:<name>, namespace must be specified")
+			switch info.Object.(type) {
+			case *rbacv1.ClusterRoleBinding:
+				if tokens[0] == "" {
+					return fmt.Errorf("serviceaccount must be <namespace>:<name>, namespace must be specified")
+				}
+			case *rbacv1beta1.ClusterRoleBinding:
+				if tokens[0] == "" {
+					return fmt.Errorf("serviceaccount must be <namespace>:<name>, namespace must be specified")
+				}
+			case *rbacv1alpha1.ClusterRoleBinding:
+				if tokens[0] == "" {
+					return fmt.Errorf("serviceaccount must be <namespace>:<name>, namespace must be specified")
+				}
 			}
 		}
 	}
@@ -181,19 +195,19 @@ func (o *SubjectOptions) Validate() error {
 func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 	var err error
 	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
-		subjects := []rbac.Subject{}
+		subjects := []rbacv1.Subject{}
 		for _, user := range sets.NewString(o.Users...).List() {
-			subject := rbac.Subject{
-				Kind:     rbac.UserKind,
-				APIGroup: rbac.GroupName,
+			subject := rbacv1.Subject{
+				Kind:     rbacv1.UserKind,
+				APIGroup: rbacv1.GroupName,
 				Name:     user,
 			}
 			subjects = append(subjects, subject)
 		}
 		for _, group := range sets.NewString(o.Groups...).List() {
-			subject := rbac.Subject{
-				Kind:     rbac.GroupKind,
-				APIGroup: rbac.GroupName,
+			subject := rbacv1.Subject{
+				Kind:     rbacv1.GroupKind,
+				APIGroup: rbacv1.GroupName,
 				Name:     group,
 			}
 			subjects = append(subjects, subject)
@@ -208,18 +222,18 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 					return nil, err
 				}
 			}
-			subject := rbac.Subject{
-				Kind:      rbac.ServiceAccountKind,
+			subject := rbacv1.Subject{
+				Kind:      rbacv1.ServiceAccountKind,
 				Namespace: namespace,
 				Name:      name,
 			}
 			subjects = append(subjects, subject)
 		}
 
+		info.Object = info.AsVersioned()
 		transformed, err := updateSubjectForObject(info.Object, subjects, fn)
 		if transformed && err == nil {
-			// TODO: switch UpdatePodSpecForObject to work on v1.PodSpec
-			return runtime.Encode(o.Encoder, info.AsVersioned())
+			return runtime.Encode(o.Encoder, info.Object)
 		}
 		return nil, err
 	})
@@ -262,22 +276,38 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 }
 
 //Note: the obj mutates in the function
-func updateSubjectForObject(obj runtime.Object, subjects []rbac.Subject, fn updateSubjects) (bool, error) {
+func updateSubjectForObject(obj runtime.Object, subjects []rbacv1.Subject, fn updateSubjects) (bool, error) {
 	switch t := obj.(type) {
-	case *rbac.RoleBinding:
-		transformed, result := fn(t.Subjects, subjects)
-		t.Subjects = result
+	case *rbacv1.RoleBinding:
+		transformed, result := fn(V1SubjectsToSubjectInterfaces(t.Subjects), V1SubjectsToSubjectInterfaces(subjects))
+		t.Subjects = SubjectInterfacesToV1Subjects(result)
 		return transformed, nil
-	case *rbac.ClusterRoleBinding:
-		transformed, result := fn(t.Subjects, subjects)
-		t.Subjects = result
+	case *rbacv1beta1.RoleBinding:
+		transformed, result := fn(V1Beta1SubjectsToSubjectInterfaces(t.Subjects), V1SubjectsToSubjectInterfaces(subjects))
+		t.Subjects = SubjectInterfacesToV1Beta1Subjects(result)
+		return transformed, nil
+	case *rbacv1alpha1.RoleBinding:
+		transformed, result := fn(V1Alpha1SubjectsToSubjectInterfaces(t.Subjects), V1SubjectsToSubjectInterfaces(subjects))
+		t.Subjects = SubjectInterfacesToV1Alpha1Subjects(result)
+		return transformed, nil
+	case *rbacv1.ClusterRoleBinding:
+		transformed, result := fn(V1SubjectsToSubjectInterfaces(t.Subjects), V1SubjectsToSubjectInterfaces(subjects))
+		t.Subjects = SubjectInterfacesToV1Subjects(result)
+		return transformed, nil
+	case *rbacv1beta1.ClusterRoleBinding:
+		transformed, result := fn(V1Beta1SubjectsToSubjectInterfaces(t.Subjects), V1SubjectsToSubjectInterfaces(subjects))
+		t.Subjects = SubjectInterfacesToV1Beta1Subjects(result)
+		return transformed, nil
+	case *rbacv1alpha1.ClusterRoleBinding:
+		transformed, result := fn(V1Alpha1SubjectsToSubjectInterfaces(t.Subjects), V1SubjectsToSubjectInterfaces(subjects))
+		t.Subjects = SubjectInterfacesToV1Alpha1Subjects(result)
 		return transformed, nil
 	default:
 		return false, fmt.Errorf("setting subjects is only supported for RoleBinding/ClusterRoleBinding")
 	}
 }
 
-func addSubjects(existings []rbac.Subject, targets []rbac.Subject) (bool, []rbac.Subject) {
+func addSubjects(existings []subjectInterface, targets []subjectInterface) (bool, []subjectInterface) {
 	transformed := false
 	updated := existings
 	for _, item := range targets {
@@ -289,9 +319,9 @@ func addSubjects(existings []rbac.Subject, targets []rbac.Subject) (bool, []rbac
 	return transformed, updated
 }
 
-func contain(slice []rbac.Subject, item rbac.Subject) bool {
+func contain(slice []subjectInterface, item subjectInterface) bool {
 	for _, v := range slice {
-		if v == item {
+		if equals(v, item) {
 			return true
 		}
 	}

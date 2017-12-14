@@ -113,7 +113,7 @@ func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io
 	}
 
 	r := f.NewBuilder().
-		Internal().
+		Unstructured().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, args...).
@@ -138,6 +138,9 @@ func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io
 		o.Rollbackers = append(o.Rollbackers, rollbacker)
 		return nil
 	})
+	for i, info := range o.Infos {
+		o.Infos[i].Object = info.AsVersioned()
+	}
 	return err
 }
 

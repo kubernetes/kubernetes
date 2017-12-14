@@ -236,7 +236,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 
 	if len(o.From) != 0 {
 		b := f.NewBuilder().
-			Internal().
+			Unstructured().
 			LocalParam(o.Local).
 			ContinueOnError().
 			NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -256,7 +256,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		}
 
 		for _, info := range infos {
-			versionedObject, err := info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
+			versionedObject, err := info.Versioned()
 			if err != nil {
 				return err
 			}
@@ -304,7 +304,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 	}
 
 	b := f.NewBuilder().
-		Internal().
+		Unstructured().
 		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -320,6 +320,9 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 	o.Infos, err = b.Do().Infos()
 	if err != nil {
 		return err
+	}
+	for i, info := range o.Infos {
+		o.Infos[i].Object = info.AsVersioned()
 	}
 	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
 		info.Object = info.AsVersioned()

@@ -17,13 +17,13 @@ limitations under the License.
 package kubectl
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"os/signal"
 	"sort"
 	"syscall"
 
+	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	extv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -34,16 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
 	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 const (
@@ -57,15 +51,21 @@ type Rollbacker interface {
 }
 
 func RollbackerFor(kind schema.GroupKind, c kubernetes.Interface) (Rollbacker, error) {
-	switch kind {
-	case extensions.Kind("Deployment"), apps.Kind("Deployment"):
+	g, k := kind.Group, kind.Kind
+	switch {
+	case g == extv1beta1.GroupName && k == "Deployment":
+		fallthrough
+	case g == appsv1.GroupName && k == "Deployment":
 		return &DeploymentRollbacker{c}, nil
-	case extensions.Kind("DaemonSet"), apps.Kind("DaemonSet"):
+	case g == extv1beta1.GroupName && k == "DaemonSet":
+		fallthrough
+	case g == appsv1.GroupName && k == "DaemonSet":
 		return &DaemonSetRollbacker{c}, nil
-	case apps.Kind("StatefulSet"):
+	case g == appsv1.GroupName && k == "StatefulSet":
 		return &StatefulSetRollbacker{c}, nil
+	default:
+		return nil, fmt.Errorf("no rollbacker has been implemented for %q", kind)
 	}
-	return nil, fmt.Errorf("no rollbacker has been implemented for %q", kind)
 }
 
 type DeploymentRollbacker struct {
@@ -73,7 +73,7 @@ type DeploymentRollbacker struct {
 }
 
 func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error) {
-	d, ok := obj.(*extensions.Deployment)
+	d, ok := obj.(*extv1beta1.Deployment)
 	if !ok {
 		return "", fmt.Errorf("passed object is not a Deployment: %#v", obj)
 	}
@@ -120,7 +120,7 @@ func watchRollbackEvent(w watch.Interface) string {
 			if !ok {
 				return ""
 			}
-			obj, ok := event.Object.(*api.Event)
+			obj, ok := event.Object.(*v1.Event)
 			if !ok {
 				w.Stop()
 				return ""
@@ -138,7 +138,7 @@ func watchRollbackEvent(w watch.Interface) string {
 
 // isRollbackEvent checks if the input event is about rollback, and returns true and
 // related result string back if it is.
-func isRollbackEvent(e *api.Event) (bool, string) {
+func isRollbackEvent(e *v1.Event) (bool, string) {
 	rollbackEventReasons := []string{deploymentutil.RollbackRevisionNotFound, deploymentutil.RollbackTemplateUnchanged, deploymentutil.RollbackDone}
 	for _, reason := range rollbackEventReasons {
 		if e.Reason == reason {
@@ -151,13 +151,8 @@ func isRollbackEvent(e *api.Event) (bool, string) {
 	return false, ""
 }
 
-func simpleDryRun(deployment *extensions.Deployment, c kubernetes.Interface, toRevision int64) (string, error) {
-	externalDeployment := &extv1beta1.Deployment{}
-	if err := legacyscheme.Scheme.Convert(deployment, externalDeployment, nil); err != nil {
-		return "", fmt.Errorf("failed to convert deployment, %v", err)
-	}
-
-	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(externalDeployment, c.ExtensionsV1beta1())
+func simpleDryRun(deployment *extv1beta1.Deployment, c kubernetes.Interface, toRevision int64) (string, error) {
+	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, c.ExtensionsV1beta1())
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve replica sets from deployment %s: %v", deployment.Name, err)
 	}
@@ -184,14 +179,7 @@ func simpleDryRun(deployment *extensions.Deployment, c kubernetes.Interface, toR
 		if !ok {
 			return "", revisionNotFoundErr(toRevision)
 		}
-		buf := bytes.NewBuffer([]byte{})
-		internalTemplate := &api.PodTemplateSpec{}
-		if err := apiv1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(template, internalTemplate, nil); err != nil {
-			return "", fmt.Errorf("failed to convert podtemplate, %v", err)
-		}
-		w := printersinternal.NewPrefixWriter(buf)
-		printersinternal.DescribePodTemplate(internalTemplate, w)
-		return buf.String(), nil
+		return printRollbackPodTemplate(template)
 	}
 
 	// Sort the revisionToSpec map by revision
@@ -202,15 +190,7 @@ func simpleDryRun(deployment *extensions.Deployment, c kubernetes.Interface, toR
 	sliceutil.SortInts64(revisions)
 
 	template, _ := revisionToSpec[revisions[len(revisions)-2]]
-	buf := bytes.NewBuffer([]byte{})
-	buf.WriteString("\n")
-	internalTemplate := &api.PodTemplateSpec{}
-	if err := apiv1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(template, internalTemplate, nil); err != nil {
-		return "", fmt.Errorf("failed to convert podtemplate, %v", err)
-	}
-	w := printersinternal.NewPrefixWriter(buf)
-	printersinternal.DescribePodTemplate(internalTemplate, w)
-	return buf.String(), nil
+	return printRollbackPodTemplate(template)
 }
 
 type DaemonSetRollbacker struct {
@@ -243,7 +223,7 @@ func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations ma
 		if err != nil {
 			return "", err
 		}
-		return printPodTemplate(&appliedDS.Spec.Template)
+		return printRollbackPodTemplate(&appliedDS.Spec.Template)
 	}
 
 	// Skip if the revision already matches current DaemonSet
@@ -294,7 +274,7 @@ func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations 
 		if err != nil {
 			return "", err
 		}
-		return printPodTemplate(&appliedSS.Spec.Template)
+		return printRollbackPodTemplate(&appliedSS.Spec.Template)
 	}
 
 	// Skip if the revision already matches current StatefulSet
@@ -340,16 +320,10 @@ func findHistory(toRevision int64, allHistory []*appsv1beta1.ControllerRevision)
 	return toHistory
 }
 
-// printPodTemplate converts a given pod template into a human-readable string.
-func printPodTemplate(specTemplate *v1.PodTemplateSpec) (string, error) {
-	content := bytes.NewBuffer([]byte{})
-	w := printersinternal.NewPrefixWriter(content)
-	internalTemplate := &api.PodTemplateSpec{}
-	if err := apiv1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(specTemplate, internalTemplate, nil); err != nil {
-		return "", fmt.Errorf("failed to convert podtemplate while printing: %v", err)
-	}
-	printersinternal.DescribePodTemplate(internalTemplate, w)
-	return fmt.Sprintf("will roll back to %s", content.String()), nil
+// printRollbackPodTemplate converts a given pod template into a human-readable string.
+func printRollbackPodTemplate(specTemplate *v1.PodTemplateSpec) (string, error) {
+	s, err := printPodTemplate(specTemplate)
+	return fmt.Sprintf("will roll back to %s", s), err
 }
 
 func revisionNotFoundErr(r int64) error {

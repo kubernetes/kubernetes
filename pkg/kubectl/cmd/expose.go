@@ -230,7 +230,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		}
 
 		if inline := cmdutil.GetFlagString(cmd, "overrides"); len(inline) > 0 {
-			codec := runtime.NewCodec(f.JSONEncoder(), f.Decoder(true))
+			codec := runtime.NewCodec(f.JSONEncoder(), f.Decoder(false))
 			object, err = cmdutil.Merge(codec, object, inline)
 			if err != nil {
 				return err
@@ -241,7 +241,6 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			ObjectTyper:  typer,
 			RESTMapper:   mapper,
 			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
-			Decoder:      f.Decoder(true),
 		}
 		info, err = resourceMapper.InfoForObject(object, nil)
 		if err != nil {

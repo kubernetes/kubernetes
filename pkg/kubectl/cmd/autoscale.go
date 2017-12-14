@@ -91,7 +91,7 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	}
 
 	r := f.NewBuilder().
-		Internal().
+		Unstructured().
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
@@ -142,7 +142,6 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			ObjectTyper:  typer,
 			RESTMapper:   mapper,
 			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
-			Decoder:      f.Decoder(true),
 		}
 		hpa, err := resourceMapper.InfoForObject(object, nil)
 		if err != nil {

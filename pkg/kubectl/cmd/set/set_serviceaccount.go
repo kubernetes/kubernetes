@@ -130,7 +130,7 @@ func (saConfig *serviceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 	resources := args[:len(args)-1]
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
-		Internal().
+		Unstructured().
 		LocalParam(saConfig.local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -144,6 +144,9 @@ func (saConfig *serviceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 	saConfig.infos, err = builder.Do().Infos()
 	if err != nil {
 		return err
+	}
+	for i, info := range saConfig.infos {
+		saConfig.infos[i].Object = info.AsVersioned()
 	}
 	return nil
 }

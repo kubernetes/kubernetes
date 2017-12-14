@@ -43,9 +43,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/printers"
 	utilexec "k8s.io/utils/exec"
 )
@@ -696,7 +696,7 @@ func FilterResourceList(obj runtime.Object, filterFuncs kubectl.Filters, filterO
 	if err != nil {
 		return 0, []runtime.Object{obj}, utilerrors.NewAggregate([]error{err})
 	}
-	if errs := runtime.DecodeList(items, legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme); len(errs) > 0 {
+	if errs := runtime.DecodeList(items, scheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme); len(errs) > 0 {
 		return 0, []runtime.Object{obj}, utilerrors.NewAggregate(errs)
 	}
 

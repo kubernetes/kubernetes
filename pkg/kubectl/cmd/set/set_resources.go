@@ -145,7 +145,7 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
-		Internal().
+		Unstructured().
 		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -171,6 +171,9 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	o.Infos, err = builder.Do().Infos()
 	if err != nil {
 		return err
+	}
+	for i, info := range o.Infos {
+		o.Infos[i].Object = info.AsVersioned()
 	}
 	return nil
 }

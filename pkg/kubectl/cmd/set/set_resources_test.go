@@ -47,7 +47,7 @@ import (
 
 func TestResourcesLocal(t *testing.T) {
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -91,7 +91,7 @@ func TestResourcesLocal(t *testing.T) {
 
 func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -452,7 +452,7 @@ func TestSetResourcesRemote(t *testing.T) {
 			tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{testapi.Default.Codec()}, Typer: typer, Mapper: mapper}
 			tf.Namespace = "test"
 			tf.CategoryExpander = categories.LegacyCategoryExpander
-			tf.Client = &fake.RESTClient{
+			tf.UnstructuredClient = &fake.RESTClient{
 				GroupVersion:         groupVersion,
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
