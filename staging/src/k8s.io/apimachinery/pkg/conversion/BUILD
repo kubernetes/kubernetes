@@ -30,7 +30,10 @@ go_library(
         "helper.go",
     ],
     importpath = "k8s.io/apimachinery/pkg/conversion",
-    deps = ["//vendor/k8s.io/apimachinery/third_party/forked/golang/reflect:go_default_library"],
+    deps = [
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/apimachinery/third_party/forked/golang/reflect:go_default_library",
+    ],
 )
 
 filegroup(

@@ -18,7 +18,12 @@ package conversion
 
 import (
 	"fmt"
+	"path/filepath"
 	"reflect"
+	"runtime"
+	"strings"
+
+	"github.com/golang/glog"
 )
 
 type typePair struct {
@@ -577,11 +582,37 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 	return c.defaultConvert(sv, dv, scope)
 }
 
+// printDefaultConvertCallers returns strings that contains filtered stack trace of
+// default convert callers.
+func printDefaultConvertCallers() string {
+	pc := make([]uintptr, 30)
+	n := runtime.Callers(2, pc)
+	if n == 0 {
+		return "<unknown>"
+	}
+	pc = pc[:n] // pass only valid pcs to runtime.CallersFrames
+	frames := runtime.CallersFrames(pc)
+	out := []string{}
+	for {
+		frame, more := frames.Next()
+		if !more {
+			break
+		}
+		// skip machinery
+		if strings.Contains(frame.File, "k8s.io/apimachinery") {
+			continue
+		}
+		out = append(out, fmt.Sprintf("%s:%d %s", filepath.Base(frame.File), frame.Line, frame.Function))
+	}
+	return strings.Join(out, "\n")
+}
+
 // defaultConvert recursively copies sv into dv. no conversion function is called
 // for the current stack frame (but conversion functions may be called for nested objects)
 func (c *Converter) defaultConvert(sv, dv reflect.Value, scope *scope) error {
 	dt, st := dv.Type(), sv.Type()
 
+	glog.Warningf("DEPRECATED: Detected defaultConvert call (%s->%s) source:\n%s\n", st.String(), dt.String(), printDefaultConvertCallers())
 	if !dv.CanSet() {
 		return scope.errorf("Cannot set dest. (Tried to deep copy something with unexported fields?)")
 	}
