@@ -252,7 +252,7 @@ func CreateAddNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
 	return func(originalObj interface{}) {
 		node := originalObj.(*v1.Node).DeepCopy()
 		if err := f(node); err != nil {
-			utilruntime.HandleError(fmt.Errorf("Error while processing Node Delete: %v", err))
+			utilruntime.HandleError(fmt.Errorf("Error while processing Node Add: %v", err))
 		}
 	}
 }
