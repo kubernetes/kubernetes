@@ -31,11 +31,8 @@ import (
 )
 
 const (
-
 	// ClusterAutoscalerProvider defines the default autoscaler provider
 	ClusterAutoscalerProvider = "ClusterAutoscalerProvider"
-	// StatefulSetKind defines the name of 'StatefulSet' kind
-	StatefulSetKind = "StatefulSet"
 )
 
 func init() {
