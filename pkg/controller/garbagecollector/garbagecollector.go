@@ -297,7 +297,7 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 	if err != nil {
 		return false, nil, err
 	}
-	resource, err := gc.apiResource(reference.APIVersion, reference.Kind, len(item.identity.Namespace) != 0)
+	resource, err := gc.apiResource(reference.APIVersion, reference.Kind)
 	if err != nil {
 		return false, nil, err
 	}
