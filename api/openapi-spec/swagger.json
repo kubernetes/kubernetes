@@ -75655,7 +75655,7 @@
     }
    },
    "io.k8s.api.core.v1.FlexVolumeSource": {
-    "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
+    "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin.",
     "required": [
      "driver"
     ],
@@ -77006,7 +77006,7 @@
       "$ref": "#/definitions/io.k8s.api.core.v1.FCVolumeSource"
      },
      "flexVolume": {
-      "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
+      "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin.",
       "$ref": "#/definitions/io.k8s.api.core.v1.FlexVolumeSource"
      },
      "flocker": {
@@ -78895,7 +78895,7 @@
       "$ref": "#/definitions/io.k8s.api.core.v1.FCVolumeSource"
      },
      "flexVolume": {
-      "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
+      "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin.",
       "$ref": "#/definitions/io.k8s.api.core.v1.FlexVolumeSource"
      },
      "flocker": {

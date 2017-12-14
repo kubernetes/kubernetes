@@ -269,7 +269,7 @@ type VolumeSource struct {
 	Quobyte *QuobyteVolumeSource
 
 	// FlexVolume represents a generic volume resource that is
-	// provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.
+	// provisioned/attached using an exec based plugin.
 	// +optional
 	FlexVolume *FlexVolumeSource
 
@@ -352,7 +352,7 @@ type PersistentVolumeSource struct {
 	// +optional
 	ISCSI *ISCSIPersistentVolumeSource
 	// FlexVolume represents a generic volume resource that is
-	// provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.
+	// provisioned/attached using an exec based plugin.
 	// +optional
 	FlexVolume *FlexVolumeSource
 	// Cinder represents a cinder volume attached and mounted on kubelets host machine
@@ -868,7 +868,7 @@ type FCVolumeSource struct {
 }
 
 // FlexVolume represents a generic volume resource that is
-// provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.
+// provisioned/attached using an exec based plugin.
 type FlexVolumeSource struct {
 	// Driver is the name of the driver to use for this volume.
 	Driver string

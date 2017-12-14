@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -488,9 +489,13 @@ func TestValidateProxyMode(t *testing.T) {
 	newPath := field.NewPath("KubeProxyConfiguration")
 	successCases := []kubeproxyconfig.ProxyMode{
 		kubeproxyconfig.ProxyModeUserspace,
-		kubeproxyconfig.ProxyModeIPTables,
-		kubeproxyconfig.ProxyModeIPVS,
 		kubeproxyconfig.ProxyMode(""),
+	}
+
+	if runtime.GOOS == "windows" {
+		successCases = append(successCases, kubeproxyconfig.ProxyModeKernelspace)
+	} else {
+		successCases = append(successCases, kubeproxyconfig.ProxyModeIPTables, kubeproxyconfig.ProxyModeIPVS)
 	}
 
 	for _, successCase := range successCases {
@@ -505,13 +510,13 @@ func TestValidateProxyMode(t *testing.T) {
 	}{
 		{
 			mode: kubeproxyconfig.ProxyMode("non-existing"),
-			msg:  "or blank (blank means the best-available proxy (currently iptables)",
+			msg:  "or blank (blank means the",
 		},
 	}
 
 	for _, errorCase := range errorCases {
 		if errs := validateProxyMode(errorCase.mode, newPath.Child("ProxyMode")); len(errs) == 0 {
-			t.Errorf("expected failure for %s", errorCase.msg)
+			t.Errorf("expected failure %s for %v", errorCase.msg, errorCase.mode)
 		} else if !strings.Contains(errs[0].Error(), errorCase.msg) {
 			t.Errorf("unexpected error: %v, expected: %s", errs[0], errorCase.msg)
 		}
