@@ -933,7 +933,7 @@ func (f *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		glog.Info("Created equivalence class cache")
 	}
 
-	algo := core.NewGenericScheduler(f.schedulerCache, f.equivalencePodCache, f.podQueue, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders, f.volumeBinder)
+	algo := core.NewGenericScheduler(f.schedulerCache, f.equivalencePodCache, f.podQueue, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders, f.volumeBinder, f.pVCLister)
 
 	podBackoff := util.CreateDefaultPodBackoff()
 	return &scheduler.Config{
