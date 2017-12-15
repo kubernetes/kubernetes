@@ -143,9 +143,9 @@ func Run(s *options.CloudControllerManagerServer) error {
 			clientBuilder = rootClientBuilder
 		}
 
-		err := StartControllers(s, kubeconfig, clientBuilder, stop, recorder, cloud)
-		glog.Fatalf("error running controllers: %v", err)
-		panic("unreachable")
+		if err := StartControllers(s, kubeconfig, clientBuilder, stop, recorder, cloud); err != nil {
+			glog.Fatalf("error running controllers: %v", err)
+		}
 	}
 
 	if !s.LeaderElection.LeaderElect {
