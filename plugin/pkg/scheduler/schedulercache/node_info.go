@@ -38,6 +38,7 @@ type NodeInfo struct {
 
 	pods             []*v1.Pod
 	podsWithAffinity []*v1.Pod
+	podUsedPorts     map[string]bool
 	usedPorts        map[string]bool
 
 	// Total requested resource of all pods on this node.
@@ -164,6 +165,7 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		nonzeroRequest:      &Resource{},
 		allocatableResource: &Resource{},
 		generation:          0,
+		podUsedPorts:        make(map[string]bool),
 		usedPorts:           make(map[string]bool),
 	}
 	for _, pod := range pods {
@@ -186,6 +188,13 @@ func (n *NodeInfo) Pods() []*v1.Pod {
 		return nil
 	}
 	return n.pods
+}
+
+func (n *NodeInfo) PodUsedPorts() map[string]bool {
+	if n == nil {
+		return nil
+	}
+	return n.podUsedPorts
 }
 
 func (n *NodeInfo) UsedPorts() map[string]bool {
@@ -269,15 +278,16 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		taintsErr:               n.taintsErr,
 		memoryPressureCondition: n.memoryPressureCondition,
 		diskPressureCondition:   n.diskPressureCondition,
+		podUsedPorts:            make(map[string]bool),
 		usedPorts:               make(map[string]bool),
 		generation:              n.generation,
 	}
 	if len(n.pods) > 0 {
 		clone.pods = append([]*v1.Pod(nil), n.pods...)
 	}
-	if len(n.usedPorts) > 0 {
-		for k, v := range n.usedPorts {
-			clone.usedPorts[k] = v
+	if len(n.podUsedPorts) > 0 {
+		for k, v := range n.podUsedPorts {
+			clone.podUsedPorts[k] = v
 		}
 	}
 	if len(n.podsWithAffinity) > 0 {
@@ -285,6 +295,11 @@ func (n *NodeInfo) Clone() *NodeInfo {
 	}
 	if len(n.taints) > 0 {
 		clone.taints = append([]v1.Taint(nil), n.taints...)
+	}
+	if len(n.usedPorts) > 0 {
+		for k, v := range n.usedPorts {
+			clone.usedPorts[k] = v
+		}
 	}
 	return clone
 }
@@ -295,8 +310,8 @@ func (n *NodeInfo) String() string {
 	for i, pod := range n.pods {
 		podKeys[i] = pod.Name
 	}
-	return fmt.Sprintf("&NodeInfo{Pods:%v, RequestedResource:%#v, NonZeroRequest: %#v, UsedPort: %#v, AllocatableResource:%#v}",
-		podKeys, n.requestedResource, n.nonzeroRequest, n.usedPorts, n.allocatableResource)
+	return fmt.Sprintf("&NodeInfo{Pods:%v, RequestedResource:%#v, NonZeroRequest: %#v, PodUsedPorts: %#v, AllocatableResource:%#v, UsedPorts:%#v}",
+		podKeys, n.requestedResource, n.nonzeroRequest, n.podUsedPorts, n.allocatableResource, n.usedPorts)
 }
 
 func hasPodAffinityConstraints(pod *v1.Pod) bool {
@@ -325,7 +340,7 @@ func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	}
 
 	// Consume ports when pods added.
-	n.updateUsedPorts(pod, true)
+	n.updatePodUsedPorts(pod, true)
 
 	n.generation++
 }
@@ -376,7 +391,7 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 			n.nonzeroRequest.Memory -= non0_mem
 
 			// Release ports when remove Pods.
-			n.updateUsedPorts(pod, false)
+			n.updatePodUsedPorts(pod, false)
 
 			n.generation++
 
@@ -400,7 +415,7 @@ func calculateResource(pod *v1.Pod) (res Resource, non0_cpu int64, non0_mem int6
 	return
 }
 
-func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, used bool) {
+func (n *NodeInfo) updatePodUsedPorts(pod *v1.Pod, used bool) {
 	for j := range pod.Spec.Containers {
 		container := &pod.Spec.Containers[j]
 		for k := range container.Ports {
@@ -423,9 +438,9 @@ func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, used bool) {
 				str := fmt.Sprintf("%s/%s/%d", portProtocol, portHostIP, podPort.HostPort)
 
 				if used {
-					n.usedPorts[str] = used
+					n.podUsedPorts[str] = used
 				} else {
-					delete(n.usedPorts, str)
+					delete(n.podUsedPorts, str)
 				}
 
 			}
@@ -450,6 +465,15 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 		default:
 			// We ignore other conditions.
 		}
+	}
+	dps := node.Status.UsedPorts
+	n.usedPorts = make(map[string]bool)
+	for i := range dps {
+		portHostIP := dps[i].HostIP
+		if portHostIP == "" {
+			portHostIP = util.DefaultBindAllHostIP
+		}
+		n.usedPorts[fmt.Sprintf("%s/%s/%d", dps[i].Protocol, portHostIP, dps[i].Port)] = true
 	}
 	n.generation++
 	return nil

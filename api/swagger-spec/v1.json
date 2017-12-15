@@ -20108,6 +20108,13 @@
        "$ref": "v1.AttachedVolume"
       },
       "description": "List of volumes that are attached to the node."
+     },
+     "usedPorts": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.UsedPort"
+      },
+      "description": "List of ports currently used on the Node"
      }
     }
    },
@@ -20285,6 +20292,24 @@
      "devicePath": {
       "type": "string",
       "description": "DevicePath represents the device path where the volume should be available"
+     }
+    }
+   },
+   "v1.UsedPort": {
+    "id": "v1.UsedPort",
+    "properties": {
+     "protocol": {
+      "type": "string",
+      "description": "Protocol for port. Must be UDP or TCP."
+     },
+     "port": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Port number"
+     },
+     "hostIP": {
+      "type": "string",
+      "description": "What host IP to bind the port to."
      }
     }
    },

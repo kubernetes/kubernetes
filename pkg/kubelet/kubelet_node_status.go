@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/drael/GOnetstat"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -724,6 +725,7 @@ func (kl *Kubelet) setNodeStatusInfo(node *v1.Node) {
 	kl.setNodeStatusDaemonEndpoints(node)
 	kl.setNodeStatusImages(node)
 	kl.setNodeStatusGoRuntime(node)
+	kl.setNodeStatusUsedPorts(node)
 }
 
 // Set Ready condition for the node.
@@ -1034,4 +1036,26 @@ func validateNodeIP(nodeIP net.IP) error {
 		}
 	}
 	return fmt.Errorf("Node IP: %q not found in the host's network interfaces", nodeIP.String())
+}
+
+func (kl *Kubelet) setNodeStatusUsedPorts(node *v1.Node) {
+	tcpData := GOnetstat.Tcp()
+	tcpData = append(GOnetstat.Tcp6(), tcpData...)
+	udpData := GOnetstat.Udp()
+	udpData = append(GOnetstat.Udp6(), udpData...)
+
+	ports := make([]v1.UsedPort, 0)
+	for j := range tcpData {
+		if tcpData[j].State != "LISTEN" {
+			continue
+		}
+		ports = append(ports, v1.UsedPort{Protocol: v1.ProtocolTCP, Port: int32(tcpData[j].Port), HostIP: tcpData[j].Ip})
+	}
+	for j := range udpData {
+		if udpData[j].State != "LISTEN" {
+			continue
+		}
+		ports = append(ports, v1.UsedPort{Protocol: v1.ProtocolUDP, Port: int32(udpData[j].Port), HostIP: udpData[j].Ip})
+	}
+	node.Status.UsedPorts = ports
 }

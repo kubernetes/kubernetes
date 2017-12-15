@@ -337,6 +337,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
 	assert.Equal(t, v1.NodeReady, updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type, "NotReady should be last")
 	assert.Len(t, updatedNode.Status.Images, maxImagesInNodeStatus)
+	updatedNode.Status.UsedPorts = nil // currently used ports are unpredictable and maybe ephemeral, ignore them before compare expected with updated
 	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", diff.ObjectDiff(expectedNode, updatedNode))
 }
 
@@ -528,6 +529,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
 	assert.Equal(t, v1.NodeReady, updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type,
 		"NodeReady should be the last condition")
+	updatedNode.Status.UsedPorts = nil // currently used ports are unpredictable and maybe ephemeral, ignore them before compare expected with updated
 	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", diff.ObjectDiff(expectedNode, updatedNode))
 }
 
@@ -723,6 +725,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			LastHeartbeatTime:  metav1.Time{},
 			LastTransitionTime: metav1.Time{},
 		}
+		updatedNode.Status.UsedPorts = nil // currently used ports are unpredictable and maybe ephemeral, ignore them before compare expected with updated
 		assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", diff.ObjectDiff(expectedNode, updatedNode))
 	}
 

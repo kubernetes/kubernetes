@@ -76591,6 +76591,13 @@
       "description": "NodePhase is the recently observed lifecycle phase of the node. More info: https://kubernetes.io/docs/concepts/nodes/node/#phase The field is never populated, and now is deprecated.",
       "type": "string"
      },
+     "usedPorts": {
+      "description": "List of ports currently used on the Node",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.UsedPort"
+      }
+     },
      "volumesAttached": {
       "description": "List of volumes that are attached to the node.",
       "type": "array",
@@ -78848,6 +78855,23 @@
      },
      "value": {
       "description": "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string.",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.UsedPort": {
+    "properties": {
+     "hostIP": {
+      "description": "What host IP to bind the port to.",
+      "type": "string"
+     },
+     "port": {
+      "description": "Port number",
+      "type": "integer",
+      "format": "int32"
+     },
+     "protocol": {
+      "description": "Protocol for port. Must be UDP or TCP.",
       "type": "string"
      }
     }
