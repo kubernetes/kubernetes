@@ -46,12 +46,12 @@ build:
 	docker build --pull -t $(IMAGE)-$(ARCH):$(VERSION) $(TEMP_DIR)
 
 push: build
-	gcloud docker --server=k8s.gcr.io -- push $(IMAGE)-$(ARCH):$(VERSION)
+	gcloud docker -- push $(IMAGE)-$(ARCH):$(VERSION)
 ifeq ($(ARCH),amd64)
 	# Backward compatibility. TODO: deprecate this image tag
 	docker rmi $(IMAGE):$(VERSION) 2>/dev/null || true
 	docker tag $(IMAGE)-$(ARCH):$(VERSION) $(IMAGE):$(VERSION)
-	gcloud docker --server=k8s.gcr.io -- push $(IMAGE):$(VERSION)
+	gcloud docker -- push $(IMAGE):$(VERSION)
 endif
 
 clean:

@@ -71,7 +71,7 @@ endif
 	rm -rf $(TEMP_DIR)
 
 push: build
-	gcloud docker --server=k8s.gcr.io -- push $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG)
+	gcloud docker -- push $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG)
 
 clean:
 	docker rmi -f $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG) || true

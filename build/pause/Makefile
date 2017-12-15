@@ -87,13 +87,13 @@ endif
 
 push: .push-$(ARCH)
 .push-$(ARCH): .container-$(ARCH)
-	gcloud docker --server=k8s.gcr.io -- push $(IMAGE):$(TAG)
+	gcloud docker -- push $(IMAGE):$(TAG)
 	touch $@
 
 push-legacy: .push-legacy-$(ARCH)
 .push-legacy-$(ARCH): .container-$(ARCH)
 ifeq ($(ARCH),amd64)
-	gcloud docker --server=k8s.gcr.io -- push $(LEGACY_AMD64_IMAGE):$(TAG)
+	gcloud docker -- push $(LEGACY_AMD64_IMAGE):$(TAG)
 endif
 	touch $@
 

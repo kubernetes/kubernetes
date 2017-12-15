@@ -21,5 +21,5 @@ build:
 	docker build --pull -t "$(IMAGE):$(VERSION)" .
 
 push:
-	gcloud docker --server=k8s.gcr.io -- push "$(IMAGE):$(VERSION)"
+	gcloud docker -- push "$(IMAGE):$(VERSION)"
 

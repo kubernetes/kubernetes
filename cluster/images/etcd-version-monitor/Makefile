@@ -40,7 +40,7 @@ build:
 	docker build -t $(IMAGE) $(TEMP_DIR)
 
 push: build
-	gcloud docker --server=k8s.gcr.io -- push $(IMAGE)
+	gcloud docker -- push $(IMAGE)
 
 all: build
 

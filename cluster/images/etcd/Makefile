@@ -105,12 +105,12 @@ endif
 	docker build --pull -t $(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG) $(TEMP_DIR)
 
 push: build
-	gcloud docker --server=k8s.gcr.io -- push $(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG)
+	gcloud docker -- push $(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG)
 
 ifeq ($(ARCH),amd64)
 	# Backward compatibility. TODO: deprecate this image tag
 	docker tag $(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG) $(REGISTRY)/etcd:$(REGISTRY_TAG)
-	gcloud docker --server=k8s.gcr.io -- push $(REGISTRY)/etcd:$(REGISTRY_TAG)
+	gcloud docker -- push $(REGISTRY)/etcd:$(REGISTRY_TAG)
 endif
 
 all: build

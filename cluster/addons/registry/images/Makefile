@@ -21,4 +21,4 @@ build:
 	docker build --pull -t $(REPO):$(TAG) .
 
 push:
-	gcloud docker --server=k8s.gcr.io -- push $(REPO):$(TAG)
+	gcloud docker -- push $(REPO):$(TAG)

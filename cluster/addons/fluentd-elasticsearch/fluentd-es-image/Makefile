@@ -22,4 +22,4 @@ build:
 	docker build --pull -t $(PREFIX)/$(IMAGE):$(TAG) .
 
 push:
-	gcloud docker --server=k8s.gcr.io -- push $(PREFIX)/$(IMAGE):$(TAG)
+	gcloud docker -- push $(PREFIX)/$(IMAGE):$(TAG)

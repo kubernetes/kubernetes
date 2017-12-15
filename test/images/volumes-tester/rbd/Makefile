@@ -34,8 +34,8 @@ block:
 
 push: image
 	# Push image tagged as latest to repository
-	gcloud docker --server=k8s.gcr.io -- push $(PREFIX)/volume-rbd
+	gcloud docker -- push $(PREFIX)/volume-rbd
 	# Push version tagged image to repository (since this image is already pushed it will simply create or update version tag)
-	gcloud docker --server=k8s.gcr.io -- push $(PREFIX)/volume-rbd:$(TAG)
+	gcloud docker -- push $(PREFIX)/volume-rbd:$(TAG)
 
 clean:

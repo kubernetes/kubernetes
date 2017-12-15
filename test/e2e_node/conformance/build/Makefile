@@ -76,10 +76,10 @@ endif
 	docker build --pull -t ${IMAGE_NAME}-${ARCH}:${VERSION} ${TEMP_DIR}
 
 push: build
-	gcloud docker --server=k8s.gcr.io -- push ${IMAGE_NAME}-${ARCH}:${VERSION}
+	gcloud docker -- push ${IMAGE_NAME}-${ARCH}:${VERSION}
 ifeq ($(ARCH),amd64)
 	docker tag ${IMAGE_NAME}-${ARCH}:${VERSION} ${IMAGE_NAME}:${VERSION}
-	gcloud docker --server=k8s.gcr.io -- push ${IMAGE_NAME}:${VERSION}
+	gcloud docker -- push ${IMAGE_NAME}:${VERSION}
 endif
 
 .PHONY: all

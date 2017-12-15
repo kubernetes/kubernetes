@@ -22,7 +22,7 @@ container:
 	docker build --pull -t ${REGISTRY}/${IMAGE}:${TAG} .
 
 push: 
-	gcloud docker --server=k8s.gcr.io -- push ${REGISTRY}/${IMAGE}:${TAG}
+	gcloud docker -- push ${REGISTRY}/${IMAGE}:${TAG}
 
 upload:
 	./stage-upload.sh ${TAG} ${REGISTRY}/${IMAGE}:${TAG}
