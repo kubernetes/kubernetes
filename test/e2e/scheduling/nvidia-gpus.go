@@ -163,7 +163,7 @@ func testNvidiaGPUsOnCOS(f *framework.Framework) {
 	framework.Logf("Cluster is running on COS. Proceeding with test")
 
 	if f.BaseName == "device-plugin-gpus" {
-		dsYamlUrl = "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/daemonset.yaml"
+		dsYamlUrl = "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/k8s-1.9/daemonset.yaml"
 		gpuResourceName = framework.NVIDIAGPUResourceName
 		podCreationFunc = makeCudaAdditionDevicePluginTestPod
 	} else {
