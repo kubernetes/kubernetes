@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/history"
 )
 
-// StatefulSetControl implements the control logic for updating StatefulSets and their children Pods. It is implemented
+// StatefulSetControlInterface implements the control logic for updating StatefulSets and their children Pods. It is implemented
 // as an interface to allow for extensions that provide different semantics. Currently, there is only one implementation.
 type StatefulSetControlInterface interface {
 	// UpdateStatefulSet implements the control logic for Pod creation, update, and deletion, and
@@ -154,7 +154,7 @@ func (ssc *defaultStatefulSetControl) truncateHistory(
 	}
 	// collect live revisions and historic revisions
 	for i := range revisions {
-		if !live[revisions[i].Name] {
+		if result, ok := live[revisions[i].Name]; ok && !result {
 			history = append(history, revisions[i])
 		}
 	}
