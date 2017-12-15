@@ -264,7 +264,7 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 						case result.Operation == reconciliation.ReconcileUpdate:
 							glog.Infof("updated role.%s/%s in %v with additional permissions: %v", rbac.GroupName, role.Name, namespace, result.MissingRules)
 						case result.Operation == reconciliation.ReconcileCreate:
-							glog.Infof("created role.%s/%s in %v ", rbac.GroupName, role.Name, namespace)
+							glog.Infof("created role.%s/%s in %v", rbac.GroupName, role.Name, namespace)
 						}
 						return nil
 					})
