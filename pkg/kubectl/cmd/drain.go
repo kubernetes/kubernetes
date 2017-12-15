@@ -61,6 +61,7 @@ type DrainOptions struct {
 	backOff            clockwork.Clock
 	DeleteLocalData    bool
 	Selector           string
+	Message            string
 	mapper             meta.RESTMapper
 	nodeInfos          []*resource.Info
 	Out                io.Writer
@@ -113,6 +114,7 @@ func NewCmdCordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
+	cmd.Flags().StringVarP(&options.Message, "message", "m", options.Message, "Message describing the reason to cordon a node")
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
@@ -140,6 +142,7 @@ func NewCmdUncordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
+	cmd.Flags().StringVarP(&options.Message, "message", "m", options.Message, "Message describing the reason to uncordon a node")
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
@@ -197,6 +200,7 @@ func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.Flags().IntVar(&options.GracePeriodSeconds, "grace-period", -1, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
 	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "The length of time to wait before giving up, zero means infinite")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
+	cmd.Flags().StringVarP(&options.Message, "message", "m", options.Message, "Message describing the reason to drain a node")
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
@@ -206,6 +210,7 @@ func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 	var err error
 	o.Selector = cmdutil.GetFlagString(cmd, "selector")
+	o.Message = cmdutil.GetFlagString(cmd, "message")
 
 	if len(args) == 0 && !cmd.Flags().Changed("selector") {
 		return cmdutil.UsageErrorf(cmd, fmt.Sprintf("USAGE: %s [flags]", cmd.Use))
@@ -713,6 +718,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 				if !o.DryRun {
 					helper := resource.NewHelper(o.restClient, nodeInfo.Mapping)
 					node.Spec.Unschedulable = desired
+					node.Status.Message = o.Message
 					newData, err := json.Marshal(obj)
 					if err != nil {
 						fmt.Fprintf(o.ErrOut, "error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
@@ -723,7 +729,14 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 						fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
 						continue
 					}
+					// Patch Spec.Unschedulable
 					_, err = helper.Patch(cmdNamespace, nodeInfo.Name, types.StrategicMergePatchType, patchBytes)
+					if err != nil {
+						fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
+						continue
+					}
+					// Patch Status.Message
+					_, err = helper.PatchSubresources(cmdNamespace, nodeInfo.Name, types.StrategicMergePatchType, patchBytes, "status")
 					if err != nil {
 						fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
 						continue

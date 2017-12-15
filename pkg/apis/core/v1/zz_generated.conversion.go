@@ -2825,6 +2825,7 @@ func autoConvert_v1_NodeStatus_To_core_NodeStatus(in *v1.NodeStatus, out *core.N
 	out.Images = *(*[]core.ContainerImage)(unsafe.Pointer(&in.Images))
 	out.VolumesInUse = *(*[]core.UniqueVolumeName)(unsafe.Pointer(&in.VolumesInUse))
 	out.VolumesAttached = *(*[]core.AttachedVolume)(unsafe.Pointer(&in.VolumesAttached))
+	out.Message = in.Message
 	return nil
 }
 
@@ -2848,6 +2849,7 @@ func autoConvert_core_NodeStatus_To_v1_NodeStatus(in *core.NodeStatus, out *v1.N
 	out.Images = *(*[]v1.ContainerImage)(unsafe.Pointer(&in.Images))
 	out.VolumesInUse = *(*[]v1.UniqueVolumeName)(unsafe.Pointer(&in.VolumesInUse))
 	out.VolumesAttached = *(*[]v1.AttachedVolume)(unsafe.Pointer(&in.VolumesAttached))
+	out.Message = in.Message
 	return nil
 }
 

@@ -20108,6 +20108,10 @@
        "$ref": "v1.AttachedVolume"
       },
       "description": "List of volumes that are attached to the node."
+     },
+     "message": {
+      "type": "string",
+      "description": "Message describes reason why node is marked as schedulable/unschedulable/ready/notready. By default, message is empty."
      }
     }
    },

@@ -3831,6 +3831,9 @@ type NodeStatus struct {
 	// List of volumes that are attached to the node.
 	// +optional
 	VolumesAttached []AttachedVolume `json:"volumesAttached,omitempty" protobuf:"bytes,10,rep,name=volumesAttached"`
+	// Message describes reason why node is marked as schedulable/unschedulable/ready/notready. By default, message is empty.
+	// +optional
+	Message string `json:"message,omitempty" protobuf:"bytes,11,opt,name=message"`
 }
 
 type UniqueVolumeName string

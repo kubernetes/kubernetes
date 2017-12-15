@@ -141,6 +141,17 @@ func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte) 
 		Get()
 }
 
+func (m *Helper) PatchSubresources(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (runtime.Object, error) {
+	return m.RESTClient.Patch(pt).
+		NamespaceIfScoped(namespace, m.NamespaceScoped).
+		Resource(m.Resource).
+		SubResource(subresources...).
+		Name(name).
+		Body(data).
+		Do().
+		Get()
+}
+
 func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Object) (runtime.Object, error) {
 	c := m.RESTClient
 

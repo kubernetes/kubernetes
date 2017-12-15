@@ -1075,6 +1075,7 @@ var map_NodeStatus = map[string]string{
 	"images":          "List of container images on this node",
 	"volumesInUse":    "List of attachable volumes in use (mounted) by the node.",
 	"volumesAttached": "List of volumes that are attached to the node.",
+	"message":         "Message describes reason why node is marked as schedulable/unschedulable/ready/notready. By default, message is empty.",
 }
 
 func (NodeStatus) SwaggerDoc() map[string]string {
