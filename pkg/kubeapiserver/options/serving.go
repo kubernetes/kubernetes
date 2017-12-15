@@ -85,7 +85,7 @@ func (s InsecureServingOptions) Validate(portArg string) []error {
 	errors := []error{}
 
 	if s.BindPort < 0 || s.BindPort > 65535 {
-		errors = append(errors, fmt.Errorf("--insecure-port %v must be between 0 and 65535, inclusive. 0 for turning off secure port.", s.BindPort))
+		errors = append(errors, fmt.Errorf("--insecure-port %v must be between 0 and 65535, inclusive. 0 for turning off insecure (HTTP) port.", s.BindPort))
 	}
 
 	return errors
@@ -103,7 +103,7 @@ func (s *InsecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"The port on which to serve unsecured, unauthenticated access. It is assumed "+
 		"that firewall rules are set up such that this port is not reachable from outside of "+
 		"the cluster and that port 443 on the cluster's public address is proxied to this "+
-		"port. This is performed by nginx in the default setup.")
+		"port. This is performed by nginx in the default setup. Set to zero to disable")
 }
 
 func (s *InsecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
