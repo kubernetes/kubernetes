@@ -357,6 +357,77 @@ func TestNewAPIServerKubeletClientCertAndKey(t *testing.T) {
 	certstestutil.AssertCertificateHasOrganizations(t, apiClientCert, kubeadmconstants.MastersGroup)
 }
 
+func TestNewEtcdCertAndKey(t *testing.T) {
+	hostname := "valid-hostname"
+
+	advertiseAddresses := []string{"1.2.3.4", "1:2:3::4"}
+	for _, addr := range advertiseAddresses {
+		cfg := &kubeadmapi.MasterConfiguration{
+			API:        kubeadmapi.API{AdvertiseAddress: addr},
+			Networking: kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+			NodeName:   "valid-hostname",
+		}
+		caCert, caKey, err := NewCACertAndKey()
+		if err != nil {
+			t.Fatalf("failed creation of ca cert and key: %v", err)
+		}
+
+		etcdCert, _, err := NewEtcdCertAndKey(cfg, caCert, caKey)
+		if err != nil {
+			t.Fatalf("failed creation of cert and key: %v", err)
+		}
+
+		certstestutil.AssertCertificateIsSignedByCa(t, etcdCert, caCert)
+		certstestutil.AssertCertificateHasServerAuthUsage(t, etcdCert)
+		certstestutil.AssertCertificateHasDNSNames(t, etcdCert, hostname, "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.local")
+		certstestutil.AssertCertificateHasIPAddresses(t, etcdCert, net.ParseIP("10.96.0.1"), net.ParseIP(addr))
+	}
+}
+
+func TestNewEtcdPeerCertAndKey(t *testing.T) {
+	hostname := "valid-hostname"
+
+	advertiseAddresses := []string{"1.2.3.4", "1:2:3::4"}
+	for _, addr := range advertiseAddresses {
+		cfg := &kubeadmapi.MasterConfiguration{
+			API:        kubeadmapi.API{AdvertiseAddress: addr},
+			Networking: kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+			NodeName:   "valid-hostname",
+		}
+		caCert, caKey, err := NewCACertAndKey()
+		if err != nil {
+			t.Fatalf("failed creation of ca cert and key: %v", err)
+		}
+
+		etcdPeerCert, _, err := NewEtcdPeerCertAndKey(cfg, caCert, caKey)
+		if err != nil {
+			t.Fatalf("failed creation of cert and key: %v", err)
+		}
+
+		certstestutil.AssertCertificateIsSignedByCa(t, etcdPeerCert, caCert)
+		certstestutil.AssertCertificateHasServerAuthUsage(t, etcdPeerCert)
+		certstestutil.AssertCertificateHasClientAuthUsage(t, etcdPeerCert)
+		certstestutil.AssertCertificateHasDNSNames(t, etcdPeerCert, hostname, "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.local")
+		certstestutil.AssertCertificateHasIPAddresses(t, etcdPeerCert, net.ParseIP("10.96.0.1"), net.ParseIP(addr))
+	}
+}
+
+func TestNewAPIServerEtcdClientCertAndKey(t *testing.T) {
+	caCert, caKey, err := NewCACertAndKey()
+	if err != nil {
+		t.Fatalf("failed creation of ca cert and key: %v", err)
+	}
+
+	apiEtcdClientCert, _, err := NewAPIServerEtcdClientCertAndKey(caCert, caKey)
+	if err != nil {
+		t.Fatalf("failed creation of cert and key: %v", err)
+	}
+
+	certstestutil.AssertCertificateIsSignedByCa(t, apiEtcdClientCert, caCert)
+	certstestutil.AssertCertificateHasClientAuthUsage(t, apiEtcdClientCert)
+	certstestutil.AssertCertificateHasOrganizations(t, apiEtcdClientCert, kubeadmconstants.MastersGroup)
+}
+
 func TestNewNewServiceAccountSigningKey(t *testing.T) {
 
 	key, err := NewServiceAccountSigningKey()
@@ -569,6 +640,21 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 			setupFunc:     CreateCACertAndKeyfiles,
 			createFunc:    CreateAPIServerKubeletClientCertAndKeyFiles,
 			expectedFiles: []string{kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName},
+		},
+		{
+			setupFunc:     CreateCACertAndKeyfiles,
+			createFunc:    CreateEtcdCertAndKeyFiles,
+			expectedFiles: []string{kubeadmconstants.EtcdCertName, kubeadmconstants.EtcdKeyName},
+		},
+		{
+			setupFunc:     CreateCACertAndKeyfiles,
+			createFunc:    CreateEtcdPeerCertAndKeyFiles,
+			expectedFiles: []string{kubeadmconstants.EtcdPeerCertName, kubeadmconstants.EtcdPeerKeyName},
+		},
+		{
+			setupFunc:     CreateCACertAndKeyfiles,
+			createFunc:    CreateAPIServerEtcdClientCertAndKeyFiles,
+			expectedFiles: []string{kubeadmconstants.APIServerEtcdClientCertName, kubeadmconstants.APIServerEtcdClientKeyName},
 		},
 		{
 			createFunc:    CreateServiceAccountKeyAndPublicKeyFiles,

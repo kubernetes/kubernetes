@@ -190,21 +190,37 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *versio
 	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.APIServerExtraArgs)...)
 	command = append(command, getAuthzParameters(cfg.AuthorizationModes)...)
 
-	// Check if the user decided to use an external etcd cluster
+	// If the user set endpoints for an external etcd cluster
 	if len(cfg.Etcd.Endpoints) > 0 {
 		command = append(command, fmt.Sprintf("--etcd-servers=%s", strings.Join(cfg.Etcd.Endpoints, ",")))
-	} else {
-		command = append(command, "--etcd-servers=http://127.0.0.1:2379")
-	}
 
-	// Is etcd secured?
-	if cfg.Etcd.CAFile != "" {
-		command = append(command, fmt.Sprintf("--etcd-cafile=%s", cfg.Etcd.CAFile))
-	}
-	if cfg.Etcd.CertFile != "" && cfg.Etcd.KeyFile != "" {
-		etcdClientFileArg := fmt.Sprintf("--etcd-certfile=%s", cfg.Etcd.CertFile)
-		etcdKeyFileArg := fmt.Sprintf("--etcd-keyfile=%s", cfg.Etcd.KeyFile)
-		command = append(command, etcdClientFileArg, etcdKeyFileArg)
+		// Use any user supplied etcd certificates
+		if cfg.Etcd.CAFile != "" {
+			command = append(command, fmt.Sprintf("--etcd-cafile=%s", cfg.Etcd.CAFile))
+		}
+		if cfg.Etcd.CertFile != "" && cfg.Etcd.KeyFile != "" {
+			etcdClientFileArg := fmt.Sprintf("--etcd-certfile=%s", cfg.Etcd.CertFile)
+			etcdKeyFileArg := fmt.Sprintf("--etcd-keyfile=%s", cfg.Etcd.KeyFile)
+			command = append(command, etcdClientFileArg, etcdKeyFileArg)
+		}
+	} else {
+		// Default to etcd static pod on localhost
+		etcdEndpointsArg := "--etcd-servers=https://127.0.0.1:2379"
+		etcdCAFileArg := fmt.Sprintf("--etcd-cafile=%s", filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName))
+		etcdClientFileArg := fmt.Sprintf("--etcd-certfile=%s", filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientCertName))
+		etcdKeyFileArg := fmt.Sprintf("--etcd-keyfile=%s", filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientKeyName))
+		command = append(command, etcdEndpointsArg, etcdCAFileArg, etcdClientFileArg, etcdKeyFileArg)
+
+		// Warn for unused user supplied variables
+		if cfg.Etcd.CAFile != "" {
+			fmt.Printf("[controlplane] Configuration for %s CAFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.CAFile, kubeadmconstants.Etcd)
+		}
+		if cfg.Etcd.CertFile != "" {
+			fmt.Printf("[controlplane] Configuration for %s CertFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.CertFile, kubeadmconstants.Etcd)
+		}
+		if cfg.Etcd.KeyFile != "" {
+			fmt.Printf("[controlplane] Configuration for %s KeyFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.KeyFile, kubeadmconstants.Etcd)
+		}
 	}
 
 	if cfg.CloudProvider != "" {

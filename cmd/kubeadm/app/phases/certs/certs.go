@@ -40,6 +40,9 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
 		CreateCACertAndKeyfiles,
 		CreateAPIServerCertAndKeyFiles,
 		CreateAPIServerKubeletClientCertAndKeyFiles,
+		CreateEtcdCertAndKeyFiles,
+		CreateEtcdPeerCertAndKeyFiles,
+		CreateAPIServerEtcdClientCertAndKeyFiles,
 		CreateServiceAccountKeyAndPublicKeyFiles,
 		CreateFrontProxyCACertAndKeyFiles,
 		CreateFrontProxyClientCertAndKeyFiles,
@@ -116,6 +119,78 @@ func CreateAPIServerKubeletClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfigura
 	return writeCertificateFilesIfNotExist(
 		cfg.CertificatesDir,
 		kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName,
+		caCert,
+		apiClientCert,
+		apiClientKey,
+	)
+}
+
+// CreateEtcdCertAndKeyFiles create a new certificate and key file for etcd.
+// If the etcd serving certificate and key file already exist in the target folder, they are used only if evaluated equal; otherwise an error is returned.
+// It assumes the cluster CA certificate and key file exist in the CertificatesDir
+func CreateEtcdCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
+
+	caCert, caKey, err := loadCertificateAuthorithy(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+	if err != nil {
+		return err
+	}
+
+	etcdCert, etcdKey, err := NewEtcdCertAndKey(cfg, caCert, caKey)
+	if err != nil {
+		return err
+	}
+
+	return writeCertificateFilesIfNotExist(
+		cfg.CertificatesDir,
+		kubeadmconstants.EtcdCertAndKeyBaseName,
+		caCert,
+		etcdCert,
+		etcdKey,
+	)
+}
+
+// CreateEtcdPeerCertAndKeyFiles create a new certificate and key file for etcd peering.
+// If the etcd peer certificate and key file already exist in the target folder, they are used only if evaluated equal; otherwise an error is returned.
+// It assumes the cluster CA certificate and key file exist in the CertificatesDir
+func CreateEtcdPeerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
+
+	caCert, caKey, err := loadCertificateAuthorithy(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+	if err != nil {
+		return err
+	}
+
+	etcdPeerCert, etcdPeerKey, err := NewEtcdPeerCertAndKey(cfg, caCert, caKey)
+	if err != nil {
+		return err
+	}
+
+	return writeCertificateFilesIfNotExist(
+		cfg.CertificatesDir,
+		kubeadmconstants.EtcdPeerCertAndKeyBaseName,
+		caCert,
+		etcdPeerCert,
+		etcdPeerKey,
+	)
+}
+
+// CreateAPIServerEtcdClientCertAndKeyFiles create a new client certificate for the apiserver calling etcd
+// If the apiserver-etcd-client certificate and key file already exist in the target folder, they are used only if evaluated equal; otherwise an error is returned.
+// It assumes the cluster CA certificate and key file exist in the CertificatesDir
+func CreateAPIServerEtcdClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
+
+	caCert, caKey, err := loadCertificateAuthorithy(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+	if err != nil {
+		return err
+	}
+
+	apiClientCert, apiClientKey, err := NewAPIServerEtcdClientCertAndKey(caCert, caKey)
+	if err != nil {
+		return err
+	}
+
+	return writeCertificateFilesIfNotExist(
+		cfg.CertificatesDir,
+		kubeadmconstants.APIServerEtcdClientCertAndKeyBaseName,
 		caCert,
 		apiClientCert,
 		apiClientKey,
@@ -225,6 +300,64 @@ func NewAPIServerKubeletClientCertAndKey(caCert *x509.Certificate, caKey *rsa.Pr
 	apiClientCert, apiClientKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failure while creating API server kubelet client key and certificate: %v", err)
+	}
+
+	return apiClientCert, apiClientKey, nil
+}
+
+// NewEtcdCertAndKey generate CA certificate for etcd, signed by the given CA.
+func NewEtcdCertAndKey(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
+
+	altNames, err := getAltNames(cfg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failure while composing altnames for etcd: %v", err)
+	}
+
+	config := certutil.Config{
+		CommonName: kubeadmconstants.EtcdCertCommonName,
+		AltNames:   *altNames,
+		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	}
+	etcdCert, etcdKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failure while creating etcd key and certificate: %v", err)
+	}
+
+	return etcdCert, etcdKey, nil
+}
+
+// NewEtcdPeerCertAndKey generate CA certificate for etcd peering, signed by the given CA.
+func NewEtcdPeerCertAndKey(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
+
+	altNames, err := getAltNames(cfg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failure while composing altnames for etcd peering: %v", err)
+	}
+
+	config := certutil.Config{
+		CommonName: kubeadmconstants.EtcdPeerCertCommonName,
+		AltNames:   *altNames,
+		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+	}
+	etcdPeerCert, etcdPeerKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failure while creating etcd peer key and certificate: %v", err)
+	}
+
+	return etcdPeerCert, etcdPeerKey, nil
+}
+
+// NewAPIServerEtcdClientCertAndKey generate CA certificate for the apiservers to connect to etcd securely, signed by the given CA.
+func NewAPIServerEtcdClientCertAndKey(caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
+
+	config := certutil.Config{
+		CommonName:   kubeadmconstants.APIServerEtcdClientCertCommonName,
+		Organization: []string{kubeadmconstants.MastersGroup},
+		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	}
+	apiClientCert, apiClientKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failure while creating API server etcd client key and certificate: %v", err)
 	}
 
 	return apiClientCert, apiClientKey, nil

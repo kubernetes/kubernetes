@@ -74,6 +74,33 @@ var (
 		If both files already exist, kubeadm skips the generation step and existing files will be used.
 		`+cmdutil.AlphaDisclaimer), kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName)
 
+	etcdCertLongDesc = fmt.Sprintf(normalizer.LongDesc(`
+		Generates the etcd serving certificate and key and saves them into %s and %s files.
+		
+		The certificate includes default subject alternative names and additional sans eventually provided by the user;
+		default sans are: <node-name>, <apiserver-advertise-address>, kubernetes, kubernetes.default, kubernetes.default.svc, 
+		kubernetes.default.svc.<service-dns-domain>, <internalAPIServerVirtualIP> (that is the .10 address in <service-cidr> address space).
+
+		If both files already exist, kubeadm skips the generation step and existing files will be used.
+		`+cmdutil.AlphaDisclaimer), kubeadmconstants.EtcdCertName, kubeadmconstants.EtcdKeyName)
+
+	etcdPeerCertLongDesc = fmt.Sprintf(normalizer.LongDesc(`
+		Generates the etcd peer certificate and key and saves them into %s and %s files.
+		
+		The certificate includes default subject alternative names and additional sans eventually provided by the user;
+		default sans are: <node-name>, <apiserver-advertise-address>, kubernetes, kubernetes.default, kubernetes.default.svc, 
+		kubernetes.default.svc.<service-dns-domain>, <internalAPIServerVirtualIP> (that is the .10 address in <service-cidr> address space).
+
+		If both files already exist, kubeadm skips the generation step and existing files will be used.
+		`+cmdutil.AlphaDisclaimer), kubeadmconstants.EtcdPeerCertName, kubeadmconstants.EtcdPeerKeyName)
+
+	apiServerEtcdCertLongDesc = fmt.Sprintf(normalizer.LongDesc(`
+		Generates the client certificate for the API server to connect to etcd securely and the respective key,
+		and saves them into %s and %s files.
+
+		If both files already exist, kubeadm skips the generation step and existing files will be used.
+		`+cmdutil.AlphaDisclaimer), kubeadmconstants.APIServerEtcdClientCertName, kubeadmconstants.APIServerEtcdClientKeyName)
+
 	saKeyLongDesc = fmt.Sprintf(normalizer.LongDesc(`
 		Generates the private key for signing service account tokens along with its public key, and saves them into
 		%s and %s files.
@@ -156,6 +183,24 @@ func getCertsSubCommands(defaultKubernetesVersion string) []*cobra.Command {
 			short:   "Generates client certificate for the API server to connect to the kubelets securely",
 			long:    apiServerKubeletCertLongDesc,
 			cmdFunc: certsphase.CreateAPIServerKubeletClientCertAndKeyFiles,
+		},
+		{
+			use:     "etcd-server",
+			short:   "Generates etcd serving certificate and key",
+			long:    etcdCertLongDesc,
+			cmdFunc: certsphase.CreateEtcdCertAndKeyFiles,
+		},
+		{
+			use:     "etcd-peer",
+			short:   "Generates etcd peer certificate and key",
+			long:    etcdPeerCertLongDesc,
+			cmdFunc: certsphase.CreateEtcdPeerCertAndKeyFiles,
+		},
+		{
+			use:     "apiserver-etcd-client",
+			short:   "Generates client certificate for the API server to connect to etcd securely",
+			long:    apiServerEtcdCertLongDesc,
+			cmdFunc: certsphase.CreateAPIServerEtcdClientCertAndKeyFiles,
 		},
 		{
 			use:     "sa",

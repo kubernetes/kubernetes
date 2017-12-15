@@ -65,6 +65,33 @@ const (
 	// APIServerKubeletClientCertCommonName defines kubelet client certificate common name (CN)
 	APIServerKubeletClientCertCommonName = "kube-apiserver-kubelet-client"
 
+	// EtcdCertAndKeyBaseName defines etcd's server certificate and key base name
+	EtcdCertAndKeyBaseName = "etcd-server"
+	// EtcdCertName defines etcd's server certificate name
+	EtcdCertName = "etcd-server.crt"
+	// EtcdKeyName defines etcd's server key name
+	EtcdKeyName = "etcd-server.key"
+	// EtcdCertCommonName defines etcd's server certificate common name (CN)
+	EtcdCertCommonName = "kube-etcd"
+
+	// EtcdPeerCertAndKeyBaseName defines etcd's peer certificate and key base name
+	EtcdPeerCertAndKeyBaseName = "etcd-peer"
+	// EtcdPeerCertName defines etcd's peer certificate name
+	EtcdPeerCertName = "etcd-peer.crt"
+	// EtcdPeerKeyName defines etcd's peer key name
+	EtcdPeerKeyName = "etcd-peer.key"
+	// EtcdPeerCertCommonName defines etcd's peer certificate common name (CN)
+	EtcdPeerCertCommonName = "kube-etcd-peer"
+
+	// APIServerEtcdClientCertAndKeyBaseName defines etcd client certificate and key base name
+	APIServerEtcdClientCertAndKeyBaseName = "apiserver-etcd-client"
+	// APIServerEtcdClientCertName defines etcd client certificate name
+	APIServerEtcdClientCertName = "apiserver-etcd-client.crt"
+	// APIServerEtcdClientKeyName defines etcd client key name
+	APIServerEtcdClientKeyName = "apiserver-etcd-client.key"
+	// APIServerEtcdClientCertCommonName defines etcd client certificate common name (CN)
+	APIServerEtcdClientCertCommonName = "kube-apiserver-etcd-client"
+
 	// ServiceAccountKeyBaseName defines SA key base name
 	ServiceAccountKeyBaseName = "sa"
 	// ServiceAccountPublicKeyName defines SA public key base name

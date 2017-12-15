@@ -23,7 +23,8 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
+	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -133,6 +134,22 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 	if component == constants.Etcd {
 		recoverEtcd = true
 	}
+
+	// ensure etcd certs are generated for etcd and kube-apiserver
+	if component == constants.Etcd {
+		if err := certsphase.CreateEtcdCertAndKeyFiles(cfg); err != nil {
+			return fmt.Errorf("failed to upgrade the %s certificate: %v", constants.Etcd, err)
+		}
+		if err := certsphase.CreateEtcdPeerCertAndKeyFiles(cfg); err != nil {
+			return fmt.Errorf("failed to upgrade the %s peer certificate: %v", constants.Etcd, err)
+		}
+	}
+	if component == constants.KubeAPIServer {
+		if err := certsphase.CreateAPIServerEtcdClientCertAndKeyFiles(cfg); err != nil {
+			return fmt.Errorf("failed to upgrade the %s %s-client certificate: %v", constants.KubeAPIServer, constants.Etcd, err)
+		}
+	}
+
 	// The old manifest is here; in the /etc/kubernetes/manifests/
 	currentManifestPath := pathMgr.RealManifestPath(component)
 	// The new, upgraded manifest will be written here
@@ -180,7 +197,7 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 	if len(cfg.Etcd.Endpoints) != 0 {
 		return false, fmt.Errorf("external etcd detected, won't try to change any etcd state")
 	}
-	// Checking health state of etcd before proceeding with the upgrtade
+	// Checking health state of etcd before proceeding with the upgrade
 	etcdCluster := util.LocalEtcdCluster{}
 	etcdStatus, err := etcdCluster.GetEtcdClusterStatus()
 	if err != nil {
@@ -191,7 +208,7 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 	backupEtcdDir := pathMgr.BackupEtcdDir()
 	runningEtcdDir := cfg.Etcd.DataDir
 	if err := util.CopyDir(runningEtcdDir, backupEtcdDir); err != nil {
-		return true, fmt.Errorf("fail to back up etcd data: %v", err)
+		return true, fmt.Errorf("failer to back up etcd data: %v", err)
 	}
 
 	// Need to check currently used version and version from constants, if differs then upgrade
@@ -215,7 +232,7 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 
 	beforeEtcdPodHash, err := waiter.WaitForStaticPodSingleHash(cfg.NodeName, constants.Etcd)
 	if err != nil {
-		return true, fmt.Errorf("fail to get etcd pod's hash: %v", err)
+		return true, fmt.Errorf("failed to get etcd pod's hash: %v", err)
 	}
 
 	// Write the updated etcd static Pod manifest into the temporary directory, at this point no etcd change
@@ -227,7 +244,7 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 	// Perform etcd upgrade using common to all control plane components function
 	if err := upgradeComponent(constants.Etcd, waiter, pathMgr, cfg, beforeEtcdPodHash, recoverManifests); err != nil {
 		// Since etcd upgrade component failed, the old manifest has been restored
-		// now we need to check the heatlth of etcd cluster if it came back up with old manifest
+		// now we need to check the health of etcd cluster if it came back up with old manifest
 		if _, err := etcdCluster.GetEtcdClusterStatus(); err != nil {
 			// At this point we know that etcd cluster is dead and it is safe to copy backup datastore and to rollback old etcd manifest
 			if err := rollbackEtcdData(cfg, fmt.Errorf("etcd cluster is not healthy after upgrade: %v rolling back", err), pathMgr); err != nil {
@@ -299,7 +316,7 @@ func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager
 
 	// Write the updated static Pod manifests into the temporary directory
 	fmt.Printf("[upgrade/staticpods] Writing new Static Pod manifests to %q\n", pathMgr.TempManifestDir())
-	err = controlplane.CreateInitStaticPodManifestFiles(pathMgr.TempManifestDir(), cfg)
+	err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.TempManifestDir(), cfg)
 	if err != nil {
 		return fmt.Errorf("error creating init static pod manifest files: %v", err)
 	}

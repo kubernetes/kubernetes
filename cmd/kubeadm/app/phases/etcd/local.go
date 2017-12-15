@@ -18,6 +18,7 @@ package etcd
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"k8s.io/api/core/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -28,7 +29,8 @@ import (
 )
 
 const (
-	etcdVolumeName = "etcd"
+	etcdVolumeName  = "etcd-data"
+	certsVolumeName = "k8s-certs"
 )
 
 // CreateLocalEtcdStaticPodManifestFile will write local etcd static pod manifest file.
@@ -50,7 +52,8 @@ func CreateLocalEtcdStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.Ma
 func GetEtcdPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.Pod {
 	pathType := v1.HostPathDirectoryOrCreate
 	etcdMounts := map[string]v1.Volume{
-		etcdVolumeName: staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.DataDir, &pathType),
+		etcdVolumeName:  staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.DataDir, &pathType),
+		certsVolumeName: staticpodutil.NewVolume(certsVolumeName, cfg.CertificatesDir, &pathType),
 	}
 	return staticpodutil.ComponentPod(v1.Container{
 		Name:            kubeadmconstants.Etcd,
@@ -58,7 +61,10 @@ func GetEtcdPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.Pod {
 		Image:           images.GetCoreImage(kubeadmconstants.Etcd, cfg.ImageRepository, cfg.KubernetesVersion, cfg.Etcd.Image),
 		ImagePullPolicy: cfg.ImagePullPolicy,
 		// Mount the etcd datadir path read-write so etcd can store data in a more persistent manner
-		VolumeMounts:  []v1.VolumeMount{staticpodutil.NewVolumeMount(etcdVolumeName, cfg.Etcd.DataDir, false)},
+		VolumeMounts: []v1.VolumeMount{
+			staticpodutil.NewVolumeMount(etcdVolumeName, cfg.Etcd.DataDir, false),
+			staticpodutil.NewVolumeMount(certsVolumeName, cfg.CertificatesDir, false),
+		},
 		LivenessProbe: staticpodutil.ComponentProbe(cfg, kubeadmconstants.Etcd, 2379, "/health", v1.URISchemeHTTP),
 	}, etcdMounts)
 }
@@ -66,9 +72,17 @@ func GetEtcdPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.Pod {
 // getEtcdCommand builds the right etcd command from the given config object
 func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	defaultArguments := map[string]string{
-		"listen-client-urls":    "http://127.0.0.1:2379",
-		"advertise-client-urls": "http://127.0.0.1:2379",
+		"listen-client-urls":    "https://127.0.0.1:2379",
+		"advertise-client-urls": "https://127.0.0.1:2379",
 		"data-dir":              cfg.Etcd.DataDir,
+		"cert-file":             filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCertName),
+		"key-file":              filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdKeyName),
+		"trusted-ca-file":       filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
+		"client-cert-auth":      "true",
+		"peer-cert-file":        filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerCertName),
+		"peer-key-file":         filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerKeyName),
+		"peer-trusted-ca-file":  filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
+		"peer-client-cert-auth": "true",
 	}
 
 	command := []string{"etcd"}
