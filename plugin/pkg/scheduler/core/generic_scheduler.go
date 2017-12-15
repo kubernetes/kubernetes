@@ -549,6 +549,10 @@ func PrioritizeNodes(
 			if priorityConfigs[i].Function != nil {
 				continue
 			}
+			if nodeInfo.Node() == nil {
+				appendError(fmt.Errorf("node not found"))
+				return
+			}
 			results[i][index], err = priorityConfigs[i].Map(pod, meta, nodeInfo)
 			if err != nil {
 				appendError(err)

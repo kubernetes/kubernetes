@@ -17,8 +17,6 @@ limitations under the License.
 package priorities
 
 import (
-	"fmt"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -44,10 +42,6 @@ func NewNodeLabelPriority(label string, presence bool) (algorithm.PriorityMapFun
 // If presence is false, prioritizes nodes that do not have the specified label.
 func (n *NodeLabelPrioritizer) CalculateNodeLabelPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()
-	if node == nil {
-		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
-	}
-
 	exists := labels.Set(node.Labels).Has(n.label)
 	score := 0
 	if (exists && n.presence) || (!exists && !n.presence) {

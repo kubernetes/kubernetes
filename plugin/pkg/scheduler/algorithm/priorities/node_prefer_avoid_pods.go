@@ -17,8 +17,6 @@ limitations under the License.
 package priorities
 
 import (
-	"fmt"
-
 	"k8s.io/api/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
@@ -28,10 +26,6 @@ import (
 
 func CalculateNodePreferAvoidPodsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()
-	if node == nil {
-		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
-	}
-
 	controllerRef := priorityutil.GetControllerRef(pod)
 	if controllerRef != nil {
 		// Ignore pods that are owned by other controller than ReplicationController

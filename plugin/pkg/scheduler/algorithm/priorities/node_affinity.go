@@ -17,8 +17,6 @@ limitations under the License.
 package priorities
 
 import (
-	"fmt"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -33,9 +31,6 @@ import (
 // score the node gets.
 func CalculateNodeAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()
-	if node == nil {
-		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
-	}
 
 	var affinity *v1.Affinity
 	if priorityMeta, ok := meta.(*priorityMetadata); ok {
