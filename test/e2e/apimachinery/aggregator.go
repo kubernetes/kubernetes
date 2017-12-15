@@ -53,17 +53,15 @@ var _ = SIGDescribe("Aggregator", func() {
 	var c clientset.Interface
 	var aggrclient *aggregatorclient.Clientset
 	f := framework.NewDefaultFramework("aggregator")
-	framework.AddCleanupAction(func() {
-		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
-		if len(ns) > 0 {
-			cleanTest(c, aggrclient, ns)
-		}
-	})
 
 	BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		aggrclient = f.AggregatorClient
+	})
+
+	AfterEach(func() {
+		cleanTest(c, aggrclient, ns)
 	})
 
 	It("Should be able to support the 1.7 Sample API Server using the current Aggregator", func() {
