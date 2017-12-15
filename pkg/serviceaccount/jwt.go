@@ -194,7 +194,7 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 			return nil, false, errors.New("namespace claim is missing")
 		}
 		secretName, _ := claims[SecretNameClaim].(string)
-		if len(namespace) == 0 {
+		if len(secretName) == 0 {
 			return nil, false, errors.New("secretName claim is missing")
 		}
 		serviceAccountName, _ := claims[ServiceAccountNameClaim].(string)
