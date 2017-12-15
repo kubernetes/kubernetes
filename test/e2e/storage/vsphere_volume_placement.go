@@ -69,24 +69,19 @@ var _ = SIGDescribe("Volume Placement", func() {
 			vsp.DeleteVolume(volumePath)
 		}
 		volumePaths = nil
-	})
-
-	/*
-		Steps
-		1. Remove labels assigned to node 1 and node 2
-		2. Delete VMDK volume
-	*/
-	framework.AddCleanupAction(func() {
-		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
-		if len(ns) > 0 {
-			if len(node1KeyValueLabel) > 0 {
-				framework.RemoveLabelOffNode(c, node1Name, "vsphere_e2e_label")
-			}
-			if len(node2KeyValueLabel) > 0 {
-				framework.RemoveLabelOffNode(c, node2Name, "vsphere_e2e_label")
-			}
+		/*
+			Steps
+			1. Remove labels assigned to node 1 and node 2
+			2. Delete VMDK volume
+		*/
+		if len(node1KeyValueLabel) > 0 {
+			framework.RemoveLabelOffNode(c, node1Name, "vsphere_e2e_label")
+		}
+		if len(node2KeyValueLabel) > 0 {
+			framework.RemoveLabelOffNode(c, node2Name, "vsphere_e2e_label")
 		}
 	})
+
 	/*
 		Steps
 
