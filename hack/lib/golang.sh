@@ -622,6 +622,8 @@ kube::golang::build_binaries() {
     # Use eval to preserve embedded quoted strings.
     local goflags goldflags gogcflags
     eval "goflags=(${GOFLAGS:-})"
+    # Add a build-mode, default to position independent executable (pie)
+    goflags+=("-buildmode=pie")
     goldflags="${GOLDFLAGS:-} $(kube::version::ldflags)"
     gogcflags="${GOGCFLAGS:-}"
 
@@ -684,7 +686,7 @@ kube::golang::build_binaries() {
       for platform in "${platforms[@]}"; do (
           kube::golang::set_platform_envs "${platform}"
           kube::log::status "${platform}: go build started"
-          kube::golang::build_binaries_for_platform ${platform} ${use_go_build:-}
+          kube::golang::build_binaries_for_platform ${platform} ${use_go_build:-} 
           kube::log::status "${platform}: go build finished"
         ) &> "/tmp//${platform//\//_}.build" &
       done

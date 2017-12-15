@@ -15,7 +15,7 @@ go_binary(
             "-linkmode",
             "external",
             "-extldflags",
-            "-static",
+            "-buildmode=pie",
         ],
     }),
     importpath = "k8s.io/kubernetes/cmd/kubectl",
