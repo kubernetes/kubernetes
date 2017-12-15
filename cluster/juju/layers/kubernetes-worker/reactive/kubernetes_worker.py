@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
 import random
 import shutil
@@ -432,6 +433,32 @@ def apply_node_labels():
 @when_any('config.changed.kubelet-extra-args',
           'config.changed.proxy-extra-args')
 def extra_args_changed():
+    set_state('kubernetes-worker.restart-needed')
+
+
+@when('config.changed.docker-logins')
+def docker_logins_changed():
+    config = hookenv.config()
+    previous_logins = config.previous('docker-logins')
+    logins = config['docker-logins']
+    logins = json.loads(logins)
+
+    if previous_logins:
+        previous_logins = json.loads(previous_logins)
+        next_servers = {login['server'] for login in logins}
+        previous_servers = {login['server'] for login in previous_logins}
+        servers_to_logout = previous_servers - next_servers
+        for server in servers_to_logout:
+            cmd = ['docker', 'logout', server]
+            subprocess.check_call(cmd)
+
+    for login in logins:
+        server = login['server']
+        username = login['username']
+        password = login['password']
+        cmd = ['docker', 'login', server, '-u', username, '-p', password]
+        subprocess.check_call(cmd)
+
     set_state('kubernetes-worker.restart-needed')
 
 
