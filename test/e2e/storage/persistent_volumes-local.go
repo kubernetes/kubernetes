@@ -1000,7 +1000,7 @@ func createBootstrapperJob(config *localTestConfig) {
 			},
 		},
 	}
-	job, err := config.client.Batch().Jobs(config.ns).Create(bootJob)
+	job, err := config.client.BatchV1().Jobs(config.ns).Create(bootJob)
 	Expect(err).NotTo(HaveOccurred())
 	err = framework.WaitForJobFinish(config.client, config.ns, job.Name, 1)
 	Expect(err).NotTo(HaveOccurred())

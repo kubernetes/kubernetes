@@ -255,7 +255,7 @@ func verifyRemainingCronJobsJobsPods(f *framework.Framework, clientSet clientset
 		By(fmt.Sprintf("expected %d cronjobs, got %d cronjobs", cjNum, len(cronJobs.Items)))
 	}
 
-	jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+	jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list jobs: %v", err)
 	}
@@ -974,7 +974,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 		By("Wait for the CronJob to create new Job")
 		err = wait.PollImmediate(500*time.Millisecond, 2*time.Minute, func() (bool, error) {
-			jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+			jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("Failed to list jobs: %v", err)
 			}

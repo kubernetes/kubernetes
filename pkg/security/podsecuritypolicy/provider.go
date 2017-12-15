@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	"k8s.io/kubernetes/pkg/util/maps"
 )
 
 // used to pass in the field being validated for reusable group strategies so they
@@ -64,17 +63,16 @@ func NewSimpleProvider(psp *extensions.PodSecurityPolicy, namespace string, stra
 	}, nil
 }
 
-// Create a PodSecurityContext based on the given constraints.  If a setting is already set
-// on the PodSecurityContext it will not be changed.  Validate should be used after the context
-// is created to ensure it complies with the required restrictions.
-func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurityContext, map[string]string, error) {
+// DefaultPodSecurityContext sets the default values of the required but not filled fields.
+// It modifies the SecurityContext and annotations of the provided pod. Validation should be
+// used after the context is defaulted to ensure it complies with the required restrictions.
+func (s *simpleProvider) DefaultPodSecurityContext(pod *api.Pod) error {
 	sc := securitycontext.NewPodSecurityContextMutator(pod.Spec.SecurityContext)
-	annotations := maps.CopySS(pod.Annotations)
 
 	if sc.SupplementalGroups() == nil {
 		supGroups, err := s.strategies.SupplementalGroupStrategy.Generate(pod)
 		if err != nil {
-			return nil, nil, err
+			return err
 		}
 		sc.SetSupplementalGroups(supGroups)
 	}
@@ -82,7 +80,7 @@ func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurit
 	if sc.FSGroup() == nil {
 		fsGroup, err := s.strategies.FSGroupStrategy.GenerateSingle(pod)
 		if err != nil {
-			return nil, nil, err
+			return err
 		}
 		sc.SetFSGroup(fsGroup)
 	}
@@ -90,41 +88,42 @@ func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurit
 	if sc.SELinuxOptions() == nil {
 		seLinux, err := s.strategies.SELinuxStrategy.Generate(pod, nil)
 		if err != nil {
-			return nil, nil, err
+			return err
 		}
 		sc.SetSELinuxOptions(seLinux)
 	}
 
 	// This is only generated on the pod level.  Containers inherit the pod's profile.  If the
 	// container has a specific profile set then it will be caught in the validation step.
-	seccompProfile, err := s.strategies.SeccompStrategy.Generate(annotations, pod)
+	seccompProfile, err := s.strategies.SeccompStrategy.Generate(pod.Annotations, pod)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 	if seccompProfile != "" {
-		if annotations == nil {
-			annotations = map[string]string{}
+		if pod.Annotations == nil {
+			pod.Annotations = map[string]string{}
 		}
-		annotations[api.SeccompPodAnnotationKey] = seccompProfile
+		pod.Annotations[api.SeccompPodAnnotationKey] = seccompProfile
 	}
-	return sc.PodSecurityContext(), annotations, nil
+
+	pod.Spec.SecurityContext = sc.PodSecurityContext()
+
+	return nil
 }
 
-// Create a SecurityContext based on the given constraints.  If a setting is already set on the
-// container's security context then it will not be changed.  Validation should be used after
-// the context is created to ensure it complies with the required restrictions.
-func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container *api.Container) (*api.SecurityContext, map[string]string, error) {
+// DefaultContainerSecurityContext sets the default values of the required but not filled fields.
+// It modifies the SecurityContext of the container and annotations of the pod. Validation should
+// be used after the context is defaulted to ensure it complies with the required restrictions.
+func (s *simpleProvider) DefaultContainerSecurityContext(pod *api.Pod, container *api.Container) error {
 	sc := securitycontext.NewEffectiveContainerSecurityContextMutator(
 		securitycontext.NewPodSecurityContextAccessor(pod.Spec.SecurityContext),
 		securitycontext.NewContainerSecurityContextMutator(container.SecurityContext),
 	)
 
-	annotations := maps.CopySS(pod.Annotations)
-
 	if sc.RunAsUser() == nil {
 		uid, err := s.strategies.RunAsUserStrategy.Generate(pod, container)
 		if err != nil {
-			return nil, nil, err
+			return err
 		}
 		sc.SetRunAsUser(uid)
 	}
@@ -132,14 +131,14 @@ func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container 
 	if sc.SELinuxOptions() == nil {
 		seLinux, err := s.strategies.SELinuxStrategy.Generate(pod, container)
 		if err != nil {
-			return nil, nil, err
+			return err
 		}
 		sc.SetSELinuxOptions(seLinux)
 	}
 
-	annotations, err := s.strategies.AppArmorStrategy.Generate(annotations, container)
+	annotations, err := s.strategies.AppArmorStrategy.Generate(pod.Annotations, container)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	// if we're using the non-root strategy set the marker that this container should not be
@@ -152,7 +151,7 @@ func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container 
 
 	caps, err := s.strategies.CapabilitiesStrategy.Generate(pod, container)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 	sc.SetCapabilities(caps)
 
@@ -174,7 +173,10 @@ func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container 
 		sc.SetAllowPrivilegeEscalation(&s.psp.Spec.AllowPrivilegeEscalation)
 	}
 
-	return sc.ContainerSecurityContext(), annotations, nil
+	pod.Annotations = annotations
+	container.SecurityContext = sc.ContainerSecurityContext()
+
+	return nil
 }
 
 // Ensure a pod's SecurityContext is in compliance with the given constraints.

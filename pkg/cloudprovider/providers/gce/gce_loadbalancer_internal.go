@@ -525,11 +525,6 @@ func (gce *GCECloud) ensureInternalBackendService(name, description string, affi
 		glog.V(2).Infof("ensureInternalBackendService: created backend service %v successfully", name)
 		return nil
 	}
-	// Check existing backend service
-	existingIGLinks := sets.NewString()
-	for _, be := range bs.Backends {
-		existingIGLinks.Insert(be.Group)
-	}
 
 	if backendSvcEqual(expectedBS, bs) {
 		return nil
