@@ -118,7 +118,7 @@ func DirExists(fs utilfs.Filesystem, path string) (bool, error) {
 		if info.IsDir() {
 			return true, nil
 		}
-		return false, fmt.Errorf("expected dir at %q, but mode is is %q", path, info.Mode().String())
+		return false, fmt.Errorf("expected dir at %q, but mode is %q", path, info.Mode().String())
 	} else if os.IsNotExist(err) {
 		return false, nil
 	} else {
