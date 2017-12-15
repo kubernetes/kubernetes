@@ -40,9 +40,7 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/registry/core/secret",
     library = ":go_default_library",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
-        "//pkg/api/testing:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

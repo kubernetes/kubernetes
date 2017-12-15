@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -110,7 +109,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	if !ok {
 		return nil, nil, false, fmt.Errorf("not a persistentvolumeclaim")
 	}
-	return labels.Set(persistentvolumeclaimObj.Labels), PersistentVolumeClaimToSelectableFields(persistentvolumeclaimObj), persistentvolumeclaimObj.Initializers != nil, nil
+	return labels.Set(persistentvolumeclaimObj.Labels), api.PersistentVolumeClaimToSelectableFields(persistentvolumeclaimObj), persistentvolumeclaimObj.Initializers != nil, nil
 }
 
 // MatchPersistentVolumeClaim returns a generic matcher for a given label and field selector.
@@ -120,14 +119,4 @@ func MatchPersistentVolumeClaim(label labels.Selector, field fields.Selector) st
 		Field:    field,
 		GetAttrs: GetAttrs,
 	}
-}
-
-// PersistentVolumeClaimToSelectableFields returns a field set that represents the object
-func PersistentVolumeClaimToSelectableFields(persistentvolumeclaim *api.PersistentVolumeClaim) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&persistentvolumeclaim.ObjectMeta, true)
-	specificFieldsSet := fields.Set{
-		// This is a bug, but we need to support it for backward compatibility.
-		"name": persistentvolumeclaim.Name,
-	}
-	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
 }

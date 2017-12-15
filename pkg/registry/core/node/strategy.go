@@ -31,7 +31,6 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
 	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -150,22 +149,13 @@ type ResourceGetter interface {
 	Get(genericapirequest.Context, string, *metav1.GetOptions) (runtime.Object, error)
 }
 
-// NodeToSelectableFields returns a field set that represents the object.
-func NodeToSelectableFields(node *api.Node) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&node.ObjectMeta, false)
-	specificFieldsSet := fields.Set{
-		"spec.unschedulable": fmt.Sprint(node.Spec.Unschedulable),
-	}
-	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
-}
-
 // GetAttrs returns labels and fields of a given object for filtering purposes.
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	nodeObj, ok := obj.(*api.Node)
 	if !ok {
 		return nil, nil, false, fmt.Errorf("not a node")
 	}
-	return labels.Set(nodeObj.ObjectMeta.Labels), NodeToSelectableFields(nodeObj), nodeObj.Initializers != nil, nil
+	return labels.Set(nodeObj.ObjectMeta.Labels), api.NodeToSelectableFields(nodeObj), nodeObj.Initializers != nil, nil
 }
 
 // MatchNode returns a generic matcher for a given label and field selector.

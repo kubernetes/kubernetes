@@ -29,8 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 
@@ -358,15 +356,6 @@ func TestCheckLogLocation(t *testing.T) {
 			t.Errorf("expected %v, got %v", tc.expectedErr, err)
 		}
 	}
-}
-
-func TestSelectableFieldLabelConversions(t *testing.T) {
-	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
-		"Pod",
-		PodToSelectableFields(&api.Pod{}),
-		nil,
-	)
 }
 
 type mockConnectionInfoGetter struct {

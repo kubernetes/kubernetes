@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -211,7 +210,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	if !ok {
 		return nil, nil, false, fmt.Errorf("not a pod")
 	}
-	return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), pod.Initializers != nil, nil
+	return labels.Set(pod.ObjectMeta.Labels), api.PodToSelectableFields(pod), pod.Initializers != nil, nil
 }
 
 // MatchPod returns a generic matcher for a given label and field selector.
@@ -228,22 +227,6 @@ func NodeNameTriggerFunc(obj runtime.Object) []storage.MatchValue {
 	pod := obj.(*api.Pod)
 	result := storage.MatchValue{IndexName: "spec.nodeName", Value: pod.Spec.NodeName}
 	return []storage.MatchValue{result}
-}
-
-// PodToSelectableFields returns a field set that represents the object
-// TODO: fields are not labels, and the validation rules for them do not apply.
-func PodToSelectableFields(pod *api.Pod) fields.Set {
-	// The purpose of allocation with a given number of elements is to reduce
-	// amount of allocations needed to create the fields.Set. If you add any
-	// field here or the number of object-meta related fields changes, this should
-	// be adjusted.
-	podSpecificFieldsSet := make(fields.Set, 7)
-	podSpecificFieldsSet["spec.nodeName"] = pod.Spec.NodeName
-	podSpecificFieldsSet["spec.restartPolicy"] = string(pod.Spec.RestartPolicy)
-	podSpecificFieldsSet["spec.schedulerName"] = string(pod.Spec.SchedulerName)
-	podSpecificFieldsSet["status.phase"] = string(pod.Status.Phase)
-	podSpecificFieldsSet["status.podIP"] = string(pod.Status.PodIP)
-	return generic.AddObjectMetaFieldsSet(podSpecificFieldsSet, &pod.ObjectMeta, true)
 }
 
 // ResourceGetter is an interface for retrieving resources by ResourceLocation.

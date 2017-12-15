@@ -346,3 +346,491 @@ func roundTripRS(t *testing.T, rs *extensions.ReplicaSet) *extensions.ReplicaSet
 	}
 	return obj3
 }
+
+func TestGenericFieldLabelConversionFunc(t *testing.T) {
+	testcases := []struct {
+		name      string
+		labelName string
+		value     string
+		expectErr bool
+		errMsg    string
+	}{
+		{
+			name:      "valid fieldSelector metadata.name",
+			labelName: "metadata.name",
+			value:     "foo",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector metadata.namespace",
+			labelName: "metadata.namespace",
+			value:     "foo",
+			expectErr: false,
+		},
+		{
+			name:      "invalid fieldSelector abc.xyz",
+			labelName: "abc.xyz",
+			value:     "foo",
+			expectErr: true,
+			errMsg:    `field label "abc.xyz" not supported`,
+		},
+	}
+
+	for _, tc := range testcases {
+		label, value, err := corev1.GenericFieldLabelConversionFunc(tc.labelName, tc.value)
+		if err != nil {
+			if !tc.expectErr {
+				t.Errorf("%q : unexpected err for fieldSelector %q", tc.name, tc.labelName)
+			} else if err.Error() != tc.errMsg {
+				t.Errorf("%q : unexpected error message for fieldSelector %q", tc.name, tc.errMsg)
+			}
+		} else {
+			if label != tc.labelName {
+				t.Errorf("%q: epxected label %q, got %q", tc.name, tc.labelName, label)
+			}
+			if value != tc.value {
+				t.Errorf("%q: epxected value %q, got %q", tc.name, tc.value, value)
+			}
+		}
+	}
+}
+
+func TestPodFieldLabelConversionFunc(t *testing.T) {
+	testcases := []struct {
+		name      string
+		labelName string
+		value     string
+		expectErr bool
+		errMsg    string
+	}{
+		{
+			name:      "valid fieldSelector metadata.name",
+			labelName: "metadata.name",
+			value:     "foo",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector metadata.namespace",
+			labelName: "metadata.namespace",
+			value:     "bar",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector spec.nodeName",
+			labelName: "spec.nodeName",
+			value:     "node1",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector spec.restartPolicy",
+			labelName: "spec.restartPolicy",
+			value:     "Always",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector status.phase",
+			labelName: "status.phase",
+			value:     "ph1",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector status.podIP",
+			labelName: "status.podIP",
+			value:     "4.5.6.7",
+			expectErr: false,
+		},
+		{
+			name:      "invalid fieldSelector spec.subDomain",
+			labelName: "spec.subDomain",
+			value:     "domain1",
+			expectErr: true,
+			errMsg:    `field label "spec.subDomain" not supported for "Pod"`,
+		},
+		{
+			name:      "invalid fieldSelector abc.xyz",
+			labelName: "abc.xyz",
+			value:     "foo",
+			expectErr: true,
+			errMsg:    `field label "abc.xyz" not supported for "Pod"`,
+		},
+	}
+
+	for _, tc := range testcases {
+		label, value, err := corev1.PodFieldLabelConversionFunc(tc.labelName, tc.value)
+		if err != nil {
+			if !tc.expectErr {
+				t.Errorf("%q : unexpected err for fieldSelector %q", tc.name, tc.labelName)
+			} else if err.Error() != tc.errMsg {
+				t.Errorf("%q : unexpected error message for fieldSelector %q", tc.name, tc.errMsg)
+			}
+		} else {
+			if label != tc.labelName {
+				t.Errorf("%q: epxected label %q, got %q", tc.name, tc.labelName, label)
+			}
+			if value != tc.value {
+				t.Errorf("%q: epxected value %q, got %q", tc.name, tc.value, value)
+			}
+		}
+	}
+
+}
+
+func TestNodeFieldLabelConversionFunc(t *testing.T) {
+	testcases := []struct {
+		name      string
+		labelName string
+		value     string
+		expectErr bool
+		errMsg    string
+	}{
+		{
+			name:      "valid fieldSelector metadata.name",
+			labelName: "metadata.name",
+			value:     "foo",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector spec.unschedulable",
+			labelName: "spec.unschedulable",
+			value:     "false",
+			expectErr: false,
+		},
+		{
+			name:      "invalid fieldSelector abc.xyz",
+			labelName: "abc.xyz",
+			value:     "foo",
+			expectErr: true,
+			errMsg:    `field label "abc.xyz" not supported for "Node"`,
+		},
+	}
+
+	for _, tc := range testcases {
+		label, value, err := corev1.NodeFieldLabelConversionFunc(tc.labelName, tc.value)
+		if err != nil {
+			if !tc.expectErr {
+				t.Errorf("%q : unexpected err for fieldSelector %q", tc.name, tc.labelName)
+			} else if err.Error() != tc.errMsg {
+				t.Errorf("%q : unexpected error message for fieldSelector %q", tc.name, tc.errMsg)
+			}
+		} else {
+			if label != tc.labelName {
+				t.Errorf("%q: epxected label %q, got %q", tc.name, tc.labelName, label)
+			}
+			if value != tc.value {
+				t.Errorf("%q: epxected value %q, got %q", tc.name, tc.value, value)
+			}
+		}
+	}
+}
+
+func TestReplicationControllerFieldLabelConversionFunc(t *testing.T) {
+	testcases := []struct {
+		name      string
+		labelName string
+		value     string
+		expectErr bool
+		errMsg    string
+	}{
+		{
+			name:      "valid fieldSelector metadata.name",
+			labelName: "metadata.name",
+			value:     "foo",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector metadata.namespace",
+			labelName: "metadata.namespace",
+			value:     "foo",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector status.replicas",
+			labelName: "status.replicas",
+			value:     "1",
+			expectErr: false,
+		},
+		{
+			name:      "invalid fieldSelector abc.xyz",
+			labelName: "abc.xyz",
+			value:     "foo",
+			expectErr: true,
+			errMsg:    `field label "abc.xyz" not supported for "ReplicationController"`,
+		},
+	}
+
+	for _, tc := range testcases {
+		label, value, err := corev1.ReplicationControllerFieldLabelConversionFunc(tc.labelName, tc.value)
+		if err != nil {
+			if !tc.expectErr {
+				t.Errorf("%q : unexpected err for fieldSelector %q", tc.name, tc.labelName)
+			} else if err.Error() != tc.errMsg {
+				t.Errorf("%q : unexpected error message for fieldSelector %q", tc.name, tc.errMsg)
+			}
+		} else {
+			if label != tc.labelName {
+				t.Errorf("%q: epxected label %q, got %q", tc.name, tc.labelName, label)
+			}
+			if value != tc.value {
+				t.Errorf("%q: epxected value %q, got %q", tc.name, tc.value, value)
+			}
+		}
+	}
+}
+
+func TestPersistentVolumeFieldLabelConversionFunc(t *testing.T) {
+	testcases := []struct {
+		name      string
+		labelName string
+		value     string
+		expectErr bool
+		errMsg    string
+	}{
+		{
+			name:      "valid fieldSelector metadata.name",
+			labelName: "metadata.name",
+			value:     "foo",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector name",
+			labelName: "name",
+			value:     "foo",
+			expectErr: false,
+		},
+		{
+			name:      "invalid fieldSelector abc.xyz",
+			labelName: "abc.xyz",
+			value:     "foo",
+			expectErr: true,
+			errMsg:    `field label "abc.xyz" not supported for "PersistentVolume"`,
+		},
+	}
+
+	for _, tc := range testcases {
+		label, value, err := corev1.PersistentVolumeFieldLabelConversionFunc(tc.labelName, tc.value)
+		if err != nil {
+			if !tc.expectErr {
+				t.Errorf("%q : unexpected err for fieldSelector %q", tc.name, tc.labelName)
+			} else if err.Error() != tc.errMsg {
+				t.Errorf("%q : unexpected error message for fieldSelector %q", tc.name, tc.errMsg)
+			}
+		} else {
+			if label != tc.labelName {
+				t.Errorf("%q: epxected label %q, got %q", tc.name, tc.labelName, label)
+			}
+			if value != tc.value {
+				t.Errorf("%q: epxected value %q, got %q", tc.name, tc.value, value)
+			}
+		}
+	}
+}
+
+func TestEventFieldLabelConversionFunc(t *testing.T) {
+	testcases := []struct {
+		name      string
+		labelName string
+		value     string
+		expectErr bool
+		errMsg    string
+	}{
+		{
+			name:      "valid fieldSelector involvedObject.apiVersion",
+			labelName: "involvedObject.apiVersion",
+			value:     "foo",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector involvedObject.fieldPath",
+			labelName: "involvedObject.fieldPath",
+			value:     "bar",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector involvedObject.kind",
+			labelName: "involvedObject.kind",
+			value:     "baz",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector involvedObject.name",
+			labelName: "involvedObject.name",
+			value:     "name1",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector involvedObject.namespace",
+			labelName: "involvedObject.namespace",
+			value:     "ns1",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector involvedObject.resourceVersion",
+			labelName: "involvedObject.resourceVersion",
+			value:     "1",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector involvedObject.uid",
+			labelName: "involvedObject.uid",
+			value:     "uid1",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector metadata.name",
+			labelName: "metadata.name",
+			value:     "foo",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector metadata.namespace",
+			labelName: "metadata.namespace",
+			value:     "ns1",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector reason",
+			labelName: "reason",
+			value:     "reason1",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector source",
+			labelName: "source",
+			value:     "test",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector type",
+			labelName: "type",
+			value:     "type1",
+			expectErr: false,
+		},
+		{
+			name:      "invalid fieldSelector abc.xyz",
+			labelName: "abc.xyz",
+			value:     "foo",
+			expectErr: true,
+			errMsg:    `field label "abc.xyz" not supported for "Event"`,
+		},
+	}
+
+	for _, tc := range testcases {
+		label, value, err := corev1.EventFieldLabelConversionFunc(tc.labelName, tc.value)
+		if err != nil {
+			if !tc.expectErr {
+				t.Errorf("%q : unexpected err for fieldSelector %q", tc.name, tc.labelName)
+			} else if err.Error() != tc.errMsg {
+				t.Errorf("%q : unexpected error message for fieldSelector %q", tc.name, tc.errMsg)
+			}
+		} else {
+			if label != tc.labelName {
+				t.Errorf("%q: epxected label %q, got %q", tc.name, tc.labelName, label)
+			}
+			if value != tc.value {
+				t.Errorf("%q: epxected value %q, got %q", tc.name, tc.value, value)
+			}
+		}
+	}
+}
+
+func TestNamespaceFieldLabelConversionFunc(t *testing.T) {
+	testcases := []struct {
+		name      string
+		labelName string
+		value     string
+		expectErr bool
+		errMsg    string
+	}{
+		{
+			name:      "valid fieldSelector metadata.name",
+			labelName: "metadata.name",
+			value:     "foo",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector name",
+			labelName: "name",
+			value:     "foo",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector status.phase",
+			labelName: "status.phase",
+			value:     "ph1",
+			expectErr: false,
+		},
+		{
+			name:      "invalid fieldSelector abc.xyz",
+			labelName: "abc.xyz",
+			value:     "foo",
+			expectErr: true,
+			errMsg:    `field label "abc.xyz" not supported for "Namespace"`,
+		},
+	}
+
+	for _, tc := range testcases {
+		label, value, err := corev1.NamespaceFieldLabelConversionFunc(tc.labelName, tc.value)
+		if err != nil {
+			if !tc.expectErr {
+				t.Errorf("%q : unexpected err for fieldSelector %q", tc.name, tc.labelName)
+			} else if err.Error() != tc.errMsg {
+				t.Errorf("%q : unexpected error message for fieldSelector %q", tc.name, tc.errMsg)
+			}
+		} else {
+			if label != tc.labelName {
+				t.Errorf("%q: epxected label %q, got %q", tc.name, tc.labelName, label)
+			}
+			if value != tc.value {
+				t.Errorf("%q: epxected value %q, got %q", tc.name, tc.value, value)
+			}
+		}
+	}
+}
+
+func TestSecretFieldLabelConversionFunc(t *testing.T) {
+	testcases := []struct {
+		name      string
+		labelName string
+		value     string
+		expectErr bool
+		errMsg    string
+	}{
+		{
+			name:      "valid fieldSelector metadata.name",
+			labelName: "metadata.name",
+			value:     "foo",
+			expectErr: false,
+		},
+		{
+			name:      "valid fieldSelector type",
+			labelName: "type",
+			value:     "type1",
+			expectErr: false,
+		},
+		{
+			name:      "invalid fieldSelector abc.xyz",
+			labelName: "abc.xyz",
+			value:     "foo",
+			expectErr: true,
+			errMsg:    `field label "abc.xyz" not supported for "Secret"`,
+		},
+	}
+
+	for _, tc := range testcases {
+		label, value, err := corev1.SecretFieldLabelConversionFunc(tc.labelName, tc.value)
+		if err != nil {
+			if !tc.expectErr {
+				t.Errorf("%q : unexpected err for fieldSelector %q", tc.name, tc.labelName)
+			} else if err.Error() != tc.errMsg {
+				t.Errorf("%q : unexpected error message for fieldSelector %q", tc.name, tc.errMsg)
+			}
+		} else {
+			if label != tc.labelName {
+				t.Errorf("%q: epxected label %q, got %q", tc.name, tc.labelName, label)
+			}
+			if value != tc.value {
+				t.Errorf("%q: epxected value %q, got %q", tc.name, tc.value, value)
+			}
+		}
+	}
+}

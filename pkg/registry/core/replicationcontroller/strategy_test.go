@@ -22,8 +22,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 
 	// install all api groups for testing
@@ -145,15 +143,6 @@ func TestControllerStatusStrategy(t *testing.T) {
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error %v", errs)
 	}
-}
-
-func TestSelectableFieldLabelConversions(t *testing.T) {
-	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
-		"ReplicationController",
-		ControllerToSelectableFields(&api.ReplicationController{}),
-		nil,
-	)
 }
 
 func TestValidateUpdate(t *testing.T) {
