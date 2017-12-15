@@ -213,9 +213,9 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 	var clientTimeout time.Duration
 	if transport != http.DefaultTransport {
 		httpClient = &http.Client{Transport: transport}
-		if config.Timeout > 0 {
-			clientTimeout = config.Timeout
-		}
+	}
+	if config.Timeout > 0 {
+		clientTimeout = config.Timeout
 	}
 
 	return NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient, clientTimeout)
@@ -242,9 +242,9 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 	var clientTimeout time.Duration
 	if transport != http.DefaultTransport {
 		httpClient = &http.Client{Transport: transport}
-		if config.Timeout > 0 {
-			clientTimeout = config.Timeout
-		}
+	}
+	if config.Timeout > 0 {
+		clientTimeout = config.Timeout
 	}
 
 	versionConfig := config.ContentConfig

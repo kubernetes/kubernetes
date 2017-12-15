@@ -86,13 +86,9 @@ func TestDoRequestSuccess(t *testing.T) {
 }
 
 func TestRESTClientRequestTimeout(t *testing.T) {
-	testServer, _, _ := testServerEnv(t, 200)
-	defer testServer.Close()
-
 	timeout := 10 * time.Second
 
 	c, err := RESTClientFor(&Config{
-		Host: testServer.URL,
 		ContentConfig: ContentConfig{
 			GroupVersion:         &v1.SchemeGroupVersion,
 			NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
