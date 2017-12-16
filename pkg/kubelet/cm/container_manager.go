@@ -122,13 +122,6 @@ type Status struct {
 	SoftRequirements error
 }
 
-const (
-	// Uer visible keys for managing node allocatable enforcement on the node.
-	NodeAllocatableEnforcementKey = "pods"
-	SystemReservedEnforcementKey  = "system-reserved"
-	KubeReservedEnforcementKey    = "kube-reserved"
-)
-
 // containerManager for the kubelet is currently an injected dependency.
 // We need to parse the --qos-reserve-requests option in
 // cmd/kubelet/app/server.go and there isn't really a good place to put

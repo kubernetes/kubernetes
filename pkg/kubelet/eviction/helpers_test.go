@@ -30,8 +30,8 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
-	"k8s.io/kubernetes/pkg/kubelet/cm"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/quota"
 )
 
@@ -61,7 +61,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			expectThresholds:        []evictionapi.Threshold{},
 		},
 		"all memory eviction values": {
-			allocatableConfig:       []string{cm.NodeAllocatableEnforcementKey},
+			allocatableConfig:       []string{kubetypes.NodeAllocatableEnforcementKey},
 			evictionHard:            map[string]string{"memory.available": "150Mi"},
 			evictionSoft:            map[string]string{"memory.available": "300Mi"},
 			evictionSoftGracePeriod: map[string]string{"memory.available": "30s"},
