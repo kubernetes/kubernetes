@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
+	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
@@ -3411,9 +3412,9 @@ func ValidateService(service *core.Service) field.ErrorList {
 			// This is a workaround for broken cloud environments that
 			// over-open firewalls.  Hopefully it can go away when more clouds
 			// understand containers better.
-			if port.Port == 10250 {
+			if port.Port == ports.KubeletPort {
 				portPath := specPath.Child("ports").Index(ix)
-				allErrs = append(allErrs, field.Invalid(portPath, port.Port, "may not expose port 10250 externally since it is used by kubelet"))
+				allErrs = append(allErrs, field.Invalid(portPath, port.Port, fmt.Sprintf("may not expose port %v externally since it is used by kubelet", ports.KubeletPort)))
 			}
 		}
 		if service.Spec.ClusterIP == "None" {
@@ -3425,7 +3426,7 @@ func ValidateService(service *core.Service) field.ErrorList {
 		}
 	case core.ServiceTypeExternalName:
 		if service.Spec.ClusterIP != "" {
-			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterIP"), service.Spec.ClusterIP, "must be empty for ExternalName services"))
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("clusterIP"), "must be empty for ExternalName services"))
 		}
 		if len(service.Spec.ExternalName) > 0 {
 			allErrs = append(allErrs, ValidateDNS1123Subdomain(service.Spec.ExternalName, specPath.Child("externalName"))...)
@@ -3504,7 +3505,7 @@ func ValidateService(service *core.Service) field.ErrorList {
 		for i := range service.Spec.Ports {
 			portPath := portsPath.Index(i)
 			if service.Spec.Ports[i].NodePort != 0 {
-				allErrs = append(allErrs, field.Invalid(portPath.Child("nodePort"), service.Spec.Ports[i].NodePort, "may not be used when `type` is 'ClusterIP'"))
+				allErrs = append(allErrs, field.Forbidden(portPath.Child("nodePort"), "may not be used when `type` is 'ClusterIP'"))
 			}
 		}
 	}
@@ -3554,7 +3555,7 @@ func ValidateService(service *core.Service) field.ErrorList {
 			val = service.Annotations[core.AnnotationLoadBalancerSourceRangesKey]
 		}
 		if service.Spec.Type != core.ServiceTypeLoadBalancer {
-			allErrs = append(allErrs, field.Invalid(fieldPath, "", "may only be used when `type` is 'LoadBalancer'"))
+			allErrs = append(allErrs, field.Forbidden(fieldPath, "may only be used when `type` is 'LoadBalancer'"))
 		}
 		_, err := apiservice.GetLoadBalancerSourceRanges(service)
 		if err != nil {
