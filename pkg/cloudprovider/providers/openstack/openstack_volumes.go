@@ -590,7 +590,11 @@ func (os *OpenStack) DiskIsAttached(instanceID, volumeID string) (bool, error) {
 func (os *OpenStack) DisksAreAttached(instanceID string, volumeIDs []string) (map[string]bool, error) {
 	attached := make(map[string]bool)
 	for _, volumeID := range volumeIDs {
-		isAttached, _ := os.DiskIsAttached(instanceID, volumeID)
+		isAttached, err := os.DiskIsAttached(instanceID, volumeID)
+		if err != nil && err != ErrNotFound {
+			attached[volumeID] = true
+			continue
+		}
 		attached[volumeID] = isAttached
 	}
 	return attached, nil
