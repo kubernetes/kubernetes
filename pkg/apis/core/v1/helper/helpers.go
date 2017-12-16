@@ -89,15 +89,6 @@ func IsServiceIPSet(service *v1.Service) bool {
 	return service.Spec.ClusterIP != v1.ClusterIPNone && service.Spec.ClusterIP != ""
 }
 
-// this function aims to check if the service's cluster IP is requested or not
-func IsServiceIPRequested(service *v1.Service) bool {
-	// ExternalName services are CNAME aliases to external ones. Ignore the IP.
-	if service.Spec.Type == v1.ServiceTypeExternalName {
-		return false
-	}
-	return service.Spec.ClusterIP == ""
-}
-
 // AddToNodeAddresses appends the NodeAddresses to the passed-by-pointer slice,
 // only if they do not already exist
 func AddToNodeAddresses(addresses *[]v1.NodeAddress, addAddresses ...v1.NodeAddress) {
@@ -414,20 +405,6 @@ func GetPersistentVolumeClaimClass(claim *v1.PersistentVolumeClaim) string {
 	}
 
 	return ""
-}
-
-// PersistentVolumeClaimHasClass returns true if given claim has set StorageClassName field.
-func PersistentVolumeClaimHasClass(claim *v1.PersistentVolumeClaim) bool {
-	// Use beta annotation first
-	if _, found := claim.Annotations[v1.BetaStorageClassAnnotation]; found {
-		return true
-	}
-
-	if claim.Spec.StorageClassName != nil {
-		return true
-	}
-
-	return false
 }
 
 // GetStorageNodeAffinityFromAnnotation gets the json serialized data from PersistentVolume.Annotations

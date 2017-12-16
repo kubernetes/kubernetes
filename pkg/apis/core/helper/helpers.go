@@ -254,24 +254,10 @@ func IsIntegerResourceName(str string) bool {
 	return integerResources.Has(str) || IsExtendedResourceName(core.ResourceName(str))
 }
 
-// Extended and HugePages resources
-func IsScalarResourceName(name core.ResourceName) bool {
-	return IsExtendedResourceName(name) || IsHugePageResourceName(name)
-}
-
 // this function aims to check if the service's ClusterIP is set or not
 // the objective is not to perform validation here
 func IsServiceIPSet(service *core.Service) bool {
 	return service.Spec.ClusterIP != core.ClusterIPNone && service.Spec.ClusterIP != ""
-}
-
-// this function aims to check if the service's cluster IP is requested or not
-func IsServiceIPRequested(service *core.Service) bool {
-	// ExternalName services are CNAME aliases to external ones. Ignore the IP.
-	if service.Spec.Type == core.ServiceTypeExternalName {
-		return false
-	}
-	return service.Spec.ClusterIP == ""
 }
 
 var standardFinalizers = sets.NewString(
@@ -279,20 +265,6 @@ var standardFinalizers = sets.NewString(
 	metav1.FinalizerOrphanDependents,
 	metav1.FinalizerDeleteDependents,
 )
-
-// HasAnnotation returns a bool if passed in annotation exists
-func HasAnnotation(obj core.ObjectMeta, ann string) bool {
-	_, found := obj.Annotations[ann]
-	return found
-}
-
-// SetMetaDataAnnotation sets the annotation and value
-func SetMetaDataAnnotation(obj *core.ObjectMeta, ann string, value string) {
-	if obj.Annotations == nil {
-		obj.Annotations = make(map[string]string)
-	}
-	obj.Annotations[ann] = value
-}
 
 func IsStandardFinalizerName(str string) bool {
 	return standardFinalizers.Has(str)
