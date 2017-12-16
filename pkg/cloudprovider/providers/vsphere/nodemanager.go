@@ -265,14 +265,33 @@ func (nm *NodeManager) GetNodeInfo(nodeName k8stypes.NodeName) (NodeInfo, error)
 	return *nodeInfo, nil
 }
 
-func (nm *NodeManager) GetNodeDetails() []NodeDetails {
+func (nm *NodeManager) GetNodeDetails() ([]NodeDetails, error) {
 	nm.nodeInfoLock.RLock()
 	defer nm.nodeInfoLock.RUnlock()
 	var nodeDetails []NodeDetails
+	vsphereSessionRefreshMap := make(map[string]bool)
+
+	// Create context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	for nodeName, nodeInfo := range nm.nodeInfoMap {
 		nodeDetails = append(nodeDetails, NodeDetails{nodeName, nodeInfo.vm})
+		if vsphereSessionRefreshMap[nodeInfo.vcServer] {
+			continue
+		}
+		vsphereInstance := nm.vsphereInstanceMap[nodeInfo.vcServer]
+		if vsphereInstance == nil {
+			err := fmt.Errorf("vSphereInstance for vc server %q not found while looking for vm %q", nodeInfo.vcServer, nodeInfo.vm)
+			return nil, err
+		}
+		err := vsphereInstance.conn.Connect(ctx)
+		if err != nil {
+			return nil, err
+		}
+		vsphereSessionRefreshMap[nodeInfo.vcServer] = true
 	}
-	return nodeDetails
+	return nodeDetails, nil
 }
 
 func (nm *NodeManager) addNodeInfo(nodeName string, nodeInfo *NodeInfo) {
