@@ -964,10 +964,10 @@ func runDrainTest(f *framework.Framework, migSizes map[string]int, namespace str
 			MinAvailable: &minAvailable,
 		},
 	}
-	_, err = f.ClientSet.Policy().PodDisruptionBudgets(namespace).Create(pdb)
+	_, err = f.ClientSet.PolicyV1beta1().PodDisruptionBudgets(namespace).Create(pdb)
 
 	defer func() {
-		f.ClientSet.Policy().PodDisruptionBudgets(namespace).Delete(pdb.Name, &metav1.DeleteOptions{})
+		f.ClientSet.PolicyV1beta1().PodDisruptionBudgets(namespace).Delete(pdb.Name, &metav1.DeleteOptions{})
 	}()
 
 	framework.ExpectNoError(err)
@@ -1904,7 +1904,7 @@ func addKubeSystemPdbs(f *framework.Framework) (func(), error) {
 		var finalErr error
 		for _, newPdbName := range newPdbs {
 			By(fmt.Sprintf("Delete PodDisruptionBudget %v", newPdbName))
-			err := f.ClientSet.Policy().PodDisruptionBudgets("kube-system").Delete(newPdbName, &metav1.DeleteOptions{})
+			err := f.ClientSet.PolicyV1beta1().PodDisruptionBudgets("kube-system").Delete(newPdbName, &metav1.DeleteOptions{})
 			if err != nil {
 				// log error, but attempt to remove other pdbs
 				glog.Errorf("Failed to delete PodDisruptionBudget %v, err: %v", newPdbName, err)
@@ -1942,7 +1942,7 @@ func addKubeSystemPdbs(f *framework.Framework) (func(), error) {
 				MinAvailable: &minAvailable,
 			},
 		}
-		_, err := f.ClientSet.Policy().PodDisruptionBudgets("kube-system").Create(pdb)
+		_, err := f.ClientSet.PolicyV1beta1().PodDisruptionBudgets("kube-system").Create(pdb)
 		newPdbs = append(newPdbs, pdbName)
 
 		if err != nil {
