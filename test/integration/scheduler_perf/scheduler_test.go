@@ -258,7 +258,7 @@ func (inputConfig *schedulerPerfConfig) generatePodAndNodeTopology(config *testC
 }
 
 // writePodAndNodeTopologyToConfig reads a configuration and then applies it to a test configuration.
-//TODO: As of now, this function is not doing anything expect for reading input values to priority structs.
+//TODO: As of now, this function is not doing anything except for reading input values to priority structs.
 func writePodAndNodeTopologyToConfig(config *testConfig) error {
 	// High Level structure that should be filled for every predicate or priority.
 	inputConfig := &schedulerPerfConfig{
