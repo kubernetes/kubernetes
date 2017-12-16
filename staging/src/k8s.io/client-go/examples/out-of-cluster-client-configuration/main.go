@@ -62,7 +62,11 @@ func main() {
 		// Examples for error handling:
 		// - Use helper functions like e.g. errors.IsNotFound()
 		// - And/or cast to StatusError and use its properties like e.g. ErrStatus.Message
-		_, err = clientset.CoreV1().Pods("default").Get("example-xxxxx", metav1.GetOptions{})
+
+		// Fill this out if you wish to limit it to a namespace
+		namespace := ""
+
+		pods, err = clientset.CoreV1().Pods(namespace).List(metav1.ListOptions{})
 		if errors.IsNotFound(err) {
 			fmt.Printf("Pod not found\n")
 		} else if statusError, isStatus := err.(*errors.StatusError); isStatus {
@@ -70,7 +74,22 @@ func main() {
 		} else if err != nil {
 			panic(err.Error())
 		} else {
-			fmt.Printf("Found pod\n")
+			fmt.Printf("Found pods\n")
+
+			// Example of retrieving pod names, creationtimestamps by iterating through the Items
+			for _, pod := range pods.Items {
+				fmt.Println("######################")
+				fmt.Println("Pod name:", pod.Name)
+
+				// Iterate the container and image names for each pod
+				for _, container := range pod.Spec.Containers {
+					fmt.Println("  Container:", container.Name)
+					fmt.Println("  Image:", container.Image)
+				}
+				fmt.Println("Created on:", pod.CreationTimestamp)
+				fmt.Println("######################")
+			}
+
 		}
 
 		time.Sleep(10 * time.Second)
