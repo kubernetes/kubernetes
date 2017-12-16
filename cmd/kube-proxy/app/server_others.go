@@ -134,7 +134,9 @@ func newProxyServer(
 	var endpointsEventHandler proxyconfig.EndpointsHandler
 
 	proxyMode := getProxyMode(string(config.Mode), iptInterface, ipsetInterface, iptables.LinuxKernelCompatTester{})
-	if proxyMode == proxyModeIPTables {
+
+	switch proxyMode {
+	case proxyModeIPTables:
 		glog.V(0).Info("Using iptables Proxier.")
 		nodeIP := net.ParseIP(config.BindAddress)
 		if nodeIP.Equal(net.IPv4zero) || nodeIP.Equal(net.IPv6zero) {
@@ -176,7 +178,7 @@ func newProxyServer(
 		// ipvs rule is created by IPVS proxier or not.  Users should explicitly specify `--clean-ipvs=true` to flush
 		// all ipvs rules when kube-proxy start up.  Users do this operation should be with caution.
 		ipvs.CleanupLeftovers(ipvsInterface, iptInterface, ipsetInterface, cleanupIPVS)
-	} else if proxyMode == proxyModeIPVS {
+	case proxyModeIPVS:
 		glog.V(0).Info("Using ipvs Proxier.")
 		proxierIPVS, err := ipvs.NewProxier(
 			iptInterface,
@@ -206,7 +208,7 @@ func newProxyServer(
 		// TODO this has side effects that should only happen when Run() is invoked.
 		userspace.CleanupLeftovers(iptInterface)
 		iptables.CleanupLeftovers(iptInterface)
-	} else {
+	default:
 		glog.V(0).Info("Using userspace Proxier.")
 		// This is a proxy.LoadBalancer which NewProxier needs but has methods we don't need for
 		// our config.EndpointsConfigHandler.
@@ -270,23 +272,21 @@ func newProxyServer(
 }
 
 func getProxyMode(proxyMode string, iptver iptables.IPTablesVersioner, ipsetver ipvs.IPSetVersioner, kcompat iptables.KernelCompatTester) string {
-	if proxyMode == proxyModeUserspace {
+	switch proxyMode {
+	case proxyModeUserspace:
 		return proxyModeUserspace
-	}
-
-	if len(proxyMode) > 0 && proxyMode == proxyModeIPTables {
+	case proxyModeIPTables:
 		return tryIPTablesProxy(iptver, kcompat)
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.SupportIPVSProxyMode) {
-		if proxyMode == proxyModeIPVS {
+	case proxyModeIPVS:
+		if utilfeature.DefaultFeatureGate.Enabled(features.SupportIPVSProxyMode) {
 			return tryIPVSProxy(iptver, ipsetver, kcompat)
 		} else {
 			glog.Warningf("Can't use ipvs proxier, trying iptables proxier")
 			return tryIPTablesProxy(iptver, kcompat)
 		}
 	}
-	glog.Warningf("Flag proxy-mode=%q unknown, assuming iptables proxy", proxyMode)
+
+	glog.Warningf("Flag proxy-mode=%q unknown, assuming iptables proxier", proxyMode)
 	return tryIPTablesProxy(iptver, kcompat)
 }
 
@@ -296,7 +296,8 @@ func tryIPVSProxy(iptver iptables.IPTablesVersioner, ipsetver ipvs.IPSetVersione
 	useIPVSProxy, err := ipvs.CanUseIPVSProxier(ipsetver)
 	if err != nil {
 		// Try to fallback to iptables before falling back to userspace
-		utilruntime.HandleError(fmt.Errorf("can't determine whether to use ipvs proxy, error: %v", err))
+		utilruntime.HandleError(fmt.Errorf("can't determine whether to use ipvs proxier, trying iptables proxier: %v", err))
+		return tryIPTablesProxy(iptver, kcompat)
 	}
 	if useIPVSProxy {
 		return proxyModeIPVS
@@ -311,13 +312,13 @@ func tryIPTablesProxy(iptver iptables.IPTablesVersioner, kcompat iptables.Kernel
 	// guaranteed false on error, error only necessary for debugging
 	useIPTablesProxy, err := iptables.CanUseIPTablesProxier(iptver, kcompat)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("can't determine whether to use iptables proxy, using userspace proxier: %v", err))
+		utilruntime.HandleError(fmt.Errorf("can't determine whether to use iptables proxier, using userspace proxier: %v", err))
 		return proxyModeUserspace
 	}
 	if useIPTablesProxy {
 		return proxyModeIPTables
 	}
 	// Fallback.
-	glog.V(1).Infof("Can't use iptables proxy, using userspace proxier")
+	glog.V(1).Infof("Can't use iptables proxier, using userspace proxier")
 	return proxyModeUserspace
 }
