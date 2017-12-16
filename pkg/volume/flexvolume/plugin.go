@@ -19,6 +19,7 @@ package flexvolume
 import (
 	"fmt"
 	"path"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -100,7 +101,11 @@ func (plugin *flexVolumePlugin) Init(host volume.VolumeHost) error {
 func (plugin *flexVolumePlugin) getExecutable() string {
 	parts := strings.Split(plugin.driverName, "/")
 	execName := parts[len(parts)-1]
-	return path.Join(plugin.execPath, execName)
+	execPath := path.Join(plugin.execPath, execName)
+	if runtime.GOOS == "windows" {
+		execPath = volume.GetWindowsPath(execPath)
+	}
+	return execPath
 }
 
 // Name is part of the volume.VolumePlugin interface.
