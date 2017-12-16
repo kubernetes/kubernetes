@@ -47,16 +47,16 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	if kc.HealthzPort != 0 && utilvalidation.IsValidPortNum(int(kc.HealthzPort)) != nil {
 		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: HealthzPort (--healthz-port) %v must be between 1 and 65535, inclusive", kc.HealthzPort))
 	}
-	if utilvalidation.IsInRange(int(kc.ImageGCHighThresholdPercent), 0, 100) != nil {
+	if utilvalidation.IsInRange(int64(kc.ImageGCHighThresholdPercent), 0, 100) != nil {
 		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: ImageGCHighThresholdPercent (--image-gc-high-threshold) %v must be between 0 and 100, inclusive", kc.ImageGCHighThresholdPercent))
 	}
-	if utilvalidation.IsInRange(int(kc.ImageGCLowThresholdPercent), 0, 100) != nil {
+	if utilvalidation.IsInRange(int64(kc.ImageGCLowThresholdPercent), 0, 100) != nil {
 		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: ImageGCLowThresholdPercent (--image-gc-low-threshold) %v must be between 0 and 100, inclusive", kc.ImageGCLowThresholdPercent))
 	}
-	if utilvalidation.IsInRange(int(kc.IPTablesDropBit), 0, 31) != nil {
+	if utilvalidation.IsInRange(int64(kc.IPTablesDropBit), 0, 31) != nil {
 		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: IPTablesDropBit (--iptables-drop-bit) %v must be between 0 and 31, inclusive", kc.IPTablesDropBit))
 	}
-	if utilvalidation.IsInRange(int(kc.IPTablesMasqueradeBit), 0, 31) != nil {
+	if utilvalidation.IsInRange(int64(kc.IPTablesMasqueradeBit), 0, 31) != nil {
 		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: IPTablesMasqueradeBit (--iptables-masquerade-bit) %v must be between 0 and 31, inclusive", kc.IPTablesMasqueradeBit))
 	}
 	if kc.KubeAPIBurst < 0 {
@@ -71,7 +71,7 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	if kc.MaxPods < 0 {
 		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: MaxPods (--max-pods) %v must not be a negative number", kc.MaxPods))
 	}
-	if utilvalidation.IsInRange(int(kc.OOMScoreAdj), -1000, 1000) != nil {
+	if utilvalidation.IsInRange(int64(kc.OOMScoreAdj), -1000, 1000) != nil {
 		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: OOMScoreAdj (--oom-score-adj) %v must be between -1000 and 1000, inclusive", kc.OOMScoreAdj))
 	}
 	if kc.PodsPerCore < 0 {

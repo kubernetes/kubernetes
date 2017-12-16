@@ -19,6 +19,7 @@ package validation
 import (
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/validate"
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -30,9 +31,7 @@ func ValidateScale(scale *autoscaling.Scale) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&scale.ObjectMeta, true, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
 
-	if scale.Spec.Replicas < 0 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "replicas"), scale.Spec.Replicas, "must be greater than or equal to 0"))
-	}
+	allErrs = append(allErrs, validate.NonNegative(int64(scale.Spec.Replicas), field.NewPath("spec", "replicas"))...)
 
 	return allErrs
 }
@@ -43,12 +42,10 @@ var ValidateHorizontalPodAutoscalerName = apivalidation.ValidateReplicationContr
 
 func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAutoscalerSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if autoscaler.MinReplicas != nil && *autoscaler.MinReplicas < 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("minReplicas"), *autoscaler.MinReplicas, "must be greater than 0"))
+	if autoscaler.MinReplicas != nil {
+		allErrs = append(allErrs, validate.Positive(int64(*autoscaler.MinReplicas), fldPath.Child("minReplicas"))...)
 	}
-	if autoscaler.MaxReplicas < 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxReplicas"), autoscaler.MaxReplicas, "must be greater than 0"))
-	}
+	allErrs = append(allErrs, validate.Positive(int64(autoscaler.MaxReplicas), fldPath.Child("maxReplicas"))...)
 	if autoscaler.MinReplicas != nil && autoscaler.MaxReplicas < *autoscaler.MinReplicas {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxReplicas"), autoscaler.MaxReplicas, "must be greater than or equal to `minReplicas`"))
 	}
@@ -97,8 +94,8 @@ func ValidateHorizontalPodAutoscalerUpdate(newAutoscaler, oldAutoscaler *autosca
 func ValidateHorizontalPodAutoscalerStatusUpdate(newAutoscaler, oldAutoscaler *autoscaling.HorizontalPodAutoscaler) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&newAutoscaler.ObjectMeta, &oldAutoscaler.ObjectMeta, field.NewPath("metadata"))
 	status := newAutoscaler.Status
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.CurrentReplicas), field.NewPath("status", "currentReplicas"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.DesiredReplicas), field.NewPath("status", "desiredReplicasa"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(status.CurrentReplicas), field.NewPath("status", "currentReplicas"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(status.DesiredReplicas), field.NewPath("status", "desiredReplicasa"))...)
 	return allErrs
 }
 
@@ -208,8 +205,8 @@ func validateResourceSource(src *autoscaling.ResourceMetricSource, fldPath *fiel
 		allErrs = append(allErrs, field.Required(fldPath.Child("targetAverageUtilization"), "must set either a target raw value or a target utilization"))
 	}
 
-	if src.TargetAverageUtilization != nil && *src.TargetAverageUtilization < 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("targetAverageUtilization"), src.TargetAverageUtilization, "must be greater than 0"))
+	if src.TargetAverageUtilization != nil {
+		allErrs = append(allErrs, validate.Positive(int64(*src.TargetAverageUtilization), fldPath.Child("targetAverageUtilization"))...)
 	}
 
 	if src.TargetAverageUtilization != nil && src.TargetAverageValue != nil {

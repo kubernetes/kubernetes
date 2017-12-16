@@ -23,9 +23,9 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/validate"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 )
 
@@ -47,13 +47,8 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("OOMScoreAdj"), *config.OOMScoreAdj, "must be within the range [-1000, 1000]"))
 	}
 
-	if config.UDPIdleTimeout.Duration <= 0 {
-		allErrs = append(allErrs, field.Invalid(newPath.Child("UDPIdleTimeout"), config.UDPIdleTimeout, "must be greater than 0"))
-	}
-
-	if config.ConfigSyncPeriod.Duration <= 0 {
-		allErrs = append(allErrs, field.Invalid(newPath.Child("ConfigSyncPeriod"), config.ConfigSyncPeriod, "must be greater than 0"))
-	}
+	allErrs = append(allErrs, validate.Positive(int64(config.UDPIdleTimeout.Duration), newPath.Child("UDPIdleTimeout"))...)
+	allErrs = append(allErrs, validate.Positive(int64(config.ConfigSyncPeriod.Duration), newPath.Child("ConfigSyncPeriod"))...)
 
 	if net.ParseIP(config.BindAddress) == nil {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("BindAddress"), config.BindAddress, "not a valid textual representation of an IP address"))
@@ -82,13 +77,9 @@ func validateKubeProxyIPTablesConfiguration(config kubeproxyconfig.KubeProxyIPTa
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("MasqueradeBit"), config.MasqueradeBit, "must be within the range [0, 31]"))
 	}
 
-	if config.SyncPeriod.Duration <= 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.SyncPeriod, "must be greater than 0"))
-	}
+	allErrs = append(allErrs, validate.Positive(int64(config.SyncPeriod.Duration), fldPath.Child("SyncPeriod"))...)
 
-	if config.MinSyncPeriod.Duration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("MinSyncPeriod"), config.MinSyncPeriod, "must be greater than or equal to 0"))
-	}
+	allErrs = append(allErrs, validate.NonNegativeDuration(config.MinSyncPeriod.Duration, fldPath.Child("MinSyncPeriod"))...)
 
 	if config.MinSyncPeriod.Duration > config.SyncPeriod.Duration {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.MinSyncPeriod, fmt.Sprintf("must be greater than or equal to %s", fldPath.Child("MinSyncPeriod").String())))
@@ -100,13 +91,9 @@ func validateKubeProxyIPTablesConfiguration(config kubeproxyconfig.KubeProxyIPTa
 func validateKubeProxyIPVSConfiguration(config kubeproxyconfig.KubeProxyIPVSConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if config.SyncPeriod.Duration <= 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.SyncPeriod, "must be greater than 0"))
-	}
+	allErrs = append(allErrs, validate.Positive(int64(config.SyncPeriod.Duration), fldPath.Child("SyncPeriod"))...)
 
-	if config.MinSyncPeriod.Duration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("MinSyncPeriod"), config.MinSyncPeriod, "must be greater than or equal to 0"))
-	}
+	allErrs = append(allErrs, validate.NonNegativeDuration(config.MinSyncPeriod.Duration, fldPath.Child("MinSyncPeriod"))...)
 
 	if config.MinSyncPeriod.Duration > config.SyncPeriod.Duration {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.MinSyncPeriod, fmt.Sprintf("must be greater than or equal to %s", fldPath.Child("MinSyncPeriod").String())))
@@ -120,25 +107,20 @@ func validateKubeProxyIPVSConfiguration(config kubeproxyconfig.KubeProxyIPVSConf
 func validateKubeProxyConntrackConfiguration(config kubeproxyconfig.KubeProxyConntrackConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if config.Max != nil && *config.Max < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("Max"), config.Max, "must be greater than or equal to 0"))
+	if config.Max != nil {
+		allErrs = append(allErrs, validate.NonNegative(int64(*config.Max), fldPath.Child("Max"))...)
 	}
 
-	if config.MaxPerCore != nil && *config.MaxPerCore < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("MaxPerCore"), config.MaxPerCore, "must be greater than or equal to 0"))
+	if config.MaxPerCore != nil {
+		allErrs = append(allErrs, validate.NonNegative(int64(*config.MaxPerCore), fldPath.Child("MaxPerCore"))...)
 	}
 
-	if config.Min != nil && *config.Min < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("Min"), config.Min, "must be greater than or equal to 0"))
+	if config.Min != nil {
+		allErrs = append(allErrs, validate.NonNegative(int64(*config.Min), fldPath.Child("Min"))...)
 	}
 
-	if config.TCPEstablishedTimeout.Duration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("TCPEstablishedTimeout"), config.TCPEstablishedTimeout, "must be greater than or equal to 0"))
-	}
-
-	if config.TCPCloseWaitTimeout.Duration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("TCPCloseWaitTimeout"), config.TCPCloseWaitTimeout, "must be greater than or equal to 0"))
-	}
+	allErrs = append(allErrs, validate.NonNegativeDuration(config.TCPEstablishedTimeout.Duration, fldPath.Child("TCPEstablishedTimeout"))...)
+	allErrs = append(allErrs, validate.NonNegativeDuration(config.TCPCloseWaitTimeout.Duration, fldPath.Child("TCPCloseWaitTimeout"))...)
 
 	return allErrs
 }
@@ -183,7 +165,7 @@ func validateProxyModeWindows(mode kubeproxyconfig.ProxyMode, fldPath *field.Pat
 
 func validateClientConnectionConfiguration(config kubeproxyconfig.ClientConnectionConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(config.Burst), fldPath.Child("Burst"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(config.Burst), fldPath.Child("Burst"))...)
 	return allErrs
 }
 

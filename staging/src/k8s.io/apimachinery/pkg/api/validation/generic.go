@@ -19,8 +19,8 @@ package validation
 import (
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/validate"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 const IsNegativeErrorMsg string = `must be greater than or equal to 0`
@@ -30,7 +30,10 @@ const IsNegativeErrorMsg string = `must be greater than or equal to 0`
 // if the name will have a value appended to it.  If the name is not valid,
 // this returns a list of descriptions of individual characteristics of the
 // value that were not valid.  Otherwise this returns an empty list or nil.
-type ValidateNameFunc func(name string, prefix bool) []string
+//
+// NOTE: This is deprecated, new callers should use
+// k8s.io/apimachinery/pkg/api/validate.NameValidator.
+type ValidateNameFunc = validate.NameValidator
 
 // NameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
 func NameIsDNSSubdomain(name string, prefix bool) []string {
@@ -76,10 +79,7 @@ func maskTrailingDash(name string) string {
 }
 
 // Validates that given value is not negative.
-func ValidateNonnegativeField(value int64, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if value < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, IsNegativeErrorMsg))
-	}
-	return allErrs
-}
+//
+// NOTE: This is deprecated, new callers should use
+// k8s.io/apimachinery/pkg/api/validate.NonNegative().
+var ValidateNonnegativeField = validate.NonNegative

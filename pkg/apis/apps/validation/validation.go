@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/api/validate"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
@@ -90,7 +91,7 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path) fi
 	case apps.RollingUpdateStatefulSetStrategyType:
 		if spec.UpdateStrategy.RollingUpdate != nil {
 			allErrs = append(allErrs,
-				apivalidation.ValidateNonnegativeField(
+				validate.NonNegative(
 					int64(spec.UpdateStrategy.RollingUpdate.Partition),
 					fldPath.Child("updateStrategy").Child("rollingUpdate").Child("partition"))...)
 		}
@@ -103,7 +104,7 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path) fi
 					apps.OnDeleteStatefulSetStrategyType)))
 	}
 
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(spec.Replicas), fldPath.Child("replicas"))...)
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
 	} else {
@@ -157,7 +158,7 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) fi
 	statefulSet.Spec.Template = restoreTemplate
 	statefulSet.Spec.UpdateStrategy = restoreStrategy
 
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(statefulSet.Spec.Replicas), field.NewPath("spec", "replicas"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(statefulSet.Spec.Replicas), field.NewPath("spec", "replicas"))...)
 	return allErrs
 }
 
@@ -165,15 +166,15 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) fi
 func ValidateStatefulSetStatus(status *apps.StatefulSetStatus, fieldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.Replicas), fieldPath.Child("replicas"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ReadyReplicas), fieldPath.Child("readyReplicas"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.CurrentReplicas), fieldPath.Child("currentReplicas"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UpdatedReplicas), fieldPath.Child("updatedReplicas"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(status.Replicas), fieldPath.Child("replicas"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(status.ReadyReplicas), fieldPath.Child("readyReplicas"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(status.CurrentReplicas), fieldPath.Child("currentReplicas"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(status.UpdatedReplicas), fieldPath.Child("updatedReplicas"))...)
 	if status.ObservedGeneration != nil {
-		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.ObservedGeneration), fieldPath.Child("observedGeneration"))...)
+		allErrs = append(allErrs, validate.NonNegative(int64(*status.ObservedGeneration), fieldPath.Child("observedGeneration"))...)
 	}
 	if status.CollisionCount != nil {
-		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.CollisionCount), fieldPath.Child("collisionCount"))...)
+		allErrs = append(allErrs, validate.NonNegative(int64(*status.CollisionCount), fieldPath.Child("collisionCount"))...)
 	}
 
 	msg := "cannot be greater than status.replicas"
@@ -214,7 +215,7 @@ func ValidateControllerRevision(revision *apps.ControllerRevision) field.ErrorLi
 	if revision.Data == nil {
 		errs = append(errs, field.Required(field.NewPath("data"), "data is mandatory"))
 	}
-	errs = append(errs, apivalidation.ValidateNonnegativeField(revision.Revision, field.NewPath("revision"))...)
+	errs = append(errs, validate.NonNegative(revision.Revision, field.NewPath("revision"))...)
 	return errs
 }
 
@@ -226,6 +227,6 @@ func ValidateControllerRevisionUpdate(newHistory, oldHistory *apps.ControllerRev
 
 	errs = append(errs, apivalidation.ValidateObjectMetaUpdate(&newHistory.ObjectMeta, &oldHistory.ObjectMeta, field.NewPath("metadata"))...)
 	errs = append(errs, ValidateControllerRevision(newHistory)...)
-	errs = append(errs, apivalidation.ValidateImmutableField(newHistory.Data, oldHistory.Data, field.NewPath("data"))...)
+	errs = append(errs, validate.Immutable(newHistory.Data, oldHistory.Data, field.NewPath("data"))...)
 	return errs
 }

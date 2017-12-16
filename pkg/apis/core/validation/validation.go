@@ -32,6 +32,7 @@ import (
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/validate"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -59,13 +60,9 @@ import (
 // fields by default.
 var RepairMalformedUpdates bool = apimachineryvalidation.RepairMalformedUpdates
 
-const isNegativeErrorMsg string = apimachineryvalidation.IsNegativeErrorMsg
 const isInvalidQuotaResource string = `must be a standard resource for quota`
-const fieldImmutableErrorMsg string = apimachineryvalidation.FieldImmutableErrorMsg
 const isNotIntegerErrorMsg string = `must be an integer`
-const isNotPositiveErrorMsg string = `must be greater than zero`
 
-var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
 var fileModeErrorMsg string = "must be a number between 0 and 0777 (octal), both inclusive"
 
 // BannedOwners is a black list of object that are not allowed to be owners.
@@ -94,23 +91,6 @@ func ValidateHasLabel(meta metav1.ObjectMeta, fldPath *field.Path, key, expected
 // ValidateAnnotations validates that a set of annotations are correctly defined.
 func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	return apimachineryvalidation.ValidateAnnotations(annotations, fldPath)
-}
-
-func ValidateDNS1123Label(value string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	for _, msg := range validation.IsDNS1123Label(value) {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
-	}
-	return allErrs
-}
-
-// ValidateDNS1123Subdomain validates that a name is a proper DNS subdomain.
-func ValidateDNS1123Subdomain(value string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	for _, msg := range validation.IsDNS1123Subdomain(value) {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
-	}
-	return allErrs
 }
 
 func ValidatePodSpecificAnnotations(annotations map[string]string, spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
@@ -206,22 +186,6 @@ func ValidateOwnerReferences(ownerReferences []metav1.OwnerReference, fldPath *f
 	return apimachineryvalidation.ValidateOwnerReferences(ownerReferences, fldPath)
 }
 
-// ValidateNameFunc validates that the provided name is valid for a given resource type.
-// Not all resources have the same validation rules for names. Prefix is true
-// if the name will have a value appended to it.  If the name is not valid,
-// this returns a list of descriptions of individual characteristics of the
-// value that were not valid.  Otherwise this returns an empty list or nil.
-type ValidateNameFunc apimachineryvalidation.ValidateNameFunc
-
-// maskTrailingDash replaces the final character of a string with a subdomain safe
-// value if is a dash.
-func maskTrailingDash(name string) string {
-	if strings.HasSuffix(name, "-") {
-		return name[:len(name)-2] + "a"
-	}
-	return name
-}
-
 // ValidatePodName can be used to check whether the given pod name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
@@ -287,63 +251,27 @@ var ValidateClassName = NameIsDNSSubdomain
 var ValidatePriorityClassName = NameIsDNSSubdomain
 
 // TODO update all references to these functions to point to the apimachineryvalidation ones
-// NameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
+// NameIsDNSSubdomain is a validate.NameValidator for names that must be a DNS subdomain.
 func NameIsDNSSubdomain(name string, prefix bool) []string {
 	return apimachineryvalidation.NameIsDNSSubdomain(name, prefix)
 }
 
-// NameIsDNSLabel is a ValidateNameFunc for names that must be a DNS 1123 label.
+// NameIsDNSLabel is a validate.NameValidator for names that must be a DNS 1123 label.
 func NameIsDNSLabel(name string, prefix bool) []string {
 	return apimachineryvalidation.NameIsDNSLabel(name, prefix)
 }
 
-// NameIsDNS1035Label is a ValidateNameFunc for names that must be a DNS 952 label.
+// NameIsDNS1035Label is a validate.NameValidator for names that must be a DNS 952 label.
 func NameIsDNS1035Label(name string, prefix bool) []string {
 	return apimachineryvalidation.NameIsDNS1035Label(name, prefix)
-}
-
-// Validates that given value is not negative.
-func ValidateNonnegativeField(value int64, fldPath *field.Path) field.ErrorList {
-	return apimachineryvalidation.ValidateNonnegativeField(value, fldPath)
-}
-
-// Validates that a Quantity is not negative
-func ValidateNonnegativeQuantity(value resource.Quantity, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if value.Cmp(resource.Quantity{}) < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, value.String(), isNegativeErrorMsg))
-	}
-	return allErrs
-}
-
-// Validates that a Quantity is positive
-func ValidatePositiveQuantityValue(value resource.Quantity, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if value.Cmp(resource.Quantity{}) <= 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, value.String(), isNotPositiveErrorMsg))
-	}
-	return allErrs
-}
-
-func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) field.ErrorList {
-	return apimachineryvalidation.ValidateImmutableField(newVal, oldVal, fldPath)
-}
-
-func ValidateImmutableAnnotation(newVal string, oldVal string, annotation string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	if oldVal != newVal {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("annotations", annotation), newVal, fieldImmutableErrorMsg))
-	}
-	return allErrs
 }
 
 // ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
 // been performed.
 // It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
 // TODO: Remove calls to this method scattered in validations of specific resources, e.g., ValidatePodUpdate.
-func ValidateObjectMeta(meta *metav1.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
-	allErrs := apimachineryvalidation.ValidateObjectMeta(meta, requiresNamespace, apimachineryvalidation.ValidateNameFunc(nameFn), fldPath)
+func ValidateObjectMeta(meta *metav1.ObjectMeta, requiresNamespace bool, nameFn validate.NameValidator, fldPath *field.Path) field.ErrorList {
+	allErrs := apimachineryvalidation.ValidateObjectMeta(meta, requiresNamespace, validate.NameValidator(nameFn), fldPath)
 	// run additional checks for the finalizer name
 	for i := range meta.Finalizers {
 		allErrs = append(allErrs, validateKubeFinalizerName(string(meta.Finalizers[i]), fldPath.Child("finalizers").Index(i))...)
@@ -378,7 +306,7 @@ func ValidateVolumes(volumes []core.Volume, fldPath *field.Path) (map[string]cor
 		if len(vol.Name) == 0 {
 			el = append(el, field.Required(namePath, ""))
 		} else {
-			el = append(el, ValidateDNS1123Label(vol.Name, namePath)...)
+			el = append(el, validate.DNS1123Label(vol.Name, namePath)...)
 		}
 		if allNames.Has(vol.Name) {
 			el = append(el, field.Duplicate(namePath, vol.Name))
@@ -731,9 +659,7 @@ func validateISCSIVolumeSource(iscsi *core.ISCSIVolumeSource, fldPath *field.Pat
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("iqn"), iscsi.IQN, "must be valid format"))
 		}
 	}
-	if iscsi.Lun < 0 || iscsi.Lun > 255 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), iscsi.Lun, validation.InclusiveRangeError(0, 255)))
-	}
+	allErrs = append(allErrs, validate.InRange(int64(iscsi.Lun), 0, 255, fldPath.Child("lun"))...)
 	if (iscsi.DiscoveryCHAPAuth || iscsi.SessionCHAPAuth) && iscsi.SecretRef == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("secretRef"), ""))
 	}
@@ -771,9 +697,7 @@ func validateISCSIPersistentVolumeSource(iscsi *core.ISCSIPersistentVolumeSource
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("iqn"), iscsi.IQN, "must be valid format"))
 		}
 	}
-	if iscsi.Lun < 0 || iscsi.Lun > 255 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), iscsi.Lun, validation.InclusiveRangeError(0, 255)))
-	}
+	allErrs = append(allErrs, validate.InRange(int64(iscsi.Lun), 0, 255, fldPath.Child("lun"))...)
 	if (iscsi.DiscoveryCHAPAuth || iscsi.SessionCHAPAuth) && iscsi.SecretRef == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("secretRef"), ""))
 	}
@@ -812,9 +736,7 @@ func validateFCVolumeSource(fc *core.FCVolumeSource, fldPath *field.Path) field.
 		if fc.Lun == nil {
 			allErrs = append(allErrs, field.Required(fldPath.Child("lun"), "lun is required if targetWWNs is specified"))
 		} else {
-			if *fc.Lun < 0 || *fc.Lun > 255 {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), fc.Lun, validation.InclusiveRangeError(0, 255)))
-			}
+			allErrs = append(allErrs, validate.InRange(int64(*fc.Lun), 0, 255, fldPath.Child("lun"))...)
 		}
 	}
 	return allErrs
@@ -825,20 +747,16 @@ func validateGCEPersistentDiskVolumeSource(pd *core.GCEPersistentDiskVolumeSourc
 	if len(pd.PDName) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("pdName"), ""))
 	}
-	if pd.Partition < 0 || pd.Partition > 255 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("partition"), pd.Partition, pdPartitionErrorMsg))
-	}
+	allErrs = append(allErrs, validate.InRange(int64(pd.Partition), 0, 255, fldPath.Child("partition"))...)
 	return allErrs
 }
 
-func validateAWSElasticBlockStoreVolumeSource(PD *core.AWSElasticBlockStoreVolumeSource, fldPath *field.Path) field.ErrorList {
+func validateAWSElasticBlockStoreVolumeSource(ebs *core.AWSElasticBlockStoreVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(PD.VolumeID) == 0 {
+	if len(ebs.VolumeID) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeID"), ""))
 	}
-	if PD.Partition < 0 || PD.Partition > 255 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("partition"), PD.Partition, pdPartitionErrorMsg))
-	}
+	allErrs = append(allErrs, validate.InRange(int64(ebs.Partition), 0, 255, fldPath.Child("partition"))...)
 	return allErrs
 }
 
@@ -1410,10 +1328,10 @@ func validateStorageOSVolumeSource(storageos *core.StorageOSVolumeSource, fldPat
 	if len(storageos.VolumeName) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeName"), ""))
 	} else {
-		allErrs = append(allErrs, ValidateDNS1123Label(storageos.VolumeName, fldPath.Child("volumeName"))...)
+		allErrs = append(allErrs, validate.DNS1123Label(storageos.VolumeName, fldPath.Child("volumeName"))...)
 	}
 	if len(storageos.VolumeNamespace) > 0 {
-		allErrs = append(allErrs, ValidateDNS1123Label(storageos.VolumeNamespace, fldPath.Child("volumeNamespace"))...)
+		allErrs = append(allErrs, validate.DNS1123Label(storageos.VolumeNamespace, fldPath.Child("volumeNamespace"))...)
 	}
 	if storageos.SecretRef != nil {
 		if len(storageos.SecretRef.Name) == 0 {
@@ -1428,10 +1346,10 @@ func validateStorageOSPersistentVolumeSource(storageos *core.StorageOSPersistent
 	if len(storageos.VolumeName) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeName"), ""))
 	} else {
-		allErrs = append(allErrs, ValidateDNS1123Label(storageos.VolumeName, fldPath.Child("volumeName"))...)
+		allErrs = append(allErrs, validate.DNS1123Label(storageos.VolumeName, fldPath.Child("volumeName"))...)
 	}
 	if len(storageos.VolumeNamespace) > 0 {
-		allErrs = append(allErrs, ValidateDNS1123Label(storageos.VolumeNamespace, fldPath.Child("volumeNamespace"))...)
+		allErrs = append(allErrs, validate.DNS1123Label(storageos.VolumeNamespace, fldPath.Child("volumeNamespace"))...)
 	}
 	if storageos.SecretRef != nil {
 		if len(storageos.SecretRef.Name) == 0 {
@@ -1496,7 +1414,7 @@ func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
 	capPath := specPath.Child("capacity")
 	for r, qty := range pv.Spec.Capacity {
 		allErrs = append(allErrs, validateBasicResource(qty, capPath.Key(string(r)))...)
-		allErrs = append(allErrs, ValidatePositiveQuantityValue(qty, capPath.Key(string(r)))...)
+		allErrs = append(allErrs, validate.PositiveQuantity(qty, capPath.Key(string(r)))...)
 	}
 	if len(string(pv.Spec.PersistentVolumeReclaimPolicy)) > 0 {
 		if !supportedReclaimPolicy.Has(string(pv.Spec.PersistentVolumeReclaimPolicy)) {
@@ -1732,7 +1650,7 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume) field.E
 	newPv.Status = oldPv.Status
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.VolumeMode, oldPv.Spec.VolumeMode, field.NewPath("volumeMode"))...)
+		allErrs = append(allErrs, validate.Immutable(newPv.Spec.VolumeMode, oldPv.Spec.VolumeMode, field.NewPath("volumeMode"))...)
 	}
 
 	return allErrs
@@ -1775,7 +1693,7 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 		allErrs = append(allErrs, field.Required(fldPath.Child("resources").Key(string(core.ResourceStorage)), ""))
 	} else {
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(core.ResourceStorage), storageValue, fldPath.Child("resources").Key(string(core.ResourceStorage)))...)
-		allErrs = append(allErrs, ValidatePositiveQuantityValue(storageValue, fldPath.Child("resources").Key(string(core.ResourceStorage)))...)
+		allErrs = append(allErrs, validate.PositiveQuantity(storageValue, fldPath.Child("resources").Key(string(core.ResourceStorage)))...)
 	}
 
 	if spec.StorageClassName != nil && len(*spec.StorageClassName) > 0 {
@@ -1832,10 +1750,10 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 
 	// storageclass annotation should be immutable after creation
 	// TODO: remove Beta when no longer needed
-	allErrs = append(allErrs, ValidateImmutableAnnotation(newPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], oldPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], v1.BetaStorageClassAnnotation, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, validate.Immutable(newPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], oldPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], field.NewPath("metadata", "annotations").Key(v1.BetaStorageClassAnnotation))...)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		allErrs = append(allErrs, ValidateImmutableField(newPvc.Spec.VolumeMode, oldPvc.Spec.VolumeMode, field.NewPath("volumeMode"))...)
+		allErrs = append(allErrs, validate.Immutable(newPvc.Spec.VolumeMode, oldPvc.Spec.VolumeMode, field.NewPath("volumeMode"))...)
 	}
 
 	newPvc.Status = oldPvc.Status
@@ -2115,7 +2033,7 @@ func validateContainerResourceDivisor(rName string, divisor resource.Quantity, f
 func validateConfigMapKeySelector(s *core.ConfigMapKeySelector, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	nameFn := ValidateNameFunc(ValidateSecretName)
+	nameFn := validate.NameValidator(ValidateSecretName)
 	for _, msg := range nameFn(s.Name, false) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), s.Name, msg))
 	}
@@ -2133,7 +2051,7 @@ func validateConfigMapKeySelector(s *core.ConfigMapKeySelector, fldPath *field.P
 func validateSecretKeySelector(s *core.SecretKeySelector, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	nameFn := ValidateNameFunc(ValidateSecretName)
+	nameFn := validate.NameValidator(ValidateSecretName)
 	for _, msg := range nameFn(s.Name, false) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), s.Name, msg))
 	}
@@ -2269,11 +2187,11 @@ func validateProbe(probe *core.Probe, fldPath *field.Path) field.ErrorList {
 	}
 	allErrs = append(allErrs, validateHandler(&probe.Handler, fldPath)...)
 
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.InitialDelaySeconds), fldPath.Child("initialDelaySeconds"))...)
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.TimeoutSeconds), fldPath.Child("timeoutSeconds"))...)
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.PeriodSeconds), fldPath.Child("periodSeconds"))...)
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.SuccessThreshold), fldPath.Child("successThreshold"))...)
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.FailureThreshold), fldPath.Child("failureThreshold"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(probe.InitialDelaySeconds), fldPath.Child("initialDelaySeconds"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(probe.TimeoutSeconds), fldPath.Child("timeoutSeconds"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(probe.PeriodSeconds), fldPath.Child("periodSeconds"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(probe.SuccessThreshold), fldPath.Child("successThreshold"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(probe.FailureThreshold), fldPath.Child("failureThreshold"))...)
 	return allErrs
 }
 
@@ -2291,15 +2209,16 @@ func validateClientIPAffinityConfig(config *core.SessionAffinityConfig, fldPath 
 		allErrs = append(allErrs, field.Required(fldPath.Child("clientIP").Child("timeoutSeconds"), fmt.Sprintf("when session affinity type is %s", core.ServiceAffinityClientIP)))
 		return allErrs
 	}
-	allErrs = append(allErrs, validateAffinityTimeout(config.ClientIP.TimeoutSeconds, fldPath.Child("clientIP").Child("timeoutSeconds"))...)
+	allErrs = append(allErrs, validateAffinityTimeout(*config.ClientIP.TimeoutSeconds, fldPath.Child("clientIP").Child("timeoutSeconds"))...)
 
 	return allErrs
 }
 
-func validateAffinityTimeout(timeout *int32, fldPath *field.Path) field.ErrorList {
+func validateAffinityTimeout(timeout int32, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if *timeout <= 0 || *timeout > core.MaxClientIPServiceAffinitySeconds {
-		allErrs = append(allErrs, field.Invalid(fldPath, timeout, fmt.Sprintf("must be greater than 0 and less than %d", core.MaxClientIPServiceAffinitySeconds)))
+	allErrs = append(allErrs, validate.Positive(int64(timeout), fldPath)...)
+	if timeout > core.MaxClientIPServiceAffinitySeconds {
+		allErrs = append(allErrs, field.Invalid(fldPath, timeout, fmt.Sprintf("must be less than or equal to %d", core.MaxClientIPServiceAffinitySeconds)))
 	}
 	return allErrs
 }
@@ -2492,7 +2411,7 @@ func validateContainers(containers []core.Container, volumes map[string]core.Vol
 		if len(ctr.Name) == 0 {
 			allErrs = append(allErrs, field.Required(namePath, ""))
 		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(ctr.Name, namePath)...)
+			allErrs = append(allErrs, validate.DNS1123Label(ctr.Name, namePath)...)
 		}
 		if allNames.Has(ctr.Name) {
 			allErrs = append(allErrs, field.Duplicate(namePath, ctr.Name))
@@ -2620,7 +2539,7 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("searches"), dnsConfig.Searches, "must not have more than 256 characters (including spaces) in the search list"))
 		}
 		for i, search := range dnsConfig.Searches {
-			allErrs = append(allErrs, ValidateDNS1123Subdomain(search, fldPath.Child("searches").Index(i))...)
+			allErrs = append(allErrs, validate.DNS1123Subdomain(search, fldPath.Child("searches").Index(i))...)
 		}
 		// Validate options.
 		for i, option := range dnsConfig.Options {
@@ -2747,7 +2666,7 @@ func ValidateHostAliases(hostAliases []core.HostAlias, fldPath *field.Path) fiel
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), hostAlias.IP, "must be valid IP address"))
 		}
 		for _, hostname := range hostAlias.Hostnames {
-			allErrs = append(allErrs, ValidateDNS1123Subdomain(hostname, fldPath.Child("hostnames"))...)
+			allErrs = append(allErrs, validate.DNS1123Subdomain(hostname, fldPath.Child("hostnames"))...)
 		}
 	}
 	return allErrs
@@ -2896,18 +2815,15 @@ func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	}
 
 	if spec.ActiveDeadlineSeconds != nil {
-		value := *spec.ActiveDeadlineSeconds
-		if value < 1 || value > math.MaxInt32 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("activeDeadlineSeconds"), value, validation.InclusiveRangeError(1, math.MaxInt32)))
-		}
+		allErrs = append(allErrs, validate.InRange(*spec.ActiveDeadlineSeconds, 1, math.MaxInt32, fldPath.Child("activeDeadlineSeconds"))...)
 	}
 
 	if len(spec.Hostname) > 0 {
-		allErrs = append(allErrs, ValidateDNS1123Label(spec.Hostname, fldPath.Child("hostname"))...)
+		allErrs = append(allErrs, validate.DNS1123Label(spec.Hostname, fldPath.Child("hostname"))...)
 	}
 
 	if len(spec.Subdomain) > 0 {
-		allErrs = append(allErrs, ValidateDNS1123Label(spec.Subdomain, fldPath.Child("subdomain"))...)
+		allErrs = append(allErrs, validate.DNS1123Label(spec.Subdomain, fldPath.Child("subdomain"))...)
 	}
 
 	if len(spec.Tolerations) > 0 {
@@ -3292,8 +3208,8 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod) field.ErrorList {
 	// 2.  from a positive value to a lesser, non-negative value
 	if newPod.Spec.ActiveDeadlineSeconds != nil {
 		newActiveDeadlineSeconds := *newPod.Spec.ActiveDeadlineSeconds
-		if newActiveDeadlineSeconds < 0 || newActiveDeadlineSeconds > math.MaxInt32 {
-			allErrs = append(allErrs, field.Invalid(specPath.Child("activeDeadlineSeconds"), newActiveDeadlineSeconds, validation.InclusiveRangeError(0, math.MaxInt32)))
+		if newErrs := validate.InRange(newActiveDeadlineSeconds, 0, math.MaxInt32, specPath.Child("activeDeadlineSeconds")); len(newErrs) > 0 {
+			allErrs = append(allErrs, newErrs...)
 			return allErrs
 		}
 		if oldPod.Spec.ActiveDeadlineSeconds != nil {
@@ -3429,7 +3345,7 @@ func ValidateService(service *core.Service) field.ErrorList {
 			allErrs = append(allErrs, field.Forbidden(specPath.Child("clusterIP"), "must be empty for ExternalName services"))
 		}
 		if len(service.Spec.ExternalName) > 0 {
-			allErrs = append(allErrs, ValidateDNS1123Subdomain(service.Spec.ExternalName, specPath.Child("externalName"))...)
+			allErrs = append(allErrs, validate.DNS1123Subdomain(service.Spec.ExternalName, specPath.Child("externalName"))...)
 		} else {
 			allErrs = append(allErrs, field.Required(specPath.Child("externalName"), ""))
 		}
@@ -3574,7 +3490,7 @@ func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService bo
 	if requireName && len(sp.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	} else if len(sp.Name) != 0 {
-		allErrs = append(allErrs, ValidateDNS1123Label(sp.Name, fldPath.Child("name"))...)
+		allErrs = append(allErrs, validate.DNS1123Label(sp.Name, fldPath.Child("name"))...)
 		if allNames.Has(sp.Name) {
 			allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), sp.Name))
 		} else {
@@ -3657,7 +3573,7 @@ func ValidateServiceUpdate(service, oldService *core.Service) field.ErrorList {
 	// which do not have ClusterIP assigned yet (empty string value)
 	if service.Spec.Type != core.ServiceTypeExternalName {
 		if oldService.Spec.Type != core.ServiceTypeExternalName && oldService.Spec.ClusterIP != "" {
-			allErrs = append(allErrs, ValidateImmutableField(service.Spec.ClusterIP, oldService.Spec.ClusterIP, field.NewPath("spec", "clusterIP"))...)
+			allErrs = append(allErrs, validate.Immutable(service.Spec.ClusterIP, oldService.Spec.ClusterIP, field.NewPath("spec", "clusterIP"))...)
 		}
 	}
 
@@ -3695,11 +3611,11 @@ func ValidateReplicationControllerStatusUpdate(controller, oldController *core.R
 
 func ValidateReplicationControllerStatus(status core.ReplicationControllerStatus, statusPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(status.Replicas), statusPath.Child("replicas"))...)
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(status.FullyLabeledReplicas), statusPath.Child("fullyLabeledReplicas"))...)
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(status.ReadyReplicas), statusPath.Child("readyReplicas"))...)
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(status.AvailableReplicas), statusPath.Child("availableReplicas"))...)
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(status.ObservedGeneration), statusPath.Child("observedGeneration"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(status.Replicas), statusPath.Child("replicas"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(status.FullyLabeledReplicas), statusPath.Child("fullyLabeledReplicas"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(status.ReadyReplicas), statusPath.Child("readyReplicas"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(status.AvailableReplicas), statusPath.Child("availableReplicas"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(status.ObservedGeneration), statusPath.Child("observedGeneration"))...)
 	msg := "cannot be greater than status.replicas"
 	if status.FullyLabeledReplicas > status.Replicas {
 		allErrs = append(allErrs, field.Invalid(statusPath.Child("fullyLabeledReplicas"), status.FullyLabeledReplicas, msg))
@@ -3758,9 +3674,9 @@ func ValidatePodTemplateSpecForRC(template *core.PodTemplateSpec, selectorMap ma
 // ValidateReplicationControllerSpec tests if required fields in the replication controller spec are set.
 func ValidateReplicationControllerSpec(spec *core.ReplicationControllerSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
 	allErrs = append(allErrs, ValidateNonEmptySelector(spec.Selector, fldPath.Child("selector"))...)
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
+	allErrs = append(allErrs, validate.NonNegative(int64(spec.Replicas), fldPath.Child("replicas"))...)
 	allErrs = append(allErrs, ValidatePodTemplateSpecForRC(spec.Template, spec.Selector, spec.Replicas, fldPath.Child("template"))...)
 	return allErrs
 }
@@ -4310,7 +4226,7 @@ func ValidateSecretUpdate(newSecret, oldSecret *core.Secret) field.ErrorList {
 		newSecret.Type = oldSecret.Type
 	}
 
-	allErrs = append(allErrs, ValidateImmutableField(newSecret.Type, oldSecret.Type, field.NewPath("type"))...)
+	allErrs = append(allErrs, validate.Immutable(newSecret.Type, oldSecret.Type, field.NewPath("type"))...)
 
 	allErrs = append(allErrs, ValidateSecret(newSecret)...)
 	return allErrs
@@ -4483,7 +4399,7 @@ func ValidateResourceQuotaSpec(resourceQuotaSpec *core.ResourceQuotaSpec, fld *f
 // ValidateResourceQuantityValue enforces that specified quantity is valid for specified resource
 func ValidateResourceQuantityValue(resource string, value resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateNonnegativeQuantity(value, fldPath)...)
+	allErrs = append(allErrs, validate.NonNegativeQuantity(value, fldPath)...)
 	if helper.IsIntegerResourceName(resource) {
 		if value.MilliValue()%int64(1000) != int64(0) {
 			allErrs = append(allErrs, field.Invalid(fldPath, value, isNotIntegerErrorMsg))
@@ -4508,9 +4424,7 @@ func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *core.Resour
 	for _, scope := range oldResourceQuota.Spec.Scopes {
 		oldScopes.Insert(string(scope))
 	}
-	if !oldScopes.Equal(newScopes) {
-		allErrs = append(allErrs, field.Invalid(fldPath, newResourceQuota.Spec.Scopes, fieldImmutableErrorMsg))
-	}
+	allErrs = append(allErrs, validate.Immutable(oldScopes, newScopes, fldPath)...)
 
 	newResourceQuota.Status = oldResourceQuota.Status
 	return allErrs
@@ -4683,7 +4597,7 @@ func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path,
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), address.IP, msg))
 	}
 	if len(address.Hostname) > 0 {
-		allErrs = append(allErrs, ValidateDNS1123Label(address.Hostname, fldPath.Child("hostname"))...)
+		allErrs = append(allErrs, validate.DNS1123Label(address.Hostname, fldPath.Child("hostname"))...)
 	}
 	// During endpoint update, verify that NodeName is a DNS subdomain and transition rules allow the update
 	if address.NodeName != nil {
@@ -4730,7 +4644,7 @@ func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *fi
 	if requireName && len(port.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	} else if len(port.Name) != 0 {
-		allErrs = append(allErrs, ValidateDNS1123Label(port.Name, fldPath.Child("name"))...)
+		allErrs = append(allErrs, validate.DNS1123Label(port.Name, fldPath.Child("name"))...)
 	}
 	for _, msg := range validation.IsValidPortNum(int(port.Port)) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("port"), port.Port, msg))
@@ -4766,9 +4680,7 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path) fiel
 	}
 
 	if sc.RunAsUser != nil {
-		if *sc.RunAsUser < 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("runAsUser"), *sc.RunAsUser, isNegativeErrorMsg))
-		}
+		allErrs = append(allErrs, validate.NonNegative(int64(*sc.RunAsUser), fldPath.Child("runAsUser"))...)
 	}
 
 	if sc.AllowPrivilegeEscalation != nil && !*sc.AllowPrivilegeEscalation {
@@ -4790,19 +4702,17 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path) fiel
 
 func ValidatePodLogOptions(opts *core.PodLogOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if opts.TailLines != nil && *opts.TailLines < 0 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("tailLines"), *opts.TailLines, isNegativeErrorMsg))
+	if opts.TailLines != nil {
+		allErrs = append(allErrs, validate.NonNegative(int64(*opts.TailLines), field.NewPath("tailLines"))...)
 	}
-	if opts.LimitBytes != nil && *opts.LimitBytes < 1 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("limitBytes"), *opts.LimitBytes, "must be greater than 0"))
+	if opts.LimitBytes != nil {
+		allErrs = append(allErrs, validate.Positive(int64(*opts.LimitBytes), field.NewPath("limitBytes"))...)
 	}
 	switch {
 	case opts.SinceSeconds != nil && opts.SinceTime != nil:
 		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "at most one of `sinceTime` or `sinceSeconds` may be specified"))
 	case opts.SinceSeconds != nil:
-		if *opts.SinceSeconds < 1 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("sinceSeconds"), *opts.SinceSeconds, "must be greater than 0"))
-		}
+		allErrs = append(allErrs, validate.Positive(int64(*opts.SinceSeconds), field.NewPath("sinceSeconds"))...)
 	}
 	return allErrs
 }
