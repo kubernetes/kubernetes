@@ -550,7 +550,10 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 	podUID := string(pod.UID)
 	contName := container.Name
 	allocatedDevicesUpdated := false
-	for k, v := range container.Resources.Limits {
+	// NOTE: Skipping the Resources.Limits is safe here because:
+	// 1. If container Spec mentions Limits only, implicitly Requests, equal to Limits, will get added to the Spec.
+	// 2. If container Spec mentions Limits, which are greater than or less than Requests, will fail at validation.
+	for k, v := range container.Resources.Requests {
 		resource := string(k)
 		needed := int(v.Value())
 		glog.V(3).Infof("needs %d %s", needed, resource)
