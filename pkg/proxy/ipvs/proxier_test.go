@@ -18,6 +18,7 @@ package ipvs
 
 import (
 	"bytes"
+	"fmt"
 	"net"
 	"reflect"
 	"testing"
@@ -85,6 +86,25 @@ func (fake *fakeHealthChecker) SyncServices(newServices map[types.NamespacedName
 func (fake *fakeHealthChecker) SyncEndpoints(newEndpoints map[types.NamespacedName]int) error {
 	fake.Endpoints = newEndpoints
 	return nil
+}
+
+// fakeKernelHandler implements KernelHandler.
+type fakeKernelHandler struct {
+	modules []string
+}
+
+func (fake *fakeKernelHandler) GetModules() ([]string, error) {
+	return fake.modules, nil
+}
+
+// fakeKernelHandler implements KernelHandler.
+type fakeIPSetVersioner struct {
+	version string
+	err     error
+}
+
+func (fake *fakeIPSetVersioner) GetVersion() (string, error) {
+	return fake.version, fake.err
 }
 
 func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset utilipset.Interface, nodeIPs []net.IP) *Proxier {
@@ -178,6 +198,70 @@ func makeTestEndpoints(namespace, name string, eptFunc func(*api.Endpoints)) *ap
 	}
 	eptFunc(ept)
 	return ept
+}
+
+func TestCanUseIPVSProxier(t *testing.T) {
+	testCases := []struct {
+		mods         []string
+		kernelErr    error
+		ipsetVersion string
+		ipsetErr     error
+		ok           bool
+	}{
+		// case 0, kernel error
+		{
+			mods:         []string{"foo", "bar", "baz"},
+			kernelErr:    fmt.Errorf("oops"),
+			ipsetVersion: "0.0",
+			ok:           false,
+		},
+		// case 1, ipset error
+		{
+			mods:         []string{"foo", "bar", "baz"},
+			ipsetVersion: MinIPSetCheckVersion,
+			ipsetErr:     fmt.Errorf("oops"),
+			ok:           false,
+		},
+		// case 2, missing required kernel modules and ipset version too low
+		{
+			mods:         []string{"foo", "bar", "baz"},
+			ipsetVersion: "1.1",
+			ok:           false,
+		},
+		// case 3, missing required ip_vs_* kernel modules
+		{
+			mods:         []string{"ip_vs", "a", "bc", "def"},
+			ipsetVersion: MinIPSetCheckVersion,
+			ok:           false,
+		},
+		// case 4, ipset version too low
+		{
+			mods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4"},
+			ipsetVersion: "4.3.0",
+			ok:           false,
+		},
+		// case 5
+		{
+			mods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4"},
+			ipsetVersion: MinIPSetCheckVersion,
+			ok:           true,
+		},
+		// case 6
+		{
+			mods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4", "foo", "bar"},
+			ipsetVersion: "6.19",
+			ok:           true,
+		},
+	}
+
+	for i := range testCases {
+		handle := &fakeKernelHandler{modules: testCases[i].mods}
+		versioner := &fakeIPSetVersioner{version: testCases[i].ipsetVersion, err: testCases[i].ipsetErr}
+		ok, _ := CanUseIPVSProxier(handle, versioner)
+		if ok != testCases[i].ok {
+			t.Errorf("Case [%d], expect %v, got %v", i, testCases[i].ok, ok)
+		}
+	}
 }
 
 func TestNodePort(t *testing.T) {

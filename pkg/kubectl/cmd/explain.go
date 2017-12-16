@@ -129,5 +129,5 @@ func RunExplain(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, ar
 		return fmt.Errorf("Couldn't find resource for %q", gvk)
 	}
 
-	return explain.PrintModelDescription(fieldsPath, out, schema, recursive)
+	return explain.PrintModelDescription(fieldsPath, out, schema, gvk, recursive)
 }

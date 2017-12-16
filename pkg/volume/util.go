@@ -38,6 +38,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+const (
+	// GB - GigaByte size
+	GB = 1000 * 1000 * 1000
+	// GIB - GibiByte size
+	GIB = 1024 * 1024 * 1024
+)
+
 type RecycleEventRecorder func(eventtype, message string)
 
 // RecycleVolumeByWatchingPodUntilCompletion is intended for use with volume
@@ -286,6 +293,18 @@ func CalculateTimeoutForVolume(minimumTimeout, timeoutIncrement int, pv *v1.Pers
 // (2 GiB is the smallest allocatable volume that can hold 1500MiB)
 func RoundUpSize(volumeSizeBytes int64, allocationUnitBytes int64) int64 {
 	return (volumeSizeBytes + allocationUnitBytes - 1) / allocationUnitBytes
+}
+
+// RoundUpToGB rounds up given quantity to chunks of GB
+func RoundUpToGB(size resource.Quantity) int64 {
+	requestBytes := size.Value()
+	return RoundUpSize(requestBytes, GB)
+}
+
+// RoundUpToGiB rounds up given quantity upto chunks of GiB
+func RoundUpToGiB(size resource.Quantity) int64 {
+	requestBytes := size.Value()
+	return RoundUpSize(requestBytes, GIB)
 }
 
 // GenerateVolumeName returns a PV name with clusterName prefix. The function

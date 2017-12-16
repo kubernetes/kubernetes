@@ -64,7 +64,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		// Since disruptionAllowed starts out 0, if we see it ever become positive,
 		// that means the controller is working.
 		err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-			pdb, err := cs.Policy().PodDisruptionBudgets(ns).Get("foo", metav1.GetOptions{})
+			pdb, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Get("foo", metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -226,7 +226,7 @@ func createPDBMinAvailableOrDie(cs kubernetes.Interface, ns string, minAvailable
 			MinAvailable: &minAvailable,
 		},
 	}
-	_, err := cs.Policy().PodDisruptionBudgets(ns).Create(&pdb)
+	_, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Create(&pdb)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -241,7 +241,7 @@ func createPDBMaxUnavailableOrDie(cs kubernetes.Interface, ns string, maxUnavail
 			MaxUnavailable: &maxUnavailable,
 		},
 	}
-	_, err := cs.Policy().PodDisruptionBudgets(ns).Create(&pdb)
+	_, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Create(&pdb)
 	Expect(err).NotTo(HaveOccurred())
 }
 

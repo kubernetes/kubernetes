@@ -24,6 +24,7 @@ import (
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	. "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
@@ -175,4 +176,39 @@ func (f FakeStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (sss []*apps.Stat
 		err = fmt.Errorf("Could not find StatefulSet for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
+}
+
+// FakePersistentVolumeClaimLister implements PersistentVolumeClaimLister on []*v1.PersistentVolumeClaim for test purposes.
+type FakePersistentVolumeClaimLister []*v1.PersistentVolumeClaim
+
+var _ corelisters.PersistentVolumeClaimLister = FakePersistentVolumeClaimLister{}
+
+func (f FakePersistentVolumeClaimLister) List(selector labels.Selector) (ret []*v1.PersistentVolumeClaim, err error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (f FakePersistentVolumeClaimLister) PersistentVolumeClaims(namespace string) corelisters.PersistentVolumeClaimNamespaceLister {
+	return &fakePersistentVolumeClaimNamespaceLister{
+		pvcs:      f,
+		namespace: namespace,
+	}
+}
+
+// fakePersistentVolumeClaimNamespaceLister is implementation of PersistentVolumeClaimNamespaceLister returned by List() above.
+type fakePersistentVolumeClaimNamespaceLister struct {
+	pvcs      []*v1.PersistentVolumeClaim
+	namespace string
+}
+
+func (f *fakePersistentVolumeClaimNamespaceLister) Get(name string) (*v1.PersistentVolumeClaim, error) {
+	for _, pvc := range f.pvcs {
+		if pvc.Name == name && pvc.Namespace == f.namespace {
+			return pvc, nil
+		}
+	}
+	return nil, fmt.Errorf("persistentvolumeclaim %q not found", name)
+}
+
+func (f fakePersistentVolumeClaimNamespaceLister) List(selector labels.Selector) (ret []*v1.PersistentVolumeClaim, err error) {
+	return nil, fmt.Errorf("not implemented")
 }

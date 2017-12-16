@@ -542,6 +542,12 @@ func resourcePodSpec(nodeName, memory, cpu string) v1.PodSpec {
 	}
 }
 
+func resourceContainerSpec(memory, cpu string) v1.ResourceRequirements {
+	return v1.ResourceRequirements{
+		Requests: allocatableResources(memory, cpu),
+	}
+}
+
 func resourcePodSpecWithoutNodeName(memory, cpu string) v1.PodSpec {
 	return v1.PodSpec{
 		Containers: []v1.Container{{
@@ -1538,6 +1544,7 @@ func setDaemonSetCritical(ds *extensions.DaemonSet) {
 
 func TestNodeShouldRunDaemonPod(t *testing.T) {
 	cases := []struct {
+		predicateName                                    string
 		podsOnNode                                       []*v1.Pod
 		nodeCondition                                    []v1.NodeCondition
 		ds                                               *extensions.DaemonSet
@@ -1545,6 +1552,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 		err                                              error
 	}{
 		{
+			predicateName: "ShouldRunDaemonPod",
 			ds: &extensions.DaemonSet{
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
@@ -1561,6 +1569,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			shouldContinueRunning: true,
 		},
 		{
+			predicateName: "InsufficientResourceError",
 			ds: &extensions.DaemonSet{
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
@@ -1577,6 +1586,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			shouldContinueRunning: true,
 		},
 		{
+			predicateName: "ErrPodNotMatchHostName",
 			ds: &extensions.DaemonSet{
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
@@ -1593,6 +1603,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			shouldContinueRunning: false,
 		},
 		{
+			predicateName: "ErrPodNotFitsHostPorts",
 			podsOnNode: []*v1.Pod{
 				{
 					Spec: v1.PodSpec{
@@ -1625,11 +1636,177 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			shouldSchedule:        false,
 			shouldContinueRunning: false,
 		},
+		{
+			predicateName: "InsufficientResourceError",
+			podsOnNode: []*v1.Pod{
+				{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{{
+							Ports: []v1.ContainerPort{{
+								HostPort: 666,
+							}},
+							Resources: resourceContainerSpec("50M", "0.5"),
+						}},
+					},
+				},
+			},
+			ds: &extensions.DaemonSet{
+				Spec: extensions.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: simpleDaemonSetLabel,
+						},
+						Spec: resourcePodSpec("", "100M", "0.5"),
+					},
+				},
+			},
+			wantToRun:             true,
+			shouldSchedule:        false,
+			shouldContinueRunning: true,
+		},
+		{
+			predicateName: "ShouldRunDaemonPod",
+			podsOnNode: []*v1.Pod{
+				{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{{
+							Ports: []v1.ContainerPort{{
+								HostPort: 666,
+							}},
+							Resources: resourceContainerSpec("50M", "0.5"),
+						}},
+					},
+				},
+			},
+			ds: &extensions.DaemonSet{
+				Spec: extensions.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: simpleDaemonSetLabel,
+						},
+						Spec: resourcePodSpec("", "50M", "0.5"),
+					},
+				},
+			},
+			wantToRun:             true,
+			shouldSchedule:        true,
+			shouldContinueRunning: true,
+		},
+		{
+			predicateName: "ErrNodeSelectorNotMatch",
+			ds: &extensions.DaemonSet{
+				Spec: extensions.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: simpleDaemonSetLabel,
+						},
+						Spec: v1.PodSpec{
+							NodeSelector: simpleDaemonSetLabel2,
+						},
+					},
+				},
+			},
+			wantToRun:             false,
+			shouldSchedule:        false,
+			shouldContinueRunning: false,
+		},
+		{
+			predicateName: "ShouldRunDaemonPod",
+			ds: &extensions.DaemonSet{
+				Spec: extensions.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: simpleDaemonSetLabel,
+						},
+						Spec: v1.PodSpec{
+							NodeSelector: simpleDaemonSetLabel,
+						},
+					},
+				},
+			},
+			wantToRun:             true,
+			shouldSchedule:        true,
+			shouldContinueRunning: true,
+		},
+		{
+			predicateName: "ErrPodAffinityNotMatch",
+			ds: &extensions.DaemonSet{
+				Spec: extensions.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: simpleDaemonSetLabel,
+						},
+						Spec: v1.PodSpec{
+							Affinity: &v1.Affinity{
+								NodeAffinity: &v1.NodeAffinity{
+									RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+										NodeSelectorTerms: []v1.NodeSelectorTerm{
+											{
+												MatchExpressions: []v1.NodeSelectorRequirement{
+													{
+														Key:      "type",
+														Operator: v1.NodeSelectorOpIn,
+														Values:   []string{"test"},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantToRun:             false,
+			shouldSchedule:        false,
+			shouldContinueRunning: false,
+		},
+		{
+			predicateName: "ShouldRunDaemonPod",
+			ds: &extensions.DaemonSet{
+				Spec: extensions.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: simpleDaemonSetLabel,
+						},
+						Spec: v1.PodSpec{
+							Affinity: &v1.Affinity{
+								NodeAffinity: &v1.NodeAffinity{
+									RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+										NodeSelectorTerms: []v1.NodeSelectorTerm{
+											{
+												MatchExpressions: []v1.NodeSelectorRequirement{
+													{
+														Key:      "type",
+														Operator: v1.NodeSelectorOpIn,
+														Values:   []string{"production"},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantToRun:             true,
+			shouldSchedule:        true,
+			shouldContinueRunning: true,
+		},
 	}
 
 	for i, c := range cases {
 		for _, strategy := range updateStrategies() {
-			node := newNode("test-node", nil)
+			node := newNode("test-node", simpleDaemonSetLabel)
 			node.Status.Conditions = append(node.Status.Conditions, c.nodeCondition...)
 			node.Status.Allocatable = allocatableResources("100M", "1")
 			manager, _, _, err := newTestController()
@@ -1645,16 +1822,16 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			wantToRun, shouldSchedule, shouldContinueRunning, err := manager.nodeShouldRunDaemonPod(node, c.ds)
 
 			if wantToRun != c.wantToRun {
-				t.Errorf("[%v] expected wantToRun: %v, got: %v", i, c.wantToRun, wantToRun)
+				t.Errorf("[%v] strategy: %v, predicateName: %v expected wantToRun: %v, got: %v", i, c.ds.Spec.UpdateStrategy.Type, c.predicateName, c.wantToRun, wantToRun)
 			}
 			if shouldSchedule != c.shouldSchedule {
-				t.Errorf("[%v] expected shouldSchedule: %v, got: %v", i, c.shouldSchedule, shouldSchedule)
+				t.Errorf("[%v] strategy: %v, predicateName: %v expected shouldSchedule: %v, got: %v", i, c.ds.Spec.UpdateStrategy.Type, c.predicateName, c.shouldSchedule, shouldSchedule)
 			}
 			if shouldContinueRunning != c.shouldContinueRunning {
-				t.Errorf("[%v] expected shouldContinueRunning: %v, got: %v", i, c.shouldContinueRunning, shouldContinueRunning)
+				t.Errorf("[%v] strategy: %v, predicateName: %v expected shouldContinueRunning: %v, got: %v", i, c.ds.Spec.UpdateStrategy.Type, c.predicateName, c.shouldContinueRunning, shouldContinueRunning)
 			}
 			if err != c.err {
-				t.Errorf("[%v] expected err: %v, got: %v", i, c.err, err)
+				t.Errorf("[%v] strategy: %v, predicateName: %v expected err: %v, got: %v", i, c.predicateName, c.ds.Spec.UpdateStrategy.Type, c.err, err)
 			}
 		}
 	}

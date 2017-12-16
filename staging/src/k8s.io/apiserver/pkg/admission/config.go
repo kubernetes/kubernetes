@@ -17,6 +17,7 @@ limitations under the License.
 package admission
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -26,8 +27,6 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
-
-	"bytes"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -151,8 +150,8 @@ func GetAdmissionPluginConfigurationFor(pluginCfg apiserver.AdmissionPluginConfi
 	return nil, nil
 }
 
-// GetAdmissionPluginConfiguration takes the admission configuration and returns a reader
-// for the specified plugin.  If no specific configuration is present, we return a nil reader.
+// ConfigFor returns a reader for the specified plugin.
+// If no specific configuration is present, we return a nil reader.
 func (p configProvider) ConfigFor(pluginName string) (io.Reader, error) {
 	// there is no config, so there is no potential config
 	if p.config == nil {

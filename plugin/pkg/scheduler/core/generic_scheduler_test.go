@@ -186,6 +186,7 @@ func TestGenericScheduler(t *testing.T) {
 		predicates    map[string]algorithm.FitPredicate
 		prioritizers  []algorithm.PriorityConfig
 		nodes         []string
+		pvcs          []*v1.PersistentVolumeClaim
 		pod           *v1.Pod
 		pods          []*v1.Pod
 		expectedHosts sets.String
@@ -300,6 +301,77 @@ func TestGenericScheduler(t *testing.T) {
 				},
 			},
 		},
+		{
+			// Pod with existing PVC
+			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
+			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
+			nodes:        []string{"machine1", "machine2"},
+			pvcs:         []*v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC"}}},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "ignore"},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							VolumeSource: v1.VolumeSource{
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "existingPVC",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedHosts: sets.NewString("machine1", "machine2"),
+			name:          "existing PVC",
+			wErr:          nil,
+		},
+		{
+			// Pod with non existing PVC
+			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
+			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
+			nodes:        []string{"machine1", "machine2"},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "ignore"},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							VolumeSource: v1.VolumeSource{
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "unknownPVC",
+								},
+							},
+						},
+					},
+				},
+			},
+			name:       "unknown PVC",
+			expectsErr: true,
+			wErr:       fmt.Errorf("persistentvolumeclaim \"unknownPVC\" not found"),
+		},
+		{
+			// Pod with deleting PVC
+			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
+			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
+			nodes:        []string{"machine1", "machine2"},
+			pvcs:         []*v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", DeletionTimestamp: &metav1.Time{}}}},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "ignore"},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							VolumeSource: v1.VolumeSource{
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "existingPVC",
+								},
+							},
+						},
+					},
+				},
+			},
+			name:       "deleted PVC",
+			expectsErr: true,
+			wErr:       fmt.Errorf("persistentvolumeclaim \"existingPVC\" is being deleted"),
+		},
 	}
 	for _, test := range tests {
 		cache := schedulercache.New(time.Duration(0), wait.NeverStop)
@@ -309,9 +381,14 @@ func TestGenericScheduler(t *testing.T) {
 		for _, name := range test.nodes {
 			cache.AddNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}})
 		}
+		pvcs := []*v1.PersistentVolumeClaim{}
+		for _, pvc := range test.pvcs {
+			pvcs = append(pvcs, pvc)
+		}
+		pvcLister := schedulertesting.FakePersistentVolumeClaimLister(pvcs)
 
 		scheduler := NewGenericScheduler(
-			cache, nil, NewSchedulingQueue(), test.predicates, algorithm.EmptyPredicateMetadataProducer, test.prioritizers, algorithm.EmptyMetadataProducer, []algorithm.SchedulerExtender{}, nil)
+			cache, nil, NewSchedulingQueue(), test.predicates, algorithm.EmptyPredicateMetadataProducer, test.prioritizers, algorithm.EmptyMetadataProducer, []algorithm.SchedulerExtender{}, nil, pvcLister)
 		machine, err := scheduler.Schedule(test.pod, schedulertesting.FakeNodeLister(makeNodeList(test.nodes)))
 
 		if !reflect.DeepEqual(err, test.wErr) {
@@ -1190,7 +1267,7 @@ func TestPreempt(t *testing.T) {
 			extenders = append(extenders, extender)
 		}
 		scheduler := NewGenericScheduler(
-			cache, nil, NewSchedulingQueue(), map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources}, algorithm.EmptyPredicateMetadataProducer, []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}}, algorithm.EmptyMetadataProducer, extenders, nil)
+			cache, nil, NewSchedulingQueue(), map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources}, algorithm.EmptyPredicateMetadataProducer, []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}}, algorithm.EmptyMetadataProducer, extenders, nil, schedulertesting.FakePersistentVolumeClaimLister{})
 		// Call Preempt and check the expected results.
 		node, victims, _, err := scheduler.Preempt(test.pod, schedulertesting.FakeNodeLister(makeNodeList(nodeNames)), error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))
 		if err != nil {

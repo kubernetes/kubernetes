@@ -62,8 +62,16 @@ func VisitPVSecretNames(pv *api.PersistentVolume, visitor Visitor) bool {
 			}
 		}
 	case source.FlexVolume != nil:
-		if source.FlexVolume.SecretRef != nil && !visitor(getClaimRefNamespace(pv), source.FlexVolume.SecretRef.Name) {
-			return false
+		if source.FlexVolume.SecretRef != nil {
+			// previously persisted PV objects use claimRef namespace
+			ns := getClaimRefNamespace(pv)
+			if len(source.FlexVolume.SecretRef.Namespace) > 0 {
+				// use the secret namespace if namespace is set
+				ns = source.FlexVolume.SecretRef.Namespace
+			}
+			if !visitor(ns, source.FlexVolume.SecretRef.Name) {
+				return false
+			}
 		}
 	case source.RBD != nil:
 		if source.RBD.SecretRef != nil {

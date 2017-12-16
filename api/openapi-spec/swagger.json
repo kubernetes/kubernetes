@@ -75654,6 +75654,37 @@
      }
     }
    },
+   "io.k8s.api.core.v1.FlexPersistentVolumeSource": {
+    "description": "FlexPersistentVolumeSource represents a generic persistent volume resource that is provisioned/attached using an exec based plugin.",
+    "required": [
+     "driver"
+    ],
+    "properties": {
+     "driver": {
+      "description": "Driver is the name of the driver to use for this volume.",
+      "type": "string"
+     },
+     "fsType": {
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". The default filesystem depends on FlexVolume script.",
+      "type": "string"
+     },
+     "options": {
+      "description": "Optional: Extra command options if any.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
+     },
+     "readOnly": {
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+      "type": "boolean"
+     },
+     "secretRef": {
+      "description": "Optional: SecretRef is reference to the secret object containing sensitive information to pass to the plugin scripts. This may be empty if no secret object is specified. If the secret object contains more than one secret, all secrets are passed to the plugin scripts.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.SecretReference"
+     }
+    }
+   },
    "io.k8s.api.core.v1.FlexVolumeSource": {
     "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin.",
     "required": [
@@ -77007,7 +77038,7 @@
      },
      "flexVolume": {
       "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin.",
-      "$ref": "#/definitions/io.k8s.api.core.v1.FlexVolumeSource"
+      "$ref": "#/definitions/io.k8s.api.core.v1.FlexPersistentVolumeSource"
      },
      "flocker": {
       "description": "Flocker represents a Flocker volume attached to a kubelet's host machine and exposed to the pod for its usage. This depends on the Flocker control service being running",

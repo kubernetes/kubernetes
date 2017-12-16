@@ -2130,8 +2130,8 @@ func (b kubectlBuilder) Exec() (string, error) {
 		if err != nil {
 			var rc int = 127
 			if ee, ok := err.(*exec.ExitError); ok {
-				Logf("rc: %d", rc)
 				rc = int(ee.Sys().(syscall.WaitStatus).ExitStatus())
+				Logf("rc: %d", rc)
 			}
 			return "", uexec.CodeExitError{
 				Err:  fmt.Errorf("error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v\n", cmd, cmd.Stdout, cmd.Stderr, err),
