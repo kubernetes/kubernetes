@@ -63,13 +63,13 @@ nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
 
 
-def set_upgrade_needed():
+def set_upgrade_needed(forced=False):
     set_state('kubernetes-master.upgrade-needed')
     config = hookenv.config()
     previous_channel = config.previous('channel')
     require_manual = config.get('require-manual-upgrade')
     hookenv.log('set upgrade needed')
-    if previous_channel is None or not require_manual:
+    if previous_channel is None or not require_manual or forced:
         hookenv.log('forcing upgrade')
         set_state('kubernetes-master.upgrade-specified')
 
@@ -102,12 +102,39 @@ def check_for_upgrade_needed():
     add_rbac_roles()
     set_state('reconfigure.authentication.setup')
     remove_state('authentication.setup')
+    changed = snap_resources_changed()
+    if changed == 'yes':
+        set_upgrade_needed()
+    elif changed == 'unknown':
+        # We are here on an upgrade from non-rolling master
+        # Since this upgrade might also include resource updates eg
+        # juju upgrade-charm kubernetes-master --resource kube-any=my.snap
+        # we take no risk and forcibly upgrade the snaps.
+        # Forcibly means we do not prompt the user to call the upgrade action.
+        set_upgrade_needed(forced=True)
 
+
+def snap_resources_changed():
+    '''
+    Check if the snapped resources have changed. The first time this method is
+    called will report "unknown".
+
+    Returns: "yes" in case a snap resource file has changed,
+             "no" in case a snap resources are the same as last call,
+             "unknown" if it is the first time this method is called
+
+    '''
+    db = unitdata.kv()
     resources = ['kubectl', 'kube-apiserver', 'kube-controller-manager',
                  'kube-scheduler', 'cdk-addons']
     paths = [hookenv.resource_get(resource) for resource in resources]
-    if any_file_changed(paths):
-        set_upgrade_needed()
+    if db.get('snap.resources.fingerprint.initialised'):
+        result = 'yes' if any_file_changed(paths) else 'no'
+        return result
+    else:
+        db.set('snap.resources.fingerprint.initialised', True)
+        any_file_changed(paths)
+        return 'unknown'
 
 
 def add_rbac_roles():
@@ -222,6 +249,7 @@ def install_snaps():
     snap.install('kube-scheduler', channel=channel)
     hookenv.status_set('maintenance', 'Installing cdk-addons snap')
     snap.install('cdk-addons', channel=channel)
+    snap_resources_changed()
     set_state('kubernetes-master.snaps.installed')
     remove_state('kubernetes-master.components.started')
 
@@ -360,6 +388,7 @@ def set_app_version():
 
 @when('cdk-addons.configured', 'kube-api-endpoint.available',
       'kube-control.connected')
+@when_not('kubernetes-master.upgrade-needed')
 def idle_status(kube_api, kube_control):
     ''' Signal at the end of the run that we are running. '''
     if not all_kube_system_pods_running():
