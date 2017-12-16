@@ -410,7 +410,7 @@ func generate(opts sampleDataOpts) ([]*api.Pod, []*api.PersistentVolume) {
 			for i := 0; i < opts.uniquePVCsPerPod; i++ {
 				pv := &api.PersistentVolume{}
 				pv.Name = fmt.Sprintf("pv%d-%s-%s", i, pod.Name, pod.Namespace)
-				pv.Spec.FlexVolume = &api.FlexVolumeSource{SecretRef: &api.LocalObjectReference{Name: fmt.Sprintf("secret-%s", pv.Name)}}
+				pv.Spec.FlexVolume = &api.FlexPersistentVolumeSource{SecretRef: &api.SecretReference{Name: fmt.Sprintf("secret-%s", pv.Name)}}
 				pv.Spec.ClaimRef = &api.ObjectReference{Name: fmt.Sprintf("pvc%d-%s", i, pod.Name), Namespace: pod.Namespace}
 				pvs = append(pvs, pv)
 
@@ -421,7 +421,7 @@ func generate(opts sampleDataOpts) ([]*api.Pod, []*api.PersistentVolume) {
 			for i := 0; i < opts.sharedPVCsPerPod; i++ {
 				pv := &api.PersistentVolume{}
 				pv.Name = fmt.Sprintf("pv%d-shared-%s", i, pod.Namespace)
-				pv.Spec.FlexVolume = &api.FlexVolumeSource{SecretRef: &api.LocalObjectReference{Name: fmt.Sprintf("secret-%s", pv.Name)}}
+				pv.Spec.FlexVolume = &api.FlexPersistentVolumeSource{SecretRef: &api.SecretReference{Name: fmt.Sprintf("secret-%s", pv.Name)}}
 				pv.Spec.ClaimRef = &api.ObjectReference{Name: fmt.Sprintf("pvc%d-shared", i), Namespace: pod.Namespace}
 				pvs = append(pvs, pv)
 
