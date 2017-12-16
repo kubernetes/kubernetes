@@ -115,9 +115,9 @@ func diskTearDown(manager diskManager, c rbdUnmounter, volPath string, mounter m
 	}
 
 	notMnt, mntErr := mounter.IsLikelyNotMountPoint(volPath)
-	if err != nil && !os.IsNotExist(err) {
+	if mntErr != nil && !os.IsNotExist(mntErr) {
 		glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
-		return err
+		return mntErr
 	}
 	if notMnt {
 		if err := os.Remove(volPath); err != nil {
