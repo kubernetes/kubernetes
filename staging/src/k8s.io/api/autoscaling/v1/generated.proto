@@ -138,7 +138,8 @@ message HorizontalPodAutoscalerStatus {
 // MetricSpec specifies how to scale based on a single metric
 // (only `type` and one other matching field should be set at once).
 message MetricSpec {
-  // type is the type of metric source.  It should match one of the fields below.
+  // type is the type of metric source.  It should be one of "Object",
+  // "Pods" or "Resource", each mapping to a matching field in the object.
   optional string type = 1;
 
   // object refers to a metric describing a single kubernetes object
@@ -163,7 +164,8 @@ message MetricSpec {
 
 // MetricStatus describes the last-read state of a single metric.
 message MetricStatus {
-  // type is the type of metric source.  It will match one of the fields below.
+  // type is the type of metric source.  It will be one of "Object",
+  // "Pods" or "Resource", each corresponds to a matching field in the object.
   optional string type = 1;
 
   // object refers to a metric describing a single kubernetes object
