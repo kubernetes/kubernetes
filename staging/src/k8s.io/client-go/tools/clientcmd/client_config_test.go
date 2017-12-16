@@ -225,6 +225,43 @@ func TestBasicTokenFile(t *testing.T) {
 	matchStringArg(token, clientConfig.BearerToken, t)
 }
 
+func TestTrailingLinebreakTokenFile(t *testing.T) {
+	token := "exampletoken"
+	f, err := ioutil.TempFile("", "tokenfile")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+		return
+	}
+	defer os.Remove(f.Name())
+	// Write the tokenfile as a single line, adding a linebreak
+	if err := ioutil.WriteFile(f.Name(), []byte(token+"\n"), 0644); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+		return
+	}
+
+	config := clientcmdapi.NewConfig()
+	config.Clusters["clean"] = &clientcmdapi.Cluster{
+		Server: "https://localhost:8443",
+	}
+	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
+		TokenFile: f.Name(),
+	}
+	config.Contexts["clean"] = &clientcmdapi.Context{
+		Cluster:  "clean",
+		AuthInfo: "clean",
+	}
+	config.CurrentContext = "clean"
+
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{}, nil)
+
+	clientConfig, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	matchStringArg(token, clientConfig.BearerToken, t)
+}
+
 func TestPrecedenceTokenFile(t *testing.T) {
 	token := "exampletoken"
 	f, err := ioutil.TempFile("", "tokenfile")

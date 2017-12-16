@@ -17,6 +17,7 @@ limitations under the License.
 package clientcmd
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -214,11 +215,21 @@ func (config *DirectClientConfig) getUserIdentificationPartialConfig(configAuthI
 	if len(configAuthInfo.Token) > 0 {
 		mergedConfig.BearerToken = configAuthInfo.Token
 	} else if len(configAuthInfo.TokenFile) > 0 {
-		tokenBytes, err := ioutil.ReadFile(configAuthInfo.TokenFile)
+		tokenFile, err := os.Open(configAuthInfo.TokenFile)
 		if err != nil {
 			return nil, err
 		}
-		mergedConfig.BearerToken = string(tokenBytes)
+		defer tokenFile.Close()
+
+		// read the first line (excluding newline) of the token file as
+		// the Bearer token
+		scanner := bufio.NewScanner(tokenFile)
+		scanner.Scan()
+
+		if err := scanner.Err(); err != nil {
+			return nil, err
+		}
+		mergedConfig.BearerToken = scanner.Text()
 	}
 	if len(configAuthInfo.Impersonate) > 0 {
 		mergedConfig.Impersonate = restclient.ImpersonationConfig{
