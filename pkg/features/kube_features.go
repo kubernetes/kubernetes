@@ -115,6 +115,13 @@ const (
 	//
 	// New local storage types to support local storage capacity isolation
 	LocalStorageCapacityIsolation utilfeature.Feature = "LocalStorageCapacityIsolation"
+
+	// owner @brendandburns
+	// stable: v1.10
+	//
+	// Enable the service proxy to contact external IP addresses. Note this feature is present
+	// only for backward compatability, it will be removed in the 1.11 release.
+	ServiceProxyAllowExternalIPs utilfeature.Feature = "ServiceProxyAllowExternalIPs"
 )
 
 func init() {
@@ -143,4 +150,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	// unintentionally on either side:
 	StreamingProxyRedirects:          {Default: true, PreRelease: utilfeature.Beta},
 	genericfeatures.AdvancedAuditing: {Default: false, PreRelease: utilfeature.Alpha},
+
+	// backward compatability features that enable backwards compatability but should be removed soon.
+	ServiceProxyAllowExternalIPs: {Default: false, PreRelease: utilfeature.Beta},
 }
