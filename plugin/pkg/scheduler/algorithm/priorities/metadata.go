@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
@@ -47,6 +48,7 @@ type priorityMetadata struct {
 	podTolerations []v1.Toleration
 	affinity       *v1.Affinity
 	podSelectors   []labels.Selector
+	controllerRef  *metav1.OwnerReference
 }
 
 // PriorityMetadata is a MetadataProducer.  Node info can be nil.
@@ -62,6 +64,7 @@ func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, nodeNameToInfo
 		podTolerations: tolerationsPreferNoSchedule,
 		affinity:       pod.Spec.Affinity,
 		podSelectors:   podSelectors,
+		controllerRef:  priorityutil.GetControllerRef(pod),
 	}
 }
 
