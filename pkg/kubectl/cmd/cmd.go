@@ -221,7 +221,8 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		Long: templates.LongDesc(`
       kubectl controls the Kubernetes cluster manager.
 
-      Find more information at https://github.com/kubernetes/kubernetes.`),
+      Find more information at:
+            https://kubernetes.io/docs/reference/kubectl/overview/`),
 		Run: runHelp,
 		BashCompletionFunction: bashCompletionFunc,
 	}
