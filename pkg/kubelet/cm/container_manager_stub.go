@@ -70,8 +70,8 @@ func (cm *containerManagerStub) GetCapacity() v1.ResourceList {
 	return nil
 }
 
-func (cm *containerManagerStub) GetDevicePluginResourceCapacity() (v1.ResourceList, []string) {
-	return nil, []string{}
+func (cm *containerManagerStub) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {
+	return nil, nil, []string{}
 }
 
 func (cm *containerManagerStub) NewPodContainerManager() PodContainerManager {
