@@ -92,6 +92,7 @@ func TestSummaryProvider(t *testing.T) {
 		StartTime:          cgroupStatsMap["/kubelet"].cs.StartTime,
 		CPU:                cgroupStatsMap["/kubelet"].cs.CPU,
 		Memory:             cgroupStatsMap["/kubelet"].cs.Memory,
+		DiskIo:             cgroupStatsMap["/kubelet"].cs.DiskIo,
 		Accelerators:       cgroupStatsMap["/kubelet"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/kubelet"].cs.UserDefinedMetrics,
 	})
@@ -100,6 +101,7 @@ func TestSummaryProvider(t *testing.T) {
 		StartTime:          cgroupStatsMap["/misc"].cs.StartTime,
 		CPU:                cgroupStatsMap["/misc"].cs.CPU,
 		Memory:             cgroupStatsMap["/misc"].cs.Memory,
+		DiskIo:             cgroupStatsMap["/misc"].cs.DiskIo,
 		Accelerators:       cgroupStatsMap["/misc"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/misc"].cs.UserDefinedMetrics,
 	})
@@ -108,6 +110,7 @@ func TestSummaryProvider(t *testing.T) {
 		StartTime:          cgroupStatsMap["/runtime"].cs.StartTime,
 		CPU:                cgroupStatsMap["/runtime"].cs.CPU,
 		Memory:             cgroupStatsMap["/runtime"].cs.Memory,
+		DiskIo:             cgroupStatsMap["/runtime"].cs.DiskIo,
 		Accelerators:       cgroupStatsMap["/runtime"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/runtime"].cs.UserDefinedMetrics,
 	})
