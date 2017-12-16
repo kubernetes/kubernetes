@@ -171,12 +171,6 @@ func (expc *expandController) deletePVC(obj interface{}) {
 }
 
 func (expc *expandController) pvcUpdate(oldObj, newObj interface{}) {
-	oldPvc, ok := oldObj.(*v1.PersistentVolumeClaim)
-
-	if oldPvc == nil || !ok {
-		return
-	}
-
 	newPVC, ok := newObj.(*v1.PersistentVolumeClaim)
 
 	if newPVC == nil || !ok {

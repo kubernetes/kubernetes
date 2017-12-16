@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package reconciler implements interfaces that attempt to reconcile the
-// desired state of the with the actual state of the world by triggering
-// actions.
+// Package expand implements interfaces that attempt to resize a pvc
+// by adding pvc to a volume resize map from which PVCs are picked and
+// resized
 
 package expand
 
