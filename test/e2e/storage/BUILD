@@ -19,6 +19,7 @@ go_library(
         "persistent_volumes-vsphere.go",
         "pv_reclaimpolicy.go",
         "pvc_label_selector.go",
+        "volume_expand.go",
         "volume_io.go",
         "volume_metrics.go",
         "volume_provisioning.go",
