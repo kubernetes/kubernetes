@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
@@ -444,7 +443,7 @@ func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 		// and users should not be that surprised.
 		// It should happen only in very rare case when scheduler schedules
 		// a pod and user deletes a PVC that's used by it at the same time.
-		if volumeutil.IsPVCBeingDeleted(pvc) {
+		if pvc.ObjectMeta.DeletionTimestamp != nil {
 			return "", "", fmt.Errorf(
 				"can't start pod because PVC %s/%s is being deleted",
 				namespace,
