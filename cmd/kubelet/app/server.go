@@ -186,6 +186,29 @@ func Run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) error {
 	return nil
 }
 
+func setKubeDepsCloud(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) error {
+	if s.CloudProvider == kubeletconfigv1alpha1.AutoDetectCloudProvider {
+		glog.Warning("--cloud-provider=auto-detect is deprecated. The desired cloud provider should be set explicitly")
+	}
+
+	if kubeDeps.Cloud == nil {
+		if !cloudprovider.IsExternal(s.CloudProvider) && s.CloudProvider != kubeletconfigv1alpha1.AutoDetectCloudProvider {
+			cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+			if err != nil {
+				return err
+			}
+			if cloud == nil {
+				glog.V(2).Infof("No cloud provider specified: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
+			} else {
+				glog.V(2).Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
+			}
+			kubeDeps.Cloud = cloud
+		}
+	}
+
+	return nil
+}
+
 func checkPermissions() error {
 	if uid := os.Getuid(); uid != 0 {
 		return fmt.Errorf("Kubelet needs to run as uid `0`. It is being run as %d", uid)
@@ -289,23 +312,8 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		}
 	}
 
-	if s.CloudProvider == kubeletconfigv1alpha1.AutoDetectCloudProvider {
-		glog.Warning("--cloud-provider=auto-detect is deprecated. The desired cloud provider should be set explicitly")
-	}
-
-	if kubeDeps.Cloud == nil {
-		if !cloudprovider.IsExternal(s.CloudProvider) && s.CloudProvider != kubeletconfigv1alpha1.AutoDetectCloudProvider {
-			cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
-			if err != nil {
-				return err
-			}
-			if cloud == nil {
-				glog.V(2).Infof("No cloud provider specified: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
-			} else {
-				glog.V(2).Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
-			}
-			kubeDeps.Cloud = cloud
-		}
+	if err = setKubeDepsCloud(s, kubeDeps); err != nil {
+		return err
 	}
 
 	nodeName, err := getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
