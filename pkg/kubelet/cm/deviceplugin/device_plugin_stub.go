@@ -17,43 +17,63 @@ limitations under the License.
 package deviceplugin
 
 import (
-	"log"
+	"fmt"
 	"net"
 	"os"
 	"path"
 	"path/filepath"
 	"time"
 
+	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
 )
 
-// Stub implementation for DevicePlugin.
-type Stub struct {
+// StubDevicePlugin is a stub implementation for a Device Plugin.
+type StubDevicePlugin struct {
 	devs   []*pluginapi.Device
 	socket string
 
 	stop   chan interface{}
 	update chan []*pluginapi.Device
 
-	server *grpc.Server
+	server          *grpc.Server
+	serverErrorChan chan error
 }
 
-// NewDevicePluginStub returns an initialized DevicePlugin Stub.
-func NewDevicePluginStub(devs []*pluginapi.Device, socket string) *Stub {
-	return &Stub{
+// NewStubDevicePlugin returns an initialized DevicePlugin Stub.
+func NewStubDevicePlugin(devs []*pluginapi.Device, socket string) *StubDevicePlugin {
+	return &StubDevicePlugin{
 		devs:   devs,
 		socket: socket,
 
 		stop:   make(chan interface{}),
 		update: make(chan []*pluginapi.Device),
+
+		serverErrorChan: make(chan error),
 	}
 }
 
+// dial establishes the gRPC communication with the registered device plugin.
+func dial(unixSocketPath string, timeout time.Duration) (*grpc.ClientConn, error) {
+	c, err := grpc.Dial(unixSocketPath, grpc.WithInsecure(), grpc.WithBlock(),
+		grpc.WithTimeout(timeout),
+		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
+			return net.DialTimeout("unix", addr, timeout)
+		}),
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf(errFailedToDialDevicePlugin+" %v", err)
+	}
+
+	return c, nil
+}
+
 // Start starts the gRPC server of the device plugin
-func (m *Stub) Start() error {
+func (m *StubDevicePlugin) Start() error {
 	err := m.cleanup()
 	if err != nil {
 		return err
@@ -70,41 +90,57 @@ func (m *Stub) Start() error {
 	m.server = grpc.NewServer([]grpc.ServerOption{}...)
 	pluginapi.RegisterDevicePluginServer(m.server, m)
 
-	go m.server.Serve(sock)
-	// Wait till grpc server is ready.
-	for i := 0; i < 10; i++ {
-		services := m.server.GetServiceInfo()
-		if len(services) > 1 {
-			break
-		}
+	go func() {
+		err := m.server.Serve(sock)
+		m.serverErrorChan <- err
+		close(m.serverErrorChan)
+	}()
 
-		time.Sleep(1 * time.Second)
+	go func() {
+		for {
+			select {
+			case err := <-m.serverErrorChan:
+				glog.Errorf("gRPC server ended unexpectedly")
+				panic(err)
+			case <-m.stop:
+				m.server.Stop()
+				return
+			}
+		}
+	}()
+
+	// Wait for server to start by launching a blocking connexion
+	c, err := dial(m.socket, 5*time.Second)
+	if err != nil {
+		return err
 	}
-	log.Println("Starting to serve on", m.socket)
+	c.Close()
+
+	glog.V(2).Infof("Starting to serve on %s", m.socket)
 
 	return nil
 }
 
 // Stop stops the gRPC server
-func (m *Stub) Stop() error {
-	close(m.stop)
+func (m *StubDevicePlugin) Stop() error {
+	glog.V(2).Infof("Stopping server")
 
-	m.server.Stop()
+	close(m.stop)
+	<-m.serverErrorChan
 
 	return m.cleanup()
 }
 
 // Register registers the device plugin for the given resourceName with Kubelet.
-func (m *Stub) Register(kubeletEndpoint, resourceName string) error {
-	conn, err := grpc.Dial(kubeletEndpoint, grpc.WithInsecure(),
-		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
-			return net.DialTimeout("unix", addr, timeout)
-		}))
-	defer conn.Close()
+func (m *StubDevicePlugin) Register(kubeletEndpoint, resourceName string) error {
+	c, err := dial(kubeletEndpoint, 5*time.Second)
+	defer c.Close()
+
 	if err != nil {
 		return err
 	}
-	client := pluginapi.NewRegistrationClient(conn)
+
+	client := pluginapi.NewRegistrationClient(c)
 	reqt := &pluginapi.RegisterRequest{
 		Version:      pluginapi.Version,
 		Endpoint:     path.Base(m.socket),
@@ -115,12 +151,13 @@ func (m *Stub) Register(kubeletEndpoint, resourceName string) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
 // ListAndWatch lists devices and update that list according to the Update call
-func (m *Stub) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
-	log.Println("ListAndWatch")
+func (m *StubDevicePlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
+	glog.V(2).Infof("ListAndWatch")
 	var devs []*pluginapi.Device
 
 	for _, d := range m.devs {
@@ -143,19 +180,19 @@ func (m *Stub) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAnd
 }
 
 // Update allows the device plugin to send new devices through ListAndWatch
-func (m *Stub) Update(devs []*pluginapi.Device) {
+func (m *StubDevicePlugin) Update(devs []*pluginapi.Device) {
 	m.update <- devs
 }
 
 // Allocate does a mock allocation
-func (m *Stub) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
-	log.Printf("Allocate, %+v", r)
+func (m *StubDevicePlugin) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
+	glog.V(2).Infof("Allocate, %+v", r)
 
 	var response pluginapi.AllocateResponse
 	return &response, nil
 }
 
-func (m *Stub) cleanup() error {
+func (m *StubDevicePlugin) cleanup() error {
 	if err := os.Remove(m.socket); err != nil && !os.IsNotExist(err) {
 		return err
 	}

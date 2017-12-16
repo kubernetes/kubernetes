@@ -50,7 +50,7 @@ func TestHandlerNewEndpoint(t *testing.T) {
 	hdlr.SetStore(store)
 	require.Equal(t, hdlr.Store(), store)
 
-	p := NewDevicePluginStub(nil, pluginSocketName)
+	p := NewStubDevicePlugin(nil, pluginSocketName)
 	require.NoError(t, p.Start())
 	defer p.Stop()
 
@@ -80,7 +80,7 @@ func TestHandlerNewEndpoint(t *testing.T) {
 
 func TestTrackEndpoint(t *testing.T) {
 	// setup
-	p := NewDevicePluginStub(nil, pluginSocketName)
+	p := NewStubDevicePlugin(nil, pluginSocketName)
 	require.NoError(t, p.Start())
 
 	hdlr := newEndpointHandlerImpl(func(n string, a, u, r []pluginapi.Device) {})
@@ -183,8 +183,8 @@ func TestReRegistration(t *testing.T) {
 
 	hdlr.SetStore(newInstrumentedEndpointStoreShim(outChan, continueChan))
 
-	p1 := NewDevicePluginStub(devs, pluginSocketName)
-	p2 := NewDevicePluginStub(devs, pluginSocketName+".new")
+	p1 := NewStubDevicePlugin(devs, pluginSocketName)
+	p2 := NewStubDevicePlugin(devs, pluginSocketName+".new")
 	require.NoError(t, p1.Start())
 
 	// Create first endpoint

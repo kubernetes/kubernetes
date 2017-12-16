@@ -25,7 +25,7 @@ import (
 )
 
 func TestEndpointStore(t *testing.T) {
-	p := NewDevicePluginStub(nil, pluginSocketName)
+	p := NewStubDevicePlugin(nil, pluginSocketName)
 	require.NoError(t, p.Start())
 
 	store := newEndpointStoreImpl()
@@ -62,10 +62,10 @@ func TestEndpointStore(t *testing.T) {
 }
 
 func TestSwapEndpoint(t *testing.T) {
-	p1 := NewDevicePluginStub(nil, pluginSocketName)
+	p1 := NewStubDevicePlugin(nil, pluginSocketName)
 	require.NoError(t, p1.Start())
 
-	p2 := NewDevicePluginStub(nil, pluginSocketName+".new")
+	p2 := NewStubDevicePlugin(nil, pluginSocketName+".new")
 	require.NoError(t, p2.Start())
 
 	store := newEndpointStoreImpl()
@@ -100,7 +100,7 @@ func TestSwapEndpoint(t *testing.T) {
 }
 
 func TestDeleteEndpoint(t *testing.T) {
-	p := NewDevicePluginStub(nil, pluginSocketName)
+	p := NewStubDevicePlugin(nil, pluginSocketName)
 	require.NoError(t, p.Start())
 
 	store := newEndpointStoreImpl()

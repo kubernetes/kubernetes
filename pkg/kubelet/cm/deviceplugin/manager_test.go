@@ -63,7 +63,7 @@ func TestNewManagerImplStart(t *testing.T) {
 	cleanup(t, m, p)
 }
 
-func setup(t *testing.T, devs []*pluginapi.Device, callback managerCallback) (Manager, *Stub) {
+func setup(t *testing.T, devs []*pluginapi.Device, callback managerCallback) (Manager, *StubDevicePlugin) {
 	m, err := newManagerImpl(socketName)
 	require.NoError(t, err)
 
@@ -75,14 +75,14 @@ func setup(t *testing.T, devs []*pluginapi.Device, callback managerCallback) (Ma
 	err = m.Start(activePods, &sourcesReadyStub{})
 	require.NoError(t, err)
 
-	p := NewDevicePluginStub(devs, pluginSocketName)
+	p := NewStubDevicePlugin(devs, pluginSocketName)
 	err = p.Start()
 	require.NoError(t, err)
 
 	return m, p
 }
 
-func cleanup(t *testing.T, m Manager, p *Stub) {
+func cleanup(t *testing.T, m Manager, p *StubDevicePlugin) {
 	p.Stop()
 	m.Stop()
 }

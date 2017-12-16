@@ -125,8 +125,8 @@ func TestRun(t *testing.T) {
 	callbackChan = nil
 }
 
-func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback managerCallback) (*Stub, *endpointImpl) {
-	p := NewDevicePluginStub(devs, socket)
+func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback managerCallback) (*StubDevicePlugin, *endpointImpl) {
+	p := NewStubDevicePlugin(devs, socket)
 	require.NoError(t, p.Start())
 
 	dStore := newDeviceStoreImpl(callback)
@@ -143,7 +143,7 @@ func newTestEndpoint(resourceName string) endpoint {
 	}
 }
 
-func ecleanup(t *testing.T, p *Stub, e *endpointImpl) {
+func ecleanup(t *testing.T, p *StubDevicePlugin, e *endpointImpl) {
 	e.Stop()
 	p.Stop()
 }

@@ -18,7 +18,6 @@ package deviceplugin
 
 import (
 	"fmt"
-	"net"
 	"sync"
 	"time"
 
@@ -64,7 +63,7 @@ func newEndpoint(socketPath, resourceName string) (*endpointImpl, error) {
 }
 
 func newEndpointWithStore(socketPath, resourceName string, devStore deviceStore) (*endpointImpl, error) {
-	client, c, err := dial(socketPath)
+	c, err := dial(socketPath, 5*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -72,8 +71,8 @@ func newEndpointWithStore(socketPath, resourceName string, devStore deviceStore)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &endpointImpl{
-		client:     client,
 		clientConn: c,
+		client:     pluginapi.NewDevicePluginClient(c),
 
 		socketPath:   socketPath,
 		resourceName: resourceName,
@@ -111,7 +110,10 @@ func (e *endpointImpl) ResourceName() string {
 // will adjust the resource available information accordingly.
 func (e *endpointImpl) Run() {
 	glog.V(3).Infof("Starting to run endpoint %s", e.resourceName)
+
+	e.Lock()
 	e.stopChan = make(chan interface{}, 0)
+	e.Unlock()
 
 	stream, err := e.client.ListAndWatch(e.ctx, &pluginapi.Empty{})
 	if err != nil {
@@ -150,37 +152,23 @@ func (e *endpointImpl) Allocate(devs []string) (*pluginapi.AllocateResponse, err
 }
 
 func (e *endpointImpl) Stop() error {
-	if e.stopChan == nil {
-		e.cancel()
-		e.clientConn.Close()
-
-		return nil
-	}
+	e.Lock()
+	c := e.stopChan
+	e.Unlock()
 
 	e.cancel()
 	e.clientConn.Close()
 
+	if c == nil {
+		return nil
+	}
+
 	select {
-	case <-e.stopChan:
+	case <-c:
 		break
 	case <-time.After(1 * time.Second):
 		return fmt.Errorf("Could not stop endpoint %s", e.resourceName)
 	}
 
 	return nil
-}
-
-// dial establishes the gRPC communication with the registered device plugin.
-func dial(unixSocketPath string) (pluginapi.DevicePluginClient, *grpc.ClientConn, error) {
-	c, err := grpc.Dial(unixSocketPath, grpc.WithInsecure(), grpc.WithBlock(),
-		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
-			return net.DialTimeout("unix", addr, timeout)
-		}),
-	)
-
-	if err != nil {
-		return nil, nil, fmt.Errorf(errFailedToDialDevicePlugin+" %v", err)
-	}
-
-	return pluginapi.NewDevicePluginClient(c), c, nil
 }
