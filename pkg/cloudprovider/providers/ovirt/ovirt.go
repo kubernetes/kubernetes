@@ -128,11 +128,6 @@ func (v *OVirtCloud) ProviderName() string {
 	return ProviderName
 }
 
-// ScrubDNS filters DNS settings for pods.
-func (v *OVirtCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
-	return nameservers, searches
-}
-
 // HasClusterID returns true if the cluster has a clusterID
 func (v *OVirtCloud) HasClusterID() bool {
 	return true

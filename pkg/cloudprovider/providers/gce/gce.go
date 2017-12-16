@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -665,20 +664,6 @@ func (gce *GCECloud) updateNodeZones(prevNode, newNode *v1.Node) {
 			gce.nodeZones[newZone].Insert(newNode.ObjectMeta.Name)
 		}
 	}
-}
-
-// Known-useless DNS search path.
-var uselessDNSSearchRE = regexp.MustCompile(`^[0-9]+.google.internal.$`)
-
-// ScrubDNS filters DNS settings for pods.
-func (gce *GCECloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
-	// GCE has too many search paths by default. Filter the ones we know are useless.
-	for _, s := range searches {
-		if !uselessDNSSearchRE.MatchString(s) {
-			srchOut = append(srchOut, s)
-		}
-	}
-	return nameservers, srchOut
 }
 
 // HasClusterID returns true if the cluster has a clusterID

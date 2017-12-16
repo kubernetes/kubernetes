@@ -44,8 +44,6 @@ type Interface interface {
 	Routes() (Routes, bool)
 	// ProviderName returns the cloud provider ID.
 	ProviderName() string
-	// ScrubDNS provides an opportunity for cloud-provider-specific code to process DNS settings for pods.
-	ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string)
 	// HasClusterID returns true if a ClusterID is required and set
 	HasClusterID() bool
 }
