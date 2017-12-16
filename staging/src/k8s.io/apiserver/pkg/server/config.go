@@ -338,13 +338,17 @@ type CompletedConfig struct {
 // Complete fills in any fields not set that are required to have valid data and can be derived
 // from other fields. If you're going to `ApplyOptions`, do that first. It's mutating the receiver.
 func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedConfig {
-	if len(c.ExternalAddress) == 0 && c.PublicAddress != nil {
-		hostAndPort := c.PublicAddress.String()
-		if c.ReadWritePort != 0 {
-			hostAndPort = net.JoinHostPort(hostAndPort, strconv.Itoa(c.ReadWritePort))
-		}
-		c.ExternalAddress = hostAndPort
+	host := c.ExternalAddress
+	if host == "" && c.PublicAddress != nil {
+		host = c.PublicAddress.String()
 	}
+	if !strings.Contains(host, ":") {
+		if c.ReadWritePort != 0 {
+			host = net.JoinHostPort(host, strconv.Itoa(c.ReadWritePort))
+		}
+	}
+	c.ExternalAddress = host
+
 	if c.OpenAPIConfig != nil && c.OpenAPIConfig.SecurityDefinitions != nil {
 		// Setup OpenAPI security: all APIs will have the same authentication for now.
 		c.OpenAPIConfig.DefaultSecurity = []map[string][]string{}
