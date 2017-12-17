@@ -864,7 +864,6 @@ func testConfigCommand(args []string, startingConfig clientcmdapi.Config, t *tes
 	argsToUse = append(argsToUse, args...)
 
 	buf := bytes.NewBuffer([]byte{})
-
 	cmd := NewCmdConfig(clientcmd.NewDefaultPathOptions(), buf, buf)
 	cmd.SetArgs(argsToUse)
 	cmd.Execute()
