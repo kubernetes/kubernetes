@@ -634,6 +634,12 @@ def launch_default_ingress_controller():
     context['arch'] = arch()
     addon_path = '/root/cdk/addons/{}'
 
+    context['defaultbackend_image'] = \
+        "gcr.io/google_containers/defaultbackend:1.4"
+    if arch() == 's390x':
+        context['defaultbackend_image'] = \
+            "gcr.io/google_containers/defaultbackend-s390x:1.4"
+
     # Render the default http backend (404) replicationcontroller manifest
     manifest = addon_path.format('default-http-backend.yaml')
     render('default-http-backend.yaml', manifest, context)
