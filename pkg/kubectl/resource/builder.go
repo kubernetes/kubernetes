@@ -341,6 +341,10 @@ func (b *Builder) LabelSelectorParam(s string) *Builder {
 // LabelSelector accepts a selector directly and will filter the resulting list by that object.
 // Use LabelSelectorParam instead for user input.
 func (b *Builder) LabelSelector(selector string) *Builder {
+	if len(selector) == 0 {
+		return b
+	}
+
 	b.labelSelector = &selector
 	return b
 }
