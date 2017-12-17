@@ -4,15 +4,16 @@ import (
 	"io"
 )
 
-// Stream is a io.Writer like object, with JSON specific write functions.
+// stream is a io.Writer like object, with JSON specific write functions.
 // Error is not returned as return value, but stored as Error member on this stream instance.
 type Stream struct {
-	cfg       *frozenConfig
-	out       io.Writer
-	buf       []byte
-	n         int
-	Error     error
-	indention int
+	cfg        *frozenConfig
+	out        io.Writer
+	buf        []byte
+	n          int
+	Error      error
+	indention  int
+	Attachment interface{} // open for customized encoder
 }
 
 // NewStream create new stream instance.
@@ -191,6 +192,9 @@ func (stream *Stream) ensure(minimal int) {
 func (stream *Stream) growAtLeast(minimal int) {
 	if stream.out != nil {
 		stream.Flush()
+		if stream.Available() >= minimal {
+			return
+		}
 	}
 	toGrow := len(stream.buf)
 	if toGrow < minimal {
@@ -280,8 +284,7 @@ func (stream *Stream) WriteArrayStart() {
 
 // WriteEmptyArray write []
 func (stream *Stream) WriteEmptyArray() {
-	stream.writeByte('[')
-	stream.writeByte(']')
+	stream.writeTwoBytes('[', ']')
 }
 
 // WriteArrayEnd write ] with possible indention
