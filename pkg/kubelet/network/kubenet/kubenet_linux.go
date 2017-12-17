@@ -337,7 +337,7 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 	// TODO: check and set promiscuous mode with netlink once vishvananda/netlink supports it
 	if plugin.hairpinMode == kubeletconfig.PromiscuousBridge {
 		output, err := plugin.execer.Command("ip", "link", "show", "dev", BridgeName).CombinedOutput()
-		if err != nil || strings.Index(string(output), "PROMISC") < 0 {
+		if err != nil || !strings.Contains(string(output), "PROMISC") {
 			_, err := plugin.execer.Command("ip", "link", "set", BridgeName, "promisc", "on").CombinedOutput()
 			if err != nil {
 				return fmt.Errorf("Error setting promiscuous mode on %s: %v", BridgeName, err)

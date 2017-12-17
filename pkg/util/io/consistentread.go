@@ -35,7 +35,7 @@ func ConsistentRead(filename string, attempts int) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		if bytes.Compare(oldContent, newContent) == 0 {
+		if bytes.Equal(oldContent, newContent) {
 			return newContent, nil
 		}
 		// Files are different, continue reading

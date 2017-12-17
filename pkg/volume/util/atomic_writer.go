@@ -297,7 +297,7 @@ func (w *AtomicWriter) shouldWriteFile(path string, content []byte) (bool, error
 		return false, err
 	}
 
-	return (bytes.Compare(content, contentOnFs) != 0), nil
+	return (!bytes.Equal(content, contentOnFs)), nil
 }
 
 // pathsToRemove walks the user-visible portion of the target directory and

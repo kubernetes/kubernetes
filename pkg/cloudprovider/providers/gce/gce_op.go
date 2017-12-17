@@ -45,7 +45,7 @@ func (gce *GCECloud) waitForOp(op *computev1.Operation, getOperation func(operat
 	return wait.Poll(operationPollInterval, operationPollTimeoutDuration, func() (bool, error) {
 		start := time.Now()
 		gce.operationPollRateLimiter.Accept()
-		duration := time.Now().Sub(start)
+		duration := time.Since(start)
 		if duration > 5*time.Second {
 			glog.V(2).Infof("pollOperation: throttled %v for %v", duration, opName)
 		}
@@ -57,7 +57,7 @@ func (gce *GCECloud) waitForOp(op *computev1.Operation, getOperation func(operat
 
 		done := opIsDone(pollOp)
 		if done {
-			duration := time.Now().Sub(opStart)
+			duration := time.Since(opStart)
 			if duration > 1*time.Minute {
 				// Log the JSON. It's cleaner than the %v structure.
 				enc, err := pollOp.MarshalJSON()

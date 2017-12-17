@@ -235,7 +235,7 @@ func (m *manager) Start() {
 		Steps:    5,
 	}
 	go wait.Forever(func() {
-		sleepInterval := m.rotationDeadline.Sub(time.Now())
+		sleepInterval := time.Until(m.rotationDeadline)
 		glog.V(2).Infof("Waiting %v for next certificate rotation", sleepInterval)
 		time.Sleep(sleepInterval)
 		if err := wait.ExponentialBackoff(backoff, m.rotateCerts); err != nil {

@@ -98,7 +98,7 @@ func shouldBackupAPIServerCertAndKey(certAndKeyDir string, newK8sVer *version.Ve
 		return false, fmt.Errorf("no certificate data found")
 	}
 
-	if time.Now().Sub(certs[0].NotBefore) > expiry {
+	if time.Since(certs[0].NotBefore) > expiry {
 		return true, nil
 	}
 
