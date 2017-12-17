@@ -14,6 +14,7 @@ go_library(
         "//pkg/apis/core/validation:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )
