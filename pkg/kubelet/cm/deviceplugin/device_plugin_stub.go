@@ -120,7 +120,7 @@ func (m *Stub) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAnd
 	for _, d := range m.devs {
 		devs = append(devs, &pluginapi.Device{
 			ID:     d.ID,
-			Health: pluginapi.Healthy,
+			Health: d.Health,
 		})
 	}
 
