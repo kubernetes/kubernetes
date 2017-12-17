@@ -248,9 +248,6 @@ Loadbalancing: L7 GCE should create ingress with given static-ip,eparis,1,
 Loadbalancing: L7 Nginx should conform to Ingress spec,ncdc,1,network
 "Logging soak should survive logging 1KB every * seconds, for a duration of *, scaling up to * pods per node",justinsb,1,node
 "MemoryEviction when there is memory pressure should evict pods in the correct order (besteffort first, then burstable, then guaranteed)",ixdy,1,node
-Mesos applies slave attributes as labels,justinsb,1,apps
-Mesos schedules pods annotated with roles on correct slaves,tallclair,1,apps
-Mesos starts static pods on every node in the mesos cluster,lavalamp,1,apps
 MetricsGrabber should grab all metrics from API server.,gmarek,0,instrumentation
 MetricsGrabber should grab all metrics from a ControllerManager.,gmarek,0,instrumentation
 MetricsGrabber should grab all metrics from a Kubelet.,gmarek,0,instrumentation
