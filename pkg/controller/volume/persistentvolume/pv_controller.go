@@ -1250,7 +1250,7 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(volume *v1.PersistentVolu
 
 	opComplete := util.OperationCompleteHook(plugin.GetPluginName(), "volume_delete")
 	err = deleter.Delete()
-	opComplete(err)
+	opComplete(&err)
 	if err != nil {
 		// Deleter failed
 		return false, err
@@ -1373,7 +1373,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 
 	opComplete := util.OperationCompleteHook(plugin.GetPluginName(), "volume_provision")
 	volume, err = provisioner.Provision()
-	opComplete(err)
+	opComplete(&err)
 	if err != nil {
 		strerr := fmt.Sprintf("Failed to provision volume with StorageClass %q: %v", storageClass.Name, err)
 		glog.V(2).Infof("failed to provision volume for claim %q with StorageClass %q: %v", claimToClaimKey(claim), storageClass.Name, err)
