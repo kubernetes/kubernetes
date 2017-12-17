@@ -186,6 +186,106 @@ func Run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) error {
 	return nil
 }
 
+// setKubeDepsClients initializes clients if not standalone mode and any of the clients are not provided
+func setKubeDepsClients(clientConfig *restclient.Config,
+	kubeDeps *kubelet.Dependencies,
+	nodeName types.NodeName,
+	rotateCertificates bool,
+	certDirectory string,
+	QPS int32,
+	eventBurst int32,
+	timeout time.Duration) (err error) {
+
+	kubeDeps.KubeClient, err = newKubeClient(clientConfig)
+	if err != nil {
+		return err
+	}
+
+	if rotateCertificates && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletClientCertificate) {
+		clientCertificateManager, err := newCertificateManager(clientConfig, certDirectory, nodeName)
+		if err != nil {
+			return err
+		}
+
+		if kubeDeps.KubeClient.CertificatesV1beta1() != nil {
+			glog.V(2).Info("Starting client certificate rotation.")
+			request := kubeDeps.KubeClient.CertificatesV1beta1().CertificateSigningRequests()
+			clientCertificateManager.SetCertificateSigningRequestClient(request)
+			clientCertificateManager.Start()
+		}
+	}
+
+	kubeDeps.ExternalKubeClient = newExternalKubeClient(clientConfig)
+	kubeDeps.EventClient = newEventClient(clientConfig, QPS, eventBurst)
+	kubeDeps.HeartbeatClient = newHeartbeatClient(clientConfig, timeout)
+
+	return nil
+}
+
+func newCertificateManager(clientConfig *restclient.Config, certDirectory string, nodeName types.NodeName) (certificate.Manager, error) {
+	clientCertificateManager, err := kubeletcertificate.NewKubeletClientCertificateManager(
+		certDirectory,
+		nodeName,
+		clientConfig.CertData,
+		clientConfig.KeyData,
+		clientConfig.CertFile,
+		clientConfig.KeyFile)
+	if err != nil {
+		return nil, err
+	}
+	// we set exitIfExpired to true because we use this client configuration to request new certs - if we are unable
+	// to request new certs, we will be unable to continue normal operation
+	if err := kubeletcertificate.UpdateTransport(wait.NeverStop, clientConfig, clientCertificateManager, true); err != nil {
+		return nil, err
+	}
+
+	return clientCertificateManager, nil
+}
+
+func newKubeClient(clientConfig *restclient.Config) (clientset.Interface, error) {
+	kubeClient, err := clientset.NewForConfig(clientConfig)
+	if err != nil {
+		glog.Warningf("New kubeClient from clientConfig error: %v", err)
+	}
+
+	return kubeClient, err
+}
+
+func newExternalKubeClient(clientConfig *restclient.Config) clientset.Interface {
+	externalKubeClient, err := clientset.NewForConfig(clientConfig)
+	if err != nil {
+		glog.Warningf("New kubeClient from clientConfig error: %v", err)
+	}
+
+	return externalKubeClient
+}
+
+func newEventClient(clientConfig *restclient.Config, QPS, eventBurst int32) v1core.EventsGetter {
+	// make a separate client for events
+	eventClientConfig := *clientConfig
+	eventClientConfig.QPS = float32(QPS)
+	eventClientConfig.Burst = int(eventBurst)
+	eventClient, err := v1core.NewForConfig(&eventClientConfig)
+	if err != nil {
+		glog.Warningf("Failed to create API Server client for Events: %v", err)
+	}
+
+	return eventClient
+}
+
+func newHeartbeatClient(clientConfig *restclient.Config, timeout time.Duration) v1core.CoreV1Interface {
+	// make a separate client for heartbeat with throttling disabled and a timeout attached
+	heartbeatClientConfig := *clientConfig
+	heartbeatClientConfig.Timeout = timeout
+	heartbeatClientConfig.QPS = float32(-1)
+	heartbeatClient, err := v1core.NewForConfig(&heartbeatClientConfig)
+	if err != nil {
+		glog.Warningf("Failed to create API Server client for heartbeat: %v", err)
+	}
+
+	return heartbeatClient
+}
+
 func checkPermissions() error {
 	if uid := os.Getuid(); uid != 0 {
 		return fmt.Errorf("Kubelet needs to run as uid `0`. It is being run as %d", uid)
@@ -324,73 +424,19 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		glog.Warningf("standalone mode, no API client")
 	} else if kubeDeps.KubeClient == nil || kubeDeps.ExternalKubeClient == nil || kubeDeps.EventClient == nil || kubeDeps.HeartbeatClient == nil {
 		// initialize clients if not standalone mode and any of the clients are not provided
-		var kubeClient clientset.Interface
-		var eventClient v1core.EventsGetter
-		var heartbeatClient v1core.CoreV1Interface
-		var externalKubeClient clientset.Interface
-
 		clientConfig, err := CreateAPIServerClientConfig(s)
-
-		var clientCertificateManager certificate.Manager
-		if err == nil {
-			if s.RotateCertificates && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletClientCertificate) {
-				clientCertificateManager, err = kubeletcertificate.NewKubeletClientCertificateManager(s.CertDirectory, nodeName, clientConfig.CertData, clientConfig.KeyData, clientConfig.CertFile, clientConfig.KeyFile)
-				if err != nil {
-					return err
-				}
-				// we set exitIfExpired to true because we use this client configuration to request new certs - if we are unable
-				// to request new certs, we will be unable to continue normal operation
-				if err := kubeletcertificate.UpdateTransport(wait.NeverStop, clientConfig, clientCertificateManager, true); err != nil {
-					return err
-				}
-			}
-
-			kubeClient, err = clientset.NewForConfig(clientConfig)
-			if err != nil {
-				glog.Warningf("New kubeClient from clientConfig error: %v", err)
-			} else if kubeClient.CertificatesV1beta1() != nil && clientCertificateManager != nil {
-				glog.V(2).Info("Starting client certificate rotation.")
-				clientCertificateManager.SetCertificateSigningRequestClient(kubeClient.CertificatesV1beta1().CertificateSigningRequests())
-				clientCertificateManager.Start()
-			}
-			externalKubeClient, err = clientset.NewForConfig(clientConfig)
-			if err != nil {
-				glog.Warningf("New kubeClient from clientConfig error: %v", err)
-			}
-
-			// make a separate client for events
-			eventClientConfig := *clientConfig
-			eventClientConfig.QPS = float32(s.EventRecordQPS)
-			eventClientConfig.Burst = int(s.EventBurst)
-			eventClient, err = v1core.NewForConfig(&eventClientConfig)
-			if err != nil {
-				glog.Warningf("Failed to create API Server client for Events: %v", err)
-			}
-
-			// make a separate client for heartbeat with throttling disabled and a timeout attached
-			heartbeatClientConfig := *clientConfig
-			heartbeatClientConfig.Timeout = s.KubeletConfiguration.NodeStatusUpdateFrequency.Duration
-			heartbeatClientConfig.QPS = float32(-1)
-			heartbeatClient, err = v1core.NewForConfig(&heartbeatClientConfig)
-			if err != nil {
-				glog.Warningf("Failed to create API Server client for heartbeat: %v", err)
-			}
-		} else {
+		if err != nil {
 			switch {
 			case s.RequireKubeConfig:
 				return fmt.Errorf("invalid kubeconfig: %v", err)
 			case s.KubeConfig.Provided():
 				glog.Warningf("invalid kubeconfig: %v", err)
 			}
-		}
-
-		kubeDeps.KubeClient = kubeClient
-		kubeDeps.ExternalKubeClient = externalKubeClient
-		if heartbeatClient != nil {
-			kubeDeps.HeartbeatClient = heartbeatClient
-		}
-		if eventClient != nil {
-			kubeDeps.EventClient = eventClient
+		} else {
+			if err = setKubeDepsClients(clientConfig, kubeDeps, nodeName, s.RotateCertificates, s.CertDirectory,
+				s.EventRecordQPS, s.EventBurst, s.KubeletConfiguration.NodeStatusUpdateFrequency.Duration); err != nil {
+				return err
+			}
 		}
 	}
 
