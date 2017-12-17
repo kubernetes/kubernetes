@@ -34,6 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
+
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
 var nodeHealthzRetryInterval = 60 * time.Second
@@ -265,15 +267,17 @@ type HealthzServer struct {
 	recorder      record.EventRecorder
 	nodeRef       *v1.ObjectReference
 
+	client clientset.Interface
+
 	lastUpdated atomic.Value
 }
 
 // NewDefaultHealthzServer returns a default healthz http server.
-func NewDefaultHealthzServer(addr string, healthTimeout time.Duration, recorder record.EventRecorder, nodeRef *v1.ObjectReference) *HealthzServer {
-	return newHealthzServer(nil, nil, nil, addr, healthTimeout, recorder, nodeRef)
+func NewDefaultHealthzServer(addr string, healthTimeout time.Duration, recorder record.EventRecorder, nodeRef *v1.ObjectReference, client clientset.Interface) *HealthzServer {
+	return newHealthzServer(nil, nil, nil, addr, healthTimeout, recorder, nodeRef, client)
 }
 
-func newHealthzServer(listener Listener, httpServerFactory HTTPServerFactory, c clock.Clock, addr string, healthTimeout time.Duration, recorder record.EventRecorder, nodeRef *v1.ObjectReference) *HealthzServer {
+func newHealthzServer(listener Listener, httpServerFactory HTTPServerFactory, c clock.Clock, addr string, healthTimeout time.Duration, recorder record.EventRecorder, nodeRef *v1.ObjectReference, client clientset.Interface) *HealthzServer {
 	if listener == nil {
 		listener = stdNetListener{}
 	}
@@ -291,6 +295,7 @@ func newHealthzServer(listener Listener, httpServerFactory HTTPServerFactory, c 
 		healthTimeout: healthTimeout,
 		recorder:      recorder,
 		nodeRef:       nodeRef,
+		client:        client,
 	}
 }
 
@@ -340,8 +345,16 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Type", "application/json")
 	if !lastUpdated.IsZero() && currentTime.After(lastUpdated.Add(h.hs.healthTimeout)) {
 		resp.WriteHeader(http.StatusServiceUnavailable)
+	} else if err := verifyClient(h.hs.client); err != nil {
+		glog.Errorf("Failed to verify connection with apiserver: %v", err)
+		resp.WriteHeader(http.StatusServiceUnavailable)
 	} else {
 		resp.WriteHeader(http.StatusOK)
 	}
 	fmt.Fprintf(resp, fmt.Sprintf(`{"lastUpdated": %q,"currentTime": %q}`, lastUpdated, currentTime))
+}
+
+func verifyClient(client clientset.Interface) error {
+	_, err := client.Discovery().ServerVersion()
+	return err
 }

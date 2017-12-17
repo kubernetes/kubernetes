@@ -384,6 +384,10 @@ func createClients(config kubeproxyconfig.ClientConnectionConfiguration, masterO
 	if len(config.KubeConfigFile) == 0 && len(masterOverride) == 0 {
 		glog.Info("Neither kubeconfig file nor master URL was specified. Falling back to in-cluster config.")
 		kubeConfig, err = rest.InClusterConfig()
+		if err != nil {
+			// return an error if called from a process not running in a kubernetes environment
+			return nil, nil, err
+		}
 	} else {
 		// This creates a client, first loading any specified kubeconfig
 		// file, and then overriding the Master flag, if non-empty.
