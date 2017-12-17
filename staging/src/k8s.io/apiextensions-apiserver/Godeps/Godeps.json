@@ -1647,6 +1647,10 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
+			"ImportPath": "k8s.io/client-go/util/prompt",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/builder",
 			"Rev": "39a7bf85c140f972372c2a0d1ee40adbf0c8bfe1"
 		},

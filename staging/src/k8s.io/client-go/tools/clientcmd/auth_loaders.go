@@ -18,13 +18,12 @@ package clientcmd
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 
-	"github.com/howeyc/gopass"
 	clientauth "k8s.io/client-go/tools/auth"
+	"k8s.io/client-go/util/prompt"
 )
 
 // AuthLoaders are used to build clientauth.Info objects.
@@ -69,30 +68,20 @@ func (a *PromptingAuthLoader) LoadAuth(path string) (*clientauth.Info, error) {
 }
 
 // Prompt pulls the user and password from a reader
-func (a *PromptingAuthLoader) Prompt() (*clientauth.Info, error) {
-	var err error
-	auth := &clientauth.Info{}
-	auth.User, err = promptForString("Username", a.reader, true)
+func (a *PromptingAuthLoader) Prompt() (auth *clientauth.Info, err error) {
+	prompter := prompt.NewPrompter(a.reader)
+	auth = &clientauth.Info{}
+
+	auth.User, err = prompter.Prompt("Username", prompt.ShowEcho, prompt.DontMask)
 	if err != nil {
 		return nil, err
 	}
-	auth.Password, err = promptForString("Password", nil, false)
+
+	auth.Password, err = prompter.Prompt("Password", prompt.DontShowEcho, prompt.Mask)
 	if err != nil {
 		return nil, err
 	}
 	return auth, nil
-}
-
-func promptForString(field string, r io.Reader, show bool) (result string, err error) {
-	fmt.Printf("Please enter %s: ", field)
-	if show {
-		_, err = fmt.Fscan(r, &result)
-	} else {
-		var data []byte
-		data, err = gopass.GetPasswdMasked()
-		result = string(data)
-	}
-	return result, err
 }
 
 // NewPromptingAuthLoader is an AuthLoader that parses an AuthInfo object from a file path. It prompts user and creates file if it doesn't exist.

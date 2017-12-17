@@ -200,6 +200,7 @@ type createAuthInfoTest struct {
 	flags          []string
 	expected       string
 	expectedConfig clientcmdapi.Config
+	in             []byte
 }
 
 func TestCreateAuthInfo(t *testing.T) {
@@ -220,6 +221,26 @@ func TestCreateAuthInfo(t *testing.T) {
 	}
 	test.run(t)
 }
+
+func TestCreateAuthInfoPromptUsername(t *testing.T) {
+	conf := clientcmdapi.Config{}
+	test := createAuthInfoTest{
+		description: "Testing for create aythinfo",
+		config:      conf,
+		args:        []string{"cluster-admin"},
+		flags: []string{
+			"--prompt-username",
+		},
+		in:       []byte("foo\n"),
+		expected: `User "cluster-admin" set.` + "\n",
+		expectedConfig: clientcmdapi.Config{
+			AuthInfos: map[string]*clientcmdapi.AuthInfo{
+				"cluster-admin": {Username: "foo"}},
+		},
+	}
+	test.run(t)
+}
+
 func (test createAuthInfoTest) run(t *testing.T) {
 	fakeKubeFile, err := ioutil.TempFile(os.TempDir(), "")
 	if err != nil {
@@ -235,7 +256,8 @@ func (test createAuthInfoTest) run(t *testing.T) {
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigSetAuthInfo(buf, pathOptions)
+	in := bytes.NewBuffer(test.in)
+	cmd := NewCmdConfigSetAuthInfo(in, buf, pathOptions)
 	cmd.SetArgs(test.args)
 	cmd.Flags().Parse(test.flags)
 	if err := cmd.Execute(); err != nil {

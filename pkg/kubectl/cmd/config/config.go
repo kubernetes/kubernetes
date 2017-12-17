@@ -31,7 +31,7 @@ import (
 )
 
 // NewCmdConfig creates a command object for the "config" action, and adds all child commands to it.
-func NewCmdConfig(pathOptions *clientcmd.PathOptions, out, errOut io.Writer) *cobra.Command {
+func NewCmdConfig(pathOptions *clientcmd.PathOptions, in io.Reader, out, errOut io.Writer) *cobra.Command {
 	if len(pathOptions.ExplicitFileFlag) == 0 {
 		pathOptions.ExplicitFileFlag = clientcmd.RecommendedConfigPathFlag
 	}
@@ -55,7 +55,7 @@ func NewCmdConfig(pathOptions *clientcmd.PathOptions, out, errOut io.Writer) *co
 
 	cmd.AddCommand(NewCmdConfigView(out, errOut, pathOptions))
 	cmd.AddCommand(NewCmdConfigSetCluster(out, pathOptions))
-	cmd.AddCommand(NewCmdConfigSetAuthInfo(out, pathOptions))
+	cmd.AddCommand(NewCmdConfigSetAuthInfo(in, out, pathOptions))
 	cmd.AddCommand(NewCmdConfigSetContext(out, pathOptions))
 	cmd.AddCommand(NewCmdConfigSet(out, pathOptions))
 	cmd.AddCommand(NewCmdConfigUnset(out, pathOptions))

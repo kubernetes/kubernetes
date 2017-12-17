@@ -197,6 +197,7 @@ filegroup(
         "//staging/src/k8s.io/client-go/util/homedir:all-srcs",
         "//staging/src/k8s.io/client-go/util/integer:all-srcs",
         "//staging/src/k8s.io/client-go/util/jsonpath:all-srcs",
+        "//staging/src/k8s.io/client-go/util/prompt:all-srcs",
         "//staging/src/k8s.io/client-go/util/retry:all-srcs",
         "//staging/src/k8s.io/client-go/util/testing:all-srcs",
         "//staging/src/k8s.io/client-go/util/workqueue:all-srcs",
