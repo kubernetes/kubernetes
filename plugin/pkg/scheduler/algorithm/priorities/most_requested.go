@@ -76,9 +76,7 @@ func calculateUsedPriority(pod *v1.Pod, podRequests *schedulercache.Resource, no
 	cpuScore := calculateUsedScore(totalResources.MilliCPU, allocatableResources.MilliCPU, node.Name)
 	memoryScore := calculateUsedScore(totalResources.Memory, allocatableResources.Memory, node.Name)
 	if glog.V(10) {
-		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
-		// not logged. There is visible performance gain from it.
-		glog.V(10).Infof(
+		glog.Infof(
 			"%v -> %v: Most Requested Priority, capacity %d millicores %d memory bytes, total request %d millicores %d memory bytes, score %d CPU %d memory",
 			pod.Name, node.Name,
 			allocatableResources.MilliCPU, allocatableResources.Memory,
