@@ -181,6 +181,7 @@ function curl-metadata() {
 }
 
 function set-kube-env() {
+  (umask 700;
   local kube_env_yaml="${INSTALL_DIR}/kube_env.yaml"
 
   until curl-metadata kube-env > "${kube_env_yaml}"; do
@@ -196,6 +197,7 @@ for k,v in yaml.load(sys.stdin).iteritems():
   print("""readonly {var}={value}""".format(var = k, value = pipes.quote(str(v))))
   print("""export {var}""".format(var = k))
   ' < """${kube_env_yaml}""")"
+  )
 }
 
 function remove-docker-artifacts() {
