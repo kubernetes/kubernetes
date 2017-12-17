@@ -96,8 +96,12 @@ func init() {
 	// Fit is determined by node selector query.
 	factory.RegisterFitPredicate("MatchNodeSelector", predicates.PodMatchNodeSelector)
 
-	// Use equivalence class to speed up predicates & priorities
-	factory.RegisterGetEquivalencePodFunction(predicates.GetEquivalencePod)
+	// Use equivalence class to speed up heavy predicates phase.
+	factory.RegisterGetEquivalencePodFunction(
+		func(args factory.PluginFactoryArgs) algorithm.GetEquivalencePodFunc {
+			return predicates.NewEquivalencePodGenerator(args.PVCInfo)
+		},
+	)
 
 	// ServiceSpreadingPriority is a priority config factory that spreads pods by minimizing
 	// the number of pods (belonging to the same service) on the same node.

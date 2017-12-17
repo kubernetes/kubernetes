@@ -173,7 +173,7 @@ func (ec *EquivalenceCache) InvalidateAllCachedPredicateItemOfNode(nodeName stri
 
 // InvalidateCachedPredicateItemForPodAdd is a wrapper of InvalidateCachedPredicateItem for pod add case
 func (ec *EquivalenceCache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, nodeName string) {
-	// MatchInterPodAffinity: we assume scheduler can make sure newly binded pod
+	// MatchInterPodAffinity: we assume scheduler can make sure newly bound pod
 	// will not break the existing inter pod affinity. So we does not need to invalidate
 	// MatchInterPodAffinity when pod added.
 	//
@@ -188,12 +188,29 @@ func (ec *EquivalenceCache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, 
 
 	// GeneralPredicates: will always be affected by adding a new pod
 	invalidPredicates := sets.NewString("GeneralPredicates")
+
+	// MaxPDVolumeCountPredicate: we check the volumes of pod to make decision.
+	for _, vol := range pod.Spec.Volumes {
+		if vol.PersistentVolumeClaim != nil {
+			invalidPredicates.Insert("MaxEBSVolumeCount", "MaxGCEPDVolumeCount", "MaxAzureDiskVolumeCount")
+		} else {
+			if vol.AWSElasticBlockStore != nil {
+				invalidPredicates.Insert("MaxEBSVolumeCount")
+			}
+			if vol.GCEPersistentDisk != nil {
+				invalidPredicates.Insert("MaxGCEPDVolumeCount")
+			}
+			if vol.AzureDisk != nil {
+				invalidPredicates.Insert("MaxAzureDiskVolumeCount")
+			}
+		}
+	}
 	ec.InvalidateCachedPredicateItem(nodeName, invalidPredicates)
 }
 
 // getHashEquivalencePod returns the hash of equivalence pod.
 // 1. equivalenceHash
-// 2. if equivalence pod is found
+// 2. if equivalence hash is valid
 func (ec *EquivalenceCache) getHashEquivalencePod(pod *v1.Pod) (uint64, bool) {
 	equivalencePod := ec.getEquivalencePod(pod)
 	if equivalencePod != nil {
