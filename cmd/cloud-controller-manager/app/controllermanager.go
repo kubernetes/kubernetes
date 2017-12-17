@@ -169,7 +169,7 @@ func Run(s *options.CloudControllerManagerServer) error {
 		"cloud-controller-manager",
 		leaderElectionClient.CoreV1(),
 		resourcelock.ResourceLockConfig{
-			Identity:      id + "-external-cloud-controller",
+			Identity:      id,
 			EventRecorder: recorder,
 		})
 	if err != nil {
