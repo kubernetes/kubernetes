@@ -36,6 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -107,7 +108,7 @@ func (rsStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runti
 // Validate validates a new ReplicaSet.
 func (rsStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	rs := obj.(*extensions.ReplicaSet)
-	return validation.ValidateReplicaSet(rs)
+	return validation.ValidateReplicaSet(rs, feature.DefaultFeatureGate)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -124,8 +125,8 @@ func (rsStrategy) AllowCreateOnUpdate() bool {
 func (rsStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	newReplicaSet := obj.(*extensions.ReplicaSet)
 	oldReplicaSet := old.(*extensions.ReplicaSet)
-	allErrs := validation.ValidateReplicaSet(obj.(*extensions.ReplicaSet))
-	allErrs = append(allErrs, validation.ValidateReplicaSetUpdate(newReplicaSet, oldReplicaSet)...)
+	allErrs := validation.ValidateReplicaSet(obj.(*extensions.ReplicaSet), feature.DefaultFeatureGate)
+	allErrs = append(allErrs, validation.ValidateReplicaSetUpdate(newReplicaSet, oldReplicaSet, feature.DefaultFeatureGate)...)
 
 	// Update is not allowed to set Spec.Selector for all groups/versions except extensions/v1beta1.
 	// If RequestInfo is nil, it is better to revert to old behavior (i.e. allow update to set Spec.Selector)

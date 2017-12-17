@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -81,7 +82,7 @@ func (jobStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) f
 	if job.Spec.ManualSelector == nil || *job.Spec.ManualSelector == false {
 		generateSelector(job)
 	}
-	return validation.ValidateJob(job)
+	return validation.ValidateJob(job, feature.DefaultFeatureGate)
 }
 
 // generateSelector adds a selector to a job and labels to its template
@@ -149,8 +150,8 @@ func (jobStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (jobStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	validationErrorList := validation.ValidateJob(obj.(*batch.Job))
-	updateErrorList := validation.ValidateJobUpdate(obj.(*batch.Job), old.(*batch.Job))
+	validationErrorList := validation.ValidateJob(obj.(*batch.Job), feature.DefaultFeatureGate)
+	updateErrorList := validation.ValidateJobUpdate(obj.(*batch.Job), old.(*batch.Job), feature.DefaultFeatureGate)
 	return append(validationErrorList, updateErrorList...)
 }
 

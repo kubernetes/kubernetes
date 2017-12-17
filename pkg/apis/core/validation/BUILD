@@ -59,6 +59,7 @@ go_test(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/helper:go_default_library",
         "//pkg/capabilities:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",

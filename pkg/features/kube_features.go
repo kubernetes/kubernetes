@@ -215,13 +215,13 @@ const (
 )
 
 func init() {
-	utilfeature.DefaultFeatureGate.Add(defaultKubernetesFeatureGates)
+	utilfeature.DefaultFeatureGate.Add(DefaultKubernetesFeatureGates)
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
-var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
+var DefaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
 	ExternalTrafficLocalOnly:                    {Default: true, PreRelease: utilfeature.GA},
 	AppArmor:                                    {Default: true, PreRelease: utilfeature.Beta},
 	DynamicKubeletConfig:                        {Default: false, PreRelease: utilfeature.Alpha},

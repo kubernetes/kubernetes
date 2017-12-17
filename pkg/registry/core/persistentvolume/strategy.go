@@ -27,6 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	pvutil "k8s.io/kubernetes/pkg/api/persistentvolume"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -58,7 +59,7 @@ func (persistentvolumeStrategy) PrepareForCreate(ctx genericapirequest.Context, 
 
 func (persistentvolumeStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	persistentvolume := obj.(*api.PersistentVolume)
-	errorList := validation.ValidatePersistentVolume(persistentvolume)
+	errorList := validation.ValidatePersistentVolume(persistentvolume, feature.DefaultFeatureGate)
 	return append(errorList, volumevalidation.ValidatePersistentVolume(persistentvolume)...)
 }
 
@@ -82,9 +83,9 @@ func (persistentvolumeStrategy) PrepareForUpdate(ctx genericapirequest.Context, 
 
 func (persistentvolumeStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	newPv := obj.(*api.PersistentVolume)
-	errorList := validation.ValidatePersistentVolume(newPv)
+	errorList := validation.ValidatePersistentVolume(newPv, feature.DefaultFeatureGate)
 	errorList = append(errorList, volumevalidation.ValidatePersistentVolume(newPv)...)
-	return append(errorList, validation.ValidatePersistentVolumeUpdate(newPv, old.(*api.PersistentVolume))...)
+	return append(errorList, validation.ValidatePersistentVolumeUpdate(newPv, old.(*api.PersistentVolume), feature.DefaultFeatureGate)...)
 }
 
 func (persistentvolumeStrategy) AllowUnconditionalUpdate() bool {

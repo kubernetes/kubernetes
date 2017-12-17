@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -125,11 +126,13 @@ func (p *podEvaluator) Constraints(required []api.ResourceName, item runtime.Obj
 	allErrs := field.ErrorList{}
 	fldPath := field.NewPath("spec").Child("containers")
 	for i, ctr := range pod.Spec.Containers {
-		allErrs = append(allErrs, validation.ValidateResourceRequirements(&ctr.Resources, fldPath.Index(i).Child("resources"))...)
+		// TODO this is highlighting a big risk.  If the controller and apiserver don't agree on feature gates, this can fail.
+		allErrs = append(allErrs, validation.ValidateResourceRequirements(&ctr.Resources, fldPath.Index(i).Child("resources"), feature.DefaultFeatureGate)...)
 	}
 	fldPath = field.NewPath("spec").Child("initContainers")
 	for i, ctr := range pod.Spec.InitContainers {
-		allErrs = append(allErrs, validation.ValidateResourceRequirements(&ctr.Resources, fldPath.Index(i).Child("resources"))...)
+		// TODO this is highlighting a big risk.  If the controller and apiserver don't agree on feature gates, this can fail.
+		allErrs = append(allErrs, validation.ValidateResourceRequirements(&ctr.Resources, fldPath.Index(i).Child("resources"), feature.DefaultFeatureGate)...)
 	}
 	if len(allErrs) > 0 {
 		return allErrs.ToAggregate()

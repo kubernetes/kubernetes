@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
@@ -57,7 +58,7 @@ func (resourcequotaStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj
 // Validate validates a new resourcequota.
 func (resourcequotaStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	resourcequota := obj.(*api.ResourceQuota)
-	return validation.ValidateResourceQuota(resourcequota)
+	return validation.ValidateResourceQuota(resourcequota, feature.DefaultFeatureGate)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -71,8 +72,8 @@ func (resourcequotaStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (resourcequotaStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidateResourceQuota(obj.(*api.ResourceQuota))
-	return append(errorList, validation.ValidateResourceQuotaUpdate(obj.(*api.ResourceQuota), old.(*api.ResourceQuota))...)
+	errorList := validation.ValidateResourceQuota(obj.(*api.ResourceQuota), feature.DefaultFeatureGate)
+	return append(errorList, validation.ValidateResourceQuotaUpdate(obj.(*api.ResourceQuota), old.(*api.ResourceQuota), feature.DefaultFeatureGate)...)
 }
 
 func (resourcequotaStrategy) AllowUnconditionalUpdate() bool {
@@ -92,5 +93,5 @@ func (resourcequotaStatusStrategy) PrepareForUpdate(ctx genericapirequest.Contex
 }
 
 func (resourcequotaStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateResourceQuotaStatusUpdate(obj.(*api.ResourceQuota), old.(*api.ResourceQuota))
+	return validation.ValidateResourceQuotaStatusUpdate(obj.(*api.ResourceQuota), old.(*api.ResourceQuota), feature.DefaultFeatureGate)
 }

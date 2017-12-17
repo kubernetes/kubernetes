@@ -19,6 +19,7 @@ package validation
 import (
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/util/feature"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/settings"
 )
@@ -34,7 +35,7 @@ func ValidatePodPresetName(name string, prefix bool) []string {
 }
 
 // ValidatePodPresetSpec tests if required fields in the PodPreset spec are set.
-func ValidatePodPresetSpec(spec *settings.PodPresetSpec, fldPath *field.Path) field.ErrorList {
+func ValidatePodPresetSpec(spec *settings.PodPresetSpec, fldPath *field.Path, featureGates feature.FeatureGate) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(&spec.Selector, fldPath.Child("selector"))...)
@@ -43,26 +44,26 @@ func ValidatePodPresetSpec(spec *settings.PodPresetSpec, fldPath *field.Path) fi
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumes", "env", "envFrom", "volumeMounts"), "must specify at least one"))
 	}
 
-	vols, vErrs := apivalidation.ValidateVolumes(spec.Volumes, fldPath.Child("volumes"))
+	vols, vErrs := apivalidation.ValidateVolumes(spec.Volumes, fldPath.Child("volumes"), featureGates)
 	allErrs = append(allErrs, vErrs...)
-	allErrs = append(allErrs, apivalidation.ValidateEnv(spec.Env, fldPath.Child("env"))...)
+	allErrs = append(allErrs, apivalidation.ValidateEnv(spec.Env, fldPath.Child("env"), featureGates)...)
 	allErrs = append(allErrs, apivalidation.ValidateEnvFrom(spec.EnvFrom, fldPath.Child("envFrom"))...)
-	allErrs = append(allErrs, apivalidation.ValidateVolumeMounts(spec.VolumeMounts, nil, vols, nil, fldPath.Child("volumeMounts"))...)
+	allErrs = append(allErrs, apivalidation.ValidateVolumeMounts(spec.VolumeMounts, nil, vols, nil, fldPath.Child("volumeMounts"), featureGates)...)
 
 	return allErrs
 }
 
 // ValidatePodPreset validates a PodPreset.
-func ValidatePodPreset(pip *settings.PodPreset) field.ErrorList {
+func ValidatePodPreset(pip *settings.PodPreset, featureGates feature.FeatureGate) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&pip.ObjectMeta, true, ValidatePodPresetName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidatePodPresetSpec(&pip.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidatePodPresetSpec(&pip.Spec, field.NewPath("spec"), featureGates)...)
 	return allErrs
 }
 
 // ValidatePodPresetUpdate tests if required fields in the PodPreset are set.
-func ValidatePodPresetUpdate(pip, oldPip *settings.PodPreset) field.ErrorList {
+func ValidatePodPresetUpdate(pip, oldPip *settings.PodPreset, featureGates feature.FeatureGate) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&pip.ObjectMeta, &oldPip.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidatePodPresetSpec(&pip.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidatePodPresetSpec(&pip.Spec, field.NewPath("spec"), featureGates)...)
 
 	return allErrs
 }

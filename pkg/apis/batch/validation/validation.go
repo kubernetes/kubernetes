@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
@@ -75,16 +76,16 @@ func ValidateGeneratedSelector(obj *batch.Job) field.ErrorList {
 	return allErrs
 }
 
-func ValidateJob(job *batch.Job) field.ErrorList {
+func ValidateJob(job *batch.Job, featureGates feature.FeatureGate) field.ErrorList {
 	// Jobs and rcs have the same name validation
 	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateGeneratedSelector(job)...)
-	allErrs = append(allErrs, ValidateJobSpec(&job.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateJobSpec(&job.Spec, field.NewPath("spec"), featureGates)...)
 	return allErrs
 }
 
-func ValidateJobSpec(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := validateJobSpec(spec, fldPath)
+func ValidateJobSpec(spec *batch.JobSpec, fldPath *field.Path, featureGates feature.FeatureGate) field.ErrorList {
+	allErrs := validateJobSpec(spec, fldPath, featureGates)
 
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
@@ -102,7 +103,7 @@ func ValidateJobSpec(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
+func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, featureGates feature.FeatureGate) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if spec.Parallelism != nil {
@@ -118,7 +119,7 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.BackoffLimit), fldPath.Child("backoffLimit"))...)
 	}
 
-	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"))...)
+	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"), featureGates)...)
 	if spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure &&
 		spec.Template.Spec.RestartPolicy != api.RestartPolicyNever {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("template", "spec", "restartPolicy"),
@@ -135,9 +136,9 @@ func ValidateJobStatus(status *batch.JobStatus, fldPath *field.Path) field.Error
 	return allErrs
 }
 
-func ValidateJobUpdate(job, oldJob *batch.Job) field.ErrorList {
+func ValidateJobUpdate(job, oldJob *batch.Job, featureGates feature.FeatureGate) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateJobSpecUpdate(job.Spec, oldJob.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateJobSpecUpdate(job.Spec, oldJob.Spec, field.NewPath("spec"), featureGates)...)
 	return allErrs
 }
 
@@ -147,9 +148,9 @@ func ValidateJobUpdateStatus(job, oldJob *batch.Job) field.ErrorList {
 	return allErrs
 }
 
-func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path) field.ErrorList {
+func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, featureGates feature.FeatureGate) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateJobSpec(&spec, fldPath)...)
+	allErrs = append(allErrs, ValidateJobSpec(&spec, fldPath, featureGates)...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Completions, oldSpec.Completions, fldPath.Child("completions"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Selector, oldSpec.Selector, fldPath.Child("selector"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Template, oldSpec.Template, fldPath.Child("template"))...)
@@ -162,10 +163,10 @@ func ValidateJobStatusUpdate(status, oldStatus batch.JobStatus) field.ErrorList 
 	return allErrs
 }
 
-func ValidateCronJob(scheduledJob *batch.CronJob) field.ErrorList {
+func ValidateCronJob(scheduledJob *batch.CronJob, featureGates feature.FeatureGate) field.ErrorList {
 	// CronJobs and rcs have the same name validation
 	allErrs := apivalidation.ValidateObjectMeta(&scheduledJob.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateCronJobSpec(&scheduledJob.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateCronJobSpec(&scheduledJob.Spec, field.NewPath("spec"), featureGates)...)
 	if len(scheduledJob.ObjectMeta.Name) > apimachineryvalidation.DNS1035LabelMaxLength-11 {
 		// The cronjob controller appends a 11-character suffix to the cronjob (`-$TIMESTAMP`) when
 		// creating a job. The job name length limit is 63 characters.
@@ -176,15 +177,15 @@ func ValidateCronJob(scheduledJob *batch.CronJob) field.ErrorList {
 	return allErrs
 }
 
-func ValidateCronJobUpdate(job, oldJob *batch.CronJob) field.ErrorList {
+func ValidateCronJobUpdate(job, oldJob *batch.CronJob, featureGates feature.FeatureGate) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateCronJobSpec(&job.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateCronJobSpec(&job.Spec, field.NewPath("spec"), featureGates)...)
 	// skip the 52-character name validation limit on update validation
 	// to allow old cronjobs with names > 52 chars to be updated/deleted
 	return allErrs
 }
 
-func ValidateCronJobSpec(spec *batch.CronJobSpec, fldPath *field.Path) field.ErrorList {
+func ValidateCronJobSpec(spec *batch.CronJobSpec, fldPath *field.Path, featureGates feature.FeatureGate) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(spec.Schedule) == 0 {
@@ -196,7 +197,7 @@ func ValidateCronJobSpec(spec *batch.CronJobSpec, fldPath *field.Path) field.Err
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.StartingDeadlineSeconds), fldPath.Child("startingDeadlineSeconds"))...)
 	}
 	allErrs = append(allErrs, validateConcurrencyPolicy(&spec.ConcurrencyPolicy, fldPath.Child("concurrencyPolicy"))...)
-	allErrs = append(allErrs, ValidateJobTemplateSpec(&spec.JobTemplate, fldPath.Child("jobTemplate"))...)
+	allErrs = append(allErrs, ValidateJobTemplateSpec(&spec.JobTemplate, fldPath.Child("jobTemplate"), featureGates)...)
 
 	if spec.SuccessfulJobsHistoryLimit != nil {
 		// zero is a valid SuccessfulJobsHistoryLimit
@@ -234,15 +235,15 @@ func validateScheduleFormat(schedule string, fldPath *field.Path) field.ErrorLis
 	return allErrs
 }
 
-func ValidateJobTemplate(job *batch.JobTemplate) field.ErrorList {
+func ValidateJobTemplate(job *batch.JobTemplate, featureGates feature.FeatureGate) field.ErrorList {
 	// this method should be identical to ValidateJob
 	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateJobTemplateSpec(&job.Template, field.NewPath("template"))...)
+	allErrs = append(allErrs, ValidateJobTemplateSpec(&job.Template, field.NewPath("template"), featureGates)...)
 	return allErrs
 }
 
-func ValidateJobTemplateSpec(spec *batch.JobTemplateSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := validateJobSpec(&spec.Spec, fldPath.Child("spec"))
+func ValidateJobTemplateSpec(spec *batch.JobTemplateSpec, fldPath *field.Path, featureGates feature.FeatureGate) field.ErrorList {
+	allErrs := validateJobSpec(&spec.Spec, fldPath.Child("spec"), featureGates)
 
 	// jobtemplate will always have the selector automatically generated
 	if spec.Spec.Selector != nil {

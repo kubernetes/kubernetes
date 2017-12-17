@@ -26,6 +26,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -94,7 +95,7 @@ func (statefulSetStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, 
 // Validate validates a new StatefulSet.
 func (statefulSetStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	statefulSet := obj.(*apps.StatefulSet)
-	return validation.ValidateStatefulSet(statefulSet)
+	return validation.ValidateStatefulSet(statefulSet, feature.DefaultFeatureGate)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -108,7 +109,7 @@ func (statefulSetStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (statefulSetStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	validationErrorList := validation.ValidateStatefulSet(obj.(*apps.StatefulSet))
+	validationErrorList := validation.ValidateStatefulSet(obj.(*apps.StatefulSet), feature.DefaultFeatureGate)
 	updateErrorList := validation.ValidateStatefulSetUpdate(obj.(*apps.StatefulSet), old.(*apps.StatefulSet))
 	return append(validationErrorList, updateErrorList...)
 }

@@ -22,9 +22,11 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/testing/compat"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
@@ -158,8 +160,12 @@ func TestCompatibility_v1_PodSecurityContext(t *testing.T) {
 		},
 	}
 
+	featureGates := feature.NewFeatureGate()
+	if err := featureGates.Add(features.DefaultKubernetesFeatureGates); err != nil {
+		t.Fatal(err)
+	}
 	validator := func(obj runtime.Object) field.ErrorList {
-		return validation.ValidatePodSpec(&(obj.(*api.Pod).Spec), field.NewPath("spec"))
+		return validation.ValidatePodSpec(&(obj.(*api.Pod).Spec), field.NewPath("spec"), featureGates)
 	}
 
 	for _, tc := range cases {

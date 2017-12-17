@@ -33,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -102,7 +103,7 @@ func (rcStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runti
 // Validate validates a new replication controller.
 func (rcStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	controller := obj.(*api.ReplicationController)
-	return validation.ValidateReplicationController(controller)
+	return validation.ValidateReplicationController(controller, feature.DefaultFeatureGate)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -120,8 +121,8 @@ func (rcStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime
 	oldRc := old.(*api.ReplicationController)
 	newRc := obj.(*api.ReplicationController)
 
-	validationErrorList := validation.ValidateReplicationController(newRc)
-	updateErrorList := validation.ValidateReplicationControllerUpdate(newRc, oldRc)
+	validationErrorList := validation.ValidateReplicationController(newRc, feature.DefaultFeatureGate)
+	updateErrorList := validation.ValidateReplicationControllerUpdate(newRc, oldRc, feature.DefaultFeatureGate)
 	errs := append(validationErrorList, updateErrorList...)
 
 	for key, value := range helper.NonConvertibleFields(oldRc.Annotations) {

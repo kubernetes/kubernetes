@@ -17,7 +17,6 @@ limitations under the License.
 package validation
 
 import (
-	"fmt"
 	"math"
 	"reflect"
 	"strings"
@@ -29,12 +28,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/capabilities"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
@@ -441,7 +441,7 @@ func TestValidatePersistentVolumes(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		errs := ValidatePersistentVolume(scenario.volume)
+		errs := ValidatePersistentVolume(scenario.volume, feature.NewFeatureGate())
 		if len(errs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", name)
 		}
@@ -503,7 +503,7 @@ func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
 		},
 	}
 	for name, scenario := range scenarios {
-		errs := ValidatePersistentVolumeUpdate(scenario.newVolume, scenario.oldVolume)
+		errs := ValidatePersistentVolumeUpdate(scenario.newVolume, scenario.oldVolume, feature.NewFeatureGate())
 		if len(errs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", name)
 		}
@@ -672,13 +672,17 @@ func TestValidateLocalVolumes(t *testing.T) {
 		},
 	}
 
-	err := utilfeature.DefaultFeatureGate.Set("PersistentLocalVolumes=true")
+	featureGates := feature.NewFeatureGate()
+	if err := featureGates.Add(features.DefaultKubernetesFeatureGates); err != nil {
+		t.Fatal(err)
+	}
+	err := featureGates.Set("PersistentLocalVolumes=true")
 	if err != nil {
 		t.Errorf("Failed to enable feature gate for LocalPersistentVolumes: %v", err)
 		return
 	}
 	for name, scenario := range scenarios {
-		errs := ValidatePersistentVolume(scenario.volume)
+		errs := ValidatePersistentVolume(scenario.volume, featureGates)
 		if len(errs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", name)
 		}
@@ -965,7 +969,7 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		errs := ValidatePersistentVolumeClaim(scenario.claim)
+		errs := ValidatePersistentVolumeClaim(scenario.claim, feature.NewFeatureGate())
 		if len(errs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", name)
 		}
@@ -1054,9 +1058,13 @@ func TestAlphaPVVolumeModeUpdate(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
+		featureGates := feature.NewFeatureGate()
+		if err := featureGates.Add(features.DefaultKubernetesFeatureGates); err != nil {
+			t.Fatal(err)
+		}
 		// ensure we have a resource version specified for updates
-		toggleBlockVolumeFeature(scenario.enableBlock, t)
-		errs := ValidatePersistentVolumeUpdate(scenario.newPV, scenario.oldPV)
+		toggleBlockVolumeFeature(scenario.enableBlock, t, featureGates)
+		errs := ValidatePersistentVolumeUpdate(scenario.newPV, scenario.oldPV, featureGates)
 		if len(errs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", name)
 		}
@@ -1415,12 +1423,16 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
+		featureGates := feature.NewFeatureGate()
+		if err := featureGates.Add(features.DefaultKubernetesFeatureGates); err != nil {
+			t.Fatal(err)
+		}
 		// ensure we have a resource version specified for updates
-		togglePVExpandFeature(scenario.enableResize, t)
-		toggleBlockVolumeFeature(scenario.enableBlock, t)
+		togglePVExpandFeature(scenario.enableResize, t, featureGates)
+		toggleBlockVolumeFeature(scenario.enableBlock, t, featureGates)
 		scenario.oldClaim.ResourceVersion = "1"
 		scenario.newClaim.ResourceVersion = "1"
-		errs := ValidatePersistentVolumeClaimUpdate(scenario.newClaim, scenario.oldClaim)
+		errs := ValidatePersistentVolumeClaimUpdate(scenario.newClaim, scenario.oldClaim, featureGates)
 		if len(errs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", name)
 		}
@@ -1430,16 +1442,16 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 	}
 }
 
-func toggleBlockVolumeFeature(toggleFlag bool, t *testing.T) {
+func toggleBlockVolumeFeature(toggleFlag bool, t *testing.T, featureGates feature.FeatureGate) {
 	if toggleFlag {
 		// Enable alpha feature BlockVolume
-		err := utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
+		err := featureGates.Set("BlockVolume=true")
 		if err != nil {
 			t.Errorf("Failed to enable feature gate for BlockVolume: %v", err)
 			return
 		}
 	} else {
-		err := utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
+		err := featureGates.Set("BlockVolume=false")
 		if err != nil {
 			t.Errorf("Failed to disable feature gate for BlockVolume: %v", err)
 			return
@@ -1447,16 +1459,16 @@ func toggleBlockVolumeFeature(toggleFlag bool, t *testing.T) {
 	}
 }
 
-func togglePVExpandFeature(toggleFlag bool, t *testing.T) {
+func togglePVExpandFeature(toggleFlag bool, t *testing.T, featureGates feature.FeatureGate) {
 	if toggleFlag {
 		// Enable alpha feature LocalStorageCapacityIsolation
-		err := utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=true")
+		err := featureGates.Set("ExpandPersistentVolumes=true")
 		if err != nil {
 			t.Errorf("Failed to enable feature gate for ExpandPersistentVolumes: %v", err)
 			return
 		}
 	} else {
-		err := utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=false")
+		err := featureGates.Set("ExpandPersistentVolumes=false")
 		if err != nil {
 			t.Errorf("Failed to disable feature gate for ExpandPersistentVolumes: %v", err)
 			return
@@ -1665,14 +1677,18 @@ func TestValidateCSIVolumeSource(t *testing.T) {
 		},
 	}
 
-	err := utilfeature.DefaultFeatureGate.Set("CSIPersistentVolume=true")
+	featureGates := feature.NewFeatureGate()
+	if err := featureGates.Add(features.DefaultKubernetesFeatureGates); err != nil {
+		t.Fatal(err)
+	}
+	err := featureGates.Set("CSIPersistentVolume=true")
 	if err != nil {
 		t.Errorf("Failed to enable feature gate for CSIPersistentVolumes: %v", err)
 		return
 	}
 
 	for i, tc := range testCases {
-		errs := validateCSIPersistentVolumeSource(tc.csi, field.NewPath("field"))
+		errs := validateCSIPersistentVolumeSource(tc.csi, field.NewPath("field"), featureGates)
 
 		if len(errs) > 0 && tc.errtype == "" {
 			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
@@ -1686,7 +1702,7 @@ func TestValidateCSIVolumeSource(t *testing.T) {
 			}
 		}
 	}
-	err = utilfeature.DefaultFeatureGate.Set("CSIPersistentVolume=false")
+	err = featureGates.Set("CSIPersistentVolume=false")
 	if err != nil {
 		t.Errorf("Failed to disable feature gate for CSIPersistentVolumes: %v", err)
 		return
@@ -3283,7 +3299,7 @@ func TestValidateVolumes(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		names, errs := ValidateVolumes([]core.Volume{tc.vol}, field.NewPath("field"))
+		names, errs := ValidateVolumes([]core.Volume{tc.vol}, field.NewPath("field"), feature.NewFeatureGate())
 		if len(errs) > 0 && tc.errtype == "" {
 			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
 		} else if len(errs) > 1 {
@@ -3309,7 +3325,7 @@ func TestValidateVolumes(t *testing.T) {
 		{Name: "abc", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
 		{Name: "abc", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
 	}
-	_, errs := ValidateVolumes(dupsCase, field.NewPath("field"))
+	_, errs := ValidateVolumes(dupsCase, field.NewPath("field"), feature.NewFeatureGate())
 	if len(errs) == 0 {
 		t.Errorf("expected error")
 	} else if len(errs) != 1 {
@@ -3322,20 +3338,24 @@ func TestValidateVolumes(t *testing.T) {
 	hugePagesCase := core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{Medium: core.StorageMediumHugePages}}
 
 	// Enable alpha feature HugePages
-	err := utilfeature.DefaultFeatureGate.Set("HugePages=true")
+	featureGates := feature.NewFeatureGate()
+	if err := featureGates.Add(features.DefaultKubernetesFeatureGates); err != nil {
+		t.Fatal(err)
+	}
+	err := featureGates.Set("HugePages=true")
 	if err != nil {
 		t.Errorf("Failed to enable feature gate for HugePages: %v", err)
 	}
-	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "working"); len(errs) != 0 {
+	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "working", featureGates); len(errs) != 0 {
 		t.Errorf("Unexpected error when HugePages feature is enabled.")
 	}
 
 	// Disable alpha feature HugePages
-	err = utilfeature.DefaultFeatureGate.Set("HugePages=false")
+	err = featureGates.Set("HugePages=false")
 	if err != nil {
 		t.Errorf("Failed to disable feature gate for HugePages: %v", err)
 	}
-	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "failing"); len(errs) == 0 {
+	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "failing", featureGates); len(errs) == 0 {
 		t.Errorf("Expected error when HugePages feature is disabled got nothing.")
 	}
 
@@ -3409,25 +3429,29 @@ func TestAlphaHugePagesIsolation(t *testing.T) {
 		},
 	}
 	// Enable alpha feature HugePages
-	err := utilfeature.DefaultFeatureGate.Set("HugePages=true")
+	featureGates := feature.NewFeatureGate()
+	if err := featureGates.Add(features.DefaultKubernetesFeatureGates); err != nil {
+		t.Fatal(err)
+	}
+	err := featureGates.Set("HugePages=true")
 	if err != nil {
 		t.Errorf("Failed to enable feature gate for HugePages: %v", err)
 		return
 	}
 	for i := range successCases {
 		pod := &successCases[i]
-		if errs := ValidatePod(pod); len(errs) != 0 {
+		if errs := ValidatePod(pod, featureGates); len(errs) != 0 {
 			t.Errorf("Unexpected error for case[%d], err: %v", i, errs)
 		}
 	}
 	for i := range failureCases {
 		pod := &failureCases[i]
-		if errs := ValidatePod(pod); len(errs) == 0 {
+		if errs := ValidatePod(pod, featureGates); len(errs) == 0 {
 			t.Errorf("Expected error for case[%d], pod: %v", i, pod.Name)
 		}
 	}
 	// Disable alpha feature HugePages
-	err = utilfeature.DefaultFeatureGate.Set("HugePages=false")
+	err = featureGates.Set("HugePages=false")
 	if err != nil {
 		t.Errorf("Failed to disable feature gate for HugePages: %v", err)
 		return
@@ -3435,7 +3459,7 @@ func TestAlphaHugePagesIsolation(t *testing.T) {
 	// Disable alpha feature HugePages and ensure all success cases fail
 	for i := range successCases {
 		pod := &successCases[i]
-		if errs := ValidatePod(pod); len(errs) == 0 {
+		if errs := ValidatePod(pod, featureGates); len(errs) == 0 {
 			t.Errorf("Expected error for case[%d], pod: %v", i, pod.Name)
 		}
 	}
@@ -3443,7 +3467,11 @@ func TestAlphaHugePagesIsolation(t *testing.T) {
 
 func TestAlphaPVCVolumeMode(t *testing.T) {
 	// Enable alpha feature BlockVolume for PVC
-	err := utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
+	featureGates := feature.NewFeatureGate()
+	if err := featureGates.Add(features.DefaultKubernetesFeatureGates); err != nil {
+		t.Fatal(err)
+	}
+	err := featureGates.Set("BlockVolume=true")
 	if err != nil {
 		t.Errorf("Failed to enable feature gate for BlockVolume: %v", err)
 		return
@@ -3461,7 +3489,7 @@ func TestAlphaPVCVolumeMode(t *testing.T) {
 		"valid nil value":        createTestVolModePVC(nil),
 	}
 	for k, v := range successCasesPVC {
-		if errs := ValidatePersistentVolumeClaim(v); len(errs) != 0 {
+		if errs := ValidatePersistentVolumeClaim(v, featureGates); len(errs) != 0 {
 			t.Errorf("expected success for %s", k)
 		}
 	}
@@ -3472,7 +3500,7 @@ func TestAlphaPVCVolumeMode(t *testing.T) {
 		"empty value":   createTestVolModePVC(&empty),
 	}
 	for k, v := range errorCasesPVC {
-		if errs := ValidatePersistentVolumeClaim(v); len(errs) == 0 {
+		if errs := ValidatePersistentVolumeClaim(v, featureGates); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -3480,7 +3508,11 @@ func TestAlphaPVCVolumeMode(t *testing.T) {
 
 func TestAlphaPVVolumeMode(t *testing.T) {
 	// Enable alpha feature BlockVolume for PV
-	err := utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
+	featureGates := feature.NewFeatureGate()
+	if err := featureGates.Add(features.DefaultKubernetesFeatureGates); err != nil {
+		t.Fatal(err)
+	}
+	err := featureGates.Set("BlockVolume=true")
 	if err != nil {
 		t.Errorf("Failed to enable feature gate for BlockVolume: %v", err)
 		return
@@ -3498,7 +3530,7 @@ func TestAlphaPVVolumeMode(t *testing.T) {
 		"valid nil value":        createTestVolModePV(nil),
 	}
 	for k, v := range successCasesPV {
-		if errs := ValidatePersistentVolume(v); len(errs) != 0 {
+		if errs := ValidatePersistentVolume(v, featureGates); len(errs) != 0 {
 			t.Errorf("expected success for %s", k)
 		}
 	}
@@ -3509,7 +3541,7 @@ func TestAlphaPVVolumeMode(t *testing.T) {
 		"empty value":   createTestVolModePV(&empty),
 	}
 	for k, v := range errorCasesPV {
-		if errs := ValidatePersistentVolume(v); len(errs) == 0 {
+		if errs := ValidatePersistentVolume(v, featureGates); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -3594,24 +3626,28 @@ func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
 		{EmptyDir: &core.EmptyDirVolumeSource{SizeLimit: resource.NewQuantity(int64(5), resource.BinarySI)}},
 	}
 	// Enable alpha feature LocalStorageCapacityIsolation
-	err := utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=true")
+	featureGates := feature.NewFeatureGate()
+	if err := featureGates.Add(features.DefaultKubernetesFeatureGates); err != nil {
+		t.Fatal(err)
+	}
+	err := featureGates.Set("LocalStorageCapacityIsolation=true")
 	if err != nil {
 		t.Errorf("Failed to enable feature gate for LocalStorageCapacityIsolation: %v", err)
 		return
 	}
 	for _, tc := range testCases {
-		if errs := validateVolumeSource(&tc, field.NewPath("spec"), "tmpvol"); len(errs) != 0 {
+		if errs := validateVolumeSource(&tc, field.NewPath("spec"), "tmpvol", featureGates); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
 	// Disable alpha feature LocalStorageCapacityIsolation
-	err = utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=false")
+	err = featureGates.Set("LocalStorageCapacityIsolation=false")
 	if err != nil {
 		t.Errorf("Failed to disable feature gate for LocalStorageCapacityIsolation: %v", err)
 		return
 	}
 	for _, tc := range testCases {
-		if errs := validateVolumeSource(&tc, field.NewPath("spec"), "tmpvol"); len(errs) == 0 {
+		if errs := validateVolumeSource(&tc, field.NewPath("spec"), "tmpvol", featureGates); len(errs) == 0 {
 			t.Errorf("expected failure: %v", errs)
 		}
 	}
@@ -3624,21 +3660,21 @@ func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
 		},
 	}
 	// Enable alpha feature LocalStorageCapacityIsolation
-	err = utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=true")
+	err = featureGates.Set("LocalStorageCapacityIsolation=true")
 	if err != nil {
 		t.Errorf("Failed to enable feature gate for LocalStorageCapacityIsolation: %v", err)
 		return
 	}
-	if errs := ValidateResourceRequirements(&containerLimitCase, field.NewPath("resources")); len(errs) != 0 {
+	if errs := ValidateResourceRequirements(&containerLimitCase, field.NewPath("resources"), featureGates); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 	// Disable alpha feature LocalStorageCapacityIsolation
-	err = utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=false")
+	err = featureGates.Set("LocalStorageCapacityIsolation=false")
 	if err != nil {
 		t.Errorf("Failed to disable feature gate for LocalStorageCapacityIsolation: %v", err)
 		return
 	}
-	if errs := ValidateResourceRequirements(&containerLimitCase, field.NewPath("resources")); len(errs) == 0 {
+	if errs := ValidateResourceRequirements(&containerLimitCase, field.NewPath("resources"), featureGates); len(errs) == 0 {
 		t.Errorf("expected failure: %v", errs)
 	}
 
@@ -3673,22 +3709,26 @@ func TestValidateResourceQuotaWithAlphaLocalStorageCapacityIsolation(t *testing.
 	}
 
 	// Enable alpha feature LocalStorageCapacityIsolation
-	err := utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=true")
+	featureGates := feature.NewFeatureGate()
+	if err := featureGates.Add(features.DefaultKubernetesFeatureGates); err != nil {
+		t.Fatal(err)
+	}
+	err := featureGates.Set("LocalStorageCapacityIsolation=true")
 	if err != nil {
 		t.Errorf("Failed to enable feature gate for LocalStorageCapacityIsolation: %v", err)
 		return
 	}
-	if errs := ValidateResourceQuota(resourceQuota); len(errs) != 0 {
+	if errs := ValidateResourceQuota(resourceQuota, featureGates); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
 	// Disable alpha feature LocalStorageCapacityIsolation
-	err = utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=false")
+	err = featureGates.Set("LocalStorageCapacityIsolation=false")
 	if err != nil {
 		t.Errorf("Failed to disable feature gate for LocalStorageCapacityIsolation: %v", err)
 		return
 	}
-	errs := ValidateResourceQuota(resourceQuota)
+	errs := ValidateResourceQuota(resourceQuota, featureGates)
 	if len(errs) == 0 {
 		t.Errorf("expected failure for %s", resourceQuota.Name)
 	}
@@ -3820,25 +3860,29 @@ func TestLocalStorageEnvWithFeatureGate(t *testing.T) {
 		},
 	}
 	// Enable alpha feature LocalStorageCapacityIsolation
-	err := utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=true")
+	featureGates := feature.NewFeatureGate()
+	if err := featureGates.Add(features.DefaultKubernetesFeatureGates); err != nil {
+		t.Fatal(err)
+	}
+	err := featureGates.Set("LocalStorageCapacityIsolation=true")
 	if err != nil {
 		t.Errorf("Failed to enable feature gate for LocalStorageCapacityIsolation: %v", err)
 		return
 	}
 	for _, testCase := range testCases {
-		if errs := validateEnvVarValueFrom(testCase, field.NewPath("field")); len(errs) != 0 {
+		if errs := validateEnvVarValueFrom(testCase, field.NewPath("field"), featureGates); len(errs) != 0 {
 			t.Errorf("expected success, got: %v", errs)
 		}
 	}
 
 	// Disable alpha feature LocalStorageCapacityIsolation
-	err = utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=false")
+	err = featureGates.Set("LocalStorageCapacityIsolation=false")
 	if err != nil {
 		t.Errorf("Failed to disable feature gate for LocalStorageCapacityIsolation: %v", err)
 		return
 	}
 	for _, testCase := range testCases {
-		if errs := validateEnvVarValueFrom(testCase, field.NewPath("field")); len(errs) == 0 {
+		if errs := validateEnvVarValueFrom(testCase, field.NewPath("field"), featureGates); len(errs) == 0 {
 			t.Errorf("expected failure for %v", testCase.Name)
 		}
 	}
@@ -3956,7 +4000,7 @@ func TestValidateEnv(t *testing.T) {
 			},
 		},
 	}
-	if errs := ValidateEnv(successCase, field.NewPath("field")); len(errs) != 0 {
+	if errs := ValidateEnv(successCase, field.NewPath("field"), feature.NewFeatureGate()); len(errs) != 0 {
 		t.Errorf("expected success, got: %v", errs)
 	}
 
@@ -4220,7 +4264,7 @@ func TestValidateEnv(t *testing.T) {
 		},
 	}
 	for _, tc := range errorCases {
-		if errs := ValidateEnv(tc.envs, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidateEnv(tc.envs, field.NewPath("field"), feature.NewFeatureGate()); len(errs) == 0 {
 			t.Errorf("expected failure for %s", tc.name)
 		} else {
 			for i := range errs {
@@ -4401,7 +4445,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
 		{Name: "123", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
 	}
-	vols, v1err := ValidateVolumes(volumes, field.NewPath("field"))
+	vols, v1err := ValidateVolumes(volumes, field.NewPath("field"), feature.NewFeatureGate())
 	if len(v1err) > 0 {
 		t.Errorf("Invalid test volume - expected success %v", v1err)
 		return
@@ -4427,7 +4471,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "xyz", DevicePath: "/foofoo"},
 		{Name: "uvw", DevicePath: "/foofoo/share/test"},
 	}
-	if errs := ValidateVolumeMounts(successCase, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field")); len(errs) != 0 {
+	if errs := ValidateVolumeMounts(successCase, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"), feature.NewFeatureGate()); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -4450,7 +4494,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 	}
 
 	for k, v := range errorCases {
-		if errs := ValidateVolumeMounts(v, GetVolumeDeviceMap(badVolumeDevice), vols, &container, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidateVolumeMounts(v, GetVolumeDeviceMap(badVolumeDevice), vols, &container, field.NewPath("field"), feature.NewFeatureGate()); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -4549,20 +4593,11 @@ func TestValidateMountPropagation(t *testing.T) {
 	}
 
 	// Enable MountPropagation for this test
-	priorityEnabled := utilfeature.DefaultFeatureGate.Enabled("MountPropagation")
-	defer func() {
-		var err error
-		// restoring the old value
-		if priorityEnabled {
-			err = utilfeature.DefaultFeatureGate.Set("MountPropagation=true")
-		} else {
-			err = utilfeature.DefaultFeatureGate.Set("MountPropagation=false")
-		}
-		if err != nil {
-			t.Errorf("Failed to restore feature gate for MountPropagation: %v", err)
-		}
-	}()
-	err := utilfeature.DefaultFeatureGate.Set("MountPropagation=true")
+	featureGates := feature.NewFeatureGate()
+	if err := featureGates.Add(features.DefaultKubernetesFeatureGates); err != nil {
+		t.Fatal(err)
+	}
+	err := featureGates.Set("MountPropagation=true")
 	if err != nil {
 		t.Errorf("Failed to enable feature gate for MountPropagation: %v", err)
 		return
@@ -4571,13 +4606,13 @@ func TestValidateMountPropagation(t *testing.T) {
 	volumes := []core.Volume{
 		{Name: "foo", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
 	}
-	vols2, v2err := ValidateVolumes(volumes, field.NewPath("field"))
+	vols2, v2err := ValidateVolumes(volumes, field.NewPath("field"), featureGates)
 	if len(v2err) > 0 {
 		t.Errorf("Invalid test volume - expected success %v", v2err)
 		return
 	}
 	for i, test := range tests {
-		errs := ValidateVolumeMounts([]core.VolumeMount{test.mount}, nil, vols2, test.container, field.NewPath("field"))
+		errs := ValidateVolumeMounts([]core.VolumeMount{test.mount}, nil, vols2, test.container, field.NewPath("field"), featureGates)
 		if test.expectError && len(errs) == 0 {
 			t.Errorf("test %d expected error, got none", i)
 		}
@@ -4594,7 +4629,7 @@ func TestAlphaValidateVolumeDevices(t *testing.T) {
 		{Name: "def", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
 	}
 
-	vols, v1err := ValidateVolumes(volumes, field.NewPath("field"))
+	vols, v1err := ValidateVolumes(volumes, field.NewPath("field"), feature.NewFeatureGate())
 	if len(v1err) > 0 {
 		t.Errorf("Invalid test volumes - expected success %v", v1err)
 		return
@@ -4632,32 +4667,36 @@ func TestAlphaValidateVolumeDevices(t *testing.T) {
 	}
 
 	// enable Alpha BlockVolume
-	err1 := utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
+	featureGates := feature.NewFeatureGate()
+	if err := featureGates.Add(features.DefaultKubernetesFeatureGates); err != nil {
+		t.Fatal(err)
+	}
+	err1 := featureGates.Set("BlockVolume=true")
 	if err1 != nil {
 		t.Errorf("Failed to enable feature gate for BlockVolume: %v", err1)
 		return
 	}
 	// Success Cases:
 	// Validate normal success cases - only PVC volumeSource
-	if errs := ValidateVolumeDevices(successCase, GetVolumeMountMap(goodVolumeMounts), vols, field.NewPath("field")); len(errs) != 0 {
+	if errs := ValidateVolumeDevices(successCase, GetVolumeMountMap(goodVolumeMounts), vols, field.NewPath("field"), featureGates); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
 	// Error Cases:
 	// Validate normal error cases - only PVC volumeSource
 	for k, v := range errorCases {
-		if errs := ValidateVolumeDevices(v, GetVolumeMountMap(badVolumeMounts), vols, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidateVolumeDevices(v, GetVolumeMountMap(badVolumeMounts), vols, field.NewPath("field"), featureGates); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
 
 	// disable Alpha BlockVolume
-	err2 := utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
+	err2 := featureGates.Set("BlockVolume=false")
 	if err2 != nil {
 		t.Errorf("Failed to disable feature gate for BlockVolume: %v", err2)
 		return
 	}
-	if errs := ValidateVolumeDevices(disabledAlphaVolDevice, GetVolumeMountMap(goodVolumeMounts), vols, field.NewPath("field")); len(errs) == 0 {
+	if errs := ValidateVolumeDevices(disabledAlphaVolDevice, GetVolumeMountMap(goodVolumeMounts), vols, field.NewPath("field"), featureGates); len(errs) == 0 {
 		t.Errorf("expected failure: %v", errs)
 	}
 }
@@ -4944,7 +4983,7 @@ func TestValidateContainers(t *testing.T) {
 		},
 		{Name: "abc-1234", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", SecurityContext: fakeValidSecurityContext(true)},
 	}
-	if errs := validateContainers(successCase, volumeDevices, field.NewPath("field")); len(errs) != 0 {
+	if errs := validateContainers(successCase, volumeDevices, field.NewPath("field"), feature.NewFeatureGate()); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -5206,7 +5245,7 @@ func TestValidateContainers(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		if errs := validateContainers(v, volumeDevices, field.NewPath("field")); len(errs) == 0 {
+		if errs := validateContainers(v, volumeDevices, field.NewPath("field"), feature.NewFeatureGate()); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -5234,41 +5273,35 @@ func TestValidateRestartPolicy(t *testing.T) {
 }
 
 func TestValidateDNSPolicy(t *testing.T) {
-	customDNSEnabled := utilfeature.DefaultFeatureGate.Enabled("CustomPodDNS")
-	defer func() {
-		// Restoring the old value.
-		if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("CustomPodDNS=%v", customDNSEnabled)); err != nil {
-			t.Errorf("Failed to restore CustomPodDNS feature gate: %v", err)
-		}
-	}()
-	if err := utilfeature.DefaultFeatureGate.Set("CustomPodDNS=true"); err != nil {
+	featureGates := feature.NewFeatureGate()
+	if err := featureGates.Add(features.DefaultKubernetesFeatureGates); err != nil {
+		t.Fatal(err)
+	}
+	if err := featureGates.Set("CustomPodDNS=true"); err != nil {
 		t.Errorf("Failed to enable CustomPodDNS feature gate: %v", err)
 	}
 
 	successCases := []core.DNSPolicy{core.DNSClusterFirst, core.DNSDefault, core.DNSPolicy(core.DNSClusterFirst), core.DNSNone}
 	for _, policy := range successCases {
-		if errs := validateDNSPolicy(&policy, field.NewPath("field")); len(errs) != 0 {
+		if errs := validateDNSPolicy(&policy, field.NewPath("field"), featureGates); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
 
 	errorCases := []core.DNSPolicy{core.DNSPolicy("invalid")}
 	for _, policy := range errorCases {
-		if errs := validateDNSPolicy(&policy, field.NewPath("field")); len(errs) == 0 {
+		if errs := validateDNSPolicy(&policy, field.NewPath("field"), featureGates); len(errs) == 0 {
 			t.Errorf("expected failure for %v", policy)
 		}
 	}
 }
 
 func TestValidatePodDNSConfig(t *testing.T) {
-	customDNSEnabled := utilfeature.DefaultFeatureGate.Enabled("CustomPodDNS")
-	defer func() {
-		// Restoring the old value.
-		if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("CustomPodDNS=%v", customDNSEnabled)); err != nil {
-			t.Errorf("Failed to restore CustomPodDNS feature gate: %v", err)
-		}
-	}()
-	if err := utilfeature.DefaultFeatureGate.Set("CustomPodDNS=true"); err != nil {
+	featureGates := feature.NewFeatureGate()
+	if err := featureGates.Add(features.DefaultKubernetesFeatureGates); err != nil {
+		t.Fatal(err)
+	}
+	if err := featureGates.Set("CustomPodDNS=true"); err != nil {
 		t.Errorf("Failed to enable CustomPodDNS feature gate: %v", err)
 	}
 
@@ -5422,7 +5455,7 @@ func TestValidatePodDNSConfig(t *testing.T) {
 			tc.dnsPolicy = &testDNSClusterFirst
 		}
 
-		errs := validatePodDNSConfig(tc.dnsConfig, tc.dnsPolicy, field.NewPath("dnsConfig"))
+		errs := validatePodDNSConfig(tc.dnsConfig, tc.dnsPolicy, field.NewPath("dnsConfig"), featureGates)
 		if len(errs) != 0 && !tc.expectedError {
 			t.Errorf("%v: validatePodDNSConfig(%v) = %v, want nil", tc.desc, tc.dnsConfig, errs)
 		} else if len(errs) == 0 && tc.expectedError {
@@ -5440,20 +5473,11 @@ func TestValidatePodSpec(t *testing.T) {
 	minGroupID := int64(0)
 	maxGroupID := int64(2147483647)
 
-	priorityEnabled := utilfeature.DefaultFeatureGate.Enabled("PodPriority")
-	defer func() {
-		var err error
-		// restoring the old value
-		if priorityEnabled {
-			err = utilfeature.DefaultFeatureGate.Set("PodPriority=true")
-		} else {
-			err = utilfeature.DefaultFeatureGate.Set("PodPriority=false")
-		}
-		if err != nil {
-			t.Errorf("Failed to restore feature gate for PodPriority: %v", err)
-		}
-	}()
-	err := utilfeature.DefaultFeatureGate.Set("PodPriority=true")
+	featureGates := feature.NewFeatureGate()
+	if err := featureGates.Add(features.DefaultKubernetesFeatureGates); err != nil {
+		t.Fatal(err)
+	}
+	err := featureGates.Set("PodPriority=true")
 	if err != nil {
 		t.Errorf("Failed to enable feature gate for PodPriority: %v", err)
 		return
@@ -5584,7 +5608,7 @@ func TestValidatePodSpec(t *testing.T) {
 		},
 	}
 	for i := range successCases {
-		if errs := ValidatePodSpec(&successCases[i], field.NewPath("field")); len(errs) != 0 {
+		if errs := ValidatePodSpec(&successCases[i], field.NewPath("field"), featureGates); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -5787,12 +5811,12 @@ func TestValidatePodSpec(t *testing.T) {
 		},
 	}
 	for k, v := range failureCases {
-		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidatePodSpec(&v, field.NewPath("field"), featureGates); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
 		}
 	}
 
-	err = utilfeature.DefaultFeatureGate.Set("PodPriority=false")
+	err = featureGates.Set("PodPriority=false")
 	if err != nil {
 		t.Errorf("Failed to disable feature gate for PodPriority: %v", err)
 		return
@@ -5815,7 +5839,7 @@ func TestValidatePodSpec(t *testing.T) {
 		},
 	}
 	for k, v := range featuregatedCases {
-		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidatePodSpec(&v, field.NewPath("field"), featureGates); len(errs) == 0 {
 			t.Errorf("expected failure due to gated feature: %q", k)
 		}
 	}
@@ -6222,8 +6246,14 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 	}
+
+	featureGates := feature.NewFeatureGate()
+	if err := featureGates.Add(features.DefaultKubernetesFeatureGates); err != nil {
+		t.Fatal(err)
+	}
+
 	for _, pod := range successCases {
-		if errs := ValidatePod(&pod); len(errs) != 0 {
+		if errs := ValidatePod(&pod, featureGates); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -6968,7 +6998,7 @@ func TestValidatePod(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		if errs := ValidatePod(&v.spec); len(errs) == 0 {
+		if errs := ValidatePod(&v.spec, featureGates); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
 		} else if v.expectedError == "" {
 			t.Errorf("missing expectedError for %q, got %q", k, errs.ToAggregate().Error())
@@ -7687,7 +7717,7 @@ func TestValidatePodUpdate(t *testing.T) {
 	for _, test := range tests {
 		test.new.ObjectMeta.ResourceVersion = "1"
 		test.old.ObjectMeta.ResourceVersion = "1"
-		errs := ValidatePodUpdate(&test.new, &test.old)
+		errs := ValidatePodUpdate(&test.new, &test.old, feature.NewFeatureGate())
 		if test.err == "" {
 			if len(errs) != 0 {
 				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.new, test.old)
@@ -8729,7 +8759,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 	for _, successCase := range successCases {
 		successCase.old.ObjectMeta.ResourceVersion = "1"
 		successCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateReplicationControllerUpdate(&successCase.update, &successCase.old); len(errs) != 0 {
+		if errs := ValidateReplicationControllerUpdate(&successCase.update, &successCase.old, feature.NewFeatureGate()); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -8804,7 +8834,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 		},
 	}
 	for testName, errorCase := range errorCases {
-		if errs := ValidateReplicationControllerUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
+		if errs := ValidateReplicationControllerUpdate(&errorCase.update, &errorCase.old, feature.NewFeatureGate()); len(errs) == 0 {
 			t.Errorf("expected failure: %s", testName)
 		}
 	}
@@ -8874,7 +8904,7 @@ func TestValidateReplicationController(t *testing.T) {
 		},
 	}
 	for _, successCase := range successCases {
-		if errs := ValidateReplicationController(&successCase); len(errs) != 0 {
+		if errs := ValidateReplicationController(&successCase, feature.NewFeatureGate()); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -9006,7 +9036,7 @@ func TestValidateReplicationController(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateReplicationController(&v)
+		errs := ValidateReplicationController(&v, feature.NewFeatureGate())
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
@@ -9147,7 +9177,7 @@ func TestValidateNode(t *testing.T) {
 		},
 	}
 	for _, successCase := range successCases {
-		if errs := ValidateNode(&successCase); len(errs) != 0 {
+		if errs := ValidateNode(&successCase, feature.NewFeatureGate()); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -9388,7 +9418,7 @@ func TestValidateNode(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateNode(&v)
+		errs := ValidateNode(&v, feature.NewFeatureGate())
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
@@ -9779,7 +9809,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 	for i, test := range tests {
 		test.oldNode.ObjectMeta.ResourceVersion = "1"
 		test.node.ObjectMeta.ResourceVersion = "1"
-		errs := ValidateNodeUpdate(&test.node, &test.oldNode)
+		errs := ValidateNodeUpdate(&test.node, &test.oldNode, feature.NewFeatureGate())
 		if test.valid && len(errs) > 0 {
 			t.Errorf("%d: Unexpected error: %v", i, errs)
 			t.Logf("%#v vs %#v", test.oldNode.ObjectMeta, test.node.ObjectMeta)
@@ -10278,7 +10308,11 @@ func TestValidateLimitRangeForLocalStorage(t *testing.T) {
 	}
 
 	// Enable alpha feature LocalStorageCapacityIsolation
-	err := utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=true")
+	featureGates := feature.NewFeatureGate()
+	if err := featureGates.Add(features.DefaultKubernetesFeatureGates); err != nil {
+		t.Fatal(err)
+	}
+	err := featureGates.Set("LocalStorageCapacityIsolation=true")
 	if err != nil {
 		t.Errorf("Failed to enable feature gate for LocalStorageCapacityIsolation: %v", err)
 		return
@@ -10286,20 +10320,20 @@ func TestValidateLimitRangeForLocalStorage(t *testing.T) {
 
 	for _, testCase := range testCases {
 		limitRange := &core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: testCase.name, Namespace: "foo"}, Spec: testCase.spec}
-		if errs := ValidateLimitRange(limitRange); len(errs) != 0 {
+		if errs := ValidateLimitRange(limitRange, featureGates); len(errs) != 0 {
 			t.Errorf("Case %v, unexpected error: %v", testCase.name, errs)
 		}
 	}
 
 	// Disable alpha feature LocalStorageCapacityIsolation
-	err = utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=false")
+	err = featureGates.Set("LocalStorageCapacityIsolation=false")
 	if err != nil {
 		t.Errorf("Failed to disable feature gate for LocalStorageCapacityIsolation: %v", err)
 		return
 	}
 	for _, testCase := range testCases {
 		limitRange := &core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: testCase.name, Namespace: "foo"}, Spec: testCase.spec}
-		if errs := ValidateLimitRange(limitRange); len(errs) == 0 {
+		if errs := ValidateLimitRange(limitRange, featureGates); len(errs) == 0 {
 			t.Errorf("Case %v, expected feature gate unable error but actually no error", testCase.name)
 		}
 	}
@@ -10408,7 +10442,7 @@ func TestValidateLimitRange(t *testing.T) {
 
 	for _, successCase := range successCases {
 		limitRange := &core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: successCase.name, Namespace: "foo"}, Spec: successCase.spec}
-		if errs := ValidateLimitRange(limitRange); len(errs) != 0 {
+		if errs := ValidateLimitRange(limitRange, feature.NewFeatureGate()); len(errs) != 0 {
 			t.Errorf("Case %v, unexpected error: %v", successCase.name, errs)
 		}
 	}
@@ -10591,7 +10625,7 @@ func TestValidateLimitRange(t *testing.T) {
 	}
 
 	for k, v := range errorCases {
-		errs := ValidateLimitRange(&v.R)
+		errs := ValidateLimitRange(&v.R, feature.NewFeatureGate())
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
@@ -10653,11 +10687,15 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 		},
 	}
 	for name, scenario := range scenarios {
+		featureGates := feature.NewFeatureGate()
+		if err := featureGates.Add(features.DefaultKubernetesFeatureGates); err != nil {
+			t.Fatal(err)
+		}
 		// ensure we have a resource version specified for updates
-		togglePVExpandFeature(scenario.enableResize, t)
+		togglePVExpandFeature(scenario.enableResize, t, featureGates)
 		scenario.oldClaim.ResourceVersion = "1"
 		scenario.newClaim.ResourceVersion = "1"
-		errs := ValidatePersistentVolumeClaimStatusUpdate(scenario.newClaim, scenario.oldClaim)
+		errs := ValidatePersistentVolumeClaimStatusUpdate(scenario.newClaim, scenario.oldClaim, featureGates)
 		if len(errs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", name)
 		}
@@ -10816,7 +10854,7 @@ func TestValidateResourceQuota(t *testing.T) {
 	}
 
 	for _, successCase := range successCases {
-		if errs := ValidateResourceQuota(&successCase); len(errs) != 0 {
+		if errs := ValidateResourceQuota(&successCase, feature.NewFeatureGate()); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -10867,7 +10905,7 @@ func TestValidateResourceQuota(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateResourceQuota(&v.R)
+		errs := ValidateResourceQuota(&v.R, feature.NewFeatureGate())
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}

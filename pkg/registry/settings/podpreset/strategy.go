@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/settings"
@@ -64,7 +65,7 @@ func (podPresetStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, ol
 // Validate validates a new PodPreset.
 func (podPresetStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	pip := obj.(*settings.PodPreset)
-	return validation.ValidatePodPreset(pip)
+	return validation.ValidatePodPreset(pip, feature.DefaultFeatureGate)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -77,8 +78,8 @@ func (podPresetStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (podPresetStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	validationErrorList := validation.ValidatePodPreset(obj.(*settings.PodPreset))
-	updateErrorList := validation.ValidatePodPresetUpdate(obj.(*settings.PodPreset), old.(*settings.PodPreset))
+	validationErrorList := validation.ValidatePodPreset(obj.(*settings.PodPreset), feature.DefaultFeatureGate)
+	updateErrorList := validation.ValidatePodPresetUpdate(obj.(*settings.PodPreset), old.(*settings.PodPreset), feature.DefaultFeatureGate)
 	return append(validationErrorList, updateErrorList...)
 }
 

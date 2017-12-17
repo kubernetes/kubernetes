@@ -27,6 +27,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -113,7 +114,7 @@ func (daemonSetStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, ol
 // Validate validates a new daemon set.
 func (daemonSetStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	daemonSet := obj.(*extensions.DaemonSet)
-	return validation.ValidateDaemonSet(daemonSet)
+	return validation.ValidateDaemonSet(daemonSet, feature.DefaultFeatureGate)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -130,8 +131,8 @@ func (daemonSetStrategy) AllowCreateOnUpdate() bool {
 func (daemonSetStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	newDaemonSet := obj.(*extensions.DaemonSet)
 	oldDaemonSet := old.(*extensions.DaemonSet)
-	allErrs := validation.ValidateDaemonSet(obj.(*extensions.DaemonSet))
-	allErrs = append(allErrs, validation.ValidateDaemonSetUpdate(newDaemonSet, oldDaemonSet)...)
+	allErrs := validation.ValidateDaemonSet(obj.(*extensions.DaemonSet), feature.DefaultFeatureGate)
+	allErrs = append(allErrs, validation.ValidateDaemonSetUpdate(newDaemonSet, oldDaemonSet, feature.DefaultFeatureGate)...)
 
 	// Update is not allowed to set Spec.Selector for apps/v1 and apps/v1beta2 (allowed for extensions/v1beta1).
 	// If RequestInfo is nil, it is better to revert to old behavior (i.e. allow update to set Spec.Selector)

@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
@@ -52,7 +53,7 @@ func (limitrangeStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, o
 
 func (limitrangeStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	limitRange := obj.(*api.LimitRange)
-	return validation.ValidateLimitRange(limitRange)
+	return validation.ValidateLimitRange(limitRange, feature.DefaultFeatureGate)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -65,7 +66,7 @@ func (limitrangeStrategy) AllowCreateOnUpdate() bool {
 
 func (limitrangeStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	limitRange := obj.(*api.LimitRange)
-	return validation.ValidateLimitRange(limitRange)
+	return validation.ValidateLimitRange(limitRange, feature.DefaultFeatureGate)
 }
 
 func (limitrangeStrategy) AllowUnconditionalUpdate() bool {

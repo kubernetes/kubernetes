@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -52,7 +53,7 @@ func (podTemplateStrategy) PrepareForCreate(ctx genericapirequest.Context, obj r
 // Validate validates a new pod template.
 func (podTemplateStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	pod := obj.(*api.PodTemplate)
-	return validation.ValidatePodTemplate(pod)
+	return validation.ValidatePodTemplate(pod, feature.DefaultFeatureGate)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -75,7 +76,7 @@ func (podTemplateStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, 
 
 // ValidateUpdate is the default update validation for an end user.
 func (podTemplateStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidatePodTemplateUpdate(obj.(*api.PodTemplate), old.(*api.PodTemplate))
+	return validation.ValidatePodTemplateUpdate(obj.(*api.PodTemplate), old.(*api.PodTemplate), feature.DefaultFeatureGate)
 }
 
 func (podTemplateStrategy) AllowUnconditionalUpdate() bool {

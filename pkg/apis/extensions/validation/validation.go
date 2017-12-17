@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -42,17 +43,17 @@ import (
 )
 
 // ValidateDaemonSet tests if required fields in the DaemonSet are set.
-func ValidateDaemonSet(ds *extensions.DaemonSet) field.ErrorList {
+func ValidateDaemonSet(ds *extensions.DaemonSet, featureGates feature.FeatureGate) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&ds.ObjectMeta, true, ValidateDaemonSetName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateDaemonSetSpec(&ds.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateDaemonSetSpec(&ds.Spec, field.NewPath("spec"), featureGates)...)
 	return allErrs
 }
 
 // ValidateDaemonSetUpdate tests if required fields in the DaemonSet are set.
-func ValidateDaemonSetUpdate(ds, oldDS *extensions.DaemonSet) field.ErrorList {
+func ValidateDaemonSetUpdate(ds, oldDS *extensions.DaemonSet, featureGates feature.FeatureGate) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&ds.ObjectMeta, &oldDS.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateDaemonSetSpecUpdate(&ds.Spec, &oldDS.Spec, field.NewPath("spec"))...)
-	allErrs = append(allErrs, ValidateDaemonSetSpec(&ds.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateDaemonSetSpec(&ds.Spec, field.NewPath("spec"), featureGates)...)
 	return allErrs
 }
 
@@ -107,7 +108,7 @@ func ValidateDaemonSetStatusUpdate(ds, oldDS *extensions.DaemonSet) field.ErrorL
 }
 
 // ValidateDaemonSetSpec tests if required fields in the DaemonSetSpec are set.
-func ValidateDaemonSetSpec(spec *extensions.DaemonSetSpec, fldPath *field.Path) field.ErrorList {
+func ValidateDaemonSetSpec(spec *extensions.DaemonSetSpec, fldPath *field.Path, featureGates feature.FeatureGate) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
@@ -120,7 +121,7 @@ func ValidateDaemonSetSpec(spec *extensions.DaemonSetSpec, fldPath *field.Path) 
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "empty selector is not valid for daemonset."))
 	}
 
-	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"))...)
+	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"), featureGates)...)
 	// Daemons typically run on more than one node, so mark Read-Write persistent disks as invalid.
 	allErrs = append(allErrs, apivalidation.ValidateReadOnlyPersistentDisks(spec.Template.Spec.Volumes, fldPath.Child("template", "spec", "volumes"))...)
 	// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
@@ -265,7 +266,7 @@ func ValidateRollback(rollback *extensions.RollbackConfig, fldPath *field.Path) 
 }
 
 // Validates given deployment spec.
-func ValidateDeploymentSpec(spec *extensions.DeploymentSpec, fldPath *field.Path) field.ErrorList {
+func ValidateDeploymentSpec(spec *extensions.DeploymentSpec, fldPath *field.Path, featureGates feature.FeatureGate) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
 
@@ -282,7 +283,7 @@ func ValidateDeploymentSpec(spec *extensions.DeploymentSpec, fldPath *field.Path
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "invalid label selector."))
 	} else {
-		allErrs = append(allErrs, ValidatePodTemplateSpecForReplicaSet(&spec.Template, selector, spec.Replicas, fldPath.Child("template"))...)
+		allErrs = append(allErrs, ValidatePodTemplateSpecForReplicaSet(&spec.Template, selector, spec.Replicas, fldPath.Child("template"), featureGates)...)
 	}
 
 	allErrs = append(allErrs, ValidateDeploymentStrategy(&spec.Strategy, fldPath.Child("strategy"))...)
@@ -331,9 +332,9 @@ func ValidateDeploymentStatus(status *extensions.DeploymentStatus, fldPath *fiel
 	return allErrs
 }
 
-func ValidateDeploymentUpdate(update, old *extensions.Deployment) field.ErrorList {
+func ValidateDeploymentUpdate(update, old *extensions.Deployment, featureGates feature.FeatureGate) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateDeploymentSpec(&update.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateDeploymentSpec(&update.Spec, field.NewPath("spec"), featureGates)...)
 	return allErrs
 }
 
@@ -362,9 +363,9 @@ func isDecremented(update, old *int32) bool {
 	return *update < *old
 }
 
-func ValidateDeployment(obj *extensions.Deployment) field.ErrorList {
+func ValidateDeployment(obj *extensions.Deployment, featureGates feature.FeatureGate) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&obj.ObjectMeta, true, ValidateDeploymentName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateDeploymentSpec(&obj.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateDeploymentSpec(&obj.Spec, field.NewPath("spec"), featureGates)...)
 	return allErrs
 }
 
@@ -527,17 +528,17 @@ func validateIngressBackend(backend *extensions.IngressBackend, fldPath *field.P
 var ValidateReplicaSetName = apivalidation.NameIsDNSSubdomain
 
 // ValidateReplicaSet tests if required fields in the ReplicaSet are set.
-func ValidateReplicaSet(rs *extensions.ReplicaSet) field.ErrorList {
+func ValidateReplicaSet(rs *extensions.ReplicaSet, featureGates feature.FeatureGate) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&rs.ObjectMeta, true, ValidateReplicaSetName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateReplicaSetSpec(&rs.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateReplicaSetSpec(&rs.Spec, field.NewPath("spec"), featureGates)...)
 	return allErrs
 }
 
 // ValidateReplicaSetUpdate tests if required fields in the ReplicaSet are set.
-func ValidateReplicaSetUpdate(rs, oldRs *extensions.ReplicaSet) field.ErrorList {
+func ValidateReplicaSetUpdate(rs, oldRs *extensions.ReplicaSet, featureGates feature.FeatureGate) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&rs.ObjectMeta, &oldRs.ObjectMeta, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, ValidateReplicaSetSpec(&rs.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateReplicaSetSpec(&rs.Spec, field.NewPath("spec"), featureGates)...)
 	return allErrs
 }
 
@@ -573,7 +574,7 @@ func ValidateReplicaSetStatus(status extensions.ReplicaSetStatus, fldPath *field
 }
 
 // ValidateReplicaSetSpec tests if required fields in the ReplicaSet spec are set.
-func ValidateReplicaSetSpec(spec *extensions.ReplicaSetSpec, fldPath *field.Path) field.ErrorList {
+func ValidateReplicaSetSpec(spec *extensions.ReplicaSetSpec, fldPath *field.Path, featureGates feature.FeatureGate) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
@@ -592,13 +593,13 @@ func ValidateReplicaSetSpec(spec *extensions.ReplicaSetSpec, fldPath *field.Path
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "invalid label selector."))
 	} else {
-		allErrs = append(allErrs, ValidatePodTemplateSpecForReplicaSet(&spec.Template, selector, spec.Replicas, fldPath.Child("template"))...)
+		allErrs = append(allErrs, ValidatePodTemplateSpecForReplicaSet(&spec.Template, selector, spec.Replicas, fldPath.Child("template"), featureGates)...)
 	}
 	return allErrs
 }
 
 // Validates the given template and ensures that it is in accordance with the desired selector and replicas.
-func ValidatePodTemplateSpecForReplicaSet(template *api.PodTemplateSpec, selector labels.Selector, replicas int32, fldPath *field.Path) field.ErrorList {
+func ValidatePodTemplateSpecForReplicaSet(template *api.PodTemplateSpec, selector labels.Selector, replicas int32, fldPath *field.Path, featureGates feature.FeatureGate) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if template == nil {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
@@ -610,7 +611,7 @@ func ValidatePodTemplateSpecForReplicaSet(template *api.PodTemplateSpec, selecto
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("metadata", "labels"), template.Labels, "`selector` does not match template `labels`"))
 			}
 		}
-		allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(template, fldPath)...)
+		allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(template, fldPath, featureGates)...)
 		if replicas > 1 {
 			allErrs = append(allErrs, apivalidation.ValidateReadOnlyPersistentDisks(template.Spec.Volumes, fldPath.Child("spec", "volumes"))...)
 		}

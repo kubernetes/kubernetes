@@ -27,6 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	pvcutil "k8s.io/kubernetes/pkg/api/persistentvolumeclaim"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -57,7 +58,7 @@ func (persistentvolumeclaimStrategy) PrepareForCreate(ctx genericapirequest.Cont
 
 func (persistentvolumeclaimStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	pvc := obj.(*api.PersistentVolumeClaim)
-	return validation.ValidatePersistentVolumeClaim(pvc)
+	return validation.ValidatePersistentVolumeClaim(pvc, feature.DefaultFeatureGate)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -79,8 +80,8 @@ func (persistentvolumeclaimStrategy) PrepareForUpdate(ctx genericapirequest.Cont
 }
 
 func (persistentvolumeclaimStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidatePersistentVolumeClaim(obj.(*api.PersistentVolumeClaim))
-	return append(errorList, validation.ValidatePersistentVolumeClaimUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))...)
+	errorList := validation.ValidatePersistentVolumeClaim(obj.(*api.PersistentVolumeClaim), feature.DefaultFeatureGate)
+	return append(errorList, validation.ValidatePersistentVolumeClaimUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim), feature.DefaultFeatureGate)...)
 }
 
 func (persistentvolumeclaimStrategy) AllowUnconditionalUpdate() bool {
@@ -101,7 +102,7 @@ func (persistentvolumeclaimStatusStrategy) PrepareForUpdate(ctx genericapireques
 }
 
 func (persistentvolumeclaimStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidatePersistentVolumeClaimStatusUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))
+	return validation.ValidatePersistentVolumeClaimStatusUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim), feature.DefaultFeatureGate)
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.

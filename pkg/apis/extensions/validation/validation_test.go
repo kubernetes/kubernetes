@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -668,7 +669,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 		if len(successCase.old.ObjectMeta.ResourceVersion) == 0 || len(successCase.update.ObjectMeta.ResourceVersion) == 0 {
 			t.Errorf("%q has incorrect test setup with no resource version set", testName)
 		}
-		if errs := ValidateDaemonSetUpdate(&successCase.update, &successCase.old); len(errs) != 0 {
+		if errs := ValidateDaemonSetUpdate(&successCase.update, &successCase.old, feature.NewFeatureGate()); len(errs) != 0 {
 			t.Errorf("%q expected no error, but got: %v", testName, errs)
 		}
 	}
@@ -886,7 +887,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			t.Errorf("%q has incorrect test setup with no resource version set", testName)
 		}
 		// Run the tests
-		if errs := ValidateDaemonSetUpdate(&errorCase.update, &errorCase.old); len(errs) != errorCase.expectedErrNum {
+		if errs := ValidateDaemonSetUpdate(&errorCase.update, &errorCase.old, feature.NewFeatureGate()); len(errs) != errorCase.expectedErrNum {
 			t.Errorf("%q expected %d errors, but got %d error: %v", testName, errorCase.expectedErrNum, len(errs), errs)
 		} else {
 			t.Logf("(PASS) %q got errors %v", testName, errs)
@@ -943,7 +944,7 @@ func TestValidateDaemonSet(t *testing.T) {
 		},
 	}
 	for _, successCase := range successCases {
-		if errs := ValidateDaemonSet(&successCase); len(errs) != 0 {
+		if errs := ValidateDaemonSet(&successCase, feature.NewFeatureGate()); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -1067,7 +1068,7 @@ func TestValidateDaemonSet(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateDaemonSet(&v)
+		errs := ValidateDaemonSet(&v, feature.NewFeatureGate())
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
@@ -1141,7 +1142,7 @@ func TestValidateDeployment(t *testing.T) {
 		validDeployment(),
 	}
 	for _, successCase := range successCases {
-		if errs := ValidateDeployment(successCase); len(errs) != 0 {
+		if errs := ValidateDeployment(successCase, feature.NewFeatureGate()); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -1223,7 +1224,7 @@ func TestValidateDeployment(t *testing.T) {
 	errorCases["must be greater than minReadySeconds"] = invalidProgressDeadlineDeployment
 
 	for k, v := range errorCases {
-		errs := ValidateDeployment(v)
+		errs := ValidateDeployment(v, feature.NewFeatureGate())
 		if len(errs) == 0 {
 			t.Errorf("[%s] expected failure", k)
 		} else if !strings.Contains(errs[0].Error(), k) {
@@ -2018,7 +2019,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 	for _, successCase := range successCases {
 		successCase.old.ObjectMeta.ResourceVersion = "1"
 		successCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateReplicaSetUpdate(&successCase.update, &successCase.old); len(errs) != 0 {
+		if errs := ValidateReplicaSetUpdate(&successCase.update, &successCase.old, feature.NewFeatureGate()); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -2093,7 +2094,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 		},
 	}
 	for testName, errorCase := range errorCases {
-		if errs := ValidateReplicaSetUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
+		if errs := ValidateReplicaSetUpdate(&errorCase.update, &errorCase.old, feature.NewFeatureGate()); len(errs) == 0 {
 			t.Errorf("expected failure: %s", testName)
 		}
 	}
@@ -2163,7 +2164,7 @@ func TestValidateReplicaSet(t *testing.T) {
 		},
 	}
 	for _, successCase := range successCases {
-		if errs := ValidateReplicaSet(&successCase); len(errs) != 0 {
+		if errs := ValidateReplicaSet(&successCase, feature.NewFeatureGate()); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -2295,7 +2296,7 @@ func TestValidateReplicaSet(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateReplicaSet(&v)
+		errs := ValidateReplicaSet(&v, feature.NewFeatureGate())
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
