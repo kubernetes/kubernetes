@@ -331,9 +331,11 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 			setupLocalVolumeProvisioner(config)
 			volumePath = path.Join(
 				hostBase, discoveryDir, fmt.Sprintf("vol-%v", string(uuid.NewUUID())))
+			setupLocalVolumeProvisionerMountPoint(config, volumePath)
 		})
 
 		AfterEach(func() {
+			cleanupLocalVolumeProvisionerMountPoint(config, volumePath)
 			cleanupLocalVolumeProvisioner(config, volumePath)
 			cleanupStorageClass(config)
 		})
@@ -344,11 +346,6 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 			kind := schema.GroupKind{Group: "extensions", Kind: "DaemonSet"}
 			framework.WaitForControlledPodsRunning(config.client, config.ns, daemonSetName, kind)
 
-			By("Creating a directory under discovery path")
-			framework.Logf("creating local volume under path %q", volumePath)
-			mkdirCmd := fmt.Sprintf("mkdir %v -m 777", volumePath)
-			err := framework.IssueSSHCommand(mkdirCmd, framework.TestContext.Provider, config.node0)
-			Expect(err).NotTo(HaveOccurred())
 			By("Waiting for a PersitentVolume to be created")
 			oldPV, err := waitForLocalPersistentVolume(config.client, volumePath)
 			Expect(err).NotTo(HaveOccurred())
@@ -868,7 +865,7 @@ func setupLocalVolumeProvisioner(config *localTestConfig) {
 	createVolumeConfigMap(config)
 
 	By("Initializing local volume discovery base path")
-	mkdirCmd := fmt.Sprintf("mkdir %v -m 777", path.Join(hostBase, discoveryDir))
+	mkdirCmd := fmt.Sprintf("mkdir -p %v -m 777", path.Join(hostBase, discoveryDir))
 	err := framework.IssueSSHCommand(mkdirCmd, framework.TestContext.Provider, config.node0)
 	Expect(err).NotTo(HaveOccurred())
 }
@@ -877,7 +874,7 @@ func cleanupLocalVolumeProvisioner(config *localTestConfig, volumePath string) {
 	By("Cleaning up cluster role binding")
 	deleteClusterRoleBinding(config)
 
-	By("Removing the test directory")
+	By("Removing the test discovery directory")
 	removeCmd := fmt.Sprintf("rm -r %s", path.Join(hostBase, discoveryDir))
 	err := framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, config.node0)
 	Expect(err).NotTo(HaveOccurred())
@@ -887,6 +884,30 @@ func cleanupLocalVolumeProvisioner(config *localTestConfig, volumePath string) {
 	Expect(err).NotTo(HaveOccurred())
 	err = config.client.CoreV1().PersistentVolumes().Delete(pv.Name, &metav1.DeleteOptions{})
 	Expect(err).NotTo(HaveOccurred())
+}
+
+func setupLocalVolumeProvisionerMountPoint(config *localTestConfig, volumePath string) {
+	By(fmt.Sprintf("Creating local directory at path %q", volumePath))
+	mkdirCmd := fmt.Sprintf("mkdir %v -m 777", volumePath)
+	err := framework.IssueSSHCommand(mkdirCmd, framework.TestContext.Provider, config.node0)
+	Expect(err).NotTo(HaveOccurred())
+
+	By(fmt.Sprintf("Mounting local directory at path %q", volumePath))
+	mntCmd := fmt.Sprintf("sudo mount --bind %v %v", volumePath, volumePath)
+	err = framework.IssueSSHCommand(mntCmd, framework.TestContext.Provider, config.node0)
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func cleanupLocalVolumeProvisionerMountPoint(config *localTestConfig, volumePath string) {
+	By(fmt.Sprintf("Unmounting the test mount point from %q", volumePath))
+	umountCmd := fmt.Sprintf("sudo umount %v", volumePath)
+	err := framework.IssueSSHCommand(umountCmd, framework.TestContext.Provider, config.node0)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Removing the test mount point")
+	removeCmd := fmt.Sprintf("rm -r %s", volumePath)
+	err = framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, config.node0)
+
 }
 
 func createServiceAccount(config *localTestConfig) {
