@@ -695,20 +695,6 @@ func gceSubnetworkURL(apiEndpoint, project, region, subnetwork string) string {
 	return apiEndpoint + strings.Join([]string{"projects", project, "regions", region, "subnetworks", subnetwork}, "/")
 }
 
-// getProjectIDInURL parses full resource URLS and shorter URLS
-// https://www.googleapis.com/compute/v1/projects/myproject/global/networks/mycustom
-// projects/myproject/global/networks/mycustom
-// All return "myproject"
-func getProjectIDInURL(urlStr string) (string, error) {
-	fields := strings.Split(urlStr, "/")
-	for i, v := range fields {
-		if v == "projects" && i < len(fields)-1 {
-			return fields[i+1], nil
-		}
-	}
-	return "", fmt.Errorf("could not find project field in url: %v", urlStr)
-}
-
 // getRegionInURL parses full resource URLS and shorter URLS
 // https://www.googleapis.com/compute/v1/projects/myproject/regions/us-central1/subnetworks/a
 // projects/myproject/regions/us-central1/subnetworks/a
