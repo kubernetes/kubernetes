@@ -56,7 +56,7 @@ func (f *ring2Factory) PrinterForOptions(options *printers.PrintOptions) (printe
 	// TODO: used by the custom column implementation and the name implementation, break this dependency
 	decoders := []runtime.Decoder{f.clientAccessFactory.Decoder(true), unstructured.UnstructuredJSONScheme}
 	encoder := f.clientAccessFactory.JSONEncoder()
-	return PrinterForOptions(mapper, typer, encoder, decoders, options)
+	return printerForOptions(mapper, typer, encoder, decoders, options)
 }
 
 func (f *ring2Factory) PrinterForMapping(options *printers.PrintOptions, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {

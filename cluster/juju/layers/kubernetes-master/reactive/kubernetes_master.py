@@ -443,7 +443,7 @@ def start_master(etcd):
     configure_apiserver(etcd)
     configure_controller_manager()
     configure_scheduler()
-
+    set_state('kubernetes-master.components.started')
     hookenv.open_port(6443)
 
 
@@ -467,10 +467,10 @@ def etcd_data_change(etcd):
 @when('cdk-addons.configured')
 def send_cluster_dns_detail(kube_control):
     ''' Send cluster DNS info '''
-    # Note that the DNS server doesn't necessarily exist at this point. We know
-    # where we're going to put it, though, so let's send the info anyway.
-    dns_ip = get_dns_ip()
-    kube_control.set_dns(53, hookenv.config('dns_domain'), dns_ip)
+    enableKubeDNS = hookenv.config('enable-kube-dns')
+    dnsDomain = hookenv.config('dns_domain')
+    dns_ip = None if not enableKubeDNS else get_dns_ip()
+    kube_control.set_dns(53, dnsDomain, dns_ip, enableKubeDNS)
 
 
 @when('kube-control.connected')
@@ -583,7 +583,7 @@ def kick_api_server(tls):
     if data_changed('cert', tls.get_server_cert()):
         # certificate changed, so restart the api server
         hookenv.log("Certificate information changed, restarting api server")
-        set_state('kube-apiserver.do-restart')
+        restart_apiserver()
     tls_client.reset_certificate_write_flag('server')
 
 
@@ -592,11 +592,12 @@ def configure_cdk_addons():
     ''' Configure CDK addons '''
     remove_state('cdk-addons.configured')
     dbEnabled = str(hookenv.config('enable-dashboard-addons')).lower()
+    dnsEnabled = str(hookenv.config('enable-kube-dns')).lower()
     args = [
         'arch=' + arch(),
-        'dns-ip=' + get_dns_ip(),
         'dns-domain=' + hookenv.config('dns_domain'),
-        'enable-dashboard=' + dbEnabled
+        'enable-dashboard=' + dbEnabled,
+        'enable-kube-dns=' + dnsEnabled
     ]
     check_call(['snap', 'set', 'cdk-addons'] + args)
     if not addons_ready():
@@ -866,42 +867,25 @@ def shutdown():
     service_stop('snap.kube-scheduler.daemon')
 
 
-@when('kube-apiserver.do-restart')
 def restart_apiserver():
     prev_state, prev_msg = hookenv.status_get()
     hookenv.status_set('maintenance', 'Restarting kube-apiserver')
     host.service_restart('snap.kube-apiserver.daemon')
     hookenv.status_set(prev_state, prev_msg)
-    remove_state('kube-apiserver.do-restart')
-    set_state('kube-apiserver.started')
 
 
-@when('kube-controller-manager.do-restart')
 def restart_controller_manager():
     prev_state, prev_msg = hookenv.status_get()
     hookenv.status_set('maintenance', 'Restarting kube-controller-manager')
     host.service_restart('snap.kube-controller-manager.daemon')
     hookenv.status_set(prev_state, prev_msg)
-    remove_state('kube-controller-manager.do-restart')
-    set_state('kube-controller-manager.started')
 
 
-@when('kube-scheduler.do-restart')
 def restart_scheduler():
     prev_state, prev_msg = hookenv.status_get()
     hookenv.status_set('maintenance', 'Restarting kube-scheduler')
     host.service_restart('snap.kube-scheduler.daemon')
     hookenv.status_set(prev_state, prev_msg)
-    remove_state('kube-scheduler.do-restart')
-    set_state('kube-scheduler.started')
-
-
-@when_all('kube-apiserver.started',
-          'kube-controller-manager.started',
-          'kube-scheduler.started')
-@when_not('kubernetes-master.components.started')
-def componenets_started():
-    set_state('kubernetes-master.components.started')
 
 
 def arch():
@@ -980,11 +964,10 @@ def create_kubeconfig(kubeconfig, server, ca, key=None, certificate=None,
 
 
 def get_dns_ip():
-    '''Get an IP address for the DNS server on the provided cidr.'''
-    interface = ipaddress.IPv4Interface(service_cidr())
-    # Add .10 at the end of the network
-    ip = interface.network.network_address + 10
-    return ip.exploded
+    cmd = "kubectl get service --namespace kube-system kube-dns --output json"
+    output = check_output(cmd, shell=True).decode()
+    svc = json.loads(output)
+    return svc['spec']['clusterIP']
 
 
 def get_kubernetes_service_ip():
@@ -1117,8 +1100,7 @@ def configure_apiserver(etcd):
     api_opts['admission-control'] = ','.join(admission_control)
 
     configure_kubernetes_service('kube-apiserver', api_opts, 'api-extra-args')
-
-    set_state('kube-apiserver.do-restart')
+    restart_apiserver()
 
 
 def configure_controller_manager():
@@ -1140,8 +1122,7 @@ def configure_controller_manager():
 
     configure_kubernetes_service('kube-controller-manager', controller_opts,
                                  'controller-manager-extra-args')
-
-    set_state('kube-controller-manager.do-restart')
+    restart_controller_manager()
 
 
 def configure_scheduler():
@@ -1154,7 +1135,7 @@ def configure_scheduler():
     configure_kubernetes_service('kube-scheduler', scheduler_opts,
                                  'scheduler-extra-args')
 
-    set_state('kube-scheduler.do-restart')
+    restart_scheduler()
 
 
 def setup_basic_auth(password=None, username='admin', uid='admin',

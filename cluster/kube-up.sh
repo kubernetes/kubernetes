@@ -34,7 +34,7 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 DEPRECATED_PROVIDERS=(
   "centos"
-  "libvert-coreos"
+  "libvirt-coreos"
   "local"
   "openstack-heat"
   "photon-controller"

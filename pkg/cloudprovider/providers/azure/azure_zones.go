@@ -21,13 +21,10 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
 )
 
 const instanceInfoURL = "http://169.254.169.254/metadata/v1/InstanceInfo"
@@ -63,10 +60,11 @@ func (az *Cloud) GetZone() (cloudprovider.Zone, error) {
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
 func (az *Cloud) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
-	nodeName, err := splitProviderID(providerID)
+	nodeName, err := az.vmSet.GetNodeNameByProviderID(providerID)
 	if err != nil {
 		return cloudprovider.Zone{}, err
 	}
+
 	return az.GetZoneByNodeName(nodeName)
 }
 
@@ -74,20 +72,7 @@ func (az *Cloud) GetZoneByProviderID(providerID string) (cloudprovider.Zone, err
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
 func (az *Cloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
-
-	vm, err := az.VirtualMachinesClient.Get(az.ResourceGroup, string(nodeName), compute.InstanceView)
-
-	if err != nil {
-		return cloudprovider.Zone{}, err
-	}
-
-	failureDomain := strconv.Itoa(int(*vm.VirtualMachineProperties.InstanceView.PlatformFaultDomain))
-
-	zone := cloudprovider.Zone{
-		FailureDomain: failureDomain,
-		Region:        *(vm.Location),
-	}
-	return zone, nil
+	return az.vmSet.GetZoneByNodeName(string(nodeName))
 }
 
 func fetchFaultDomain() (*string, error) {

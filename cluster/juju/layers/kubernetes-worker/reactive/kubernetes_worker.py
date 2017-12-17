@@ -545,7 +545,6 @@ def configure_kubelet(dns):
     kubelet_opts['v'] = '0'
     kubelet_opts['address'] = '0.0.0.0'
     kubelet_opts['port'] = '10250'
-    kubelet_opts['cluster-dns'] = dns['sdn-ip']
     kubelet_opts['cluster-domain'] = dns['domain']
     kubelet_opts['anonymous-auth'] = 'false'
     kubelet_opts['client-ca-file'] = ca_cert_path
@@ -553,6 +552,9 @@ def configure_kubelet(dns):
     kubelet_opts['tls-private-key-file'] = server_key_path
     kubelet_opts['logtostderr'] = 'true'
     kubelet_opts['fail-swap-on'] = 'false'
+
+    if (dns['enable-kube-dns']):
+        kubelet_opts['cluster-dns'] = dns['sdn-ip']
 
     privileged = is_state('kubernetes-worker.privileged')
     kubelet_opts['allow-privileged'] = 'true' if privileged else 'false'

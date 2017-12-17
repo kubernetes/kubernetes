@@ -69,21 +69,8 @@ type Lifecycle struct {
 	forceLiveLookupCache *utilcache.LRUExpireCache
 }
 
-type forceLiveLookupEntry struct {
-	expiry time.Time
-}
-
 var _ = initializer.WantsExternalKubeInformerFactory(&Lifecycle{})
 var _ = initializer.WantsExternalKubeClientSet(&Lifecycle{})
-
-func makeNamespaceKey(namespace string) *v1.Namespace {
-	return &v1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      namespace,
-			Namespace: "",
-		},
-	}
-}
 
 func (l *Lifecycle) Admit(a admission.Attributes) error {
 	// prevent deletion of immortal namespaces
@@ -182,7 +169,7 @@ func (l *Lifecycle) Admit(a admission.Attributes) error {
 		}
 
 		// TODO: This should probably not be a 403
-		return admission.NewForbidden(a, fmt.Errorf("unable to create new content in namespace %s because it is being terminated.", a.GetNamespace()))
+		return admission.NewForbidden(a, fmt.Errorf("unable to create new content in namespace %s because it is being terminated", a.GetNamespace()))
 	}
 
 	return nil

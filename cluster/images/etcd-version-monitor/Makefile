@@ -20,7 +20,7 @@
 ARCH:=amd64
 GOLANG_VERSION?=1.8.3
 REGISTRY?=gcr.io/google-containers
-TAG?=0.1.0
+TAG?=0.1.1
 IMAGE:=$(REGISTRY)/etcd-version-monitor:$(TAG)
 CURRENT_DIR:=$(pwd)
 TEMP_DIR:=$(shell mktemp -d)

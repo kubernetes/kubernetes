@@ -486,11 +486,6 @@ func (os *OpenStack) ProviderName() string {
 	return ProviderName
 }
 
-// ScrubDNS filters DNS settings for pods.
-func (os *OpenStack) ScrubDNS(nameServers, searches []string) ([]string, []string) {
-	return nameServers, searches
-}
-
 // HasClusterID returns true if the cluster has a clusterID
 func (os *OpenStack) HasClusterID() bool {
 	return true

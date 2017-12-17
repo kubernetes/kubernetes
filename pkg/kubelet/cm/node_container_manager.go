@@ -32,6 +32,7 @@ import (
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -62,7 +63,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	// default cpu shares on cgroups are low and can cause cpu starvation.
 	nodeAllocatable := cm.capacity
 	// Use Node Allocatable limits instead of capacity if the user requested enforcing node allocatable.
-	if cm.CgroupsPerQOS && nc.EnforceNodeAllocatable.Has(NodeAllocatableEnforcementKey) {
+	if cm.CgroupsPerQOS && nc.EnforceNodeAllocatable.Has(kubetypes.NodeAllocatableEnforcementKey) {
 		nodeAllocatable = cm.getNodeAllocatableAbsolute()
 	}
 
@@ -101,7 +102,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 		}()
 	}
 	// Now apply kube reserved and system reserved limits if required.
-	if nc.EnforceNodeAllocatable.Has(SystemReservedEnforcementKey) {
+	if nc.EnforceNodeAllocatable.Has(kubetypes.SystemReservedEnforcementKey) {
 		glog.V(2).Infof("Enforcing System reserved on cgroup %q with limits: %+v", nc.SystemReservedCgroupName, nc.SystemReserved)
 		if err := enforceExistingCgroup(cm.cgroupManager, nc.SystemReservedCgroupName, nc.SystemReserved); err != nil {
 			message := fmt.Sprintf("Failed to enforce System Reserved Cgroup Limits on %q: %v", nc.SystemReservedCgroupName, err)
@@ -110,7 +111,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 		}
 		cm.recorder.Eventf(nodeRef, v1.EventTypeNormal, events.SuccessfulNodeAllocatableEnforcement, "Updated limits on system reserved cgroup %v", nc.SystemReservedCgroupName)
 	}
-	if nc.EnforceNodeAllocatable.Has(KubeReservedEnforcementKey) {
+	if nc.EnforceNodeAllocatable.Has(kubetypes.KubeReservedEnforcementKey) {
 		glog.V(2).Infof("Enforcing kube reserved on cgroup %q with limits: %+v", nc.KubeReservedCgroupName, nc.KubeReserved)
 		if err := enforceExistingCgroup(cm.cgroupManager, nc.KubeReservedCgroupName, nc.KubeReserved); err != nil {
 			message := fmt.Sprintf("Failed to enforce Kube Reserved Cgroup Limits on %q: %v", nc.KubeReservedCgroupName, err)

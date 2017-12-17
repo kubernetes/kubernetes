@@ -1232,11 +1232,6 @@ func TestValidateDeployment(t *testing.T) {
 	}
 }
 
-func int64p(i int) *int64 {
-	i64 := int64(i)
-	return &i64
-}
-
 func TestValidateDeploymentStatus(t *testing.T) {
 	collisionCount := int32(-3)
 	tests := []struct {
@@ -1472,8 +1467,6 @@ func TestValidateDeploymentRollback(t *testing.T) {
 		}
 	}
 }
-
-type ingressRules map[string]string
 
 func TestValidateIngress(t *testing.T) {
 	defaultBackend := extensions.IngressBackend{
