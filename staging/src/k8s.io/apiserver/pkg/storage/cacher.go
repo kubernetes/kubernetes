@@ -682,12 +682,16 @@ func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported b
 }
 
 func filterFunction(key string, p SelectionPredicate) func(string, runtime.Object) bool {
-	f := SimpleFilter(p)
 	filterFunc := func(objKey string, obj runtime.Object) bool {
 		if !hasPathPrefix(objKey, key) {
 			return false
 		}
-		return f(obj)
+		matches, err := p.Matches(obj)
+		if err != nil {
+			glog.Errorf("invalid object for matching. Obj: %v. Err: %v", obj, err)
+			return false
+		}
+		return matches
 	}
 	return filterFunc
 }
