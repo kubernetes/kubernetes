@@ -119,7 +119,6 @@ go_library(
         "service_basic.go",
         "serviceaccount.go",
         "sorting_printer.go",
-        "versioned_client.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl",
     deps = [
