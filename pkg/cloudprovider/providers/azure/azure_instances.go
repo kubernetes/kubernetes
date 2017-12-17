@@ -22,7 +22,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -48,6 +47,7 @@ func (az *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 		}
 		return addresses, nil
 	}
+
 	ip, err := az.GetIPForMachineWithRetry(name)
 	if err != nil {
 		glog.V(2).Infof("NodeAddresses(%s) abort backoff", name)
@@ -64,7 +64,7 @@ func (az *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (az *Cloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
-	name, err := splitProviderID(providerID)
+	name, err := az.vmSet.GetNodeNameByProviderID(providerID)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func (az *Cloud) ExternalID(name types.NodeName) (string, error) {
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (az *Cloud) InstanceExistsByProviderID(providerID string) (bool, error) {
-	name, err := splitProviderID(providerID)
+	name, err := az.vmSet.GetNodeNameByProviderID(providerID)
 	if err != nil {
 		return false, err
 	}
@@ -118,70 +118,14 @@ func (az *Cloud) InstanceID(name types.NodeName) (string, error) {
 		}
 	}
 
-	if az.Config.VMType == vmTypeVMSS {
-		id, err := az.getVmssInstanceID(name)
-		if err == cloudprovider.InstanceNotFound || err == ErrorNotVmssInstance {
-			// Retry with standard type because master nodes may not belong to any vmss.
-			return az.getStandardInstanceID(name)
-		}
-
-		return id, err
-	}
-
-	return az.getStandardInstanceID(name)
-}
-
-func (az *Cloud) getVmssInstanceID(name types.NodeName) (string, error) {
-	var machine compute.VirtualMachineScaleSetVM
-	var exists bool
-	var err error
-	az.operationPollRateLimiter.Accept()
-	machine, exists, err = az.getVmssVirtualMachine(name)
-	if err != nil {
-		if az.CloudProviderBackoff {
-			glog.V(2).Infof("InstanceID(%s) backing off", name)
-			machine, exists, err = az.GetScaleSetsVMWithRetry(name)
-			if err != nil {
-				glog.V(2).Infof("InstanceID(%s) abort backoff", name)
-				return "", err
-			}
-		} else {
-			return "", err
-		}
-	} else if !exists {
-		return "", cloudprovider.InstanceNotFound
-	}
-	return *machine.ID, nil
-}
-
-func (az *Cloud) getStandardInstanceID(name types.NodeName) (string, error) {
-	var machine compute.VirtualMachine
-	var exists bool
-	var err error
-	az.operationPollRateLimiter.Accept()
-	machine, exists, err = az.getVirtualMachine(name)
-	if err != nil {
-		if az.CloudProviderBackoff {
-			glog.V(2).Infof("InstanceID(%s) backing off", name)
-			machine, exists, err = az.GetVirtualMachineWithRetry(name)
-			if err != nil {
-				glog.V(2).Infof("InstanceID(%s) abort backoff", name)
-				return "", err
-			}
-		} else {
-			return "", err
-		}
-	} else if !exists {
-		return "", cloudprovider.InstanceNotFound
-	}
-	return *machine.ID, nil
+	return az.vmSet.GetInstanceIDByNodeName(string(name))
 }
 
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (az *Cloud) InstanceTypeByProviderID(providerID string) (string, error) {
-	name, err := splitProviderID(providerID)
+	name, err := az.vmSet.GetNodeNameByProviderID(providerID)
 	if err != nil {
 		return "", err
 	}
@@ -207,46 +151,7 @@ func (az *Cloud) InstanceType(name types.NodeName) (string, error) {
 		}
 	}
 
-	if az.Config.VMType == vmTypeVMSS {
-		machineType, err := az.getVmssInstanceType(name)
-		if err == cloudprovider.InstanceNotFound || err == ErrorNotVmssInstance {
-			// Retry with standard type because master nodes may not belong to any vmss.
-			return az.getStandardInstanceType(name)
-		}
-
-		return machineType, err
-	}
-
-	return az.getStandardInstanceType(name)
-}
-
-// getVmssInstanceType gets instance with type vmss.
-func (az *Cloud) getVmssInstanceType(name types.NodeName) (string, error) {
-	machine, exists, err := az.getVmssVirtualMachine(name)
-	if err != nil {
-		glog.Errorf("error: az.InstanceType(%s), az.getVmssVirtualMachine(%s) err=%v", name, name, err)
-		return "", err
-	} else if !exists {
-		return "", cloudprovider.InstanceNotFound
-	}
-
-	if machine.Sku.Name != nil {
-		return *machine.Sku.Name, nil
-	}
-
-	return "", fmt.Errorf("instance type is not set")
-}
-
-// getStandardInstanceType gets instance with standard type.
-func (az *Cloud) getStandardInstanceType(name types.NodeName) (string, error) {
-	machine, exists, err := az.getVirtualMachine(name)
-	if err != nil {
-		glog.Errorf("error: az.InstanceType(%s), az.getVirtualMachine(%s) err=%v", name, name, err)
-		return "", err
-	} else if !exists {
-		return "", cloudprovider.InstanceNotFound
-	}
-	return string(machine.HardwareProfile.VMSize), nil
+	return az.vmSet.GetInstanceTypeByNodeName(string(name))
 }
 
 // AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances
@@ -255,8 +160,8 @@ func (az *Cloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	return fmt.Errorf("not supported")
 }
 
-// CurrentNodeName returns the name of the node we are currently running on
-// On most clouds (e.g. GCE) this is the hostname, so we provide the hostname
+// CurrentNodeName returns the name of the node we are currently running on.
+// On Azure this is the hostname, so we just return the hostname.
 func (az *Cloud) CurrentNodeName(hostname string) (types.NodeName, error) {
 	return types.NodeName(hostname), nil
 }

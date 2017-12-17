@@ -870,6 +870,7 @@ func getTestCloud() (az *Cloud) {
 	az.SecurityGroupsClient = newFakeAzureNSGClient()
 	az.VirtualMachinesClient = newFakeAzureVirtualMachinesClient()
 	az.InterfacesClient = newFakeAzureInterfacesClient()
+	az.vmSet = newAvailabilitySet(az)
 
 	return az
 }
@@ -1631,7 +1632,8 @@ func TestDecodeInstanceInfo(t *testing.T) {
 	}
 }
 
-func TestSplitProviderID(t *testing.T) {
+func TestGetNodeNameByProviderID(t *testing.T) {
+	az := getTestCloud()
 	providers := []struct {
 		providerID string
 		name       types.NodeName
@@ -1666,7 +1668,7 @@ func TestSplitProviderID(t *testing.T) {
 	}
 
 	for _, test := range providers {
-		name, err := splitProviderID(test.providerID)
+		name, err := az.vmSet.GetNodeNameByProviderID(test.providerID)
 		if (err != nil) != test.fail {
 			t.Errorf("Expected to failt=%t, with pattern %v", test.fail, test)
 		}

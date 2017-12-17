@@ -24,6 +24,7 @@ go_library(
         "azure_storageaccount.go",
         "azure_util.go",
         "azure_util_vmss.go",
+        "azure_vmsets.go",
         "azure_wrap.go",
         "azure_zones.go",
     ],
