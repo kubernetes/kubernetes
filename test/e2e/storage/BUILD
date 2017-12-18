@@ -17,6 +17,7 @@ go_library(
         "persistent_volumes-gce.go",
         "persistent_volumes-local.go",
         "persistent_volumes-vsphere.go",
+        "pod_add_delete_add_fast.go",
         "pv_reclaimpolicy.go",
         "pvc_label_selector.go",
         "pvc_protection.go",
