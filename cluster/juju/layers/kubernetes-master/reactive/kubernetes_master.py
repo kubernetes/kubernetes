@@ -440,7 +440,13 @@ def send_cluster_dns_detail(kube_control):
     ''' Send cluster DNS info '''
     enableKubeDNS = hookenv.config('enable-kube-dns')
     dnsDomain = hookenv.config('dns_domain')
-    dns_ip = None if not enableKubeDNS else get_dns_ip()
+    dns_ip = None
+    if enableKubeDNS:
+        try:
+            dns_ip = get_dns_ip()
+        except CalledProcessError:
+            hookenv.log("kubedns not ready yet")
+            return
     kube_control.set_dns(53, dnsDomain, dns_ip, enableKubeDNS)
 
 
