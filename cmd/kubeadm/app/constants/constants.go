@@ -231,9 +231,6 @@ var (
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
 	MinimumKubeletVersion = version.MustParseSemantic("v1.9.0")
 
-	// MinimumKubeProxyComponentConfigVersion specifies the minimum version for the kubeProxyComponent
-	MinimumKubeProxyComponentConfigVersion = version.MustParseSemantic("v1.9.0-alpha.3")
-
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
 		8:  "3.0.17",
