@@ -213,13 +213,13 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *versio
 
 		// Warn for unused user supplied variables
 		if cfg.Etcd.CAFile != "" {
-			fmt.Printf("[controlplane] Configuration for %s CAFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.CAFile, kubeadmconstants.Etcd)
+			fmt.Printf("[controlplane] WARNING: Configuration for %s CAFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.CAFile, kubeadmconstants.Etcd)
 		}
 		if cfg.Etcd.CertFile != "" {
-			fmt.Printf("[controlplane] Configuration for %s CertFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.CertFile, kubeadmconstants.Etcd)
+			fmt.Printf("[controlplane] WARNING: Configuration for %s CertFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.CertFile, kubeadmconstants.Etcd)
 		}
 		if cfg.Etcd.KeyFile != "" {
-			fmt.Printf("[controlplane] Configuration for %s KeyFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.KeyFile, kubeadmconstants.Etcd)
+			fmt.Printf("[controlplane] WARNING: Configuration for %s KeyFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.KeyFile, kubeadmconstants.Etcd)
 		}
 	}
 

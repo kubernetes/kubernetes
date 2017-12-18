@@ -137,7 +137,7 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 
 	// ensure etcd certs are generated for etcd and kube-apiserver
 	if component == constants.Etcd {
-		if err := certsphase.CreateEtcdCertAndKeyFiles(cfg); err != nil {
+		if err := certsphase.CreateEtcdServerCertAndKeyFiles(cfg); err != nil {
 			return fmt.Errorf("failed to upgrade the %s certificate: %v", constants.Etcd, err)
 		}
 		if err := certsphase.CreateEtcdPeerCertAndKeyFiles(cfg); err != nil {

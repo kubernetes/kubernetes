@@ -60,8 +60,8 @@ var (
 	apiServerCertLongDesc = fmt.Sprintf(normalizer.LongDesc(`
 		Generates the API server serving certificate and key and saves them into %s and %s files.
 		
-		The certificate includes default subject alternative names and additional sans eventually provided by the user;
-		default sans are: <node-name>, <apiserver-advertise-address>, kubernetes, kubernetes.default, kubernetes.default.svc, 
+		The certificate includes default subject alternative names and additional SANs provided by the user;
+		default SANs are: <node-name>, <apiserver-advertise-address>, kubernetes, kubernetes.default, kubernetes.default.svc,
 		kubernetes.default.svc.<service-dns-domain>, <internalAPIServerVirtualIP> (that is the .10 address in <service-cidr> address space).
 
 		If both files already exist, kubeadm skips the generation step and existing files will be used.
@@ -74,27 +74,25 @@ var (
 		If both files already exist, kubeadm skips the generation step and existing files will be used.
 		`+cmdutil.AlphaDisclaimer), kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName)
 
-	etcdCertLongDesc = fmt.Sprintf(normalizer.LongDesc(`
+	etcdServerCertLongDesc = fmt.Sprintf(normalizer.LongDesc(`
 		Generates the etcd serving certificate and key and saves them into %s and %s files.
 		
-		The certificate includes default subject alternative names and additional sans eventually provided by the user;
-		default sans are: <node-name>, <apiserver-advertise-address>, kubernetes, kubernetes.default, kubernetes.default.svc, 
-		kubernetes.default.svc.<service-dns-domain>, <internalAPIServerVirtualIP> (that is the .10 address in <service-cidr> address space).
+		The certificate includes default subject alternative names and additional SANs provided by the user;
+		default SANs are: localhost, 127.0.0.1.
 
 		If both files already exist, kubeadm skips the generation step and existing files will be used.
-		`+cmdutil.AlphaDisclaimer), kubeadmconstants.EtcdCertName, kubeadmconstants.EtcdKeyName)
+		`+cmdutil.AlphaDisclaimer), kubeadmconstants.EtcdServerCertName, kubeadmconstants.EtcdServerKeyName)
 
 	etcdPeerCertLongDesc = fmt.Sprintf(normalizer.LongDesc(`
 		Generates the etcd peer certificate and key and saves them into %s and %s files.
 		
-		The certificate includes default subject alternative names and additional sans eventually provided by the user;
-		default sans are: <node-name>, <apiserver-advertise-address>, kubernetes, kubernetes.default, kubernetes.default.svc, 
-		kubernetes.default.svc.<service-dns-domain>, <internalAPIServerVirtualIP> (that is the .10 address in <service-cidr> address space).
+		The certificate includes default subject alternative names and additional SANs provided by the user;
+		default SANs are: <node-name>, <apiserver-advertise-address>.
 
 		If both files already exist, kubeadm skips the generation step and existing files will be used.
 		`+cmdutil.AlphaDisclaimer), kubeadmconstants.EtcdPeerCertName, kubeadmconstants.EtcdPeerKeyName)
 
-	apiServerEtcdCertLongDesc = fmt.Sprintf(normalizer.LongDesc(`
+	apiServerEtcdServerCertLongDesc = fmt.Sprintf(normalizer.LongDesc(`
 		Generates the client certificate for the API server to connect to etcd securely and the respective key,
 		and saves them into %s and %s files.
 
@@ -187,8 +185,8 @@ func getCertsSubCommands(defaultKubernetesVersion string) []*cobra.Command {
 		{
 			use:     "etcd-server",
 			short:   "Generates etcd serving certificate and key",
-			long:    etcdCertLongDesc,
-			cmdFunc: certsphase.CreateEtcdCertAndKeyFiles,
+			long:    etcdServerCertLongDesc,
+			cmdFunc: certsphase.CreateEtcdServerCertAndKeyFiles,
 		},
 		{
 			use:     "etcd-peer",
@@ -199,7 +197,7 @@ func getCertsSubCommands(defaultKubernetesVersion string) []*cobra.Command {
 		{
 			use:     "apiserver-etcd-client",
 			short:   "Generates client certificate for the API server to connect to etcd securely",
-			long:    apiServerEtcdCertLongDesc,
+			long:    apiServerEtcdServerCertLongDesc,
 			cmdFunc: certsphase.CreateAPIServerEtcdClientCertAndKeyFiles,
 		},
 		{

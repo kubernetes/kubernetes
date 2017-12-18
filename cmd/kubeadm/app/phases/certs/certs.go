@@ -20,16 +20,13 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 
-	"k8s.io/apimachinery/pkg/util/validation"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
-	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
 // CreatePKIAssets will create and write to disk all PKI assets necessary to establish the control plane.
@@ -40,7 +37,7 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
 		CreateCACertAndKeyfiles,
 		CreateAPIServerCertAndKeyFiles,
 		CreateAPIServerKubeletClientCertAndKeyFiles,
-		CreateEtcdCertAndKeyFiles,
+		CreateEtcdServerCertAndKeyFiles,
 		CreateEtcdPeerCertAndKeyFiles,
 		CreateAPIServerEtcdClientCertAndKeyFiles,
 		CreateServiceAccountKeyAndPublicKeyFiles,
@@ -125,27 +122,27 @@ func CreateAPIServerKubeletClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfigura
 	)
 }
 
-// CreateEtcdCertAndKeyFiles create a new certificate and key file for etcd.
+// CreateEtcdServerCertAndKeyFiles create a new certificate and key file for etcd.
 // If the etcd serving certificate and key file already exist in the target folder, they are used only if evaluated equal; otherwise an error is returned.
 // It assumes the cluster CA certificate and key file exist in the CertificatesDir
-func CreateEtcdCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
+func CreateEtcdServerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 
 	caCert, caKey, err := loadCertificateAuthorithy(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
 		return err
 	}
 
-	etcdCert, etcdKey, err := NewEtcdCertAndKey(cfg, caCert, caKey)
+	etcdServerCert, etcdServerKey, err := NewEtcdServerCertAndKey(cfg, caCert, caKey)
 	if err != nil {
 		return err
 	}
 
 	return writeCertificateFilesIfNotExist(
 		cfg.CertificatesDir,
-		kubeadmconstants.EtcdCertAndKeyBaseName,
+		kubeadmconstants.EtcdServerCertAndKeyBaseName,
 		caCert,
-		etcdCert,
-		etcdKey,
+		etcdServerCert,
+		etcdServerKey,
 	)
 }
 
@@ -271,7 +268,7 @@ func NewCACertAndKey() (*x509.Certificate, *rsa.PrivateKey, error) {
 // NewAPIServerCertAndKey generate CA certificate for apiserver, signed by the given CA.
 func NewAPIServerCertAndKey(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
 
-	altNames, err := getAltNames(cfg)
+	altNames, err := pkiutil.GetAPIServerAltNames(cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failure while composing altnames for API server: %v", err)
 	}
@@ -305,31 +302,31 @@ func NewAPIServerKubeletClientCertAndKey(caCert *x509.Certificate, caKey *rsa.Pr
 	return apiClientCert, apiClientKey, nil
 }
 
-// NewEtcdCertAndKey generate CA certificate for etcd, signed by the given CA.
-func NewEtcdCertAndKey(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
+// NewEtcdServerCertAndKey generate CA certificate for etcd, signed by the given CA.
+func NewEtcdServerCertAndKey(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
 
-	altNames, err := getAltNames(cfg)
+	altNames, err := pkiutil.GetEtcdAltNames(cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failure while composing altnames for etcd: %v", err)
 	}
 
 	config := certutil.Config{
-		CommonName: kubeadmconstants.EtcdCertCommonName,
+		CommonName: kubeadmconstants.EtcdServerCertCommonName,
 		AltNames:   *altNames,
 		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 	}
-	etcdCert, etcdKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
+	etcdServerCert, etcdServerKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failure while creating etcd key and certificate: %v", err)
 	}
 
-	return etcdCert, etcdKey, nil
+	return etcdServerCert, etcdServerKey, nil
 }
 
 // NewEtcdPeerCertAndKey generate CA certificate for etcd peering, signed by the given CA.
 func NewEtcdPeerCertAndKey(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
 
-	altNames, err := getAltNames(cfg)
+	altNames, err := pkiutil.GetEtcdPeerAltNames(cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failure while composing altnames for etcd peering: %v", err)
 	}
@@ -635,56 +632,4 @@ func validatePrivatePublicKey(l certKeyLocation) error {
 		return fmt.Errorf("failure loading key for %s: %v", l.uxName, err)
 	}
 	return nil
-}
-
-// getAltNames builds an AltNames object for to be used when generating apiserver certificate
-func getAltNames(cfg *kubeadmapi.MasterConfiguration) (*certutil.AltNames, error) {
-
-	// advertise address
-	advertiseAddress := net.ParseIP(cfg.API.AdvertiseAddress)
-	if advertiseAddress == nil {
-		return nil, fmt.Errorf("error parsing API AdvertiseAddress %v: is not a valid textual representation of an IP address", cfg.API.AdvertiseAddress)
-	}
-
-	// internal IP address for the API server
-	_, svcSubnet, err := net.ParseCIDR(cfg.Networking.ServiceSubnet)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing CIDR %q: %v", cfg.Networking.ServiceSubnet, err)
-	}
-
-	internalAPIServerVirtualIP, err := ipallocator.GetIndexedIP(svcSubnet, 1)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get first IP address from the given CIDR (%s): %v", svcSubnet.String(), err)
-	}
-
-	// create AltNames with defaults DNSNames/IPs
-	altNames := &certutil.AltNames{
-		DNSNames: []string{
-			cfg.NodeName,
-			"kubernetes",
-			"kubernetes.default",
-			"kubernetes.default.svc",
-			fmt.Sprintf("kubernetes.default.svc.%s", cfg.Networking.DNSDomain),
-		},
-		IPs: []net.IP{
-			internalAPIServerVirtualIP,
-			advertiseAddress,
-		},
-	}
-
-	// adds additional SAN
-	for _, altname := range cfg.APIServerCertSANs {
-		if ip := net.ParseIP(altname); ip != nil {
-			altNames.IPs = append(altNames.IPs, ip)
-		} else if len(validation.IsDNS1123Subdomain(altname)) == 0 {
-			altNames.DNSNames = append(altNames.DNSNames, altname)
-		}
-	}
-
-	// add api server dns advertise address
-	if len(cfg.API.ControlPlaneEndpoint) > 0 {
-		altNames.DNSNames = append(altNames.DNSNames, cfg.API.ControlPlaneEndpoint)
-	}
-
-	return altNames, nil
 }

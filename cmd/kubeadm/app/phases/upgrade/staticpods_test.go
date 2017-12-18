@@ -61,6 +61,8 @@ etcd:
   extraArgs: null
   image: ""
   keyFile: ""
+  serverCertSANs: null
+  peerCertSANs: null
 featureFlags: null
 imageRepository: k8s.gcr.io
 kubernetesVersion: %s
@@ -322,7 +324,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			certsphase.CreateCACertAndKeyfiles,
 			certsphase.CreateAPIServerCertAndKeyFiles,
 			certsphase.CreateAPIServerKubeletClientCertAndKeyFiles,
-			// certsphase.CreateEtcdCertAndKeyFiles,
+			// certsphase.CreateEtcdServerCertAndKeyFiles,
 			// certsphase.CreateEtcdPeerCertAndKeyFiles,
 			// certsphase.CreateAPIServerEtcdClientCertAndKeyFiles,
 			certsphase.CreateServiceAccountKeyAndPublicKeyFiles,

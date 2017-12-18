@@ -258,53 +258,6 @@ func TestWriteKeyFilesIfNotExist(t *testing.T) {
 	}
 }
 
-func TestGetAltNames(t *testing.T) {
-	hostname := "valid-hostname"
-	advertiseIP := "1.2.3.4"
-	controlPlaneEndpoint := "api.k8s.io"
-	cfg := &kubeadmapi.MasterConfiguration{
-		API:               kubeadmapi.API{AdvertiseAddress: advertiseIP, ControlPlaneEndpoint: controlPlaneEndpoint},
-		Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-		NodeName:          hostname,
-		APIServerCertSANs: []string{"10.1.245.94", "10.1.245.95"},
-	}
-
-	altNames, err := getAltNames(cfg)
-	if err != nil {
-		t.Fatalf("failed calling getAltNames: %v", err)
-	}
-
-	expectedDNSNames := []string{hostname, "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.local", controlPlaneEndpoint}
-	for _, DNSName := range expectedDNSNames {
-		found := false
-		for _, val := range altNames.DNSNames {
-			if val == DNSName {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			t.Errorf("altNames does not contain DNSName %s", DNSName)
-		}
-	}
-
-	expectedIPAddresses := []string{"10.96.0.1", advertiseIP, "10.1.245.94", "10.1.245.95"}
-	for _, IPAddress := range expectedIPAddresses {
-		found := false
-		for _, val := range altNames.IPs {
-			if val.Equal(net.ParseIP(IPAddress)) {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			t.Errorf("altNames does not contain IPAddress %s", IPAddress)
-		}
-	}
-}
-
 func TestNewCACertAndKey(t *testing.T) {
 	caCert, _, err := NewCACertAndKey()
 	if err != nil {
@@ -357,42 +310,50 @@ func TestNewAPIServerKubeletClientCertAndKey(t *testing.T) {
 	certstestutil.AssertCertificateHasOrganizations(t, apiClientCert, kubeadmconstants.MastersGroup)
 }
 
-func TestNewEtcdCertAndKey(t *testing.T) {
-	hostname := "valid-hostname"
+func TestNewEtcdServerCertAndKey(t *testing.T) {
+	proxy := "user-etcd-proxy"
+	proxyIP := "10.10.10.100"
 
-	advertiseAddresses := []string{"1.2.3.4", "1:2:3::4"}
-	for _, addr := range advertiseAddresses {
-		cfg := &kubeadmapi.MasterConfiguration{
-			API:        kubeadmapi.API{AdvertiseAddress: addr},
-			Networking: kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-			NodeName:   "valid-hostname",
-		}
-		caCert, caKey, err := NewCACertAndKey()
-		if err != nil {
-			t.Fatalf("failed creation of ca cert and key: %v", err)
-		}
-
-		etcdCert, _, err := NewEtcdCertAndKey(cfg, caCert, caKey)
-		if err != nil {
-			t.Fatalf("failed creation of cert and key: %v", err)
-		}
-
-		certstestutil.AssertCertificateIsSignedByCa(t, etcdCert, caCert)
-		certstestutil.AssertCertificateHasServerAuthUsage(t, etcdCert)
-		certstestutil.AssertCertificateHasDNSNames(t, etcdCert, hostname, "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.local")
-		certstestutil.AssertCertificateHasIPAddresses(t, etcdCert, net.ParseIP("10.96.0.1"), net.ParseIP(addr))
+	cfg := &kubeadmapi.MasterConfiguration{
+		Etcd: kubeadmapi.Etcd{
+			ServerCertSANs: []string{
+				proxy,
+				proxyIP,
+			},
+		},
 	}
+	caCert, caKey, err := NewCACertAndKey()
+	if err != nil {
+		t.Fatalf("failed creation of ca cert and key: %v", err)
+	}
+
+	etcdServerCert, _, err := NewEtcdServerCertAndKey(cfg, caCert, caKey)
+	if err != nil {
+		t.Fatalf("failed creation of cert and key: %v", err)
+	}
+
+	certstestutil.AssertCertificateIsSignedByCa(t, etcdServerCert, caCert)
+	certstestutil.AssertCertificateHasServerAuthUsage(t, etcdServerCert)
+	certstestutil.AssertCertificateHasDNSNames(t, etcdServerCert, "localhost", proxy)
+	certstestutil.AssertCertificateHasIPAddresses(t, etcdServerCert, net.ParseIP("127.0.0.1"), net.ParseIP(proxyIP))
 }
 
 func TestNewEtcdPeerCertAndKey(t *testing.T) {
 	hostname := "valid-hostname"
+	proxy := "user-etcd-proxy"
+	proxyIP := "10.10.10.100"
 
 	advertiseAddresses := []string{"1.2.3.4", "1:2:3::4"}
 	for _, addr := range advertiseAddresses {
 		cfg := &kubeadmapi.MasterConfiguration{
-			API:        kubeadmapi.API{AdvertiseAddress: addr},
-			Networking: kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-			NodeName:   "valid-hostname",
+			API:      kubeadmapi.API{AdvertiseAddress: addr},
+			NodeName: hostname,
+			Etcd: kubeadmapi.Etcd{
+				PeerCertSANs: []string{
+					proxy,
+					proxyIP,
+				},
+			},
 		}
 		caCert, caKey, err := NewCACertAndKey()
 		if err != nil {
@@ -407,8 +368,8 @@ func TestNewEtcdPeerCertAndKey(t *testing.T) {
 		certstestutil.AssertCertificateIsSignedByCa(t, etcdPeerCert, caCert)
 		certstestutil.AssertCertificateHasServerAuthUsage(t, etcdPeerCert)
 		certstestutil.AssertCertificateHasClientAuthUsage(t, etcdPeerCert)
-		certstestutil.AssertCertificateHasDNSNames(t, etcdPeerCert, hostname, "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.local")
-		certstestutil.AssertCertificateHasIPAddresses(t, etcdPeerCert, net.ParseIP("10.96.0.1"), net.ParseIP(addr))
+		certstestutil.AssertCertificateHasDNSNames(t, etcdPeerCert, hostname, proxy)
+		certstestutil.AssertCertificateHasIPAddresses(t, etcdPeerCert, net.ParseIP(addr), net.ParseIP(proxyIP))
 	}
 }
 
@@ -622,6 +583,9 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 				kubeadmconstants.CACertName, kubeadmconstants.CAKeyName,
 				kubeadmconstants.APIServerCertName, kubeadmconstants.APIServerKeyName,
 				kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName,
+				kubeadmconstants.EtcdServerCertName, kubeadmconstants.EtcdServerKeyName,
+				kubeadmconstants.EtcdPeerCertName, kubeadmconstants.EtcdPeerKeyName,
+				kubeadmconstants.APIServerEtcdClientCertName, kubeadmconstants.APIServerEtcdClientKeyName,
 				kubeadmconstants.ServiceAccountPrivateKeyName, kubeadmconstants.ServiceAccountPublicKeyName,
 				kubeadmconstants.FrontProxyCACertName, kubeadmconstants.FrontProxyCAKeyName,
 				kubeadmconstants.FrontProxyClientCertName, kubeadmconstants.FrontProxyClientKeyName,
@@ -643,8 +607,8 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 		},
 		{
 			setupFunc:     CreateCACertAndKeyfiles,
-			createFunc:    CreateEtcdCertAndKeyFiles,
-			expectedFiles: []string{kubeadmconstants.EtcdCertName, kubeadmconstants.EtcdKeyName},
+			createFunc:    CreateEtcdServerCertAndKeyFiles,
+			expectedFiles: []string{kubeadmconstants.EtcdServerCertName, kubeadmconstants.EtcdServerKeyName},
 		},
 		{
 			setupFunc:     CreateCACertAndKeyfiles,
