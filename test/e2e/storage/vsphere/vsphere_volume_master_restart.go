@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storage
+package vsphere
 
 import (
 	"fmt"
@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 /*
@@ -41,7 +42,7 @@ import (
 	6. Delete the pod and wait for the volume to be detached
 	7. Delete the volume
 */
-var _ = SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disruptive]", func() {
+var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disruptive]", func() {
 	f := framework.NewDefaultFramework("restart-master")
 
 	const labelKey = "vsphere_e2e_label"

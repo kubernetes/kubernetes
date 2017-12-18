@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storage
+package vsphere
 
 import (
 	"strings"
@@ -28,6 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 const (
@@ -63,7 +64,7 @@ const (
 	7. Verify if the MountVolume.MountDevice fails because it is unable to find the file system executable file on the node.
 */
 
-var _ = SIGDescribe("Volume FStype [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("Volume FStype [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-fstype")
 	var (
 		client    clientset.Interface

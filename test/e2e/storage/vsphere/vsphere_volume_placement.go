@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storage
+package vsphere
 
 import (
 	"fmt"
@@ -31,9 +31,10 @@ import (
 	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-var _ = SIGDescribe("Volume Placement", func() {
+var _ = utils.SIGDescribe("Volume Placement", func() {
 	f := framework.NewDefaultFramework("volume-placement")
 	var (
 		c                  clientset.Interface

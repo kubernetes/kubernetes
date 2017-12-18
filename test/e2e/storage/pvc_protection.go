@@ -30,9 +30,10 @@ import (
 	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-var _ = SIGDescribe("PVC Protection [Feature:PVCProtection]", func() {
+var _ = utils.SIGDescribe("PVC Protection [Feature:PVCProtection]", func() {
 	var (
 		client                  clientset.Interface
 		nameSpace               string

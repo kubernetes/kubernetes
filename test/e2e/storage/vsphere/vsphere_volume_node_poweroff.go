@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storage
+package vsphere
 
 import (
 	"fmt"
@@ -36,6 +36,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 /*
@@ -43,7 +44,7 @@ import (
 	1. Verify the pod got provisioned on a different node with volume attached to it
 	2. Verify the volume is detached from the powered off node
 */
-var _ = SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]", func() {
+var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("node-poweroff")
 	var (
 		client     clientset.Interface

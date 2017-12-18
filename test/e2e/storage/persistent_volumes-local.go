@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -138,7 +139,7 @@ var (
 		Level: "s0:c0,c1"}
 )
 
-var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [Serial]", func() {
+var _ = utils.SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [Serial]", func() {
 	f := framework.NewDefaultFramework("persistent-local-volumes-test")
 
 	var (
@@ -835,7 +836,7 @@ func createFileDoesntExistCmd(testFileDir string, testFile string) string {
 // Execute a read or write command in a pod.
 // Fail on error
 func podRWCmdExec(pod *v1.Pod, cmd string) string {
-	out, err := podExec(pod, cmd)
+	out, err := utils.PodExec(pod, cmd)
 	Expect(err).NotTo(HaveOccurred())
 	return out
 }

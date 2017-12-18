@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storage
+package vsphere
 
 import (
 	"fmt"
@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 const (
@@ -44,7 +45,7 @@ const (
 	4. Verify the error returned on PVC failure is the correct.
 */
 
-var _ = SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-disksize")
 	var (
 		client       clientset.Interface

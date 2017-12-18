@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storage
+package vsphere
 
 import (
 	"fmt"
@@ -31,6 +31,7 @@ import (
 	k8stype "k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 /*
@@ -43,7 +44,7 @@ import (
 	4. Each instance of routine iterates for n times, where n is read from system env - VCP_STRESS_ITERATIONS
 	5. Each iteration creates 1 PVC, 1 POD using the provisioned PV, Verify disk is attached to the node, Verify pod can access the volume, delete the pod and finally delete the PVC.
 */
-var _ = SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("vcp-stress")
 	var (
 		client        clientset.Interface

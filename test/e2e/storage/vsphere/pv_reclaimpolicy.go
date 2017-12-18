@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storage
+package vsphere
 
 import (
 	"strconv"
@@ -29,9 +29,10 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-var _ = SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
+var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 	f := framework.NewDefaultFramework("persistentvolumereclaim")
 	var (
 		c          clientset.Interface
@@ -47,7 +48,7 @@ var _ = SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 	})
 
-	SIGDescribe("persistentvolumereclaim:vsphere", func() {
+	utils.SIGDescribe("persistentvolumereclaim:vsphere", func() {
 		BeforeEach(func() {
 			framework.SkipUnlessProviderIs("vsphere")
 			pv = nil

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storage
+package vsphere
 
 import (
 	"os"
@@ -32,6 +32,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 /*
@@ -52,7 +53,7 @@ import (
 	11. Delete PVC, PV and Storage Class
 */
 
-var _ = SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-disk-format")
 	var (
 		client            clientset.Interface

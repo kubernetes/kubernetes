@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storage
+package vsphere
 
 import (
 	"fmt"
@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 /* This test calculates latency numbers for volume lifecycle operations
@@ -48,7 +49,7 @@ const (
 	DeleteOp                  = "DeleteOp"
 )
 
-var _ = SIGDescribe("vcp-performance [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("vcp-performance")
 
 	var (
