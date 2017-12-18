@@ -29,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/davecgh/go-spew/spew"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	fakeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 )
 
 type fakeListener struct {
@@ -367,8 +369,9 @@ func TestHealthzServer(t *testing.T) {
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := clock.NewFakeClock(time.Now())
+	client := newFakeClient()
 
-	hs := newHealthzServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second, nil, nil)
+	hs := newHealthzServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second, nil, nil, client)
 	server := hs.httpFactory.New(hs.addr, healthzHandler{hs: hs})
 
 	// Should return 200 "OK" by default.
@@ -383,6 +386,10 @@ func TestHealthzServer(t *testing.T) {
 	hs.UpdateTimestamp()
 	fakeClock.Step(5 * time.Second)
 	testHealthzHandler(server, http.StatusOK, t)
+}
+
+func newFakeClient() clientset.Interface {
+	return fakeclientset.NewSimpleClientset()
 }
 
 func testHealthzHandler(server HTTPServer, status int, t *testing.T) {
