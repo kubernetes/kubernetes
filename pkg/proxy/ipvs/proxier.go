@@ -970,6 +970,9 @@ func (proxier *Proxier) OnEndpointsSynced() {
 	proxier.syncProxyRules()
 }
 
+// EntryInvalidErr indiates if an ipset entry is invalid or not
+const EntryInvalidErr = "entry is invalid"
+
 // This is where all of the ipvs calls happen.
 // assumes proxier.mu is held
 func (proxier *Proxier) syncProxyRules() {
@@ -1124,6 +1127,10 @@ func (proxier *Proxier) syncProxyRules() {
 				IP2:      epIP,
 				SetType:  utilipset.HashIPPortIP,
 			}
+			if valid, err := proxier.loopbackSet.validateEntry(entry); !valid {
+				glog.Errorf("Failed to add entry %v to set %s, error: %s, %v", entry, proxier.loopbackSet.Name, EntryInvalidErr, err)
+				continue
+			}
 			proxier.loopbackSet.activeEntries.Insert(entry.String())
 		}
 
@@ -1139,8 +1146,16 @@ func (proxier *Proxier) syncProxyRules() {
 		// proxier.kubeServiceAccessSet.activeEntries.Insert(entry.String())
 		// Install masquerade rules if 'masqueradeAll' or 'clusterCIDR' is specified.
 		if proxier.masqueradeAll {
+			if valid, err := proxier.clusterIPSet.validateEntry(entry); !valid {
+				glog.Errorf("Failed to add entry %v to set %s, error: %s, %v", entry, proxier.clusterIPSet.Name, EntryInvalidErr, err)
+				continue
+			}
 			proxier.clusterIPSet.activeEntries.Insert(entry.String())
 		} else if len(proxier.clusterCIDR) > 0 {
+			if valid, err := proxier.clusterIPSet.validateEntry(entry); !valid {
+				glog.Errorf("Failed to add entry %v to set %s, error: %s, %v", entry, proxier.clusterIPSet.Name, EntryInvalidErr, err)
+				continue
+			}
 			proxier.clusterIPSet.activeEntries.Insert(entry.String())
 		}
 		// ipvs call
@@ -1208,6 +1223,10 @@ func (proxier *Proxier) syncProxyRules() {
 				SetType:  utilipset.HashIPPort,
 			}
 			// We have to SNAT packets to external IPs.
+			if valid, err := proxier.externalIPSet.validateEntry(entry); !valid {
+				glog.Errorf("Failed to add entry %v to set %s, error: %s, %v", entry, proxier.externalIPSet.Name, EntryInvalidErr, err)
+				continue
+			}
 			proxier.externalIPSet.activeEntries.Insert(entry.String())
 
 			// ipvs call
@@ -1247,12 +1266,20 @@ func (proxier *Proxier) syncProxyRules() {
 				// If we are proxying globally, we need to masquerade in case we cross nodes.
 				// If we are proxying only locally, we can retain the source IP.
 				if !svcInfo.onlyNodeLocalEndpoints {
+					if valid, err := proxier.lbMasqSet.validateEntry(entry); !valid {
+						glog.Errorf("Failed to add entry %v to set %s, error: %s, %v", entry, proxier.lbMasqSet.Name, EntryInvalidErr, err)
+						continue
+					}
 					proxier.lbMasqSet.activeEntries.Insert(entry.String())
 				}
 				if len(svcInfo.loadBalancerSourceRanges) != 0 {
 					// The service firewall rules are created based on ServiceSpec.loadBalancerSourceRanges field.
 					// This currently works for loadbalancers that preserves source ips.
 					// For loadbalancers which direct traffic to service NodePort, the firewall rules will not apply.
+					if valid, err := proxier.lbIngressSet.validateEntry(entry); !valid {
+						glog.Errorf("Failed to add entry %v to set %s, error: %s, %v", entry, proxier.lbIngressSet.Name, EntryInvalidErr, err)
+						continue
+					}
 					proxier.lbIngressSet.activeEntries.Insert(entry.String())
 
 					allowFromNode := false
@@ -1266,6 +1293,10 @@ func (proxier *Proxier) syncProxyRules() {
 							SetType:  utilipset.HashIPPortNet,
 						}
 						// enumerate all white list source cidr
+						if valid, err := proxier.lbWhiteListCIDRSet.validateEntry(entry); !valid {
+							glog.Errorf("Failed to add entry %v to set %s, error: %s, %v", entry, proxier.lbWhiteListCIDRSet.Name, EntryInvalidErr, err)
+							continue
+						}
 						proxier.lbWhiteListCIDRSet.activeEntries.Insert(entry.String())
 
 						// ignore error because it has been validated
@@ -1286,6 +1317,10 @@ func (proxier *Proxier) syncProxyRules() {
 							SetType:  utilipset.HashIPPortIP,
 						}
 						// enumerate all white list source ip
+						if valid, err := proxier.lbWhiteListIPSet.validateEntry(entry); !valid {
+							glog.Errorf("Failed to add entry %v to set %s, error: %s, %v", entry, proxier.lbWhiteListIPSet.Name, EntryInvalidErr, err)
+							continue
+						}
 						proxier.lbWhiteListIPSet.activeEntries.Insert(entry.String())
 					}
 				}
@@ -1347,8 +1382,16 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 				switch protocol {
 				case "tcp":
+					if valid, err := proxier.nodePortSetTCP.validateEntry(entry); !valid {
+						glog.Errorf("Failed to add entry %v to set %s, error: %s, %v", entry, proxier.nodePortSetTCP.Name, EntryInvalidErr, err)
+						continue
+					}
 					proxier.nodePortSetTCP.activeEntries.Insert(entry.String())
 				case "udp":
+					if valid, err := proxier.nodePortSetUDP.validateEntry(entry); !valid {
+						glog.Errorf("Failed to add entry %v to set %s, error: %s, %v", entry, proxier.nodePortSetUDP.Name, EntryInvalidErr, err)
+						continue
+					}
 					proxier.nodePortSetUDP.activeEntries.Insert(entry.String())
 				default:
 					// It should never hit
