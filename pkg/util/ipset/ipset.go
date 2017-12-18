@@ -34,10 +34,10 @@ type Interface interface {
 	DestroySet(set string) error
 	// DestroyAllSets deletes all sets.
 	DestroyAllSets() error
-	// CreateSet creates a new set,  it will ignore error when the set already exists if ignoreExistErr=true.
+	// CreateSet creates a new set.  It will ignore error when the set already exists if ignoreExistErr=true.
 	CreateSet(set *IPSet, ignoreExistErr bool) error
-	// AddEntry adds a new entry to the named set.
-	AddEntry(entry string, set string, ignoreExistErr bool) error
+	// AddEntry adds a new entry to the named set.  It will ignore error when the entry already exists if ignoreExistErr=true.
+	AddEntry(entry string, set *IPSet, ignoreExistErr bool) error
 	// DelEntry deletes one entry from the named set
 	DelEntry(entry string, set string) error
 	// Test test if an entry exists in the named set
@@ -48,6 +48,7 @@ type Interface interface {
 	ListSets() ([]string, error)
 	// GetVersion returns the "X.Y" version string for ipset.
 	GetVersion() (string, error)
+	// TODO: add comment message for ipset
 }
 
 // IPSetCmd represents the ipset util.  We use ipset command for ipset execute.
@@ -198,8 +199,8 @@ func (runner *runner) createSet(set *IPSet, ignoreExistErr bool) error {
 // AddEntry adds a new entry to the named set.
 // If the -exist option is specified, ipset ignores the error otherwise raised when
 // the same set (setname and create parameters are identical) already exists.
-func (runner *runner) AddEntry(entry string, set string, ignoreExistErr bool) error {
-	args := []string{"add", set, entry}
+func (runner *runner) AddEntry(entry string, set *IPSet, ignoreExistErr bool) error {
+	args := []string{"add", set.Name, entry}
 	if ignoreExistErr {
 		args = append(args, "-exist")
 	}

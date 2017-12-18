@@ -233,6 +233,10 @@ func TestAddEntry(t *testing.T) {
 		SetType:  HashIPPort,
 	}
 
+	testSet := &IPSet{
+		Name: "FOOBAR",
+	}
+
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// Success
@@ -254,7 +258,7 @@ func TestAddEntry(t *testing.T) {
 	}
 	runner := New(&fexec)
 	// Create with ignoreExistErr = false, expect success
-	err := runner.AddEntry(testEntry.String(), "FOOBAR", false)
+	err := runner.AddEntry(testEntry.String(), testSet, false)
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
@@ -265,7 +269,7 @@ func TestAddEntry(t *testing.T) {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
 	}
 	// Create with ignoreExistErr = true, expect success
-	err = runner.AddEntry(testEntry.String(), "FOOBAR", true)
+	err = runner.AddEntry(testEntry.String(), testSet, true)
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
@@ -276,7 +280,7 @@ func TestAddEntry(t *testing.T) {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
 	}
 	// Create with ignoreExistErr = false, expect failure
-	err = runner.AddEntry(testEntry.String(), "FOOBAR", false)
+	err = runner.AddEntry(testEntry.String(), testSet, false)
 	if err == nil {
 		t.Errorf("expected failure, got nil")
 	}
