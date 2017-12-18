@@ -211,6 +211,7 @@ var standardQuotaResources = sets.NewString(
 	string(core.ResourceConfigMaps),
 	string(core.ResourceServicesNodePorts),
 	string(core.ResourceServicesLoadBalancers),
+	string(core.ResourcePodsHostPorts),
 )
 
 // IsStandardQuotaResourceName returns true if the resource is known to
@@ -240,6 +241,7 @@ var standardResources = sets.NewString(
 	string(core.ResourceRequestsStorage),
 	string(core.ResourceServicesNodePorts),
 	string(core.ResourceServicesLoadBalancers),
+	string(core.ResourcePodsHostPorts),
 )
 
 // IsStandardResourceName returns true if the resource is known to the system

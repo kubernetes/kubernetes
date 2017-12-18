@@ -4177,6 +4177,8 @@ const (
 	ResourceLimitsMemory ResourceName = "limits.memory"
 	// Local ephemeral storage limit, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	ResourceLimitsEphemeralStorage ResourceName = "limits.ephemeral-storage"
+	// Hostports bound to pod, number
+	ResourcePodsHostPorts ResourceName = "pods.hostports"
 )
 
 // The following identify resource prefix for Kubernetes object types
