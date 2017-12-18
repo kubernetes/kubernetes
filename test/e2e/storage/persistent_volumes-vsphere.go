@@ -122,17 +122,14 @@ var _ = SIGDescribe("PersistentVolumes:vsphere", func() {
 				framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc.Name, ns), "AfterEach: failed to delete PVC ", pvc.Name)
 			}
 		}
-	})
-	/*
-		Clean up
+		/*
+			Clean up
 
-		1. Wait and verify volume is detached from the node
-		2. Delete PV
-		3. Delete Volume (vmdk)
-	*/
-	framework.AddCleanupAction(func() {
-		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
-		if len(ns) > 0 && len(volumePath) > 0 {
+			1. Wait and verify volume is detached from the node
+			2. Delete PV
+			3. Delete Volume (vmdk)
+		*/
+		if len(volumePath) > 0 {
 			client, err := framework.LoadClientset()
 			if err != nil {
 				return

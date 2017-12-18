@@ -80,9 +80,8 @@ var _ = SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 			isNodeLabeled = true
 		}
 	})
-	framework.AddCleanupAction(func() {
-		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
-		if len(namespace) > 0 && len(nodeLabelValue) > 0 {
+	AfterEach(func() {
+		if len(nodeLabelValue) > 0 {
 			framework.RemoveLabelOffNode(client, nodeName, "vsphere_e2e_label")
 		}
 	})
