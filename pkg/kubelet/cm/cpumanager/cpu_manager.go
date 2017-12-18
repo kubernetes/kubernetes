@@ -98,13 +98,7 @@ type manager struct {
 var _ Manager = &manager{}
 
 // NewManager creates new cpu manager based on provided policy
-func NewManager(
-	cpuPolicyName string,
-	reconcilePeriod time.Duration,
-	machineInfo *cadvisorapi.MachineInfo,
-	nodeAllocatableReservation v1.ResourceList,
-	stateFileDirecory string,
-) (Manager, error) {
+func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, stateFileDirecory string) (Manager, error) {
 	var policy Policy
 
 	switch policyName(cpuPolicyName) {
@@ -120,18 +114,16 @@ func NewManager(
 		glog.Infof("[cpumanager] detected CPU topology: %v", topo)
 		reservedCPUs, ok := nodeAllocatableReservation[v1.ResourceCPU]
 		if !ok {
-			// The static policy cannot initialize without this information. Panic!
-			panic("[cpumanager] unable to determine reserved CPU resources for static policy")
+			// The static policy cannot initialize without this information.
+			return nil, fmt.Errorf("[cpumanager] unable to determine reserved CPU resources for static policy")
 		}
 		if reservedCPUs.IsZero() {
-			// Panic!
-			//
 			// The static policy requires this to be nonzero. Zero CPU reservation
 			// would allow the shared pool to be completely exhausted. At that point
 			// either we would violate our guarantee of exclusivity or need to evict
 			// any pod that has at least one container that requires zero CPUs.
 			// See the comments in policy_static.go for more details.
-			panic("[cpumanager] the static policy requires systemreserved.cpu + kubereserved.cpu to be greater than zero")
+			return nil, fmt.Errorf("[cpumanager] the static policy requires systemreserved.cpu + kubereserved.cpu to be greater than zero")
 		}
 
 		// Take the ceiling of the reservation, since fractional CPUs cannot be
