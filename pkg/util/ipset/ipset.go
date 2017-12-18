@@ -88,6 +88,36 @@ type IPSet struct {
 	PortRange string
 }
 
+// Validate checks if a given ipset is valid or not.
+func (set *IPSet) Validate() (bool, error) {
+	// Check if protocol is valid for `HashIPPort`, `HashIPPortIP` and `HashIPPortNet` type set.
+	if set.SetType == HashIPPort || set.SetType == HashIPPortIP || set.SetType == HashIPPortNet {
+		if valid := validateHashFamily(set.HashFamily); !valid {
+			return false, fmt.Errorf("currently supported ip set hash families are: [%s, %s], %s is not supported", ProtocolFamilyIPV4, ProtocolFamilyIPV6, set.HashFamily)
+		}
+	}
+	// check set type
+	if valid := validateIPSetType(set.SetType); !valid {
+		return false, fmt.Errorf("currently supported ipset types are: %v, %s is not supported", ValidIPSetTypes, set.SetType)
+	}
+	// check port range for bitmap type set
+	if set.SetType == BitmapPort {
+		if valid, err := validatePortRange(set.PortRange); !valid {
+			return false, err
+		}
+	}
+	// check hash size value of ipset
+	if set.HashSize <= 0 {
+		return false, fmt.Errorf("invalid hashsize value, should be >0")
+	}
+	// check max elem value of ipset
+	if set.MaxElem <= 0 {
+		return false, fmt.Errorf("invalid maxelem value, should be >0")
+	}
+
+	return true, nil
+}
+
 // Entry represents a ipset entry.
 type Entry struct {
 	// IP is the entry's IP.  The IP address protocol corresponds to the HashFamily of IPSet.
@@ -310,17 +340,41 @@ func getIPSetVersionString(exec utilexec.Interface) (string, error) {
 	return match[0], nil
 }
 
-func validatePortRange(portRange string) bool {
+// checks if port range is valid. The begin port number is not necessarily less than
+// end port number - ipset util can accept it.  It means both 1-100 and 100-1 are valid.
+func validatePortRange(portRange string) (bool, error) {
 	strs := strings.Split(portRange, "-")
 	if len(strs) != 2 {
-		return false
+		return false, fmt.Errorf("port range should be in the format of `a-b`")
 	}
 	for i := range strs {
-		if _, err := strconv.Atoi(strs[i]); err != nil {
-			return false
+		num, err := strconv.Atoi(strs[i])
+		if err != nil {
+			return false, err
+		}
+		if num < 0 {
+			return false, fmt.Errorf("port number %d should be >=0", num)
 		}
 	}
-	return true
+	return true, nil
+}
+
+// checks if the given ipset type is valid.
+func validateIPSetType(set Type) bool {
+	for _, valid := range ValidIPSetTypes {
+		if set == valid {
+			return true
+		}
+	}
+	return false
+}
+
+// checks if given hash family is supported in ipset
+func validateHashFamily(family string) bool {
+	if family == ProtocolFamilyIPV4 || family == ProtocolFamilyIPV6 {
+		return true
+	}
+	return false
 }
 
 // IsNotFoundError returns true if the error indicates "not found".  It parses

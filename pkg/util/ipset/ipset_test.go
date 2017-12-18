@@ -485,3 +485,172 @@ baz`
 		t.Errorf("expected sets: %v, got: %v", expected, list)
 	}
 }
+
+func Test_validIPSetType(t *testing.T) {
+	testCases := []struct {
+		setType Type
+		valid   bool
+	}{
+		{ // case[0]
+			setType: Type("foo"),
+			valid:   false,
+		},
+		{ // case[1]
+			setType: HashIPPortNet,
+			valid:   true,
+		},
+		{ // case[2]
+			setType: HashIPPort,
+			valid:   true,
+		},
+		{ // case[3]
+			setType: HashIPPortIP,
+			valid:   true,
+		},
+		{ // case[4]
+			setType: BitmapPort,
+			valid:   true,
+		},
+		{ // case[5]
+			setType: Type(""),
+			valid:   false,
+		},
+	}
+	for i := range testCases {
+		valid := validateIPSetType(testCases[i].setType)
+		if valid != testCases[i].valid {
+			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v]", i, testCases[i].valid, valid)
+		}
+	}
+}
+
+func Test_validatePortRange(t *testing.T) {
+	testCases := []struct {
+		portRange string
+		valid     bool
+		desc      string
+	}{
+		{ // case[0]
+			portRange: "a-b",
+			valid:     false,
+			desc:      "invalid port number",
+		},
+		{ // case[1]
+			portRange: "1-2",
+			valid:     true,
+			desc:      "valid",
+		},
+		{ // case[2]
+			portRange: "90-1",
+			valid:     true,
+			desc:      "ipset util can accept the input of begin port number can be less than end port number",
+		},
+		{ // case[3]
+			portRange: DefaultPortRange,
+			valid:     true,
+			desc:      "default port range is valid, of course",
+		},
+		{ // case[4]
+			portRange: "12",
+			valid:     false,
+			desc:      "a single number is invalid",
+		},
+		{ // case[5]
+			portRange: "1-",
+			valid:     false,
+			desc:      "should specify end port",
+		},
+		{ // case[6]
+			portRange: "-100",
+			valid:     false,
+			desc:      "should specify begin port",
+		},
+		{ // case[7]
+			portRange: "1:100",
+			valid:     false,
+			desc:      "delimiter should be -",
+		},
+		{ // case[8]
+			portRange: "1~100",
+			valid:     false,
+			desc:      "delimiter should be -",
+		},
+		{ // case[9]
+			portRange: "1,100",
+			valid:     false,
+			desc:      "delimiter should be -",
+		},
+		{ // case[10]
+			portRange: "100-100",
+			valid:     true,
+			desc:      "begin port number can be equal to end port number",
+		},
+		{ // case[11]
+			portRange: "",
+			valid:     false,
+			desc:      "empty string is invalid",
+		},
+		{ // case[12]
+			portRange: "-1-12",
+			valid:     false,
+			desc:      "port number can not be negative value",
+		},
+		{ // case[13]
+			portRange: "-1--8",
+			valid:     false,
+			desc:      "port number can not be negative value",
+		},
+	}
+	for i := range testCases {
+		valid, _ := validatePortRange(testCases[i].portRange)
+		if valid != testCases[i].valid {
+			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v], desc: %s", i, testCases[i].valid, valid, testCases[i].desc)
+		}
+	}
+}
+
+func Test_validateFamily(t *testing.T) {
+	testCases := []struct {
+		family string
+		valid  bool
+	}{
+		{ // case[0]
+			family: "foo",
+			valid:  false,
+		},
+		{ // case[1]
+			family: ProtocolFamilyIPV4,
+			valid:  true,
+		},
+		{ // case[2]
+			family: ProtocolFamilyIPV6,
+			valid:  true,
+		},
+		{ // case[3]
+			family: "ipv4",
+			valid:  false,
+		},
+		{ // case[4]
+			family: "ipv6",
+			valid:  false,
+		},
+		{ // case[5]
+			family: "tcp",
+			valid:  false,
+		},
+		{ // case[6]
+			family: "udp",
+			valid:  false,
+		},
+		{ // case[7]
+			family: "",
+			valid:  false,
+		},
+	}
+	for i := range testCases {
+		valid := validateHashFamily(testCases[i].family)
+		if valid != testCases[i].valid {
+			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v]", i, testCases[i].valid, valid)
+		}
+	}
+}
