@@ -28,6 +28,12 @@ set -o pipefail
 readonly UUID_MNT_PREFIX="/mnt/disks/by-uuid/google-local-ssds"
 readonly UUID_BLOCK_PREFIX="/dev/disk/by-uuid/google-local-ssds"
 
+# Use --retry-connrefused opt only if it's supported by curl.
+CURL_RETRY_CONNREFUSED=""
+if curl --help | grep -q -- '--retry-connrefused'; then
+  CURL_RETRY_CONNREFUSED='--retry-connrefused'
+fi
+
 function setup-os-params {
   # Reset core_pattern. On GCI, the default core_pattern pipes the core dumps to
   # /sbin/crash_reporter which is more restrictive in saving crash dumps. So for
@@ -1655,7 +1661,7 @@ function start-kube-apiserver {
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
   if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
-    local -r vm_external_ip=$(curl --retry 5 --retry-delay 3 --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
+    local -r vm_external_ip=$(curl --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
     if [[ -n "${PROXY_SSH_USER:-}" ]]; then
       params+=" --advertise-address=${vm_external_ip}"      
       params+=" --ssh-user=${PROXY_SSH_USER}"

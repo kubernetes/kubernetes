@@ -31,6 +31,12 @@ DEFAULT_NPD_SHA1="a57a3fe64cab8a18ec654f5cef0aec59dae62568"
 DEFAULT_MOUNTER_TAR_SHA="8003b798cf33c7f91320cd6ee5cec4fa22244571"
 ###
 
+# Use --retry-connrefused opt only if it's supported by curl.
+CURL_RETRY_CONNREFUSED=""
+if curl --help | grep -q -- '--retry-connrefused'; then
+  CURL_RETRY_CONNREFUSED='--retry-connrefused'
+fi
+
 function set-broken-motd {
   cat > /etc/motd <<EOF
 Broken (or in progress) Kubernetes node setup! Check the cluster initialization status
@@ -50,7 +56,7 @@ function download-kube-env {
   # Fetch kube-env from GCE metadata server.
   (umask 700;
   local -r tmp_kube_env="/tmp/kube-env.yaml"
-  curl --fail --retry 5 --retry-delay 3 --silent --show-error \
+  curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
     -H "X-Google-Metadata-Request: True" \
     -o "${tmp_kube_env}" \
     http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
@@ -68,7 +74,7 @@ function download-kube-master-certs {
   # Fetch kube-env from GCE metadata server.
   (umask 700;
   local -r tmp_kube_master_certs="/tmp/kube-master-certs.yaml"
-  curl --fail --retry 5 --retry-delay 3 --silent --show-error \
+  curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
     -H "X-Google-Metadata-Request: True" \
     -o "${tmp_kube_master_certs}" \
     http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-master-certs
@@ -106,7 +112,7 @@ function download-or-bust {
     for url in "${urls[@]}"; do
       local file="${url##*/}"
       rm -f "${file}"
-      if ! curl -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 "${url}"; then
+      if ! curl -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 ${CURL_RETRY_CONNREFUSED} "${url}"; then
         echo "== Failed to download ${url}. Retrying. =="
       elif [[ -n "${hash}" ]] && ! validate-hash "${file}" "${hash}"; then
         echo "== Hash validation of ${url} failed. Retrying. =="
