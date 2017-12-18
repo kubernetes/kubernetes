@@ -49,8 +49,8 @@ import (
 )
 
 const (
-	MatchInterPodAffinity               = "MatchInterPodAffinity"
-	CheckVolumeBinding                  = "CheckVolumeBinding"
+	MatchInterPodAffinityPred           = "MatchInterPodAffinity"
+	CheckVolumeBindingPred              = "CheckVolumeBinding"
 	CheckNodeConditionPred              = "CheckNodeCondition"
 	GeneralPred                         = "GeneralPredicates"
 	HostNamePred                        = "HostName"
@@ -67,7 +67,7 @@ const (
 	MaxAzureDiskVolumeCountPred         = "MaxAzureDiskVolumeCount"
 	NoVolumeZoneConflictPred            = "NoVolumeZoneConflict"
 	CheckNodeMemoryPressurePred         = "CheckNodeMemoryPressure"
-	CheckNodeDiskPressure               = "CheckNodeDiskPressure"
+	CheckNodeDiskPressurePred           = "CheckNodeDiskPressure"
 	// DefaultMaxGCEPDVolumes defines the maximum number of PD Volumes for GCE
 	// GCE instances can have up to 16 PD volumes attached.
 	DefaultMaxGCEPDVolumes = 16
@@ -95,19 +95,19 @@ const (
 // For example:
 // https://github.com/kubernetes/kubernetes/blob/36a218e/plugin/pkg/scheduler/factory/factory.go#L422
 
-// IMPORTANT: this list contains the ordering of the predicates, if you develop a new predicates
-// it is mandatory to add its name on this list.
-// otherwise it won't be processed, see generic_scheduler#podFitsOnNode()
-// the order is based on the restrictiveness & complexity of predicates
-// design doc: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/scheduling/predicates-ordering.md
+// IMPORTANT NOTE: this list contains the ordering of the predicates, if you develop a new predicate
+// it is mandatory to add its name to this list.
+// Otherwise it won't be processed, see generic_scheduler#podFitsOnNode().
+// The order is based on the restrictiveness & complexity of predicates.
+// Design doc: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/scheduling/predicates-ordering.md
 var (
 	predicatesOrdering = []string{CheckNodeConditionPred,
 		GeneralPred, HostNamePred, PodFitsHostPortsPred,
 		MatchNodeSelectorPred, PodFitsResourcesPred, NoDiskConflictPred,
 		PodToleratesNodeTaintsPred, PodToleratesNodeNoExecuteTaintsPred, CheckNodeLabelPresencePred,
 		checkServiceAffinityPred, MaxEBSVolumeCountPred, MaxGCEPDVolumeCountPred,
-		MaxAzureDiskVolumeCountPred, CheckVolumeBinding, NoVolumeZoneConflictPred,
-		CheckNodeMemoryPressurePred, CheckNodeDiskPressure, MatchInterPodAffinity}
+		MaxAzureDiskVolumeCountPred, CheckVolumeBindingPred, NoVolumeZoneConflictPred,
+		CheckNodeMemoryPressurePred, CheckNodeDiskPressurePred, MatchInterPodAffinityPred}
 )
 
 // NodeInfo: Other types for predicate functions...
@@ -124,7 +124,7 @@ type CachedPersistentVolumeInfo struct {
 	corelisters.PersistentVolumeLister
 }
 
-func GetPredicatesOrdering() []string {
+func PredicatesOrdering() []string {
 	return predicatesOrdering
 }
 

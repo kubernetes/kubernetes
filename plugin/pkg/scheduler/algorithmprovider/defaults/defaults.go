@@ -65,17 +65,17 @@ func init() {
 	// Fit is defined based on the absence of port conflicts.
 	// This predicate is actually a default predicate, because it is invoked from
 	// predicates.GeneralPredicates()
-	factory.RegisterFitPredicate("PodFitsHostPorts", predicates.PodFitsHostPorts)
+	factory.RegisterFitPredicate(predicates.PodFitsHostPortsPred, predicates.PodFitsHostPorts)
 	// Fit is determined by resource availability.
 	// This predicate is actually a default predicate, because it is invoked from
 	// predicates.GeneralPredicates()
-	factory.RegisterFitPredicate("PodFitsResources", predicates.PodFitsResources)
+	factory.RegisterFitPredicate(predicates.PodFitsResourcesPred, predicates.PodFitsResources)
 	// Fit is determined by the presence of the Host parameter and a string match
 	// This predicate is actually a default predicate, because it is invoked from
 	// predicates.GeneralPredicates()
-	factory.RegisterFitPredicate("HostName", predicates.PodFitsHost)
+	factory.RegisterFitPredicate(predicates.HostNamePred, predicates.PodFitsHost)
 	// Fit is determined by node selector query.
-	factory.RegisterFitPredicate("MatchNodeSelector", predicates.PodMatchNodeSelector)
+	factory.RegisterFitPredicate(predicates.MatchNodeSelectorPred, predicates.PodMatchNodeSelector)
 
 	// Use equivalence class to speed up heavy predicates phase.
 	factory.RegisterGetEquivalencePodFunction(
@@ -117,62 +117,62 @@ func defaultPredicates() sets.String {
 	return sets.NewString(
 		// Fit is determined by volume zone requirements.
 		factory.RegisterFitPredicateFactory(
-			"NoVolumeZoneConflict",
+			predicates.NoVolumeZoneConflictPred,
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
 				return predicates.NewVolumeZonePredicate(args.PVInfo, args.PVCInfo, args.StorageClassInfo)
 			},
 		),
 		// Fit is determined by whether or not there would be too many AWS EBS volumes attached to the node
 		factory.RegisterFitPredicateFactory(
-			"MaxEBSVolumeCount",
+			predicates.MaxEBSVolumeCountPred,
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
 				return predicates.NewMaxPDVolumeCountPredicate(predicates.EBSVolumeFilterType, args.PVInfo, args.PVCInfo)
 			},
 		),
 		// Fit is determined by whether or not there would be too many GCE PD volumes attached to the node
 		factory.RegisterFitPredicateFactory(
-			"MaxGCEPDVolumeCount",
+			predicates.MaxGCEPDVolumeCountPred,
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
 				return predicates.NewMaxPDVolumeCountPredicate(predicates.GCEPDVolumeFilterType, args.PVInfo, args.PVCInfo)
 			},
 		),
 		// Fit is determined by whether or not there would be too many Azure Disk volumes attached to the node
 		factory.RegisterFitPredicateFactory(
-			"MaxAzureDiskVolumeCount",
+			predicates.MaxAzureDiskVolumeCountPred,
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
 				return predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilterType, args.PVInfo, args.PVCInfo)
 			},
 		),
 		// Fit is determined by inter-pod affinity.
 		factory.RegisterFitPredicateFactory(
-			predicates.MatchInterPodAffinity,
+			predicates.MatchInterPodAffinityPred,
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
 				return predicates.NewPodAffinityPredicate(args.NodeInfo, args.PodLister)
 			},
 		),
 
 		// Fit is determined by non-conflicting disk volumes.
-		factory.RegisterFitPredicate("NoDiskConflict", predicates.NoDiskConflict),
+		factory.RegisterFitPredicate(predicates.NoDiskConflictPred, predicates.NoDiskConflict),
 
 		// GeneralPredicates are the predicates that are enforced by all Kubernetes components
 		// (e.g. kubelet and all schedulers)
-		factory.RegisterFitPredicate("GeneralPredicates", predicates.GeneralPredicates),
+		factory.RegisterFitPredicate(predicates.GeneralPred, predicates.GeneralPredicates),
 
 		// Fit is determined by node memory pressure condition.
-		factory.RegisterFitPredicate("CheckNodeMemoryPressure", predicates.CheckNodeMemoryPressurePredicate),
+		factory.RegisterFitPredicate(predicates.CheckNodeMemoryPressurePred, predicates.CheckNodeMemoryPressurePredicate),
 
 		// Fit is determined by node disk pressure condition.
-		factory.RegisterFitPredicate("CheckNodeDiskPressure", predicates.CheckNodeDiskPressurePredicate),
+		factory.RegisterFitPredicate(predicates.CheckNodeDiskPressurePred, predicates.CheckNodeDiskPressurePredicate),
 
 		// Fit is determined by node conditions: not ready, network unavailable or out of disk.
-		factory.RegisterMandatoryFitPredicate("CheckNodeCondition", predicates.CheckNodeConditionPredicate),
+		factory.RegisterMandatoryFitPredicate(predicates.CheckNodeConditionPred, predicates.CheckNodeConditionPredicate),
 
 		// Fit is determined based on whether a pod can tolerate all of the node's taints
-		factory.RegisterFitPredicate("PodToleratesNodeTaints", predicates.PodToleratesNodeTaints),
+		factory.RegisterFitPredicate(predicates.PodToleratesNodeTaintsPred, predicates.PodToleratesNodeTaints),
 
 		// Fit is determined by volume topology requirements.
 		factory.RegisterFitPredicateFactory(
-			predicates.CheckVolumeBinding,
+			predicates.CheckVolumeBindingPred,
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
 				return predicates.NewVolumeBindingPredicate(args.VolumeBinder)
 			},
@@ -185,18 +185,18 @@ func ApplyFeatureGates() {
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
 		// Remove "CheckNodeCondition" predicate
-		factory.RemoveFitPredicate("CheckNodeCondition")
+		factory.RemoveFitPredicate(predicates.CheckNodeConditionPred)
 		// Remove Key "CheckNodeCondition" From All Algorithm Provider
 		// The key will be removed from all providers which in algorithmProviderMap[]
 		// if you just want remove specific provider, call func RemovePredicateKeyFromAlgoProvider()
-		factory.RemovePredicateKeyFromAlgorithmProviderMap("CheckNodeCondition")
+		factory.RemovePredicateKeyFromAlgorithmProviderMap(predicates.CheckNodeConditionPred)
 
 		// Fit is determined based on whether a pod can tolerate all of the node's taints
-		factory.RegisterMandatoryFitPredicate("PodToleratesNodeTaints", predicates.PodToleratesNodeTaints)
+		factory.RegisterMandatoryFitPredicate(predicates.PodToleratesNodeTaintsPred, predicates.PodToleratesNodeTaints)
 		// Insert Key "PodToleratesNodeTaints" To All Algorithm Provider
 		// The key will insert to all providers which in algorithmProviderMap[]
 		// if you just want insert to specific provider, call func InsertPredicateKeyToAlgoProvider()
-		factory.InsertPredicateKeyToAlgorithmProviderMap("PodToleratesNodeTaints")
+		factory.InsertPredicateKeyToAlgorithmProviderMap(predicates.PodToleratesNodeTaintsPred)
 
 		glog.Warningf("TaintNodesByCondition is enabled, PodToleratesNodeTaints predicate is mandatory")
 	}

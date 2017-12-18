@@ -43,7 +43,7 @@ import (
 )
 
 var (
-	order = []string{"false", "true", "matches", "nopods", predicates.MatchInterPodAffinity}
+	order = []string{"false", "true", "matches", "nopods", predicates.MatchInterPodAffinityPred}
 )
 
 func falsePredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
@@ -872,7 +872,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			nodes = append(nodes, node)
 		}
 		if test.addAffinityPredicate {
-			test.predicates[predicates.MatchInterPodAffinity] = algorithmpredicates.NewPodAffinityPredicate(FakeNodeInfo(*nodes[0]), schedulertesting.FakePodLister(test.pods))
+			test.predicates[predicates.MatchInterPodAffinityPred] = algorithmpredicates.NewPodAffinityPredicate(FakeNodeInfo(*nodes[0]), schedulertesting.FakePodLister(test.pods))
 		}
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, nodes)
 		nodeToPods, err := selectNodesForPreemption(test.pod, nodeNameToInfo, nodes, test.predicates, PredicateMetadata, nil, nil)

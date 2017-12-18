@@ -444,7 +444,7 @@ func podFitsOnNode(
 		// TODO(bsalamat): consider using eCache and adding proper eCache invalidations
 		// when pods are nominated or their nominations change.
 		eCacheAvailable = eCacheAvailable && !podsAdded
-		for _, predicateKey := range predicates.GetPredicatesOrdering() {
+		for _, predicateKey := range predicates.PredicatesOrdering() {
 			//TODO (yastij) : compute average predicate restrictiveness to export it as promethus metric
 			if predicate, exist := predicateFuncs[predicateKey]; exist {
 				if eCacheAvailable {

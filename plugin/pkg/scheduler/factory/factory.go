@@ -409,7 +409,7 @@ func (c *configFactory) invalidatePredicatesForPv(pv *v1.PersistentVolume) {
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		// Add/delete impacts the available PVs to choose from
-		invalidPredicates.Insert(predicates.CheckVolumeBinding)
+		invalidPredicates.Insert(predicates.CheckVolumeBindingPred)
 	}
 
 	c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(invalidPredicates)
@@ -480,7 +480,7 @@ func (c *configFactory) invalidatePredicatesForPvc(pvc *v1.PersistentVolumeClaim
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		// Add/delete impacts the available PVs to choose from
-		invalidPredicates.Insert(predicates.CheckVolumeBinding)
+		invalidPredicates.Insert(predicates.CheckVolumeBindingPred)
 	}
 	c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(invalidPredicates)
 }
@@ -491,7 +491,7 @@ func (c *configFactory) invalidatePredicatesForPvcUpdate(old, new *v1.Persistent
 	if old.Spec.VolumeName != new.Spec.VolumeName {
 		if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 			// PVC volume binding has changed
-			invalidPredicates.Insert(predicates.CheckVolumeBinding)
+			invalidPredicates.Insert(predicates.CheckVolumeBindingPred)
 		}
 		// The bound volume type may change
 		invalidPredicates.Insert(maxPDVolumeCountPredicateKeys...)
