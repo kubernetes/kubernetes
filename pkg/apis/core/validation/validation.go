@@ -4350,7 +4350,13 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 	allErrs := field.ErrorList{}
 	limPath := fldPath.Child("limits")
 	reqPath := fldPath.Child("requests")
+	limContainsCpuOrMemory := false
+	reqContainsCpuOrMemory := false
+	limContainsHugePages := false
+	reqContainsHugePages := false
+	supportedQoSComputeResources := sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
 	for resourceName, quantity := range requirements.Limits {
+
 		fldPath := limPath.Key(string(resourceName))
 		// Validate resource name.
 		allErrs = append(allErrs, validateContainerResourceName(string(resourceName), fldPath)...)
@@ -4361,10 +4367,17 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 		if resourceName == core.ResourceEphemeralStorage && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
 			allErrs = append(allErrs, field.Forbidden(limPath, "ResourceEphemeralStorage field disabled by feature-gate for ResourceRequirements"))
 		}
-		if helper.IsHugePageResourceName(resourceName) && !utilfeature.DefaultFeatureGate.Enabled(features.HugePages) {
-			allErrs = append(allErrs, field.Forbidden(limPath, fmt.Sprintf("%s field disabled by feature-gate for ResourceRequirements", resourceName)))
+		if helper.IsHugePageResourceName(resourceName) {
+			if !utilfeature.DefaultFeatureGate.Enabled(features.HugePages) {
+				allErrs = append(allErrs, field.Forbidden(limPath, fmt.Sprintf("%s field disabled by feature-gate for ResourceRequirements", resourceName)))
+			} else {
+				limContainsHugePages = true
+			}
 		}
 
+		if supportedQoSComputeResources.Has(string(resourceName)) {
+			limContainsCpuOrMemory = true
+		}
 	}
 	for resourceName, quantity := range requirements.Requests {
 		fldPath := reqPath.Key(string(resourceName))
@@ -4385,6 +4398,16 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 		} else if resourceName == core.ResourceNvidiaGPU {
 			allErrs = append(allErrs, field.Invalid(reqPath, quantity.String(), fmt.Sprintf("must be equal to %s request", core.ResourceNvidiaGPU)))
 		}
+		if helper.IsHugePageResourceName(resourceName) {
+			reqContainsHugePages = true
+		}
+		if supportedQoSComputeResources.Has(string(resourceName)) {
+			reqContainsCpuOrMemory = true
+		}
+
+	}
+	if !limContainsCpuOrMemory && !reqContainsCpuOrMemory && (reqContainsHugePages || limContainsHugePages) {
+		allErrs = append(allErrs, field.Forbidden(fldPath, fmt.Sprintf("HugePages require cpu or memory")))
 	}
 
 	return allErrs

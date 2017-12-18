@@ -26,7 +26,7 @@ go_library(
     srcs = ["qos.go"],
     importpath = "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos",
     deps = [
-        "//pkg/apis/core/v1/helper:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
