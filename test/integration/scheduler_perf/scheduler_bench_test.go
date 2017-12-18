@@ -31,22 +31,25 @@ import (
 // BenchmarkScheduling benchmarks the scheduling rate when the cluster has
 // various quantities of nodes and scheduled pods.
 func BenchmarkScheduling(b *testing.B) {
-	tests := []struct{ nodes, pods int }{
-		{nodes: 100, pods: 0},
-		{nodes: 100, pods: 1000},
-		{nodes: 1000, pods: 0},
-		{nodes: 1000, pods: 1000},
+	tests := []struct{ nodes, pods, minOps int }{
+		{nodes: 100, pods: 0, minOps: 100},
+		{nodes: 100, pods: 1000, minOps: 100},
+		{nodes: 1000, pods: 0, minOps: 100},
+		{nodes: 1000, pods: 1000, minOps: 100},
 	}
 	for _, test := range tests {
 		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.pods)
-		b.Run(name, func(b *testing.B) { benchmarkScheduling(test.nodes, test.pods, b) })
+		b.Run(name, func(b *testing.B) { benchmarkScheduling(test.nodes, test.pods, test.minOps, b) })
 	}
 }
 
 // benchmarkScheduling benchmarks scheduling rate with specific number of nodes
-// and specific number of pods already scheduled. Since an operation takes relatively
-// long time, b.N should be small: 10 - 100.
-func benchmarkScheduling(numNodes, numScheduledPods int, b *testing.B) {
+// and specific number of pods already scheduled.
+// Since an operation typically takes more than 1 second, we put a minimum bound on b.N of minOps.
+func benchmarkScheduling(numNodes, numScheduledPods, minOps int, b *testing.B) {
+	if b.N < minOps {
+		b.N = minOps
+	}
 	schedulerConfigFactory, finalFunc := mustSetupScheduler()
 	defer finalFunc()
 	c := schedulerConfigFactory.GetClient()
