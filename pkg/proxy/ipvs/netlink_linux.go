@@ -22,6 +22,14 @@ import (
 	"fmt"
 	"net"
 	"syscall"
+	// TODO: replace syscall with golang.org/x/sys/unix?
+	// The Go doc for syscall says:
+	// NOTE: This package is locked down.
+	// Code outside the standard Go repository should be migrated to use the corresponding package in the golang.org/x/sys repository.
+	// That is also where updates required by new systems or versions should be applied.
+	// See https://golang.org/s/go1.4-syscall for more information.
+
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/vishvananda/netlink"
 )
@@ -30,7 +38,7 @@ type netlinkHandle struct {
 	netlink.Handle
 }
 
-// NewNetLinkHandle will crate a new netlinkHandle
+// NewNetLinkHandle will crate a new NetLinkHandle
 func NewNetLinkHandle() NetLinkHandle {
 	return &netlinkHandle{netlink.Handle{}}
 }
@@ -95,4 +103,60 @@ func (h *netlinkHandle) DeleteDummyDevice(devName string) error {
 		return fmt.Errorf("expect dummy device, got device type: %s", link.Type())
 	}
 	return h.LinkDel(dummy)
+}
+
+// GetLocalAddresses lists all LOCAL type IP addresses from host based on filter device.
+// If filter device is not specified, it's equivalent to exec:
+// $ ip route show table local type local proto kernel
+// 10.0.0.1 dev kube-ipvs0  scope host  src 10.0.0.1
+// 10.0.0.10 dev kube-ipvs0  scope host  src 10.0.0.10
+// 10.0.0.252 dev kube-ipvs0  scope host  src 10.0.0.252
+// 100.106.89.164 dev eth0  scope host  src 100.106.89.164
+// 127.0.0.0/8 dev lo  scope host  src 127.0.0.1
+// 127.0.0.1 dev lo  scope host  src 127.0.0.1
+// 172.17.0.1 dev docker0  scope host  src 172.17.0.1
+// 192.168.122.1 dev virbr0  scope host  src 192.168.122.1
+// Then cut the unique src IP fields,
+// --> result set: [10.0.0.1, 10.0.0.10, 10.0.0.252, 100.106.89.164, 127.0.0.1, 192.168.122.1]
+
+// If filter device is specified, it's equivalent to exec:
+// $ ip route show table local type local proto kernel dev kube-ipvs0
+// 10.0.0.1  scope host  src 10.0.0.1
+// 10.0.0.10  scope host  src 10.0.0.10
+// Then cut the unique src IP fields,
+// --> result set: [10.0.0.1, 10.0.0.10]
+func (h *netlinkHandle) GetLocalAddresses(filterDev string) (sets.String, error) {
+	linkIndex := -1
+	if len(filterDev) != 0 {
+		link, err := h.LinkByName(filterDev)
+		if err != nil {
+			return nil, fmt.Errorf("error get filter device %s, err: %v", filterDev, err)
+		}
+		linkIndex = link.Attrs().Index
+	}
+
+	routeFilter := &netlink.Route{
+		Table:    syscall.RT_TABLE_LOCAL,
+		Type:     syscall.RTN_LOCAL,
+		Protocol: syscall.RTPROT_KERNEL,
+	}
+	filterMask := netlink.RT_FILTER_TABLE | netlink.RT_FILTER_TYPE | netlink.RT_FILTER_PROTOCOL
+
+	// find filter device
+	if linkIndex != -1 {
+		routeFilter.LinkIndex = linkIndex
+		filterMask |= netlink.RT_FILTER_OIF
+	}
+
+	routes, err := h.RouteListFiltered(netlink.FAMILY_ALL, routeFilter, filterMask)
+	if err != nil {
+		return nil, fmt.Errorf("error list route table, err: %v", err)
+	}
+	res := sets.NewString()
+	for _, route := range routes {
+		if route.Src != nil {
+			res.Insert(route.Src.String())
+		}
+	}
+	return res, nil
 }

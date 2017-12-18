@@ -20,6 +20,8 @@ package ipvs
 
 import (
 	"fmt"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type emptyHandle struct {
@@ -48,4 +50,9 @@ func (h *emptyHandle) EnsureDummyDevice(devName string) (bool, error) {
 // DeleteDummyDevice is part of interface.
 func (h *emptyHandle) DeleteDummyDevice(devName string) error {
 	return fmt.Errorf("netlink is not supported in this platform")
+}
+
+// GetLocalAddresses is part of interface.
+func (h *emptyHandle) GetLocalAddresses(filterDev string) (sets.String, error) {
+	return nil, fmt.Errorf("netlink is not supported in this platform")
 }

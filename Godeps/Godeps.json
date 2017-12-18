@@ -2530,15 +2530,15 @@
 		},
 		{
 			"ImportPath": "github.com/vishvananda/netlink",
-			"Rev": "f5a6f697a596c788d474984a38a0ac4ba0719e93"
+			"Rev": "f67b75edbf5e3bb7dfe70bb788610693a71be3d1"
 		},
 		{
 			"ImportPath": "github.com/vishvananda/netlink/nl",
-			"Rev": "f5a6f697a596c788d474984a38a0ac4ba0719e93"
+			"Rev": "f67b75edbf5e3bb7dfe70bb788610693a71be3d1"
 		},
 		{
 			"ImportPath": "github.com/vishvananda/netns",
-			"Rev": "86bef332bfc3b59b7624a600bd53009ce91a9829"
+			"Rev": "be1fbeda19366dea804f00efff2dd73a1642fdcc"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi",
