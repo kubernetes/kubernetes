@@ -79,7 +79,7 @@ func CreateCACertAndKeyfiles(cfg *kubeadmapi.MasterConfiguration) error {
 // It assumes the cluster CA certificate and key files should exists into the CertificatesDir
 func CreateAPIServerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 
-	caCert, caKey, err := loadCertificateAuthorithy(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+	caCert, caKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
 		return err
 	}
@@ -103,12 +103,12 @@ func CreateAPIServerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 // It assumes the cluster CA certificate and key files should exists into the CertificatesDir
 func CreateAPIServerKubeletClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 
-	caCert, caKey, err := loadCertificateAuthorithy(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+	caCert, caKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
 		return err
 	}
 
-	apiClientCert, apiClientKey, err := NewAPIServerKubeletClientCertAndKey(caCert, caKey)
+	apiKubeletClientCert, apiKubeletClientKey, err := NewAPIServerKubeletClientCertAndKey(caCert, caKey)
 	if err != nil {
 		return err
 	}
@@ -117,8 +117,8 @@ func CreateAPIServerKubeletClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfigura
 		cfg.CertificatesDir,
 		kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName,
 		caCert,
-		apiClientCert,
-		apiClientKey,
+		apiKubeletClientCert,
+		apiKubeletClientKey,
 	)
 }
 
@@ -127,7 +127,7 @@ func CreateAPIServerKubeletClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfigura
 // It assumes the cluster CA certificate and key file exist in the CertificatesDir
 func CreateEtcdServerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 
-	caCert, caKey, err := loadCertificateAuthorithy(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+	caCert, caKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
 		return err
 	}
@@ -151,7 +151,7 @@ func CreateEtcdServerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error 
 // It assumes the cluster CA certificate and key file exist in the CertificatesDir
 func CreateEtcdPeerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 
-	caCert, caKey, err := loadCertificateAuthorithy(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+	caCert, caKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
 		return err
 	}
@@ -175,12 +175,12 @@ func CreateEtcdPeerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 // It assumes the cluster CA certificate and key file exist in the CertificatesDir
 func CreateAPIServerEtcdClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 
-	caCert, caKey, err := loadCertificateAuthorithy(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+	caCert, caKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
 		return err
 	}
 
-	apiClientCert, apiClientKey, err := NewAPIServerEtcdClientCertAndKey(caCert, caKey)
+	apiEtcdClientCert, apiEtcdClientKey, err := NewAPIServerEtcdClientCertAndKey(caCert, caKey)
 	if err != nil {
 		return err
 	}
@@ -189,8 +189,8 @@ func CreateAPIServerEtcdClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguratio
 		cfg.CertificatesDir,
 		kubeadmconstants.APIServerEtcdClientCertAndKeyBaseName,
 		caCert,
-		apiClientCert,
-		apiClientKey,
+		apiEtcdClientCert,
+		apiEtcdClientKey,
 	)
 }
 
@@ -235,7 +235,7 @@ func CreateFrontProxyCACertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) erro
 // It assumes the front proxy CAA certificate and key files should exists into the CertificatesDir
 func CreateFrontProxyClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 
-	frontProxyCACert, frontProxyCAKey, err := loadCertificateAuthorithy(cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName)
+	frontProxyCACert, frontProxyCAKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName)
 	if err != nil {
 		return err
 	}
@@ -398,8 +398,8 @@ func NewFrontProxyClientCertAndKey(frontProxyCACert *x509.Certificate, frontProx
 	return frontProxyClientCert, frontProxyClientKey, nil
 }
 
-// loadCertificateAuthorithy loads certificate authority
-func loadCertificateAuthorithy(pkiDir string, baseName string) (*x509.Certificate, *rsa.PrivateKey, error) {
+// loadCertificateAuthority loads certificate authority
+func loadCertificateAuthority(pkiDir string, baseName string) (*x509.Certificate, *rsa.PrivateKey, error) {
 	// Checks if certificate authority exists in the PKI directory
 	if !pkiutil.CertOrKeyExist(pkiDir, baseName) {
 		return nil, nil, fmt.Errorf("couldn't load %s certificate authority from %s", baseName, pkiDir)

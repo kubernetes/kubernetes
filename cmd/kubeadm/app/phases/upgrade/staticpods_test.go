@@ -308,13 +308,13 @@ func TestStaticPodControlPlane(t *testing.T) {
 		defer os.RemoveAll(pathMgr.TempManifestDir())
 		defer os.RemoveAll(pathMgr.BackupManifestDir())
 
-		tempCersDir, err := ioutil.TempDir("", "kubeadm-certs")
+		tempCertsDir, err := ioutil.TempDir("", "kubeadm-certs")
 		if err != nil {
 			t.Fatalf("couldn't create temporary certificates directory: %v", err)
 		}
-		defer os.RemoveAll(tempCersDir)
+		defer os.RemoveAll(tempCertsDir)
 
-		oldcfg, err := getConfig("v1.7.0", tempCersDir)
+		oldcfg, err := getConfig("v1.7.0", tempCertsDir)
 		if err != nil {
 			t.Fatalf("couldn't create config: %v", err)
 		}
@@ -337,6 +337,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 				t.Fatalf("couldn't initialize pre-upgrade certificate: %v", err)
 			}
 		}
+		fmt.Printf("Wrote certs to %s\n", oldcfg.CertificatesDir)
 
 		// Initialize the directory with v1.7 manifests; should then be upgraded to v1.8 using the method
 		err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.RealManifestDir(), oldcfg)
@@ -353,7 +354,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			t.Fatalf("couldn't read temp file: %v", err)
 		}
 
-		newcfg, err := getConfig("v1.8.0", tempCersDir)
+		newcfg, err := getConfig("v1.8.0", tempCertsDir)
 		if err != nil {
 			t.Fatalf("couldn't create config: %v", err)
 		}

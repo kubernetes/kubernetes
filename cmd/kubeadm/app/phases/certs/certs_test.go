@@ -275,7 +275,7 @@ func TestNewAPIServerCertAndKey(t *testing.T) {
 		cfg := &kubeadmapi.MasterConfiguration{
 			API:        kubeadmapi.API{AdvertiseAddress: addr},
 			Networking: kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-			NodeName:   "valid-hostname",
+			NodeName:   hostname,
 		}
 		caCert, caKey, err := NewCACertAndKey()
 		if err != nil {
@@ -300,14 +300,14 @@ func TestNewAPIServerKubeletClientCertAndKey(t *testing.T) {
 		t.Fatalf("failed creation of ca cert and key: %v", err)
 	}
 
-	apiClientCert, _, err := NewAPIServerKubeletClientCertAndKey(caCert, caKey)
+	apiKubeletClientCert, _, err := NewAPIServerKubeletClientCertAndKey(caCert, caKey)
 	if err != nil {
 		t.Fatalf("failed creation of cert and key: %v", err)
 	}
 
-	certstestutil.AssertCertificateIsSignedByCa(t, apiClientCert, caCert)
-	certstestutil.AssertCertificateHasClientAuthUsage(t, apiClientCert)
-	certstestutil.AssertCertificateHasOrganizations(t, apiClientCert, kubeadmconstants.MastersGroup)
+	certstestutil.AssertCertificateIsSignedByCa(t, apiKubeletClientCert, caCert)
+	certstestutil.AssertCertificateHasClientAuthUsage(t, apiKubeletClientCert)
+	certstestutil.AssertCertificateHasOrganizations(t, apiKubeletClientCert, kubeadmconstants.MastersGroup)
 }
 
 func TestNewEtcdServerCertAndKey(t *testing.T) {

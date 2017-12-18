@@ -208,7 +208,7 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 	backupEtcdDir := pathMgr.BackupEtcdDir()
 	runningEtcdDir := cfg.Etcd.DataDir
 	if err := util.CopyDir(runningEtcdDir, backupEtcdDir); err != nil {
-		return true, fmt.Errorf("failer to back up etcd data: %v", err)
+		return true, fmt.Errorf("failed to back up etcd data: %v", err)
 	}
 
 	// Need to check currently used version and version from constants, if differs then upgrade
