@@ -208,9 +208,7 @@ func getVSpherePersistentVolumeSpec(volumePath string, persistentVolumeReclaimPo
 
 // function to get vsphere persistent volume spec with given selector labels.
 func getVSpherePersistentVolumeClaimSpec(namespace string, labels map[string]string) *v1.PersistentVolumeClaim {
-	var (
-		pvc *v1.PersistentVolumeClaim
-	)
+	var pvc *v1.PersistentVolumeClaim
 	pvc = &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-",

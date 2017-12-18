@@ -97,11 +97,9 @@ var _ = SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating PVCs using the Storage Class")
-		count := 0
-		for count < volume_ops_scale {
+		for count := 0; count < volume_ops_scale; count++ {
 			pvclaims[count], err = framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClassAnnotation(namespace, "2Gi", storageclass))
 			Expect(err).NotTo(HaveOccurred())
-			count++
 		}
 
 		By("Waiting for all claims to be in bound phase")
