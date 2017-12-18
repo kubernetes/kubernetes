@@ -317,7 +317,7 @@ foo       baz           <none>
 				},
 				{
 					Header:    "AGE",
-					FieldSpec: "{.metadata.creationTimestamp.elapsedTime()}",
+					FieldSpec: "{.metadata.creationTimestamp.elapsedTimeString()}",
 				},
 			},
 			obj: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", CreationTimestamp: metav1.NewTime(time.Now().Add(-120 * time.Minute))}},

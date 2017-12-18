@@ -22,9 +22,9 @@ import (
 	"time"
 )
 
-// ElapsedTime returns the elapsed time since timestamp in
+// ElapsedTimeString returns the elapsed time since timestamp in
 // human-readable approximation.
-func ElapsedTime(timestamp metav1.Time) string {
+func ElapsedTimeString(timestamp metav1.Time) string {
 	if timestamp.IsZero() {
 		return "<unknown>"
 	}

@@ -44,10 +44,10 @@ const (
 var jsonRegexp = regexp.MustCompile("^{\\.?([^{}]+)}$|^\\.?([^{}]+)$")
 
 var jsonPathFunctions = map[string]jsonpath.JSONPathFunction{
-	"elapsedTime": elapsedTimeJSONPathFunc,
+	"elapsedTimeString": elapsedTimeStringJSONPathFunc,
 }
 
-func elapsedTimeJSONPathFunc(input []reflect.Value) []reflect.Value {
+func elapsedTimeStringJSONPathFunc(input []reflect.Value) []reflect.Value {
 	results := []reflect.Value{}
 	for _, value := range input {
 		var v string
@@ -55,12 +55,12 @@ func elapsedTimeJSONPathFunc(input []reflect.Value) []reflect.Value {
 		case string:
 			parsedTime, err := time.Parse(time.RFC3339, val)
 			if err == nil {
-				v = ElapsedTime(metav1.NewTime(parsedTime))
+				v = ElapsedTimeString(metav1.NewTime(parsedTime))
 			} else {
 				v = "<err:" + val + ">"
 			}
 		case metav1.Time:
-			v = ElapsedTime(val)
+			v = ElapsedTimeString(val)
 		default:
 			v = "<err>"
 		}
