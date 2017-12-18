@@ -366,7 +366,7 @@ func (m *MockEndpoint) allocate(devs []string) (*pluginapi.AllocateResponse, err
 	return nil, nil
 }
 
-func makePod(limits v1.ResourceList) *v1.Pod {
+func makePod(requests v1.ResourceList) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID: uuid.NewUUID(),
@@ -375,7 +375,7 @@ func makePod(limits v1.ResourceList) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Resources: v1.ResourceRequirements{
-						Limits: limits,
+						Requests: requests,
 					},
 				},
 			},
@@ -616,7 +616,7 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 				{
 					Name: string(uuid.NewUUID()),
 					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
+						Requests: v1.ResourceList{
 							v1.ResourceName(res1.resourceName): res2.resourceQuantity,
 						},
 					},
@@ -624,7 +624,7 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 				{
 					Name: string(uuid.NewUUID()),
 					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
+						Requests: v1.ResourceList{
 							v1.ResourceName(res1.resourceName): res1.resourceQuantity,
 						},
 					},
@@ -634,7 +634,7 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 				{
 					Name: string(uuid.NewUUID()),
 					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
+						Requests: v1.ResourceList{
 							v1.ResourceName(res1.resourceName): res2.resourceQuantity,
 							v1.ResourceName(res2.resourceName): res2.resourceQuantity,
 						},
@@ -643,7 +643,7 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 				{
 					Name: string(uuid.NewUUID()),
 					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
+						Requests: v1.ResourceList{
 							v1.ResourceName(res1.resourceName): res2.resourceQuantity,
 							v1.ResourceName(res2.resourceName): res2.resourceQuantity,
 						},
