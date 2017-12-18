@@ -17,7 +17,8 @@ coreos:
         Type=oneshot
         RemainAfterExit=yes
         ExecStartPre=/bin/mkdir -p /opt/kubernetes/bin
-        ExecStartPre=/usr/bin/curl --fail --retry 5 --retry-delay 3 --silent --show-error	-H "X-Google-Metadata-Request: True" -o /opt/kubernetes/bin/configure.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh
+        # Use --retry-connrefused opt only if it's supported by curl.
+        ExecStartPre=/bin/bash -c 'OPT=""; if curl --help | grep -q -- "--retry-connrefused"; then OPT="--retry-connrefused"; fi; /usr/bin/curl --fail --retry 5 --retry-delay 3 $OPT --silent --show-error -H "X-Google-Metadata-Request: True" -o /opt/kubernetes/bin/configure.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh'
         ExecStartPre=/bin/chmod 544 /opt/kubernetes/bin/configure.sh
         ExecStart=/opt/kubernetes/bin/configure.sh
 
