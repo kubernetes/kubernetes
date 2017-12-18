@@ -2270,25 +2270,6 @@ func TestPortForward(t *testing.T) {
 	}
 }
 
-// Tests that identify the host port conflicts are detected correctly.
-func TestGetHostPortConflicts(t *testing.T) {
-	pods := []*v1.Pod{
-		{Spec: v1.PodSpec{Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 80}}}}}},
-		{Spec: v1.PodSpec{Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 81}}}}}},
-		{Spec: v1.PodSpec{Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 82}}}}}},
-		{Spec: v1.PodSpec{Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 83}}}}}},
-	}
-	// Pods should not cause any conflict.
-	assert.False(t, hasHostPortConflicts(pods), "Should not have port conflicts")
-
-	expected := &v1.Pod{
-		Spec: v1.PodSpec{Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 81}}}}},
-	}
-	// The new pod should cause conflict and be reported.
-	pods = append(pods, expected)
-	assert.True(t, hasHostPortConflicts(pods), "Should have port conflicts")
-}
-
 func TestHasHostMountPVC(t *testing.T) {
 	tests := map[string]struct {
 		pvError       error
