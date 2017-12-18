@@ -89,6 +89,10 @@ func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, i
 	return set
 }
 
+func (set *IPSet) validateEntry(entry *utilipset.Entry) (bool, error) {
+	return entry.Validate(&set.IPSet)
+}
+
 func (set *IPSet) isEmpty() bool {
 	return len(set.activeEntries.UnsortedList()) == 0
 }
