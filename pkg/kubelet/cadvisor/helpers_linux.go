@@ -21,6 +21,7 @@ package cadvisor
 import (
 	"fmt"
 
+	"github.com/google/cadvisor/container/crio"
 	cadvisorfs "github.com/google/cadvisor/fs"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -44,7 +45,7 @@ func (i *imageFsInfoProvider) ImageFsInfoLabel() (string, error) {
 		// This is a temporary workaround to get stats for cri-o from cadvisor
 		// and should be removed.
 		// Related to https://github.com/kubernetes/kubernetes/issues/51798
-		if i.runtimeEndpoint == CrioSocket {
+		if i.runtimeEndpoint == crio.CrioSocket {
 			return cadvisorfs.LabelCrioImages, nil
 		}
 	}

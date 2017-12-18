@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -32,11 +33,6 @@ import (
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 )
-
-/*
-#include <unistd.h>
-*/
-import "C"
 
 type CgroupSubsystems struct {
 	// Cgroup subsystem mounts.
@@ -510,15 +506,7 @@ func setCpuStats(s *cgroups.Stats, ret *info.ContainerStats) {
 // https://github.com/moby/moby/blob/8b1adf55c2af329a4334f21d9444d6a169000c81/daemon/stats/collector_unix.go#L73
 // Apache 2.0, Copyright Docker, Inc.
 func getNumberOnlineCPUs() (uint32, error) {
-	i, err := C.sysconf(C._SC_NPROCESSORS_ONLN)
-	// According to POSIX - errno is undefined after successful
-	// sysconf, and can be non-zero in several cases, so look for
-	// error in returned value not in errno.
-	// (https://sourceware.org/bugzilla/show_bug.cgi?id=21536)
-	if i == -1 {
-		return 0, err
-	}
-	return uint32(i), nil
+	return uint32(runtime.NumCPU()), nil
 }
 
 func setDiskIoStats(s *cgroups.Stats, ret *info.ContainerStats) {
