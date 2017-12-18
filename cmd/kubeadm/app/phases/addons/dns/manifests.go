@@ -293,7 +293,7 @@ data:
   Corefile: |
     .:53 {
         errors
-        log stdout
+        log
         health
         kubernetes {{ .DNSDomain }} {{ .ServiceCIDR }} {
            pods insecure
