@@ -53,7 +53,7 @@ endif
 build:
 	# Copy the content in this dir to the temp dir,
 	# without copying the subdirectories.
-	find ./ -maxdepth 1 -type f | xargs cp -t $(TEMP_DIR)
+	find ./ -maxdepth 1 -type f | xargs -I {} cp {} $(TEMP_DIR)
 
 	# Compile attachlease
 	docker run -i -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes -v $(TEMP_DIR):/build -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \

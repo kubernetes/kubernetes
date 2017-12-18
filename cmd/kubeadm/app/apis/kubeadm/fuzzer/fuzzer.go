@@ -116,7 +116,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		func(obj *kubeadm.NodeConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
 			obj.CACertPath = "foo"
-			obj.CACertPath = "foo"
 			obj.DiscoveryFile = "foo"
 			obj.DiscoveryToken = "foo"
 			obj.DiscoveryTokenAPIServers = []string{"foo"}

@@ -390,8 +390,7 @@ func getClientset(file string, dryRun bool) (clientset.Interface, error) {
 		}
 		return apiclient.NewDryRunClient(dryRunGetter, os.Stdout), nil
 	}
-	client, err := kubeconfigutil.ClientSetFromFile(file)
-	return client, err
+	return kubeconfigutil.ClientSetFromFile(file)
 }
 
 func getJoinCommand(token string, kubeConfigFile string) (string, error) {

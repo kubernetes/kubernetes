@@ -77,6 +77,7 @@ type Iterator struct {
 	captureStartedAt int
 	captured         []byte
 	Error            error
+	Attachment       interface{} // open for customized decoder
 }
 
 // NewIterator creates an empty Iterator instance
@@ -167,7 +168,7 @@ func (iter *Iterator) isObjectEnd() bool {
 	if c == '}' {
 		return true
 	}
-	iter.ReportError("isObjectEnd", "object ended prematurely")
+	iter.ReportError("isObjectEnd", "object ended prematurely, unexpected char "+string([]byte{c}))
 	return true
 }
 
@@ -200,8 +201,22 @@ func (iter *Iterator) ReportError(operation string, msg string) {
 	if peekStart < 0 {
 		peekStart = 0
 	}
-	iter.Error = fmt.Errorf("%s: %s, parsing %v ...%s... at %s", operation, msg, iter.head,
-		string(iter.buf[peekStart:iter.head]), string(iter.buf[0:iter.tail]))
+	peekEnd := iter.head + 10
+	if peekEnd > iter.tail {
+		peekEnd = iter.tail
+	}
+	parsing := string(iter.buf[peekStart:peekEnd])
+	contextStart := iter.head - 50
+	if contextStart < 0 {
+		contextStart = 0
+	}
+	contextEnd := iter.head + 50
+	if contextEnd > iter.tail {
+		contextEnd = iter.tail
+	}
+	context := string(iter.buf[contextStart:contextEnd])
+	iter.Error = fmt.Errorf("%s: %s, error found in #%v byte of ...|%s|..., bigger context ...|%s|...",
+		operation, msg, iter.head-peekStart, parsing, context)
 }
 
 // CurrentBuffer gets current buffer as string for debugging purpose
@@ -210,7 +225,7 @@ func (iter *Iterator) CurrentBuffer() string {
 	if peekStart < 0 {
 		peekStart = 0
 	}
-	return fmt.Sprintf("parsing %v ...|%s|... at %s", iter.head,
+	return fmt.Sprintf("parsing #%v byte, around ...|%s|..., whole buffer ...|%s|...", iter.head,
 		string(iter.buf[peekStart:iter.head]), string(iter.buf[0:iter.tail]))
 }
 

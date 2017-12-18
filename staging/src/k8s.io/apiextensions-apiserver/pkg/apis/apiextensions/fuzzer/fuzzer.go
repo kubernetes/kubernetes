@@ -60,22 +60,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 					}
 					if isValue || c.Intn(10) == 0 {
 						c.Fuzz(vobj.Field(i).Addr().Interface())
-
-						// JSON keys must not contain escape char with our JSON codec (jsoniter)
-						// TODO: remove this when/if we moved from jsoniter.ConfigFastest to ConfigCompatibleWithStandardLibrary
-						if field.Type.Kind() == reflect.Map {
-							keys := append([]reflect.Value(nil), vobj.Field(i).MapKeys()...)
-							for _, k := range keys {
-								stripped := toJSONString(k.String())
-								if stripped == k.String() {
-									continue
-								}
-								// set new key
-								vobj.Field(i).SetMapIndex(reflect.ValueOf(stripped), vobj.Field(i).MapIndex(k))
-								// remove old
-								vobj.Field(i).SetMapIndex(k, reflect.Value{})
-							}
-						}
 					}
 				}
 			}
@@ -124,14 +108,4 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 		},
 	}
-}
-
-func toJSONString(s string) string {
-	return strings.Map(func(r rune) rune {
-		// replace chars which are not supported in keys by jsoniter.ConfigFastest
-		if r == '\\' || r == '"' {
-			return 'x'
-		}
-		return r
-	}, s)
 }

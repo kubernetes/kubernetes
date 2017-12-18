@@ -44,7 +44,6 @@ filegroup(
         "//cmd/kubeadm/app/phases/kubelet:all-srcs",
         "//cmd/kubeadm/app/phases/markmaster:all-srcs",
         "//cmd/kubeadm/app/phases/selfhosting:all-srcs",
-        "//cmd/kubeadm/app/phases/token:all-srcs",
         "//cmd/kubeadm/app/phases/upgrade:all-srcs",
         "//cmd/kubeadm/app/phases/uploadconfig:all-srcs",
         "//cmd/kubeadm/app/preflight:all-srcs",

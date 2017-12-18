@@ -38,7 +38,8 @@ func NewAPIEnablementOptions() *APIEnablementOptions {
 func (s *APIEnablementOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.RuntimeConfig, "runtime-config", ""+
 		"A set of key=value pairs that describe runtime configuration that may be passed "+
-		"to apiserver. apis/<groupVersion> key can be used to turn on/off specific api versions. "+
-		"apis/<groupVersion>/<resource> can be used to turn on/off specific resources. api/all and "+
+		"to apiserver. <group>/<version> (or <version> for the core group) key can be used to "+
+		"turn on/off specific api versions. <grouop>/<version>/<resource> (or <version>/<resource> "+
+		"for the core group) can be used to turn on/off specific resources. api/all and "+
 		"api/legacy are special keys to control all and legacy api versions respectively.")
 }

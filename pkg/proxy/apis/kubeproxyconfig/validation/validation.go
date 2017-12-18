@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
@@ -152,33 +153,32 @@ func validateProxyMode(mode kubeproxyconfig.ProxyMode, fldPath *field.Path) fiel
 }
 
 func validateProxyModeLinux(mode kubeproxyconfig.ProxyMode, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
+	validModes := sets.NewString(
+		string(kubeproxyconfig.ProxyModeUserspace),
+		string(kubeproxyconfig.ProxyModeIPTables),
+		string(kubeproxyconfig.ProxyModeIPVS),
+	)
 
-	switch mode {
-	case kubeproxyconfig.ProxyModeUserspace:
-	case kubeproxyconfig.ProxyModeIPTables:
-	case kubeproxyconfig.ProxyModeIPVS:
-	case "":
-	default:
-		modes := []string{string(kubeproxyconfig.ProxyModeUserspace), string(kubeproxyconfig.ProxyModeIPTables), string(kubeproxyconfig.ProxyModeIPVS)}
-		errMsg := fmt.Sprintf("must be %s or blank (blank means the best-available proxy [currently iptables])", strings.Join(modes, ","))
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("ProxyMode"), string(mode), errMsg))
+	if mode == "" || validModes.Has(string(mode)) {
+		return nil
 	}
-	return allErrs
+
+	errMsg := fmt.Sprintf("must be %s or blank (blank means the best-available proxy [currently iptables])", strings.Join(validModes.List(), ","))
+	return field.ErrorList{field.Invalid(fldPath.Child("ProxyMode"), string(mode), errMsg)}
 }
 
 func validateProxyModeWindows(mode kubeproxyconfig.ProxyMode, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
+	validModes := sets.NewString(
+		string(kubeproxyconfig.ProxyModeUserspace),
+		string(kubeproxyconfig.ProxyModeKernelspace),
+	)
 
-	switch mode {
-	case kubeproxyconfig.ProxyModeUserspace:
-	case kubeproxyconfig.ProxyModeKernelspace:
-	default:
-		modes := []string{string(kubeproxyconfig.ProxyModeUserspace), string(kubeproxyconfig.ProxyModeKernelspace)}
-		errMsg := fmt.Sprintf("must be %s or blank (blank means the most-available proxy [currently userspace])", strings.Join(modes, ","))
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("ProxyMode"), string(mode), errMsg))
+	if mode == "" || validModes.Has(string(mode)) {
+		return nil
 	}
-	return allErrs
+
+	errMsg := fmt.Sprintf("must be %s or blank (blank means the most-available proxy [currently userspace])", strings.Join(validModes.List(), ","))
+	return field.ErrorList{field.Invalid(fldPath.Child("ProxyMode"), string(mode), errMsg)}
 }
 
 func validateClientConnectionConfiguration(config kubeproxyconfig.ClientConnectionConfiguration, fldPath *field.Path) field.ErrorList {

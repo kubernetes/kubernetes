@@ -532,8 +532,9 @@ func BenchmarkDecodeIntoJSON(b *testing.B) {
 	b.StopTimer()
 }
 
-// BenchmarkDecodeJSON provides a baseline for JSON decode performance
-func BenchmarkDecodeIntoJSONCodecGen(b *testing.B) {
+// BenchmarkDecodeIntoJSONCodecGenConfigFast provides a baseline
+// for JSON decode performance with jsoniter.ConfigFast
+func BenchmarkDecodeIntoJSONCodecGenConfigFast(b *testing.B) {
 	kcodec := testapi.Default.Codec()
 	items := benchmarkItems(b)
 	width := len(items)
@@ -550,6 +551,32 @@ func BenchmarkDecodeIntoJSONCodecGen(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		obj := v1.Pod{}
 		if err := jsoniter.ConfigFastest.Unmarshal(encoded[i%width], &obj); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+// BenchmarkDecodeIntoJSONCodecGenConfigCompatibleWithStandardLibrary
+//  provides a baseline for JSON decode performance
+// with jsoniter.ConfigCompatibleWithStandardLibrary
+func BenchmarkDecodeIntoJSONCodecGenConfigCompatibleWithStandardLibrary(b *testing.B) {
+	kcodec := testapi.Default.Codec()
+	items := benchmarkItems(b)
+	width := len(items)
+	encoded := make([][]byte, width)
+	for i := range items {
+		data, err := runtime.Encode(kcodec, &items[i])
+		if err != nil {
+			b.Fatal(err)
+		}
+		encoded[i] = data
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		obj := v1.Pod{}
+		if err := jsoniter.ConfigCompatibleWithStandardLibrary.Unmarshal(encoded[i%width], &obj); err != nil {
 			b.Fatal(err)
 		}
 	}

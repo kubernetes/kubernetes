@@ -19,6 +19,7 @@ package vclib
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -362,18 +363,27 @@ func (vm *VirtualMachine) getVirtualDeviceByPath(ctx context.Context, diskPath s
 		glog.Errorf("Failed to get the devices for VM: %q. err: %+v", vm.InventoryPath, err)
 		return nil, err
 	}
+
 	// filter vm devices to retrieve device for the given vmdk file identified by disk path
 	for _, device := range vmDevices {
 		if vmDevices.TypeName(device) == "VirtualDisk" {
 			virtualDevice := device.GetVirtualDevice()
 			if backing, ok := virtualDevice.Backing.(*types.VirtualDiskFlatVer2BackingInfo); ok {
-				if backing.FileName == diskPath {
+				if matchVirtualDiskAndVolPath(backing.FileName, diskPath) {
+					glog.V(LogLevel).Infof("Found VirtualDisk backing with filename %q for diskPath %q", backing.FileName, diskPath)
 					return device, nil
 				}
 			}
 		}
 	}
 	return nil, nil
+}
+
+func matchVirtualDiskAndVolPath(diskPath, volPath string) bool {
+	fileExt := ".vmdk"
+	diskPath = strings.TrimSuffix(diskPath, fileExt)
+	volPath = strings.TrimSuffix(volPath, fileExt)
+	return diskPath == volPath
 }
 
 // deleteController removes latest added SCSI controller from VM.
