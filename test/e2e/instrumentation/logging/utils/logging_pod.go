@@ -101,7 +101,7 @@ func (p *loadLoggingPod) Start(f *framework.Framework) error {
 			Containers: []api_v1.Container{
 				{
 					Name:  loggingContainerName,
-					Image: "gcr.io/google_containers/logs-generator:v0.1.0",
+					Image: "k8s.gcr.io/logs-generator:v0.1.0",
 					Env: []api_v1.EnvVar{
 						{
 							Name:  "LOGS_GENERATOR_LINES_TOTAL",

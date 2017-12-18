@@ -6,7 +6,7 @@ spec:
   hostNetwork: true
   containers:
   - name: kube-apiserver
-    image: gcr.io/google_containers/kube-apiserver:9680e782e08a1a1c94c656190011bd02
+    image: k8s.gcr.io/kube-apiserver:9680e782e08a1a1c94c656190011bd02
     command:
     - /bin/sh
     - -c
