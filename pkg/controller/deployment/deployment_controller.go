@@ -108,14 +108,21 @@ func NewDeploymentController(dInformer extensionsinformers.DeploymentInformer, r
 			return nil, err
 		}
 	}
+	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "deployment-controller"})
 	dc := &DeploymentController{
-		client:        client,
-		eventRecorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "deployment-controller"}),
-		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
-	}
-	dc.rsControl = controller.RealRSControl{
-		KubeClient: client,
-		Recorder:   dc.eventRecorder,
+		client:          client,
+		eventRecorder:   eventRecorder,
+		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
+		dLister:         dInformer.Lister(),
+		dListerSynced:   dInformer.Informer().HasSynced,
+		rsLister:        rsInformer.Lister(),
+		rsListerSynced:  rsInformer.Informer().HasSynced,
+		podLister:       podInformer.Lister(),
+		podListerSynced: podInformer.Informer().HasSynced,
+		rsControl: controller.RealRSControl{
+			KubeClient: client,
+			Recorder:   eventRecorder,
+		},
 	}
 
 	dInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -136,12 +143,6 @@ func NewDeploymentController(dInformer extensionsinformers.DeploymentInformer, r
 	dc.syncHandler = dc.syncDeployment
 	dc.enqueueDeployment = dc.enqueue
 
-	dc.dLister = dInformer.Lister()
-	dc.rsLister = rsInformer.Lister()
-	dc.podLister = podInformer.Lister()
-	dc.dListerSynced = dInformer.Informer().HasSynced
-	dc.rsListerSynced = rsInformer.Informer().HasSynced
-	dc.podListerSynced = podInformer.Informer().HasSynced
 	return dc, nil
 }
 
