@@ -226,10 +226,10 @@ var (
 	MasterComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
-	MinimumControlPlaneVersion = version.MustParseSemantic("v1.8.0")
+	MinimumControlPlaneVersion = version.MustParseSemantic("v1.9.0")
 
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
-	MinimumKubeletVersion = version.MustParseSemantic("v1.8.0")
+	MinimumKubeletVersion = version.MustParseSemantic("v1.9.0")
 
 	// MinimumKubeProxyComponentConfigVersion specifies the minimum version for the kubeProxyComponent
 	MinimumKubeProxyComponentConfigVersion = version.MustParseSemantic("v1.9.0-alpha.3")
