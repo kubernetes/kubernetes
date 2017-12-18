@@ -39,11 +39,11 @@ func TestCanSupport(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/photon-pd")
+	plug, err := plugMgr.FindPluginByName(photonPersistentDiskPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if plug.GetPluginName() != "kubernetes.io/photon-pd" {
+	if plug.GetPluginName() != photonPersistentDiskPluginName {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
 	if !plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{PhotonPersistentDisk: &v1.PhotonPersistentDiskVolumeSource{}}}}) {
@@ -63,7 +63,7 @@ func TestGetAccessModes(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/photon-pd")
+	plug, err := plugMgr.FindPersistentPluginByName(photonPersistentDiskPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -99,7 +99,7 @@ func TestPlugin(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/photon-pd")
+	plug, err := plugMgr.FindPluginByName(photonPersistentDiskPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -210,7 +210,7 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/photon-pd")
+	plug, err := plugMgr.FindPluginByName(photonPersistentDiskPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}

@@ -41,11 +41,11 @@ func TestCanSupport(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
+	plug, err := plugMgr.FindPluginByName(gcePersistentDiskPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if plug.GetPluginName() != "kubernetes.io/gce-pd" {
+	if plug.GetPluginName() != gcePersistentDiskPluginName {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
 	if !plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{}}}}) {
@@ -65,7 +65,7 @@ func TestGetAccessModes(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/gce-pd")
+	plug, err := plugMgr.FindPersistentPluginByName(gcePersistentDiskPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -99,7 +99,7 @@ func TestPlugin(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
+	plug, err := plugMgr.FindPluginByName(gcePersistentDiskPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}

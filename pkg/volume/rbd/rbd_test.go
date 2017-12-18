@@ -48,11 +48,11 @@ func TestCanSupport(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/rbd")
+	plug, err := plugMgr.FindPluginByName(rbdPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if plug.GetPluginName() != "kubernetes.io/rbd" {
+	if plug.GetPluginName() != rbdPluginName {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
 	if plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{}}}) {
@@ -163,7 +163,7 @@ func doTestPlugin(t *testing.T, c *testcase) {
 	fakeVolumeHost := volumetest.NewFakeVolumeHost(c.root, nil, nil)
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, fakeVolumeHost)
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/rbd")
+	plug, err := plugMgr.FindPluginByName(rbdPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}

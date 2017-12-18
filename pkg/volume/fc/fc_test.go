@@ -41,11 +41,11 @@ func TestCanSupport(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/fc")
+	plug, err := plugMgr.FindPluginByName(fcPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if plug.GetPluginName() != "kubernetes.io/fc" {
+	if plug.GetPluginName() != fcPluginName {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
 	if plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{}}}) {
@@ -63,7 +63,7 @@ func TestGetAccessModes(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/fc")
+	plug, err := plugMgr.FindPersistentPluginByName(fcPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -130,7 +130,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/fc")
+	plug, err := plugMgr.FindPluginByName(fcPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -200,7 +200,7 @@ func doTestPluginNilMounter(t *testing.T, spec *volume.Spec) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/fc")
+	plug, err := plugMgr.FindPluginByName(fcPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}

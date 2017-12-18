@@ -52,9 +52,9 @@ func TestCanSupport(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir)
+	plug := makePluginUnderTest(t, emptyDirPluginName, tmpDir)
 
-	if plug.GetPluginName() != "kubernetes.io/empty-dir" {
+	if plug.GetPluginName() != emptyDirPluginName {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
 	if !plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}}}) {
@@ -110,7 +110,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		volumePath  = path.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/test-volume")
 		metadataDir = path.Join(basePath, "pods/poduid/plugins/kubernetes.io~empty-dir/test-volume")
 
-		plug       = makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
+		plug       = makePluginUnderTest(t, emptyDirPluginName, basePath)
 		volumeName = "test-volume"
 		spec       = &v1.Volume{
 			Name:         volumeName,
@@ -235,7 +235,7 @@ func TestPluginBackCompat(t *testing.T) {
 	}
 	defer os.RemoveAll(basePath)
 
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
+	plug := makePluginUnderTest(t, emptyDirPluginName, basePath)
 
 	spec := &v1.Volume{
 		Name: "vol1",
@@ -264,7 +264,7 @@ func TestMetrics(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir)
+	plug := makePluginUnderTest(t, emptyDirPluginName, tmpDir)
 
 	spec := &v1.Volume{
 		Name: "vol1",
