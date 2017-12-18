@@ -7,7 +7,7 @@ metadata:
   name: kubernetes-dashboard
   namespace: kube-system
 ---
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kubernetes-dashboard
@@ -30,7 +30,7 @@ spec:
       priorityClassName: system-cluster-critical
       containers:
       - name: kubernetes-dashboard
-        image: k8s.gcr.io/kubernetes-dashboard-amd64:v1.8.0
+        image: k8s.gcr.io/kubernetes-dashboard-amd64:v1.8.3
         resources:
           limits:
             cpu: 100m
@@ -57,7 +57,8 @@ spec:
           timeoutSeconds: 30
       volumes:
       - name: kubernetes-dashboard-certs
-        emptyDir: {}
+        secret:
+          secretName: kubernetes-dashboard-certs
       - name: tmp-volume
         emptyDir: {}
       serviceAccountName: kubernetes-dashboard
