@@ -18,16 +18,14 @@ limitations under the License.
 package envelope
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/url"
 	"time"
 
+	"github.com/golang/glog"
+
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 
 	"golang.org/x/net/context"
 
@@ -35,14 +33,14 @@ import (
 )
 
 const (
-	// Supportied protocol schema for gRPC.
-	tcpProtocol  = "tcp"
+	// Now only supportied unix domain socket.
 	unixProtocol = "unix"
 
 	// Current version for the protocal interface definition.
-	version = "v1beta1"
+	kmsapiVersion = "v1beta1"
 )
 
+// The gRPC implementation for envelope.Service.
 type gRPCService struct {
 	// gRPC client instance
 	kmsClient  kmsapi.KMSServiceClient
@@ -50,7 +48,9 @@ type gRPCService struct {
 }
 
 // NewGRPCService returns an envelope.Service which use gRPC to communicate the remote KMS provider.
-func NewGRPCService(endpoint, serverCert, clientCert, clientKey string) (Service, error) {
+func NewGRPCService(endpoint string) (Service, error) {
+	glog.Infof("Configure KMS provider with endpoint: %s", endpoint)
+
 	protocol, addr, err := parseEndpoint(endpoint)
 	if err != nil {
 		return nil, err
@@ -60,18 +60,20 @@ func NewGRPCService(endpoint, serverCert, clientCert, clientKey string) (Service
 		return net.DialTimeout(protocol, addr, timeout)
 	}
 
-	// With or without TLS/SSL support
-	tlsOption, err := getTLSDialOption(serverCert, clientCert, clientKey)
+	connection, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDialer(dialer))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("connect remote KMS provider %q failed, error: %v", addr, err)
 	}
 
-	conn, err := grpc.Dial(addr, tlsOption, grpc.WithDialer(dialer))
+	kmsClient := kmsapi.NewKMSServiceClient(connection)
+
+	err = checkAPIVersion(kmsClient)
 	if err != nil {
-		return nil, fmt.Errorf("connect remote image service %s failed, error: %v", addr, err)
+		connection.Close()
+		return nil, fmt.Errorf("failed check version for %q, error: %v", addr, err)
 	}
 
-	return &gRPCService{kmsClient: kmsapi.NewKMSServiceClient(conn), connection: conn}, nil
+	return &gRPCService{kmsClient: kmsClient, connection: connection}, nil
 }
 
 // Parse the endpoint to extract schema, host or path.
@@ -82,63 +84,35 @@ func parseEndpoint(endpoint string) (string, string, error) {
 
 	u, err := url.Parse(endpoint)
 	if err != nil {
-		return "", "", fmt.Errorf("invalid kms provider endpoint %q, error: %v", endpoint, err)
+		return "", "", fmt.Errorf("invalid endpoint %q for remote KMS provider, error: %v", endpoint, err)
 	}
 
-	switch u.Scheme {
-	case tcpProtocol:
-		return tcpProtocol, u.Host, nil
-	case unixProtocol:
-		return unixProtocol, u.Path, nil
-	default:
-		return "", "", fmt.Errorf("invalid endpoint %q for remote KMS provider", endpoint)
+	if u.Scheme != unixProtocol {
+		return "", "", fmt.Errorf("unsupported scheme %q for remote KMS provider", u.Scheme)
 	}
+	return unixProtocol, u.Path, nil
 }
 
-// Build the TLS/SSL options for gRPC client.
-func getTLSDialOption(serverCert, clientCert, clientKey string) (grpc.DialOption, error) {
-	// No TLS/SSL support.
-	if len(serverCert) == 0 && len(clientCert) == 0 && len(clientKey) == 0 {
-		return grpc.WithInsecure(), nil
+// Check the KMS provider API version.
+// Only matching kubeRuntimeAPIVersion is supported now.
+func checkAPIVersion(kmsClient kmsapi.KMSServiceClient) error {
+	request := &kmsapi.VersionRequest{Version: kmsapiVersion}
+	response, err := kmsClient.Version(context.Background(), request)
+	if err != nil {
+		return fmt.Errorf("failed get version from remote KMS provider: %v", err)
+	}
+	if response.Version != kmsapiVersion {
+		return fmt.Errorf("KMS provider api version %s is not supported, only %s is supported now",
+			response.Version, kmsapiVersion)
 	}
 
-	// Set the CA that verify the certificate from the gRPC server.
-	certPool := x509.NewCertPool()
-	if len(serverCert) > 0 {
-		ca, err := ioutil.ReadFile(serverCert)
-		if err != nil {
-			return nil, fmt.Errorf("kms provider invalid server cert, error: %v", err)
-		}
-		if !certPool.AppendCertsFromPEM(ca) {
-			return nil, fmt.Errorf("can't append server cert for kms provider")
-		}
-	}
-
-	// Set client authenticate certificate.
-	certificates := make([]tls.Certificate, 0, 1)
-	if len(clientCert) != 0 || len(clientKey) != 0 {
-		if len(clientCert) == 0 || len(clientKey) == 0 {
-			return nil, fmt.Errorf("both client cert and key must be provided for kms provider")
-		}
-
-		cert, err := tls.LoadX509KeyPair(clientCert, clientKey)
-		if err != nil {
-			return nil, fmt.Errorf("kms provider invalid client cert or key, error: %v", err)
-		}
-		certificates = append(certificates, cert)
-	}
-
-	tlsConfig := tls.Config{
-		Certificates: certificates,
-		RootCAs:      certPool,
-	}
-	transportCreds := credentials.NewTLS(&tlsConfig)
-	return grpc.WithTransportCredentials(transportCreds), nil
+	glog.Infof("KMS provider %s initialized, version: %s", response.RuntimeName, response.RuntimeVersion)
+	return nil
 }
 
 // Decrypt a given data string to obtain the original byte data.
-func (g *gRPCService) Decrypt(cipher string) ([]byte, error) {
-	request := &kmsapi.DecryptRequest{Cipher: []byte(cipher), Version: version}
+func (g *gRPCService) Decrypt(cipher []byte) ([]byte, error) {
+	request := &kmsapi.DecryptRequest{Cipher: cipher, Version: kmsapiVersion}
 	response, err := g.kmsClient.Decrypt(context.Background(), request)
 	if err != nil {
 		return nil, err
@@ -147,11 +121,11 @@ func (g *gRPCService) Decrypt(cipher string) ([]byte, error) {
 }
 
 // Encrypt bytes to a string ciphertext.
-func (g *gRPCService) Encrypt(plain []byte) (string, error) {
-	request := &kmsapi.EncryptRequest{Plain: plain, Version: version}
+func (g *gRPCService) Encrypt(plain []byte) ([]byte, error) {
+	request := &kmsapi.EncryptRequest{Plain: plain, Version: kmsapiVersion}
 	response, err := g.kmsClient.Encrypt(context.Background(), request)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return string(response.Cipher), nil
+	return response.Cipher, nil
 }

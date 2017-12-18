@@ -83,22 +83,6 @@ type KMSConfig struct {
 	CacheSize int `json:"cachesize,omitempty"`
 	// configfile is the path to the configuration file for the named KMS provider.
 	ConfigFile string `json:"configfile"`
-	// remoteServer is the configuration for connection gRPC server.
-	RemoteServer *RemoteServerConfig `json:"remoteServer"`
-}
-
-// RemoteServerConfig contains the connection informations that connect remote
-// gRPC server for envelope transformer.
-type RemoteServerConfig struct {
-	// gRPC server listen address, for example tcp://localhost:3735,
-	// unix:///var/run/kmsprovider.sock
+	// the gRPC server listening address, for example "unix:///var/run/kms-provider.sock".
 	Endpoint string `json:"endpoint"`
-
-	// CACert is the path to a PEM-encoded CA cert file to use to verify the
-	// gRPC server SSL certificate.
-	ServerCACert string `json:"serverCACert"`
-
-	// TLS certificate authentication information
-	ClientCert string `json:"clientCert"`
-	ClientKey  string `json:"clientKey"`
 }

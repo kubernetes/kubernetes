@@ -152,8 +152,7 @@ func GetPrefixTransformers(config *ResourceConfig) ([]value.PrefixTransformer, e
 			}
 
 			var envelopeService envelope.Service
-			remoteConfig := provider.KMS.RemoteServer
-			if remoteConfig == nil {
+			if len(provider.KMS.ConfigFile) > 0 {
 				// There should be no KMS provider plugins on API server side in future.
 				f, err := os.Open(provider.KMS.ConfigFile)
 				if err != nil {
@@ -169,13 +168,8 @@ func GetPrefixTransformers(config *ResourceConfig) ([]value.PrefixTransformer, e
 					return nil, fmt.Errorf("KMS plugin %q not found", provider.KMS.Name)
 				}
 			} else {
-				// Get gRPC client service with remote config
-				envelopeService, err = envelope.NewGRPCService(
-					remoteConfig.Endpoint,
-					remoteConfig.ServerCACert,
-					remoteConfig.ClientCert,
-					remoteConfig.ClientKey,
-				)
+				// Get gRPC client service with endpoint.
+				envelopeService, err = envelope.NewGRPCService(provider.KMS.Endpoint)
 				if err != nil {
 					return nil, fmt.Errorf("could not configure KMS plugin %q, error: %v", provider.KMS.Name, err)
 				}
