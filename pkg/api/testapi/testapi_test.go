@@ -25,8 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// TODO these tests don't add much value for testing things that have groups
-
 func TestResourcePathWithPrefix(t *testing.T) {
 	testCases := []struct {
 		prefix    string
@@ -43,6 +41,24 @@ func TestResourcePathWithPrefix(t *testing.T) {
 	}
 	for _, item := range testCases {
 		if actual := Default.ResourcePathWithPrefix(item.prefix, item.resource, item.namespace, item.name); actual != item.expected {
+			t.Errorf("Expected: %s, got: %s for prefix: %s, resource: %s, namespace: %s and name: %s", item.expected, actual, item.prefix, item.resource, item.namespace, item.name)
+		}
+	}
+	testCasesHaveGroup := []struct {
+		prefix    string
+		resource  string
+		namespace string
+		name      string
+		expected  string
+	}{
+		{"prefix", "resource", "mynamespace", "myresource", "/apis/" + Extensions.GroupVersion().Group + "/" + Extensions.GroupVersion().Version + "/prefix/namespaces/mynamespace/resource/myresource"},
+		{"prefix", "resource", "", "myresource", "/apis/" + Extensions.GroupVersion().Group + "/" + Extensions.GroupVersion().Version + "/prefix/resource/myresource"},
+		{"prefix", "resource", "mynamespace", "", "/apis/" + Extensions.GroupVersion().Group + "/" + Extensions.GroupVersion().Version + "/prefix/namespaces/mynamespace/resource"},
+		{"prefix", "resource", "", "", "/apis/" + Extensions.GroupVersion().Group + "/" + Extensions.GroupVersion().Version + "/prefix/resource"},
+		{"", "resource", "mynamespace", "myresource", "/apis/" + Extensions.GroupVersion().Group + "/" + Extensions.GroupVersion().Version + "/namespaces/mynamespace/resource/myresource"},
+	}
+	for _, item := range testCasesHaveGroup {
+		if actual := Extensions.ResourcePathWithPrefix(item.prefix, item.resource, item.namespace, item.name); actual != item.expected {
 			t.Errorf("Expected: %s, got: %s for prefix: %s, resource: %s, namespace: %s and name: %s", item.expected, actual, item.prefix, item.resource, item.namespace, item.name)
 		}
 	}
@@ -63,6 +79,40 @@ func TestResourcePath(t *testing.T) {
 	for _, item := range testCases {
 		if actual := Default.ResourcePath(item.resource, item.namespace, item.name); actual != item.expected {
 			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s and name: %s", item.expected, actual, item.resource, item.namespace, item.name)
+		}
+	}
+	testCasesHaveGroup := []struct {
+		resource  string
+		namespace string
+		name      string
+		expected  string
+	}{
+		{"resource", "mynamespace", "myresource", "/apis/" + Extensions.GroupVersion().Group + "/" + Extensions.GroupVersion().Version + "/namespaces/mynamespace/resource/myresource"},
+		{"resource", "", "myresource", "/apis/" + Extensions.GroupVersion().Group + "/" + Extensions.GroupVersion().Version + "/resource/myresource"},
+		{"resource", "mynamespace", "", "/apis/" + Extensions.GroupVersion().Group + "/" + Extensions.GroupVersion().Version + "/namespaces/mynamespace/resource"},
+		{"resource", "", "", "/apis/" + Extensions.GroupVersion().Group + "/" + Extensions.GroupVersion().Version + "/resource"},
+	}
+	for _, item := range testCasesHaveGroup {
+		if actual := Extensions.ResourcePath(item.resource, item.namespace, item.name); actual != item.expected {
+			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s and name: %s", item.expected, actual, item.resource, item.namespace, item.name)
+		}
+	}
+}
+
+func TestSubResourcePath(t *testing.T) {
+	testCases := []struct {
+		resource  string
+		namespace string
+		name      string
+		sub       string
+		expected  string
+	}{
+		{"resource", "mynamespace", "myresource", "subresource", "/api/" + Default.GroupVersion().Version + "/namespaces/mynamespace/resource/myresource/subresource"},
+		{"resource", "mynamespace", "myresource", "", "/api/" + Default.GroupVersion().Version + "/namespaces/mynamespace/resource/myresource"},
+	}
+	for _, item := range testCases {
+		if actual := Default.SubResourcePath(item.resource, item.namespace, item.name, item.sub); actual != item.expected {
+			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s, name: %s and sub: %s", item.expected, actual, item.resource, item.namespace, item.name, item.sub)
 		}
 	}
 }
