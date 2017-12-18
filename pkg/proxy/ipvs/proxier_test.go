@@ -264,6 +264,83 @@ func TestCanUseIPVSProxier(t *testing.T) {
 	}
 }
 
+func TestGetNodeIPs(t *testing.T) {
+	testCases := []struct {
+		devAddresses map[string][]string
+		expectIPs    []string
+	}{
+		// case 0
+		{
+			devAddresses: map[string][]string{"eth0": {"1.2.3.4"}, "lo": {"127.0.0.1"}},
+			expectIPs:    []string{"1.2.3.4", "127.0.0.1"},
+		},
+		// case 1
+		{
+			devAddresses: map[string][]string{"lo": {"127.0.0.1"}},
+			expectIPs:    []string{"127.0.0.1"},
+		},
+		// case 2
+		{
+			devAddresses: map[string][]string{},
+			expectIPs:    []string{},
+		},
+		// case 3
+		{
+			devAddresses: map[string][]string{"encap0": {"10.20.30.40"}, "lo": {"127.0.0.1"}, "docker0": {"172.17.0.1"}},
+			expectIPs:    []string{"10.20.30.40", "127.0.0.1", "172.17.0.1"},
+		},
+		// case 4
+		{
+			devAddresses: map[string][]string{"encaps9": {"10.20.30.40"}, "lo": {"127.0.0.1"}, "encap7": {"10.20.30.31"}},
+			expectIPs:    []string{"10.20.30.40", "127.0.0.1", "10.20.30.31"},
+		},
+		// case 5
+		{
+			devAddresses: map[string][]string{"kube-ipvs0": {"1.2.3.4"}, "lo": {"127.0.0.1"}, "encap7": {"10.20.30.31"}},
+			expectIPs:    []string{"127.0.0.1", "10.20.30.31"},
+		},
+		// case 6
+		{
+			devAddresses: map[string][]string{"kube-ipvs0": {"1.2.3.4", "2.3.4.5"}, "lo": {"127.0.0.1"}},
+			expectIPs:    []string{"127.0.0.1"},
+		},
+		// case 7
+		{
+			devAddresses: map[string][]string{"kube-ipvs0": {"1.2.3.4", "2.3.4.5"}},
+			expectIPs:    []string{},
+		},
+		// case 8
+		{
+			devAddresses: map[string][]string{"kube-ipvs0": {"1.2.3.4", "2.3.4.5"}, "eth5": {"3.4.5.6"}, "lo": {"127.0.0.1"}},
+			expectIPs:    []string{"127.0.0.1", "3.4.5.6"},
+		},
+		// case 9
+		{
+			devAddresses: map[string][]string{"ipvs0": {"1.2.3.4"}, "lo": {"127.0.0.1"}, "encap7": {"10.20.30.31"}},
+			expectIPs:    []string{"127.0.0.1", "10.20.30.31", "1.2.3.4"},
+		},
+	}
+
+	for i := range testCases {
+		fake := netlinktest.NewFakeNetlinkHandle()
+		for dev, addresses := range testCases[i].devAddresses {
+			fake.SetLocalAddresses(dev, addresses...)
+		}
+		r := realIPGetter{nl: fake}
+		ips, err := r.NodeIPs()
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		ipStrs := sets.NewString()
+		for _, ip := range ips {
+			ipStrs.Insert(ip.String())
+		}
+		if !ipStrs.Equal(sets.NewString(testCases[i].expectIPs...)) {
+			t.Errorf("case[%d], unexpected mismatch, expected: %v, got: %v", i, testCases[i].expectIPs, ips)
+		}
+	}
+}
+
 func TestNodePort(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
