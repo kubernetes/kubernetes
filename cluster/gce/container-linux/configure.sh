@@ -21,7 +21,7 @@ set -o pipefail
 function download-kube-env {
   # Fetch kube-env from GCE metadata server.
   local -r tmp_kube_env="/tmp/kube-env.yaml"
-  curl --fail --retry 5 --retry-delay 3 --silent --show-error \
+  curl --fail --retry 5 --retry-delay 3 --retry-connrefused --silent --show-error \
     -H "X-Google-Metadata-Request: True" \
     -o "${tmp_kube_env}" \
     http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
@@ -55,7 +55,7 @@ function download-or-bust {
     for url in "${urls[@]}"; do
       local file="${url##*/}"
       rm -f "${file}"
-      if ! curl -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 "${url}"; then
+      if ! curl -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 --retry-connrefused "${url}"; then
         echo "== Failed to download ${url}. Retrying. =="
       elif [[ -n "${hash}" ]] && ! validate-hash "${file}" "${hash}"; then
         echo "== Hash validation of ${url} failed. Retrying. =="
