@@ -30,6 +30,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"k8s.io/api/core/v1"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -550,6 +551,18 @@ func TestVolumes(t *testing.T) {
 
 		WaitForVolumeStatus(t, os, vol, volumeAvailableStatus)
 	}
+
+	expectedVolSize := resource.MustParse("2Gi")
+	newVolSize, err := os.ExpandVolume(vol, resource.MustParse("1Gi"), expectedVolSize)
+	if err != nil {
+		t.Fatalf("Cannot expand a Cinder volume: %v", err)
+	}
+	if newVolSize != expectedVolSize {
+		t.Logf("Expected: %v but got: %v ", expectedVolSize, newVolSize)
+	}
+	t.Logf("Volume expanded to (%v) \n", newVolSize)
+
+	WaitForVolumeStatus(t, os, vol, volumeAvailableStatus)
 
 	err = os.DeleteVolume(vol)
 	if err != nil {
