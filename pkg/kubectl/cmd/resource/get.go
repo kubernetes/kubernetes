@@ -308,6 +308,7 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 	}
 
 	filteredResourceCount := 0
+	noHeaders := cmdutil.GetFlagBool(cmd, "no-headers")
 	for ix := range objs {
 		var mapping *meta.RESTMapping
 		var original runtime.Object
@@ -350,7 +351,6 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 			// TODO: this doesn't belong here
 			// add linebreak between resource groups (if there is more than one)
 			// skip linebreak above first resource group
-			noHeaders := cmdutil.GetFlagBool(cmd, "no-headers")
 			if lastMapping != nil && !noHeaders {
 				fmt.Fprintf(options.ErrOut, "%s\n", "")
 			}
