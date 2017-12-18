@@ -56,6 +56,19 @@ type NodeStats struct {
 	// Stats about the underlying container runtime.
 	// +optional
 	Runtime *RuntimeStats `json:"runtime,omitempty"`
+	// Stats about the rlimit of system.
+	// +optional
+	Rlimit *RlimitStats `json:"rlimit,omitempty"`
+}
+
+// RlimitStats are stats rlimit of OS.
+type RlimitStats struct {
+	Time metav1.Time `json:"time"`
+
+	// The max PID of OS.
+	MaxPID *int64 `json:"maxpid,omitempty"`
+	// The number of running process in the OS.
+	NumOfRunningProcesses *int64 `json:"curproc,omitempty"`
 }
 
 // RuntimeStats are stats pertaining to the underlying container runtime.

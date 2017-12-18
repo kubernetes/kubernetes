@@ -73,6 +73,7 @@ func init() {
 	signalToNodeCondition[evictionapi.SignalNodeFsAvailable] = v1.NodeDiskPressure
 	signalToNodeCondition[evictionapi.SignalImageFsInodesFree] = v1.NodeDiskPressure
 	signalToNodeCondition[evictionapi.SignalNodeFsInodesFree] = v1.NodeDiskPressure
+	signalToNodeCondition[evictionapi.SignalPIDAvailable] = v1.NodePIDPressure
 
 	// map signals to resources (and vice-versa)
 	signalToResource = map[evictionapi.Signal]v1.ResourceName{}
@@ -760,6 +761,17 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider, capacityProvi
 						time:      imageFs.Time,
 					}
 				}
+			}
+		}
+	}
+
+	if rlimit := summary.Node.Rlimit; rlimit != nil {
+		if rlimit.NumOfRunningProcesses != nil && rlimit.MaxPID != nil {
+			available := int64(*rlimit.MaxPID) - int64(*rlimit.NumOfRunningProcesses)
+			result[evictionapi.SignalPIDAvailable] = signalObservation{
+				available: resource.NewQuantity(available, resource.BinarySI),
+				capacity:  resource.NewQuantity(int64(*rlimit.MaxPID), resource.BinarySI),
+				time:      rlimit.Time,
 			}
 		}
 	}

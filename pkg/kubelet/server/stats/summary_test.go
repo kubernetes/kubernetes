@@ -58,6 +58,7 @@ func TestSummaryProvider(t *testing.T) {
 			"/misc":    {cs: getContainerStats(), ns: getNetworkStats()},
 			"/kubelet": {cs: getContainerStats(), ns: getNetworkStats()},
 		}
+		rlimitStats = getRlimitStats()
 	)
 
 	assert := assert.New(t)
@@ -69,6 +70,7 @@ func TestSummaryProvider(t *testing.T) {
 		On("ListPodStats").Return(podStats, nil).
 		On("ImageFsStats").Return(imageFsStats, nil).
 		On("RootFsStats").Return(rootFsStats, nil).
+		On("RlimitStats").Return(rlimitStats, nil).
 		On("GetCgroupStats", "/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil).
 		On("GetCgroupStats", "/runtime", false).Return(cgroupStatsMap["/runtime"].cs, cgroupStatsMap["/runtime"].ns, nil).
 		On("GetCgroupStats", "/misc", false).Return(cgroupStatsMap["/misc"].cs, cgroupStatsMap["/misc"].ns, nil).
@@ -138,6 +140,13 @@ func getVolumeStats() *statsapi.VolumeStats {
 func getNetworkStats() *statsapi.NetworkStats {
 	f := fuzz.New().NilChance(0)
 	v := &statsapi.NetworkStats{}
+	f.Fuzz(v)
+	return v
+}
+
+func getRlimitStats() *statsapi.RlimitStats {
+	f := fuzz.New().NilChance(0)
+	v := &statsapi.RlimitStats{}
 	f.Fuzz(v)
 	return v
 }
