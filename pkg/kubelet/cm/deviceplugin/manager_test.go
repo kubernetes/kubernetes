@@ -366,7 +366,7 @@ func (m *MockEndpoint) allocate(devs []string) (*pluginapi.AllocateResponse, err
 	return nil, nil
 }
 
-func makePod(requests v1.ResourceList) *v1.Pod {
+func makePod(limits v1.ResourceList) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID: uuid.NewUUID(),
@@ -375,7 +375,7 @@ func makePod(requests v1.ResourceList) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Resources: v1.ResourceRequirements{
-						Requests: requests,
+						Limits: limits,
 					},
 				},
 			},
@@ -616,7 +616,7 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 				{
 					Name: string(uuid.NewUUID()),
 					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
+						Limits: v1.ResourceList{
 							v1.ResourceName(res1.resourceName): res2.resourceQuantity,
 						},
 					},
@@ -624,7 +624,7 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 				{
 					Name: string(uuid.NewUUID()),
 					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
+						Limits: v1.ResourceList{
 							v1.ResourceName(res1.resourceName): res1.resourceQuantity,
 						},
 					},
@@ -634,7 +634,7 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 				{
 					Name: string(uuid.NewUUID()),
 					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
+						Limits: v1.ResourceList{
 							v1.ResourceName(res1.resourceName): res2.resourceQuantity,
 							v1.ResourceName(res2.resourceName): res2.resourceQuantity,
 						},
@@ -643,7 +643,7 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 				{
 					Name: string(uuid.NewUUID()),
 					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
+						Limits: v1.ResourceList{
 							v1.ResourceName(res1.resourceName): res2.resourceQuantity,
 							v1.ResourceName(res2.resourceName): res2.resourceQuantity,
 						},
@@ -664,6 +664,10 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 	initCont2Devices := testManager.podDevices.containerDevices(podUID, initCont2, res1.resourceName)
 	normalCont1Devices := testManager.podDevices.containerDevices(podUID, normalCont1, res1.resourceName)
 	normalCont2Devices := testManager.podDevices.containerDevices(podUID, normalCont2, res1.resourceName)
+	as.Equal(1, initCont1Devices.Len())
+	as.Equal(2, initCont2Devices.Len())
+	as.Equal(1, normalCont1Devices.Len())
+	as.Equal(1, normalCont2Devices.Len())
 	as.True(initCont2Devices.IsSuperset(initCont1Devices))
 	as.True(initCont2Devices.IsSuperset(normalCont1Devices))
 	as.True(initCont2Devices.IsSuperset(normalCont2Devices))
