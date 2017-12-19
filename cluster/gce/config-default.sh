@@ -121,6 +121,8 @@ MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 # It is the primary range in the subnet and is the range used for node instance IPs.
 NODE_IP_RANGE="$(get-node-ip-range)"
 
+# NOTE: Avoid giving nodes empty scopes, because kubelet needs a service account
+# in order to initialize properly.
 NODE_SCOPES="${NODE_SCOPES:-monitoring,logging-write,storage-ro}"
 
 # Extra docker options for nodes.
