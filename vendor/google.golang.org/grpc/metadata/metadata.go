@@ -1,23 +1,38 @@
 /*
  *
- * Copyright 2014 gRPC authors.
+ * Copyright 2014, Google Inc.
+ * All rights reserved.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     * Redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above
+ * copyright notice, this list of conditions and the following disclaimer
+ * in the documentation and/or other materials provided with the
+ * distribution.
+ *     * Neither the name of Google Inc. nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
 
 // Package metadata define the structure of the metadata supported by gRPC library.
-// Please refer to https://grpc.io/docs/guides/wire.html for more information about custom-metadata.
+// Please refer to http://www.grpc.io/docs/guides/wire.html for more information about custom-metadata.
 package metadata
 
 import (
@@ -36,17 +51,8 @@ func DecodeKeyValue(k, v string) (string, string, error) {
 // two convenience functions New and Pairs to generate MD.
 type MD map[string][]string
 
-// New creates an MD from a given key-value map.
-//
-// Only the following ASCII characters are allowed in keys:
-//  - digits: 0-9
-//  - uppercase letters: A-Z (normalized to lower)
-//  - lowercase letters: a-z
-//  - special characters: -_.
-// Uppercase letters are automatically converted to lowercase.
-//
-// Keys beginning with "grpc-" are reserved for grpc-internal use only and may
-// result in errors if set in metadata.
+// New creates a MD from given key-value map.
+// Keys are automatically converted to lowercase.
 func New(m map[string]string) MD {
 	md := MD{}
 	for k, val := range m {
@@ -58,16 +64,7 @@ func New(m map[string]string) MD {
 
 // Pairs returns an MD formed by the mapping of key, value ...
 // Pairs panics if len(kv) is odd.
-//
-// Only the following ASCII characters are allowed in keys:
-//  - digits: 0-9
-//  - uppercase letters: A-Z (normalized to lower)
-//  - lowercase letters: a-z
-//  - special characters: -_.
-// Uppercase letters are automatically converted to lowercase.
-//
-// Keys beginning with "grpc-" are reserved for grpc-internal use only and may
-// result in errors if set in metadata.
+// Keys are automatically converted to lowercase.
 func Pairs(kv ...string) MD {
 	if len(kv)%2 == 1 {
 		panic(fmt.Sprintf("metadata: Pairs got the odd number of input pairs for metadata: %d", len(kv)))
@@ -94,9 +91,9 @@ func (md MD) Copy() MD {
 	return Join(md)
 }
 
-// Join joins any number of mds into a single MD.
+// Join joins any number of MDs into a single MD.
 // The order of values for each key is determined by the order in which
-// the mds containing those values are presented to Join.
+// the MDs containing those values are presented to Join.
 func Join(mds ...MD) MD {
 	out := MD{}
 	for _, md := range mds {
@@ -110,6 +107,11 @@ func Join(mds ...MD) MD {
 type mdIncomingKey struct{}
 type mdOutgoingKey struct{}
 
+// NewContext is a wrapper for NewOutgoingContext(ctx, md).  Deprecated.
+func NewContext(ctx context.Context, md MD) context.Context {
+	return NewOutgoingContext(ctx, md)
+}
+
 // NewIncomingContext creates a new context with incoming md attached.
 func NewIncomingContext(ctx context.Context, md MD) context.Context {
 	return context.WithValue(ctx, mdIncomingKey{}, md)
@@ -120,17 +122,22 @@ func NewOutgoingContext(ctx context.Context, md MD) context.Context {
 	return context.WithValue(ctx, mdOutgoingKey{}, md)
 }
 
-// FromIncomingContext returns the incoming metadata in ctx if it exists.  The
-// returned MD should not be modified. Writing to it may cause races.
-// Modification should be made to copies of the returned MD.
+// FromContext is a wrapper for FromIncomingContext(ctx).  Deprecated.
+func FromContext(ctx context.Context) (md MD, ok bool) {
+	return FromIncomingContext(ctx)
+}
+
+// FromIncomingContext returns the incoming MD in ctx if it exists.  The
+// returned md should be immutable, writing to it may cause races.
+// Modification should be made to the copies of the returned md.
 func FromIncomingContext(ctx context.Context) (md MD, ok bool) {
 	md, ok = ctx.Value(mdIncomingKey{}).(MD)
 	return
 }
 
-// FromOutgoingContext returns the outgoing metadata in ctx if it exists.  The
-// returned MD should not be modified. Writing to it may cause races.
-// Modification should be made to the copies of the returned MD.
+// FromOutgoingContext returns the outgoing MD in ctx if it exists.  The
+// returned md should be immutable, writing to it may cause races.
+// Modification should be made to the copies of the returned md.
 func FromOutgoingContext(ctx context.Context) (md MD, ok bool) {
 	md, ok = ctx.Value(mdOutgoingKey{}).(MD)
 	return

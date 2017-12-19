@@ -20,7 +20,6 @@ import (
 
 	"github.com/coreos/etcd/auth/authpb"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
-
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -101,20 +100,28 @@ type Auth interface {
 }
 
 type auth struct {
+	c *Client
+
+	conn   *grpc.ClientConn // conn in-use
 	remote pb.AuthClient
 }
 
 func NewAuth(c *Client) Auth {
-	return &auth{remote: RetryAuthClient(c)}
+	conn := c.ActiveConnection()
+	return &auth{
+		conn:   c.ActiveConnection(),
+		remote: pb.NewAuthClient(conn),
+		c:      c,
+	}
 }
 
 func (auth *auth) AuthEnable(ctx context.Context) (*AuthEnableResponse, error) {
-	resp, err := auth.remote.AuthEnable(ctx, &pb.AuthEnableRequest{})
+	resp, err := auth.remote.AuthEnable(ctx, &pb.AuthEnableRequest{}, grpc.FailFast(false))
 	return (*AuthEnableResponse)(resp), toErr(ctx, err)
 }
 
 func (auth *auth) AuthDisable(ctx context.Context) (*AuthDisableResponse, error) {
-	resp, err := auth.remote.AuthDisable(ctx, &pb.AuthDisableRequest{})
+	resp, err := auth.remote.AuthDisable(ctx, &pb.AuthDisableRequest{}, grpc.FailFast(false))
 	return (*AuthDisableResponse)(resp), toErr(ctx, err)
 }
 
@@ -139,12 +146,12 @@ func (auth *auth) UserGrantRole(ctx context.Context, user string, role string) (
 }
 
 func (auth *auth) UserGet(ctx context.Context, name string) (*AuthUserGetResponse, error) {
-	resp, err := auth.remote.UserGet(ctx, &pb.AuthUserGetRequest{Name: name})
+	resp, err := auth.remote.UserGet(ctx, &pb.AuthUserGetRequest{Name: name}, grpc.FailFast(false))
 	return (*AuthUserGetResponse)(resp), toErr(ctx, err)
 }
 
 func (auth *auth) UserList(ctx context.Context) (*AuthUserListResponse, error) {
-	resp, err := auth.remote.UserList(ctx, &pb.AuthUserListRequest{})
+	resp, err := auth.remote.UserList(ctx, &pb.AuthUserListRequest{}, grpc.FailFast(false))
 	return (*AuthUserListResponse)(resp), toErr(ctx, err)
 }
 
@@ -169,12 +176,12 @@ func (auth *auth) RoleGrantPermission(ctx context.Context, name string, key, ran
 }
 
 func (auth *auth) RoleGet(ctx context.Context, role string) (*AuthRoleGetResponse, error) {
-	resp, err := auth.remote.RoleGet(ctx, &pb.AuthRoleGetRequest{Role: role})
+	resp, err := auth.remote.RoleGet(ctx, &pb.AuthRoleGetRequest{Role: role}, grpc.FailFast(false))
 	return (*AuthRoleGetResponse)(resp), toErr(ctx, err)
 }
 
 func (auth *auth) RoleList(ctx context.Context) (*AuthRoleListResponse, error) {
-	resp, err := auth.remote.RoleList(ctx, &pb.AuthRoleListRequest{})
+	resp, err := auth.remote.RoleList(ctx, &pb.AuthRoleListRequest{}, grpc.FailFast(false))
 	return (*AuthRoleListResponse)(resp), toErr(ctx, err)
 }
 
@@ -202,7 +209,7 @@ type authenticator struct {
 }
 
 func (auth *authenticator) authenticate(ctx context.Context, name string, password string) (*AuthenticateResponse, error) {
-	resp, err := auth.remote.Authenticate(ctx, &pb.AuthenticateRequest{Name: name, Password: password})
+	resp, err := auth.remote.Authenticate(ctx, &pb.AuthenticateRequest{Name: name, Password: password}, grpc.FailFast(false))
 	return (*AuthenticateResponse)(resp), toErr(ctx, err)
 }
 

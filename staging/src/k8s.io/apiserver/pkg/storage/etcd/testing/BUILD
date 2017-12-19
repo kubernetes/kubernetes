@@ -13,7 +13,6 @@ go_library(
         "//vendor/github.com/coreos/etcd/client:go_default_library",
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver:go_default_library",
-        "//vendor/github.com/coreos/etcd/etcdserver/api/etcdhttp:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/api/v2http:go_default_library",
         "//vendor/github.com/coreos/etcd/integration:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/testutil:go_default_library",

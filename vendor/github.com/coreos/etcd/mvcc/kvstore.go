@@ -18,6 +18,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"math"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -33,28 +34,24 @@ var (
 	keyBucketName  = []byte("key")
 	metaBucketName = []byte("meta")
 
-	consistentIndexKeyName  = []byte("consistent_index")
-	scheduledCompactKeyName = []byte("scheduledCompactRev")
-	finishedCompactKeyName  = []byte("finishedCompactRev")
-
-	ErrCompacted = errors.New("mvcc: required revision has been compacted")
-	ErrFutureRev = errors.New("mvcc: required revision is a future revision")
-	ErrCanceled  = errors.New("mvcc: watcher is canceled")
-	ErrClosed    = errors.New("mvcc: closed")
-
-	plog = capnslog.NewPackageLogger("github.com/coreos/etcd", "mvcc")
-)
-
-const (
 	// markedRevBytesLen is the byte length of marked revision.
 	// The first `revBytesLen` bytes represents a normal revision. The last
 	// one byte is the mark.
 	markedRevBytesLen      = revBytesLen + 1
 	markBytePosition       = markedRevBytesLen - 1
 	markTombstone     byte = 't'
-)
 
-var restoreChunkKeys = 10000 // non-const for testing
+	consistentIndexKeyName  = []byte("consistent_index")
+	scheduledCompactKeyName = []byte("scheduledCompactRev")
+	finishedCompactKeyName  = []byte("finishedCompactRev")
+
+	ErrTxnIDMismatch = errors.New("mvcc: txn id mismatch")
+	ErrCompacted     = errors.New("mvcc: required revision has been compacted")
+	ErrFutureRev     = errors.New("mvcc: required revision is a future revision")
+	ErrCanceled      = errors.New("mvcc: watcher is canceled")
+
+	plog = capnslog.NewPackageLogger("github.com/coreos/etcd", "mvcc")
+)
 
 // ConsistentIndexGetter is an interface that wraps the Get method.
 // Consistent index is the offset of an entry in a consistent replicated log.
@@ -64,11 +61,7 @@ type ConsistentIndexGetter interface {
 }
 
 type store struct {
-	ReadView
-	WriteView
-
-	// mu read locks for txns and write locks for non-txn store changes.
-	mu sync.RWMutex
+	mu sync.Mutex // guards the following
 
 	ig ConsistentIndexGetter
 
@@ -77,19 +70,19 @@ type store struct {
 
 	le lease.Lessor
 
-	// revMuLock protects currentRev and compactMainRev.
-	// Locked at end of write txn and released after write txn unlock lock.
-	// Locked before locking read txn and released after locking.
-	revMu sync.RWMutex
-	// currentRev is the revision of the last completed transaction.
-	currentRev int64
-	// compactMainRev is the main revision of the last compaction.
+	currentRev revision
+	// the main revision of the last compaction
 	compactMainRev int64
+
+	tx        backend.BatchTx
+	txnID     int64 // tracks the current txnID to verify txn operations
+	txnModify bool
 
 	// bytesBuf8 is a byte slice of length 8
 	// to avoid a repetitive allocation in saveIndex.
 	bytesBuf8 []byte
 
+	changes   []mvccpb.KeyValue
 	fifoSched schedule.Scheduler
 
 	stopc chan struct{}
@@ -105,18 +98,17 @@ func NewStore(b backend.Backend, le lease.Lessor, ig ConsistentIndexGetter) *sto
 
 		le: le,
 
-		currentRev:     1,
+		currentRev:     revision{main: 1},
 		compactMainRev: -1,
 
-		bytesBuf8: make([]byte, 8),
+		bytesBuf8: make([]byte, 8, 8),
 		fifoSched: schedule.NewFIFOScheduler(),
 
 		stopc: make(chan struct{}),
 	}
-	s.ReadView = &readView{s}
-	s.WriteView = &writeView{s}
+
 	if s.le != nil {
-		s.le.SetRangeDeleter(func() lease.TxnDelete { return s.Write() })
+		s.le.SetRangeDeleter(s)
 	}
 
 	tx := s.b.BatchTx()
@@ -134,6 +126,140 @@ func NewStore(b backend.Backend, le lease.Lessor, ig ConsistentIndexGetter) *sto
 	return s
 }
 
+func (s *store) Rev() int64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.currentRev.main
+}
+
+func (s *store) FirstRev() int64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.compactMainRev
+}
+
+func (s *store) Put(key, value []byte, lease lease.LeaseID) int64 {
+	id := s.TxnBegin()
+	s.put(key, value, lease)
+	s.txnEnd(id)
+
+	putCounter.Inc()
+
+	return int64(s.currentRev.main)
+}
+
+func (s *store) Range(key, end []byte, ro RangeOptions) (r *RangeResult, err error) {
+	id := s.TxnBegin()
+	kvs, count, rev, err := s.rangeKeys(key, end, ro.Limit, ro.Rev, ro.Count)
+	s.txnEnd(id)
+
+	rangeCounter.Inc()
+
+	r = &RangeResult{
+		KVs:   kvs,
+		Count: count,
+		Rev:   rev,
+	}
+
+	return r, err
+}
+
+func (s *store) DeleteRange(key, end []byte) (n, rev int64) {
+	id := s.TxnBegin()
+	n = s.deleteRange(key, end)
+	s.txnEnd(id)
+
+	deleteCounter.Inc()
+
+	return n, int64(s.currentRev.main)
+}
+
+func (s *store) TxnBegin() int64 {
+	s.mu.Lock()
+	s.currentRev.sub = 0
+	s.tx = s.b.BatchTx()
+	s.tx.Lock()
+
+	s.txnID = rand.Int63()
+	return s.txnID
+}
+
+func (s *store) TxnEnd(txnID int64) error {
+	err := s.txnEnd(txnID)
+	if err != nil {
+		return err
+	}
+
+	txnCounter.Inc()
+	return nil
+}
+
+// txnEnd is used for unlocking an internal txn. It does
+// not increase the txnCounter.
+func (s *store) txnEnd(txnID int64) error {
+	if txnID != s.txnID {
+		return ErrTxnIDMismatch
+	}
+
+	// only update index if the txn modifies the mvcc state.
+	// read only txn might execute with one write txn concurrently,
+	// it should not write its index to mvcc.
+	if s.txnModify {
+		s.saveIndex()
+	}
+	s.txnModify = false
+
+	s.tx.Unlock()
+	if s.currentRev.sub != 0 {
+		s.currentRev.main += 1
+	}
+	s.currentRev.sub = 0
+
+	dbTotalSize.Set(float64(s.b.Size()))
+	s.mu.Unlock()
+	return nil
+}
+
+func (s *store) TxnRange(txnID int64, key, end []byte, ro RangeOptions) (r *RangeResult, err error) {
+	if txnID != s.txnID {
+		return nil, ErrTxnIDMismatch
+	}
+
+	kvs, count, rev, err := s.rangeKeys(key, end, ro.Limit, ro.Rev, ro.Count)
+
+	r = &RangeResult{
+		KVs:   kvs,
+		Count: count,
+		Rev:   rev,
+	}
+	return r, err
+}
+
+func (s *store) TxnPut(txnID int64, key, value []byte, lease lease.LeaseID) (rev int64, err error) {
+	if txnID != s.txnID {
+		return 0, ErrTxnIDMismatch
+	}
+
+	s.put(key, value, lease)
+	return int64(s.currentRev.main + 1), nil
+}
+
+func (s *store) TxnDeleteRange(txnID int64, key, end []byte) (n, rev int64, err error) {
+	if txnID != s.txnID {
+		return 0, 0, ErrTxnIDMismatch
+	}
+
+	n = s.deleteRange(key, end)
+	if n != 0 || s.currentRev.sub != 0 {
+		rev = int64(s.currentRev.main + 1)
+	} else {
+		rev = int64(s.currentRev.main)
+	}
+	return n, rev, nil
+}
+
 func (s *store) compactBarrier(ctx context.Context, ch chan struct{}) {
 	if ctx == nil || ctx.Err() != nil {
 		s.mu.Lock()
@@ -149,25 +275,16 @@ func (s *store) compactBarrier(ctx context.Context, ch chan struct{}) {
 	close(ch)
 }
 
-func (s *store) Hash() (hash uint32, revision int64, err error) {
-	s.b.ForceCommit()
-	h, err := s.b.Hash(DefaultIgnores)
-	return h, s.currentRev, err
-}
-
 func (s *store) Compact(rev int64) (<-chan struct{}, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.revMu.Lock()
-	defer s.revMu.Unlock()
-
 	if rev <= s.compactMainRev {
 		ch := make(chan struct{})
 		f := func(ctx context.Context) { s.compactBarrier(ctx, ch) }
 		s.fifoSched.Schedule(f)
 		return ch, ErrCompacted
 	}
-	if rev > s.currentRev {
+	if rev > s.currentRev.main {
 		return nil, ErrFutureRev
 	}
 
@@ -216,14 +333,24 @@ func init() {
 	}
 }
 
+func (s *store) Hash() (uint32, int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.b.ForceCommit()
+
+	h, err := s.b.Hash(DefaultIgnores)
+	rev := s.currentRev.main
+	return h, rev, err
+}
+
 func (s *store) Commit() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	tx := s.b.BatchTx()
-	tx.Lock()
-	s.saveIndex(tx)
-	tx.Unlock()
+	s.tx = s.b.BatchTx()
+	s.tx.Lock()
+	s.saveIndex()
+	s.tx.Unlock()
 	s.b.ForceCommit()
 }
 
@@ -236,8 +363,10 @@ func (s *store) Restore(b backend.Backend) error {
 
 	s.b = b
 	s.kvindex = newTreeIndex()
-	s.currentRev = 1
+	s.currentRev = revision{main: 1}
 	s.compactMainRev = -1
+	s.tx = b.BatchTx()
+	s.txnID = -1
 	s.fifoSched = schedule.NewFIFOScheduler()
 	s.stopc = make(chan struct{})
 
@@ -245,63 +374,75 @@ func (s *store) Restore(b backend.Backend) error {
 }
 
 func (s *store) restore() error {
-	reportDbTotalSizeInBytesMu.Lock()
-	b := s.b
-	reportDbTotalSizeInBytes = func() float64 { return float64(b.Size()) }
-	reportDbTotalSizeInBytesMu.Unlock()
-
 	min, max := newRevBytes(), newRevBytes()
 	revToBytes(revision{main: 1}, min)
 	revToBytes(revision{main: math.MaxInt64, sub: math.MaxInt64}, max)
 
 	keyToLease := make(map[string]lease.LeaseID)
 
+	// use an unordered map to hold the temp index data to speed up
+	// the initial key index recovery.
+	// we will convert this unordered map into the tree index later.
+	unordered := make(map[string]*keyIndex, 100000)
+
 	// restore index
 	tx := s.b.BatchTx()
 	tx.Lock()
-
 	_, finishedCompactBytes := tx.UnsafeRange(metaBucketName, finishedCompactKeyName, nil, 0)
 	if len(finishedCompactBytes) != 0 {
 		s.compactMainRev = bytesToRev(finishedCompactBytes[0]).main
 		plog.Printf("restore compact to %d", s.compactMainRev)
 	}
-	_, scheduledCompactBytes := tx.UnsafeRange(metaBucketName, scheduledCompactKeyName, nil, 0)
-	scheduledCompact := int64(0)
-	if len(scheduledCompactBytes) != 0 {
-		scheduledCompact = bytesToRev(scheduledCompactBytes[0]).main
+
+	// TODO: limit N to reduce max memory usage
+	keys, vals := tx.UnsafeRange(keyBucketName, min, max, 0)
+	for i, key := range keys {
+		var kv mvccpb.KeyValue
+		if err := kv.Unmarshal(vals[i]); err != nil {
+			plog.Fatalf("cannot unmarshal event: %v", err)
+		}
+
+		rev := bytesToRev(key[:revBytesLen])
+
+		// restore index
+		switch {
+		case isTombstone(key):
+			if ki, ok := unordered[string(kv.Key)]; ok {
+				ki.tombstone(rev.main, rev.sub)
+			}
+			delete(keyToLease, string(kv.Key))
+
+		default:
+			ki, ok := unordered[string(kv.Key)]
+			if ok {
+				ki.put(rev.main, rev.sub)
+			} else {
+				ki = &keyIndex{key: kv.Key}
+				ki.restore(revision{kv.CreateRevision, 0}, rev, kv.Version)
+				unordered[string(kv.Key)] = ki
+			}
+
+			if lid := lease.LeaseID(kv.Lease); lid != lease.NoLease {
+				keyToLease[string(kv.Key)] = lid
+			} else {
+				delete(keyToLease, string(kv.Key))
+			}
+		}
+
+		// update revision
+		s.currentRev = rev
 	}
 
-	// index keys concurrently as they're loaded in from tx
-	keysGauge.Set(0)
-	rkvc, revc := restoreIntoIndex(s.kvindex)
-	for {
-		keys, vals := tx.UnsafeRange(keyBucketName, min, max, int64(restoreChunkKeys))
-		if len(keys) == 0 {
-			break
-		}
-		// rkvc blocks if the total pending keys exceeds the restore
-		// chunk size to keep keys from consuming too much memory.
-		restoreChunk(rkvc, keys, vals, keyToLease)
-		if len(keys) < restoreChunkKeys {
-			// partial set implies final set
-			break
-		}
-		// next set begins after where this one ended
-		newMin := bytesToRev(keys[len(keys)-1][:revBytesLen])
-		newMin.sub++
-		revToBytes(newMin, min)
+	// restore the tree index from the unordered index.
+	for _, v := range unordered {
+		s.kvindex.Insert(v)
 	}
-	close(rkvc)
-	s.currentRev = <-revc
 
 	// keys in the range [compacted revision -N, compaction] might all be deleted due to compaction.
 	// the correct revision should be set to compaction revision in the case, not the largest revision
 	// we have seen.
-	if s.currentRev < s.compactMainRev {
-		s.currentRev = s.compactMainRev
-	}
-	if scheduledCompact <= s.compactMainRev {
-		scheduledCompact = 0
+	if s.currentRev.main < s.compactMainRev {
+		s.currentRev.main = s.compactMainRev
 	}
 
 	for key, lid := range keyToLease {
@@ -314,6 +455,15 @@ func (s *store) restore() error {
 		}
 	}
 
+	_, scheduledCompactBytes := tx.UnsafeRange(metaBucketName, scheduledCompactKeyName, nil, 0)
+	scheduledCompact := int64(0)
+	if len(scheduledCompactBytes) != 0 {
+		scheduledCompact = bytesToRev(scheduledCompactBytes[0]).main
+		if scheduledCompact <= s.compactMainRev {
+			scheduledCompact = 0
+		}
+	}
+
 	tx.Unlock()
 
 	if scheduledCompact != 0 {
@@ -322,75 +472,6 @@ func (s *store) restore() error {
 	}
 
 	return nil
-}
-
-type revKeyValue struct {
-	key  []byte
-	kv   mvccpb.KeyValue
-	kstr string
-}
-
-func restoreIntoIndex(idx index) (chan<- revKeyValue, <-chan int64) {
-	rkvc, revc := make(chan revKeyValue, restoreChunkKeys), make(chan int64, 1)
-	go func() {
-		currentRev := int64(1)
-		defer func() { revc <- currentRev }()
-		// restore the tree index from streaming the unordered index.
-		kiCache := make(map[string]*keyIndex, restoreChunkKeys)
-		for rkv := range rkvc {
-			ki, ok := kiCache[rkv.kstr]
-			// purge kiCache if many keys but still missing in the cache
-			if !ok && len(kiCache) >= restoreChunkKeys {
-				i := 10
-				for k := range kiCache {
-					delete(kiCache, k)
-					if i--; i == 0 {
-						break
-					}
-				}
-			}
-			// cache miss, fetch from tree index if there
-			if !ok {
-				ki = &keyIndex{key: rkv.kv.Key}
-				if idxKey := idx.KeyIndex(ki); idxKey != nil {
-					kiCache[rkv.kstr], ki = idxKey, idxKey
-					ok = true
-				}
-			}
-			rev := bytesToRev(rkv.key)
-			currentRev = rev.main
-			if ok {
-				if isTombstone(rkv.key) {
-					ki.tombstone(rev.main, rev.sub)
-					continue
-				}
-				ki.put(rev.main, rev.sub)
-			} else if !isTombstone(rkv.key) {
-				ki.restore(revision{rkv.kv.CreateRevision, 0}, rev, rkv.kv.Version)
-				idx.Insert(ki)
-				kiCache[rkv.kstr] = ki
-			}
-		}
-	}()
-	return rkvc, revc
-}
-
-func restoreChunk(kvc chan<- revKeyValue, keys, vals [][]byte, keyToLease map[string]lease.LeaseID) {
-	for i, key := range keys {
-		rkv := revKeyValue{key: key}
-		if err := rkv.kv.Unmarshal(vals[i]); err != nil {
-			plog.Fatalf("cannot unmarshal event: %v", err)
-		}
-		rkv.kstr = string(rkv.kv.Key)
-		if isTombstone(key) {
-			delete(keyToLease, rkv.kstr)
-		} else if lid := lease.LeaseID(rkv.kv.Lease); lid != lease.NoLease {
-			keyToLease[rkv.kstr] = lid
-		} else {
-			delete(keyToLease, rkv.kstr)
-		}
-		kvc <- rkv
-	}
 }
 
 func (s *store) Close() error {
@@ -409,10 +490,180 @@ func (a *store) Equal(b *store) bool {
 	return a.kvindex.Equal(b.kvindex)
 }
 
-func (s *store) saveIndex(tx backend.BatchTx) {
+// range is a keyword in Go, add Keys suffix.
+func (s *store) rangeKeys(key, end []byte, limit, rangeRev int64, countOnly bool) (kvs []mvccpb.KeyValue, count int, curRev int64, err error) {
+	curRev = int64(s.currentRev.main)
+	if s.currentRev.sub > 0 {
+		curRev += 1
+	}
+
+	if rangeRev > curRev {
+		return nil, -1, s.currentRev.main, ErrFutureRev
+	}
+	var rev int64
+	if rangeRev <= 0 {
+		rev = curRev
+	} else {
+		rev = rangeRev
+	}
+	if rev < s.compactMainRev {
+		return nil, -1, 0, ErrCompacted
+	}
+
+	_, revpairs := s.kvindex.Range(key, end, int64(rev))
+	if len(revpairs) == 0 {
+		return nil, 0, curRev, nil
+	}
+	if countOnly {
+		return nil, len(revpairs), curRev, nil
+	}
+
+	for _, revpair := range revpairs {
+		start, end := revBytesRange(revpair)
+
+		_, vs := s.tx.UnsafeRange(keyBucketName, start, end, 0)
+		if len(vs) != 1 {
+			plog.Fatalf("range cannot find rev (%d,%d)", revpair.main, revpair.sub)
+		}
+
+		var kv mvccpb.KeyValue
+		if err := kv.Unmarshal(vs[0]); err != nil {
+			plog.Fatalf("cannot unmarshal event: %v", err)
+		}
+		kvs = append(kvs, kv)
+		if limit > 0 && len(kvs) >= int(limit) {
+			break
+		}
+	}
+	return kvs, len(revpairs), curRev, nil
+}
+
+func (s *store) put(key, value []byte, leaseID lease.LeaseID) {
+	s.txnModify = true
+
+	rev := s.currentRev.main + 1
+	c := rev
+	oldLease := lease.NoLease
+
+	// if the key exists before, use its previous created and
+	// get its previous leaseID
+	_, created, ver, err := s.kvindex.Get(key, rev)
+	if err == nil {
+		c = created.main
+		oldLease = s.le.GetLease(lease.LeaseItem{Key: string(key)})
+	}
+
+	ibytes := newRevBytes()
+	revToBytes(revision{main: rev, sub: s.currentRev.sub}, ibytes)
+
+	ver = ver + 1
+	kv := mvccpb.KeyValue{
+		Key:            key,
+		Value:          value,
+		CreateRevision: c,
+		ModRevision:    rev,
+		Version:        ver,
+		Lease:          int64(leaseID),
+	}
+
+	d, err := kv.Marshal()
+	if err != nil {
+		plog.Fatalf("cannot marshal event: %v", err)
+	}
+
+	s.tx.UnsafeSeqPut(keyBucketName, ibytes, d)
+	s.kvindex.Put(key, revision{main: rev, sub: s.currentRev.sub})
+	s.changes = append(s.changes, kv)
+	s.currentRev.sub += 1
+
+	if oldLease != lease.NoLease {
+		if s.le == nil {
+			panic("no lessor to detach lease")
+		}
+
+		err = s.le.Detach(oldLease, []lease.LeaseItem{{Key: string(key)}})
+		if err != nil {
+			plog.Errorf("unexpected error from lease detach: %v", err)
+		}
+	}
+
+	if leaseID != lease.NoLease {
+		if s.le == nil {
+			panic("no lessor to attach lease")
+		}
+
+		err = s.le.Attach(leaseID, []lease.LeaseItem{{Key: string(key)}})
+		if err != nil {
+			panic("unexpected error from lease Attach")
+		}
+	}
+}
+
+func (s *store) deleteRange(key, end []byte) int64 {
+	s.txnModify = true
+
+	rrev := s.currentRev.main
+	if s.currentRev.sub > 0 {
+		rrev += 1
+	}
+	keys, revs := s.kvindex.Range(key, end, rrev)
+
+	if len(keys) == 0 {
+		return 0
+	}
+
+	for i, key := range keys {
+		s.delete(key, revs[i])
+	}
+	return int64(len(keys))
+}
+
+func (s *store) delete(key []byte, rev revision) {
+	mainrev := s.currentRev.main + 1
+
+	ibytes := newRevBytes()
+	revToBytes(revision{main: mainrev, sub: s.currentRev.sub}, ibytes)
+	ibytes = appendMarkTombstone(ibytes)
+
+	kv := mvccpb.KeyValue{
+		Key: key,
+	}
+
+	d, err := kv.Marshal()
+	if err != nil {
+		plog.Fatalf("cannot marshal event: %v", err)
+	}
+
+	s.tx.UnsafeSeqPut(keyBucketName, ibytes, d)
+	err = s.kvindex.Tombstone(key, revision{main: mainrev, sub: s.currentRev.sub})
+	if err != nil {
+		plog.Fatalf("cannot tombstone an existing key (%s): %v", string(key), err)
+	}
+	s.changes = append(s.changes, kv)
+	s.currentRev.sub += 1
+
+	item := lease.LeaseItem{Key: string(key)}
+	leaseID := s.le.GetLease(item)
+
+	if leaseID != lease.NoLease {
+		err = s.le.Detach(leaseID, []lease.LeaseItem{item})
+		if err != nil {
+			plog.Errorf("cannot detach %v", err)
+		}
+	}
+}
+
+func (s *store) getChanges() []mvccpb.KeyValue {
+	changes := s.changes
+	s.changes = make([]mvccpb.KeyValue, 0, 4)
+	return changes
+}
+
+func (s *store) saveIndex() {
 	if s.ig == nil {
 		return
 	}
+	tx := s.tx
 	bs := s.bytesBuf8
 	binary.BigEndian.PutUint64(bs, s.ig.ConsistentIndex())
 	// put the index into the underlying backend

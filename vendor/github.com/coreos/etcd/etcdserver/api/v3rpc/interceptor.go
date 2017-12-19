@@ -45,7 +45,7 @@ func newUnaryInterceptor(s *etcdserver.EtcdServer) grpc.UnaryServerInterceptor {
 			return nil, rpctypes.ErrGRPCNotCapable
 		}
 
-		md, ok := metadata.FromIncomingContext(ctx)
+		md, ok := metadata.FromContext(ctx)
 		if ok {
 			if ks := md[rpctypes.MetadataRequireLeaderKey]; len(ks) > 0 && ks[0] == rpctypes.MetadataHasLeader {
 				if s.Leader() == types.ID(raft.None) {
@@ -66,7 +66,7 @@ func newStreamInterceptor(s *etcdserver.EtcdServer) grpc.StreamServerInterceptor
 			return rpctypes.ErrGRPCNotCapable
 		}
 
-		md, ok := metadata.FromIncomingContext(ss.Context())
+		md, ok := metadata.FromContext(ss.Context())
 		if ok {
 			if ks := md[rpctypes.MetadataRequireLeaderKey]; len(ks) > 0 && ks[0] == rpctypes.MetadataHasLeader {
 				if s.Leader() == types.ID(raft.None) {

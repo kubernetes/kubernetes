@@ -15,8 +15,6 @@
 package grpcproxy
 
 import (
-	"io"
-
 	"golang.org/x/net/context"
 
 	"github.com/coreos/etcd/clientv3"
@@ -51,9 +49,6 @@ func (mp *maintenanceProxy) Snapshot(sr *pb.SnapshotRequest, stream pb.Maintenan
 	for {
 		rr, err := sc.Recv()
 		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
 			return err
 		}
 		err = stream.Send(rr)

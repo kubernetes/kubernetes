@@ -9,7 +9,7 @@ go_library(
         "//vendor/github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/etcdserverpb:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/adt:go_default_library",
-        "//vendor/github.com/golang/groupcache/lru:go_default_library",
+        "//vendor/github.com/karlseguin/ccache:go_default_library",
     ],
 )
 

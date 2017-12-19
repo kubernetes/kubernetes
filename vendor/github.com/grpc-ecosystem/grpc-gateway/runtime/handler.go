@@ -9,13 +9,12 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime/internal"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
-	"google.golang.org/grpc/status"
 )
 
 // ForwardResponseStream forwards the stream from gRPC server to REST client.
-func ForwardResponseStream(ctx context.Context, mux *ServeMux, marshaler Marshaler, w http.ResponseWriter, req *http.Request, recv func() (proto.Message, error), opts ...func(context.Context, http.ResponseWriter, proto.Message) error) {
+func ForwardResponseStream(ctx context.Context, marshaler Marshaler, w http.ResponseWriter, req *http.Request, recv func() (proto.Message, error), opts ...func(context.Context, http.ResponseWriter, proto.Message) error) {
 	f, ok := w.(http.Flusher)
 	if !ok {
 		grpclog.Printf("Flush not supported in %T", w)
@@ -29,7 +28,7 @@ func ForwardResponseStream(ctx context.Context, mux *ServeMux, marshaler Marshal
 		http.Error(w, "unexpected error", http.StatusInternalServerError)
 		return
 	}
-	handleForwardResponseServerMetadata(w, mux, md)
+	handleForwardResponseServerMetadata(w, md)
 
 	w.Header().Set("Transfer-Encoding", "chunked")
 	w.Header().Set("Content-Type", marshaler.ContentType())
@@ -58,7 +57,7 @@ func ForwardResponseStream(ctx context.Context, mux *ServeMux, marshaler Marshal
 			grpclog.Printf("Failed to marshal response chunk: %v", err)
 			return
 		}
-		if _, err = w.Write(buf); err != nil {
+		if _, err = fmt.Fprintf(w, "%s\n", buf); err != nil {
 			grpclog.Printf("Failed to send response chunk: %v", err)
 			return
 		}
@@ -66,12 +65,11 @@ func ForwardResponseStream(ctx context.Context, mux *ServeMux, marshaler Marshal
 	}
 }
 
-func handleForwardResponseServerMetadata(w http.ResponseWriter, mux *ServeMux, md ServerMetadata) {
+func handleForwardResponseServerMetadata(w http.ResponseWriter, md ServerMetadata) {
 	for k, vs := range md.HeaderMD {
-		if h, ok := mux.outgoingHeaderMatcher(k); ok {
-			for _, v := range vs {
-				w.Header().Add(h, v)
-			}
+		hKey := fmt.Sprintf("%s%s", MetadataHeaderPrefix, k)
+		for i := range vs {
+			w.Header().Add(hKey, vs[i])
 		}
 	}
 }
@@ -86,31 +84,31 @@ func handleForwardResponseTrailerHeader(w http.ResponseWriter, md ServerMetadata
 func handleForwardResponseTrailer(w http.ResponseWriter, md ServerMetadata) {
 	for k, vs := range md.TrailerMD {
 		tKey := fmt.Sprintf("%s%s", MetadataTrailerPrefix, k)
-		for _, v := range vs {
-			w.Header().Add(tKey, v)
+		for i := range vs {
+			w.Header().Add(tKey, vs[i])
 		}
 	}
 }
 
 // ForwardResponseMessage forwards the message "resp" from gRPC server to REST client.
-func ForwardResponseMessage(ctx context.Context, mux *ServeMux, marshaler Marshaler, w http.ResponseWriter, req *http.Request, resp proto.Message, opts ...func(context.Context, http.ResponseWriter, proto.Message) error) {
+func ForwardResponseMessage(ctx context.Context, marshaler Marshaler, w http.ResponseWriter, req *http.Request, resp proto.Message, opts ...func(context.Context, http.ResponseWriter, proto.Message) error) {
 	md, ok := ServerMetadataFromContext(ctx)
 	if !ok {
 		grpclog.Printf("Failed to extract ServerMetadata from context")
 	}
 
-	handleForwardResponseServerMetadata(w, mux, md)
+	handleForwardResponseServerMetadata(w, md)
 	handleForwardResponseTrailerHeader(w, md)
 	w.Header().Set("Content-Type", marshaler.ContentType())
 	if err := handleForwardResponseOptions(ctx, w, resp, opts); err != nil {
-		HTTPError(ctx, mux, marshaler, w, req, err)
+		HTTPError(ctx, marshaler, w, req, err)
 		return
 	}
 
 	buf, err := marshaler.Marshal(resp)
 	if err != nil {
 		grpclog.Printf("Marshal error: %v", err)
-		HTTPError(ctx, mux, marshaler, w, req, err)
+		HTTPError(ctx, marshaler, w, req, err)
 		return
 	}
 
@@ -148,10 +146,7 @@ func handleForwardResponseStreamError(marshaler Marshaler, w http.ResponseWriter
 
 func streamChunk(result proto.Message, err error) map[string]proto.Message {
 	if err != nil {
-		grpcCode := codes.Unknown
-		if s, ok := status.FromError(err); ok {
-			grpcCode = s.Code()
-		}
+		grpcCode := grpc.Code(err)
 		httpCode := HTTPStatusFromCode(grpcCode)
 		return map[string]proto.Message{
 			"error": &internal.StreamError{

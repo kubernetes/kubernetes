@@ -222,6 +222,7 @@ func (ki *keyIndex) compact(atRev int64, available map[revision]struct{}) {
 	}
 	// remove the previous generations.
 	ki.generations = ki.generations[i:]
+	return
 }
 
 func (ki *keyIndex) isEmpty() bool {

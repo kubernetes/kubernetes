@@ -18,8 +18,8 @@ import (
 	"io"
 
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
-
 	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 )
 
 type (
@@ -36,7 +36,7 @@ type Maintenance interface {
 	// AlarmDisarm disarms a given alarm.
 	AlarmDisarm(ctx context.Context, m *AlarmMember) (*AlarmResponse, error)
 
-	// Defragment releases wasted space from internal fragmentation on a given etcd member.
+	// Defragment defragments storage backend of the etcd member with given endpoint.
 	// Defragment is only needed when deleting a large number of keys and want to reclaim
 	// the resources.
 	// Defragment is an expensive operation. User should avoid defragmenting multiple members
@@ -48,36 +48,17 @@ type Maintenance interface {
 	// Status gets the status of the endpoint.
 	Status(ctx context.Context, endpoint string) (*StatusResponse, error)
 
-	// Snapshot provides a reader for a point-in-time snapshot of etcd.
+	// Snapshot provides a reader for a snapshot of a backend.
 	Snapshot(ctx context.Context) (io.ReadCloser, error)
 }
 
 type maintenance struct {
-	dial   func(endpoint string) (pb.MaintenanceClient, func(), error)
+	c      *Client
 	remote pb.MaintenanceClient
 }
 
 func NewMaintenance(c *Client) Maintenance {
-	return &maintenance{
-		dial: func(endpoint string) (pb.MaintenanceClient, func(), error) {
-			conn, err := c.dial(endpoint)
-			if err != nil {
-				return nil, nil, err
-			}
-			cancel := func() { conn.Close() }
-			return RetryMaintenanceClient(c, conn), cancel, nil
-		},
-		remote: RetryMaintenanceClient(c, c.conn),
-	}
-}
-
-func NewMaintenanceFromMaintenanceClient(remote pb.MaintenanceClient) Maintenance {
-	return &maintenance{
-		dial: func(string) (pb.MaintenanceClient, func(), error) {
-			return remote, func() {}, nil
-		},
-		remote: remote,
-	}
+	return &maintenance{c: c, remote: pb.NewMaintenanceClient(c.conn)}
 }
 
 func (m *maintenance) AlarmList(ctx context.Context) (*AlarmResponse, error) {
@@ -86,11 +67,15 @@ func (m *maintenance) AlarmList(ctx context.Context) (*AlarmResponse, error) {
 		MemberID: 0,                 // all
 		Alarm:    pb.AlarmType_NONE, // all
 	}
-	resp, err := m.remote.Alarm(ctx, req)
-	if err == nil {
-		return (*AlarmResponse)(resp), nil
+	for {
+		resp, err := m.remote.Alarm(ctx, req, grpc.FailFast(false))
+		if err == nil {
+			return (*AlarmResponse)(resp), nil
+		}
+		if isHaltErr(ctx, err) {
+			return nil, toErr(ctx, err)
+		}
 	}
-	return nil, toErr(ctx, err)
 }
 
 func (m *maintenance) AlarmDisarm(ctx context.Context, am *AlarmMember) (*AlarmResponse, error) {
@@ -116,7 +101,7 @@ func (m *maintenance) AlarmDisarm(ctx context.Context, am *AlarmMember) (*AlarmR
 		return &ret, nil
 	}
 
-	resp, err := m.remote.Alarm(ctx, req)
+	resp, err := m.remote.Alarm(ctx, req, grpc.FailFast(false))
 	if err == nil {
 		return (*AlarmResponse)(resp), nil
 	}
@@ -124,12 +109,13 @@ func (m *maintenance) AlarmDisarm(ctx context.Context, am *AlarmMember) (*AlarmR
 }
 
 func (m *maintenance) Defragment(ctx context.Context, endpoint string) (*DefragmentResponse, error) {
-	remote, cancel, err := m.dial(endpoint)
+	conn, err := m.c.Dial(endpoint)
 	if err != nil {
 		return nil, toErr(ctx, err)
 	}
-	defer cancel()
-	resp, err := remote.Defragment(ctx, &pb.DefragmentRequest{})
+	defer conn.Close()
+	remote := pb.NewMaintenanceClient(conn)
+	resp, err := remote.Defragment(ctx, &pb.DefragmentRequest{}, grpc.FailFast(false))
 	if err != nil {
 		return nil, toErr(ctx, err)
 	}
@@ -137,12 +123,13 @@ func (m *maintenance) Defragment(ctx context.Context, endpoint string) (*Defragm
 }
 
 func (m *maintenance) Status(ctx context.Context, endpoint string) (*StatusResponse, error) {
-	remote, cancel, err := m.dial(endpoint)
+	conn, err := m.c.Dial(endpoint)
 	if err != nil {
 		return nil, toErr(ctx, err)
 	}
-	defer cancel()
-	resp, err := remote.Status(ctx, &pb.StatusRequest{})
+	defer conn.Close()
+	remote := pb.NewMaintenanceClient(conn)
+	resp, err := remote.Status(ctx, &pb.StatusRequest{}, grpc.FailFast(false))
 	if err != nil {
 		return nil, toErr(ctx, err)
 	}
@@ -150,7 +137,7 @@ func (m *maintenance) Status(ctx context.Context, endpoint string) (*StatusRespo
 }
 
 func (m *maintenance) Snapshot(ctx context.Context) (io.ReadCloser, error) {
-	ss, err := m.remote.Snapshot(ctx, &pb.SnapshotRequest{})
+	ss, err := m.remote.Snapshot(ctx, &pb.SnapshotRequest{}, grpc.FailFast(false))
 	if err != nil {
 		return nil, toErr(ctx, err)
 	}

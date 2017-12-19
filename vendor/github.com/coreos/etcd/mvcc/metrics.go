@@ -15,8 +15,6 @@
 package mvcc
 
 import (
-	"sync"
-
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -131,21 +129,12 @@ var (
 			Buckets: prometheus.ExponentialBuckets(100, 2, 14),
 		})
 
-	dbTotalSize = prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+	dbTotalSize = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "etcd_debugging",
 		Subsystem: "mvcc",
 		Name:      "db_total_size_in_bytes",
 		Help:      "Total size of the underlying database in bytes.",
-	},
-		func() float64 {
-			reportDbTotalSizeInBytesMu.RLock()
-			defer reportDbTotalSizeInBytesMu.RUnlock()
-			return reportDbTotalSizeInBytes()
-		},
-	)
-	// overridden by mvcc initialization
-	reportDbTotalSizeInBytesMu sync.RWMutex
-	reportDbTotalSizeInBytes   func() float64 = func() float64 { return 0 }
+	})
 )
 
 func init() {
