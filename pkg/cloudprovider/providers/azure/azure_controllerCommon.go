@@ -53,7 +53,6 @@ var defaultBackOff = kwait.Backoff{
 }
 
 type controllerCommon struct {
-	tenantID              string
 	subscriptionID        string
 	location              string
 	storageEndpointSuffix string

@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
 	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
@@ -846,8 +847,10 @@ func TestReconcilePublicIPWithExternalAndInternalSwitch(t *testing.T) {
 func getTestCloud() (az *Cloud) {
 	az = &Cloud{
 		Config: Config{
-			TenantID:                     "tenant",
-			SubscriptionID:               "subscription",
+			AzureAuthConfig: auth.AzureAuthConfig{
+				TenantID:       "tenant",
+				SubscriptionID: "subscription",
+			},
 			ResourceGroup:                "rg",
 			VnetResourceGroup:            "rg",
 			Location:                     "westus",
