@@ -4300,6 +4300,51 @@ run_cluster_management_tests() {
 
   kube::test::get_object_assert nodes "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:'
 
+  # create test pods we can work with
+  kubectl create -f - "${kube_flags[@]}" << __EOF__
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "test-pod-1",
+    "labels": {
+      "e": "f"
+    }
+  },
+  "spec": {
+    "containers": [
+      {
+        "name": "container-1",
+        "resources": {},
+        "image": "test-image"
+      }
+    ]
+  }
+}
+__EOF__
+
+  kubectl create -f - "${kube_flags[@]}" << __EOF__
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "test-pod-2",
+    "labels": {
+      "c": "d"
+    }
+  },
+  "spec": {
+    "containers": [
+      {
+        "name": "container-1",
+        "resources": {},
+        "image": "test-image"
+      }
+    ]
+  }
+}
+__EOF__
+
   ### kubectl cordon update with --dry-run does not mark node unschedulable
   # Pre-condition: node is schedulable
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
@@ -4312,6 +4357,20 @@ run_cluster_management_tests() {
   kubectl drain "127.0.0.1" --dry-run
   # Post-condition: node still exists, node is still schedulable
   kube::test::get_object_assert nodes "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:'
+  kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
+
+  ### kubectl drain with --pod-selector only evicts pods that match the given selector
+  # Pre-condition: node is schedulable
+  kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
+  # Pre-condition: test-pod-1 and test-pod-2 exist
+  kube::test::get_object_assert "pods" "{{range .items}}{{.metadata.name}},{{end}}" 'test-pod-1,test-pod-2,'
+  kubectl drain "127.0.0.1" --pod-selector 'e in (f)'
+  # only "test-pod-1" should have been matched and deleted - test-pod-2 should still exist
+  kube::test::get_object_assert "pods/test-pod-2" "{{.metadata.name}}" 'test-pod-2'
+  # delete pod no longer in use
+  kubectl delete pod/test-pod-2
+  # Post-condition: node is schedulable
+  kubectl uncordon "127.0.0.1"
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
 
   ### kubectl uncordon update with --dry-run is a no-op
