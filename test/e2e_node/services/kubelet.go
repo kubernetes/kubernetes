@@ -198,13 +198,16 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		// - test/e2e_node/conformance/run_test.sh.
 		"--pod-cidr", "10.100.0.0/24",
 		"--eviction-pressure-transition-period", "30s",
-		// Apply test framework feature gates by default. This could also be overridden
-		// by kubelet-flags.
-		"--feature-gates", framework.TestContext.FeatureGates,
 		"--eviction-hard", "memory.available<250Mi,nodefs.available<10%,nodefs.inodesFree<5%", // The hard eviction thresholds.
 		"--eviction-minimum-reclaim", "nodefs.available=5%,nodefs.inodesFree=5%", // The minimum reclaimed resources after eviction.
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 	)
+
+	// Apply test framework feature gates by default. This could also be overridden
+	// by kubelet-flags.
+	if framework.TestContext.FeatureGates != "" {
+		cmdArgs = append(cmdArgs, "--feature-gates", framework.TestContext.FeatureGates)
+	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
 		// Enable dynamic config if the feature gate is enabled
