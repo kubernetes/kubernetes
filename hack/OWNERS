@@ -20,6 +20,7 @@ approvers:
   - jbeda
   - lavalamp
   - madhusudancs
+  - mengqiy # for hack/make-rules/test-cmd-util.sh
   - pwittrock
   - shashidharatd
   - spxtr
