@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	vspheretest "k8s.io/kubernetes/test/e2e/storage/vsphere"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 func DeleteCinderVolume(name string) error {
@@ -260,7 +261,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 			config := framework.VolumeTestConfig{
 				Namespace:   namespace.Name,
 				Prefix:      "cephfs",
-				ServerImage: framework.CephServerImage,
+				ServerImage: imageutils.GetE2EImage(imageutils.VolumeCephServer),
 				ServerPorts: []int{6789},
 			}
 

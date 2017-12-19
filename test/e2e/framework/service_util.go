@@ -802,7 +802,7 @@ func newEchoServerPodSpec(podName string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "echoserver",
-					Image: "k8s.gcr.io/echoserver:1.6",
+					Image: imageutils.GetE2EImage(imageutils.EchoServer),
 					Ports: []v1.ContainerPort{{ContainerPort: int32(port)}},
 				},
 			},

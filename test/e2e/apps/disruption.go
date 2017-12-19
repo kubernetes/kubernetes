@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // schedulingTimeout is longer specifically because sometimes we need to wait
@@ -257,7 +258,7 @@ func createPodsOrDie(cs kubernetes.Interface, ns string, n int) {
 				Containers: []v1.Container{
 					{
 						Name:  "busybox",
-						Image: "k8s.gcr.io/echoserver:1.6",
+						Image: imageutils.GetE2EImage(imageutils.EchoServer),
 					},
 				},
 				RestartPolicy: v1.RestartPolicyAlways,
@@ -301,7 +302,7 @@ func waitForPodsOrDie(cs kubernetes.Interface, ns string, n int) {
 func createReplicaSetOrDie(cs kubernetes.Interface, ns string, size int32, exclusive bool) {
 	container := v1.Container{
 		Name:  "busybox",
-		Image: "k8s.gcr.io/echoserver:1.6",
+		Image: imageutils.GetE2EImage(imageutils.EchoServer),
 	}
 	if exclusive {
 		container.Ports = []v1.ContainerPort{
