@@ -217,7 +217,7 @@ func asCSIAccessMode(am api.PersistentVolumeAccessMode) csipb.VolumeCapability_A
 	case api.ReadWriteOnce:
 		return csipb.VolumeCapability_AccessMode_SINGLE_NODE_WRITER
 	case api.ReadOnlyMany:
-		return csipb.VolumeCapability_AccessMode_MULTI_NODE_SINGLE_WRITER
+		return csipb.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
 	case api.ReadWriteMany:
 		return csipb.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER
 	}

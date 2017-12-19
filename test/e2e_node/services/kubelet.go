@@ -60,9 +60,13 @@ func (a *args) Set(value string) error {
 
 // kubeletArgs is the override kubelet args specified by the test runner.
 var kubeletArgs args
+var kubeletContainerized bool
+var hyperkubeImage string
 
 func init() {
 	flag.Var(&kubeletArgs, "kubelet-flags", "Kubelet flags passed to kubelet, this will override default kubelet flags in the test. Flags specified in multiple kubelet-flags will be concatenate.")
+	flag.BoolVar(&kubeletContainerized, "kubelet-containerized", false, "Run kubelet in a docker container")
+	flag.StringVar(&hyperkubeImage, "hyperkube-image", "", "Docker image with containerized kubelet")
 }
 
 // RunKubelet starts kubelet and waits for termination signal. Once receives the
@@ -93,6 +97,10 @@ const (
 // startKubelet starts the Kubelet in a separate process or returns an error
 // if the Kubelet fails to start.
 func (e *E2EServices) startKubelet() (*server, error) {
+	if kubeletContainerized && hyperkubeImage == "" {
+		return nil, fmt.Errorf("the --hyperkube-image option must be set")
+	}
+
 	glog.Info("Starting kubelet")
 
 	// set feature gates so we can check which features are enabled and pass the appropriate flags
@@ -125,7 +133,32 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		// sense to test it that way
 		isSystemd = true
 		unitName := fmt.Sprintf("kubelet-%d.service", rand.Int31())
-		cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, "--slice=runtime.slice", "--remain-after-exit", builder.GetKubeletServerBin())
+		if kubeletContainerized {
+			cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, "--slice=runtime.slice", "--remain-after-exit",
+				"/usr/bin/docker", "run", "--name=kubelet",
+				"--rm", "--privileged", "--net=host", "--pid=host",
+				"-e HOST=/rootfs", "-e HOST_ETC=/host-etc",
+				"-v", "/etc/localtime:/etc/localtime:ro",
+				"-v", "/etc/machine-id:/etc/machine-id:ro",
+				"-v", filepath.Dir(kubeconfigPath)+":/etc/kubernetes",
+				"-v", "/:/rootfs:ro,rslave",
+				"-v", "/run:/run",
+				"-v", "/sys/fs/cgroup:/sys/fs/cgroup:rw",
+				"-v", "/sys:/sys:rw",
+				"-v", "/usr/bin/docker:/usr/bin/docker:ro",
+				"-v", "/var/lib/cni:/var/lib/cni",
+				"-v", "/var/lib/docker:/var/lib/docker",
+				"-v", "/var/lib/kubelet:/var/lib/kubelet:rw,rslave",
+				"-v", "/var/log:/var/log",
+				"-v", manifestPath+":"+manifestPath+":rw",
+				hyperkubeImage, "/hyperkube", "kubelet",
+				"--containerized",
+			)
+			kubeconfigPath = "/etc/kubernetes/kubeconfig"
+		} else {
+			cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, "--slice=runtime.slice", "--remain-after-exit", builder.GetKubeletServerBin())
+		}
+
 		killCommand = exec.Command("systemctl", "kill", unitName)
 		restartCommand = exec.Command("systemctl", "restart", unitName)
 		e.logs["kubelet.log"] = LogFileData{
@@ -165,13 +198,16 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		// - test/e2e_node/conformance/run_test.sh.
 		"--pod-cidr", "10.100.0.0/24",
 		"--eviction-pressure-transition-period", "30s",
-		// Apply test framework feature gates by default. This could also be overridden
-		// by kubelet-flags.
-		"--feature-gates", framework.TestContext.FeatureGates,
 		"--eviction-hard", "memory.available<250Mi,nodefs.available<10%,nodefs.inodesFree<5%", // The hard eviction thresholds.
 		"--eviction-minimum-reclaim", "nodefs.available=5%,nodefs.inodesFree=5%", // The minimum reclaimed resources after eviction.
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 	)
+
+	// Apply test framework feature gates by default. This could also be overridden
+	// by kubelet-flags.
+	if framework.TestContext.FeatureGates != "" {
+		cmdArgs = append(cmdArgs, "--feature-gates", framework.TestContext.FeatureGates)
+	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
 		// Enable dynamic config if the feature gate is enabled

@@ -349,10 +349,8 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 		pod                   *kapi.Pod
 		podBeforeUpdate       *kapi.Pod
 		psps                  []*extensions.PodSecurityPolicy
-		shouldPassAdmit       bool
 		shouldPassValidate    bool
 		expectMutation        bool
-		expectedPodUser       *int64
 		expectedContainerUser *int64
 		expectedPSP           string
 	}{
@@ -360,10 +358,8 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			operation:             kadmission.Create,
 			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{privilegedPSP},
-			shouldPassAdmit:       true,
 			shouldPassValidate:    true,
 			expectMutation:        false,
-			expectedPodUser:       nil,
 			expectedContainerUser: nil,
 			expectedPSP:           privilegedPSP.Name,
 		},
@@ -371,10 +367,8 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			operation:             kadmission.Create,
 			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1, privilegedPSP},
-			shouldPassAdmit:       true,
 			shouldPassValidate:    true,
 			expectMutation:        false,
-			expectedPodUser:       nil,
 			expectedContainerUser: nil,
 			expectedPSP:           privilegedPSP.Name,
 		},
@@ -382,10 +376,8 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			operation:             kadmission.Create,
 			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1},
-			shouldPassAdmit:       true,
 			shouldPassValidate:    true,
 			expectMutation:        true,
-			expectedPodUser:       nil,
 			expectedContainerUser: &mutating1.Spec.RunAsUser.Ranges[0].Min,
 			expectedPSP:           mutating1.Name,
 		},
@@ -394,10 +386,8 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			pod:                   changedPodWithSC.DeepCopy(),
 			podBeforeUpdate:       podWithSC.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1, privilegedPSP},
-			shouldPassAdmit:       true,
 			shouldPassValidate:    true,
 			expectMutation:        false,
-			expectedPodUser:       nil,
 			expectedContainerUser: nil,
 			expectedPSP:           privilegedPSP.Name,
 		},
@@ -406,10 +396,8 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			pod:                   changedPod.DeepCopy(),
 			podBeforeUpdate:       unprivilegedRunAsAnyPod.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1},
-			shouldPassAdmit:       true,
 			shouldPassValidate:    false,
 			expectMutation:        false,
-			expectedPodUser:       nil,
 			expectedContainerUser: nil,
 			expectedPSP:           "",
 		},
@@ -418,10 +406,8 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
 			podBeforeUpdate:       unprivilegedRunAsAnyPod.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1},
-			shouldPassAdmit:       true,
 			shouldPassValidate:    true,
 			expectMutation:        false,
-			expectedPodUser:       nil,
 			expectedContainerUser: nil,
 			expectedPSP:           "",
 		},
@@ -430,38 +416,32 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			pod:                   gcChangedPod.DeepCopy(),
 			podBeforeUpdate:       unprivilegedRunAsAnyPod.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1},
-			shouldPassAdmit:       true,
 			shouldPassValidate:    true,
 			expectMutation:        false,
-			expectedPodUser:       nil,
 			expectedContainerUser: nil,
 			expectedPSP:           "",
 		},
 	}
 
 	for k, v := range tests {
-		testPSPAdmitAdvanced(k, v.operation, v.psps, nil, &user.DefaultInfo{}, v.pod, v.podBeforeUpdate, v.shouldPassAdmit, v.shouldPassValidate, v.expectMutation, v.expectedPSP, t)
+		testPSPAdmitAdvanced(k, v.operation, v.psps, nil, &user.DefaultInfo{}, v.pod, v.podBeforeUpdate, true, v.shouldPassValidate, v.expectMutation, v.expectedPSP, t)
 
-		if v.shouldPassAdmit {
-			actualPodUser := (*int64)(nil)
-			if v.pod.Spec.SecurityContext != nil {
-				actualPodUser = v.pod.Spec.SecurityContext.RunAsUser
-			}
-			if (actualPodUser == nil) != (v.expectedPodUser == nil) {
-				t.Errorf("%s expected pod user %v, got %v", k, v.expectedPodUser, actualPodUser)
-			} else if actualPodUser != nil && *actualPodUser != *v.expectedPodUser {
-				t.Errorf("%s expected pod user %v, got %v", k, *v.expectedPodUser, *actualPodUser)
-			}
+		actualPodUser := (*int64)(nil)
+		if v.pod.Spec.SecurityContext != nil {
+			actualPodUser = v.pod.Spec.SecurityContext.RunAsUser
+		}
+		if actualPodUser != nil {
+			t.Errorf("%s expected pod user nil, got %v", k, *actualPodUser)
+		}
 
-			actualContainerUser := (*int64)(nil)
-			if v.pod.Spec.Containers[0].SecurityContext != nil {
-				actualContainerUser = v.pod.Spec.Containers[0].SecurityContext.RunAsUser
-			}
-			if (actualContainerUser == nil) != (v.expectedContainerUser == nil) {
-				t.Errorf("%s expected container user %v, got %v", k, v.expectedContainerUser, actualContainerUser)
-			} else if actualContainerUser != nil && *actualContainerUser != *v.expectedContainerUser {
-				t.Errorf("%s expected container user %v, got %v", k, *v.expectedContainerUser, *actualContainerUser)
-			}
+		actualContainerUser := (*int64)(nil)
+		if v.pod.Spec.Containers[0].SecurityContext != nil {
+			actualContainerUser = v.pod.Spec.Containers[0].SecurityContext.RunAsUser
+		}
+		if (actualContainerUser == nil) != (v.expectedContainerUser == nil) {
+			t.Errorf("%s expected container user %v, got %v", k, v.expectedContainerUser, actualContainerUser)
+		} else if actualContainerUser != nil && *actualContainerUser != *v.expectedContainerUser {
+			t.Errorf("%s expected container user %v, got %v", k, *v.expectedContainerUser, *actualContainerUser)
 		}
 	}
 }

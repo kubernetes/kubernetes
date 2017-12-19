@@ -47,35 +47,29 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 	rootUser := int64(0)
 	runAsNonRootTrue := true
 	runAsNonRootFalse := false
-	imageRootUser := int64(0)
-	imageNonRootUser := int64(123)
 	for _, test := range []struct {
-		desc      string
-		sc        *v1.SecurityContext
-		imageUser int64
-		fail      bool
+		desc string
+		sc   *v1.SecurityContext
+		fail bool
 	}{
 		{
-			desc:      "Pass if SecurityContext is not set",
-			sc:        nil,
-			imageUser: imageRootUser,
-			fail:      false,
+			desc: "Pass if SecurityContext is not set",
+			sc:   nil,
+			fail: false,
 		},
 		{
 			desc: "Pass if RunAsNonRoot is not set",
 			sc: &v1.SecurityContext{
 				RunAsUser: &rootUser,
 			},
-			imageUser: imageRootUser,
-			fail:      false,
+			fail: false,
 		},
 		{
 			desc: "Pass if RunAsNonRoot is false (image user is root)",
 			sc: &v1.SecurityContext{
 				RunAsNonRoot: &runAsNonRootFalse,
 			},
-			imageUser: imageRootUser,
-			fail:      false,
+			fail: false,
 		},
 		{
 			desc: "Pass if RunAsNonRoot is false (RunAsUser is root)",
@@ -83,8 +77,7 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 				RunAsNonRoot: &runAsNonRootFalse,
 				RunAsUser:    &rootUser,
 			},
-			imageUser: imageNonRootUser,
-			fail:      false,
+			fail: false,
 		},
 		{
 			desc: "Fail if container's RunAsUser is root and RunAsNonRoot is true",
@@ -92,16 +85,14 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 				RunAsNonRoot: &runAsNonRootTrue,
 				RunAsUser:    &rootUser,
 			},
-			imageUser: imageNonRootUser,
-			fail:      true,
+			fail: true,
 		},
 		{
 			desc: "Fail if image's user is root and RunAsNonRoot is true",
 			sc: &v1.SecurityContext{
 				RunAsNonRoot: &runAsNonRootTrue,
 			},
-			imageUser: imageRootUser,
-			fail:      true,
+			fail: true,
 		},
 	} {
 		pod.Spec.Containers[0].SecurityContext = test.sc

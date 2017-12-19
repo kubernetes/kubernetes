@@ -21,6 +21,7 @@ import subprocess
 from charms import layer
 from charms.reactive import when, when_any, when_not
 from charms.reactive import set_state, remove_state
+from charms.reactive import hook
 from charmhelpers.core import hookenv
 from charmhelpers.core import host
 from charmhelpers.contrib.charmsupport import nrpe
@@ -33,6 +34,26 @@ from subprocess import Popen
 from subprocess import PIPE
 from subprocess import STDOUT
 from subprocess import CalledProcessError
+
+
+apilb_nginx = """/var/log/nginx.*.log {
+    daily
+    missingok
+    rotate 14
+    compress
+    delaycompress
+    notifempty
+    create 0640 www-data adm
+    sharedscripts
+    prerotate
+        if [ -d /etc/logrotate.d/httpd-prerotate ]; then \\
+            run-parts /etc/logrotate.d/httpd-prerotate; \\
+        fi \\
+    endscript
+    postrotate
+        invoke-rc.d nginx rotate >/dev/null 2>&1
+    endscript
+}"""
 
 
 @when('certificates.available')
@@ -89,6 +110,14 @@ def close_old_port():
         hookenv.log('Port %d already closed, skipping.' % old_port)
 
 
+def maybe_write_apilb_logrotate_config():
+    filename = '/etc/logrotate.d/apilb_nginx'
+    if not os.path.exists(filename):
+        # Set log rotation for apilb log file
+        with open(filename, 'w+') as fp:
+            fp.write(apilb_nginx)
+
+
 @when('nginx.available', 'apiserver.available',
       'certificates.server.cert.available')
 def install_load_balancer(apiserver, tls):
@@ -123,7 +152,14 @@ def install_load_balancer(apiserver, tls):
                 server_certificate=server_cert_path,
                 server_key=server_key_path,
         )
+
+        maybe_write_apilb_logrotate_config()
         hookenv.status_set('active', 'Loadbalancer ready.')
+
+
+@hook('upgrade-charm')
+def upgrade_charm():
+    maybe_write_apilb_logrotate_config()
 
 
 @when('nginx.available')

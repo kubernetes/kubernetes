@@ -39,6 +39,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -56,6 +57,7 @@ const (
 	skipNamespaceLabelValue      = "yes"
 	skippedNamespaceName         = "exempted-namesapce"
 	disallowedPodName            = "disallowed-pod"
+	hangingPodName               = "hanging-pod"
 	disallowedConfigMapName      = "disallowed-configmap"
 	allowedConfigMapName         = "allowed-configmap"
 	crdName                      = "e2e-test-webhook-crd"
@@ -99,7 +101,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		// Note that in 1.9 we will have backwards incompatible change to
 		// admission webhooks, so the image will be updated to 1.9 sometime in
 		// the development 1.9 cycle.
-		deployWebhookAndService(f, "gcr.io/kubernetes-e2e-test-images/k8s-sample-admission-webhook-amd64:1.8v6", context)
+		deployWebhookAndService(f, imageutils.GetE2EImage(imageutils.AdmissionWebhook), context)
 	})
 	AfterEach(func() {
 		cleanWebhookTest(client, namespaceName)
@@ -453,6 +455,17 @@ func testWebhook(f *framework.Framework) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg2, err.Error())
 	}
 
+	By("create a pod that causes the webhook to hang")
+	client = f.ClientSet
+	// Creating the pod, the request should be rejected
+	pod = hangingPod(f)
+	_, err = client.CoreV1().Pods(f.Namespace.Name).Create(pod)
+	Expect(err).NotTo(BeNil())
+	expectedTimeoutErr := "request did not complete within allowed duration"
+	if !strings.Contains(err.Error(), expectedTimeoutErr) {
+		framework.Failf("expect timeout error %q, got %q", expectedTimeoutErr, err.Error())
+	}
+
 	By("create a configmap that should be denied by the webhook")
 	// Creating the configmap, the request should be rejected
 	configmap := nonCompliantConfigMap(f)
@@ -624,6 +637,25 @@ func nonCompliantPod(f *framework.Framework) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "webhook-disallow",
+					Image: framework.GetPauseImageName(f.ClientSet),
+				},
+			},
+		},
+	}
+}
+
+func hangingPod(f *framework.Framework) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: hangingPodName,
+			Labels: map[string]string{
+				"webhook-e2e-test": "wait-forever",
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "wait-forever",
 					Image: framework.GetPauseImageName(f.ClientSet),
 				},
 			},

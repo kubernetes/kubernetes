@@ -38,6 +38,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+const (
+	// GB - GigaByte size
+	GB = 1000 * 1000 * 1000
+	// GIB - GibiByte size
+	GIB = 1024 * 1024 * 1024
+)
+
 type RecycleEventRecorder func(eventtype, message string)
 
 // RecycleVolumeByWatchingPodUntilCompletion is intended for use with volume
@@ -288,6 +295,18 @@ func RoundUpSize(volumeSizeBytes int64, allocationUnitBytes int64) int64 {
 	return (volumeSizeBytes + allocationUnitBytes - 1) / allocationUnitBytes
 }
 
+// RoundUpToGB rounds up given quantity to chunks of GB
+func RoundUpToGB(size resource.Quantity) int64 {
+	requestBytes := size.Value()
+	return RoundUpSize(requestBytes, GB)
+}
+
+// RoundUpToGiB rounds up given quantity upto chunks of GiB
+func RoundUpToGiB(size resource.Quantity) int64 {
+	requestBytes := size.Value()
+	return RoundUpSize(requestBytes, GIB)
+}
+
 // GenerateVolumeName returns a PV name with clusterName prefix. The function
 // should be used to generate a name of GCE PD or Cinder volume. It basically
 // adds "<clusterName>-dynamic-" before the PV name, making sure the resulting
@@ -494,4 +513,13 @@ func AccessModesContainedInAll(indexedModes []v1.PersistentVolumeAccessMode, req
 		}
 	}
 	return true
+}
+
+// GetWindowsPath get a windows path
+func GetWindowsPath(path string) string {
+	windowsPath := strings.Replace(path, "/", "\\", -1)
+	if strings.HasPrefix(windowsPath, "\\") {
+		windowsPath = "c:" + windowsPath
+	}
+	return windowsPath
 }

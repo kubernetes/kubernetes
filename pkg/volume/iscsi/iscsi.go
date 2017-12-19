@@ -118,7 +118,7 @@ func (plugin *iscsiPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.V
 			if kubeClient == nil {
 				return nil, fmt.Errorf("Cannot get kube client")
 			}
-			secretObj, err := kubeClient.Core().Secrets(secretNamespace).Get(secretName, metav1.GetOptions{})
+			secretObj, err := kubeClient.CoreV1().Secrets(secretNamespace).Get(secretName, metav1.GetOptions{})
 			if err != nil {
 				err = fmt.Errorf("Couldn't get secret %v/%v error: %v", secretNamespace, secretName, err)
 				return nil, err

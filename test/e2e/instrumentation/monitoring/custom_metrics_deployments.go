@@ -18,17 +18,19 @@ package monitoring
 
 import (
 	"fmt"
+
 	gcm "google.golang.org/api/monitoring/v3"
 	corev1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var (
-	CustomMetricName  = "foo-metric"
-	UnusedMetricName  = "unused-metric"
+	CustomMetricName  = "foo"
+	UnusedMetricName  = "unused"
 	CustomMetricValue = int64(448)
 	UnusedMetricValue = int64(446)
 	// HPAPermissions is a ClusterRoleBinding that grants unauthenticated user permissions granted for
@@ -97,7 +99,7 @@ func stackdriverExporterPodSpec(metricName string, metricValue int64) corev1.Pod
 		Containers: []corev1.Container{
 			{
 				Name:            "stackdriver-exporter",
-				Image:           "gcr.io/google-containers/sd-dummy-exporter:v0.1.0",
+				Image:           imageutils.GetE2EImage(imageutils.SDDummyExporter),
 				ImagePullPolicy: corev1.PullPolicy("Always"),
 				Command:         []string{"/sd_dummy_exporter", "--pod-id=$(POD_ID)", "--metric-name=" + metricName, fmt.Sprintf("--metric-value=%v", metricValue)},
 				Env: []corev1.EnvVar{
@@ -111,6 +113,72 @@ func stackdriverExporterPodSpec(metricName string, metricValue int64) corev1.Pod
 					},
 				},
 				Ports: []corev1.ContainerPort{{ContainerPort: 80}},
+			},
+		},
+	}
+}
+
+// PrometheusExporterDeployment is a Deployment of simple application with two containers
+// one exposing a metric in prometheus fromat and second a prometheus-to-sd container
+// that scrapes the metric and pushes it to stackdriver.
+func PrometheusExporterDeployment(name, namespace string, replicas int32, metricValue int64) *extensions.Deployment {
+	return &extensions.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: extensions.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"name": name},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"name": name,
+					},
+				},
+				Spec: prometheusExporterPodSpec(CustomMetricName, metricValue, 8080),
+			},
+			Replicas: &replicas,
+		},
+	}
+}
+
+func prometheusExporterPodSpec(metricName string, metricValue int64, port int32) corev1.PodSpec {
+	return corev1.PodSpec{
+		Containers: []corev1.Container{
+			{
+				Name:            "prometheus-exporter",
+				Image:           "gcr.io/google-containers/prometheus-dummy-exporter:v0.1.0",
+				ImagePullPolicy: corev1.PullPolicy("Always"),
+				Command: []string{"/prometheus_dummy_exporter", "--metric-name=" + metricName,
+					fmt.Sprintf("--metric-value=%v", metricValue), fmt.Sprintf("=--port=%d", port)},
+				Ports: []corev1.ContainerPort{{ContainerPort: port}},
+			},
+			{
+				Name:            "prometheus-to-sd",
+				Image:           "gcr.io/google-containers/prometheus-to-sd:v0.2.3",
+				ImagePullPolicy: corev1.PullPolicy("Always"),
+				Command: []string{"/monitor", fmt.Sprintf("--source=:http://localhost:%d", port),
+					"--stackdriver-prefix=custom.googleapis.com", "--pod-id=$(POD_ID)", "--namespace-id=$(POD_NAMESPACE)"},
+				Env: []corev1.EnvVar{
+					{
+						Name: "POD_ID",
+						ValueFrom: &corev1.EnvVarSource{
+							FieldRef: &corev1.ObjectFieldSelector{
+								FieldPath: "metadata.uid",
+							},
+						},
+					},
+					{
+						Name: "POD_NAMESPACE",
+						ValueFrom: &corev1.EnvVarSource{
+							FieldRef: &corev1.ObjectFieldSelector{
+								FieldPath: "metadata.namespace",
+							},
+						},
+					},
+				},
 			},
 		},
 	}

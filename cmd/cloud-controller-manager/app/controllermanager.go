@@ -93,6 +93,10 @@ func Run(s *options.CloudControllerManagerServer) error {
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
 
+	if cloud == nil {
+		glog.Fatalf("cloud provider is nil")
+	}
+
 	if cloud.HasClusterID() == false {
 		if s.AllowUntaggedCloud == true {
 			glog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
@@ -143,9 +147,9 @@ func Run(s *options.CloudControllerManagerServer) error {
 			clientBuilder = rootClientBuilder
 		}
 
-		err := StartControllers(s, kubeconfig, clientBuilder, stop, recorder, cloud)
-		glog.Fatalf("error running controllers: %v", err)
-		panic("unreachable")
+		if err := StartControllers(s, kubeconfig, rootClientBuilder, clientBuilder, stop, recorder, cloud); err != nil {
+			glog.Fatalf("error running controllers: %v", err)
+		}
 	}
 
 	if !s.LeaderElection.LeaderElect {
@@ -165,7 +169,7 @@ func Run(s *options.CloudControllerManagerServer) error {
 		"cloud-controller-manager",
 		leaderElectionClient.CoreV1(),
 		resourcelock.ResourceLockConfig{
-			Identity:      id + "-external-cloud-controller",
+			Identity:      id,
 			EventRecorder: recorder,
 		})
 	if err != nil {
@@ -189,7 +193,7 @@ func Run(s *options.CloudControllerManagerServer) error {
 }
 
 // StartControllers starts the cloud specific controller loops.
-func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restclient.Config, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}, recorder record.EventRecorder, cloud cloudprovider.Interface) error {
+func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restclient.Config, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}, recorder record.EventRecorder, cloud cloudprovider.Interface) error {
 	// Function to build the kube client object
 	client := func(serviceAccountName string) clientset.Interface {
 		return clientBuilder.ClientOrDie(serviceAccountName)
@@ -200,7 +204,7 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 		cloud.Initialize(clientBuilder)
 	}
 
-	versionedClient := client("shared-informers")
+	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
 	sharedInformers := informers.NewSharedInformerFactory(versionedClient, resyncPeriod(s)())
 
 	// Start the CloudNodeController

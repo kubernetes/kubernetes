@@ -44,7 +44,7 @@ var (
 		Diff configurations specified by filename or stdin between their local,
 		last-applied, live and/or "merged" versions.
 
-		LOCAL and LIVE versions are diffed by default. Other availble keywords
+		LOCAL and LIVE versions are diffed by default. Other available keywords
 		are MERGED and LAST.
 
 		Output is always YAML.

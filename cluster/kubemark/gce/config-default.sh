@@ -37,7 +37,7 @@ EVENT_PD=${EVENT_PD:-false}
 
 MASTER_OS_DISTRIBUTION=${KUBE_MASTER_OS_DISTRIBUTION:-gci}
 NODE_OS_DISTRIBUTION=${KUBE_NODE_OS_DISTRIBUTION:-gci}
-MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-cos-stable-60-9592-90-0}
+MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-cos-stable-63-10032-71-0}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
 
 # GPUs supported in GCE do not have compatible drivers in Debian 7.
@@ -61,7 +61,7 @@ RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 KUBE_APISERVER_REQUEST_TIMEOUT=300
 
-# Set etcd image (e.g. gcr.io/google_containers/etcd) and version (e.g. 3.1.10) if you need
+# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.1.10) if you need
 # non-default version.
 ETCD_IMAGE="${TEST_ETCD_IMAGE:-}"
 ETCD_VERSION="${TEST_ETCD_VERSION:-}"

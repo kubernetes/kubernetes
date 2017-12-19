@@ -18,6 +18,7 @@ package ipvs
 
 import (
 	"bytes"
+	"fmt"
 	"net"
 	"reflect"
 	"testing"
@@ -85,6 +86,25 @@ func (fake *fakeHealthChecker) SyncServices(newServices map[types.NamespacedName
 func (fake *fakeHealthChecker) SyncEndpoints(newEndpoints map[types.NamespacedName]int) error {
 	fake.Endpoints = newEndpoints
 	return nil
+}
+
+// fakeKernelHandler implements KernelHandler.
+type fakeKernelHandler struct {
+	modules []string
+}
+
+func (fake *fakeKernelHandler) GetModules() ([]string, error) {
+	return fake.modules, nil
+}
+
+// fakeKernelHandler implements KernelHandler.
+type fakeIPSetVersioner struct {
+	version string
+	err     error
+}
+
+func (fake *fakeIPSetVersioner) GetVersion() (string, error) {
+	return fake.version, fake.err
 }
 
 func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset utilipset.Interface, nodeIPs []net.IP) *Proxier {
@@ -178,6 +198,147 @@ func makeTestEndpoints(namespace, name string, eptFunc func(*api.Endpoints)) *ap
 	}
 	eptFunc(ept)
 	return ept
+}
+
+func TestCanUseIPVSProxier(t *testing.T) {
+	testCases := []struct {
+		mods         []string
+		kernelErr    error
+		ipsetVersion string
+		ipsetErr     error
+		ok           bool
+	}{
+		// case 0, kernel error
+		{
+			mods:         []string{"foo", "bar", "baz"},
+			kernelErr:    fmt.Errorf("oops"),
+			ipsetVersion: "0.0",
+			ok:           false,
+		},
+		// case 1, ipset error
+		{
+			mods:         []string{"foo", "bar", "baz"},
+			ipsetVersion: MinIPSetCheckVersion,
+			ipsetErr:     fmt.Errorf("oops"),
+			ok:           false,
+		},
+		// case 2, missing required kernel modules and ipset version too low
+		{
+			mods:         []string{"foo", "bar", "baz"},
+			ipsetVersion: "1.1",
+			ok:           false,
+		},
+		// case 3, missing required ip_vs_* kernel modules
+		{
+			mods:         []string{"ip_vs", "a", "bc", "def"},
+			ipsetVersion: MinIPSetCheckVersion,
+			ok:           false,
+		},
+		// case 4, ipset version too low
+		{
+			mods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4"},
+			ipsetVersion: "4.3.0",
+			ok:           false,
+		},
+		// case 5
+		{
+			mods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4"},
+			ipsetVersion: MinIPSetCheckVersion,
+			ok:           true,
+		},
+		// case 6
+		{
+			mods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4", "foo", "bar"},
+			ipsetVersion: "6.19",
+			ok:           true,
+		},
+	}
+
+	for i := range testCases {
+		handle := &fakeKernelHandler{modules: testCases[i].mods}
+		versioner := &fakeIPSetVersioner{version: testCases[i].ipsetVersion, err: testCases[i].ipsetErr}
+		ok, _ := CanUseIPVSProxier(handle, versioner)
+		if ok != testCases[i].ok {
+			t.Errorf("Case [%d], expect %v, got %v", i, testCases[i].ok, ok)
+		}
+	}
+}
+
+func TestGetNodeIPs(t *testing.T) {
+	testCases := []struct {
+		devAddresses map[string][]string
+		expectIPs    []string
+	}{
+		// case 0
+		{
+			devAddresses: map[string][]string{"eth0": {"1.2.3.4"}, "lo": {"127.0.0.1"}},
+			expectIPs:    []string{"1.2.3.4", "127.0.0.1"},
+		},
+		// case 1
+		{
+			devAddresses: map[string][]string{"lo": {"127.0.0.1"}},
+			expectIPs:    []string{"127.0.0.1"},
+		},
+		// case 2
+		{
+			devAddresses: map[string][]string{},
+			expectIPs:    []string{},
+		},
+		// case 3
+		{
+			devAddresses: map[string][]string{"encap0": {"10.20.30.40"}, "lo": {"127.0.0.1"}, "docker0": {"172.17.0.1"}},
+			expectIPs:    []string{"10.20.30.40", "127.0.0.1", "172.17.0.1"},
+		},
+		// case 4
+		{
+			devAddresses: map[string][]string{"encaps9": {"10.20.30.40"}, "lo": {"127.0.0.1"}, "encap7": {"10.20.30.31"}},
+			expectIPs:    []string{"10.20.30.40", "127.0.0.1", "10.20.30.31"},
+		},
+		// case 5
+		{
+			devAddresses: map[string][]string{"kube-ipvs0": {"1.2.3.4"}, "lo": {"127.0.0.1"}, "encap7": {"10.20.30.31"}},
+			expectIPs:    []string{"127.0.0.1", "10.20.30.31"},
+		},
+		// case 6
+		{
+			devAddresses: map[string][]string{"kube-ipvs0": {"1.2.3.4", "2.3.4.5"}, "lo": {"127.0.0.1"}},
+			expectIPs:    []string{"127.0.0.1"},
+		},
+		// case 7
+		{
+			devAddresses: map[string][]string{"kube-ipvs0": {"1.2.3.4", "2.3.4.5"}},
+			expectIPs:    []string{},
+		},
+		// case 8
+		{
+			devAddresses: map[string][]string{"kube-ipvs0": {"1.2.3.4", "2.3.4.5"}, "eth5": {"3.4.5.6"}, "lo": {"127.0.0.1"}},
+			expectIPs:    []string{"127.0.0.1", "3.4.5.6"},
+		},
+		// case 9
+		{
+			devAddresses: map[string][]string{"ipvs0": {"1.2.3.4"}, "lo": {"127.0.0.1"}, "encap7": {"10.20.30.31"}},
+			expectIPs:    []string{"127.0.0.1", "10.20.30.31", "1.2.3.4"},
+		},
+	}
+
+	for i := range testCases {
+		fake := netlinktest.NewFakeNetlinkHandle()
+		for dev, addresses := range testCases[i].devAddresses {
+			fake.SetLocalAddresses(dev, addresses...)
+		}
+		r := realIPGetter{nl: fake}
+		ips, err := r.NodeIPs()
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		ipStrs := sets.NewString()
+		for _, ip := range ips {
+			ipStrs.Insert(ip.String())
+		}
+		if !ipStrs.Equal(sets.NewString(testCases[i].expectIPs...)) {
+			t.Errorf("case[%d], unexpected mismatch, expected: %v, got: %v", i, testCases[i].expectIPs, ips)
+		}
+	}
 }
 
 func TestNodePort(t *testing.T) {

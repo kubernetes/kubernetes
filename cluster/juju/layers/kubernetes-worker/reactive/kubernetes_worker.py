@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
 import random
 import shutil
@@ -157,7 +158,7 @@ def shutdown():
     '''
     try:
         if os.path.isfile(kubeconfig_path):
-            kubectl('delete', 'node', gethostname())
+            kubectl('delete', 'node', gethostname().lower())
     except CalledProcessError:
         hookenv.log('Failed to unregister node.')
     service_stop('snap.kubelet.daemon')
@@ -435,6 +436,32 @@ def extra_args_changed():
     set_state('kubernetes-worker.restart-needed')
 
 
+@when('config.changed.docker-logins')
+def docker_logins_changed():
+    config = hookenv.config()
+    previous_logins = config.previous('docker-logins')
+    logins = config['docker-logins']
+    logins = json.loads(logins)
+
+    if previous_logins:
+        previous_logins = json.loads(previous_logins)
+        next_servers = {login['server'] for login in logins}
+        previous_servers = {login['server'] for login in previous_logins}
+        servers_to_logout = previous_servers - next_servers
+        for server in servers_to_logout:
+            cmd = ['docker', 'logout', server]
+            subprocess.check_call(cmd)
+
+    for login in logins:
+        server = login['server']
+        username = login['username']
+        password = login['password']
+        cmd = ['docker', 'login', server, '-u', username, '-p', password]
+        subprocess.check_call(cmd)
+
+    set_state('kubernetes-worker.restart-needed')
+
+
 def arch():
     '''Return the package architecture as a string. Raise an exception if the
     architecture is not supported by kubernetes.'''
@@ -518,7 +545,6 @@ def configure_kubelet(dns):
     kubelet_opts['v'] = '0'
     kubelet_opts['address'] = '0.0.0.0'
     kubelet_opts['port'] = '10250'
-    kubelet_opts['cluster-dns'] = dns['sdn-ip']
     kubelet_opts['cluster-domain'] = dns['domain']
     kubelet_opts['anonymous-auth'] = 'false'
     kubelet_opts['client-ca-file'] = ca_cert_path
@@ -526,6 +552,9 @@ def configure_kubelet(dns):
     kubelet_opts['tls-private-key-file'] = server_key_path
     kubelet_opts['logtostderr'] = 'true'
     kubelet_opts['fail-swap-on'] = 'false'
+
+    if (dns['enable-kube-dns']):
+        kubelet_opts['cluster-dns'] = dns['sdn-ip']
 
     privileged = is_state('kubernetes-worker.privileged')
     kubelet_opts['allow-privileged'] = 'true' if privileged else 'false'
@@ -605,6 +634,12 @@ def launch_default_ingress_controller():
     context['arch'] = arch()
     addon_path = '/root/cdk/addons/{}'
 
+    context['defaultbackend_image'] = \
+        "k8s.gcr.io/defaultbackend:1.4"
+    if arch() == 's390x':
+        context['defaultbackend_image'] = \
+            "k8s.gcr.io/defaultbackend-s390x:1.4"
+
     # Render the default http backend (404) replicationcontroller manifest
     manifest = addon_path.format('default-http-backend.yaml')
     render('default-http-backend.yaml', manifest, context)
@@ -620,7 +655,7 @@ def launch_default_ingress_controller():
 
     # Render the ingress replication controller manifest
     context['ingress_image'] = \
-        "gcr.io/google_containers/nginx-ingress-controller:0.9.0-beta.13"
+        "k8s.gcr.io/nginx-ingress-controller:0.9.0-beta.13"
     if arch() == 's390x':
         context['ingress_image'] = \
             "docker.io/cdkbot/nginx-ingress-controller-s390x:0.9.0-beta.13"
@@ -844,14 +879,14 @@ def request_kubelet_and_proxy_credentials(kube_control):
     # The kube-cotrol interface is created to support RBAC.
     # At this point we might as well do the right thing and return the hostname
     # even if it will only be used when we enable RBAC
-    nodeuser = 'system:node:{}'.format(gethostname())
+    nodeuser = 'system:node:{}'.format(gethostname().lower())
     kube_control.set_auth_request(nodeuser)
 
 
 @when('kube-control.connected')
 def catch_change_in_creds(kube_control):
     """Request a service restart in case credential updates were detected."""
-    nodeuser = 'system:node:{}'.format(gethostname())
+    nodeuser = 'system:node:{}'.format(gethostname().lower())
     creds = kube_control.get_auth_credentials(nodeuser)
     if creds \
             and data_changed('kube-control.creds', creds) \
@@ -906,7 +941,8 @@ class ApplyNodeLabelFailed(Exception):
 def _apply_node_label(label, delete=False, overwrite=False):
     ''' Invoke kubectl to apply node label changes '''
 
-    hostname = gethostname()
+    # k8s lowercases hostnames and uses them as node names
+    hostname = gethostname().lower()
     # TODO: Make this part of the kubectl calls instead of a special string
     cmd_base = 'kubectl --kubeconfig={0} label node {1} {2}'
 

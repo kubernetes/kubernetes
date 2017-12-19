@@ -289,12 +289,8 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		}
 	}
 
-	if s.CloudProvider == kubeletconfigv1alpha1.AutoDetectCloudProvider {
-		glog.Warning("--cloud-provider=auto-detect is deprecated. The desired cloud provider should be set explicitly")
-	}
-
 	if kubeDeps.Cloud == nil {
-		if !cloudprovider.IsExternal(s.CloudProvider) && s.CloudProvider != kubeletconfigv1alpha1.AutoDetectCloudProvider {
+		if !cloudprovider.IsExternal(s.CloudProvider) {
 			cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 			if err != nil {
 				return err
@@ -333,7 +329,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		var heartbeatClient v1core.CoreV1Interface
 		var externalKubeClient clientset.Interface
 
-		clientConfig, err := CreateAPIServerClientConfig(s)
+		clientConfig, err := createAPIServerClientConfig(s)
 
 		var clientCertificateManager certificate.Manager
 		if err == nil {
@@ -617,10 +613,9 @@ func createClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 	}
 }
 
-// CreateAPIServerClientConfig generates a client.Config from command line flags
+// createAPIServerClientConfig generates a client.Config from command line flags
 // via createClientConfig and then injects chaos into the configuration via addChaosToClientConfig.
-// This func is exported to support integration with third party kubelet extensions (e.g. kubernetes-mesos).
-func CreateAPIServerClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
+func createAPIServerClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 	clientConfig, err := createClientConfig(s)
 	if err != nil {
 		return nil, err
@@ -692,15 +687,11 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 	credentialprovider.SetPreferredDockercfgPath(kubeFlags.RootDirectory)
 	glog.V(2).Infof("Using root directory: %v", kubeFlags.RootDirectory)
 
-	builder := kubeDeps.Builder
-	if builder == nil {
-		builder = CreateAndInitKubelet
-	}
 	if kubeDeps.OSInterface == nil {
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
 	}
 
-	k, err := builder(kubeCfg,
+	k, err := CreateAndInitKubelet(kubeCfg,
 		kubeDeps,
 		&kubeFlags.ContainerRuntimeOptions,
 		kubeFlags.ContainerRuntime,
@@ -714,7 +705,6 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		kubeFlags.RegisterNode,
 		kubeFlags.RegisterWithTaints,
 		kubeFlags.AllowedUnsafeSysctls,
-		kubeFlags.Containerized,
 		kubeFlags.RemoteRuntimeEndpoint,
 		kubeFlags.RemoteImageEndpoint,
 		kubeFlags.ExperimentalMounterPath,
@@ -788,7 +778,6 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	registerNode bool,
 	registerWithTaints []api.Taint,
 	allowedUnsafeSysctls []string,
-	containerized bool,
 	remoteRuntimeEndpoint string,
 	remoteImageEndpoint string,
 	experimentalMounterPath string,
@@ -822,7 +811,6 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		registerNode,
 		registerWithTaints,
 		allowedUnsafeSysctls,
-		containerized,
 		remoteRuntimeEndpoint,
 		remoteImageEndpoint,
 		experimentalMounterPath,

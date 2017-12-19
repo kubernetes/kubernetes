@@ -92,12 +92,14 @@ go_test(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig:go_default_library",
+        "//pkg/proxy/ipvs:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/pointer:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
 

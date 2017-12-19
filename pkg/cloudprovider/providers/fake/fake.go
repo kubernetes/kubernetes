@@ -110,11 +110,6 @@ func (f *FakeCloud) ProviderName() string {
 	return f.Provider
 }
 
-// ScrubDNS filters DNS settings for pods.
-func (f *FakeCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
-	return nameservers, searches
-}
-
 // HasClusterID returns true if the cluster has a clusterID
 func (f *FakeCloud) HasClusterID() bool {
 	return true

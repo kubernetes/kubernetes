@@ -727,7 +727,6 @@ staging/src/k8s.io/code-generator/cmd/client-gen/generators/scheme
 staging/src/k8s.io/code-generator/cmd/client-gen/types
 staging/src/k8s.io/code-generator/cmd/conversion-gen/generators
 staging/src/k8s.io/code-generator/cmd/go-to-protobuf/protobuf
-staging/src/k8s.io/code-generator/cmd/informer-gen/generators
 staging/src/k8s.io/code-generator/cmd/lister-gen/generators
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
@@ -796,6 +795,8 @@ test/e2e/scalability
 test/e2e/scheduling
 test/e2e/servicecatalog
 test/e2e/storage
+test/e2e/storage/utils
+test/e2e/storage/vsphere
 test/e2e/ui
 test/e2e/upgrades
 test/e2e/upgrades/apps

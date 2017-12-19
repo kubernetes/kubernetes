@@ -49,12 +49,12 @@ func registerMetrics() {
 }
 
 // OperationCompleteHook returns a hook to call when an operation is completed
-func OperationCompleteHook(plugin, operationName string) func(error) {
+func OperationCompleteHook(plugin, operationName string) func(*error) {
 	requestTime := time.Now()
-	opComplete := func(err error) {
+	opComplete := func(err *error) {
 		timeTaken := time.Since(requestTime).Seconds()
 		// Create metric with operation name and plugin name
-		if err != nil {
+		if *err != nil {
 			storageOperationErrorMetric.WithLabelValues(plugin, operationName).Inc()
 		} else {
 			storageOperationMetric.WithLabelValues(plugin, operationName).Observe(timeTaken)

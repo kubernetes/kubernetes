@@ -123,7 +123,7 @@ func Test202StatusCode(t *testing.T) {
 	ns := framework.CreateTestingNamespace("status-code", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	rsClient := clientSet.Extensions().ReplicaSets(ns.Name)
+	rsClient := clientSet.ExtensionsV1beta1().ReplicaSets(ns.Name)
 
 	// 1. Create the resource without any finalizer and then delete it without setting DeleteOptions.
 	// Verify that server returns 200 in this case.
@@ -173,7 +173,7 @@ func TestAPIListChunking(t *testing.T) {
 	ns := framework.CreateTestingNamespace("list-paging", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	rsClient := clientSet.Extensions().ReplicaSets(ns.Name)
+	rsClient := clientSet.ExtensionsV1beta1().ReplicaSets(ns.Name)
 
 	for i := 0; i < 4; i++ {
 		rs := newRS(ns.Name)

@@ -259,7 +259,7 @@ func NewNodeController(
 		}
 		mask := clusterCIDR.Mask
 		if maskSize, _ := mask.Size(); maskSize > nodeCIDRMaskSize {
-			glog.Fatal("Controller: Invalid clusterCIDR, mask size of clusterCIDR must be less than nodeCIDRMaskSize.")
+			glog.Fatalf("Controller: Invalid clusterCIDR, mask size of clusterCIDR(%d) must be less than nodeCIDRMaskSize(%d).", maskSize, nodeCIDRMaskSize)
 		}
 	}
 
@@ -987,7 +987,7 @@ func (nc *Controller) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.Node
 		// If ReadyCondition changed since the last time we checked, we update the transition timestamp to "now",
 		// otherwise we leave it as it is.
 		if savedCondition.LastTransitionTime != observedCondition.LastTransitionTime {
-			glog.V(3).Infof("ReadyCondition for Node %s transitioned from %v to %v", node.Name, savedCondition.Status, observedCondition)
+			glog.V(3).Infof("ReadyCondition for Node %s transitioned from %v to %v", node.Name, savedCondition, observedCondition)
 			transitionTime = nc.now()
 		} else {
 			transitionTime = savedNodeStatus.readyTransitionTimestamp

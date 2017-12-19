@@ -238,7 +238,7 @@ func (b *glusterfsMounter) CanMount() error {
 	exe := b.plugin.host.GetExec(b.plugin.GetPluginName())
 	switch runtime.GOOS {
 	case "linux":
-		if _, err := exe.Run("/bin/ls", gciLinuxGlusterMountBinaryPath); err != nil {
+		if _, err := exe.Run("test", "-x", gciLinuxGlusterMountBinaryPath); err != nil {
 			return fmt.Errorf("Required binary %s is missing", gciLinuxGlusterMountBinaryPath)
 		}
 	}
@@ -695,7 +695,7 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 
 	glog.V(2).Infof("Allocated GID [%d] for PVC %s", gid, p.options.PVC.Name)
 
-	glusterfs, sizeGB, err := p.CreateVolume(gid)
+	glusterfs, sizeGiB, err := p.CreateVolume(gid)
 	if err != nil {
 		if releaseErr := gidTable.Release(gid); releaseErr != nil {
 			glog.Errorf("error when releasing GID in storageclass: %s", scName)
@@ -704,10 +704,12 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		glog.Errorf("create volume error: %v.", err)
 		return nil, fmt.Errorf("create volume error: %v", err)
 	}
+	mode := v1.PersistentVolumeFilesystem
 	pv := new(v1.PersistentVolume)
 	pv.Spec.PersistentVolumeSource.Glusterfs = glusterfs
 	pv.Spec.PersistentVolumeReclaimPolicy = p.options.PersistentVolumeReclaimPolicy
 	pv.Spec.AccessModes = p.options.PVC.Spec.AccessModes
+	pv.Spec.VolumeMode = &mode
 	if len(pv.Spec.AccessModes) == 0 {
 		pv.Spec.AccessModes = p.plugin.GetAccessModes()
 	}
@@ -724,7 +726,7 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	}
 
 	pv.Spec.Capacity = v1.ResourceList{
-		v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dG", sizeGB)),
+		v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGiB)),
 	}
 	return pv, nil
 }
@@ -732,10 +734,9 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolumeSource, size int, err error) {
 	var clusterIDs []string
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	volSizeBytes := capacity.Value()
-	// Glusterfs creates volumes in units of GBs
-	sz := int(volume.RoundUpSize(volSizeBytes, 1000*1000*1000))
-	glog.V(2).Infof("create volume of size: %d bytes and configuration %+v", volSizeBytes, p.provisionerConfig)
+	// Glusterfs creates volumes in units of GiB, but heketi documentation incorrectly reports GBs
+	sz := int(volume.RoundUpToGiB(capacity))
+	glog.V(2).Infof("create volume of size: %d GiB and configuration %+v", sz, p.provisionerConfig)
 	if p.url == "" {
 		glog.Errorf("REST server endpoint is empty")
 		return nil, 0, fmt.Errorf("failed to create glusterfs REST client, REST URL is empty")
@@ -1077,10 +1078,10 @@ func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize res
 
 	// Find out delta size
 	expansionSize := (newSize.Value() - oldSize.Value())
-	expansionSizeGB := int(volume.RoundUpSize(expansionSize, 1000*1000*1000))
+	expansionSizeGiB := int(volume.RoundUpSize(expansionSize, volume.GIB))
 
 	// Make volume expansion request
-	volumeExpandReq := &gapi.VolumeExpandRequest{Size: expansionSizeGB}
+	volumeExpandReq := &gapi.VolumeExpandRequest{Size: expansionSizeGiB}
 
 	// Expand the volume
 	volumeInfoRes, err := cli.VolumeExpand(volumeID, volumeExpandReq)
@@ -1090,6 +1091,6 @@ func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize res
 	}
 
 	glog.V(2).Infof("volume %s expanded to new size %d successfully", volumeName, volumeInfoRes.Size)
-	newVolumeSize := resource.MustParse(fmt.Sprintf("%dG", volumeInfoRes.Size))
+	newVolumeSize := resource.MustParse(fmt.Sprintf("%dGi", volumeInfoRes.Size))
 	return newVolumeSize, nil
 }

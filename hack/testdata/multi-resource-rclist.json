@@ -26,7 +26,7 @@
                "spec":{
                   "containers":[{
                     "name": "mock-container",
-                    "image": "gcr.io/google-containers/pause:2.0",
+                    "image": "k8s.gcr.io/pause:2.0",
                     "ports":[{
                         "containerPort":9949,
                         "protocol":"TCP"
@@ -60,7 +60,7 @@
             "spec":{
               "containers":[{
                 "name": "mock-container",
-                "image": "gcr.io/google-containers/pause:2.0",
+                "image": "k8s.gcr.io/pause:2.0",
                 "ports":[{
                   "containerPort":9949,
                   "protocol":"TCP"

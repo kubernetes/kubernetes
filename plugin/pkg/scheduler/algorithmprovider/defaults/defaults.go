@@ -31,11 +31,8 @@ import (
 )
 
 const (
-
 	// ClusterAutoscalerProvider defines the default autoscaler provider
 	ClusterAutoscalerProvider = "ClusterAutoscalerProvider"
-	// StatefulSetKind defines the name of 'StatefulSet' kind
-	StatefulSetKind = "StatefulSet"
 )
 
 func init() {
@@ -167,7 +164,7 @@ func defaultPredicates() sets.String {
 		// Fit is determined by node disk pressure condition.
 		factory.RegisterFitPredicate("CheckNodeDiskPressure", predicates.CheckNodeDiskPressurePredicate),
 
-		// Fit is determied by node condtions: not ready, network unavailable and out of disk.
+		// Fit is determined by node conditions: not ready, network unavailable or out of disk.
 		factory.RegisterMandatoryFitPredicate("CheckNodeCondition", predicates.CheckNodeConditionPredicate),
 
 		// Fit is determined based on whether a pod can tolerate all of the node's taints

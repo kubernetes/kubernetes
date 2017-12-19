@@ -35,7 +35,6 @@ import (
 
 	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -171,36 +170,57 @@ type IPGetter interface {
 	NodeIPs() ([]net.IP, error)
 }
 
-type realIPGetter struct{}
+// realIPGetter is a real NodeIP handler, it implements IPGetter.
+type realIPGetter struct {
+	// nl is a handle for revoking netlink interface
+	nl NetLinkHandle
+}
 
+// NodeIPs returns all LOCAL type IP addresses from host which are taken as the Node IPs of NodePort service.
+// Firstly, it will list source IP exists in local route table with `kernel` protocol type.  For example,
+// $ ip route show table local type local proto kernel
+// 10.0.0.1 dev kube-ipvs0  scope host  src 10.0.0.1
+// 10.0.0.10 dev kube-ipvs0  scope host  src 10.0.0.10
+// 10.0.0.252 dev kube-ipvs0  scope host  src 10.0.0.252
+// 100.106.89.164 dev eth0  scope host  src 100.106.89.164
+// 127.0.0.0/8 dev lo  scope host  src 127.0.0.1
+// 127.0.0.1 dev lo  scope host  src 127.0.0.1
+// 172.17.0.1 dev docker0  scope host  src 172.17.0.1
+// 192.168.122.1 dev virbr0  scope host  src 192.168.122.1
+// Then cut the unique src IP fields,
+// --> result set1: [10.0.0.1, 10.0.0.10, 10.0.0.252, 100.106.89.164, 127.0.0.1, 192.168.122.1]
+
+// NOTE: For cases where an LB acts as a VIP (e.g. Google cloud), the VIP IP is considered LOCAL, but the protocol
+// of the entry is 66, e.g. `10.128.0.6 dev ens4  proto 66  scope host`.  Therefore, the rule mentioned above will
+// filter these entries out.
+
+// Secondly, as we bind Cluster IPs to the dummy interface in IPVS proxier, we need to filter the them out so that
+// we can eventually get the Node IPs.  Fortunately, the dummy interface created by IPVS proxier is known as `kube-ipvs0`,
+// so we just need to specify the `dev kube-ipvs0` argument in ip route command, for example,
+// $ ip route show table local type local proto kernel dev kube-ipvs0
+// 10.0.0.1  scope host  src 10.0.0.1
+// 10.0.0.10  scope host  src 10.0.0.10
+// Then cut the unique src IP fields,
+// --> result set2: [10.0.0.1, 10.0.0.10]
+
+// Finally, Node IP set = set1 - set2
 func (r *realIPGetter) NodeIPs() (ips []net.IP, err error) {
-	interfaces, err := net.Interfaces()
+	// Pass in empty filter device name for list all LOCAL type addresses.
+	allAddress, err := r.nl.GetLocalAddresses("")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error listing LOCAL type addresses from host, error: %v", err)
 	}
-	for i := range interfaces {
-		name := interfaces[i].Name
-		// We assume node ip bind to eth{x}
-		if !strings.HasPrefix(name, "eth") {
-			continue
-		}
-		intf, err := net.InterfaceByName(name)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Failed to get interface by name: %s, error: %v", name, err))
-			continue
-		}
-		addrs, err := intf.Addrs()
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Failed to get addresses from interface: %s, error: %v", name, err))
-			continue
-		}
-		for _, a := range addrs {
-			if ipnet, ok := a.(*net.IPNet); ok {
-				ips = append(ips, ipnet.IP)
-			}
-		}
+	dummyAddress, err := r.nl.GetLocalAddresses(DefaultDummyDevice)
+	if err != nil {
+		return nil, fmt.Errorf("error listing LOCAL type addresses from device: %s, error: %v", DefaultDummyDevice, err)
 	}
-	return
+	// exclude ip address from dummy interface created by IPVS proxier - they are all Cluster IPs.
+	nodeAddress := allAddress.Difference(dummyAddress)
+	// translate ip string to IP
+	for _, ipStr := range nodeAddress.UnsortedList() {
+		ips = append(ips, net.ParseIP(ipStr))
+	}
+	return ips, nil
 }
 
 // Proxier implements ProxyProvider
@@ -294,7 +314,7 @@ func NewProxier(ipt utiliptables.Interface,
 		healthzServer:      healthzServer,
 		ipvs:               ipvs,
 		ipvsScheduler:      scheduler,
-		ipGetter:           &realIPGetter{},
+		ipGetter:           &realIPGetter{nl: NewNetLinkHandle()},
 		iptablesData:       bytes.NewBuffer(nil),
 		natChains:          bytes.NewBuffer(nil),
 		natRules:           bytes.NewBuffer(nil),
@@ -688,14 +708,28 @@ func (em proxyEndpointsMap) unmerge(other proxyEndpointsMap) {
 	}
 }
 
-// CanUseIPVSProxier returns true if we can use the ipvs Proxier.
-// This is determined by checking if all the required kernel modules can be loaded. It may
-// return an error if it fails to get the kernel modules information without error, in which
-// case it will also return false.
-func CanUseIPVSProxier(ipsetver IPSetVersioner) (bool, error) {
-	// Try to load IPVS required kernel modules using modprobe
+// KernelHandler can handle the current installed kernel modules.
+type KernelHandler interface {
+	GetModules() ([]string, error)
+}
+
+// LinuxKernelHandler implements KernelHandler interface.
+type LinuxKernelHandler struct {
+	executor utilexec.Interface
+}
+
+// NewLinuxKernelHandler initializes LinuxKernelHandler with exec.
+func NewLinuxKernelHandler() *LinuxKernelHandler {
+	return &LinuxKernelHandler{
+		executor: utilexec.New(),
+	}
+}
+
+// GetModules returns all installed kernel modules.
+func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
+	// Try to load IPVS required kernel modules using modprobe first
 	for _, kmod := range ipvsModules {
-		err := utilexec.New().Command("modprobe", "--", kmod).Run()
+		err := handle.executor.Command("modprobe", "--", kmod).Run()
 		if err != nil {
 			glog.Warningf("Failed to load kernel module %v with modprobe. "+
 				"You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", kmod)
@@ -703,12 +737,24 @@ func CanUseIPVSProxier(ipsetver IPSetVersioner) (bool, error) {
 	}
 
 	// Find out loaded kernel modules
-	out, err := utilexec.New().Command("cut", "-f1", "-d", " ", "/proc/modules").CombinedOutput()
+	out, err := handle.executor.Command("cut", "-f1", "-d", " ", "/proc/modules").CombinedOutput()
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
 	mods := strings.Split(string(out), "\n")
+	return mods, nil
+}
+
+// CanUseIPVSProxier returns true if we can use the ipvs Proxier.
+// This is determined by checking if all the required kernel modules can be loaded. It may
+// return an error if it fails to get the kernel modules information without error, in which
+// case it will also return false.
+func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner) (bool, error) {
+	mods, err := handle.GetModules()
+	if err != nil {
+		return false, fmt.Errorf("error getting installed ipvs required kernel modules: %v", err)
+	}
 	wantModules := sets.NewString()
 	loadModules := sets.NewString()
 	wantModules.Insert(ipvsModules...)
@@ -1701,40 +1747,6 @@ func (proxier *Proxier) linkKubeServiceChain(existingNATChains map[utiliptables.
 	}
 	return nil
 }
-
-//// linkKubeIPSetsChain will Create chain KUBE-SVC-IPSETS and link the chin in KUBE-SERVICES
-//
-//// Chain KUBE-SERVICES (policy ACCEPT)
-//// target            prot opt source               destination
-//// KUBE-SVC-IPSETS   all  --  0.0.0.0/0            0.0.0.0/0     match-set KUBE-SERVICE-ACCESS dst,dst
-//
-//// Chain KUBE-SVC-IPSETS (1 references)
-//// target     prot opt source               destination
-//// KUBE-MARK-MASQ  all  --  0.0.0.0/0       0.0.0.0/0            match-set KUBE-EXTERNAL-IP dst,dst
-//// ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-EXTERNAL-IP dst,dst PHYSDEV match ! --physdev-is-in ADDRTYPE match src-type !LOCAL
-//// ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-EXTERNAL-IP dst,dst ADDRTYPE match dst-type LOCAL
-//// ...
-//func (proxier *Proxier) linkKubeIPSetsChain(existingNATChains map[utiliptables.Chain]string, natChains *bytes.Buffer) error {
-//	if _, err := proxier.iptables.EnsureChain(utiliptables.TableNAT, KubeServiceIPSetsChain); err != nil {
-//		return fmt.Errorf("Failed to ensure that %s chain %s exists: %v", utiliptables.TableNAT, KubeServiceIPSetsChain, err)
-//	}
-//
-//	// TODO: iptables comment message for ipset?
-//	// The hash:ip,port type of sets require two src/dst parameters of the set match and SET target kernel modules.
-//	args := []string{"-m", "set", "--match-set", proxier.kubeServiceAccessSet.Name, "dst,dst", "-j", string(KubeServiceIPSetsChain)}
-//	if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, utiliptables.TableNAT, kubeServicesChain, args...); err != nil {
-//		return fmt.Errorf("Failed to ensure that ipset %s chain %s jumps to %s: %v", proxier.kubeServiceAccessSet.Name, kubeServicesChain, KubeServiceIPSetsChain, err)
-//	}
-//
-//	// equal to `iptables -t nat -N KUBE-SVC-IPSETS`
-//	// write `:KUBE-SERVICES - [0:0]` in nat table
-//	if chain, ok := existingNATChains[KubeServiceIPSetsChain]; ok {
-//		writeLine(natChains, chain)
-//	} else {
-//		writeLine(natChains, utiliptables.MakeChainLine(KubeServiceIPSetsChain))
-//	}
-//	return nil
-//}
 
 func (proxier *Proxier) createKubeFireWallChain(existingNATChains map[utiliptables.Chain]string, natChains *bytes.Buffer) error {
 	// `iptables -t nat -N KUBE-FIRE-WALL`

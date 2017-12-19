@@ -98,4 +98,6 @@ function get-cluster-ip-range {
   echo "${suggested_range}"
 }
 
+# NOTE: Avoid giving nodes empty scopes, because kubelet needs a service account
+# in order to initialize properly.
 NODE_SCOPES="${NODE_SCOPES:-monitoring,logging-write,storage-ro}"

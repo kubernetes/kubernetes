@@ -24,6 +24,7 @@ go_library(
         "azure_storageaccount.go",
         "azure_util.go",
         "azure_util_vmss.go",
+        "azure_vmsets.go",
         "azure_wrap.go",
         "azure_zones.go",
     ],
@@ -59,6 +60,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "azure_loadbalancer_test.go",
         "azure_test.go",
         "azure_util_test.go",
     ],

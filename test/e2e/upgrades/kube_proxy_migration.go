@@ -216,5 +216,5 @@ func getKubeProxyStaticPods(c clientset.Interface) (*v1.PodList, error) {
 func getKubeProxyDaemonSet(c clientset.Interface) (*extensions.DaemonSetList, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{clusterAddonLabelKey: kubeProxyLabelName}))
 	listOpts := metav1.ListOptions{LabelSelector: label.String()}
-	return c.Extensions().DaemonSets(metav1.NamespaceSystem).List(listOpts)
+	return c.ExtensionsV1beta1().DaemonSets(metav1.NamespaceSystem).List(listOpts)
 }

@@ -19,6 +19,8 @@ package deviceplugin
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"reflect"
 	"sync/atomic"
 	"testing"
@@ -33,6 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
+	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
@@ -260,11 +264,17 @@ func TestCheckpoint(t *testing.T) {
 	resourceName1 := "domain1.com/resource1"
 	resourceName2 := "domain2.com/resource2"
 
+	as := assert.New(t)
+	tmpDir, err := ioutil.TempDir("", "checkpoint")
+	as.Nil(err)
+	defer os.RemoveAll(tmpDir)
 	testManager := &ManagerImpl{
+		socketdir:        tmpDir,
 		allDevices:       make(map[string]sets.String),
 		allocatedDevices: make(map[string]sets.String),
 		podDevices:       make(podDevices),
 	}
+	testManager.store, _ = utilstore.NewFileStore("/tmp/", utilfs.DefaultFs{})
 
 	testManager.podDevices.insert("pod1", "con1", resourceName1,
 		constructDevices([]string{"dev1", "dev2"}),
@@ -298,8 +308,7 @@ func TestCheckpoint(t *testing.T) {
 	expectedAllocatedDevices := testManager.podDevices.devices()
 	expectedAllDevices := testManager.allDevices
 
-	err := testManager.writeCheckpoint()
-	as := assert.New(t)
+	err = testManager.writeCheckpoint()
 
 	as.Nil(err)
 	testManager.podDevices = make(podDevices)
@@ -357,188 +366,308 @@ func (m *MockEndpoint) allocate(devs []string) (*pluginapi.AllocateResponse, err
 	return nil, nil
 }
 
-func TestPodContainerDeviceAllocation(t *testing.T) {
-	flag.Set("alsologtostderr", fmt.Sprintf("%t", true))
-	var logLevel string
-	flag.StringVar(&logLevel, "logLevel", "4", "test")
-	flag.Lookup("v").Value.Set(logLevel)
-
-	resourceName1 := "domain1.com/resource1"
-	resourceQuantity1 := *resource.NewQuantity(int64(2), resource.DecimalSI)
-	devID1 := "dev1"
-	devID2 := "dev2"
-	resourceName2 := "domain2.com/resource2"
-	resourceQuantity2 := *resource.NewQuantity(int64(1), resource.DecimalSI)
-	devID3 := "dev3"
-	devID4 := "dev4"
-
-	as := require.New(t)
-	monitorCallback := func(resourceName string, added, updated, deleted []pluginapi.Device) {}
-	podsStub := activePodsStub{
-		activePods: []*v1.Pod{},
-	}
-	cachedNode := &v1.Node{
-		Status: v1.NodeStatus{
-			Allocatable: v1.ResourceList{},
+func makePod(requests v1.ResourceList) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: uuid.NewUUID(),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: requests,
+					},
+				},
+			},
 		},
 	}
-	nodeInfo := &schedulercache.NodeInfo{}
-	nodeInfo.SetNode(cachedNode)
+}
 
+func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestResource) *ManagerImpl {
+	monitorCallback := func(resourceName string, added, updated, deleted []pluginapi.Device) {}
 	testManager := &ManagerImpl{
+		socketdir:        tmpDir,
 		callback:         monitorCallback,
 		allDevices:       make(map[string]sets.String),
 		allocatedDevices: make(map[string]sets.String),
 		endpoints:        make(map[string]endpoint),
 		podDevices:       make(podDevices),
-		activePods:       podsStub.getActivePods,
+		activePods:       activePods,
 		sourcesReady:     &sourcesReadyStub{},
 	}
+	testManager.store, _ = utilstore.NewFileStore("/tmp/", utilfs.DefaultFs{})
+	for _, res := range testRes {
+		testManager.allDevices[res.resourceName] = sets.NewString()
+		for _, dev := range res.devs {
+			testManager.allDevices[res.resourceName].Insert(dev)
+		}
+		if res.resourceName == "domain1.com/resource1" {
+			testManager.endpoints[res.resourceName] = &MockEndpoint{
+				allocateFunc: func(devs []string) (*pluginapi.AllocateResponse, error) {
+					resp := new(pluginapi.AllocateResponse)
+					resp.Envs = make(map[string]string)
+					for _, dev := range devs {
+						switch dev {
+						case "dev1":
+							resp.Devices = append(resp.Devices, &pluginapi.DeviceSpec{
+								ContainerPath: "/dev/aaa",
+								HostPath:      "/dev/aaa",
+								Permissions:   "mrw",
+							})
 
-	testManager.allDevices[resourceName1] = sets.NewString()
-	testManager.allDevices[resourceName1].Insert(devID1)
-	testManager.allDevices[resourceName1].Insert(devID2)
-	testManager.allDevices[resourceName2] = sets.NewString()
-	testManager.allDevices[resourceName2].Insert(devID3)
-	testManager.allDevices[resourceName2].Insert(devID4)
+							resp.Devices = append(resp.Devices, &pluginapi.DeviceSpec{
+								ContainerPath: "/dev/bbb",
+								HostPath:      "/dev/bbb",
+								Permissions:   "mrw",
+							})
 
-	testManager.endpoints[resourceName1] = &MockEndpoint{
-		allocateFunc: func(devs []string) (*pluginapi.AllocateResponse, error) {
-			resp := new(pluginapi.AllocateResponse)
-			resp.Envs = make(map[string]string)
-			for _, dev := range devs {
-				switch dev {
-				case "dev1":
-					resp.Devices = append(resp.Devices, &pluginapi.DeviceSpec{
-						ContainerPath: "/dev/aaa",
-						HostPath:      "/dev/aaa",
-						Permissions:   "mrw",
-					})
+							resp.Mounts = append(resp.Mounts, &pluginapi.Mount{
+								ContainerPath: "/container_dir1/file1",
+								HostPath:      "host_dir1/file1",
+								ReadOnly:      true,
+							})
 
-					resp.Devices = append(resp.Devices, &pluginapi.DeviceSpec{
-						ContainerPath: "/dev/bbb",
-						HostPath:      "/dev/bbb",
-						Permissions:   "mrw",
-					})
+						case "dev2":
+							resp.Devices = append(resp.Devices, &pluginapi.DeviceSpec{
+								ContainerPath: "/dev/ccc",
+								HostPath:      "/dev/ccc",
+								Permissions:   "mrw",
+							})
 
-					resp.Mounts = append(resp.Mounts, &pluginapi.Mount{
-						ContainerPath: "/container_dir1/file1",
-						HostPath:      "host_dir1/file1",
-						ReadOnly:      true,
-					})
+							resp.Mounts = append(resp.Mounts, &pluginapi.Mount{
+								ContainerPath: "/container_dir1/file2",
+								HostPath:      "host_dir1/file2",
+								ReadOnly:      true,
+							})
 
-				case "dev2":
-					resp.Devices = append(resp.Devices, &pluginapi.DeviceSpec{
-						ContainerPath: "/dev/ccc",
-						HostPath:      "/dev/ccc",
-						Permissions:   "mrw",
-					})
-
-					resp.Mounts = append(resp.Mounts, &pluginapi.Mount{
-						ContainerPath: "/container_dir1/file2",
-						HostPath:      "host_dir1/file2",
-						ReadOnly:      true,
-					})
-
-					resp.Envs["key1"] = "val1"
-				}
+							resp.Envs["key1"] = "val1"
+						}
+					}
+					return resp, nil
+				},
 			}
-			return resp, nil
-		},
-	}
+		}
+		if res.resourceName == "domain2.com/resource2" {
+			testManager.endpoints[res.resourceName] = &MockEndpoint{
+				allocateFunc: func(devs []string) (*pluginapi.AllocateResponse, error) {
+					resp := new(pluginapi.AllocateResponse)
+					resp.Envs = make(map[string]string)
+					for _, dev := range devs {
+						switch dev {
+						case "dev3":
+							resp.Envs["key2"] = "val2"
 
-	testManager.endpoints[resourceName2] = &MockEndpoint{
-		allocateFunc: func(devs []string) (*pluginapi.AllocateResponse, error) {
-			resp := new(pluginapi.AllocateResponse)
-			resp.Envs = make(map[string]string)
-			for _, dev := range devs {
-				switch dev {
-				case "dev3":
-					resp.Envs["key2"] = "val2"
-
-				case "dev4":
-					resp.Envs["key2"] = "val3"
-				}
+						case "dev4":
+							resp.Envs["key2"] = "val3"
+						}
+					}
+					return resp, nil
+				},
 			}
-			return resp, nil
+		}
+	}
+	return testManager
+}
+
+func getTestNodeInfo(allocatable v1.ResourceList) *schedulercache.NodeInfo {
+	cachedNode := &v1.Node{
+		Status: v1.NodeStatus{
+			Allocatable: allocatable,
 		},
 	}
+	nodeInfo := &schedulercache.NodeInfo{}
+	nodeInfo.SetNode(cachedNode)
+	return nodeInfo
+}
 
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID: uuid.NewUUID(),
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name: string(uuid.NewUUID()),
-					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
-							v1.ResourceName(resourceName1): resourceQuantity1,
-							v1.ResourceName("cpu"):         resourceQuantity1,
-							v1.ResourceName(resourceName2): resourceQuantity2,
-						},
-					},
-				},
-			},
-		},
+type TestResource struct {
+	resourceName     string
+	resourceQuantity resource.Quantity
+	devs             []string
+}
+
+func TestPodContainerDeviceAllocation(t *testing.T) {
+	flag.Set("alsologtostderr", fmt.Sprintf("%t", true))
+	var logLevel string
+	flag.StringVar(&logLevel, "logLevel", "4", "test")
+	flag.Lookup("v").Value.Set(logLevel)
+	res1 := TestResource{
+		resourceName:     "domain1.com/resource1",
+		resourceQuantity: *resource.NewQuantity(int64(2), resource.DecimalSI),
+		devs:             []string{"dev1", "dev2"},
 	}
-
-	podsStub.updateActivePods([]*v1.Pod{pod})
-	err := testManager.Allocate(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: pod})
+	res2 := TestResource{
+		resourceName:     "domain2.com/resource2",
+		resourceQuantity: *resource.NewQuantity(int64(1), resource.DecimalSI),
+		devs:             []string{"dev3", "dev4"},
+	}
+	testResources := make([]TestResource, 2)
+	testResources = append(testResources, res1)
+	testResources = append(testResources, res2)
+	as := require.New(t)
+	podsStub := activePodsStub{
+		activePods: []*v1.Pod{},
+	}
+	tmpDir, err := ioutil.TempDir("", "checkpoint")
 	as.Nil(err)
-	runContainerOpts := testManager.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
-	as.NotNil(runContainerOpts)
-	as.Equal(len(runContainerOpts.Devices), 3)
-	as.Equal(len(runContainerOpts.Mounts), 2)
-	as.Equal(len(runContainerOpts.Envs), 2)
+	defer os.RemoveAll(tmpDir)
+	nodeInfo := getTestNodeInfo(v1.ResourceList{})
+	testManager := getTestManager(tmpDir, podsStub.getActivePods, testResources)
 
-	// Requesting to create a pod without enough resources should fail.
-	as.Equal(2, testManager.allocatedDevices[resourceName1].Len())
-	failPod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID: uuid.NewUUID(),
+	testPods := []*v1.Pod{
+		makePod(v1.ResourceList{
+			v1.ResourceName(res1.resourceName): res1.resourceQuantity,
+			v1.ResourceName("cpu"):             res1.resourceQuantity,
+			v1.ResourceName(res2.resourceName): res2.resourceQuantity}),
+		makePod(v1.ResourceList{
+			v1.ResourceName(res1.resourceName): res2.resourceQuantity}),
+		makePod(v1.ResourceList{
+			v1.ResourceName(res2.resourceName): res2.resourceQuantity}),
+	}
+	testCases := []struct {
+		description               string
+		testPod                   *v1.Pod
+		expectedContainerOptsLen  []int
+		expectedAllocatedResName1 int
+		expectedAllocatedResName2 int
+		expErr                    error
+	}{
+		{
+			description:               "Successfull allocation of two Res1 resources and one Res2 resource",
+			testPod:                   testPods[0],
+			expectedContainerOptsLen:  []int{3, 2, 2},
+			expectedAllocatedResName1: 2,
+			expectedAllocatedResName2: 1,
+			expErr: nil,
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name: string(uuid.NewUUID()),
-					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
-							v1.ResourceName(resourceName1): resourceQuantity2,
-						},
-					},
-				},
-			},
+		{
+			description:               "Requesting to create a pod without enough resources should fail",
+			testPod:                   testPods[1],
+			expectedContainerOptsLen:  nil,
+			expectedAllocatedResName1: 2,
+			expectedAllocatedResName2: 1,
+			expErr: fmt.Errorf("requested number of devices unavailable for domain1.com/resource1. Requested: 1, Available: 0"),
+		},
+		{
+			description:               "Successfull allocation of all available Res1 resources and Res2 resources",
+			testPod:                   testPods[2],
+			expectedContainerOptsLen:  []int{0, 0, 1},
+			expectedAllocatedResName1: 2,
+			expectedAllocatedResName2: 2,
+			expErr: nil,
 		},
 	}
-	err = testManager.Allocate(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: failPod})
-	as.NotNil(err)
-	runContainerOpts2 := testManager.GetDeviceRunContainerOptions(failPod, &failPod.Spec.Containers[0])
-	as.Nil(runContainerOpts2)
-
-	// Requesting to create a new pod with a single resourceName2 should succeed.
-	newPod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID: uuid.NewUUID(),
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name: string(uuid.NewUUID()),
-					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
-							v1.ResourceName(resourceName2): resourceQuantity2,
-						},
-					},
-				},
-			},
-		},
+	activePods := []*v1.Pod{}
+	for _, testCase := range testCases {
+		pod := testCase.testPod
+		activePods = append(activePods, pod)
+		podsStub.updateActivePods(activePods)
+		err := testManager.Allocate(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: pod})
+		if !reflect.DeepEqual(err, testCase.expErr) {
+			t.Errorf("DevicePluginManager error (%v). expected error: %v but got: %v",
+				testCase.description, testCase.expErr, err)
+		}
+		runContainerOpts := testManager.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
+		if testCase.expectedContainerOptsLen == nil {
+			as.Nil(runContainerOpts)
+		} else {
+			as.Equal(len(runContainerOpts.Devices), testCase.expectedContainerOptsLen[0])
+			as.Equal(len(runContainerOpts.Mounts), testCase.expectedContainerOptsLen[1])
+			as.Equal(len(runContainerOpts.Envs), testCase.expectedContainerOptsLen[2])
+		}
+		as.Equal(testCase.expectedAllocatedResName1, testManager.allocatedDevices[res1.resourceName].Len())
+		as.Equal(testCase.expectedAllocatedResName2, testManager.allocatedDevices[res2.resourceName].Len())
 	}
-	err = testManager.Allocate(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: newPod})
+
+}
+
+func TestInitContainerDeviceAllocation(t *testing.T) {
+	// Requesting to create a pod that requests resourceName1 in init containers and normal containers
+	// should succeed with devices allocated to init containers reallocated to normal containers.
+	res1 := TestResource{
+		resourceName:     "domain1.com/resource1",
+		resourceQuantity: *resource.NewQuantity(int64(2), resource.DecimalSI),
+		devs:             []string{"dev1", "dev2"},
+	}
+	res2 := TestResource{
+		resourceName:     "domain2.com/resource2",
+		resourceQuantity: *resource.NewQuantity(int64(1), resource.DecimalSI),
+		devs:             []string{"dev3", "dev4"},
+	}
+	testResources := make([]TestResource, 2)
+	testResources = append(testResources, res1)
+	testResources = append(testResources, res2)
+	as := require.New(t)
+	podsStub := activePodsStub{
+		activePods: []*v1.Pod{},
+	}
+	nodeInfo := getTestNodeInfo(v1.ResourceList{})
+	tmpDir, err := ioutil.TempDir("", "checkpoint")
 	as.Nil(err)
-	runContainerOpts3 := testManager.GetDeviceRunContainerOptions(newPod, &newPod.Spec.Containers[0])
-	as.Equal(1, len(runContainerOpts3.Envs))
+	defer os.RemoveAll(tmpDir)
+	testManager := getTestManager(tmpDir, podsStub.getActivePods, testResources)
+
+	podWithPluginResourcesInInitContainers := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: uuid.NewUUID(),
+		},
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{
+				{
+					Name: string(uuid.NewUUID()),
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceName(res1.resourceName): res2.resourceQuantity,
+						},
+					},
+				},
+				{
+					Name: string(uuid.NewUUID()),
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceName(res1.resourceName): res1.resourceQuantity,
+						},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name: string(uuid.NewUUID()),
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceName(res1.resourceName): res2.resourceQuantity,
+							v1.ResourceName(res2.resourceName): res2.resourceQuantity,
+						},
+					},
+				},
+				{
+					Name: string(uuid.NewUUID()),
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceName(res1.resourceName): res2.resourceQuantity,
+							v1.ResourceName(res2.resourceName): res2.resourceQuantity,
+						},
+					},
+				},
+			},
+		},
+	}
+	podsStub.updateActivePods([]*v1.Pod{podWithPluginResourcesInInitContainers})
+	err = testManager.Allocate(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: podWithPluginResourcesInInitContainers})
+	as.Nil(err)
+	podUID := string(podWithPluginResourcesInInitContainers.UID)
+	initCont1 := podWithPluginResourcesInInitContainers.Spec.InitContainers[0].Name
+	initCont2 := podWithPluginResourcesInInitContainers.Spec.InitContainers[1].Name
+	normalCont1 := podWithPluginResourcesInInitContainers.Spec.Containers[0].Name
+	normalCont2 := podWithPluginResourcesInInitContainers.Spec.Containers[1].Name
+	initCont1Devices := testManager.podDevices.containerDevices(podUID, initCont1, res1.resourceName)
+	initCont2Devices := testManager.podDevices.containerDevices(podUID, initCont2, res1.resourceName)
+	normalCont1Devices := testManager.podDevices.containerDevices(podUID, normalCont1, res1.resourceName)
+	normalCont2Devices := testManager.podDevices.containerDevices(podUID, normalCont2, res1.resourceName)
+	as.True(initCont2Devices.IsSuperset(initCont1Devices))
+	as.True(initCont2Devices.IsSuperset(normalCont1Devices))
+	as.True(initCont2Devices.IsSuperset(normalCont2Devices))
+	as.Equal(0, normalCont1Devices.Intersection(normalCont2Devices).Len())
 }
 
 func TestSanitizeNodeAllocatable(t *testing.T) {
@@ -557,6 +686,7 @@ func TestSanitizeNodeAllocatable(t *testing.T) {
 		allocatedDevices: make(map[string]sets.String),
 		podDevices:       make(podDevices),
 	}
+	testManager.store, _ = utilstore.NewFileStore("/tmp/", utilfs.DefaultFs{})
 	// require one of resource1 and one of resource2
 	testManager.allocatedDevices[resourceName1] = sets.NewString()
 	testManager.allocatedDevices[resourceName1].Insert(devID1)

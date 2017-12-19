@@ -48,19 +48,11 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-)
-
-// Current supported images for e2e volume testing to be assigned to VolumeTestConfig.serverImage
-const (
-	NfsServerImage       string = "gcr.io/google_containers/volume-nfs:0.8"
-	IscsiServerImage     string = "gcr.io/google_containers/volume-iscsi:0.1"
-	GlusterfsServerImage string = "gcr.io/google_containers/volume-gluster:0.2"
-	CephServerImage      string = "gcr.io/google_containers/volume-ceph:0.1"
-	RbdServerImage       string = "gcr.io/google_containers/volume-rbd:0.1"
 )
 
 const (
@@ -116,7 +108,7 @@ func NewNFSServer(cs clientset.Interface, namespace string, args []string) (conf
 	config = VolumeTestConfig{
 		Namespace:   namespace,
 		Prefix:      "nfs",
-		ServerImage: NfsServerImage,
+		ServerImage: imageutils.GetE2EImage(imageutils.VolumeNFSServer),
 		ServerPorts: []int{2049},
 	}
 	if len(args) > 0 {
@@ -131,7 +123,7 @@ func NewGlusterfsServer(cs clientset.Interface, namespace string) (config Volume
 	config = VolumeTestConfig{
 		Namespace:   namespace,
 		Prefix:      "gluster",
-		ServerImage: GlusterfsServerImage,
+		ServerImage: imageutils.GetE2EImage(imageutils.VolumeGlusterServer),
 		ServerPorts: []int{24007, 24008, 49152},
 	}
 	pod, ip = CreateStorageServer(cs, config)
@@ -173,7 +165,7 @@ func NewISCSIServer(cs clientset.Interface, namespace string) (config VolumeTest
 	config = VolumeTestConfig{
 		Namespace:   namespace,
 		Prefix:      "iscsi",
-		ServerImage: IscsiServerImage,
+		ServerImage: imageutils.GetE2EImage(imageutils.VolumeISCSIServer),
 		ServerPorts: []int{3260},
 		ServerVolumes: map[string]string{
 			// iSCSI container needs to insert modules from the host
@@ -189,7 +181,7 @@ func NewRBDServer(cs clientset.Interface, namespace string) (config VolumeTestCo
 	config = VolumeTestConfig{
 		Namespace:   namespace,
 		Prefix:      "rbd",
-		ServerImage: RbdServerImage,
+		ServerImage: imageutils.GetE2EImage(imageutils.VolumeRBDServer),
 		ServerPorts: []int{6789},
 		ServerVolumes: map[string]string{
 			"/lib/modules": "/lib/modules",

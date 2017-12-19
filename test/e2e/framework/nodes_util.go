@@ -78,6 +78,10 @@ func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
 			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
 			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
 			"TEST_ETCD_IMAGE=3.1.10")
+	} else {
+		// In e2e tests, we skip the confirmation prompt about
+		// implicit etcd upgrades to simulate the user entering "y".
+		env = append(env, "TEST_ALLOW_IMPLICIT_ETCD_UPGRADE=true")
 	}
 
 	v := "v" + rawV

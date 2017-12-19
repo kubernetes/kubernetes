@@ -51,9 +51,10 @@ func NewFileState(filePath string, policyName string) State {
 
 	if err := stateFile.tryRestoreState(); err != nil {
 		// could not restore state, init new state file
-		glog.Infof("[cpumanager] state file: initializing empty state file - reason: \"%s\"", err)
-		stateFile.cache.ClearState()
-		stateFile.storeState()
+		msg := fmt.Sprintf("[cpumanager] state file: unable to restore state from disk (%s)\n", err.Error()) +
+			"Panicking because we cannot guarantee sane CPU affinity for existing containers.\n" +
+			fmt.Sprintf("Please drain this node and delete the CPU manager state file \"%s\" before restarting Kubelet.", stateFile.stateFilePath)
+		panic(msg)
 	}
 
 	return stateFile
@@ -73,45 +74,51 @@ func (sf *stateFile) tryRestoreState() error {
 
 	var content []byte
 
-	if content, err = ioutil.ReadFile(sf.stateFilePath); os.IsNotExist(err) {
-		// Create file
-		if _, err = os.Create(sf.stateFilePath); err != nil {
-			glog.Errorf("[cpumanager] state file: unable to create state file \"%s\":%s", sf.stateFilePath, err.Error())
-			panic("[cpumanager] state file not created")
-		}
-		glog.Infof("[cpumanager] state file: created empty state file \"%s\"", sf.stateFilePath)
-	} else {
-		// File exists - try to read
-		var readState stateFileData
+	content, err = ioutil.ReadFile(sf.stateFilePath)
 
-		if err = json.Unmarshal(content, &readState); err != nil {
-			glog.Warningf("[cpumanager] state file: could not unmarshal, corrupted state file - \"%s\"", sf.stateFilePath)
-			return err
-		}
-
-		if sf.policyName != readState.PolicyName {
-			return fmt.Errorf("policy configured \"%s\" != policy from state file \"%s\"", sf.policyName, readState.PolicyName)
-		}
-
-		if tmpDefaultCPUSet, err = cpuset.Parse(readState.DefaultCPUSet); err != nil {
-			glog.Warningf("[cpumanager] state file: could not parse state file - [defaultCpuSet:\"%s\"]", readState.DefaultCPUSet)
-			return err
-		}
-
-		for containerID, cpuString := range readState.Entries {
-			if tmpContainerCPUSet, err = cpuset.Parse(cpuString); err != nil {
-				glog.Warningf("[cpumanager] state file: could not parse state file - container id: %s, cpuset: \"%s\"", containerID, cpuString)
-				return err
-			}
-			tmpAssignments[containerID] = tmpContainerCPUSet
-		}
-
-		sf.cache.SetDefaultCPUSet(tmpDefaultCPUSet)
-		sf.cache.SetCPUAssignments(tmpAssignments)
-
-		glog.V(2).Infof("[cpumanager] state file: restored state from state file \"%s\"", sf.stateFilePath)
-		glog.V(2).Infof("[cpumanager] state file: defaultCPUSet: %s", tmpDefaultCPUSet.String())
+	// If the state file does not exist or has zero length, write a new file.
+	if os.IsNotExist(err) || len(content) == 0 {
+		sf.storeState()
+		glog.Infof("[cpumanager] state file: created new state file \"%s\"", sf.stateFilePath)
+		return nil
 	}
+
+	// Fail on any other file read error.
+	if err != nil {
+		return err
+	}
+
+	// File exists; try to read it.
+	var readState stateFileData
+
+	if err = json.Unmarshal(content, &readState); err != nil {
+		glog.Errorf("[cpumanager] state file: could not unmarshal, corrupted state file - \"%s\"", sf.stateFilePath)
+		return err
+	}
+
+	if sf.policyName != readState.PolicyName {
+		return fmt.Errorf("policy configured \"%s\" != policy from state file \"%s\"", sf.policyName, readState.PolicyName)
+	}
+
+	if tmpDefaultCPUSet, err = cpuset.Parse(readState.DefaultCPUSet); err != nil {
+		glog.Errorf("[cpumanager] state file: could not parse state file - [defaultCpuSet:\"%s\"]", readState.DefaultCPUSet)
+		return err
+	}
+
+	for containerID, cpuString := range readState.Entries {
+		if tmpContainerCPUSet, err = cpuset.Parse(cpuString); err != nil {
+			glog.Errorf("[cpumanager] state file: could not parse state file - container id: %s, cpuset: \"%s\"", containerID, cpuString)
+			return err
+		}
+		tmpAssignments[containerID] = tmpContainerCPUSet
+	}
+
+	sf.cache.SetDefaultCPUSet(tmpDefaultCPUSet)
+	sf.cache.SetCPUAssignments(tmpAssignments)
+
+	glog.V(2).Infof("[cpumanager] state file: restored state from state file \"%s\"", sf.stateFilePath)
+	glog.V(2).Infof("[cpumanager] state file: defaultCPUSet: %s", tmpDefaultCPUSet.String())
+
 	return nil
 }
 

@@ -1330,7 +1330,7 @@ func (t *Tester) testListTableConversion(obj runtime.Object, assignFn AssignFunc
 			t.Errorf("column %d has unexpected format: %q with type %q", j, column.Format, column.Type)
 		}
 		if column.Priority < 0 || column.Priority > 2 {
-			t.Errorf("column %d has unexpected priority", j, column.Priority)
+			t.Errorf("column %d has unexpected priority: %q", j, column.Priority)
 		}
 		if len(column.Description) == 0 {
 			t.Errorf("column %d has no description", j)
@@ -1341,7 +1341,7 @@ func (t *Tester) testListTableConversion(obj runtime.Object, assignFn AssignFunc
 	}
 	for i, row := range table.Rows {
 		if len(row.Cells) != len(table.ColumnDefinitions) {
-			t.Errorf("row %d did not have the correct number of cells: %d in %v", len(table.ColumnDefinitions), row.Cells)
+			t.Errorf("row %d did not have the correct number of cells: %d in %v", i, len(table.ColumnDefinitions), row.Cells)
 		}
 		for j, cell := range row.Cells {
 			// do not add to this test without discussion - may break clients

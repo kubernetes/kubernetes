@@ -62,7 +62,7 @@ kube::version::get_version_vars() {
       fi
     fi
 
-    # Use git describe to find the version based on annotated tags.
+    # Use git describe to find the version based on tags.
     if [[ -n ${KUBE_GIT_VERSION-} ]] || KUBE_GIT_VERSION=$("${git[@]}" describe --tags --abbrev=14 "${KUBE_GIT_COMMIT}^{commit}" 2>/dev/null); then
       # This translates the "git describe" to an actual semver.org
       # compatible semantic version that looks something like this:
@@ -133,8 +133,8 @@ kube::version::ldflag() {
   local val=${2}
 
   # If you update these, also update the list pkg/version/def.bzl.
-  echo "-X ${KUBE_GO_PACKAGE}/pkg/version.${key}=${val}"
-  echo "-X ${KUBE_GO_PACKAGE}/vendor/k8s.io/client-go/pkg/version.${key}=${val}"
+  echo "-X '${KUBE_GO_PACKAGE}/pkg/version.${key}=${val}'"
+  echo "-X '${KUBE_GO_PACKAGE}/vendor/k8s.io/client-go/pkg/version.${key}=${val}'"
 }
 
 # Prints the value that needs to be passed to the -ldflags parameter of go build

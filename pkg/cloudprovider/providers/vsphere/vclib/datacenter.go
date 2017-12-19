@@ -138,14 +138,8 @@ func (dc *Datacenter) GetDatastoreByPath(ctx context.Context, vmDiskPath string)
 		glog.Errorf("Failed to parse vmDiskPath: %s", vmDiskPath)
 		return nil, errors.New("Failed to parse vmDiskPath")
 	}
-	finder := getFinder(dc)
-	ds, err := finder.Datastore(ctx, datastorePathObj.Datastore)
-	if err != nil {
-		glog.Errorf("Failed while searching for datastore: %s. err: %+v", datastorePathObj.Datastore, err)
-		return nil, err
-	}
-	datastore := Datastore{ds, dc}
-	return &datastore, nil
+
+	return dc.GetDatastoreByName(ctx, datastorePathObj.Datastore)
 }
 
 // GetDatastoreByName gets the Datastore object for the given datastore name

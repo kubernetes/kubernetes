@@ -74,9 +74,7 @@ func calculateBalancedResourceAllocation(pod *v1.Pod, podRequests *schedulercach
 		score = int((1 - diff) * float64(schedulerapi.MaxPriority))
 	}
 	if glog.V(10) {
-		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
-		// not logged. There is visible performance gain from it.
-		glog.V(10).Infof(
+		glog.Infof(
 			"%v -> %v: Balanced Resource Allocation, capacity %d millicores %d memory bytes, total request %d millicores %d memory bytes, score %d",
 			pod.Name, node.Name,
 			allocatableResources.MilliCPU, allocatableResources.Memory,

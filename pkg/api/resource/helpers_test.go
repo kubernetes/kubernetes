@@ -18,10 +18,8 @@ package resource
 
 import (
 	"testing"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -60,23 +58,5 @@ func TestDefaultResourceHelpers(t *testing.T) {
 	}
 	if resourceList.Memory().Format != resource.BinarySI {
 		t.Errorf("expected %v, actual %v", resource.BinarySI, resourceList.Memory().Format)
-	}
-}
-
-func newPod(now metav1.Time, ready bool, beforeSec int) *api.Pod {
-	conditionStatus := api.ConditionFalse
-	if ready {
-		conditionStatus = api.ConditionTrue
-	}
-	return &api.Pod{
-		Status: api.PodStatus{
-			Conditions: []api.PodCondition{
-				{
-					Type:               api.PodReady,
-					LastTransitionTime: metav1.NewTime(now.Time.Add(-1 * time.Duration(beforeSec) * time.Second)),
-					Status:             conditionStatus,
-				},
-			},
-		},
 	}
 }

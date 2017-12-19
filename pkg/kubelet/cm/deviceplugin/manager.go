@@ -19,7 +19,6 @@ package deviceplugin
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -38,6 +37,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
+	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
@@ -80,6 +81,7 @@ type ManagerImpl struct {
 
 	// podDevices contains pod to allocated device mapping.
 	podDevices podDevices
+	store      utilstore.Store
 }
 
 type sourcesReadyStub struct{}
@@ -114,6 +116,11 @@ func newManagerImpl(socketPath string) (*ManagerImpl, error) {
 	// Before that, initializes them to perform no-op operations.
 	manager.activePods = func() []*v1.Pod { return []*v1.Pod{} }
 	manager.sourcesReady = &sourcesReadyStub{}
+	var err error
+	manager.store, err = utilstore.NewFileStore(dir, utilfs.DefaultFs{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize device plugin checkpointing store: %+v", err)
+	}
 
 	return manager, nil
 }
@@ -240,16 +247,19 @@ func (m *ManagerImpl) Devices() map[string][]pluginapi.Device {
 // from the registered device plugins.
 func (m *ManagerImpl) Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 	pod := attrs.Pod
+	devicesToReuse := make(map[string]sets.String)
 	// TODO: Reuse devices between init containers and regular containers.
 	for _, container := range pod.Spec.InitContainers {
-		if err := m.allocateContainerResources(pod, &container); err != nil {
+		if err := m.allocateContainerResources(pod, &container, devicesToReuse); err != nil {
 			return err
 		}
+		m.podDevices.addContainerAllocatedResources(string(pod.UID), container.Name, devicesToReuse)
 	}
 	for _, container := range pod.Spec.Containers {
-		if err := m.allocateContainerResources(pod, &container); err != nil {
+		if err := m.allocateContainerResources(pod, &container, devicesToReuse); err != nil {
 			return err
 		}
+		m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, devicesToReuse)
 	}
 
 	m.mutex.Lock()
@@ -415,22 +425,27 @@ func (m *ManagerImpl) writeCheckpoint() error {
 	if err != nil {
 		return err
 	}
-	filepath := m.checkpointFile()
-	return ioutil.WriteFile(filepath, dataJSON, 0644)
+	err = m.store.Write(kubeletDevicePluginCheckpoint, dataJSON)
+	if err != nil {
+		return fmt.Errorf("failed to write deviceplugin checkpoint file %q: %v", kubeletDevicePluginCheckpoint, err)
+	}
+	return nil
 }
 
 // Reads device to container allocation information from disk, and populates
 // m.allocatedDevices accordingly.
 func (m *ManagerImpl) readCheckpoint() error {
-	filepath := m.checkpointFile()
-	content, err := ioutil.ReadFile(filepath)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to read checkpoint file %q: %v", filepath, err)
+	content, err := m.store.Read(kubeletDevicePluginCheckpoint)
+	if err != nil {
+		if err == utilstore.ErrKeyNotFound {
+			return nil
+		}
+		return fmt.Errorf("failed to read checkpoint file %q: %v", kubeletDevicePluginCheckpoint, err)
 	}
-	glog.V(2).Infof("Read checkpoint file %s\n", filepath)
+	glog.V(4).Infof("Read checkpoint file %s\n", kubeletDevicePluginCheckpoint)
 	var data checkpointData
 	if err := json.Unmarshal(content, &data); err != nil {
-		return fmt.Errorf("failed to unmarshal checkpoint data: %v", err)
+		return fmt.Errorf("failed to unmarshal deviceplugin checkpoint data: %v", err)
 	}
 
 	m.mutex.Lock()
@@ -471,7 +486,7 @@ func (m *ManagerImpl) updateAllocatedDevices(activePods []*v1.Pod) {
 
 // Returns list of device Ids we need to allocate with Allocate rpc call.
 // Returns empty list in case we don't need to issue the Allocate rpc call.
-func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, required int) (sets.String, error) {
+func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, required int, reusableDevices sets.String) (sets.String, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	needed := required
@@ -497,6 +512,14 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 		return nil, fmt.Errorf("can't allocate unregistered device %v", resource)
 	}
 	devices = sets.NewString()
+	// Allocates from reusableDevices list first.
+	for device := range reusableDevices {
+		devices.Insert(device)
+		needed--
+		if needed == 0 {
+			return devices, nil
+		}
+	}
 	// Needs to allocate additional devices.
 	if m.allocatedDevices[resource] == nil {
 		m.allocatedDevices[resource] = sets.NewString()
@@ -523,11 +546,14 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 // plugin resources for the input container, issues an Allocate rpc request
 // for each new device resource requirement, processes their AllocateResponses,
 // and updates the cached containerDevices on success.
-func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Container) error {
+func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Container, devicesToReuse map[string]sets.String) error {
 	podUID := string(pod.UID)
 	contName := container.Name
 	allocatedDevicesUpdated := false
-	for k, v := range container.Resources.Limits {
+	// NOTE: Skipping the Resources.Limits is safe here because:
+	// 1. If container Spec mentions Limits only, implicitly Requests, equal to Limits, will get added to the Spec.
+	// 2. If container Spec mentions Limits, which are greater than or less than Requests, will fail at validation.
+	for k, v := range container.Resources.Requests {
 		resource := string(k)
 		needed := int(v.Value())
 		glog.V(3).Infof("needs %d %s", needed, resource)
@@ -544,7 +570,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 			m.updateAllocatedDevices(m.activePods())
 			allocatedDevicesUpdated = true
 		}
-		allocDevices, err := m.devicesToAllocate(podUID, contName, resource, needed)
+		allocDevices, err := m.devicesToAllocate(podUID, contName, resource, needed, devicesToReuse[resource])
 		if err != nil {
 			return err
 		}

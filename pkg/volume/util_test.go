@@ -94,8 +94,8 @@ func TestRecyclerPod(t *testing.T) {
 				// Pod gets Running and Succeeded
 				newPodEvent(watch.Added, "podRecyclerSuccess", v1.PodPending, ""),
 				newEvent(v1.EventTypeNormal, "Successfully assigned recycler-for-podRecyclerSuccess to 127.0.0.1"),
-				newEvent(v1.EventTypeNormal, "pulling image \"gcr.io/google_containers/busybox\""),
-				newEvent(v1.EventTypeNormal, "Successfully pulled image \"gcr.io/google_containers/busybox\""),
+				newEvent(v1.EventTypeNormal, "pulling image \"k8s.gcr.io/busybox\""),
+				newEvent(v1.EventTypeNormal, "Successfully pulled image \"k8s.gcr.io/busybox\""),
 				newEvent(v1.EventTypeNormal, "Created container with docker id 83d929aeac82"),
 				newEvent(v1.EventTypeNormal, "Started container with docker id 83d929aeac82"),
 				newPodEvent(watch.Modified, "podRecyclerSuccess", v1.PodRunning, ""),
@@ -103,8 +103,8 @@ func TestRecyclerPod(t *testing.T) {
 			},
 			expectedEvents: []mockEvent{
 				{v1.EventTypeNormal, "Successfully assigned recycler-for-podRecyclerSuccess to 127.0.0.1"},
-				{v1.EventTypeNormal, "pulling image \"gcr.io/google_containers/busybox\""},
-				{v1.EventTypeNormal, "Successfully pulled image \"gcr.io/google_containers/busybox\""},
+				{v1.EventTypeNormal, "pulling image \"k8s.gcr.io/busybox\""},
+				{v1.EventTypeNormal, "Successfully pulled image \"k8s.gcr.io/busybox\""},
 				{v1.EventTypeNormal, "Created container with docker id 83d929aeac82"},
 				{v1.EventTypeNormal, "Started container with docker id 83d929aeac82"},
 			},
@@ -866,6 +866,37 @@ func TestValidateZone(t *testing.T) {
 	for _, succCase := range succCases {
 		if got := ValidateZone(succCase); got != nil {
 			t.Errorf("%v(%v) returned (%v), want (%v)", functionUnderTest, succCase, got, nil)
+		}
+	}
+}
+
+func TestGetWindowsPath(t *testing.T) {
+	tests := []struct {
+		path         string
+		expectedPath string
+	}{
+		{
+			path:         `/var/lib/kubelet/pods/146f8428-83e7-11e7-8dd4-000d3a31dac4/volumes/kubernetes.io~disk`,
+			expectedPath: `c:\var\lib\kubelet\pods\146f8428-83e7-11e7-8dd4-000d3a31dac4\volumes\kubernetes.io~disk`,
+		},
+		{
+			path:         `\var/lib/kubelet/pods/146f8428-83e7-11e7-8dd4-000d3a31dac4\volumes\kubernetes.io~disk`,
+			expectedPath: `c:\var\lib\kubelet\pods\146f8428-83e7-11e7-8dd4-000d3a31dac4\volumes\kubernetes.io~disk`,
+		},
+		{
+			path:         `/`,
+			expectedPath: `c:\`,
+		},
+		{
+			path:         ``,
+			expectedPath: ``,
+		},
+	}
+
+	for _, test := range tests {
+		result := GetWindowsPath(test.path)
+		if result != test.expectedPath {
+			t.Errorf("GetWindowsPath(%v) returned (%v), want (%v)", test.path, result, test.expectedPath)
 		}
 	}
 }

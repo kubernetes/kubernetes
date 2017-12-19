@@ -181,11 +181,6 @@ func (cs *CSCloud) ProviderName() string {
 	return ProviderName
 }
 
-// ScrubDNS filters DNS settings for pods.
-func (cs *CSCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
-	return nameservers, searches
-}
-
 // HasClusterID returns true if the cluster has a clusterID
 func (cs *CSCloud) HasClusterID() bool {
 	return true

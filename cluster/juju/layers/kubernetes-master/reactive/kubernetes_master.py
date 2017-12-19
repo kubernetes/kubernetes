@@ -39,7 +39,7 @@ from charms.reactive import hook
 from charms.reactive import remove_state
 from charms.reactive import set_state
 from charms.reactive import is_state
-from charms.reactive import when, when_any, when_not, when_all
+from charms.reactive import when, when_any, when_not
 from charms.reactive.helpers import data_changed, any_file_changed
 from charms.kubernetes.common import get_version
 from charms.kubernetes.common import retry
@@ -63,13 +63,13 @@ nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
 
 
-def set_upgrade_needed():
+def set_upgrade_needed(forced=False):
     set_state('kubernetes-master.upgrade-needed')
     config = hookenv.config()
     previous_channel = config.previous('channel')
     require_manual = config.get('require-manual-upgrade')
     hookenv.log('set upgrade needed')
-    if previous_channel is None or not require_manual:
+    if previous_channel is None or not require_manual or forced:
         hookenv.log('forcing upgrade')
         set_state('kubernetes-master.upgrade-specified')
 
@@ -102,12 +102,39 @@ def check_for_upgrade_needed():
     add_rbac_roles()
     set_state('reconfigure.authentication.setup')
     remove_state('authentication.setup')
+    changed = snap_resources_changed()
+    if changed == 'yes':
+        set_upgrade_needed()
+    elif changed == 'unknown':
+        # We are here on an upgrade from non-rolling master
+        # Since this upgrade might also include resource updates eg
+        # juju upgrade-charm kubernetes-master --resource kube-any=my.snap
+        # we take no risk and forcibly upgrade the snaps.
+        # Forcibly means we do not prompt the user to call the upgrade action.
+        set_upgrade_needed(forced=True)
 
+
+def snap_resources_changed():
+    '''
+    Check if the snapped resources have changed. The first time this method is
+    called will report "unknown".
+
+    Returns: "yes" in case a snap resource file has changed,
+             "no" in case a snap resources are the same as last call,
+             "unknown" if it is the first time this method is called
+
+    '''
+    db = unitdata.kv()
     resources = ['kubectl', 'kube-apiserver', 'kube-controller-manager',
                  'kube-scheduler', 'cdk-addons']
     paths = [hookenv.resource_get(resource) for resource in resources]
-    if any_file_changed(paths):
-        set_upgrade_needed()
+    if db.get('snap.resources.fingerprint.initialised'):
+        result = 'yes' if any_file_changed(paths) else 'no'
+        return result
+    else:
+        db.set('snap.resources.fingerprint.initialised', True)
+        any_file_changed(paths)
+        return 'unknown'
 
 
 def add_rbac_roles():
@@ -222,6 +249,7 @@ def install_snaps():
     snap.install('kube-scheduler', channel=channel)
     hookenv.status_set('maintenance', 'Installing cdk-addons snap')
     snap.install('cdk-addons', channel=channel)
+    snap_resources_changed()
     set_state('kubernetes-master.snaps.installed')
     remove_state('kubernetes-master.components.started')
 
@@ -360,6 +388,7 @@ def set_app_version():
 
 @when('cdk-addons.configured', 'kube-api-endpoint.available',
       'kube-control.connected')
+@when_not('kubernetes-master.upgrade-needed')
 def idle_status(kube_api, kube_control):
     ''' Signal at the end of the run that we are running. '''
     if not all_kube_system_pods_running():
@@ -414,7 +443,7 @@ def start_master(etcd):
     configure_apiserver(etcd)
     configure_controller_manager()
     configure_scheduler()
-
+    set_state('kubernetes-master.components.started')
     hookenv.open_port(6443)
 
 
@@ -438,10 +467,16 @@ def etcd_data_change(etcd):
 @when('cdk-addons.configured')
 def send_cluster_dns_detail(kube_control):
     ''' Send cluster DNS info '''
-    # Note that the DNS server doesn't necessarily exist at this point. We know
-    # where we're going to put it, though, so let's send the info anyway.
-    dns_ip = get_dns_ip()
-    kube_control.set_dns(53, hookenv.config('dns_domain'), dns_ip)
+    enableKubeDNS = hookenv.config('enable-kube-dns')
+    dnsDomain = hookenv.config('dns_domain')
+    dns_ip = None
+    if enableKubeDNS:
+        try:
+            dns_ip = get_dns_ip()
+        except CalledProcessError:
+            hookenv.log("kubedns not ready yet")
+            return
+    kube_control.set_dns(53, dnsDomain, dns_ip, enableKubeDNS)
 
 
 @when('kube-control.connected')
@@ -554,7 +589,7 @@ def kick_api_server(tls):
     if data_changed('cert', tls.get_server_cert()):
         # certificate changed, so restart the api server
         hookenv.log("Certificate information changed, restarting api server")
-        set_state('kube-apiserver.do-restart')
+        restart_apiserver()
     tls_client.reset_certificate_write_flag('server')
 
 
@@ -563,11 +598,13 @@ def configure_cdk_addons():
     ''' Configure CDK addons '''
     remove_state('cdk-addons.configured')
     dbEnabled = str(hookenv.config('enable-dashboard-addons')).lower()
+    dnsEnabled = str(hookenv.config('enable-kube-dns')).lower()
     args = [
         'arch=' + arch(),
-        'dns-ip=' + get_dns_ip(),
+        'dns-ip=' + get_deprecated_dns_ip(),
         'dns-domain=' + hookenv.config('dns_domain'),
-        'enable-dashboard=' + dbEnabled
+        'enable-dashboard=' + dbEnabled,
+        'enable-kube-dns=' + dnsEnabled
     ]
     check_call(['snap', 'set', 'cdk-addons'] + args)
     if not addons_ready():
@@ -837,42 +874,25 @@ def shutdown():
     service_stop('snap.kube-scheduler.daemon')
 
 
-@when('kube-apiserver.do-restart')
 def restart_apiserver():
     prev_state, prev_msg = hookenv.status_get()
     hookenv.status_set('maintenance', 'Restarting kube-apiserver')
     host.service_restart('snap.kube-apiserver.daemon')
     hookenv.status_set(prev_state, prev_msg)
-    remove_state('kube-apiserver.do-restart')
-    set_state('kube-apiserver.started')
 
 
-@when('kube-controller-manager.do-restart')
 def restart_controller_manager():
     prev_state, prev_msg = hookenv.status_get()
     hookenv.status_set('maintenance', 'Restarting kube-controller-manager')
     host.service_restart('snap.kube-controller-manager.daemon')
     hookenv.status_set(prev_state, prev_msg)
-    remove_state('kube-controller-manager.do-restart')
-    set_state('kube-controller-manager.started')
 
 
-@when('kube-scheduler.do-restart')
 def restart_scheduler():
     prev_state, prev_msg = hookenv.status_get()
     hookenv.status_set('maintenance', 'Restarting kube-scheduler')
     host.service_restart('snap.kube-scheduler.daemon')
     hookenv.status_set(prev_state, prev_msg)
-    remove_state('kube-scheduler.do-restart')
-    set_state('kube-scheduler.started')
-
-
-@when_all('kube-apiserver.started',
-          'kube-controller-manager.started',
-          'kube-scheduler.started')
-@when_not('kubernetes-master.components.started')
-def componenets_started():
-    set_state('kubernetes-master.components.started')
 
 
 def arch():
@@ -951,9 +971,16 @@ def create_kubeconfig(kubeconfig, server, ca, key=None, certificate=None,
 
 
 def get_dns_ip():
-    '''Get an IP address for the DNS server on the provided cidr.'''
+    cmd = "kubectl get service --namespace kube-system kube-dns --output json"
+    output = check_output(cmd, shell=True).decode()
+    svc = json.loads(output)
+    return svc['spec']['clusterIP']
+
+
+def get_deprecated_dns_ip():
+    '''We previously hardcoded the dns ip. This function returns the old
+    hardcoded value for use with older versions of cdk_addons.'''
     interface = ipaddress.IPv4Interface(service_cidr())
-    # Add .10 at the end of the network
     ip = interface.network.network_address + 10
     return ip.exploded
 
@@ -1088,8 +1115,7 @@ def configure_apiserver(etcd):
     api_opts['admission-control'] = ','.join(admission_control)
 
     configure_kubernetes_service('kube-apiserver', api_opts, 'api-extra-args')
-
-    set_state('kube-apiserver.do-restart')
+    restart_apiserver()
 
 
 def configure_controller_manager():
@@ -1111,8 +1137,7 @@ def configure_controller_manager():
 
     configure_kubernetes_service('kube-controller-manager', controller_opts,
                                  'controller-manager-extra-args')
-
-    set_state('kube-controller-manager.do-restart')
+    restart_controller_manager()
 
 
 def configure_scheduler():
@@ -1125,7 +1150,7 @@ def configure_scheduler():
     configure_kubernetes_service('kube-scheduler', scheduler_opts,
                                  'scheduler-extra-args')
 
-    set_state('kube-scheduler.do-restart')
+    restart_scheduler()
 
 
 def setup_basic_auth(password=None, username='admin', uid='admin',

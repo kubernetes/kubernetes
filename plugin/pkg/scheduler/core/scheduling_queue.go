@@ -149,8 +149,6 @@ type UnschedulablePods interface {
 // scheduling. This is called activeQ and is a Heap. Another queue holds
 // pods that are already tried and are determined to be unschedulable. The latter
 // is called unschedulableQ.
-// Heap is already thread safe, but we need to acquire another lock here to ensure
-// atomicity of operations on the two data structures..
 type PriorityQueue struct {
 	lock sync.RWMutex
 	cond sync.Cond
@@ -611,7 +609,7 @@ func (h *heapData) Pop() interface{} {
 	return item.obj
 }
 
-// Heap is a thread-safe producer/consumer queue that implements a heap data structure.
+// Heap is a producer/consumer queue that implements a heap data structure.
 // It can be used to implement priority queues and similar data structures.
 type Heap struct {
 	// data stores objects and has a queue that keeps their ordering according

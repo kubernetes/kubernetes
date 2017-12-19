@@ -20,18 +20,19 @@ import (
 	"context"
 	"time"
 
-	"golang.org/x/oauth2/google"
-	clientset "k8s.io/client-go/kubernetes"
-
-	. "github.com/onsi/ginkgo"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/test/e2e/framework"
-
 	gcm "google.golang.org/api/monitoring/v3"
 	as "k8s.io/api/autoscaling/v2beta1"
+	corev1 "k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/instrumentation/monitoring"
+
+	. "github.com/onsi/ginkgo"
+	"golang.org/x/oauth2/google"
 )
 
 const (
@@ -46,15 +47,32 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Me
 	})
 
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
-	var kubeClient clientset.Interface
 
-	It("should autoscale with Custom Metrics from Stackdriver [Feature:CustomMetricsAutoscaling]", func() {
-		kubeClient = f.ClientSet
-		testHPA(f, kubeClient)
+	It("should scale down with Custom Metric of type Pod from Stackdriver [Feature:CustomMetricsAutoscaling]", func() {
+		initialReplicas := 2
+		scaledReplicas := 1
+		deployment := monitoring.StackdriverExporterDeployment(stackdriverExporterDeployment, f.Namespace.ObjectMeta.Name, int32(initialReplicas), 100)
+		customMetricTest(f, f.ClientSet, podsHPA(f.Namespace.ObjectMeta.Name), deployment, nil, initialReplicas, scaledReplicas)
+	})
+
+	It("should scale down with Custom Metric of type Object from Stackdriver [Feature:CustomMetricsAutoscaling]", func() {
+		initialReplicas := 2
+		scaledReplicas := 1
+		deployment := monitoring.StackdriverExporterDeployment(dummyDeploymentName, f.Namespace.ObjectMeta.Name, int32(initialReplicas), 100)
+		pod := monitoring.StackdriverExporterPod(stackdriverExporterPod, f.Namespace.ObjectMeta.Name, stackdriverExporterPod, monitoring.CustomMetricName, 100)
+		customMetricTest(f, f.ClientSet, objectHPA(f.Namespace.ObjectMeta.Name), deployment, pod, initialReplicas, scaledReplicas)
+	})
+
+	It("should scale down with Custom Metric of type Pod from Stackdriver with Prometheus [Feature:CustomMetricsAutoscaling]", func() {
+		initialReplicas := 2
+		scaledReplicas := 1
+		deployment := monitoring.PrometheusExporterDeployment(stackdriverExporterDeployment, f.Namespace.ObjectMeta.Name, int32(initialReplicas), 100)
+		customMetricTest(f, f.ClientSet, podsHPA(f.Namespace.ObjectMeta.Name), deployment, nil, initialReplicas, scaledReplicas)
 	})
 })
 
-func testHPA(f *framework.Framework, kubeClient clientset.Interface) {
+func customMetricTest(f *framework.Framework, kubeClient clientset.Interface, hpa *as.HorizontalPodAutoscaler,
+	deployment *extensions.Deployment, pod *corev1.Pod, initialReplicas, scaledReplicas int) {
 	projectId := framework.TestContext.CloudConfig.ProjectID
 
 	ctx := context.Background()
@@ -92,51 +110,55 @@ func testHPA(f *framework.Framework, kubeClient clientset.Interface) {
 	defer monitoring.CleanupAdapter()
 
 	// Run application that exports the metric
-	err = createDeploymentsToScale(f, kubeClient)
+	err = createDeploymentToScale(f, kubeClient, deployment, pod)
 	if err != nil {
 		framework.Failf("Failed to create stackdriver-exporter pod: %v", err)
 	}
-	defer cleanupDeploymentsToScale(f, kubeClient)
+	defer cleanupDeploymentsToScale(f, kubeClient, deployment, pod)
 
-	// Autoscale the deployments
-	err = createPodsHPA(f, kubeClient)
+	// Wait for the deployment to run
+	waitForReplicas(deployment.ObjectMeta.Name, f.Namespace.ObjectMeta.Name, kubeClient, 15*time.Minute, initialReplicas)
+
+	// Autoscale the deployment
+	_, err = kubeClient.AutoscalingV2beta1().HorizontalPodAutoscalers(f.Namespace.ObjectMeta.Name).Create(hpa)
 	if err != nil {
-		framework.Failf("Failed to create 'Pods' HPA: %v", err)
-	}
-	err = createObjectHPA(f, kubeClient)
-	if err != nil {
-		framework.Failf("Failed to create 'Objects' HPA: %v", err)
+		framework.Failf("Failed to create HPA: %v", err)
 	}
 
-	waitForReplicas(stackdriverExporterDeployment, f.Namespace.ObjectMeta.Name, kubeClient, 15*time.Minute, 1)
-	waitForReplicas(dummyDeploymentName, f.Namespace.ObjectMeta.Name, kubeClient, 15*time.Minute, 1)
+	waitForReplicas(deployment.ObjectMeta.Name, f.Namespace.ObjectMeta.Name, kubeClient, 15*time.Minute, scaledReplicas)
 }
 
-func createDeploymentsToScale(f *framework.Framework, cs clientset.Interface) error {
-	_, err := cs.Extensions().Deployments(f.Namespace.ObjectMeta.Name).Create(monitoring.StackdriverExporterDeployment(stackdriverExporterDeployment, f.Namespace.Name, 2, 100))
-	if err != nil {
-		return err
+func createDeploymentToScale(f *framework.Framework, cs clientset.Interface, deployment *extensions.Deployment, pod *corev1.Pod) error {
+	if deployment != nil {
+		_, err := cs.Extensions().Deployments(f.Namespace.ObjectMeta.Name).Create(deployment)
+		if err != nil {
+			return err
+		}
 	}
-	_, err = cs.CoreV1().Pods(f.Namespace.ObjectMeta.Name).Create(monitoring.StackdriverExporterPod(stackdriverExporterPod, f.Namespace.Name, stackdriverExporterPod, monitoring.CustomMetricName, 100))
-	if err != nil {
-		return err
+	if pod != nil {
+		_, err := cs.CoreV1().Pods(f.Namespace.ObjectMeta.Name).Create(pod)
+		if err != nil {
+			return err
+		}
 	}
-	_, err = cs.Extensions().Deployments(f.Namespace.ObjectMeta.Name).Create(monitoring.StackdriverExporterDeployment(dummyDeploymentName, f.Namespace.Name, 2, 100))
-	return err
+	return nil
 }
 
-func cleanupDeploymentsToScale(f *framework.Framework, cs clientset.Interface) {
-	_ = cs.Extensions().Deployments(f.Namespace.ObjectMeta.Name).Delete(stackdriverExporterDeployment, &metav1.DeleteOptions{})
-	_ = cs.CoreV1().Pods(f.Namespace.ObjectMeta.Name).Delete(stackdriverExporterPod, &metav1.DeleteOptions{})
-	_ = cs.Extensions().Deployments(f.Namespace.ObjectMeta.Name).Delete(dummyDeploymentName, &metav1.DeleteOptions{})
+func cleanupDeploymentsToScale(f *framework.Framework, cs clientset.Interface, deployment *extensions.Deployment, pod *corev1.Pod) {
+	if deployment != nil {
+		_ = cs.Extensions().Deployments(f.Namespace.ObjectMeta.Name).Delete(deployment.ObjectMeta.Name, &metav1.DeleteOptions{})
+	}
+	if pod != nil {
+		_ = cs.CoreV1().Pods(f.Namespace.ObjectMeta.Name).Delete(pod.ObjectMeta.Name, &metav1.DeleteOptions{})
+	}
 }
 
-func createPodsHPA(f *framework.Framework, cs clientset.Interface) error {
+func podsHPA(namespace string) *as.HorizontalPodAutoscaler {
 	var minReplicas int32 = 1
-	_, err := cs.AutoscalingV2beta1().HorizontalPodAutoscalers(f.Namespace.ObjectMeta.Name).Create(&as.HorizontalPodAutoscaler{
+	return &as.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "custom-metrics-pods-hpa",
-			Namespace: f.Namespace.ObjectMeta.Name,
+			Namespace: namespace,
 		},
 		Spec: as.HorizontalPodAutoscalerSpec{
 			Metrics: []as.MetricSpec{
@@ -156,16 +178,15 @@ func createPodsHPA(f *framework.Framework, cs clientset.Interface) error {
 				Name:       stackdriverExporterDeployment,
 			},
 		},
-	})
-	return err
+	}
 }
 
-func createObjectHPA(f *framework.Framework, cs clientset.Interface) error {
+func objectHPA(namespace string) *as.HorizontalPodAutoscaler {
 	var minReplicas int32 = 1
-	_, err := cs.AutoscalingV2beta1().HorizontalPodAutoscalers(f.Namespace.ObjectMeta.Name).Create(&as.HorizontalPodAutoscaler{
+	return &as.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "custom-metrics-objects-hpa",
-			Namespace: f.Namespace.ObjectMeta.Name,
+			Namespace: namespace,
 		},
 		Spec: as.HorizontalPodAutoscalerSpec{
 			Metrics: []as.MetricSpec{
@@ -189,14 +210,13 @@ func createObjectHPA(f *framework.Framework, cs clientset.Interface) error {
 				Name:       dummyDeploymentName,
 			},
 		},
-	})
-	return err
+	}
 }
 
 func waitForReplicas(deploymentName, namespace string, cs clientset.Interface, timeout time.Duration, desiredReplicas int) {
 	interval := 20 * time.Second
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		deployment, err := cs.Extensions().Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
+		deployment, err := cs.ExtensionsV1beta1().Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to get replication controller %s: %v", deployment, err)
 		}

@@ -4,6 +4,8 @@ go_library(
     name = "go_default_library",
     srcs = [
         "systemstat.go",
+        "systemstat_ex.go",
+        "utils.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "systemstat_linux.go",

@@ -120,6 +120,15 @@ func (fake *fakeDiskManager) DetachDisk(c fcDiskUnmounter, mntPath string) error
 	return nil
 }
 
+func (fake *fakeDiskManager) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath string) error {
+	err := os.RemoveAll(mapPath)
+	if err != nil {
+		return err
+	}
+	fake.detachCalled = true
+	return nil
+}
+
 func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	tmpDir, err := utiltesting.MkTmpdir("fc_test")
 	if err != nil {

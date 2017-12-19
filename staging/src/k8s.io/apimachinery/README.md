@@ -6,7 +6,7 @@ Scheme, typing, encoding, decoding, and conversion packages for Kubernetes and K
 ## Purpose
 
 This library is a shared dependency for servers and clients to work with Kubernetes API infrastructure without direct 
-type dependencies.  It's first comsumers are `k8s.io/kubernetes`, `k8s.io/client-go`, and `k8s.io/apiserver`.
+type dependencies.  Its first consumers are `k8s.io/kubernetes`, `k8s.io/client-go`, and `k8s.io/apiserver`.
 
 
 ## Compatibility
@@ -25,5 +25,5 @@ Code changes are made in that location, merged into `k8s.io/kubernetes` and late
 ## Things you should *NOT* do
 
  1. Add API types to this repo.  This is for the machinery, not for the types.
- 2. Directly modify any files under `pkg` in this repo.  Those are driven from `k8s.io/kuberenetes/staging/src/k8s.io/apimachinery`.
+ 2. Directly modify any files under `pkg` in this repo.  Those are driven from `k8s.io/kubernetes/staging/src/k8s.io/apimachinery`.
  3. Expect compatibility.  This repo is direct support of Kubernetes and the API isn't yet stable enough for API guarantees.

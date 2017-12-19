@@ -122,18 +122,7 @@ type Status struct {
 	SoftRequirements error
 }
 
-const (
-	// Uer visible keys for managing node allocatable enforcement on the node.
-	NodeAllocatableEnforcementKey = "pods"
-	SystemReservedEnforcementKey  = "system-reserved"
-	KubeReservedEnforcementKey    = "kube-reserved"
-)
-
-// containerManager for the kubelet is currently an injected dependency.
-// We need to parse the --qos-reserve-requests option in
-// cmd/kubelet/app/server.go and there isn't really a good place to put
-// the code.  If/When the kubelet dependency injection gets worked out,
-// maybe there will be a better place for it.
+// parsePercentage parses the percentage string to numeric value.
 func parsePercentage(v string) (int64, error) {
 	if !strings.HasSuffix(v, "%") {
 		return 0, fmt.Errorf("percentage expected, got '%s'", v)

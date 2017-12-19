@@ -58,13 +58,13 @@ func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName) (compute.Virtua
 	return machine, exists, err
 }
 
-// GetScaleSetsVMWithRetry invokes az.getScaleSetsVM with exponential backoff retry
-func (az *Cloud) GetScaleSetsVMWithRetry(name types.NodeName) (compute.VirtualMachineScaleSetVM, bool, error) {
+// GetScaleSetsVMWithRetry invokes ss.getScaleSetVM with exponential backoff retry
+func (ss *scaleSet) GetScaleSetsVMWithRetry(name types.NodeName, scaleSetName string) (compute.VirtualMachineScaleSetVM, bool, error) {
 	var machine compute.VirtualMachineScaleSetVM
 	var exists bool
-	err := wait.ExponentialBackoff(az.resourceRequestBackoff, func() (bool, error) {
+	err := wait.ExponentialBackoff(ss.resourceRequestBackoff, func() (bool, error) {
 		var retryErr error
-		machine, exists, retryErr = az.getVmssVirtualMachine(name)
+		machine, exists, retryErr = ss.getScaleSetVM(string(name), scaleSetName)
 		if retryErr != nil {
 			glog.Errorf("GetScaleSetsVMWithRetry backoff: failure, will retry,err=%v", retryErr)
 			return false, nil

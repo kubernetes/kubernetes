@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"time"
 
+	autoscalingapi "k8s.io/api/autoscaling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -31,6 +32,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+
+	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	appsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
 	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
@@ -515,4 +518,94 @@ func (scaler *DeploymentScaler) Scale(namespace, name string, newSize uint, prec
 		return err
 	}
 	return nil
+}
+
+// validateGeneric ensures that the preconditions match. Returns nil if they are valid, otherwise an error
+// TODO(p0lyn0mial): when the work on GenericScaler is done, rename validateGeneric to validate
+func (precondition *ScalePrecondition) validateGeneric(scale *autoscalingapi.Scale) error {
+	if precondition.Size != -1 && int(scale.Spec.Replicas) != precondition.Size {
+		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(int(scale.Spec.Replicas))}
+	}
+	if len(precondition.ResourceVersion) > 0 && scale.ResourceVersion != precondition.ResourceVersion {
+		return PreconditionError{"resource version", precondition.ResourceVersion, scale.ResourceVersion}
+	}
+	return nil
+}
+
+// GenericScaler can update scales for resources in a particular namespace
+// TODO(o0lyn0mial): when the work on GenericScaler is done, don't
+// export the GenericScaler. Instead use ScalerFor method for getting the Scaler
+// also update the UTs
+type GenericScaler struct {
+	scaleNamespacer scaleclient.ScalesGetter
+	targetGR        schema.GroupResource
+}
+
+var _ Scaler = &GenericScaler{}
+
+// ScaleSimple updates a scale of a given resource. It returns the resourceVersion of the scale if the update was successful.
+func (s *GenericScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (updatedResourceVersion string, err error) {
+	scale, err := s.scaleNamespacer.Scales(namespace).Get(s.targetGR, name)
+	if err != nil {
+		return "", ScaleError{ScaleGetFailure, "", err}
+	}
+	if preconditions != nil {
+		if err := preconditions.validateGeneric(scale); err != nil {
+			return "", err
+		}
+	}
+
+	scale.Spec.Replicas = int32(newSize)
+	updatedScale, err := s.scaleNamespacer.Scales(namespace).Update(s.targetGR, scale)
+	if err != nil {
+		if errors.IsConflict(err) {
+			return "", ScaleError{ScaleUpdateConflictFailure, scale.ResourceVersion, err}
+		}
+		return "", ScaleError{ScaleUpdateFailure, scale.ResourceVersion, err}
+	}
+	return updatedScale.ResourceVersion, nil
+}
+
+// Scale updates a scale of a given resource to a new size, with optional precondition check (if preconditions is not nil),
+// optional retries (if retry is not nil), and then optionally waits for the status to reach desired count.
+func (s *GenericScaler) Scale(namespace, resourceName string, newSize uint, preconditions *ScalePrecondition, retry, waitForReplicas *RetryParams) error {
+	if preconditions == nil {
+		preconditions = &ScalePrecondition{-1, ""}
+	}
+	if retry == nil {
+		// make it try only once, immediately
+		retry = &RetryParams{Interval: time.Millisecond, Timeout: time.Millisecond}
+	}
+	cond := ScaleCondition(s, preconditions, namespace, resourceName, newSize, nil)
+	if err := wait.PollImmediate(retry.Interval, retry.Timeout, cond); err != nil {
+		return err
+	}
+	if waitForReplicas != nil {
+		err := wait.PollImmediate(
+			waitForReplicas.Interval,
+			waitForReplicas.Timeout,
+			scaleHasDesiredReplicas(s.scaleNamespacer, s.targetGR, resourceName, namespace, int32(newSize)))
+		if err == wait.ErrWaitTimeout {
+			return fmt.Errorf("timed out waiting for %q to be synced", resourceName)
+		}
+		return err
+	}
+	return nil
+}
+
+// scaleHasDesiredReplicas returns a condition that will be true if and only if the desired replica
+// count for a scale (Spec) equals its updated replicas count (Status)
+func scaleHasDesiredReplicas(sClient scaleclient.ScalesGetter, gr schema.GroupResource, resourceName string, namespace string, desiredReplicas int32) wait.ConditionFunc {
+	return func() (bool, error) {
+		actualScale, err := sClient.Scales(namespace).Get(gr, resourceName)
+		if err != nil {
+			return false, err
+		}
+		// this means the desired scale target has been reset by something else
+		if actualScale.Spec.Replicas != desiredReplicas {
+			return true, nil
+		}
+		return actualScale.Spec.Replicas == actualScale.Status.Replicas &&
+			desiredReplicas == actualScale.Status.Replicas, nil
+	}
 }

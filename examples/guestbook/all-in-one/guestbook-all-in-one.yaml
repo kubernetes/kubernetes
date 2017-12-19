@@ -30,7 +30,7 @@ spec:
     spec:
       containers:
       - name: master
-        image: gcr.io/google_containers/redis:e2e  # or just image: redis
+        image: k8s.gcr.io/redis:e2e  # or just image: redis
         resources:
           requests:
             cpu: 100m

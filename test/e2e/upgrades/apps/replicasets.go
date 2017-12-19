@@ -54,7 +54,7 @@ func (r *ReplicaSetUpgradeTest) Setup(f *framework.Framework) {
 
 	By(fmt.Sprintf("Creating replicaset %s in namespace %s", rsName, ns))
 	replicaSet := framework.NewReplicaSet(rsName, ns, 1, map[string]string{"test": "upgrade"}, "nginx", nginxImage)
-	rs, err := c.Extensions().ReplicaSets(ns).Create(replicaSet)
+	rs, err := c.ExtensionsV1beta1().ReplicaSets(ns).Create(replicaSet)
 	framework.ExpectNoError(err)
 
 	By(fmt.Sprintf("Waiting for replicaset %s to have all of its replicas ready", rsName))
@@ -67,7 +67,7 @@ func (r *ReplicaSetUpgradeTest) Setup(f *framework.Framework) {
 func (r *ReplicaSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	c := f.ClientSet
 	ns := f.Namespace.Name
-	rsClient := c.Extensions().ReplicaSets(ns)
+	rsClient := c.ExtensionsV1beta1().ReplicaSets(ns)
 
 	// Block until upgrade is done
 	By(fmt.Sprintf("Waiting for upgrade to finish before checking replicaset %s", rsName))

@@ -815,7 +815,7 @@ var _ = SIGDescribe("Services", func() {
 		tcpService := jig.CreateTCPServiceOrFail(ns, nil)
 		defer func() {
 			framework.Logf("Cleaning up the updating NodePorts test service")
-			err := cs.Core().Services(ns).Delete(serviceName, nil)
+			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			Expect(err).NotTo(HaveOccurred())
 		}()
 		jig.SanityCheckService(tcpService, v1.ServiceTypeClusterIP)
@@ -1435,8 +1435,36 @@ var _ = SIGDescribe("Services", func() {
 		svc = jig.WaitForLoadBalancerOrFail(namespace, serviceName, createTimeout)
 		jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 		lbIngress := &svc.Status.LoadBalancer.Ingress[0]
+		svcPort := int(svc.Spec.Ports[0].Port)
 		// should have an internal IP.
 		Expect(isInternalEndpoint(lbIngress)).To(BeTrue())
+
+		// ILBs are not accessible from the test orchestrator, so it's necessary to use
+		//  a pod to test the service.
+		By("hitting the internal load balancer from pod")
+		framework.Logf("creating pod with host network")
+		hostExec := framework.LaunchHostExecPod(f.ClientSet, f.Namespace.Name, "ilb-host-exec")
+
+		framework.Logf("Waiting up to %v for service %q's internal LB to respond to requests", createTimeout, serviceName)
+		tcpIngressIP := framework.GetIngressPoint(lbIngress)
+		if pollErr := wait.PollImmediate(pollInterval, createTimeout, func() (bool, error) {
+			cmd := fmt.Sprintf(`curl -m 5 'http://%v:%v/echo?msg=hello'`, tcpIngressIP, svcPort)
+			stdout, err := framework.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
+			if err != nil {
+				framework.Logf("error curling; stdout: %v. err: %v", stdout, err)
+				return false, nil
+			}
+
+			if !strings.Contains(stdout, "hello") {
+				framework.Logf("Expected output to contain 'hello', got %q; retrying...", stdout)
+				return false, nil
+			}
+
+			framework.Logf("Successful curl; stdout: %v", stdout)
+			return true, nil
+		}); pollErr != nil {
+			framework.Failf("Failed to hit ILB IP, err: %v", pollErr)
+		}
 
 		By("switching to external type LoadBalancer")
 		svc = jig.UpdateServiceOrFail(namespace, serviceName, func(svc *v1.Service) {
@@ -1456,6 +1484,11 @@ var _ = SIGDescribe("Services", func() {
 		// should have an external IP.
 		jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 		Expect(isInternalEndpoint(lbIngress)).To(BeFalse())
+
+		By("hitting the external load balancer")
+		framework.Logf("Waiting up to %v for service %q's external LB to respond to requests", createTimeout, serviceName)
+		tcpIngressIP = framework.GetIngressPoint(lbIngress)
+		jig.TestReachableHTTP(tcpIngressIP, svcPort, framework.LoadBalancerLagTimeoutDefault)
 
 		// GCE cannot test a specific IP because the test may not own it. This cloud specific condition
 		// will be removed when GCP supports similar functionality.

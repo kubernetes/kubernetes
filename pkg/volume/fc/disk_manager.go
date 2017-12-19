@@ -31,7 +31,9 @@ type diskManager interface {
 	// Attaches the disk to the kubelet's host machine.
 	AttachDisk(b fcDiskMounter) (string, error)
 	// Detaches the disk from the kubelet's host machine.
-	DetachDisk(disk fcDiskUnmounter, devName string) error
+	DetachDisk(disk fcDiskUnmounter, devicePath string) error
+	// Detaches the block disk from the kubelet's host machine.
+	DetachBlockFCDisk(disk fcDiskUnmapper, mntPath, devicePath string) error
 }
 
 // utility to mount a disk based filesystem

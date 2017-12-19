@@ -538,10 +538,6 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 			CronJobV2Alpha1GeneratorName:       kubectl.CronJobV2Alpha1{},
 			CronJobV1Beta1GeneratorName:        kubectl.CronJobV1Beta1{},
 		}
-	case "autoscale":
-		generator = map[string]kubectl.Generator{
-			HorizontalPodAutoscalerV1GeneratorName: kubectl.HorizontalPodAutoscalerV1{},
-		}
 	case "namespace":
 		generator = map[string]kubectl.Generator{
 			NamespaceV1GeneratorName: kubectl.NamespaceGeneratorV1{},

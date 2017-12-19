@@ -1135,11 +1135,6 @@ func (c *Cloud) ProviderName() string {
 	return ProviderName
 }
 
-// ScrubDNS filters DNS settings for pods.
-func (c *Cloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
-	return nameservers, searches
-}
-
 // LoadBalancer returns an implementation of LoadBalancer for Amazon Web Services.
 func (c *Cloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return c, true

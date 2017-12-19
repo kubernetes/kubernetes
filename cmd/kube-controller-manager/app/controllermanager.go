@@ -71,6 +71,13 @@ const (
 	ControllerStartJitter = 1.0
 )
 
+type ControllerLoopMode int
+
+const (
+	IncludeCloudLoops ControllerLoopMode = iota
+	ExternalLoops
+)
+
 // NewControllerManagerCommand creates a *cobra.Command object with default parameters
 func NewControllerManagerCommand() *cobra.Command {
 	s := options.NewCMServer()
@@ -151,7 +158,7 @@ func Run(s *options.CMServer) error {
 		}
 		saTokenControllerInitFunc := serviceAccountTokenControllerStarter{rootClientBuilder: rootClientBuilder}.startServiceAccountTokenController
 
-		if err := StartControllers(ctx, saTokenControllerInitFunc, NewControllerInitializers()); err != nil {
+		if err := StartControllers(ctx, saTokenControllerInitFunc, NewControllerInitializers(ctx.LoopMode)); err != nil {
 			glog.Fatalf("error starting controllers: %v", err)
 		}
 
@@ -262,6 +269,11 @@ type ControllerContext struct {
 	// It must be initialized and ready to use.
 	Cloud cloudprovider.Interface
 
+	// Control for which control loops to be run
+	// IncludeCloudLoops is for a kube-controller-manager running all loops
+	// ExternalLoops is for a kube-controller-manager running with a cloud-controller-manager
+	LoopMode ControllerLoopMode
+
 	// Stop is the stop channel
 	Stop <-chan struct{}
 
@@ -305,7 +317,7 @@ func IsControllerEnabled(name string, disabledByDefaultControllers sets.String, 
 type InitFunc func(ctx ControllerContext) (bool, error)
 
 func KnownControllers() []string {
-	ret := sets.StringKeySet(NewControllerInitializers())
+	ret := sets.StringKeySet(NewControllerInitializers(IncludeCloudLoops))
 
 	// add "special" controllers that aren't initialized normally.  These controllers cannot be initialized
 	// using a normal function.  The only known special case is the SA token controller which *must* be started
@@ -329,7 +341,7 @@ const (
 
 // NewControllerInitializers is a public map of named controller groups (you can start more than one in an init func)
 // paired to their InitFunc.  This allows for structured downstream composition and subdivision.
-func NewControllerInitializers() map[string]InitFunc {
+func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc {
 	controllers := map[string]InitFunc{}
 	controllers["endpoint"] = startEndpointController
 	controllers["replicationcontroller"] = startReplicationController
@@ -352,9 +364,12 @@ func NewControllerInitializers() map[string]InitFunc {
 	controllers["ttl"] = startTTLController
 	controllers["bootstrapsigner"] = startBootstrapSignerController
 	controllers["tokencleaner"] = startTokenCleanerController
-	controllers["service"] = startServiceController
+	if loopMode == IncludeCloudLoops {
+		controllers["service"] = startServiceController
+		controllers["route"] = startRouteController
+		// TODO: Move node controller and volume controller into the IncludeCloudLoops only set.
+	}
 	controllers["node"] = startNodeController
-	controllers["route"] = startRouteController
 	controllers["persistentvolume-binder"] = startPersistentVolumeBinderController
 	controllers["attachdetach"] = startAttachDetachController
 	controllers["persistentvolume-expander"] = startVolumeExpandController
@@ -430,7 +445,17 @@ func CreateControllerContext(s *options.CMServer, rootClientBuilder, clientBuild
 		return ControllerContext{}, err
 	}
 
-	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+	var cloud cloudprovider.Interface
+	var loopMode ControllerLoopMode
+	if cloudprovider.IsExternal(s.CloudProvider) {
+		loopMode = ExternalLoops
+		if s.ExternalCloudVolumePlugin != "" {
+			cloud, err = cloudprovider.InitCloudProvider(s.ExternalCloudVolumePlugin, s.CloudConfigFile)
+		}
+	} else {
+		loopMode = IncludeCloudLoops
+		cloud, err = cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+	}
 	if err != nil {
 		return ControllerContext{}, fmt.Errorf("cloud provider could not be initialized: %v", err)
 	}
@@ -453,6 +478,7 @@ func CreateControllerContext(s *options.CMServer, rootClientBuilder, clientBuild
 		Options:            *s,
 		AvailableResources: availableResources,
 		Cloud:              cloud,
+		LoopMode:           loopMode,
 		Stop:               stop,
 		InformersStarted:   make(chan struct{}),
 	}

@@ -18,6 +18,7 @@ package core
 
 import (
 	"reflect"
+	"sync"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -87,12 +88,16 @@ func TestPriorityQueue_Add(t *testing.T) {
 
 func TestPriorityQueue_Pop(t *testing.T) {
 	q := NewPriorityQueue()
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		if p, err := q.Pop(); err != nil || p != &highPriorityPod {
 			t.Errorf("Expected: %v after Pop, but got: %v", highPriorityPod.Name, p.Name)
 		}
 	}()
 	q.Add(&highPriorityPod)
+	wg.Wait()
 }
 
 func TestPriorityQueue_Update(t *testing.T) {
