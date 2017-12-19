@@ -655,7 +655,7 @@ func (c *Cacher) Stop() {
 	}
 	c.stopLock.Lock()
 	if c.stopped {
-		// avoid that it was locked meanwhile as isStopped only read-locks
+		c.stopLock.Unlock()
 		return
 	}
 	c.stopped = true
