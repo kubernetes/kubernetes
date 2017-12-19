@@ -18,9 +18,11 @@ package generators
 
 import (
 	"fmt"
+	"path"
 	"path/filepath"
 	"strings"
 
+	"github.com/golang/glog"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -28,8 +30,7 @@ import (
 
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
-
-	"github.com/golang/glog"
+	informergenargs "k8s.io/code-generator/cmd/informer-gen/args"
 )
 
 // NameSystems returns the name system used by the generators in this package.
@@ -112,7 +113,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 	boilerplate = append(boilerplate, []byte(generatedBy())...)
 
-	customArgs, ok := arguments.CustomArgs.(*CustomArgs)
+	customArgs, ok := arguments.CustomArgs.(*informergenargs.CustomArgs)
 	if !ok {
 		glog.Fatalf("Wrong CustomArgs type: %T", arguments.CustomArgs)
 	}
@@ -158,7 +159,8 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			gv.Version = clientgentypes.Version(parts[len(parts)-1])
 			targetGroupVersions = externalGroupVersions
 		}
-		groupPkgName := strings.ToLower(gv.Group.NonEmpty())
+		groupPackageName := gv.Group.NonEmpty()
+		gvPackage := path.Clean(p.Path)
 
 		// If there's a comment of the form "// +groupName=somegroup" or
 		// "// +groupName=somegroup.foo.bar.io", use the first field (somegroup) as the name of the
@@ -169,9 +171,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 		// If there's a comment of the form "// +groupGoName=SomeUniqueShortName", use that as
 		// the Go group identifier in CamelCase. It defaults
-		groupGoNames[groupPkgName] = namer.IC(strings.Split(gv.Group.NonEmpty(), ".")[0])
+		groupGoNames[groupPackageName] = namer.IC(strings.Split(gv.Group.NonEmpty(), ".")[0])
 		if override := types.ExtractCommentTags("+", p.Comments)["groupGoName"]; override != nil {
-			groupGoNames[groupPkgName] = namer.IC(override[0])
+			groupGoNames[groupPackageName] = namer.IC(override[0])
 		}
 
 		var typesToGenerate []*types.Type
@@ -192,23 +194,23 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			continue
 		}
 
-		groupVersionsEntry, ok := targetGroupVersions[groupPkgName]
+		groupVersionsEntry, ok := targetGroupVersions[groupPackageName]
 		if !ok {
 			groupVersionsEntry = clientgentypes.GroupVersions{
-				PackageName: groupPkgName,
+				PackageName: groupPackageName,
 				Group:       gv.Group,
 			}
 		}
-		groupVersionsEntry.Versions = append(groupVersionsEntry.Versions, gv.Version)
-		targetGroupVersions[groupPkgName] = groupVersionsEntry
+		groupVersionsEntry.Versions = append(groupVersionsEntry.Versions, clientgentypes.PackageVersion{Version: gv.Version, Package: gvPackage})
+		targetGroupVersions[groupPackageName] = groupVersionsEntry
 
 		orderer := namer.Orderer{Namer: namer.NewPrivateNamer(0)}
 		typesToGenerate = orderer.OrderTypes(typesToGenerate)
 
 		if internal {
-			packageList = append(packageList, versionPackage(internalVersionPackagePath, groupPkgName, gv, groupGoNames[groupPkgName], boilerplate, typesToGenerate, customArgs.InternalClientSetPackage, customArgs.ListersPackage))
+			packageList = append(packageList, versionPackage(internalVersionPackagePath, groupPackageName, gv, groupGoNames[groupPackageName], boilerplate, typesToGenerate, customArgs.InternalClientSetPackage, customArgs.ListersPackage))
 		} else {
-			packageList = append(packageList, versionPackage(externalVersionPackagePath, groupPkgName, gv, groupGoNames[groupPkgName], boilerplate, typesToGenerate, customArgs.VersionedClientSetPackage, customArgs.ListersPackage))
+			packageList = append(packageList, versionPackage(externalVersionPackagePath, groupPackageName, gv, groupGoNames[groupPackageName], boilerplate, typesToGenerate, customArgs.VersionedClientSetPackage, customArgs.ListersPackage))
 		}
 	}
 

@@ -42,32 +42,35 @@ limitations under the License.
 package main
 
 import (
+	"flag"
 	"path/filepath"
-
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/examples/defaulter-gen/generators"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"k8s.io/gengo/args"
+	"k8s.io/gengo/examples/defaulter-gen/generators"
+
+	generatorargs "k8s.io/code-generator/cmd/defaulter-gen/args"
 )
 
 func main() {
-	arguments := args.Default()
-
-	// Custom args.
-	customArgs := &generators.CustomArgs{
-		ExtraPeerDirs: []string{},
-	}
-	pflag.CommandLine.StringSliceVar(&customArgs.ExtraPeerDirs, "extra-peer-dirs", customArgs.ExtraPeerDirs,
-		"Comma-separated list of import paths which are considered, after tag-specified peers, for conversions.")
+	genericArgs, customArgs := generatorargs.NewDefaults()
 
 	// Override defaults.
-	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
-	arguments.OutputFileBaseName = "zz_generated.defaults"
-	arguments.CustomArgs = customArgs
+	// TODO: move this out of defaulter-gen
+	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
+
+	genericArgs.AddFlags(pflag.CommandLine)
+	customArgs.AddFlags(pflag.CommandLine)
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
+
+	if err := generatorargs.Validate(genericArgs); err != nil {
+		glog.Fatalf("Error: %v", err)
+	}
 
 	// Run it.
-	if err := arguments.Execute(
+	if err := genericArgs.Execute(
 		generators.NameSystems(),
 		generators.DefaultNameSystem(),
 		generators.Packages,
