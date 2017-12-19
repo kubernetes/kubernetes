@@ -59,6 +59,7 @@ const (
 	FailedUnmapDevice                    = "FailedUnmapDevice"
 	WarnAlreadyMountedVolume             = "AlreadyMountedVolume"
 	SuccessfulDetachVolume               = "SuccessfulDetachVolume"
+	SuccessfulAttachVolume               = "SuccessfulAttachVolume"
 	SuccessfulMountVolume                = "SuccessfulMountVolume"
 	SuccessfulUnMountVolume              = "SuccessfulUnMountVolume"
 	HostPortConflict                     = "HostPortConflict"

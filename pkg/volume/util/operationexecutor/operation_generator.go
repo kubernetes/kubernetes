@@ -325,6 +325,11 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 			return volumeToAttach.GenerateError("AttachVolume.Attach failed", attachErr)
 		}
 
+		// Successful attach event is useful for user debugging
+		simpleMsg, _ := volumeToAttach.GenerateMsg("AttachVolume.Attach succeeded", "")
+		for _, pod := range volumeToAttach.ScheduledPods {
+			og.recorder.Eventf(pod, v1.EventTypeNormal, kevents.SuccessfulAttachVolume, simpleMsg)
+		}
 		glog.Infof(volumeToAttach.GenerateMsgDetailed("AttachVolume.Attach succeeded", ""))
 
 		// Update actual state of world
