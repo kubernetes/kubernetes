@@ -638,7 +638,7 @@ def launch_default_ingress_controller():
         "k8s.gcr.io/defaultbackend:1.4"
     if arch() == 's390x':
         context['defaultbackend_image'] = \
-            "k8s.gcr.io/defaultbackend-s390x:1.4"
+            "gcr.io/google-containers/defaultbackend-s390x:1.4"
 
     # Render the default http backend (404) replicationcontroller manifest
     manifest = addon_path.format('default-http-backend.yaml')
