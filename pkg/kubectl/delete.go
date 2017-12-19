@@ -289,8 +289,10 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 	// to not be set on any node so the DameonSetController will start deleting
 	// daemon pods. Once it's done deleting the daemon pods, it's safe to delete
 	// the DaemonSet.
+	// The name this nodeSelector should make it clear that this is a result of
+	// an incomplete delete operation.
 	ds.Spec.Template.Spec.NodeSelector = map[string]string{
-		string(uuid.NewUUID()): string(uuid.NewUUID()),
+		fmt.Sprintf("pending-deletion-started-at-%v", time.Now().Format("2006-01-02-15-04-05")): string(uuid.NewUUID()),
 	}
 	// force update to avoid version conflict
 	ds.ResourceVersion = ""
