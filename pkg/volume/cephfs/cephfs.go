@@ -232,7 +232,10 @@ func (cephfsVolume *cephfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if !notMnt {
 		return nil
 	}
-	os.MkdirAll(dir, 0750)
+
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return err
+	}
 
 	// check whether it belongs to fuse, if not, default to use kernel mount.
 	if cephfsVolume.checkFuseMount() {
@@ -253,6 +256,7 @@ func (cephfsVolume *cephfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 		}
 	}
 	glog.V(4).Infof("CephFS kernel mount.")
+
 	err = cephfsVolume.execMount(dir)
 	if err != nil {
 		// cleanup upon failure.
