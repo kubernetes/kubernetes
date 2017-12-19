@@ -220,7 +220,6 @@ packageSpecs:
   versionRange: '>=4.2.0'
 - name: less
   versionRange: '>=481'
-- name: linux-headers-${KERNEL_RELEASE}
 - name: netcat-openbsd
   versionRange: '>=1.10'
 - name: python
