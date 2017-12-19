@@ -55,6 +55,14 @@ var execCommand = exec.Command
 //     "name": "gcp",
 //
 //     'config': {
+//       # Authentication options
+//       # These options are used while getting a token.
+//
+//       # comma-separated list of GCP API scopes. default value of this field
+//       # is "https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/userinfo.email".
+// 		 # to override the API scopes, specify this field explicitly.
+//       "scopes": "https://www.googleapis.com/auth/cloud-platform"
+//
 //       # Caching options
 //
 //       # Raw string data representing cached access token.
@@ -102,6 +110,9 @@ func newGCPAuthProvider(_ string, gcpConfig map[string]string, persister restcli
 		if len(cmd) == 0 {
 			return nil, fmt.Errorf("missing access token cmd")
 		}
+		if gcpConfig["scopes"] != "" {
+			return nil, fmt.Errorf("scopes can only be used when kubectl is using a gcp service account key")
+		}
 		var args []string
 		if cmdArgs, ok := gcpConfig["cmd-args"]; ok {
 			args = strings.Fields(cmdArgs)
@@ -112,7 +123,17 @@ func newGCPAuthProvider(_ string, gcpConfig map[string]string, persister restcli
 		}
 		ts = newCmdTokenSource(cmd, args, gcpConfig["token-key"], gcpConfig["expiry-key"], gcpConfig["time-fmt"])
 	} else {
-		ts, err = google.DefaultTokenSource(context.Background(), "https://www.googleapis.com/auth/cloud-platform")
+		var scopes []string
+		if gcpConfig["scopes"] != "" {
+			scopes = strings.Split(gcpConfig["scopes"], ",")
+		} else {
+			// default scopes: userinfo.email is used to authenticate to
+			// GKE APIs with gserviceaccount email instead of numeric uniqueID.
+			scopes = []string{
+				"https://www.googleapis.com/auth/cloud-platform",
+				"https://www.googleapis.com/auth/userinfo.email"}
+		}
+		ts, err = google.DefaultTokenSource(context.Background(), scopes...)
 	}
 	if err != nil {
 		return nil, err
