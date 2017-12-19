@@ -258,7 +258,7 @@ type KubeControllerManagerConfiguration struct {
 	// horizontalPodAutoscalerTolerance is the tolerance for when
 	// resource usage suggests upscaling/downscaling
 	HorizontalPodAutoscalerTolerance float64
-	// deploymentControllerSyncPeriod is the period for syncing the deployments.
+	// DEPRECATED: deploymentControllerSyncPeriod is the period for syncing the deployments.
 	DeploymentControllerSyncPeriod metav1.Duration
 	// podEvictionTimeout is the grace period for deleting pods on failed nodes.
 	PodEvictionTimeout metav1.Duration

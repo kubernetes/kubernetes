@@ -90,7 +90,6 @@ func NewCMServer() *CMServer {
 			HorizontalPodAutoscalerUpscaleForbiddenWindow:   metav1.Duration{Duration: 3 * time.Minute},
 			HorizontalPodAutoscalerDownscaleForbiddenWindow: metav1.Duration{Duration: 5 * time.Minute},
 			HorizontalPodAutoscalerTolerance:                0.1,
-			DeploymentControllerSyncPeriod:                  metav1.Duration{Duration: 30 * time.Second},
 			MinResyncPeriod:                                 metav1.Duration{Duration: 12 * time.Hour},
 			RegisterRetryCount:                              10,
 			PodEvictionTimeout:                              metav1.Duration{Duration: 5 * time.Minute},
@@ -179,6 +178,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet, allControllers []string, disabled
 	fs.DurationVar(&s.HorizontalPodAutoscalerDownscaleForbiddenWindow.Duration, "horizontal-pod-autoscaler-downscale-delay", s.HorizontalPodAutoscalerDownscaleForbiddenWindow.Duration, "The period since last downscale, before another downscale can be performed in horizontal pod autoscaler.")
 	fs.Float64Var(&s.HorizontalPodAutoscalerTolerance, "horizontal-pod-autoscaler-tolerance", s.HorizontalPodAutoscalerTolerance, "The minimum change (from 1.0) in the desired-to-actual metrics ratio for the horizontal pod autoscaler to consider scaling.")
 	fs.DurationVar(&s.DeploymentControllerSyncPeriod.Duration, "deployment-controller-sync-period", s.DeploymentControllerSyncPeriod.Duration, "Period for syncing the deployments.")
+	fs.MarkDeprecated("deployment-controller-sync-period", "This flag is currently no-op and will be deleted.")
 	fs.DurationVar(&s.PodEvictionTimeout.Duration, "pod-eviction-timeout", s.PodEvictionTimeout.Duration, "The grace period for deleting pods on failed nodes.")
 	fs.Float32Var(&s.DeletingPodsQps, "deleting-pods-qps", 0.1, "Number of nodes per second on which pods are deleted in case of node failure.")
 	fs.MarkDeprecated("deleting-pods-qps", "This flag is currently no-op and will be deleted.")
