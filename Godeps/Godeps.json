@@ -11,7 +11,7 @@
 	"Deps": [
 		{
 			"ImportPath": "bitbucket.org/bertimus9/systemstat",
-			"Rev": "1468fd0db20598383c9393cccaa547de6ad99e5e"
+			"Rev": "6edb7bbcb021f6510db33e604f7e18861293a14a"
 		},
 		{
 			"ImportPath": "bitbucket.org/ww/goautoneg",
