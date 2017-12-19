@@ -17,11 +17,28 @@ limitations under the License.
 package kubectl
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
 	"testing"
+	"time"
 
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/client-go/discovery"
+	fakedisco "k8s.io/client-go/discovery/fake"
+	"k8s.io/client-go/dynamic"
+	fakerest "k8s.io/client-go/rest/fake"
+	"k8s.io/client-go/scale"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -1309,4 +1326,284 @@ func TestValidateReplicaSets(t *testing.T) {
 			t.Errorf("expected an error: %v (%s)", err, test.test)
 		}
 	}
+}
+
+// TestGenericScaleSimple exercises GenericScaler.ScaleSimple method
+func TestGenericScaleSimple(t *testing.T) {
+	// test data
+	discoveryResources := []*metav1.APIResourceList{
+		{
+			GroupVersion: appsv1beta2.SchemeGroupVersion.String(),
+			APIResources: []metav1.APIResource{
+				{Name: "deployments", Namespaced: true, Kind: "Deployment"},
+				{Name: "deployments/scale", Namespaced: true, Kind: "Scale", Group: "apps", Version: "v1beta2"},
+			},
+		},
+	}
+	appsV1beta2Scale := &appsv1beta2.Scale{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Scale",
+			APIVersion: appsv1beta2.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "abc",
+		},
+		Spec: appsv1beta2.ScaleSpec{Replicas: 10},
+		Status: appsv1beta2.ScaleStatus{
+			Replicas: 10,
+		},
+	}
+	pathsResources := map[string]runtime.Object{
+		"/apis/apps/v1beta2/namespaces/default/deployments/abc/scale": appsV1beta2Scale,
+	}
+
+	scaleClient, err := fakeScaleClient(discoveryResources, pathsResources)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// test scenarios
+	scenarios := []struct {
+		name         string
+		precondition ScalePrecondition
+		newSize      int
+		targetGR     schema.GroupResource
+		resName      string
+		scaleGetter  scale.ScalesGetter
+		expectError  bool
+	}{
+		// scenario 1: scale up the "abc" deployment
+		{
+			name:         "scale up the \"abc\" deployment",
+			precondition: ScalePrecondition{10, ""},
+			newSize:      20,
+			targetGR:     schema.GroupResource{Group: "apps", Resource: "deployment"},
+			resName:      "abc",
+			scaleGetter:  scaleClient,
+		},
+		// scenario 2: scale down the "abc" deployment
+		{
+			name:         "scale down the \"abs\" deplyment",
+			precondition: ScalePrecondition{20, ""},
+			newSize:      5,
+			targetGR:     schema.GroupResource{Group: "apps", Resource: "deployment"},
+			resName:      "abc",
+			scaleGetter:  scaleClient,
+		},
+		// scenario 3: precondition error, expected size is 1,
+		// note that the previous scenario (2) set the size to 5
+		{
+			name:         "precondition error, expected size is 1",
+			precondition: ScalePrecondition{1, ""},
+			newSize:      5,
+			targetGR:     schema.GroupResource{Group: "apps", Resource: "deployment"},
+			resName:      "abc",
+			scaleGetter:  scaleClient,
+			expectError:  true,
+		},
+		// scenario 4: precondition is not validated when the precondition size is set to -1
+		{
+			name:         "precondition is not validated when the size is set to -1",
+			precondition: ScalePrecondition{-1, ""},
+			newSize:      5,
+			targetGR:     schema.GroupResource{Group: "apps", Resource: "deployment"},
+			resName:      "abc",
+			scaleGetter:  scaleClient,
+		},
+		// scenario 5: precondition error, resource version mismatch
+		{
+			name:         "precondition error, resource version mismatch",
+			precondition: ScalePrecondition{5, "v1"},
+			newSize:      5,
+			targetGR:     schema.GroupResource{Group: "apps", Resource: "deployment"},
+			resName:      "abc",
+			scaleGetter:  scaleClient,
+			expectError:  true,
+		},
+	}
+
+	// act
+	for index, scenario := range scenarios {
+		t.Run(fmt.Sprintf("running scenario %d: %s", index+1, scenario.name), func(t *testing.T) {
+			target := GenericScaler{scenario.scaleGetter, scenario.targetGR}
+
+			resVersion, err := target.ScaleSimple("default", scenario.resName, &scenario.precondition, uint(scenario.newSize))
+
+			if scenario.expectError && err == nil {
+				t.Fatal("expeced an error but was not returned")
+			}
+			if !scenario.expectError && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if resVersion != "" {
+				t.Fatalf("unexpected resource version returned = %s, wanted = %s", resVersion, "")
+			}
+		})
+	}
+}
+
+// TestGenericScale exercises GenericScaler.Scale method
+func TestGenericScale(t *testing.T) {
+	// test data
+	discoveryResources := []*metav1.APIResourceList{
+		{
+			GroupVersion: appsv1beta2.SchemeGroupVersion.String(),
+			APIResources: []metav1.APIResource{
+				{Name: "deployments", Namespaced: true, Kind: "Deployment"},
+				{Name: "deployments/scale", Namespaced: true, Kind: "Scale", Group: "apps", Version: "v1beta2"},
+			},
+		},
+	}
+	appsV1beta2Scale := &appsv1beta2.Scale{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Scale",
+			APIVersion: appsv1beta2.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "abc",
+		},
+		Spec: appsv1beta2.ScaleSpec{Replicas: 10},
+		Status: appsv1beta2.ScaleStatus{
+			Replicas: 10,
+		},
+	}
+	pathsResources := map[string]runtime.Object{
+		"/apis/apps/v1beta2/namespaces/default/deployments/abc/scale": appsV1beta2Scale,
+	}
+
+	scaleClient, err := fakeScaleClient(discoveryResources, pathsResources)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// test scenarios
+	scenarios := []struct {
+		name            string
+		precondition    ScalePrecondition
+		newSize         int
+		targetGR        schema.GroupResource
+		resName         string
+		scaleGetter     scale.ScalesGetter
+		waitForReplicas *RetryParams
+		expectError     bool
+	}{
+		// scenario 1: scale up the "abc" deployment
+		{
+			name:         "scale up the \"abc\" deployment",
+			precondition: ScalePrecondition{10, ""},
+			newSize:      20,
+			targetGR:     schema.GroupResource{Group: "apps", Resource: "deployment"},
+			resName:      "abc",
+			scaleGetter:  scaleClient,
+		},
+		// scenario 2: a resource name cannot be empty
+		{
+			name:         "a resource name cannot be empty",
+			precondition: ScalePrecondition{10, ""},
+			newSize:      20,
+			targetGR:     schema.GroupResource{Group: "apps", Resource: "deployment"},
+			resName:      "",
+			scaleGetter:  scaleClient,
+			expectError:  true,
+		},
+		// scenario 3: wait for replicas error due to status.Replicas != spec.Replicas
+		{
+			name:            "wait for replicas error due to status.Replicas != spec.Replicas",
+			precondition:    ScalePrecondition{10, ""},
+			newSize:         20,
+			targetGR:        schema.GroupResource{Group: "apps", Resource: "deployment"},
+			resName:         "abc",
+			scaleGetter:     scaleClient,
+			waitForReplicas: &RetryParams{time.Duration(5 * time.Second), time.Duration(5 * time.Second)},
+			expectError:     true,
+		},
+	}
+
+	// act
+	for index, scenario := range scenarios {
+		t.Run(fmt.Sprintf("running scenario %d: %s", index+1, scenario.name), func(t *testing.T) {
+			target := GenericScaler{scenario.scaleGetter, scenario.targetGR}
+
+			err := target.Scale("default", scenario.resName, uint(scenario.newSize), &scenario.precondition, nil, scenario.waitForReplicas)
+
+			if scenario.expectError && err == nil {
+				t.Fatal("expeced an error but was not returned")
+			}
+			if !scenario.expectError && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func fakeScaleClient(discoveryResources []*metav1.APIResourceList, pathsResources map[string]runtime.Object) (scale.ScalesGetter, error) {
+	fakeDiscoveryClient := &fakedisco.FakeDiscovery{Fake: &testcore.Fake{}}
+	fakeDiscoveryClient.Resources = discoveryResources
+	restMapperRes, err := discovery.GetAPIGroupResources(fakeDiscoveryClient)
+	if err != nil {
+		return nil, err
+	}
+	restMapper := discovery.NewRESTMapper(restMapperRes, apimeta.InterfacesForUnstructured)
+	codecs := serializer.NewCodecFactory(scale.NewScaleConverter().Scheme())
+	fakeReqHandler := func(req *http.Request) (*http.Response, error) {
+		path := req.URL.Path
+		scale, isScalePath := pathsResources[path]
+		if !isScalePath {
+			return nil, fmt.Errorf("unexpected request for URL %q with method %q", req.URL.String(), req.Method)
+		}
+
+		switch req.Method {
+		case "GET":
+			res, err := json.Marshal(scale)
+			if err != nil {
+				return nil, err
+			}
+			return &http.Response{StatusCode: 200, Header: defaultHeaders(), Body: bytesBody(res)}, nil
+		case "PUT":
+			decoder := codecs.UniversalDeserializer()
+			body, err := ioutil.ReadAll(req.Body)
+			if err != nil {
+				return nil, err
+			}
+			newScale, newScaleGVK, err := decoder.Decode(body, nil, nil)
+			if err != nil {
+				return nil, fmt.Errorf("unexpected request body: %v", err)
+			}
+			if *newScaleGVK != scale.GetObjectKind().GroupVersionKind() {
+				return nil, fmt.Errorf("unexpected scale API version %s (expected %s)", newScaleGVK.String(), scale.GetObjectKind().GroupVersionKind().String())
+			}
+			res, err := json.Marshal(newScale)
+			if err != nil {
+				return nil, err
+			}
+
+			pathsResources[path] = newScale
+			return &http.Response{StatusCode: 200, Header: defaultHeaders(), Body: bytesBody(res)}, nil
+		default:
+			return nil, fmt.Errorf("unexpected request for URL %q with method %q", req.URL.String(), req.Method)
+		}
+	}
+
+	fakeClient := &fakerest.RESTClient{
+		Client: fakerest.CreateHTTPClient(fakeReqHandler),
+		NegotiatedSerializer: serializer.DirectCodecFactory{
+			CodecFactory: serializer.NewCodecFactory(scale.NewScaleConverter().Scheme()),
+		},
+		GroupVersion:     schema.GroupVersion{},
+		VersionedAPIPath: "/not/a/real/path",
+	}
+
+	resolver := scale.NewDiscoveryScaleKindResolver(fakeDiscoveryClient)
+	client := scale.New(fakeClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
+	return client, nil
+}
+
+func bytesBody(bodyBytes []byte) io.ReadCloser {
+	return ioutil.NopCloser(bytes.NewReader(bodyBytes))
+}
+
+func defaultHeaders() http.Header {
+	header := http.Header{}
+	header.Set("Content-Type", runtime.ContentTypeJSON)
+	return header
 }
