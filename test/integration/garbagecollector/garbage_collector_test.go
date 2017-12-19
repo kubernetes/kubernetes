@@ -299,6 +299,7 @@ func TestCascadingDeletion(t *testing.T) {
 	defer ctx.tearDown()
 
 	gc, clientSet := ctx.gc, ctx.clientSet
+	gc.Debug.Store(true)
 
 	ns := createNamespaceOrDie("gc-cascading-deletion", clientSet, t)
 	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
@@ -310,10 +311,12 @@ func TestCascadingDeletion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create replication controller: %v", err)
 	}
+	t.Logf("Created toBeDeletedRC at %s", toBeDeletedRC.ResourceVersion)
 	remainingRC, err := rcClient.Create(newOwnerRC(remainingRCName, ns.Name))
 	if err != nil {
 		t.Fatalf("Failed to create replication controller: %v", err)
 	}
+	t.Logf("Created remainingRC at %s", remainingRC.ResourceVersion)
 
 	rcs, err := rcClient.List(metav1.ListOptions{})
 	if err != nil {

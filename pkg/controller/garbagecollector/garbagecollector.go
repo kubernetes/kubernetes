@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/golang/glog"
@@ -60,6 +61,8 @@ const ResourceResyncTime time.Duration = 0
 // ensures that the garbage collector operates with a graph that is at least as
 // up to date as the notification is sent.
 type GarbageCollector struct {
+	Debug *atomic.Value
+
 	restMapper resettableRESTMapper
 	// clientPool uses the regular dynamicCodec. We need it to update
 	// finalizers. It can be removed if we support patching finalizers.
@@ -88,7 +91,10 @@ func NewGarbageCollector(
 	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
 	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
 	absentOwnerCache := NewUIDCache(500)
+	debug := &atomic.Value{}
+	debug.Store(false)
 	gc := &GarbageCollector{
+		Debug:            debug,
 		clientPool:       clientPool,
 		restMapper:       mapper,
 		attemptToDelete:  attemptToDelete,
@@ -96,6 +102,7 @@ func NewGarbageCollector(
 		absentOwnerCache: absentOwnerCache,
 	}
 	gb := &GraphBuilder{
+		Debug:              debug,
 		metaOnlyClientPool: metaOnlyClientPool,
 		informersStarted:   informersStarted,
 		restMapper:         mapper,
@@ -404,6 +411,8 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 	if item.isDeletingDependents() {
 		return gc.processDeletingDependentsItem(item)
 	}
+
+	glog.V(2).Infof("DEBUG: got %s at rv=%s", item.identity, latest.GetResourceVersion())
 
 	// compute if we should delete the item
 	ownerReferences := latest.GetOwnerReferences()

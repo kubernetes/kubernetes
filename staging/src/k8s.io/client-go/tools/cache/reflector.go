@@ -237,7 +237,7 @@ func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
 // and then use the resource version to watch.
 // It returns error if ListAndWatch didn't even try to initialize watch.
 func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
-	glog.V(3).Infof("Listing and watching %v from %s", r.expectedType, r.name)
+	glog.Infof("Listing and watching %v from %s", r.expectedType, r.name)
 	var resourceVersion string
 
 	// Explicitly set "0" as resource version - it's fine for the List()
@@ -264,6 +264,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	if err := r.syncWith(items, resourceVersion); err != nil {
 		return fmt.Errorf("%s: Unable to sync list result: %v", r.name, err)
 	}
+	glog.Infof("Listed %v at %s", r.expectedType, resourceVersion)
 	r.setLastSyncResourceVersion(resourceVersion)
 
 	resyncerrc := make(chan error, 1)
