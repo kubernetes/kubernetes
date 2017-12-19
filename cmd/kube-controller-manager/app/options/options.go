@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	configvalidation "k8s.io/kubernetes/pkg/apis/componentconfig/validation"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -248,11 +249,15 @@ func (s *CMServer) Validate(allControllers []string, disabledByDefaultController
 		if strings.HasPrefix(controller, "-") {
 			controller = controller[1:]
 		}
-
 		if !allControllersSet.Has(controller) {
 			errs = append(errs, fmt.Errorf("%q is not in the list of known controllers", controller))
 		}
 	}
 
-	return utilerrors.NewAggregate(errs)
+	if configErrs := configvalidation.ValidateKubeControllerManagerConfiguration(&s.KubeControllerManagerConfiguration); configErrs != nil {
+		errs = append(errs, configErrs)
+	}
+
+	aggErrs := utilerrors.NewAggregate(errs)
+	return utilerrors.Flatten(aggErrs)
 }
