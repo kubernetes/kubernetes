@@ -55,10 +55,15 @@ type ServerConfig struct {
 	AutoCompactionRetention int
 	QuotaBackendBytes       int64
 
+	// MaxRequestBytes is the maximum request size to send over raft.
+	MaxRequestBytes uint
+
 	StrictReconfigCheck bool
 
 	// ClientCertAuthEnabled is true when cert has been signed by the client CA.
 	ClientCertAuthEnabled bool
+
+	AuthToken string
 }
 
 // VerifyBootstrap sanity-checks the initial config for bootstrap case
@@ -198,3 +203,5 @@ func (c *ServerConfig) bootstrapTimeout() time.Duration {
 	}
 	return time.Second
 }
+
+func (c *ServerConfig) backendPath() string { return filepath.Join(c.SnapDir(), "db") }

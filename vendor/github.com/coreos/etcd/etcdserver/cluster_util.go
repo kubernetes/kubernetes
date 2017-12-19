@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/coreos/etcd/etcdserver/membership"
-	"github.com/coreos/etcd/pkg/httputil"
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/coreos/etcd/version"
 	"github.com/coreos/go-semver/semver"
@@ -241,15 +240,6 @@ func getVersion(m *membership.Member, rt http.RoundTripper) (*version.Versions, 
 			plog.Warningf("failed to reach the peerURL(%s) of member %s (%v)", u, m.ID, err)
 			continue
 		}
-		// etcd 2.0 does not have version endpoint on peer url.
-		if resp.StatusCode == http.StatusNotFound {
-			httputil.GracefulClose(resp)
-			return &version.Versions{
-				Server:  "2.0.0",
-				Cluster: "2.0.0",
-			}, nil
-		}
-
 		var b []byte
 		b, err = ioutil.ReadAll(resp.Body)
 		resp.Body.Close()

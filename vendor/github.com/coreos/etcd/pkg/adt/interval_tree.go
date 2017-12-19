@@ -15,6 +15,7 @@
 package adt
 
 import (
+	"bytes"
 	"math"
 )
 
@@ -134,25 +135,29 @@ func (x *intervalNode) updateMax() {
 type nodeVisitor func(n *intervalNode) bool
 
 // visit will call a node visitor on each node that overlaps the given interval
-func (x *intervalNode) visit(iv *Interval, nv nodeVisitor) {
+func (x *intervalNode) visit(iv *Interval, nv nodeVisitor) bool {
 	if x == nil {
-		return
+		return true
 	}
 	v := iv.Compare(&x.iv.Ivl)
 	switch {
 	case v < 0:
-		x.left.visit(iv, nv)
+		if !x.left.visit(iv, nv) {
+			return false
+		}
 	case v > 0:
 		maxiv := Interval{x.iv.Ivl.Begin, x.max}
 		if maxiv.Compare(iv) == 0 {
-			x.left.visit(iv, nv)
-			x.right.visit(iv, nv)
+			if !x.left.visit(iv, nv) || !x.right.visit(iv, nv) {
+				return false
+			}
 		}
 	default:
-		nv(x)
-		x.left.visit(iv, nv)
-		x.right.visit(iv, nv)
+		if !x.left.visit(iv, nv) || !nv(x) || !x.right.visit(iv, nv) {
+			return false
+		}
 	}
+	return true
 }
 
 type IntervalValue struct {
@@ -402,10 +407,11 @@ func (ivt *IntervalTree) MaxHeight() int {
 	return int((2 * math.Log2(float64(ivt.Len()+1))) + 0.5)
 }
 
-// IntervalVisitor is used on tree searchs; return false to stop searching.
+// IntervalVisitor is used on tree searches; return false to stop searching.
 type IntervalVisitor func(n *IntervalValue) bool
 
 // Visit calls a visitor function on every tree node intersecting the given interval.
+// It will visit each interval [x, y) in ascending order sorted on x.
 func (ivt *IntervalTree) Visit(ivl Interval, ivv IntervalVisitor) {
 	ivt.root.visit(&ivl, func(n *intervalNode) bool { return ivv(&n.iv) })
 }
@@ -432,8 +438,8 @@ func (ivt *IntervalTree) Find(ivl Interval) (ret *IntervalValue) {
 	return &n.iv
 }
 
-// Contains returns true if there is some tree node intersecting the given interval.
-func (ivt *IntervalTree) Contains(iv Interval) bool {
+// Intersects returns true if there is some tree node intersecting the given interval.
+func (ivt *IntervalTree) Intersects(iv Interval) bool {
 	x := ivt.root
 	for x != nil && iv.Compare(&x.iv.Ivl) != 0 {
 		if x.left != nil && x.left.max.Compare(iv.Begin) > 0 {
@@ -443,6 +449,30 @@ func (ivt *IntervalTree) Contains(iv Interval) bool {
 		}
 	}
 	return x != nil
+}
+
+// Contains returns true if the interval tree's keys cover the entire given interval.
+func (ivt *IntervalTree) Contains(ivl Interval) bool {
+	var maxEnd, minBegin Comparable
+
+	isContiguous := true
+	ivt.Visit(ivl, func(n *IntervalValue) bool {
+		if minBegin == nil {
+			minBegin = n.Ivl.Begin
+			maxEnd = n.Ivl.End
+			return true
+		}
+		if maxEnd.Compare(n.Ivl.Begin) < 0 {
+			isContiguous = false
+			return false
+		}
+		if n.Ivl.End.Compare(maxEnd) > 0 {
+			maxEnd = n.Ivl.End
+		}
+		return true
+	})
+
+	return isContiguous && minBegin != nil && maxEnd.Compare(ivl.End) >= 0 && minBegin.Compare(ivl.Begin) <= 0
 }
 
 // Stab returns a slice with all elements in the tree intersecting the interval.
@@ -528,4 +558,33 @@ func (v Int64Comparable) Compare(c Comparable) int {
 		return 1
 	}
 	return 0
+}
+
+// BytesAffineComparable treats empty byte arrays as > all other byte arrays
+type BytesAffineComparable []byte
+
+func (b BytesAffineComparable) Compare(c Comparable) int {
+	bc := c.(BytesAffineComparable)
+
+	if len(b) == 0 {
+		if len(bc) == 0 {
+			return 0
+		}
+		return 1
+	}
+	if len(bc) == 0 {
+		return -1
+	}
+
+	return bytes.Compare(b, bc)
+}
+
+func NewBytesAffineInterval(begin, end []byte) Interval {
+	return Interval{BytesAffineComparable(begin), BytesAffineComparable(end)}
+}
+func NewBytesAffinePoint(b []byte) Interval {
+	be := make([]byte, len(b)+1)
+	copy(be, b)
+	be[len(b)] = 0
+	return NewBytesAffineInterval(b, be)
 }
