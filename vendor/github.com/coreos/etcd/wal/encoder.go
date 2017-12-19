@@ -52,7 +52,7 @@ func newEncoder(w io.Writer, prevCrc uint32, pageOffset int) *encoder {
 
 // newFileEncoder creates a new encoder with current file offset for the page writer.
 func newFileEncoder(f *os.File, prevCrc uint32) (*encoder, error) {
-	offset, err := f.Seek(0, io.SeekCurrent)
+	offset, err := f.Seek(0, os.SEEK_CUR)
 	if err != nil {
 		return nil, err
 	}

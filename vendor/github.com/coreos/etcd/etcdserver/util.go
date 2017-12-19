@@ -87,7 +87,7 @@ type notifier struct {
 
 func newNotifier() *notifier {
 	return &notifier{
-		c: make(chan struct{}),
+		c: make(chan struct{}, 0),
 	}
 }
 

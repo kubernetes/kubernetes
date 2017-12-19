@@ -13,6 +13,7 @@ go_library(
         "//vendor/github.com/coreos/etcd/lease:go_default_library",
         "//vendor/github.com/coreos/etcd/lease/leasepb:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/httputil:go_default_library",
+        "//vendor/golang.org/x/net/context:go_default_library",
     ],
 )
 

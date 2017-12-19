@@ -30,8 +30,7 @@ var (
 )
 
 const (
-	checkCompactionInterval   = 5 * time.Minute
-	executeCompactionInterval = time.Hour
+	checkCompactionInterval = 5 * time.Minute
 )
 
 type Compactable interface {
@@ -42,8 +41,6 @@ type RevGetter interface {
 	Rev() int64
 }
 
-// Periodic compacts the log by purging revisions older than
-// the configured retention time. Compaction happens hourly.
 type Periodic struct {
 	clock        clockwork.Clock
 	periodInHour int
@@ -88,12 +85,11 @@ func (t *Periodic) Run() {
 					continue
 				}
 			}
-
-			if clock.Now().Sub(last) < executeCompactionInterval {
+			if clock.Now().Sub(last) < time.Duration(t.periodInHour)*time.Hour {
 				continue
 			}
 
-			rev, remaining := t.getRev(t.periodInHour)
+			rev := t.getRev(t.periodInHour)
 			if rev < 0 {
 				continue
 			}
@@ -101,7 +97,7 @@ func (t *Periodic) Run() {
 			plog.Noticef("Starting auto-compaction at revision %d", rev)
 			_, err := t.c.Compact(t.ctx, &pb.CompactionRequest{Revision: rev})
 			if err == nil || err == mvcc.ErrCompacted {
-				t.revs = remaining
+				t.revs = make([]int64, 0)
 				last = clock.Now()
 				plog.Noticef("Finished auto-compaction at revision %d", rev)
 			} else {
@@ -128,10 +124,10 @@ func (t *Periodic) Resume() {
 	t.paused = false
 }
 
-func (t *Periodic) getRev(h int) (int64, []int64) {
+func (t *Periodic) getRev(h int) int64 {
 	i := len(t.revs) - int(time.Duration(h)*time.Hour/checkCompactionInterval)
 	if i < 0 {
-		return -1, t.revs
+		return -1
 	}
-	return t.revs[i], t.revs[i+1:]
+	return t.revs[i]
 }

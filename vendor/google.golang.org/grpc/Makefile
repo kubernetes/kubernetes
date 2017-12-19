@@ -20,16 +20,23 @@ proto:
 		echo "error: protoc not installed" >&2; \
 		exit 1; \
 	fi
-	go generate google.golang.org/grpc/...
+	go get -u -v github.com/golang/protobuf/protoc-gen-go
+	# use $$dir as the root for all proto files in the same directory
+	for dir in $$(git ls-files '*.proto' | xargs -n1 dirname | uniq); do \
+		protoc -I $$dir --go_out=plugins=grpc:$$dir $$dir/*.proto; \
+	done
 
 test: testdeps
-	go test -cpu 1,4 google.golang.org/grpc/...
+	go test -v -cpu 1,4 google.golang.org/grpc/...
 
 testrace: testdeps
-	go test -race -cpu 1,4 google.golang.org/grpc/...
+	go test -v -race -cpu 1,4 google.golang.org/grpc/...
 
 clean:
 	go clean -i google.golang.org/grpc/...
+
+coverage: testdeps
+	./coverage.sh --coveralls
 
 .PHONY: \
 	all \

@@ -15,7 +15,6 @@ go_library(
         "mux.go",
         "pattern.go",
         "proto2_convert.go",
-        "proto_errors.go",
         "query.go",
     ],
     importpath = "github.com/grpc-ecosystem/grpc-gateway/runtime",
@@ -26,10 +25,10 @@ go_library(
         "//vendor/github.com/grpc-ecosystem/grpc-gateway/runtime/internal:go_default_library",
         "//vendor/github.com/grpc-ecosystem/grpc-gateway/utilities:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
+        "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/google.golang.org/grpc/codes:go_default_library",
         "//vendor/google.golang.org/grpc/grpclog:go_default_library",
         "//vendor/google.golang.org/grpc/metadata:go_default_library",
-        "//vendor/google.golang.org/grpc/status:go_default_library",
     ],
 )
 

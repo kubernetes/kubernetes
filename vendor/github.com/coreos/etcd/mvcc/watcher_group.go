@@ -183,7 +183,7 @@ func (wg *watcherGroup) add(wa *watcher) {
 // contains is whether the given key has a watcher in the group.
 func (wg *watcherGroup) contains(key string) bool {
 	_, ok := wg.keyWatchers[key]
-	return ok || wg.ranges.Intersects(adt.NewStringAffinePoint(key))
+	return ok || wg.ranges.Contains(adt.NewStringAffinePoint(key))
 }
 
 // size gives the number of unique watchers in the group.

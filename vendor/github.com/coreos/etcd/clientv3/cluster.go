@@ -16,8 +16,8 @@ package clientv3
 
 import (
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
-
 	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 )
 
 type (
@@ -50,43 +50,53 @@ func NewCluster(c *Client) Cluster {
 	return &cluster{remote: RetryClusterClient(c)}
 }
 
-func NewClusterFromClusterClient(remote pb.ClusterClient) Cluster {
-	return &cluster{remote: remote}
-}
-
 func (c *cluster) MemberAdd(ctx context.Context, peerAddrs []string) (*MemberAddResponse, error) {
 	r := &pb.MemberAddRequest{PeerURLs: peerAddrs}
 	resp, err := c.remote.MemberAdd(ctx, r)
-	if err != nil {
+	if err == nil {
+		return (*MemberAddResponse)(resp), nil
+	}
+	if isHaltErr(ctx, err) {
 		return nil, toErr(ctx, err)
 	}
-	return (*MemberAddResponse)(resp), nil
+	return nil, toErr(ctx, err)
 }
 
 func (c *cluster) MemberRemove(ctx context.Context, id uint64) (*MemberRemoveResponse, error) {
 	r := &pb.MemberRemoveRequest{ID: id}
 	resp, err := c.remote.MemberRemove(ctx, r)
-	if err != nil {
+	if err == nil {
+		return (*MemberRemoveResponse)(resp), nil
+	}
+	if isHaltErr(ctx, err) {
 		return nil, toErr(ctx, err)
 	}
-	return (*MemberRemoveResponse)(resp), nil
+	return nil, toErr(ctx, err)
 }
 
 func (c *cluster) MemberUpdate(ctx context.Context, id uint64, peerAddrs []string) (*MemberUpdateResponse, error) {
 	// it is safe to retry on update.
-	r := &pb.MemberUpdateRequest{ID: id, PeerURLs: peerAddrs}
-	resp, err := c.remote.MemberUpdate(ctx, r)
-	if err == nil {
-		return (*MemberUpdateResponse)(resp), nil
+	for {
+		r := &pb.MemberUpdateRequest{ID: id, PeerURLs: peerAddrs}
+		resp, err := c.remote.MemberUpdate(ctx, r, grpc.FailFast(false))
+		if err == nil {
+			return (*MemberUpdateResponse)(resp), nil
+		}
+		if isHaltErr(ctx, err) {
+			return nil, toErr(ctx, err)
+		}
 	}
-	return nil, toErr(ctx, err)
 }
 
 func (c *cluster) MemberList(ctx context.Context) (*MemberListResponse, error) {
 	// it is safe to retry on list.
-	resp, err := c.remote.MemberList(ctx, &pb.MemberListRequest{})
-	if err == nil {
-		return (*MemberListResponse)(resp), nil
+	for {
+		resp, err := c.remote.MemberList(ctx, &pb.MemberListRequest{}, grpc.FailFast(false))
+		if err == nil {
+			return (*MemberListResponse)(resp), nil
+		}
+		if isHaltErr(ctx, err) {
+			return nil, toErr(ctx, err)
+		}
 	}
-	return nil, toErr(ctx, err)
 }

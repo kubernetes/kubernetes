@@ -88,6 +88,8 @@ func (f *fifo) Schedule(j Job) {
 		}
 	}
 	f.pendings = append(f.pendings, j)
+
+	return
 }
 
 func (f *fifo) Pending() int {

@@ -58,12 +58,6 @@ var (
 		Name:      "proposals_failed_total",
 		Help:      "The total number of failed proposals seen.",
 	})
-	leaseExpired = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: "etcd_debugging",
-		Subsystem: "server",
-		Name:      "lease_expired_total",
-		Help:      "The total number of expired leases.",
-	})
 )
 
 func init() {
@@ -73,7 +67,6 @@ func init() {
 	prometheus.MustRegister(proposalsApplied)
 	prometheus.MustRegister(proposalsPending)
 	prometheus.MustRegister(proposalsFailed)
-	prometheus.MustRegister(leaseExpired)
 }
 
 func monitorFileDescriptor(done <-chan struct{}) {

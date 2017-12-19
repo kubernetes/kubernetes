@@ -7,7 +7,6 @@ go_library(
         "keepalive_listener.go",
         "limit_listen.go",
         "listener.go",
-        "listener_tls.go",
         "timeout_conn.go",
         "timeout_dialer.go",
         "timeout_listener.go",
@@ -18,7 +17,10 @@ go_library(
     ],
     importpath = "github.com/coreos/etcd/pkg/transport",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/coreos/etcd/pkg/tlsutil:go_default_library"],
+    deps = [
+        "//vendor/github.com/coreos/etcd/pkg/fileutil:go_default_library",
+        "//vendor/github.com/coreos/etcd/pkg/tlsutil:go_default_library",
+    ],
 )
 
 filegroup(
