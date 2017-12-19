@@ -52,7 +52,7 @@ type Controller struct {
 	queue workqueue.RateLimitingInterface
 }
 
-// NewPVCProtectionController returns a new *{VCProtectionController.
+// NewPVCProtectionController returns a new instance of PVCProtectionController.
 func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface) *Controller {
 	e := &Controller{
 		client: cl,

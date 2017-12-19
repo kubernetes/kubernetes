@@ -268,10 +268,9 @@ func (b *volumeBinder) isVolumeBound(namespace string, vol *v1.Volume, checkFull
 			if metav1.HasAnnotation(pvc.ObjectMeta, annBindCompleted) {
 				glog.V(5).Infof("PVC %q is fully bound to PV %q", getPVCName(pvc), pvName)
 				return true, pvc, nil
-			} else {
-				glog.V(5).Infof("PVC %q is not fully bound to PV %q", getPVCName(pvc), pvName)
-				return false, pvc, nil
 			}
+			glog.V(5).Infof("PVC %q is not fully bound to PV %q", getPVCName(pvc), pvName)
+			return false, pvc, nil
 		}
 		glog.V(5).Infof("PVC %q is bound or prebound to PV %q", getPVCName(pvc), pvName)
 		return true, pvc, nil

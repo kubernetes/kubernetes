@@ -1026,7 +1026,7 @@ func (ctrl *PersistentVolumeController) reclaimVolume(volume *v1.PersistentVolum
 	return nil
 }
 
-// doRerecycleVolumeOperationcycleVolume recycles a volume. This method is
+// recycleVolumeOperation recycles a volume. This method is
 // running in standalone goroutine and already has all necessary locks.
 func (ctrl *PersistentVolumeController) recycleVolumeOperation(arg interface{}) {
 	volume, ok := arg.(*v1.PersistentVolume)

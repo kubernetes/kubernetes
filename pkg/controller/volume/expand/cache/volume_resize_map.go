@@ -94,7 +94,7 @@ func NewVolumeResizeMap(kubeClient clientset.Interface) VolumeResizeMap {
 // If for some reason we weren't able to update PVC after successful resize, then we are going to reprocess
 // the PVC and hopefully after a no-op resize in volume plugin, PVC will be updated with right values as well.
 func (resizeMap *volumeResizeMap) AddPVCUpdate(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
-	if pv.Spec.ClaimRef == nil || pvc.Namespace != pv.Spec.ClaimRef.Namespace || pvc.Name != pv.Spec.ClaimRef.Name {
+	if pv.Spec.ClaimRef == nil || pvc.Namespace != pv.Spec.ClaimRef.Namespace || pvc.Name != pv.Spec.ClaimRef.Name || (pv.Spec.ClaimRef.UID != "" && pvc.UID != pv.Spec.ClaimRef.UID) {
 		glog.V(4).Infof("Persistent Volume is not bound to PVC being updated : %s", util.ClaimToClaimKey(pvc))
 		return
 	}
