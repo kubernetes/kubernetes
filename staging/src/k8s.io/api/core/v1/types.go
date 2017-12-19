@@ -2459,7 +2459,11 @@ const (
 	// parameters such as nameservers and search paths should be defined via
 	// DNSConfig.
 	DNSNone DNSPolicy = "None"
+)
 
+const (
+	// DefaultTerminationGracePeriodSeconds indicates the default duration in
+	// seconds a pod needs to terminate gracefully.
 	DefaultTerminationGracePeriodSeconds = 30
 )
 
