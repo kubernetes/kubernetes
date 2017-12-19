@@ -45,7 +45,7 @@ var _ = SIGDescribe("Metadata Concealment", func() {
 						Containers: []v1.Container{
 							{
 								Name:  "check-metadata-concealment",
-								Image: "gcr.io/google_containers/check-metadata-concealment:v0.0.2",
+								Image: "k8s.gcr.io/check-metadata-concealment:v0.0.2",
 							},
 						},
 						RestartPolicy: v1.RestartPolicyOnFailure,

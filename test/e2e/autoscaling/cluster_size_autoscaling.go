@@ -415,6 +415,15 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			}
 		}
 
+		if minSize == 0 {
+			newSizes := make(map[string]int)
+			for mig, size := range originalSizes {
+				newSizes[mig] = size
+			}
+			newSizes[minMig] = 1
+			setMigSizes(newSizes)
+		}
+
 		removeLabels := func(nodesToClean sets.String) {
 			By("Removing labels from nodes")
 			for node := range nodesToClean {

@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 const (
@@ -38,7 +39,7 @@ const (
 	totalResizeWaitPeriod = 20 * time.Minute
 )
 
-var _ = SIGDescribe("Volume expand [Feature:ExpandPersistentVolumes] [Slow]", func() {
+var _ = utils.SIGDescribe("Volume expand [Feature:ExpandPersistentVolumes] [Slow]", func() {
 	var (
 		c           clientset.Interface
 		ns          string

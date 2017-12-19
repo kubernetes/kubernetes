@@ -7,6 +7,8 @@ go_library(
         "class.go",
         "conntrack_unspecified.go",
         "filter.go",
+        "fou.go",
+        "fou_unspecified.go",
         "genetlink_unspecified.go",
         "handle_unspecified.go",
         "link.go",
@@ -31,6 +33,7 @@ go_library(
             "class_linux.go",
             "conntrack_linux.go",
             "filter_linux.go",
+            "fou_linux.go",
             "genetlink_linux.go",
             "gtp_linux.go",
             "handle_linux.go",
@@ -55,6 +58,7 @@ go_library(
     deps = [
         "//vendor/github.com/vishvananda/netlink/nl:go_default_library",
         "//vendor/github.com/vishvananda/netns:go_default_library",
+        "//vendor/golang.org/x/sys/unix:go_default_library",
     ],
 )
 

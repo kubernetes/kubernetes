@@ -22,11 +22,37 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"reflect"
 	"strings"
 	"testing"
 )
+
+func TestYAMLDecoderReadBytesLength(t *testing.T) {
+	d := `---
+stuff: 1
+	test-foo: 1
+`
+	testCases := []struct {
+		bufLen    int
+		expectLen int
+		expectErr error
+	}{
+		{len(d), len(d), nil},
+		{len(d) + 10, len(d), nil},
+		{len(d) - 10, len(d) - 10, io.ErrShortBuffer},
+	}
+
+	for i, testCase := range testCases {
+		r := NewDocumentDecoder(ioutil.NopCloser(bytes.NewReader([]byte(d))))
+		b := make([]byte, testCase.bufLen)
+		n, err := r.Read(b)
+		if err != testCase.expectErr || n != testCase.expectLen {
+			t.Fatalf("%d: unexpected body: %d / %v", i, n, err)
+		}
+	}
+}
 
 func TestSplitYAMLDocument(t *testing.T) {
 	testCases := []struct {

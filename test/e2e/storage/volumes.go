@@ -55,6 +55,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
+	vspheretest "k8s.io/kubernetes/test/e2e/storage/vsphere"
 )
 
 func DeleteCinderVolume(name string) error {
@@ -79,7 +81,7 @@ func DeleteCinderVolume(name string) error {
 }
 
 // These tests need privileged containers, which are disabled by default.
-var _ = SIGDescribe("Volumes", func() {
+var _ = utils.SIGDescribe("Volumes", func() {
 	f := framework.NewDefaultFramework("volume")
 
 	// note that namespace deletion is handled by delete-namespace flag
@@ -510,10 +512,10 @@ var _ = SIGDescribe("Volumes", func() {
 			if err != nil {
 				return
 			}
-			vsp, err := getVSphere(c)
+			vsp, err := vspheretest.GetVSphere(c)
 			Expect(err).NotTo(HaveOccurred())
 
-			volumePath, err = createVSphereVolume(vsp, nil)
+			volumePath, err = vspheretest.CreateVSphereVolume(vsp, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			defer func() {

@@ -2459,7 +2459,11 @@ const (
 	// parameters such as nameservers and search paths should be defined via
 	// DNSConfig.
 	DNSNone DNSPolicy = "None"
+)
 
+const (
+	// DefaultTerminationGracePeriodSeconds indicates the default duration in
+	// seconds a pod needs to terminate gracefully.
 	DefaultTerminationGracePeriodSeconds = 30
 )
 
@@ -3906,7 +3910,7 @@ type PodSignature struct {
 // Describe a container image
 type ContainerImage struct {
 	// Names by which this image is known.
-	// e.g. ["gcr.io/google_containers/hyperkube:v1.0.7", "dockerhub.io/google_containers/hyperkube:v1.0.7"]
+	// e.g. ["k8s.gcr.io/hyperkube:v1.0.7", "dockerhub.io/google_containers/hyperkube:v1.0.7"]
 	Names []string `json:"names" protobuf:"bytes,1,rep,name=names"`
 	// The size of the image in bytes.
 	// +optional

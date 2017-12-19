@@ -14,7 +14,7 @@
     "containers": [
       {
         "name": "apache-php",
-	"image": "gcr.io/fake_project/fake_image:fake_tag",
+        "image": "gcr.io/fake_project/fake_image:fake_tag",
         "ports": [
           {
             "name": "apache",

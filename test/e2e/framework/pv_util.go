@@ -856,7 +856,7 @@ func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bo
 			Containers: []v1.Container{
 				{
 					Name:    "write-pod",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   "k8s.gcr.io/busybox:1.24",
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", command},
 					SecurityContext: &v1.SecurityContext{

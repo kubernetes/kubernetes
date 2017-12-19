@@ -32,9 +32,6 @@ type Storage interface {
 	Save(st raftpb.HardState, ents []raftpb.Entry) error
 	// SaveSnap function saves snapshot to the underlying stable storage.
 	SaveSnap(snap raftpb.Snapshot) error
-	// DBFilePath returns the file path of database snapshot saved with given
-	// id.
-	DBFilePath(id uint64) (string, error)
 	// Close closes the Storage and performs finalization.
 	Close() error
 }

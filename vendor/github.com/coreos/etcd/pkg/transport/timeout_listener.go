@@ -15,7 +15,6 @@
 package transport
 
 import (
-	"crypto/tls"
 	"net"
 	"time"
 )
@@ -23,7 +22,7 @@ import (
 // NewTimeoutListener returns a listener that listens on the given address.
 // If read/write on the accepted connection blocks longer than its time limit,
 // it will return timeout error.
-func NewTimeoutListener(addr string, scheme string, tlscfg *tls.Config, rdtimeoutd, wtimeoutd time.Duration) (net.Listener, error) {
+func NewTimeoutListener(addr string, scheme string, tlsinfo *TLSInfo, rdtimeoutd, wtimeoutd time.Duration) (net.Listener, error) {
 	ln, err := newListener(addr, scheme)
 	if err != nil {
 		return nil, err
@@ -33,7 +32,7 @@ func NewTimeoutListener(addr string, scheme string, tlscfg *tls.Config, rdtimeou
 		rdtimeoutd: rdtimeoutd,
 		wtimeoutd:  wtimeoutd,
 	}
-	if ln, err = wrapTLS(addr, scheme, tlscfg, ln); err != nil {
+	if ln, err = wrapTLS(addr, scheme, tlsinfo, ln); err != nil {
 		return nil, err
 	}
 	return ln, nil

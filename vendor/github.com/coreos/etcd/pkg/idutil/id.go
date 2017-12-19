@@ -32,8 +32,8 @@ const (
 // a node member ID.
 //
 // The initial id is in this format:
-// High order byte is memberID, next 5 bytes are from timestamp,
-// and low order 2 bytes are 0s.
+// High order 2 bytes are from memberID, next 5 bytes are from timestamp,
+// and low order one byte is a counter.
 // | prefix   | suffix              |
 // | 2 bytes  | 5 bytes   | 1 byte  |
 // | memberID | timestamp | cnt     |

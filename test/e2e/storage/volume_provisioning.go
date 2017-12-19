@@ -45,6 +45,7 @@ import (
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 type storageClassTest struct {
@@ -229,7 +230,7 @@ func checkGCEPD(volume *v1.PersistentVolume, volumeType string) error {
 	return nil
 }
 
-var _ = SIGDescribe("Dynamic Provisioning", func() {
+var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 	f := framework.NewDefaultFramework("volume-provisioning")
 
 	// filled in BeforeEach
