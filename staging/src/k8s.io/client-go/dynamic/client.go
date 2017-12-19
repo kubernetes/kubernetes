@@ -96,7 +96,7 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 	conf.ContentConfig = contentConfig
 
 	if conf.APIPath == "" {
-		conf.APIPath = "/api"
+		conf.APIPath = "/apis"
 	}
 
 	if len(conf.UserAgent) == 0 {
