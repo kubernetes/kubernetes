@@ -17,8 +17,6 @@ limitations under the License.
 package options
 
 import (
-	"fmt"
-
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,19 +36,24 @@ type RecommendedOptions struct {
 	Audit          *AuditOptions
 	Features       *FeatureOptions
 	CoreAPI        *CoreAPIOptions
-	Admission      *AdmissionOptions
+
+	// ExtraAdmissionInitializers is called once after all ApplyTo from the options above, to pass the returned
+	// admission plugin initializers to Admission.ApplyTo.
+	ExtraAdmissionInitializers func() ([]admission.PluginInitializer, error)
+	Admission                  *AdmissionOptions
 }
 
 func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptions {
 	return &RecommendedOptions{
-		Etcd:           NewEtcdOptions(storagebackend.NewDefaultConfig(prefix, codec)),
-		SecureServing:  NewSecureServingOptions(),
-		Authentication: NewDelegatingAuthenticationOptions(),
-		Authorization:  NewDelegatingAuthorizationOptions(),
-		Audit:          NewAuditOptions(),
-		Features:       NewFeatureOptions(),
-		CoreAPI:        NewCoreAPIOptions(),
-		Admission:      NewAdmissionOptions(),
+		Etcd:                       NewEtcdOptions(storagebackend.NewDefaultConfig(prefix, codec)),
+		SecureServing:              NewSecureServingOptions(),
+		Authentication:             NewDelegatingAuthenticationOptions(),
+		Authorization:              NewDelegatingAuthorizationOptions(),
+		Audit:                      NewAuditOptions(),
+		Features:                   NewFeatureOptions(),
+		CoreAPI:                    NewCoreAPIOptions(),
+		ExtraAdmissionInitializers: func() ([]admission.PluginInitializer, error) { return nil, nil },
+		Admission:                  NewAdmissionOptions(),
 	}
 }
 
@@ -90,34 +93,10 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig, scheme *r
 	if err := o.CoreAPI.ApplyTo(config); err != nil {
 		return err
 	}
-	if o.Admission != nil {
-		// Admission depends on CoreAPI to set SharedInformerFactory and ClientConfig.
-		if o.CoreAPI == nil {
-			return fmt.Errorf("admission depends on CoreAPI, so it must be set")
-		}
-		// Admission need scheme to construct admission initializer.
-		if scheme == nil {
-			return fmt.Errorf("admission depends on shceme, so it must be set")
-		}
-
-		pluginInitializers := []admission.PluginInitializer{}
-		for _, initFunc := range config.ExtraAdmissionInitializersInitFunc {
-			intializer, err := initFunc()
-			if err != nil {
-				return err
-			}
-			pluginInitializers = append(pluginInitializers, intializer)
-		}
-
-		err := o.Admission.ApplyTo(
-			&config.Config,
-			config.SharedInformerFactory,
-			config.ClientConfig,
-			scheme,
-			pluginInitializers...)
-		if err != nil {
-			return err
-		}
+	if initializers, err := o.ExtraAdmissionInitializers(); err != nil {
+		return err
+	} else if err := o.Admission.ApplyTo(&config.Config, config.SharedInformerFactory, config.ClientConfig, scheme, initializers...); err != nil {
+		return err
 	}
 
 	return nil

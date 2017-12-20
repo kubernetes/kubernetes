@@ -104,18 +104,15 @@ func (o *WardleServerOptions) Config() (*apiserver.Config, error) {
 
 	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
 
-	admissionInitializerInitFunc := func() (admission.PluginInitializer, error) {
+	o.RecommendedOptions.ExtraAdmissionInitializers = func() ([]admission.PluginInitializer, error) {
 		client, err := clientset.NewForConfig(serverConfig.LoopbackClientConfig)
 		if err != nil {
 			return nil, err
 		}
 		informerFactory := informers.NewSharedInformerFactory(client, serverConfig.LoopbackClientConfig.Timeout)
 		o.SharedInformerFactory = informerFactory
-		return wardleinitializer.New(informerFactory), nil
+		return []admission.PluginInitializer{wardleinitializer.New(informerFactory)}, nil
 	}
-
-	serverConfig.ExtraAdmissionInitializersInitFunc = []genericapiserver.AdmissionInitializersInitFunc{admissionInitializerInitFunc}
-
 	if err := o.RecommendedOptions.ApplyTo(serverConfig, apiserver.Scheme); err != nil {
 		return nil, err
 	}
