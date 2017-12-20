@@ -59,6 +59,8 @@ go_test(
     srcs = [
         "azure_loadbalancer_test.go",
         "azure_test.go",
+        "azure_util_test.go",
+        "azure_wrap_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
@@ -66,6 +68,7 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/service:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/arm/network:go_default_library",
+        "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/to:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
