@@ -25,6 +25,12 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Use --retry-connrefused opt only if it's supported by curl.
+CURL_RETRY_CONNREFUSED=""
+if curl --help | grep -q -- '--retry-connrefused'; then
+  CURL_RETRY_CONNREFUSED='--retry-connrefused'
+fi
+
 function create-dirs {
   echo "Creating required directories"
   mkdir -p /var/lib/kubelet
@@ -990,7 +996,7 @@ function start-kube-apiserver {
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
   if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
-    local -r vm_external_ip=$(curl --retry 5 --retry-delay 3 --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
+    local -r vm_external_ip=$(curl --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
     if [[ -n "${PROXY_SSH_USER:-}" ]]; then
       params+=" --advertise-address=${vm_external_ip}"      
       params+=" --ssh-user=${PROXY_SSH_USER}"
@@ -1419,7 +1425,7 @@ function setup-rkt {
     mkdir -p /etc/rkt "${KUBE_HOME}/download/"
     local rkt_tar="${KUBE_HOME}/download/rkt.tar.gz"
     local rkt_tmpdir=$(mktemp -d "${KUBE_HOME}/rkt_download.XXXXX")
-    curl --retry 5 --retry-delay 3 --fail --silent --show-error \
+    curl --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --fail --silent --show-error \
       --location --create-dirs --output "${rkt_tar}" \
       https://github.com/coreos/rkt/releases/download/v${RKT_VERSION}/rkt-v${RKT_VERSION}.tar.gz
     tar --strip-components=1 -xf "${rkt_tar}" -C "${rkt_tmpdir}" --overwrite
@@ -1458,7 +1464,7 @@ function install-docker2aci {
   local tar_path="${KUBE_HOME}/download/docker2aci.tar.gz"
   local tmp_path="${KUBE_HOME}/docker2aci"
   mkdir -p "${KUBE_HOME}/download/" "${tmp_path}"
-  curl --retry 5 --retry-delay 3 --fail --silent --show-error \
+  curl --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --fail --silent --show-error \
     --location --create-dirs --output "${tar_path}" \
     https://github.com/appc/docker2aci/releases/download/v0.14.0/docker2aci-v0.14.0.tar.gz
   tar --strip-components=1 -xf "${tar_path}" -C "${tmp_path}" --overwrite
