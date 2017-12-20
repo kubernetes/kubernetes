@@ -33,7 +33,7 @@ import (
 const awsChinaRegionPrefix = "cn-"
 const awsStandardDNSSuffix = "amazonaws.com"
 const awsChinaDNSSuffix = "amazonaws.com.cn"
-const registryURLTemplate = "*.dkr.ecr.%s.%s"
+const registryURLTemplate = "%s.dkr.ecr.%s.%s"
 
 // awsHandlerLogger is a handler that logs all AWS SDK requests
 // Copied from pkg/cloudprovider/providers/aws/log_handler.go
@@ -69,6 +69,7 @@ type lazyEcrProvider struct {
 	region         string
 	regionURL      string
 	actualProvider *credentialprovider.CachingDockerConfigProvider
+	account        string
 }
 
 var _ credentialprovider.DockerConfigProvider = &lazyEcrProvider{}
@@ -79,33 +80,46 @@ type ecrProvider struct {
 	region    string
 	regionURL string
 	getter    tokenGetter
+	account   string
 }
 
 var _ credentialprovider.DockerConfigProvider = &ecrProvider{}
 
 // registryURL has different suffix in AWS China region
-func registryURL(region string) string {
+func registryURL(account string, region string) string {
 	dnsSuffix := awsStandardDNSSuffix
 	// deal with aws none standard regions
 	if strings.HasPrefix(region, awsChinaRegionPrefix) {
 		dnsSuffix = awsChinaDNSSuffix
 	}
-	return fmt.Sprintf(registryURLTemplate, region, dnsSuffix)
+	return fmt.Sprintf(registryURLTemplate, account, region, dnsSuffix)
 }
 
-// RegisterCredentialsProvider registers a credential provider for the specified region.
-// It creates a lazy provider for each AWS region, in order to support
-// cross-region ECR access. They have to be lazy because it's unlikely, but not
-// impossible, that we'll use more than one.
+// RegisterCredentialsProviders registers the credential providers for the appropriate regions and accounts.
 // This should be called only if using the AWS cloud provider.
 // This way, we avoid timeouts waiting for a non-existent provider.
-func RegisterCredentialsProvider(region string) {
-	glog.V(4).Infof("registering credentials provider for AWS region %q", region)
+func RegisterCredentialsProviders(regions []string, accounts []string) {
+	if regions == nil {
+		return
+	}
+	if accounts == nil || len(accounts) == 0 {
+		accounts = []string{"*"}
+	}
+	for _, region := range regions {
+		for _, account := range accounts {
+			registerCredentialsProvider(region, account)
+		}
+	}
+}
 
-	credentialprovider.RegisterCredentialProvider("aws-ecr-"+region,
+func registerCredentialsProvider(region string, account string) {
+	glog.V(4).Infof("registering credentials provider for AWS regions %q", region)
+
+	credentialprovider.RegisterCredentialProvider("aws-ecr-"+region+"-"+account,
 		&lazyEcrProvider{
 			region:    region,
-			regionURL: registryURL(region),
+			regionURL: registryURL(account, region),
+			account:   account,
 		})
 }
 
@@ -123,7 +137,7 @@ func (p *lazyEcrProvider) LazyProvide() *credentialprovider.DockerConfigEntry {
 	if p.actualProvider == nil {
 		glog.V(2).Infof("Creating ecrProvider for %s", p.region)
 		p.actualProvider = &credentialprovider.CachingDockerConfigProvider{
-			Provider: newEcrProvider(p.region, nil),
+			Provider: newEcrProvider(p.region, p.account, nil),
 			// Refresh credentials a little earlier than expiration time
 			Lifetime: 11*time.Hour + 55*time.Minute,
 		}
@@ -146,11 +160,12 @@ func (p *lazyEcrProvider) Provide() credentialprovider.DockerConfig {
 	return cfg
 }
 
-func newEcrProvider(region string, getter tokenGetter) *ecrProvider {
+func newEcrProvider(region string, account string, getter tokenGetter) *ecrProvider {
 	return &ecrProvider{
 		region:    region,
-		regionURL: registryURL(region),
+		regionURL: registryURL(account, region),
 		getter:    getter,
+		account:   account,
 	}
 }
 
@@ -186,8 +201,15 @@ func (p *ecrProvider) LazyProvide() *credentialprovider.DockerConfigEntry {
 func (p *ecrProvider) Provide() credentialprovider.DockerConfig {
 	cfg := credentialprovider.DockerConfig{}
 
-	// TODO: fill in RegistryIds?
-	params := &ecr.GetAuthorizationTokenInput{}
+	var params *ecr.GetAuthorizationTokenInput
+	if p.account == "*" {
+		params = &ecr.GetAuthorizationTokenInput{}
+	} else {
+		params = &ecr.GetAuthorizationTokenInput{
+			RegistryIds: []*string{&p.account},
+		}
+	}
+
 	output, err := p.getter.GetAuthorizationToken(params)
 	if err != nil {
 		glog.Errorf("while requesting ECR authorization token %v", err)

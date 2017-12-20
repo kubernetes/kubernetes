@@ -58,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
+	awscredentialprovider "k8s.io/kubernetes/pkg/credentialprovider/aws"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -560,6 +561,11 @@ type CloudConfig struct {
 		//yourself in an non-AWS cloud and open an issue, please indicate that in the
 		//issue body.
 		DisableStrictZoneCheck bool
+
+		//The aws provider will lookup docker-login credentials for ECR in each region for
+		//the current AWS account. To lookup credentials for cross-account ECR access, supply
+		//the additional registry IDs.
+		EcrRegistryId []string
 	}
 }
 
@@ -1110,6 +1116,8 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 	// Register regions, in particular for ECR credentials
 	once.Do(func() {
 		RecognizeWellKnownRegions()
+		knownRegions := KnownRegions()
+		awscredentialprovider.RegisterCredentialsProviders(knownRegions, cfg.Global.EcrRegistryId)
 	})
 
 	return awsCloud, nil

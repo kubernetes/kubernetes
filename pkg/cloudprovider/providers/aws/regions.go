@@ -19,12 +19,10 @@ package aws
 import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/sets"
-	awscredentialprovider "k8s.io/kubernetes/pkg/credentialprovider/aws"
 	"sync"
 )
 
 // WellKnownRegions is the complete list of regions known to the AWS cloudprovider
-// and credentialprovider.
 var WellKnownRegions = [...]string{
 	// from `aws ec2 describe-regions --region us-east-1 --query Regions[].RegionName | sort`
 	"ap-northeast-1",
@@ -54,7 +52,6 @@ var awsRegionsMutex sync.Mutex
 var awsRegions sets.String
 
 // RecognizeRegion is called for each AWS region we know about.
-// It currently registers a credential provider for that region.
 // There are two paths to discovering a region:
 //  * we hard-code some well-known regions
 //  * if a region is discovered from instance metadata, we add that
@@ -73,8 +70,6 @@ func RecognizeRegion(region string) {
 
 	glog.V(4).Infof("found AWS region %q", region)
 
-	awscredentialprovider.RegisterCredentialsProvider(region)
-
 	awsRegions.Insert(region)
 }
 
@@ -91,4 +86,11 @@ func isRegionValid(region string) bool {
 	defer awsRegionsMutex.Unlock()
 
 	return awsRegions.Has(region)
+}
+
+func KnownRegions() []string {
+	awsRegionsMutex.Lock()
+	defer awsRegionsMutex.Unlock()
+
+	return awsRegions.List()
 }
