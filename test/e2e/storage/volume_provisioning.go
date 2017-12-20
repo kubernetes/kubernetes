@@ -626,7 +626,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				v1.BetaStorageClassAnnotation: className,
 			}
 
-			By("creating a claim with a external provisioning annotation")
+			By("creating a claim with an external provisioning annotation")
 			testDynamicProvisioning(test, c, claim, class)
 		})
 	})
@@ -914,7 +914,7 @@ func startExternalProvisioner(c clientset.Interface, ns string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "nfs-provisioner",
-					Image: "quay.io/kubernetes_incubator/nfs-provisioner:v1.0.6",
+					Image: "quay.io/kubernetes_incubator/nfs-provisioner:v1.0.8",
 					SecurityContext: &v1.SecurityContext{
 						Capabilities: &v1.Capabilities{
 							Add: []v1.Capability{"DAC_READ_SEARCH"},
