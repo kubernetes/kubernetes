@@ -15,6 +15,7 @@ go_library(
         "influxdb.go",
         "metrics_grabber.go",
         "stackdriver.go",
+        "stackdriver_metadata_agent.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/instrumentation/monitoring",
     deps = [
