@@ -239,11 +239,17 @@ func (h *httpStreamHandler) portForward(p *httpStreamPair) {
 	defer p.dataStream.Close()
 	defer p.errorStream.Close()
 
+	protocol := p.dataStream.Headers().Get(api.PortForwardProtocolType)
+	if protocol == "" {
+		// use tcp4 if no specify
+		protocol = api.PortForwardProtocolTypeTcp4
+	}
+
 	portString := p.dataStream.Headers().Get(api.PortHeader)
 	port, _ := strconv.ParseInt(portString, 10, 32)
 
 	glog.V(5).Infof("(conn=%p, request=%s) invoking forwarder.PortForward for port %s", h.conn, p.requestID, portString)
-	err := h.forwarder.PortForward(h.pod, h.uid, int32(port), p.dataStream)
+	err := h.forwarder.PortForward(h.pod, h.uid, protocol, int32(port), p.dataStream)
 	glog.V(5).Infof("(conn=%p, request=%s) done invoking forwarder.PortForward for port %s", h.conn, p.requestID, portString)
 
 	if err != nil {

@@ -75,7 +75,7 @@ type fakeKubelet struct {
 	runFunc                            func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
 	execFunc                           func(pod string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
 	attachFunc                         func(pod string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool) error
-	portForwardFunc                    func(name string, uid types.UID, port int32, stream io.ReadWriteCloser) error
+	portForwardFunc                    func(name string, uid types.UID, protocol string, port int32, stream io.ReadWriteCloser) error
 	containerLogsFunc                  func(podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	streamingConnectionIdleTimeoutFunc func() time.Duration
 	hostnameFunc                       func() string
@@ -145,8 +145,9 @@ func (fk *fakeKubelet) AttachContainer(name string, uid types.UID, container str
 	return fk.attachFunc(name, uid, container, in, out, err, tty)
 }
 
-func (fk *fakeKubelet) PortForward(name string, uid types.UID, port int32, stream io.ReadWriteCloser) error {
-	return fk.portForwardFunc(name, uid, port, stream)
+//need udp
+func (fk *fakeKubelet) PortForward(name string, uid types.UID, protocol string, port int32, stream io.ReadWriteCloser) error {
+	return fk.portForwardFunc(name, uid, protocol, port, stream)
 }
 
 func (fk *fakeKubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
@@ -1494,7 +1495,7 @@ func TestServePortForward(t *testing.T) {
 
 		portForwardFuncDone := make(chan struct{})
 
-		fw.fakeKubelet.portForwardFunc = func(name string, uid types.UID, port int32, stream io.ReadWriteCloser) error {
+		fw.fakeKubelet.portForwardFunc = func(name string, uid types.UID, protocol string, port int32, stream io.ReadWriteCloser) error {
 			defer close(portForwardFuncDone)
 
 			if e, a := expectedPodName, name; e != a {

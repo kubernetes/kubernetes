@@ -1620,9 +1620,10 @@ func (kl *Kubelet) AttachContainer(podFullName string, podUID types.UID, contain
 	return streamingRuntime.AttachContainer(container.ID, stdin, stdout, stderr, tty, resize)
 }
 
+//need udp
 // PortForward connects to the pod's port and copies data between the port
 // and the stream.
-func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port int32, stream io.ReadWriteCloser) error {
+func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, protocol string, port int32, stream io.ReadWriteCloser) error {
 	streamingRuntime, ok := kl.containerRuntime.(kubecontainer.DirectStreamingRuntime)
 	if !ok {
 		return fmt.Errorf("streaming methods not supported by runtime")

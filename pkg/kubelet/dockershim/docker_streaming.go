@@ -67,11 +67,15 @@ func (r *streamingRuntime) Attach(containerID string, in io.Reader, out, errw io
 	return attachContainer(r.client, containerID, in, out, errw, tty, resize)
 }
 
-func (r *streamingRuntime) PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
+//need udp
+func (r *streamingRuntime) PortForward(podSandboxID string, protocol string, port int32, stream io.ReadWriteCloser) error {
 	if port < 0 || port > math.MaxUint16 {
 		return fmt.Errorf("invalid port %d", port)
 	}
-	return portForward(r.client, podSandboxID, port, stream)
+	if protocol != "TCP4" && protocol != "UDP" {
+		return fmt.Errorf("invalid or not supported protocol %s", protocol)
+	}
+	return portForward(r.client, podSandboxID, protocol, port, stream)
 }
 
 // ExecSync executes a command in the container, and returns the stdout output.
@@ -159,7 +163,7 @@ func attachContainer(client libdocker.Interface, containerID string, stdin io.Re
 	return client.AttachToContainer(containerID, opts, sopts)
 }
 
-func portForward(client libdocker.Interface, podSandboxID string, port int32, stream io.ReadWriteCloser) error {
+func portForward(client libdocker.Interface, podSandboxID string, protocol string, port int32, stream io.ReadWriteCloser) error {
 	container, err := client.InspectContainer(podSandboxID)
 	if err != nil {
 		return err
@@ -175,7 +179,7 @@ func portForward(client libdocker.Interface, podSandboxID string, port int32, st
 		return fmt.Errorf("unable to do port forwarding: socat not found.")
 	}
 
-	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", socatPath, "-", fmt.Sprintf("TCP4:localhost:%d", port)}
+	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", socatPath, "-", fmt.Sprintf("%s:localhost:%d", protocol, port)}
 
 	nsenterPath, lookupErr := exec.LookPath("nsenter")
 	if lookupErr != nil {

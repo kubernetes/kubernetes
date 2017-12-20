@@ -186,7 +186,7 @@ func (h *websocketStreamHandler) portForward(p *websocketStreamPair) {
 	defer p.errorStream.Close()
 
 	glog.V(5).Infof("(conn=%p) invoking forwarder.PortForward for port %d", h.conn, p.port)
-	err := h.forwarder.PortForward(h.pod, h.uid, p.port, p.dataStream)
+	err := h.forwarder.PortForward(h.pod, h.uid, "", p.port, p.dataStream)
 	glog.V(5).Infof("(conn=%p) done invoking forwarder.PortForward for port %d", h.conn, p.port)
 
 	if err != nil {

@@ -70,7 +70,7 @@ func TestServeWSPortForward(t *testing.T) {
 
 		portForwardFuncDone := make(chan struct{})
 
-		fw.fakeKubelet.portForwardFunc = func(name string, uid types.UID, port int32, stream io.ReadWriteCloser) error {
+		fw.fakeKubelet.portForwardFunc = func(name string, uid types.UID, protocol string, port int32, stream io.ReadWriteCloser) error {
 			defer close(portForwardFuncDone)
 
 			if e, a := expectedPodName, name; e != a {
@@ -205,7 +205,7 @@ func TestServeWSMultiplePortForward(t *testing.T) {
 	portsMutex := sync.Mutex{}
 	portsForwarded := map[int32]struct{}{}
 
-	fw.fakeKubelet.portForwardFunc = func(name string, uid types.UID, port int32, stream io.ReadWriteCloser) error {
+	fw.fakeKubelet.portForwardFunc = func(name string, uid types.UID, protocol string, port int32, stream io.ReadWriteCloser) error {
 		defer portForwardWG.Done()
 
 		if e, a := expectedPodName, name; e != a {
