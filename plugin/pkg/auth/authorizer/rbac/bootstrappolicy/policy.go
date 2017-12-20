@@ -169,7 +169,7 @@ func ClusterRoles() []rbac.ClusterRole {
 			ObjectMeta: metav1.ObjectMeta{Name: "system:discovery"},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule("get").URLs(
-					"/healthz", "/version", "/version/*",
+					"/healthz", "/version", "/version/",
 					// remove once swagger 1.2 support is removed
 					"/swaggerapi", "/swaggerapi/*",
 					// do not expand this pattern for openapi discovery docs
