@@ -17,10 +17,12 @@ limitations under the License.
 package benchmark
 
 import (
+	"net"
 	"net/http"
 	"net/http/httptest"
 
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -44,7 +46,7 @@ const enableEquivalenceCache = true
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler() (schedulerConfigurator scheduler.Configurator, destroyFunc func()) {
+func mustSetupScheduler(metricServerEnabled bool) (schedulerConfigurator scheduler.Configurator, destroyFunc func()) {
 
 	h := &framework.MasterHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -52,6 +54,9 @@ func mustSetupScheduler() (schedulerConfigurator scheduler.Configurator, destroy
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
+	if metricServerEnabled {
+		go setupMetricsServer()
+	}
 	framework.RunAMasterUsingServer(framework.NewIntegrationTestMasterConfig(), s, h)
 
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{
@@ -101,6 +106,22 @@ func mustSetupScheduler() (schedulerConfigurator scheduler.Configurator, destroy
 		close(stop)
 		s.Close()
 		glog.Infof("destroyed")
+	}
+	return
+}
+
+// setupMetricsServer starts the metrics server on port 9091.
+func setupMetricsServer() {
+	glog.Infof("starting metrics server")
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", prometheus.Handler())
+	server := &http.Server{
+		// TODO: make the port configurable once we have yaml file.
+		Addr:    net.JoinHostPort("127.0.0.1", "9091"),
+		Handler: mux,
+	}
+	if err := server.ListenAndServe(); err != nil {
+		glog.Errorf("Error creating metrics server. Either port: %v", err)
 	}
 	return
 }

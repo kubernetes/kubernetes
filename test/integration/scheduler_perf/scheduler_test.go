@@ -17,6 +17,7 @@ limitations under the License.
 package benchmark
 
 import (
+	"flag"
 	"fmt"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -68,6 +69,10 @@ var (
 	}
 )
 
+// To hold metric server flag being given as input.
+// TODO: Remove this variable once, we are reading this as input from yaml file.
+var metricServer bool
+
 // TestSchedule100Node3KPods schedules 3k pods on 100 nodes.
 func TestSchedule100Node3KPods(t *testing.T) {
 	if testing.Short() {
@@ -115,7 +120,7 @@ type testConfig struct {
 
 // getBaseConfig returns baseConfig after initializing number of nodes and pods.
 func getBaseConfig(nodes int, pods int) *testConfig {
-	schedulerConfigFactory, destroyFunc := mustSetupScheduler()
+	schedulerConfigFactory, destroyFunc := mustSetupScheduler(metricServer)
 	return &testConfig{
 		schedulerSupportFunctions: schedulerConfigFactory,
 		destroyFunc:               destroyFunc,
@@ -274,4 +279,9 @@ func writePodAndNodeTopologyToConfig(config *testConfig) error {
 		return err
 	}
 	return nil
+}
+
+func init() {
+	flag.BoolVar(&metricServer, "start-metrics-server", false, "Metrics server")
+	flag.Parse()
 }

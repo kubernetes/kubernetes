@@ -21,6 +21,7 @@ go_library(
         "//plugin/pkg/scheduler/factory:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",

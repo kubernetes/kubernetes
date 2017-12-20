@@ -47,7 +47,7 @@ func BenchmarkScheduling(b *testing.B) {
 // and specific number of pods already scheduled. Since an operation takes relatively
 // long time, b.N should be small: 10 - 100.
 func benchmarkScheduling(numNodes, numScheduledPods int, b *testing.B) {
-	schedulerConfigFactory, finalFunc := mustSetupScheduler()
+	schedulerConfigFactory, finalFunc := mustSetupScheduler(metricServer)
 	defer finalFunc()
 	c := schedulerConfigFactory.GetClient()
 
