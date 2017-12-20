@@ -1243,7 +1243,7 @@ def all_kube_system_pods_running():
         status = pod['status']['phase']
         # Evicted nodes should re-spawn
         if status != 'Running' and \
-                        pod['status'].get('reason', '') != 'Evicted':
+           pod['status'].get('reason', '') != 'Evicted':
             return False
 
     return True
