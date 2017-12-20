@@ -73,6 +73,9 @@ func (j *JSONPath) Execute(wr io.Writer, data interface{}) error {
 			return err
 		}
 	}
+	if len(fullResults[0]) != 0 {
+		wr.Write([]byte("\n"))
+	}
 	return nil
 }
 

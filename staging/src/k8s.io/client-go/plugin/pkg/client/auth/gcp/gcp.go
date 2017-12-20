@@ -255,9 +255,15 @@ func (c *commandTokenSource) parseTokenCmdOutput(output []byte) (*oauth2.Token, 
 	if err != nil {
 		return nil, fmt.Errorf("error parsing token-key %q from %q: %v", c.tokenKey, string(output), err)
 	}
+	if strings.HasSuffix(accessToken, "\n") {
+		accessToken = strings.Replace(accessToken, "\n", "", strings.Index(accessToken, "\n"))
+	}
 	expiryStr, err := parseJSONPath(data, "expiry-key", c.expiryKey)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing expiry-key %q from %q: %v", c.expiryKey, string(output), err)
+	}
+	if strings.HasSuffix(expiryStr, "\n") {
+		expiryStr = strings.Replace(expiryStr, "\n", "", strings.Index(expiryStr, "\n"))
 	}
 	var expiry time.Time
 	if t, err := time.Parse(c.timeFmt, expiryStr); err != nil {
