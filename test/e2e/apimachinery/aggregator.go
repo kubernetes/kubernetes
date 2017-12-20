@@ -53,16 +53,24 @@ var _ = SIGDescribe("Aggregator", func() {
 	var ns string
 	var c clientset.Interface
 	var aggrclient *aggregatorclient.Clientset
+
+	// BeforeEachs run in LIFO order, AfterEachs run in FIFO order.
+	// We want cleanTest to happen before the namespace cleanup AfterEach
+	// inserted by NewDefaultFramework, so we put this AfterEach in front
+	// of NewDefaultFramework.
+	AfterEach(func() {
+		cleanTest(c, aggrclient, ns)
+	})
+
 	f := framework.NewDefaultFramework("aggregator")
 
+	// We want namespace initialization BeforeEach inserted by
+	// NewDefaultFramework to happen before this, so we put this BeforeEach
+	// after NewDefaultFramework.
 	BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		aggrclient = f.AggregatorClient
-	})
-
-	AfterEach(func() {
-		cleanTest(c, aggrclient, ns)
 	})
 
 	It("Should be able to support the 1.7 Sample API Server using the current Aggregator", func() {
