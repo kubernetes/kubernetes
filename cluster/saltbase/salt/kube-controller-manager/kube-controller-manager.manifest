@@ -37,6 +37,7 @@
 {% set pv_recycler_mount = "" -%}
 {% set pv_recycler_volume = "" -%}
 {% set srv_kube_path = "/srv/kubernetes" -%}
+{% flex_vol_plugin_dir = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec" -%}
 
 {% if grains.cloud is defined -%}
   {% if grains.cloud not in ['vagrant', 'photon-controller', 'azure-legacy'] -%}
@@ -137,6 +138,7 @@
         { "name": "srvkube",
         "mountPath": "{{srv_kube_path}}",
         "readOnly": true},
+        {{flexvolume_hostpath_mount}}
         { "name": "logfile",
         "mountPath": "/var/log/kube-controller-manager.log",
         "readOnly": false},
@@ -166,6 +168,7 @@
     "hostPath": {
         "path": "{{srv_kube_path}}"}
   },
+  {{flexvolume_hostpath}}
   { "name": "logfile",
     "hostPath": {
         "path": "/var/log/kube-controller-manager.log",
