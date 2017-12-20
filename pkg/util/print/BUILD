@@ -6,19 +6,18 @@ load(
     "go_test",
 )
 
-go_library(
-    name = "go_default_library",
-    srcs = ["hash.go"],
-    importpath = "k8s.io/kubernetes/pkg/util/hash",
-    deps = ["//vendor/github.com/davecgh/go-spew/spew:go_default_library"],
-)
-
 go_test(
     name = "go_default_test",
-    srcs = ["hash_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/util/hash",
+    srcs = ["print_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/util/print",
     library = ":go_default_library",
-    deps = ["//pkg/util/print:go_default_library"],
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = ["print.go"],
+    importpath = "k8s.io/kubernetes/pkg/util/print",
+    deps = ["//vendor/github.com/davecgh/go-spew/spew:go_default_library"],
 )
 
 filegroup(
