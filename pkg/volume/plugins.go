@@ -788,7 +788,7 @@ func NewPersistentVolumeRecyclerPodTemplate() *v1.Pod {
 	return pod
 }
 
-// Check validity of recycle pod template
+// ValidateRecyclerPodTemplate check validity of recycle pod template
 // List of checks:
 // - at least one volume is defined in the recycle pod template
 // If successful, returns nil

@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
-// This is the primary entrypoint for volume plugins.
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&cephfsPlugin{nil}}
 }
@@ -144,7 +144,7 @@ func (plugin *cephfsPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 			path:         path,
 			secret:       secret,
 			id:           id,
-			secret_file:  secretFile,
+			secretFile:   secretFile,
 			readonly:     readOnly,
 			mounter:      mounter,
 			plugin:       plugin,
@@ -182,16 +182,16 @@ func (plugin *cephfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*
 
 // CephFS volumes represent a bare host file or directory mount of an CephFS export.
 type cephfs struct {
-	volName     string
-	podUID      types.UID
-	mon         []string
-	path        string
-	id          string
-	secret      string
-	secret_file string
-	readonly    bool
-	mounter     mount.Interface
-	plugin      *cephfsPlugin
+	volName    string
+	podUID     types.UID
+	mon        []string
+	path       string
+	id         string
+	secret     string
+	secretFile string
+	readonly   bool
+	mounter    mount.Interface
+	plugin     *cephfsPlugin
 	volume.MetricsNil
 	mountOptions []string
 }
@@ -210,7 +210,7 @@ func (cephfsVolume *cephfsMounter) GetAttributes() volume.Attributes {
 	}
 }
 
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
+// CanMount checks prior to mount operations to verify that the required components (binaries, etc.)
 // to mount the volume are available on the underlying node.
 // If not, it returns an error
 func (cephfsMounter *cephfsMounter) CanMount() error {
@@ -294,19 +294,19 @@ func (cephfsVolume *cephfs) GetKeyringPath() string {
 
 func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 	// cephfs mount option
-	ceph_opt := ""
+	cephOpt := ""
 	// override secretfile if secret is provided
 	if cephfsVolume.secret != "" {
-		ceph_opt = "name=" + cephfsVolume.id + ",secret=" + cephfsVolume.secret
+		cephOpt = "name=" + cephfsVolume.id + ",secret=" + cephfsVolume.secret
 	} else {
-		ceph_opt = "name=" + cephfsVolume.id + ",secretfile=" + cephfsVolume.secret_file
+		cephOpt = "name=" + cephfsVolume.id + ",secretfile=" + cephfsVolume.secretFile
 	}
 	// build option array
 	opt := []string{}
 	if cephfsVolume.readonly {
 		opt = append(opt, "ro")
 	}
-	opt = append(opt, ceph_opt)
+	opt = append(opt, cephOpt)
 
 	// build src like mon1:6789,mon2:6789,mon3:6789:/
 	hosts := cephfsVolume.mon
