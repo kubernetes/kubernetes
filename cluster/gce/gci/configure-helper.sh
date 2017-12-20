@@ -1253,6 +1253,8 @@ function start-etcd-servers {
 #   CLOUD_CONFIG_VOLUME
 #   CLOUD_CONFIG_MOUNT
 #   DOCKER_REGISTRY
+#   FLEXVOLUME_HOSTPATH_MOUNT
+#   FLEXVOLUME_HOSTPATH_VOLUME
 function compute-master-manifest-variables {
   CLOUD_CONFIG_OPT=""
   CLOUD_CONFIG_VOLUME=""
@@ -1265,6 +1267,13 @@ function compute-master-manifest-variables {
   DOCKER_REGISTRY="gcr.io/google_containers"
   if [[ -n "${KUBE_DOCKER_REGISTRY:-}" ]]; then
     DOCKER_REGISTRY="${KUBE_DOCKER_REGISTRY}"
+  fi
+
+  FLEXVOLUME_HOSTPATH_MOUNT=""
+  FLEXVOLUME_HOSTPATH_VOLUME=""
+  if [[ -n "${VOLUME_PLUGIN_DIR:-}" ]]; then
+    FLEXVOLUME_HOSTPATH_MOUNT="{ \"name\": \"flexvolumedir\", \"mountPath\": \"${VOLUME_PLUGIN_DIR}\", \"readOnly\": true},"
+    FLEXVOLUME_HOSTPATH_VOLUME="{ \"name\": \"flexvolumedir\", \"hostPath\": {\"path\": \"${VOLUME_PLUGIN_DIR}\"}},"
   fi
 }
 
@@ -1639,6 +1648,9 @@ function start-kube-controller-manager {
   sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_mount}}@@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_volume}}@@g" "${src_file}"
+  sed -i -e "s@{{flexvolume_hostpath_mount}}@${FLEXVOLUME_HOSTPATH_MOUNT}@g" "${src_file}"
+  sed -i -e "s@{{flexvolume_hostpath}}@${FLEXVOLUME_HOSTPATH_VOLUME}@g" "${src_file}"
+
   cp "${src_file}" /etc/kubernetes/manifests
 }
 
