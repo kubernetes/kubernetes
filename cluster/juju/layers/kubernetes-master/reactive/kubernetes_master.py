@@ -1241,7 +1241,9 @@ def all_kube_system_pods_running():
     result = json.loads(output)
     for pod in result['items']:
         status = pod['status']['phase']
-        if status != 'Running':
+        # Evicted nodes should re-spawn
+        if status != 'Running' and \
+           pod['status'].get('reason', '') != 'Evicted':
             return False
 
     return True
