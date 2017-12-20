@@ -143,8 +143,7 @@ func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 	// assert: now we know that a dynamicConfigDir was provided, and we can rely on that existing
 
 	// make sure the filesystem is set up properly
-	// TODO(mtaufen): rename this to initializeDynamicConfigDir
-	if err := cc.initialize(); err != nil {
+	if err := cc.initializeDynamicConfigDir(); err != nil {
 		return nil, err
 	}
 
@@ -244,10 +243,10 @@ func (cc *Controller) StartSync(client clientset.Interface, nodeName string) {
 	}
 }
 
-// initialize makes sure that the storage layers for various controller components are set up correctly
-func (cc *Controller) initialize() error {
+// initializeDynamicConfigDir makes sure that the storage layers for various controller components are set up correctly
+func (cc *Controller) initializeDynamicConfigDir() error {
 	utillog.Infof("ensuring filesystem is set up correctly")
-	// initialize local checkpoint storage location
+	// initializeDynamicConfigDir local checkpoint storage location
 	return cc.checkpointStore.Initialize()
 }
 
