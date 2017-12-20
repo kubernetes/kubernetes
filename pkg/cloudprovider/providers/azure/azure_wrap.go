@@ -40,7 +40,10 @@ func checkResourceExistsFromError(err error) (bool, error) {
 		return true, nil
 	}
 	v, ok := err.(autorest.DetailedError)
-	if ok && v.StatusCode == http.StatusNotFound {
+	if !ok {
+		return false, err
+	}
+	if v.StatusCode == http.StatusNotFound {
 		return false, nil
 	}
 	return false, v
