@@ -222,7 +222,7 @@ func GetExistingContainerStatus(statuses []v1.ContainerStatus, name string) v1.C
 // 2. LastTransitionTime (is set) + minReadySeconds < current time
 func IsPodAvailable(pod *v1.Pod, minReadySeconds int32, now metav1.Time) bool {
 	c := GetPodReadyCondition(pod.Status)
-	if c != nil && c.Status == v1.ConditionTrue {
+	if c == nil || c.Status != v1.ConditionTrue {
 		return false
 	}
 	
