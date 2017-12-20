@@ -19,6 +19,7 @@ package kubelet
 import (
 	"fmt"
 	"net"
+	"runtime"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -74,7 +75,11 @@ type kubeletVolumeHost struct {
 }
 
 func (kvh *kubeletVolumeHost) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
-	return kvh.kubelet.getPodVolumeDir(podUID, pluginName, volumeName)
+	dir := kvh.kubelet.getPodVolumeDir(podUID, pluginName, volumeName)
+	if runtime.GOOS == "windows" {
+		dir = volume.GetWindowsPath(dir)
+	}
+	return dir
 }
 
 func (kvh *kubeletVolumeHost) GetPodPluginDir(podUID types.UID, pluginName string) string {
