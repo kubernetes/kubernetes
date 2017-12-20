@@ -640,7 +640,7 @@ items:
     - /swaggerapi
     - /swaggerapi/*
     - /version
-    - /version/*
+    - /version/
     verbs:
     - get
 - apiVersion: rbac.authorization.k8s.io/v1
