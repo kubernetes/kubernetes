@@ -259,7 +259,7 @@ func NewNodeController(
 		}
 		mask := clusterCIDR.Mask
 		if maskSize, _ := mask.Size(); maskSize > nodeCIDRMaskSize {
-			glog.Fatal("Controller: Invalid clusterCIDR, mask size of clusterCIDR must be less than nodeCIDRMaskSize.")
+			glog.Fatalf("Controller: Invalid clusterCIDR, mask size of clusterCIDR(%d) must be less than nodeCIDRMaskSize(%d).", maskSize, nodeCIDRMaskSize)
 		}
 	}
 

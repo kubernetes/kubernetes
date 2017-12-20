@@ -315,7 +315,7 @@ func newReplicaset() *v1beta1.ReplicaSet {
 					Containers: []v1.Container{
 						{
 							Name:  name + "-container",
-							Image: "k8s.gcr.io/porter:4524579c0eb935c056c8e75563b4e1eda31587e0",
+							Image: imageutils.GetE2EImage(imageutils.Porter),
 						},
 					},
 				},

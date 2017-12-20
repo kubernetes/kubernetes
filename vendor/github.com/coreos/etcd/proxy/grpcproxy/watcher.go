@@ -102,17 +102,16 @@ func (w *watcher) send(wr clientv3.WatchResponse) {
 	}
 
 	// all events are filtered out?
-	if !wr.IsProgressNotify() && !wr.Created && len(events) == 0 && wr.CompactRevision == 0 {
+	if !wr.IsProgressNotify() && !wr.Created && len(events) == 0 {
 		return
 	}
 
 	w.lastHeader = wr.Header
 	w.post(&pb.WatchResponse{
-		Header:          &wr.Header,
-		Created:         wr.Created,
-		CompactRevision: wr.CompactRevision,
-		WatchId:         w.id,
-		Events:          events,
+		Header:  &wr.Header,
+		Created: wr.Created,
+		WatchId: w.id,
+		Events:  events,
 	})
 }
 

@@ -24,18 +24,8 @@ var (
 		Help:      "The latency distributions of commit called by backend.",
 		Buckets:   prometheus.ExponentialBuckets(0.001, 2, 14),
 	})
-
-	snapshotDurations = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: "etcd",
-		Subsystem: "disk",
-		Name:      "backend_snapshot_duration_seconds",
-		Help:      "The latency distribution of backend snapshots.",
-		// 10 ms -> 655 seconds
-		Buckets: prometheus.ExponentialBuckets(.01, 2, 17),
-	})
 )
 
 func init() {
 	prometheus.MustRegister(commitDurations)
-	prometheus.MustRegister(snapshotDurations)
 }

@@ -31,6 +31,7 @@ func TestGVPackageFlag(t *testing.T) {
 	tests := []struct {
 		args           []string
 		def            []string
+		importBasePath string
 		expected       map[types.GroupVersion]string
 		expectedGroups []types.GroupVersions
 		parseError     string
@@ -42,47 +43,56 @@ func TestGVPackageFlag(t *testing.T) {
 		},
 		{
 			args: []string{"foo/bar/v1", "foo/bar/v2", "foo/bar/", "foo/v1"},
-			expected: map[types.GroupVersion]string{
-				{Group: "bar", Version: ""}:   "foo/bar",
-				{Group: "bar", Version: "v1"}: "foo/bar/v1",
-				{Group: "bar", Version: "v2"}: "foo/bar/v2",
-				{Group: "foo", Version: "v1"}: "foo/v1",
-			},
 			expectedGroups: []types.GroupVersions{
-				{PackageName: "bar", Group: types.Group("bar"), Versions: []types.Version{types.Version("v1"), types.Version("v2"), types.Version("")}},
-				{PackageName: "foo", Group: types.Group("foo"), Versions: []types.Version{types.Version("v1")}},
+				{PackageName: "bar", Group: types.Group("bar"), Versions: []types.PackageVersion{
+					{"v1", "foo/bar/v1"},
+					{"v2", "foo/bar/v2"},
+					{"", "foo/bar"},
+				}},
+				{PackageName: "foo", Group: types.Group("foo"), Versions: []types.PackageVersion{
+					{"v1", "foo/v1"},
+				}},
 			},
 		},
 		{
 			args: []string{"foo/bar/v1", "foo/bar/v2", "foo/bar/", "foo/v1"},
 			def:  []string{"foo/bar/v1alpha1", "foo/v1"},
-			expected: map[types.GroupVersion]string{
-				{Group: "bar", Version: ""}:   "foo/bar",
-				{Group: "bar", Version: "v1"}: "foo/bar/v1",
-				{Group: "bar", Version: "v2"}: "foo/bar/v2",
-				{Group: "foo", Version: "v1"}: "foo/v1",
-			},
 			expectedGroups: []types.GroupVersions{
-				{PackageName: "bar", Group: types.Group("bar"), Versions: []types.Version{types.Version("v1"), types.Version("v2"), types.Version("")}},
-				{PackageName: "foo", Group: types.Group("foo"), Versions: []types.Version{types.Version("v1")}},
+				{PackageName: "bar", Group: types.Group("bar"), Versions: []types.PackageVersion{
+					{"v1", "foo/bar/v1"},
+					{"v2", "foo/bar/v2"},
+					{"", "foo/bar"},
+				}},
+				{PackageName: "foo", Group: types.Group("foo"), Versions: []types.PackageVersion{
+					{"v1", "foo/v1"},
+				}},
 			},
 		},
 		{
 			args: []string{"api/v1", "api"},
-			expected: map[types.GroupVersion]string{
-				{Group: "api", Version: "v1"}: "core/v1",
-				{Group: "api", Version: ""}:   "core",
-			},
 			expectedGroups: []types.GroupVersions{
-				{PackageName: "core", Group: types.Group("api"), Versions: []types.Version{types.Version("v1"), types.Version("")}},
+				{PackageName: "core", Group: types.Group("api"), Versions: []types.PackageVersion{
+					{"v1", "core/v1"},
+					{"", "core"},
+				}},
+			},
+		},
+		{
+			args:           []string{"foo/v1"},
+			importBasePath: "k8s.io/api",
+			expectedGroups: []types.GroupVersions{
+				{PackageName: "foo", Group: types.Group("foo"), Versions: []types.PackageVersion{
+					{"v1", "k8s.io/api/foo/v1"},
+				}},
 			},
 		},
 	}
 	for i, test := range tests {
 		fs := pflag.NewFlagSet("testGVPackage", pflag.ContinueOnError)
-		gvp := map[types.GroupVersion]string{}
 		groups := []types.GroupVersions{}
-		fs.Var(NewGVPackagesValue(&gvp, &groups, test.def), "input", "usage")
+		builder := NewGroupVersionsBuilder(&groups)
+		fs.Var(NewGVPackagesValue(builder, test.def), "input", "usage")
+		fs.Var(NewInputBasePathValue(builder, test.importBasePath), "input-base-path", "usage")
 
 		args := []string{}
 		for _, a := range test.args {
@@ -98,9 +108,6 @@ func TestGVPackageFlag(t *testing.T) {
 			}
 		} else if err != nil {
 			t.Errorf("%d: expected nil error, got %v", i, err)
-		}
-		if !reflect.DeepEqual(gvp, test.expected) {
-			t.Errorf("%d: expected %+v, got %+v", i, test.expected, gvp)
 		}
 		if !reflect.DeepEqual(groups, test.expectedGroups) {
 			t.Errorf("%d: expected groups %+v, got groups %+v", i, test.expectedGroups, groups)

@@ -33,7 +33,6 @@ var (
 	ErrNoSpace                    = errors.New("etcdserver: no space")
 	ErrTooManyRequests            = errors.New("etcdserver: too many requests")
 	ErrUnhealthy                  = errors.New("etcdserver: unhealthy cluster")
-	ErrKeyNotFound                = errors.New("etcdserver: key not found")
 )
 
 type DiscoveryError struct {

@@ -24,30 +24,25 @@ import (
 // LeaderStats is used by the leader in an etcd cluster, and encapsulates
 // statistics about communication with its followers
 type LeaderStats struct {
-	leaderStats
-	sync.Mutex
-}
-
-type leaderStats struct {
 	// Leader is the ID of the leader in the etcd cluster.
 	// TODO(jonboulle): clarify that these are IDs, not names
 	Leader    string                    `json:"leader"`
 	Followers map[string]*FollowerStats `json:"followers"`
+
+	sync.Mutex
 }
 
 // NewLeaderStats generates a new LeaderStats with the given id as leader
 func NewLeaderStats(id string) *LeaderStats {
 	return &LeaderStats{
-		leaderStats: leaderStats{
-			Leader:    id,
-			Followers: make(map[string]*FollowerStats),
-		},
+		Leader:    id,
+		Followers: make(map[string]*FollowerStats),
 	}
 }
 
 func (ls *LeaderStats) JSON() []byte {
 	ls.Lock()
-	stats := ls.leaderStats
+	stats := *ls
 	ls.Unlock()
 	b, err := json.Marshal(stats)
 	// TODO(jonboulle): appropriate error handling?

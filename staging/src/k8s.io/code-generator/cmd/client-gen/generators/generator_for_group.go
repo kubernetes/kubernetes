@@ -72,13 +72,10 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 
 	apiPath := func(group string) string {
-		if len(g.apiPath) > 0 {
-			return `"` + g.apiPath + `"`
-		}
 		if group == "core" {
 			return `"/api"`
 		}
-		return `"/apis"`
+		return `"` + g.apiPath + `"`
 	}
 
 	groupName := g.group

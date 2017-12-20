@@ -35,37 +35,35 @@ limitations under the License.
 package main
 
 import (
+	"flag"
 	"path/filepath"
-
-	"k8s.io/code-generator/cmd/conversion-gen/generators"
-	"k8s.io/gengo/args"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"k8s.io/gengo/args"
+
+	generatorargs "k8s.io/code-generator/cmd/conversion-gen/args"
+	"k8s.io/code-generator/cmd/conversion-gen/generators"
 )
 
 func main() {
-	arguments := args.Default()
-
-	// Custom args.
-	customArgs := &generators.CustomArgs{
-		BasePeerDirs: generators.DefaultBasePeerDirs,
-		SkipUnsafe:   false,
-	}
-	pflag.CommandLine.StringSliceVar(&customArgs.BasePeerDirs, "base-peer-dirs", customArgs.BasePeerDirs,
-		"Comma-separated list of apimachinery import paths which are considered, after tag-specified peers, for conversions. Only change these if you have very good reasons.")
-	pflag.CommandLine.StringSliceVar(&customArgs.ExtraPeerDirs, "extra-peer-dirs", customArgs.ExtraPeerDirs,
-		"Application specific comma-separated list of import paths which are considered, after tag-specified peers and base-peer-dirs, for conversions.")
-	pflag.CommandLine.BoolVar(&customArgs.SkipUnsafe, "skip-unsafe", customArgs.SkipUnsafe,
-		"If true, will not generate code using unsafe pointer conversions; resulting code may be slower.")
+	genericArgs, customArgs := generatorargs.NewDefaults()
 
 	// Override defaults.
-	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
-	arguments.OutputFileBaseName = "conversion_generated"
-	arguments.CustomArgs = customArgs
+	// TODO: move this out of conversion-gen
+	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
+
+	genericArgs.AddFlags(pflag.CommandLine)
+	customArgs.AddFlags(pflag.CommandLine)
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
+
+	if err := generatorargs.Validate(genericArgs); err != nil {
+		glog.Fatalf("Error: %v", err)
+	}
 
 	// Run it.
-	if err := arguments.Execute(
+	if err := genericArgs.Execute(
 		generators.NameSystems(),
 		generators.DefaultNameSystem(),
 		generators.Packages,

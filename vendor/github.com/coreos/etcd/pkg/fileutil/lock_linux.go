@@ -17,7 +17,6 @@
 package fileutil
 
 import (
-	"io"
 	"os"
 	"syscall"
 )
@@ -37,7 +36,7 @@ const (
 var (
 	wrlck = syscall.Flock_t{
 		Type:   syscall.F_WRLCK,
-		Whence: int16(io.SeekStart),
+		Whence: int16(os.SEEK_SET),
 		Start:  0,
 		Len:    0,
 	}

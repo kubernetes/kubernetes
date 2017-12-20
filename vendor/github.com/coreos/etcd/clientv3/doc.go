@@ -28,7 +28,7 @@
 // Make sure to close the client after using it. If the client is not closed, the
 // connection will have leaky goroutines.
 //
-// To specify a client request timeout, wrap the context with context.WithTimeout:
+// To specify client request timeout, pass context.WithTimeout to APIs:
 //
 //	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 //	resp, err := kvc.Put(ctx, "sample_key", "sample_value")

@@ -30,31 +30,9 @@ import (
 	"k8s.io/gengo/types"
 
 	"github.com/golang/glog"
+
+	conversionargs "k8s.io/code-generator/cmd/conversion-gen/args"
 )
-
-// DefaultBasePeerDirs are the peer-dirs nearly everybody will use, i.e. those coming from
-// apimachinery.
-var DefaultBasePeerDirs = []string{
-	"k8s.io/apimachinery/pkg/apis/meta/v1",
-	"k8s.io/apimachinery/pkg/conversion",
-	"k8s.io/apimachinery/pkg/runtime",
-}
-
-// CustomArgs is used by the gengo framework to pass args specific to this generator.
-type CustomArgs struct {
-	// Base peer dirs which nearly everybody will use, i.e. outside of Kubernetes core.
-	BasePeerDirs []string
-
-	// Custom peer dirs which are application specific. Always consider these as
-	// last-ditch possibilities for conversions.
-	ExtraPeerDirs []string //
-
-	// Skipunsafe indicates whether to generate unsafe conversions to improve the efficiency
-	// of these operations. The unsafe operation is a direct pointer assignment via unsafe
-	// (within the allowed uses of unsafe) and is equivalent to a proposed Golang change to
-	// allow structs that are identical to be assigned to each other.
-	SkipUnsafe bool
-}
 
 // These are the comment tags that carry parameters for conversion generation.
 const (
@@ -264,7 +242,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			continue
 		}
 		skipUnsafe := false
-		if customArgs, ok := arguments.CustomArgs.(*CustomArgs); ok {
+		if customArgs, ok := arguments.CustomArgs.(*conversionargs.CustomArgs); ok {
 			peerPkgs = append(peerPkgs, customArgs.BasePeerDirs...)
 			peerPkgs = append(peerPkgs, customArgs.ExtraPeerDirs...)
 			skipUnsafe = customArgs.SkipUnsafe
@@ -590,12 +568,6 @@ func argsFromType(inType, outType *types.Type) generator.Args {
 	return generator.Args{
 		"inType":  inType,
 		"outType": outType,
-	}
-}
-
-func defaultingArgsFromType(inType *types.Type) generator.Args {
-	return generator.Args{
-		"inType": inType,
 	}
 }
 
