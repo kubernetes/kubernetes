@@ -26,11 +26,11 @@ import (
 
 func TestSecretForDockerRegistryGenerate(t *testing.T) {
 	username, password, email, server := "test-user", "test-password", "test-user@example.org", "https://index.docker.io/v1/"
-	secretData, err := handleDockercfgContent(username, password, email, server)
+	secretData, err := handleDockerCfgJsonContent(username, password, email, server)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	secretDataNoEmail, err := handleDockercfgContent(username, password, "", server)
+	secretDataNoEmail, err := handleDockerCfgJsonContent(username, password, "", server)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -53,9 +53,9 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 					Name: "foo",
 				},
 				Data: map[string][]byte{
-					v1.DockerConfigKey: secretData,
+					v1.DockerConfigJsonKey: secretData,
 				},
-				Type: v1.SecretTypeDockercfg,
+				Type: v1.SecretTypeDockerConfigJson,
 			},
 			expectErr: false,
 		},
@@ -70,12 +70,12 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 			},
 			expected: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo-94759gc65b",
+					Name: "foo-548cm7fgdh",
 				},
 				Data: map[string][]byte{
-					v1.DockerConfigKey: secretData,
+					v1.DockerConfigJsonKey: secretData,
 				},
-				Type: v1.SecretTypeDockercfg,
+				Type: v1.SecretTypeDockerConfigJson,
 			},
 			expectErr: false,
 		},
@@ -91,9 +91,9 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 					Name: "foo",
 				},
 				Data: map[string][]byte{
-					v1.DockerConfigKey: secretDataNoEmail,
+					v1.DockerConfigJsonKey: secretDataNoEmail,
 				},
-				Type: v1.SecretTypeDockercfg,
+				Type: v1.SecretTypeDockerConfigJson,
 			},
 			expectErr: false,
 		},
