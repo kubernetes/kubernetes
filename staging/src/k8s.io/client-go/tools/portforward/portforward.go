@@ -185,7 +185,7 @@ func (pf *PortForwarder) forward() error {
 // If both listener creation fail, an error is raised.
 func (pf *PortForwarder) listenOnPort(port *ForwardedPort) error {
 	errTcp4 := pf.listenOnPortAndAddress(port, "tcp4", "127.0.0.1")
-	errTcp6 := pf.listenOnPortAndAddress(port, "tcp6", "[::1]")
+	errTcp6 := pf.listenOnPortAndAddress(port, "tcp6", "::1")
 	if errTcp4 != nil && errTcp6 != nil {
 		return fmt.Errorf("All listeners failed to create with the following errors: %s, %s", errTcp4, errTcp6)
 	}
@@ -220,7 +220,7 @@ func (pf *PortForwarder) getListener(protocol string, hostname string, port *For
 	}
 	port.Local = uint16(localPortUInt)
 	if pf.out != nil {
-		fmt.Fprintf(pf.out, "Forwarding from %s:%d -> %d\n", hostname, localPortUInt, port.Remote)
+		fmt.Fprintf(pf.out, "Forwarding from %s -> %d\n", net.JoinHostPort(hostname, strconv.Itoa(int(localPortUInt))), port.Remote)
 	}
 
 	return listener, nil
