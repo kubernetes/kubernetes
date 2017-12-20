@@ -22,7 +22,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+	ptype "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -1651,6 +1654,7 @@ func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*
 
 	originalPod := pod.DeepCopy()
 
+	admitCounter.Reset()
 	plugin := NewTestAdmission(informerFactory.Extensions().InternalVersion().PodSecurityPolicies().Lister())
 
 	attrs := kadmission.NewAttributesRecord(pod, oldPod, kapi.Kind("Pod").WithVersion("version"), "namespace", "", kapi.Resource("pods").WithVersion("version"), "", op, &user.DefaultInfo{})
@@ -1681,6 +1685,20 @@ func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*
 	if !shouldPass && err == nil {
 		t.Errorf("%s: expected errors but received none", testCaseName)
 	}
+
+	wantLabels := map[string]string{
+		"operation":   string(op),
+		"group":       "",
+		"version":     "version",
+		"resource":    "pods",
+		"subresource": "",
+		"type":        "admit",
+		"rejected":    "false",
+	}
+	if !shouldPass {
+		wantLabels["rejected"] = "true"
+	}
+	expectMetric(t, wantLabels)
 }
 
 func TestAssignSecurityContext(t *testing.T) {
@@ -2103,4 +2121,40 @@ func userIDPtr(i int) *int64 {
 func groupIDPtr(i int) *int64 {
 	groupID := int64(i)
 	return &groupID
+}
+
+func expectMetric(t *testing.T, labelFilter map[string]string) {
+	metrics, err := prometheus.DefaultGatherer.Gather()
+	require.NoError(t, err)
+
+	counterSum := 0
+	for _, mf := range metrics {
+		if mf.GetName() != "apiserver_admission_controller_admission_latencies_seconds_count" {
+			continue // Ignore other metrics.
+		}
+		for _, metric := range mf.GetMetric() {
+			if !labelsMatch(metric, labelFilter) {
+				continue
+			}
+			counterSum += int(metric.GetCounter().GetValue())
+		}
+	}
+	assert.EqualValues(t, 1, counterSum,
+		"Wanted metric with labels %#+v", labelFilter)
+	if 1 != counterSum {
+		for _, mf := range metrics {
+			for _, metric := range mf.GetMetric() {
+				t.Logf("\tnear match: %s", metric.String())
+			}
+		}
+	}
+}
+
+func labelsMatch(metric *ptype.Metric, labelFilter map[string]string) bool {
+	for _, lp := range metric.GetLabel() {
+		if value, ok := labelFilter[lp.GetName()]; ok && lp.GetValue() != value {
+			return false
+		}
+	}
+	return true
 }

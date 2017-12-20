@@ -111,6 +111,12 @@ func (a *podSecurityPolicyPlugin) SetInternalKubeInformerFactory(f informers.Sha
 //     with the validated PSP.  If we don't find any reject the pod and give all errors from the
 //     failed attempts.
 func (c *podSecurityPolicyPlugin) Admit(a admission.Attributes) error {
+	err := c.admit(a)
+	ObserveAdmit(err != nil, a)
+	return err
+}
+
+func (c *podSecurityPolicyPlugin) admit(a admission.Attributes) error {
 	if a.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}
