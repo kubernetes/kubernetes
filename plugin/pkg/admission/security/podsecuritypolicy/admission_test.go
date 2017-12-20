@@ -49,13 +49,10 @@ const defaultContainerName = "test-c"
 // NewTestAdmission provides an admission plugin with test implementations of internal structs.  It uses
 // an authorizer that always returns true.
 func NewTestAdmission(lister extensionslisters.PodSecurityPolicyLister) kadmission.Interface {
-	return &podSecurityPolicyPlugin{
-		Handler:         kadmission.NewHandler(kadmission.Create, kadmission.Update),
-		strategyFactory: kpsp.NewSimpleStrategyFactory(),
-		pspMatcher:      getMatchingPolicies,
-		authz:           &TestAuthorizer{},
-		lister:          lister,
-	}
+	plugin := NewPlugin(kpsp.NewSimpleStrategyFactory(), getMatchingPolicies, false)
+	plugin.SetAuthorizer(&TestAuthorizer{})
+	plugin.lister = lister
+	return plugin
 }
 
 // TestAlwaysAllowedAuthorizer is a testing struct for testing that fulfills the authorizer interface.

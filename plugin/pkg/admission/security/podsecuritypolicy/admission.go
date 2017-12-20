@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/metrics"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/api"
@@ -64,6 +65,7 @@ type podSecurityPolicyPlugin struct {
 	failOnNoPolicies bool
 	authz            authorizer.Authorizer
 	lister           extensionslisters.PodSecurityPolicyLister
+	metrics          admission.Interface
 }
 
 // SetAuthorizer sets the authorizer.
@@ -88,18 +90,33 @@ var _ kubeapiserveradmission.WantsInternalKubeInformerFactory = &podSecurityPoli
 
 // NewPlugin creates a new PSP admission plugin.
 func NewPlugin(strategyFactory psp.StrategyFactory, pspMatcher PSPMatchFn, failOnNoPolicies bool) *podSecurityPolicyPlugin {
-	return &podSecurityPolicyPlugin{
+	plugin := &podSecurityPolicyPlugin{
 		Handler:          admission.NewHandler(admission.Create, admission.Update),
 		strategyFactory:  strategyFactory,
 		pspMatcher:       pspMatcher,
 		failOnNoPolicies: failOnNoPolicies,
 	}
+	// NOTE: Metrics were cherry-picked to 1.8 for _only_ the PodSecurityPolicy controller.
+	// In later releases, this step should be handled generically by the plugin initialization.
+	innerPlugin := &podSecurityPolicyPluginInner{plugin}
+	plugin.metrics = metrics.WithControllerMetrics(innerPlugin, PluginName)
+	return plugin
 }
 
 func (a *podSecurityPolicyPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	podSecurityPolicyInformer := f.Extensions().InternalVersion().PodSecurityPolicies()
 	a.lister = podSecurityPolicyInformer.Lister()
 	a.SetReadyFunc(podSecurityPolicyInformer.Informer().HasSynced)
+}
+
+func (c *podSecurityPolicyPlugin) Admit(a admission.Attributes) error {
+	return c.metrics.Admit(a)
+}
+
+// podSecurityPolicyPluginInner provides the inner implementation of Admit so that the metrics
+// wrapper can be internal to the PodSecurityPolicy admission plugin.
+type podSecurityPolicyPluginInner struct {
+	*podSecurityPolicyPlugin
 }
 
 // Admit determines if the pod should be admitted based on the requested security context
@@ -110,7 +127,7 @@ func (a *podSecurityPolicyPlugin) SetInternalKubeInformerFactory(f informers.Sha
 // 3.  Try to generate and validate a PSP with providers.  If we find one then admit the pod
 //     with the validated PSP.  If we don't find any reject the pod and give all errors from the
 //     failed attempts.
-func (c *podSecurityPolicyPlugin) Admit(a admission.Attributes) error {
+func (c *podSecurityPolicyPluginInner) Admit(a admission.Attributes) error {
 	if a.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}
