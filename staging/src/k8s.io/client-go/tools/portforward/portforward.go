@@ -30,6 +30,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // TODO move to API machinery and re-unify with kubelet/server/portfoward
@@ -39,8 +40,9 @@ const PortForwardProtocolV1Name = "portforward.k8s.io"
 // PortForwarder knows how to listen for local connections and forward them to
 // a remote pod via an upgraded HTTP request.
 type PortForwarder struct {
-	ports    []ForwardedPort
-	stopChan <-chan struct{}
+	portForwardProtocol string
+	ports               []ForwardedPort
+	stopChan            <-chan struct{}
 
 	dialer        httpstream.Dialer
 	streamConn    httpstream.Connection
@@ -110,8 +112,23 @@ func parsePorts(ports []string) ([]ForwardedPort, error) {
 	return forwards, nil
 }
 
+func parsePortForwardProtocol(s string) (string, error) {
+	switch s {
+	case "UDP", "udp", "UDP4", "udp4":
+		return api.PortForwardProtocolTypeUdp4, nil
+	case "UDP6", "udp6":
+		return api.PortForwardProtocolTypeUdp6, nil
+	case "TCP", "tcp", "TCP4", "tcp4":
+		return api.PortForwardProtocolTypeTcp4, nil
+	case "TCP6", "tcp6":
+		return api.PortForwardProtocolTypeTcp6, nil
+	default:
+		return "", errors.New("Protocol must be UDP4/6 or TCP4/6")
+	}
+}
+
 // New creates a new PortForwarder.
-func New(dialer httpstream.Dialer, ports []string, stopChan <-chan struct{}, readyChan chan struct{}, out, errOut io.Writer) (*PortForwarder, error) {
+func New(dialer httpstream.Dialer, protocol string, ports []string, stopChan <-chan struct{}, readyChan chan struct{}, out, errOut io.Writer) (*PortForwarder, error) {
 	if len(ports) == 0 {
 		return nil, errors.New("You must specify at least 1 port")
 	}
@@ -119,14 +136,28 @@ func New(dialer httpstream.Dialer, ports []string, stopChan <-chan struct{}, rea
 	if err != nil {
 		return nil, err
 	}
+	parsedProtocol, err := parsePortForwardProtocol(protocol)
+	if err != nil {
+		return nil, err
+	}
+
 	return &PortForwarder{
-		dialer:   dialer,
-		ports:    parsedPorts,
-		stopChan: stopChan,
-		Ready:    readyChan,
-		out:      out,
-		errOut:   errOut,
+		portForwardProtocol: parsedProtocol,
+		dialer:              dialer,
+		ports:               parsedPorts,
+		stopChan:            stopChan,
+		Ready:               readyChan,
+		out:                 out,
+		errOut:              errOut,
 	}, nil
+}
+
+func (pf *PortForwarder) isUdp() bool {
+	if pf.portForwardProtocol == api.PortForwardProtocolTypeUdp4 ||
+		pf.portForwardProtocol == api.PortForwardProtocolTypeUdp6 {
+		return true
+	}
+	return false
 }
 
 // ForwardPorts formats and executes a port forwarding request. The connection will remain
@@ -148,27 +179,52 @@ func (pf *PortForwarder) ForwardPorts() error {
 // listeners for each port specified in ports, and forwards local connections
 // to the remote host via streams.
 func (pf *PortForwarder) forward() error {
-	var err error
+	if pf.isUdp() {
+		for _, port := range pf.ports {
+			ServerAddr, err := net.ResolveUDPAddr("udp", strconv.Itoa(int(port.Local)))
+			if err != nil {
 
-	listenSuccess := false
-	for _, port := range pf.ports {
-		err = pf.listenOnPort(&port)
-		switch {
-		case err == nil:
-			listenSuccess = true
-		default:
-			if pf.errOut != nil {
-				fmt.Fprintf(pf.errOut, "Unable to listen on port %d: %v\n", port.Local, err)
+			}
+			conn, err := net.ListenUDP("udp", ServerAddr)
+			if err != nil {
+
+			}
+			go pf.handleConnection(conn, port)
+
+			//defer conn.Close()
+
+			//buf := make([]byte, 1024)
+			//for {
+			//	n,addr,err := conn.ReadFromUDP(buf)
+			//	fmt.Println("Received ",string(buf[0:n]), " from ",addr)
+			//
+			//	if err != nil {
+			//		fmt.Println("Error: ",err)
+			//	}
+			//}
+		}
+	} else {
+		var err error
+		listenSuccess := false
+		for _, port := range pf.ports {
+			err = pf.listenOnPort(&port)
+			switch {
+			case err == nil:
+				listenSuccess = true
+			default:
+				if pf.errOut != nil {
+					fmt.Fprintf(pf.errOut, "Unable to listen on port %d: %v\n", port.Local, err)
+				}
 			}
 		}
-	}
 
-	if !listenSuccess {
-		return fmt.Errorf("Unable to listen on any of the requested ports: %v", pf.ports)
-	}
+		if !listenSuccess {
+			return fmt.Errorf("Unable to listen on any of the requested ports: %v", pf.ports)
+		}
 
-	if pf.Ready != nil {
-		close(pf.Ready)
+		if pf.Ready != nil {
+			close(pf.Ready)
+		}
 	}
 
 	// wait for interrupt or conn closure
@@ -177,7 +233,6 @@ func (pf *PortForwarder) forward() error {
 	case <-pf.streamConn.CloseChan():
 		runtime.HandleError(errors.New("lost connection to pod"))
 	}
-
 	return nil
 }
 

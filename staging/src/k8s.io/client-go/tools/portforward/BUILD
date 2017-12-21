@@ -22,6 +22,7 @@ go_library(
     ],
     importpath = "k8s.io/client-go/tools/portforward",
     deps = [
+        "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/httpstream:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",

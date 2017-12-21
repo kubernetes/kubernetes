@@ -4439,8 +4439,10 @@ const (
 	PortForwardProtocolTypeTcp4 = "TCP4"
 	// Value for PortForwardProtocolType header for TCP6 protocol
 	PortForwardProtocolTypeTcp6 = "TCP6"
-	// Value for PortForwardProtocolType header for UDP protocol
-	PortForwardProtocolTypeUdp = "UDP"
+	// Value for PortForwardProtocolType header for UDP4 protocol
+	PortForwardProtocolTypeUdp4 = "UDP4"
+	// Value for PortForwardProtocolType header for UDP6 protocol
+	PortForwardProtocolTypeUdp6 = "UDP6"
 
 	// Name of header that specifies the port being forwarded
 	PortHeader = "port"
