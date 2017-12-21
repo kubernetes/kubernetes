@@ -45,16 +45,17 @@ const (
 	// 1. Default mode - service has no annotation ("service.beta.kubernetes.io/azure-load-balancer-mode")
 	//	  In this case the Loadbalancer of the primary Availability set is selected
 	// 2. "__auto__" mode - service is annotated with __auto__ value, this when loadbalancer from any availability set
-	//    is selected which has the miinimum rules associated with it.
-	// 3. "as1,as2" mode - this is when the laod balancer from the specified availability sets is selected that has the
-	//    miinimum rules associated with it.
+	//    is selected which has the minimum rules associated with it.
+	// 3. "as1,as2" mode - this is when the load balancer from the specified availability sets is selected that has the
+	//    minimum rules associated with it.
 	ServiceAnnotationLoadBalancerMode = "service.beta.kubernetes.io/azure-load-balancer-mode"
 
-	// ServiceAnnotationLoadBalancerAutoModeValue the annotation used on the service to specify the
+	// ServiceAnnotationLoadBalancerAutoModeValue is the annotation used on the service to specify the
 	// Azure load balancer auto selection from the availability sets
 	ServiceAnnotationLoadBalancerAutoModeValue = "__auto__"
 
-	// ServiceAnnotationDNSLabelName annotation speficying the DNS label name for the service.
+	// ServiceAnnotationDNSLabelName is the annotation used on the service
+	// to specify the DNS label name for the service.
 	ServiceAnnotationDNSLabelName = "service.beta.kubernetes.io/azure-dns-label-name"
 
 	// ServiceAnnotationSharedSecurityRule is the annotation used on the service
