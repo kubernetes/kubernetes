@@ -60,14 +60,14 @@ var getLunMutex = keymutex.NewKeyMutex()
 func (a *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
 	volumeSource, err := getVolumeSource(spec)
 	if err != nil {
-		glog.Warningf("failed to get azure disk spec")
+		glog.Warningf("failed to get azure disk spec (%v)", err)
 		return "", err
 	}
 
 	instanceid, err := a.cloud.InstanceID(nodeName)
 	if err != nil {
-		glog.Warningf("failed to get azure instance id")
-		return "", fmt.Errorf("failed to get azure instance id for node %q", nodeName)
+		glog.Warningf("failed to get azure instance id (%v)", err)
+		return "", fmt.Errorf("failed to get azure instance id for node %q (%v)", nodeName, err)
 	}
 	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
 		instanceid = instanceid[(ind + 1):]
@@ -96,8 +96,8 @@ func (a *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (
 
 		lun, err = diskController.GetNextDiskLun(nodeName)
 		if err != nil {
-			glog.Warningf("no LUN available for instance %q", nodeName)
-			return "", fmt.Errorf("all LUNs are used, cannot attach volume %q to instance %q", volumeSource.DiskName, instanceid)
+			glog.Warningf("no LUN available for instance %q (%v)", nodeName, err)
+			return "", fmt.Errorf("all LUNs are used, cannot attach volume %q to instance %q (%v)", volumeSource.DiskName, instanceid, err)
 		}
 		glog.V(4).Infof("Trying to attach volume %q lun %d to node %q.", volumeSource.DataDiskURI, lun, nodeName)
 		isManagedDisk := (*volumeSource.Kind == v1.AzureManagedDisk)
@@ -156,7 +156,7 @@ func (a *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, 
 	var err error
 	lun, err := strconv.Atoi(devicePath)
 	if err != nil {
-		return "", fmt.Errorf("azureDisk - Wait for attach expect device path as a lun number, instead got: %s", devicePath)
+		return "", fmt.Errorf("azureDisk - Wait for attach expect device path as a lun number, instead got: %s (%v)", devicePath, err)
 	}
 
 	volumeSource, err := getVolumeSource(spec)
@@ -260,7 +260,7 @@ func (d *azureDiskDetacher) Detach(diskURI string, nodeName types.NodeName) erro
 
 	instanceid, err := d.cloud.InstanceID(nodeName)
 	if err != nil {
-		glog.Warningf("no instance id for node %q, skip detaching", nodeName)
+		glog.Warningf("no instance id for node %q, skip detaching (%v)", nodeName, err)
 		return nil
 	}
 	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
