@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: nginx-ingress-serviceaccount
+  name: nginx-ingress-{{ juju_application }}-serviceaccount
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRole
 metadata:
-  name: nginx-ingress-clusterrole
+  name: nginx-ingress-{{ juju_application }}-clusterrole
 rules:
   - apiGroups:
       - ""
@@ -58,7 +58,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: Role
 metadata:
-  name: nginx-ingress-role
+  name: nginx-ingress-{{ juju_application }}-role
 rules:
   - apiGroups:
       - ""
@@ -100,57 +100,58 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: RoleBinding
 metadata:
-  name: nginx-ingress-role-nisa-binding
+  name: nginx-ingress-role-nisa-{{ juju_application }}-binding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: nginx-ingress-role
+  name: nginx-ingress-{{ juju_application }}-role
 subjects:
   - kind: ServiceAccount
-    name: nginx-ingress-serviceaccount
+    name: nginx-ingress-{{ juju_application }}-serviceaccount
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
 metadata:
-  name: nginx-ingress-clusterrole-nisa-binding
+  name: nginx-ingress-clusterrole-nisa-{{ juju_application }}-binding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: nginx-ingress-clusterrole
+  name: nginx-ingress-{{ juju_application }}-clusterrole
 subjects:
   - kind: ServiceAccount
-    name: nginx-ingress-serviceaccount
+    name: nginx-ingress-{{ juju_application }}-serviceaccount
     namespace: default
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: nginx-load-balancer-conf
+  name: nginx-load-balancer-{{ juju_application }}-conf
 ---
-apiVersion: v1
-kind: ReplicationController
+apiVersion: apps/v1beta2
+kind: DaemonSet
 metadata:
-  name: nginx-ingress-controller
+  name: nginx-ingress-{{ juju_application }}-controller
   labels:
-    k8s-app: nginx-ingress-lb
+    juju-application: nginx-ingress-{{ juju_application }}
 spec:
-  replicas: 1
   selector:
-    k8s-app: nginx-ingress-lb
+    matchLabels:
+      name: nginx-ingress-{{ juju_application }}
   template:
     metadata:
       labels:
-        k8s-app: nginx-ingress-lb
-        name: nginx-ingress-lb
+        name: nginx-ingress-{{ juju_application }}
     spec:
+      nodeSelector:
+        juju-application: {{ juju_application }}
       terminationGracePeriodSeconds: 60
       # hostPort doesn't work with CNI, so we have to use hostNetwork instead
       # see https://github.com/kubernetes/kubernetes/issues/23920
       hostNetwork: true
-      serviceAccountName: nginx-ingress-serviceaccount
+      serviceAccountName: nginx-ingress-{{ juju_application }}-serviceaccount
       containers:
       - image: {{ ingress_image }}
-        name: nginx-ingress-lb
+        name: nginx-ingress-{{ juju_application }}
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
