@@ -5,6 +5,7 @@
 package gensupport
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -58,4 +59,13 @@ func SendRequest(ctx context.Context, client *http.Client, req *http.Request) (*
 		}
 	}
 	return resp, err
+}
+
+// DecodeResponse decodes the body of res into target. If there is no body,
+// target is unchanged.
+func DecodeResponse(target interface{}, res *http.Response) error {
+	if res.StatusCode == http.StatusNoContent {
+		return nil
+	}
+	return json.NewDecoder(res.Body).Decode(target)
 }
