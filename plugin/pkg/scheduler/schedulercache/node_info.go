@@ -510,12 +510,11 @@ func getPodKey(pod *v1.Pod) (string, error) {
 // matches NodeInfo.node and the pod is not found in the pods list. Otherwise,
 // returns true.
 func (n *NodeInfo) Filter(pod *v1.Pod) bool {
-	pFullName := util.GetPodFullName(pod)
 	if pod.Spec.NodeName != n.node.Name {
 		return true
 	}
 	for _, p := range n.pods {
-		if util.GetPodFullName(p) == pFullName {
+		if p.Name == pod.Name && p.Namespace == pod.Namespace {
 			return true
 		}
 	}
