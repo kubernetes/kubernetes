@@ -30,5 +30,9 @@ var terminationSignals = []os.Signal{syscall.SIGHUP, syscall.SIGINT, syscall.SIG
 func waitForTerminationSignal() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, terminationSignals...)
+	defer func() {
+		signal.Stop(sig)
+		close(sig)
+	}()
 	<-sig
 }
