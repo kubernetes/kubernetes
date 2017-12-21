@@ -68,6 +68,7 @@ func New(client *http.Client) (*Service, error) {
 	}
 	s := &Service{client: client, BasePath: basePath}
 	s.Projects = NewProjectsService(s)
+	s.UptimeCheckIps = NewUptimeCheckIpsService(s)
 	return s, nil
 }
 
@@ -77,6 +78,8 @@ type Service struct {
 	UserAgent string // optional additional User-Agent fragment
 
 	Projects *ProjectsService
+
+	UptimeCheckIps *UptimeCheckIpsService
 }
 
 func (s *Service) userAgent() string {
@@ -93,6 +96,7 @@ func NewProjectsService(s *Service) *ProjectsService {
 	rs.MetricDescriptors = NewProjectsMetricDescriptorsService(s)
 	rs.MonitoredResourceDescriptors = NewProjectsMonitoredResourceDescriptorsService(s)
 	rs.TimeSeries = NewProjectsTimeSeriesService(s)
+	rs.UptimeCheckConfigs = NewProjectsUptimeCheckConfigsService(s)
 	return rs
 }
 
@@ -108,6 +112,8 @@ type ProjectsService struct {
 	MonitoredResourceDescriptors *ProjectsMonitoredResourceDescriptorsService
 
 	TimeSeries *ProjectsTimeSeriesService
+
+	UptimeCheckConfigs *ProjectsUptimeCheckConfigsService
 }
 
 func NewProjectsCollectdTimeSeriesService(s *Service) *ProjectsCollectdTimeSeriesService {
@@ -167,6 +173,57 @@ type ProjectsTimeSeriesService struct {
 	s *Service
 }
 
+func NewProjectsUptimeCheckConfigsService(s *Service) *ProjectsUptimeCheckConfigsService {
+	rs := &ProjectsUptimeCheckConfigsService{s: s}
+	return rs
+}
+
+type ProjectsUptimeCheckConfigsService struct {
+	s *Service
+}
+
+func NewUptimeCheckIpsService(s *Service) *UptimeCheckIpsService {
+	rs := &UptimeCheckIpsService{s: s}
+	return rs
+}
+
+type UptimeCheckIpsService struct {
+	s *Service
+}
+
+// BasicAuthentication: A type of authentication to perform against the
+// specified resource or URL that uses username and password. Currently,
+// only Basic authentication is supported in Uptime Monitoring.
+type BasicAuthentication struct {
+	// Password: The password to authenticate.
+	Password string `json:"password,omitempty"`
+
+	// Username: The username to authenticate.
+	Username string `json:"username,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Password") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Password") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *BasicAuthentication) MarshalJSON() ([]byte, error) {
+	type NoMethod BasicAuthentication
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // BucketOptions: BucketOptions describes the bucket boundaries used to
 // create a histogram for the distribution. The buckets can be in a
 // linear sequence, an exponential sequence, or each bucket can be
@@ -211,8 +268,8 @@ type BucketOptions struct {
 }
 
 func (s *BucketOptions) MarshalJSON() ([]byte, error) {
-	type noMethod BucketOptions
-	raw := noMethod(*s)
+	type NoMethod BucketOptions
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -263,8 +320,8 @@ type CollectdPayload struct {
 }
 
 func (s *CollectdPayload) MarshalJSON() ([]byte, error) {
-	type noMethod CollectdPayload
-	raw := noMethod(*s)
+	type NoMethod CollectdPayload
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -302,8 +359,8 @@ type CollectdPayloadError struct {
 }
 
 func (s *CollectdPayloadError) MarshalJSON() ([]byte, error) {
-	type noMethod CollectdPayloadError
-	raw := noMethod(*s)
+	type NoMethod CollectdPayloadError
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -351,8 +408,8 @@ type CollectdValue struct {
 }
 
 func (s *CollectdValue) MarshalJSON() ([]byte, error) {
-	type noMethod CollectdValue
-	raw := noMethod(*s)
+	type NoMethod CollectdValue
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -384,8 +441,38 @@ type CollectdValueError struct {
 }
 
 func (s *CollectdValueError) MarshalJSON() ([]byte, error) {
-	type noMethod CollectdValueError
-	raw := noMethod(*s)
+	type NoMethod CollectdValueError
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// ContentMatcher: Used to perform string matching. Currently, this
+// matches on the exact content. In the future, it can be expanded to
+// allow for regular expressions and more complex matching.
+type ContentMatcher struct {
+	// Content: String content to match
+	Content string `json:"content,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Content") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Content") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *ContentMatcher) MarshalJSON() ([]byte, error) {
+	type NoMethod ContentMatcher
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -424,8 +511,8 @@ type CreateCollectdTimeSeriesRequest struct {
 }
 
 func (s *CreateCollectdTimeSeriesRequest) MarshalJSON() ([]byte, error) {
-	type noMethod CreateCollectdTimeSeriesRequest
-	raw := noMethod(*s)
+	type NoMethod CreateCollectdTimeSeriesRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -459,8 +546,8 @@ type CreateCollectdTimeSeriesResponse struct {
 }
 
 func (s *CreateCollectdTimeSeriesResponse) MarshalJSON() ([]byte, error) {
-	type noMethod CreateCollectdTimeSeriesResponse
-	raw := noMethod(*s)
+	type NoMethod CreateCollectdTimeSeriesResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -491,8 +578,8 @@ type CreateTimeSeriesRequest struct {
 }
 
 func (s *CreateTimeSeriesRequest) MarshalJSON() ([]byte, error) {
-	type noMethod CreateTimeSeriesRequest
-	raw := noMethod(*s)
+	type NoMethod CreateTimeSeriesRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -565,19 +652,19 @@ type Distribution struct {
 }
 
 func (s *Distribution) MarshalJSON() ([]byte, error) {
-	type noMethod Distribution
-	raw := noMethod(*s)
+	type NoMethod Distribution
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 func (s *Distribution) UnmarshalJSON(data []byte) error {
-	type noMethod Distribution
+	type NoMethod Distribution
 	var s1 struct {
 		Mean                  gensupport.JSONFloat64 `json:"mean"`
 		SumOfSquaredDeviation gensupport.JSONFloat64 `json:"sumOfSquaredDeviation"`
-		*noMethod
+		*NoMethod
 	}
-	s1.noMethod = (*noMethod)(s)
+	s1.NoMethod = (*NoMethod)(s)
 	if err := json.Unmarshal(data, &s1); err != nil {
 		return err
 	}
@@ -630,8 +717,8 @@ type Explicit struct {
 }
 
 func (s *Explicit) MarshalJSON() ([]byte, error) {
-	type noMethod Explicit
-	raw := noMethod(*s)
+	type NoMethod Explicit
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -670,19 +757,19 @@ type Exponential struct {
 }
 
 func (s *Exponential) MarshalJSON() ([]byte, error) {
-	type noMethod Exponential
-	raw := noMethod(*s)
+	type NoMethod Exponential
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 func (s *Exponential) UnmarshalJSON(data []byte) error {
-	type noMethod Exponential
+	type NoMethod Exponential
 	var s1 struct {
 		GrowthFactor gensupport.JSONFloat64 `json:"growthFactor"`
 		Scale        gensupport.JSONFloat64 `json:"scale"`
-		*noMethod
+		*NoMethod
 	}
-	s1.noMethod = (*noMethod)(s)
+	s1.NoMethod = (*NoMethod)(s)
 	if err := json.Unmarshal(data, &s1); err != nil {
 		return err
 	}
@@ -774,8 +861,8 @@ type Field struct {
 }
 
 func (s *Field) MarshalJSON() ([]byte, error) {
-	type noMethod Field
-	raw := noMethod(*s)
+	type NoMethod Field
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -850,8 +937,112 @@ type Group struct {
 }
 
 func (s *Group) MarshalJSON() ([]byte, error) {
-	type noMethod Group
-	raw := noMethod(*s)
+	type NoMethod Group
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// HttpCheck: Information involved in an HTTP/HTTPS uptime check
+// request.
+type HttpCheck struct {
+	// AuthInfo: The authentication information. Optional when creating an
+	// HTTP check; defaults to empty.
+	AuthInfo *BasicAuthentication `json:"authInfo,omitempty"`
+
+	// Headers: The list of headers to send as part of the uptime check
+	// request. If two headers have the same key and different values, they
+	// should be entered as a single header, with the value being a
+	// comma-separated list of all the desired values as described at
+	// https://www.w3.org/Protocols/rfc2616/rfc2616.txt (page 31). Entering
+	// two separate headers with the same key in a Create call will cause
+	// the first to be overwritten by the second.
+	Headers map[string]string `json:"headers,omitempty"`
+
+	// MaskHeaders: Boolean specifiying whether to encrypt the header
+	// information. Encryption should be specified for any headers related
+	// to authentication that you do not wish to be seen when retrieving the
+	// configuration. The server will be responsible for encrypting the
+	// headers. On Get/List calls, if mask_headers is set to True then the
+	// headers will be obscured with ******.
+	MaskHeaders bool `json:"maskHeaders,omitempty"`
+
+	// Path: The path to the page to run the check against. Will be combined
+	// with the host (specified within the MonitoredResource) and port to
+	// construct the full URL. Optional (defaults to "/").
+	Path string `json:"path,omitempty"`
+
+	// Port: The port to the page to run the check against. Will be combined
+	// with host (specified within the MonitoredResource) and path to
+	// construct the full URL. Optional (defaults to 80 without SSL, or 443
+	// with SSL).
+	Port int64 `json:"port,omitempty"`
+
+	// UseSsl: If true, use HTTPS instead of HTTP to run the check.
+	UseSsl bool `json:"useSsl,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "AuthInfo") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "AuthInfo") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *HttpCheck) MarshalJSON() ([]byte, error) {
+	type NoMethod HttpCheck
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// InternalChecker: Nimbus InternalCheckers.
+type InternalChecker struct {
+	// CheckerId: The checker ID.
+	CheckerId string `json:"checkerId,omitempty"`
+
+	// DisplayName: The checker's human-readable name.
+	DisplayName string `json:"displayName,omitempty"`
+
+	// GcpZone: The GCP zone the uptime check should egress from. Only
+	// respected for internal uptime checks, where internal_network is
+	// specified.
+	GcpZone string `json:"gcpZone,omitempty"`
+
+	// Network: The internal network to perform this uptime check on.
+	Network string `json:"network,omitempty"`
+
+	// ProjectId: The GCP project ID. Not necessarily the same as the
+	// project_id for the config.
+	ProjectId string `json:"projectId,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "CheckerId") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "CheckerId") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *InternalChecker) MarshalJSON() ([]byte, error) {
+	type NoMethod InternalChecker
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -889,8 +1080,8 @@ type LabelDescriptor struct {
 }
 
 func (s *LabelDescriptor) MarshalJSON() ([]byte, error) {
-	type noMethod LabelDescriptor
-	raw := noMethod(*s)
+	type NoMethod LabelDescriptor
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -929,19 +1120,19 @@ type Linear struct {
 }
 
 func (s *Linear) MarshalJSON() ([]byte, error) {
-	type noMethod Linear
-	raw := noMethod(*s)
+	type NoMethod Linear
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 func (s *Linear) UnmarshalJSON(data []byte) error {
-	type noMethod Linear
+	type NoMethod Linear
 	var s1 struct {
 		Offset gensupport.JSONFloat64 `json:"offset"`
 		Width  gensupport.JSONFloat64 `json:"width"`
-		*noMethod
+		*NoMethod
 	}
-	s1.noMethod = (*noMethod)(s)
+	s1.NoMethod = (*NoMethod)(s)
 	if err := json.Unmarshal(data, &s1); err != nil {
 		return err
 	}
@@ -985,8 +1176,8 @@ type ListGroupMembersResponse struct {
 }
 
 func (s *ListGroupMembersResponse) MarshalJSON() ([]byte, error) {
-	type noMethod ListGroupMembersResponse
-	raw := noMethod(*s)
+	type NoMethod ListGroupMembersResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1022,8 +1213,8 @@ type ListGroupsResponse struct {
 }
 
 func (s *ListGroupsResponse) MarshalJSON() ([]byte, error) {
-	type noMethod ListGroupsResponse
-	raw := noMethod(*s)
+	type NoMethod ListGroupsResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1061,8 +1252,8 @@ type ListMetricDescriptorsResponse struct {
 }
 
 func (s *ListMetricDescriptorsResponse) MarshalJSON() ([]byte, error) {
-	type noMethod ListMetricDescriptorsResponse
-	raw := noMethod(*s)
+	type NoMethod ListMetricDescriptorsResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1100,8 +1291,8 @@ type ListMonitoredResourceDescriptorsResponse struct {
 }
 
 func (s *ListMonitoredResourceDescriptorsResponse) MarshalJSON() ([]byte, error) {
-	type noMethod ListMonitoredResourceDescriptorsResponse
-	raw := noMethod(*s)
+	type NoMethod ListMonitoredResourceDescriptorsResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1138,8 +1329,90 @@ type ListTimeSeriesResponse struct {
 }
 
 func (s *ListTimeSeriesResponse) MarshalJSON() ([]byte, error) {
-	type noMethod ListTimeSeriesResponse
-	raw := noMethod(*s)
+	type NoMethod ListTimeSeriesResponse
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// ListUptimeCheckConfigsResponse: The protocol for the
+// ListUptimeCheckConfigs response.
+type ListUptimeCheckConfigsResponse struct {
+	// NextPageToken: This field represents the pagination token to retrieve
+	// the next page of results. If the value is empty, it means no further
+	// results for the request. To retrieve the next page of results, the
+	// value of the next_page_token is passed to the subsequent List method
+	// call (in the request message's page_token field).
+	NextPageToken string `json:"nextPageToken,omitempty"`
+
+	// UptimeCheckConfigs: The returned uptime check configurations.
+	UptimeCheckConfigs []*UptimeCheckConfig `json:"uptimeCheckConfigs,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "NextPageToken") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "NextPageToken") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *ListUptimeCheckConfigsResponse) MarshalJSON() ([]byte, error) {
+	type NoMethod ListUptimeCheckConfigsResponse
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// ListUptimeCheckIpsResponse: The protocol for the ListUptimeCheckIps
+// response.
+type ListUptimeCheckIpsResponse struct {
+	// NextPageToken: This field represents the pagination token to retrieve
+	// the next page of results. If the value is empty, it means no further
+	// results for the request. To retrieve the next page of results, the
+	// value of the next_page_token is passed to the subsequent List method
+	// call (in the request message's page_token field). NOTE: this field is
+	// not yet implemented
+	NextPageToken string `json:"nextPageToken,omitempty"`
+
+	// UptimeCheckIps: The returned list of IP addresses (including region
+	// and location) that the checkers run from.
+	UptimeCheckIps []*UptimeCheckIp `json:"uptimeCheckIps,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "NextPageToken") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "NextPageToken") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *ListUptimeCheckIpsResponse) MarshalJSON() ([]byte, error) {
+	type NoMethod ListUptimeCheckIpsResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1172,8 +1445,8 @@ type Metric struct {
 }
 
 func (s *Metric) MarshalJSON() ([]byte, error) {
-	type noMethod Metric
-	raw := noMethod(*s)
+	type NoMethod Metric
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1187,7 +1460,9 @@ type MetricDescriptor struct {
 
 	// DisplayName: A concise name for the metric, which can be displayed in
 	// user interfaces. Use sentence case without an ending period, for
-	// example "Request count".
+	// example "Request count". This field is optional but it is recommended
+	// to be set for any metrics associated with user-visible concepts, such
+	// as Quota.
 	DisplayName string `json:"displayName,omitempty"`
 
 	// Labels: The set of labels that can be used to describe a specific
@@ -1212,16 +1487,7 @@ type MetricDescriptor struct {
 	// zero and sets a new start time for the following points.
 	MetricKind string `json:"metricKind,omitempty"`
 
-	// Name: The resource name of the metric descriptor. Depending on the
-	// implementation, the name typically includes: (1) the parent resource
-	// name that defines the scope of the metric type or of its data; and
-	// (2) the metric's URL-encoded type, which also appears in the type
-	// field of this descriptor. For example, following is the resource name
-	// of a custom metric within the GCP project
-	// my-project-id:
-	// "projects/my-project-id/metricDescriptors/custom.google
-	// apis.com%2Finvoice%2Fpaid%2Famount"
-	//
+	// Name: The resource name of the metric descriptor.
 	Name string `json:"name,omitempty"`
 
 	// Type: The metric type, including its DNS name prefix. The type is not
@@ -1235,55 +1501,12 @@ type MetricDescriptor struct {
 	//
 	Type string `json:"type,omitempty"`
 
-	// Unit: The unit in which the metric value is reported. It is only
-	// applicable if the value_type is INT64, DOUBLE, or DISTRIBUTION. The
-	// supported units are a subset of The Unified Code for Units of Measure
-	// (http://unitsofmeasure.org/ucum.html) standard:Basic units (UNIT)
-	// bit bit
-	// By byte
-	// s second
-	// min minute
-	// h hour
-	// d dayPrefixes (PREFIX)
-	// k kilo (10**3)
-	// M mega (10**6)
-	// G giga (10**9)
-	// T tera (10**12)
-	// P peta (10**15)
-	// E exa (10**18)
-	// Z zetta (10**21)
-	// Y yotta (10**24)
-	// m milli (10**-3)
-	// u micro (10**-6)
-	// n nano (10**-9)
-	// p pico (10**-12)
-	// f femto (10**-15)
-	// a atto (10**-18)
-	// z zepto (10**-21)
-	// y yocto (10**-24)
-	// Ki kibi (2**10)
-	// Mi mebi (2**20)
-	// Gi gibi (2**30)
-	// Ti tebi (2**40)GrammarThe grammar includes the dimensionless unit 1,
-	// such as 1/s.The grammar also includes these connectors:
-	// / division (as an infix operator, e.g. 1/s).
-	// . multiplication (as an infix operator, e.g. GBy.d)The grammar for a
-	// unit is as follows:
-	// Expression = Component { "." Component } { "/" Component }
-	// ;
-	//
-	// Component = [ PREFIX ] UNIT [ Annotation ]
-	//           | Annotation
-	//           | "1"
-	//           ;
-	//
-	// Annotation = "{" NAME "}" ;
-	// Notes:
-	// Annotation is just a comment if it follows a UNIT and is  equivalent
-	// to 1 if it is used alone. For examples,  {requests}/s == 1/s,
-	// By{transmitted}/s == By/s.
-	// NAME is a sequence of non-blank printable ASCII characters not
-	// containing '{' or '}'.
+	// Unit: Optional. The unit in which the metric value is reported. For
+	// example, kBy/s means kilobytes/sec, and 1 is the dimensionless unit.
+	// The supported units are a subset of The Unified Code for Units of
+	// Measure standard (http://unitsofmeasure.org/ucum.html).<br><br> This
+	// field is part of the metric's documentation, but it is ignored by
+	// Stackdriver.
 	Unit string `json:"unit,omitempty"`
 
 	// ValueType: Whether the measurement is an integer, a floating-point
@@ -1324,8 +1547,8 @@ type MetricDescriptor struct {
 }
 
 func (s *MetricDescriptor) MarshalJSON() ([]byte, error) {
-	type noMethod MetricDescriptor
-	raw := noMethod(*s)
+	type NoMethod MetricDescriptor
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1372,8 +1595,8 @@ type MonitoredResource struct {
 }
 
 func (s *MonitoredResource) MarshalJSON() ([]byte, error) {
-	type noMethod MonitoredResource
-	raw := noMethod(*s)
+	type NoMethod MonitoredResource
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1438,8 +1661,54 @@ type MonitoredResourceDescriptor struct {
 }
 
 func (s *MonitoredResourceDescriptor) MarshalJSON() ([]byte, error) {
-	type noMethod MonitoredResourceDescriptor
-	raw := noMethod(*s)
+	type NoMethod MonitoredResourceDescriptor
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// MonitoredResourceMetadata: Auxiliary metadata for a MonitoredResource
+// object. MonitoredResource objects contain the minimum set of
+// information to uniquely identify a monitored resource instance. There
+// is some other useful auxiliary metadata. Google Stackdriver
+// Monitoring & Logging uses an ingestion pipeline to extract metadata
+// for cloud resources of all types , and stores the metadata in this
+// message.
+type MonitoredResourceMetadata struct {
+	// SystemLabels: Output only. Values for predefined system metadata
+	// labels. System labels are a kind of metadata extracted by Google
+	// Stackdriver. Stackdriver determines what system labels are useful and
+	// how to obtain their values. Some examples: "machine_image", "vpc",
+	// "subnet_id", "security_group", "name", etc. System label values can
+	// be only strings, Boolean values, or a list of strings. For example:
+	// { "name": "my-test-instance",
+	//   "security_group": ["a", "b", "c"],
+	//   "spot_instance": false }
+	//
+	SystemLabels googleapi.RawMessage `json:"systemLabels,omitempty"`
+
+	// UserLabels: Output only. A map of user-defined metadata labels.
+	UserLabels map[string]string `json:"userLabels,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "SystemLabels") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "SystemLabels") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *MonitoredResourceMetadata) MarshalJSON() ([]byte, error) {
+	type NoMethod MonitoredResourceMetadata
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1477,8 +1746,8 @@ type Option struct {
 }
 
 func (s *Option) MarshalJSON() ([]byte, error) {
-	type noMethod Option
-	raw := noMethod(*s)
+	type NoMethod Option
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1516,8 +1785,8 @@ type Point struct {
 }
 
 func (s *Point) MarshalJSON() ([]byte, error) {
-	type noMethod Point
-	raw := noMethod(*s)
+	type NoMethod Point
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1547,25 +1816,65 @@ type Range struct {
 }
 
 func (s *Range) MarshalJSON() ([]byte, error) {
-	type noMethod Range
-	raw := noMethod(*s)
+	type NoMethod Range
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 func (s *Range) UnmarshalJSON(data []byte) error {
-	type noMethod Range
+	type NoMethod Range
 	var s1 struct {
 		Max gensupport.JSONFloat64 `json:"max"`
 		Min gensupport.JSONFloat64 `json:"min"`
-		*noMethod
+		*NoMethod
 	}
-	s1.noMethod = (*noMethod)(s)
+	s1.NoMethod = (*NoMethod)(s)
 	if err := json.Unmarshal(data, &s1); err != nil {
 		return err
 	}
 	s.Max = float64(s1.Max)
 	s.Min = float64(s1.Min)
 	return nil
+}
+
+// ResourceGroup: The resource submessage for group checks. It can be
+// used instead of a monitored resource, when multiple resources are
+// being monitored.
+type ResourceGroup struct {
+	// GroupId: The group of resources being monitored. Should be only the
+	// group_id, not projects/<project_id>/groups/<group_id>.
+	GroupId string `json:"groupId,omitempty"`
+
+	// ResourceType: The resource type of the group members.
+	//
+	// Possible values:
+	//   "RESOURCE_TYPE_UNSPECIFIED" - Default value (not valid).
+	//   "INSTANCE" - A group of instances from Google Cloud Platform (GCP)
+	// or Amazon Web Services (AWS).
+	//   "AWS_ELB_LOAD_BALANCER" - A group of AWS load balancers.
+	ResourceType string `json:"resourceType,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "GroupId") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "GroupId") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *ResourceGroup) MarshalJSON() ([]byte, error) {
+	type NoMethod ResourceGroup
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 // SourceContext: SourceContext represents information about the source
@@ -1594,8 +1903,8 @@ type SourceContext struct {
 }
 
 func (s *SourceContext) MarshalJSON() ([]byte, error) {
-	type noMethod SourceContext
-	raw := noMethod(*s)
+	type NoMethod SourceContext
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1670,8 +1979,38 @@ type Status struct {
 }
 
 func (s *Status) MarshalJSON() ([]byte, error) {
-	type noMethod Status
-	raw := noMethod(*s)
+	type NoMethod Status
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// TcpCheck: Information required for a TCP uptime check request.
+type TcpCheck struct {
+	// Port: The port to the page to run the check against. Will be combined
+	// with host (specified within the MonitoredResource) to construct the
+	// full URL. Required.
+	Port int64 `json:"port,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Port") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Port") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *TcpCheck) MarshalJSON() ([]byte, error) {
+	type NoMethod TcpCheck
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1705,8 +2044,8 @@ type TimeInterval struct {
 }
 
 func (s *TimeInterval) MarshalJSON() ([]byte, error) {
-	type noMethod TimeInterval
-	raw := noMethod(*s)
+	type NoMethod TimeInterval
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1716,6 +2055,12 @@ func (s *TimeInterval) MarshalJSON() ([]byte, error) {
 // fully-specified metric. This type is used for both listing and
 // creating time series.
 type TimeSeries struct {
+	// Metadata: Output only. The associated monitored resource metadata.
+	// When reading a a timeseries, this field will include metadata labels
+	// that are explicitly named in the reduction. When creating a
+	// timeseries, this field is ignored.
+	Metadata *MonitoredResourceMetadata `json:"metadata,omitempty"`
+
 	// Metric: The associated metric. A fully-specified metric used to
 	// identify the time series.
 	Metric *Metric `json:"metric,omitempty"`
@@ -1771,7 +2116,7 @@ type TimeSeries struct {
 	//   "MONEY" - The value is money.
 	ValueType string `json:"valueType,omitempty"`
 
-	// ForceSendFields is a list of field names (e.g. "Metric") to
+	// ForceSendFields is a list of field names (e.g. "Metadata") to
 	// unconditionally include in API requests. By default, fields with
 	// empty values are omitted from API requests. However, any non-pointer,
 	// non-interface field appearing in ForceSendFields will be sent to the
@@ -1779,8 +2124,8 @@ type TimeSeries struct {
 	// used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "Metric") to include in API
-	// requests with the JSON null value. By default, fields with empty
+	// NullFields is a list of field names (e.g. "Metadata") to include in
+	// API requests with the JSON null value. By default, fields with empty
 	// values are omitted from API requests. However, any field with an
 	// empty value appearing in NullFields will be sent to the server as
 	// null. It is an error if a field in this list has a non-empty value.
@@ -1789,8 +2134,8 @@ type TimeSeries struct {
 }
 
 func (s *TimeSeries) MarshalJSON() ([]byte, error) {
-	type noMethod TimeSeries
-	raw := noMethod(*s)
+	type NoMethod TimeSeries
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1837,8 +2182,8 @@ type Type struct {
 }
 
 func (s *Type) MarshalJSON() ([]byte, error) {
-	type noMethod Type
-	raw := noMethod(*s)
+	type NoMethod Type
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1880,18 +2225,18 @@ type TypedValue struct {
 }
 
 func (s *TypedValue) MarshalJSON() ([]byte, error) {
-	type noMethod TypedValue
-	raw := noMethod(*s)
+	type NoMethod TypedValue
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 func (s *TypedValue) UnmarshalJSON(data []byte) error {
-	type noMethod TypedValue
+	type NoMethod TypedValue
 	var s1 struct {
 		DoubleValue *gensupport.JSONFloat64 `json:"doubleValue"`
-		*noMethod
+		*NoMethod
 	}
-	s1.noMethod = (*noMethod)(s)
+	s1.NoMethod = (*NoMethod)(s)
 	if err := json.Unmarshal(data, &s1); err != nil {
 		return err
 	}
@@ -1899,6 +2244,163 @@ func (s *TypedValue) UnmarshalJSON(data []byte) error {
 		s.DoubleValue = (*float64)(s1.DoubleValue)
 	}
 	return nil
+}
+
+// UptimeCheckConfig: This message configures which resources and
+// services to monitor for availability.
+type UptimeCheckConfig struct {
+	// ContentMatchers: The expected content on the page the check is run
+	// against. Currently, only the first entry in the list is supported,
+	// and other entries will be ignored. The server will look for an exact
+	// match of the string in the page response's content. This field is
+	// optional and should only be specified if a content match is required.
+	ContentMatchers []*ContentMatcher `json:"contentMatchers,omitempty"`
+
+	// DisplayName: A human-friendly name for the uptime check
+	// configuration. The display name should be unique within a Stackdriver
+	// Account in order to make it easier to identify; however, uniqueness
+	// is not enforced. Required.
+	DisplayName string `json:"displayName,omitempty"`
+
+	// HttpCheck: Contains information needed to make an HTTP or HTTPS
+	// check.
+	HttpCheck *HttpCheck `json:"httpCheck,omitempty"`
+
+	// InternalCheckers: The internal checkers that this check will egress
+	// from. If is_internal is true and this list is empty, the check will
+	// egress from all InternalCheckers configured for the project that owns
+	// this CheckConfig.
+	InternalCheckers []*InternalChecker `json:"internalCheckers,omitempty"`
+
+	// IsInternal: Denotes whether this is a check that egresses from
+	// InternalCheckers.
+	IsInternal bool `json:"isInternal,omitempty"`
+
+	// MonitoredResource: The monitored resource associated with the
+	// configuration.
+	MonitoredResource *MonitoredResource `json:"monitoredResource,omitempty"`
+
+	// Name: A unique resource name for this UptimeCheckConfig. The format
+	// is:projects/[PROJECT_ID]/uptimeCheckConfigs/[UPTIME_CHECK_ID].This
+	// field should be omitted when creating the uptime check configuration;
+	// on create, the resource name is assigned by the server and included
+	// in the response.
+	Name string `json:"name,omitempty"`
+
+	// Period: How often the uptime check is performed. Currently, only 1,
+	// 5, 10, and 15 minutes are supported. Required.
+	Period string `json:"period,omitempty"`
+
+	// ResourceGroup: The group resource associated with the configuration.
+	ResourceGroup *ResourceGroup `json:"resourceGroup,omitempty"`
+
+	// SelectedRegions: The list of regions from which the check will be
+	// run. If this field is specified, enough regions to include a minimum
+	// of 3 locations must be provided, or an error message is returned. Not
+	// specifying this field will result in uptime checks running from all
+	// regions.
+	//
+	// Possible values:
+	//   "REGION_UNSPECIFIED" - Default value if no region is specified.
+	// Will result in uptime checks running from all regions.
+	//   "USA" - Allows checks to run from locations within the United
+	// States of America.
+	//   "EUROPE" - Allows checks to run from locations within the continent
+	// of Europe.
+	//   "SOUTH_AMERICA" - Allows checks to run from locations within the
+	// continent of South America.
+	//   "ASIA_PACIFIC" - Allows checks to run from locations within the
+	// Asia Pacific area (ex: Singapore).
+	SelectedRegions []string `json:"selectedRegions,omitempty"`
+
+	// TcpCheck: Contains information needed to make a TCP check.
+	TcpCheck *TcpCheck `json:"tcpCheck,omitempty"`
+
+	// Timeout: The maximum amount of time to wait for the request to
+	// complete (must be between 1 and 60 seconds). Required.
+	Timeout string `json:"timeout,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "ContentMatchers") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "ContentMatchers") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *UptimeCheckConfig) MarshalJSON() ([]byte, error) {
+	type NoMethod UptimeCheckConfig
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// UptimeCheckIp: Contains the region, location, and list of IP
+// addresses where checkers in the location run from.
+type UptimeCheckIp struct {
+	// IpAddress: The IP address from which the uptime check originates.
+	// This is a full IP address (not an IP address range). Most IP
+	// addresses, as of this publication, are in IPv4 format; however, one
+	// should not rely on the IP addresses being in IPv4 format indefinitely
+	// and should support interpreting this field in either IPv4 or IPv6
+	// format.
+	IpAddress string `json:"ipAddress,omitempty"`
+
+	// Location: A more specific location within the region that typically
+	// encodes a particular city/town/metro (and its containing
+	// state/province or country) within the broader umbrella region
+	// category.
+	Location string `json:"location,omitempty"`
+
+	// Region: A broad region category in which the IP address is located.
+	//
+	// Possible values:
+	//   "REGION_UNSPECIFIED" - Default value if no region is specified.
+	// Will result in uptime checks running from all regions.
+	//   "USA" - Allows checks to run from locations within the United
+	// States of America.
+	//   "EUROPE" - Allows checks to run from locations within the continent
+	// of Europe.
+	//   "SOUTH_AMERICA" - Allows checks to run from locations within the
+	// continent of South America.
+	//   "ASIA_PACIFIC" - Allows checks to run from locations within the
+	// Asia Pacific area (ex: Singapore).
+	Region string `json:"region,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "IpAddress") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "IpAddress") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *UptimeCheckIp) MarshalJSON() ([]byte, error) {
+	type NoMethod UptimeCheckIp
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 // method id "monitoring.projects.collectdTimeSeries.create":
@@ -2004,7 +2506,7 @@ func (c *ProjectsCollectdTimeSeriesCreateCall) Do(opts ...googleapi.CallOption) 
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2148,7 +2650,7 @@ func (c *ProjectsGroupsCreateCall) Do(opts ...googleapi.CallOption) (*Group, err
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2282,7 +2784,7 @@ func (c *ProjectsGroupsDeleteCall) Do(opts ...googleapi.CallOption) (*Empty, err
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2422,7 +2924,7 @@ func (c *ProjectsGroupsGetCall) Do(opts ...googleapi.CallOption) (*Group, error)
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2609,7 +3111,7 @@ func (c *ProjectsGroupsListCall) Do(opts ...googleapi.CallOption) (*ListGroupsRe
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2798,7 +3300,7 @@ func (c *ProjectsGroupsUpdateCall) Do(opts ...googleapi.CallOption) (*Group, err
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2989,7 +3491,7 @@ func (c *ProjectsGroupsMembersListCall) Do(opts ...googleapi.CallOption) (*ListG
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3173,7 +3675,7 @@ func (c *ProjectsMetricDescriptorsCreateCall) Do(opts ...googleapi.CallOption) (
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3304,7 +3806,7 @@ func (c *ProjectsMetricDescriptorsDeleteCall) Do(opts ...googleapi.CallOption) (
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3445,7 +3947,7 @@ func (c *ProjectsMetricDescriptorsGetCall) Do(opts ...googleapi.CallOption) (*Me
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3615,7 +4117,7 @@ func (c *ProjectsMetricDescriptorsListCall) Do(opts ...googleapi.CallOption) (*L
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3795,7 +4297,7 @@ func (c *ProjectsMonitoredResourceDescriptorsGetCall) Do(opts ...googleapi.CallO
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3967,7 +4469,7 @@ func (c *ProjectsMonitoredResourceDescriptorsListCall) Do(opts ...googleapi.Call
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4142,7 +4644,7 @@ func (c *ProjectsTimeSeriesCreateCall) Do(opts ...googleapi.CallOption) (*Empty,
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4449,7 +4951,7 @@ func (c *ProjectsTimeSeriesListCall) Do(opts ...googleapi.CallOption) (*ListTime
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4585,6 +5087,939 @@ func (c *ProjectsTimeSeriesListCall) Do(opts ...googleapi.CallOption) (*ListTime
 // A non-nil error returned from f will halt the iteration.
 // The provided context supersedes any context provided to the Context method.
 func (c *ProjectsTimeSeriesListCall) Pages(ctx context.Context, f func(*ListTimeSeriesResponse) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
+// method id "monitoring.projects.uptimeCheckConfigs.create":
+
+type ProjectsUptimeCheckConfigsCreateCall struct {
+	s                 *Service
+	parent            string
+	uptimecheckconfig *UptimeCheckConfig
+	urlParams_        gensupport.URLParams
+	ctx_              context.Context
+	header_           http.Header
+}
+
+// Create: Creates a new uptime check configuration.
+func (r *ProjectsUptimeCheckConfigsService) Create(parent string, uptimecheckconfig *UptimeCheckConfig) *ProjectsUptimeCheckConfigsCreateCall {
+	c := &ProjectsUptimeCheckConfigsCreateCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.parent = parent
+	c.uptimecheckconfig = uptimecheckconfig
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsUptimeCheckConfigsCreateCall) Fields(s ...googleapi.Field) *ProjectsUptimeCheckConfigsCreateCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsUptimeCheckConfigsCreateCall) Context(ctx context.Context) *ProjectsUptimeCheckConfigsCreateCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsUptimeCheckConfigsCreateCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsUptimeCheckConfigsCreateCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.uptimecheckconfig)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+parent}/uptimeCheckConfigs")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("POST", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"parent": c.parent,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "monitoring.projects.uptimeCheckConfigs.create" call.
+// Exactly one of *UptimeCheckConfig or error will be non-nil. Any
+// non-2xx status code is an error. Response headers are in either
+// *UptimeCheckConfig.ServerResponse.Header or (if a response was
+// returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *ProjectsUptimeCheckConfigsCreateCall) Do(opts ...googleapi.CallOption) (*UptimeCheckConfig, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &UptimeCheckConfig{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Creates a new uptime check configuration.",
+	//   "flatPath": "v3/projects/{projectsId}/uptimeCheckConfigs",
+	//   "httpMethod": "POST",
+	//   "id": "monitoring.projects.uptimeCheckConfigs.create",
+	//   "parameterOrder": [
+	//     "parent"
+	//   ],
+	//   "parameters": {
+	//     "parent": {
+	//       "description": "The project in which to create the uptime check. The format is:projects/[PROJECT_ID].",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v3/{+parent}/uptimeCheckConfigs",
+	//   "request": {
+	//     "$ref": "UptimeCheckConfig"
+	//   },
+	//   "response": {
+	//     "$ref": "UptimeCheckConfig"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/monitoring"
+	//   ]
+	// }
+
+}
+
+// method id "monitoring.projects.uptimeCheckConfigs.delete":
+
+type ProjectsUptimeCheckConfigsDeleteCall struct {
+	s          *Service
+	name       string
+	urlParams_ gensupport.URLParams
+	ctx_       context.Context
+	header_    http.Header
+}
+
+// Delete: Deletes an uptime check configuration. Note that this method
+// will fail if the uptime check configuration is referenced by an alert
+// policy or other dependent configs that would be rendered invalid by
+// the deletion.
+func (r *ProjectsUptimeCheckConfigsService) Delete(name string) *ProjectsUptimeCheckConfigsDeleteCall {
+	c := &ProjectsUptimeCheckConfigsDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsUptimeCheckConfigsDeleteCall) Fields(s ...googleapi.Field) *ProjectsUptimeCheckConfigsDeleteCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsUptimeCheckConfigsDeleteCall) Context(ctx context.Context) *ProjectsUptimeCheckConfigsDeleteCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsUptimeCheckConfigsDeleteCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsUptimeCheckConfigsDeleteCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+name}")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("DELETE", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "monitoring.projects.uptimeCheckConfigs.delete" call.
+// Exactly one of *Empty or error will be non-nil. Any non-2xx status
+// code is an error. Response headers are in either
+// *Empty.ServerResponse.Header or (if a response was returned at all)
+// in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
+// check whether the returned error was because http.StatusNotModified
+// was returned.
+func (c *ProjectsUptimeCheckConfigsDeleteCall) Do(opts ...googleapi.CallOption) (*Empty, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Empty{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Deletes an uptime check configuration. Note that this method will fail if the uptime check configuration is referenced by an alert policy or other dependent configs that would be rendered invalid by the deletion.",
+	//   "flatPath": "v3/projects/{projectsId}/uptimeCheckConfigs/{uptimeCheckConfigsId}",
+	//   "httpMethod": "DELETE",
+	//   "id": "monitoring.projects.uptimeCheckConfigs.delete",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "name": {
+	//       "description": "The uptime check configuration to delete. The format isprojects/[PROJECT_ID]/uptimeCheckConfigs/[UPTIME_CHECK_ID].",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/uptimeCheckConfigs/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v3/{+name}",
+	//   "response": {
+	//     "$ref": "Empty"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/monitoring"
+	//   ]
+	// }
+
+}
+
+// method id "monitoring.projects.uptimeCheckConfigs.get":
+
+type ProjectsUptimeCheckConfigsGetCall struct {
+	s            *Service
+	name         string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// Get: Gets a single uptime check configuration.
+func (r *ProjectsUptimeCheckConfigsService) Get(name string) *ProjectsUptimeCheckConfigsGetCall {
+	c := &ProjectsUptimeCheckConfigsGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsUptimeCheckConfigsGetCall) Fields(s ...googleapi.Field) *ProjectsUptimeCheckConfigsGetCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *ProjectsUptimeCheckConfigsGetCall) IfNoneMatch(entityTag string) *ProjectsUptimeCheckConfigsGetCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsUptimeCheckConfigsGetCall) Context(ctx context.Context) *ProjectsUptimeCheckConfigsGetCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsUptimeCheckConfigsGetCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsUptimeCheckConfigsGetCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+name}")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("GET", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "monitoring.projects.uptimeCheckConfigs.get" call.
+// Exactly one of *UptimeCheckConfig or error will be non-nil. Any
+// non-2xx status code is an error. Response headers are in either
+// *UptimeCheckConfig.ServerResponse.Header or (if a response was
+// returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *ProjectsUptimeCheckConfigsGetCall) Do(opts ...googleapi.CallOption) (*UptimeCheckConfig, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &UptimeCheckConfig{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Gets a single uptime check configuration.",
+	//   "flatPath": "v3/projects/{projectsId}/uptimeCheckConfigs/{uptimeCheckConfigsId}",
+	//   "httpMethod": "GET",
+	//   "id": "monitoring.projects.uptimeCheckConfigs.get",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "name": {
+	//       "description": "The uptime check configuration to retrieve. The format isprojects/[PROJECT_ID]/uptimeCheckConfigs/[UPTIME_CHECK_ID].",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/uptimeCheckConfigs/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v3/{+name}",
+	//   "response": {
+	//     "$ref": "UptimeCheckConfig"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/monitoring",
+	//     "https://www.googleapis.com/auth/monitoring.read"
+	//   ]
+	// }
+
+}
+
+// method id "monitoring.projects.uptimeCheckConfigs.list":
+
+type ProjectsUptimeCheckConfigsListCall struct {
+	s            *Service
+	parent       string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// List: Lists the existing valid uptime check configurations for the
+// project, leaving out any invalid configurations.
+func (r *ProjectsUptimeCheckConfigsService) List(parent string) *ProjectsUptimeCheckConfigsListCall {
+	c := &ProjectsUptimeCheckConfigsListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.parent = parent
+	return c
+}
+
+// PageSize sets the optional parameter "pageSize": The maximum number
+// of results to return in a single response. The server may further
+// constrain the maximum number of results returned in a single page. If
+// the page_size is <=0, the server will decide the number of results to
+// be returned.
+func (c *ProjectsUptimeCheckConfigsListCall) PageSize(pageSize int64) *ProjectsUptimeCheckConfigsListCall {
+	c.urlParams_.Set("pageSize", fmt.Sprint(pageSize))
+	return c
+}
+
+// PageToken sets the optional parameter "pageToken": If this field is
+// not empty then it must contain the nextPageToken value returned by a
+// previous call to this method. Using this field causes the method to
+// return more results from the previous method call.
+func (c *ProjectsUptimeCheckConfigsListCall) PageToken(pageToken string) *ProjectsUptimeCheckConfigsListCall {
+	c.urlParams_.Set("pageToken", pageToken)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsUptimeCheckConfigsListCall) Fields(s ...googleapi.Field) *ProjectsUptimeCheckConfigsListCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *ProjectsUptimeCheckConfigsListCall) IfNoneMatch(entityTag string) *ProjectsUptimeCheckConfigsListCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsUptimeCheckConfigsListCall) Context(ctx context.Context) *ProjectsUptimeCheckConfigsListCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsUptimeCheckConfigsListCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsUptimeCheckConfigsListCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+parent}/uptimeCheckConfigs")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("GET", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"parent": c.parent,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "monitoring.projects.uptimeCheckConfigs.list" call.
+// Exactly one of *ListUptimeCheckConfigsResponse or error will be
+// non-nil. Any non-2xx status code is an error. Response headers are in
+// either *ListUptimeCheckConfigsResponse.ServerResponse.Header or (if a
+// response was returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *ProjectsUptimeCheckConfigsListCall) Do(opts ...googleapi.CallOption) (*ListUptimeCheckConfigsResponse, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &ListUptimeCheckConfigsResponse{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Lists the existing valid uptime check configurations for the project, leaving out any invalid configurations.",
+	//   "flatPath": "v3/projects/{projectsId}/uptimeCheckConfigs",
+	//   "httpMethod": "GET",
+	//   "id": "monitoring.projects.uptimeCheckConfigs.list",
+	//   "parameterOrder": [
+	//     "parent"
+	//   ],
+	//   "parameters": {
+	//     "pageSize": {
+	//       "description": "The maximum number of results to return in a single response. The server may further constrain the maximum number of results returned in a single page. If the page_size is \u003c=0, the server will decide the number of results to be returned.",
+	//       "format": "int32",
+	//       "location": "query",
+	//       "type": "integer"
+	//     },
+	//     "pageToken": {
+	//       "description": "If this field is not empty then it must contain the nextPageToken value returned by a previous call to this method. Using this field causes the method to return more results from the previous method call.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "parent": {
+	//       "description": "The project whose uptime check configurations are listed. The format isprojects/[PROJECT_ID].",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v3/{+parent}/uptimeCheckConfigs",
+	//   "response": {
+	//     "$ref": "ListUptimeCheckConfigsResponse"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/monitoring",
+	//     "https://www.googleapis.com/auth/monitoring.read"
+	//   ]
+	// }
+
+}
+
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *ProjectsUptimeCheckConfigsListCall) Pages(ctx context.Context, f func(*ListUptimeCheckConfigsResponse) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
+// method id "monitoring.projects.uptimeCheckConfigs.patch":
+
+type ProjectsUptimeCheckConfigsPatchCall struct {
+	s                 *Service
+	name              string
+	uptimecheckconfig *UptimeCheckConfig
+	urlParams_        gensupport.URLParams
+	ctx_              context.Context
+	header_           http.Header
+}
+
+// Patch: Updates an uptime check configuration. You can either replace
+// the entire configuration with a new one or replace only certain
+// fields in the current configuration by specifying the fields to be
+// updated via "updateMask". Returns the updated configuration.
+func (r *ProjectsUptimeCheckConfigsService) Patch(name string, uptimecheckconfig *UptimeCheckConfig) *ProjectsUptimeCheckConfigsPatchCall {
+	c := &ProjectsUptimeCheckConfigsPatchCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	c.uptimecheckconfig = uptimecheckconfig
+	return c
+}
+
+// UpdateMask sets the optional parameter "updateMask": If present, only
+// the listed fields in the current uptime check configuration are
+// updated with values from the new configuration. If this field is
+// empty, then the current configuration is completely replaced with the
+// new configuration.
+func (c *ProjectsUptimeCheckConfigsPatchCall) UpdateMask(updateMask string) *ProjectsUptimeCheckConfigsPatchCall {
+	c.urlParams_.Set("updateMask", updateMask)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsUptimeCheckConfigsPatchCall) Fields(s ...googleapi.Field) *ProjectsUptimeCheckConfigsPatchCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsUptimeCheckConfigsPatchCall) Context(ctx context.Context) *ProjectsUptimeCheckConfigsPatchCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsUptimeCheckConfigsPatchCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsUptimeCheckConfigsPatchCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.uptimecheckconfig)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+name}")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("PATCH", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "monitoring.projects.uptimeCheckConfigs.patch" call.
+// Exactly one of *UptimeCheckConfig or error will be non-nil. Any
+// non-2xx status code is an error. Response headers are in either
+// *UptimeCheckConfig.ServerResponse.Header or (if a response was
+// returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *ProjectsUptimeCheckConfigsPatchCall) Do(opts ...googleapi.CallOption) (*UptimeCheckConfig, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &UptimeCheckConfig{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Updates an uptime check configuration. You can either replace the entire configuration with a new one or replace only certain fields in the current configuration by specifying the fields to be updated via \"updateMask\". Returns the updated configuration.",
+	//   "flatPath": "v3/projects/{projectsId}/uptimeCheckConfigs/{uptimeCheckConfigsId}",
+	//   "httpMethod": "PATCH",
+	//   "id": "monitoring.projects.uptimeCheckConfigs.patch",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "name": {
+	//       "description": "A unique resource name for this UptimeCheckConfig. The format is:projects/[PROJECT_ID]/uptimeCheckConfigs/[UPTIME_CHECK_ID].This field should be omitted when creating the uptime check configuration; on create, the resource name is assigned by the server and included in the response.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/uptimeCheckConfigs/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "updateMask": {
+	//       "description": "Optional. If present, only the listed fields in the current uptime check configuration are updated with values from the new configuration. If this field is empty, then the current configuration is completely replaced with the new configuration.",
+	//       "format": "google-fieldmask",
+	//       "location": "query",
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v3/{+name}",
+	//   "request": {
+	//     "$ref": "UptimeCheckConfig"
+	//   },
+	//   "response": {
+	//     "$ref": "UptimeCheckConfig"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/monitoring"
+	//   ]
+	// }
+
+}
+
+// method id "monitoring.uptimeCheckIps.list":
+
+type UptimeCheckIpsListCall struct {
+	s            *Service
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// List: Returns the list of IPs that checkers run from
+func (r *UptimeCheckIpsService) List() *UptimeCheckIpsListCall {
+	c := &UptimeCheckIpsListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	return c
+}
+
+// PageSize sets the optional parameter "pageSize": The maximum number
+// of results to return in a single response. The server may further
+// constrain the maximum number of results returned in a single page. If
+// the page_size is <=0, the server will decide the number of results to
+// be returned. NOTE: this field is not yet implemented
+func (c *UptimeCheckIpsListCall) PageSize(pageSize int64) *UptimeCheckIpsListCall {
+	c.urlParams_.Set("pageSize", fmt.Sprint(pageSize))
+	return c
+}
+
+// PageToken sets the optional parameter "pageToken": If this field is
+// not empty then it must contain the nextPageToken value returned by a
+// previous call to this method. Using this field causes the method to
+// return more results from the previous method call. NOTE: this field
+// is not yet implemented
+func (c *UptimeCheckIpsListCall) PageToken(pageToken string) *UptimeCheckIpsListCall {
+	c.urlParams_.Set("pageToken", pageToken)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *UptimeCheckIpsListCall) Fields(s ...googleapi.Field) *UptimeCheckIpsListCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *UptimeCheckIpsListCall) IfNoneMatch(entityTag string) *UptimeCheckIpsListCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *UptimeCheckIpsListCall) Context(ctx context.Context) *UptimeCheckIpsListCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *UptimeCheckIpsListCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *UptimeCheckIpsListCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/uptimeCheckIps")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("GET", urls, body)
+	req.Header = reqHeaders
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "monitoring.uptimeCheckIps.list" call.
+// Exactly one of *ListUptimeCheckIpsResponse or error will be non-nil.
+// Any non-2xx status code is an error. Response headers are in either
+// *ListUptimeCheckIpsResponse.ServerResponse.Header or (if a response
+// was returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *UptimeCheckIpsListCall) Do(opts ...googleapi.CallOption) (*ListUptimeCheckIpsResponse, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &ListUptimeCheckIpsResponse{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Returns the list of IPs that checkers run from",
+	//   "flatPath": "v3/uptimeCheckIps",
+	//   "httpMethod": "GET",
+	//   "id": "monitoring.uptimeCheckIps.list",
+	//   "parameterOrder": [],
+	//   "parameters": {
+	//     "pageSize": {
+	//       "description": "The maximum number of results to return in a single response. The server may further constrain the maximum number of results returned in a single page. If the page_size is \u003c=0, the server will decide the number of results to be returned. NOTE: this field is not yet implemented",
+	//       "format": "int32",
+	//       "location": "query",
+	//       "type": "integer"
+	//     },
+	//     "pageToken": {
+	//       "description": "If this field is not empty then it must contain the nextPageToken value returned by a previous call to this method. Using this field causes the method to return more results from the previous method call. NOTE: this field is not yet implemented",
+	//       "location": "query",
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v3/uptimeCheckIps",
+	//   "response": {
+	//     "$ref": "ListUptimeCheckIpsResponse"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/monitoring",
+	//     "https://www.googleapis.com/auth/monitoring.read"
+	//   ]
+	// }
+
+}
+
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *UptimeCheckIpsListCall) Pages(ctx context.Context, f func(*ListUptimeCheckIpsResponse) error) error {
 	c.ctx_ = ctx
 	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
 	for {
