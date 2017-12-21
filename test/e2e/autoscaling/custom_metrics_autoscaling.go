@@ -51,23 +51,58 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Me
 	It("should scale down with Custom Metric of type Pod from Stackdriver [Feature:CustomMetricsAutoscaling]", func() {
 		initialReplicas := 2
 		scaledReplicas := 1
-		deployment := monitoring.StackdriverExporterDeployment(stackdriverExporterDeployment, f.Namespace.ObjectMeta.Name, int32(initialReplicas), 100)
-		customMetricTest(f, f.ClientSet, podsHPA(f.Namespace.ObjectMeta.Name), deployment, nil, initialReplicas, scaledReplicas)
+		// metric should cause scale down
+		metricValue := int64(100)
+		metricTarget := 2 * metricValue
+		deployment := monitoring.SimpleStackdriverExporterDeployment(stackdriverExporterDeployment, f.Namespace.ObjectMeta.Name, int32(initialReplicas), metricValue)
+		customMetricTest(f, f.ClientSet, simplePodsHPA(f.Namespace.ObjectMeta.Name, metricTarget), deployment, nil, initialReplicas, scaledReplicas)
 	})
 
 	It("should scale down with Custom Metric of type Object from Stackdriver [Feature:CustomMetricsAutoscaling]", func() {
 		initialReplicas := 2
 		scaledReplicas := 1
-		deployment := monitoring.StackdriverExporterDeployment(dummyDeploymentName, f.Namespace.ObjectMeta.Name, int32(initialReplicas), 100)
-		pod := monitoring.StackdriverExporterPod(stackdriverExporterPod, f.Namespace.ObjectMeta.Name, stackdriverExporterPod, monitoring.CustomMetricName, 100)
-		customMetricTest(f, f.ClientSet, objectHPA(f.Namespace.ObjectMeta.Name), deployment, pod, initialReplicas, scaledReplicas)
+		// metric should cause scale down
+		metricValue := int64(100)
+		metricTarget := 2 * metricValue
+		deployment := monitoring.SimpleStackdriverExporterDeployment(dummyDeploymentName, f.Namespace.ObjectMeta.Name, int32(initialReplicas), metricValue)
+		pod := monitoring.StackdriverExporterPod(stackdriverExporterPod, f.Namespace.Name, stackdriverExporterPod, monitoring.CustomMetricName, metricValue)
+		customMetricTest(f, f.ClientSet, objectHPA(f.Namespace.ObjectMeta.Name, metricTarget), deployment, pod, initialReplicas, scaledReplicas)
 	})
 
 	It("should scale down with Custom Metric of type Pod from Stackdriver with Prometheus [Feature:CustomMetricsAutoscaling]", func() {
 		initialReplicas := 2
 		scaledReplicas := 1
-		deployment := monitoring.PrometheusExporterDeployment(stackdriverExporterDeployment, f.Namespace.ObjectMeta.Name, int32(initialReplicas), 100)
-		customMetricTest(f, f.ClientSet, podsHPA(f.Namespace.ObjectMeta.Name), deployment, nil, initialReplicas, scaledReplicas)
+		// metric should cause scale down
+		metricValue := int64(100)
+		metricTarget := 2 * metricValue
+		deployment := monitoring.PrometheusExporterDeployment(stackdriverExporterDeployment, f.Namespace.ObjectMeta.Name, int32(initialReplicas), metricValue)
+		customMetricTest(f, f.ClientSet, simplePodsHPA(f.Namespace.ObjectMeta.Name, metricTarget), deployment, nil, initialReplicas, scaledReplicas)
+	})
+
+	It("should scale up with two metrics of type Pod from Stackdriver [Feature:CustomMetricsAutoscaling]", func() {
+		initialReplicas := 1
+		scaledReplicas := 3
+		// metric 1 would cause a scale down, if not for metric 2
+		metric1Value := int64(100)
+		metric1Target := 2 * metric1Value
+		// metric2 should cause a scale up
+		metric2Value := int64(200)
+		metric2Target := int64(0.5 * float64(metric2Value))
+		containers := []monitoring.CustomMetricContainerSpec{
+			{
+				Name:        "stackdriver-exporter-metric1",
+				MetricName:  "metric1",
+				MetricValue: metric1Value,
+			},
+			{
+				Name:        "stackdriver-exporter-metric2",
+				MetricName:  "metric2",
+				MetricValue: metric2Value,
+			},
+		}
+		metricTargets := map[string]int64{"metric1": metric1Target, "metric2": metric2Target}
+		deployment := monitoring.StackdriverExporterDeployment(stackdriverExporterDeployment, f.Namespace.ObjectMeta.Name, int32(initialReplicas), containers)
+		customMetricTest(f, f.ClientSet, podsHPA(f.Namespace.ObjectMeta.Name, stackdriverExporterDeployment, metricTargets), deployment, nil, initialReplicas, scaledReplicas)
 	})
 })
 
@@ -153,35 +188,41 @@ func cleanupDeploymentsToScale(f *framework.Framework, cs clientset.Interface, d
 	}
 }
 
-func podsHPA(namespace string) *as.HorizontalPodAutoscaler {
+func simplePodsHPA(namespace string, metricTarget int64) *as.HorizontalPodAutoscaler {
+	return podsHPA(namespace, stackdriverExporterDeployment, map[string]int64{monitoring.CustomMetricName: metricTarget})
+}
+
+func podsHPA(namespace string, deploymentName string, metricTargets map[string]int64) *as.HorizontalPodAutoscaler {
 	var minReplicas int32 = 1
+	metrics := []as.MetricSpec{}
+	for metric, target := range metricTargets {
+		metrics = append(metrics, as.MetricSpec{
+			Type: as.PodsMetricSourceType,
+			Pods: &as.PodsMetricSource{
+				MetricName:         metric,
+				TargetAverageValue: *resource.NewQuantity(target, resource.DecimalSI),
+			},
+		})
+	}
 	return &as.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "custom-metrics-pods-hpa",
 			Namespace: namespace,
 		},
 		Spec: as.HorizontalPodAutoscalerSpec{
-			Metrics: []as.MetricSpec{
-				{
-					Type: as.PodsMetricSourceType,
-					Pods: &as.PodsMetricSource{
-						MetricName:         monitoring.CustomMetricName,
-						TargetAverageValue: *resource.NewQuantity(200, resource.DecimalSI),
-					},
-				},
-			},
+			Metrics:     metrics,
 			MaxReplicas: 3,
 			MinReplicas: &minReplicas,
 			ScaleTargetRef: as.CrossVersionObjectReference{
 				APIVersion: "extensions/v1beta1",
 				Kind:       "Deployment",
-				Name:       stackdriverExporterDeployment,
+				Name:       deploymentName,
 			},
 		},
 	}
 }
 
-func objectHPA(namespace string) *as.HorizontalPodAutoscaler {
+func objectHPA(namespace string, metricTarget int64) *as.HorizontalPodAutoscaler {
 	var minReplicas int32 = 1
 	return &as.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
@@ -198,7 +239,7 @@ func objectHPA(namespace string) *as.HorizontalPodAutoscaler {
 							Kind: "Pod",
 							Name: stackdriverExporterPod,
 						},
-						TargetValue: *resource.NewQuantity(200, resource.DecimalSI),
+						TargetValue: *resource.NewQuantity(metricTarget, resource.DecimalSI),
 					},
 				},
 			},
