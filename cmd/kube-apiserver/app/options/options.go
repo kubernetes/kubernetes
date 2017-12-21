@@ -51,7 +51,7 @@ type ServerRunOptions struct {
 	Authorization           *kubeoptions.BuiltInAuthorizationOptions
 	CloudProvider           *kubeoptions.CloudProviderOptions
 	StorageSerialization    *kubeoptions.StorageSerializationOptions
-	APIEnablement           *kubeoptions.APIEnablementOptions
+	APIEnablement           *genericoptions.APIEnablementOptions
 
 	AllowPrivileged           bool
 	EnableLogsHandler         bool
@@ -87,7 +87,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		Authorization:        kubeoptions.NewBuiltInAuthorizationOptions(),
 		CloudProvider:        kubeoptions.NewCloudProviderOptions(),
 		StorageSerialization: kubeoptions.NewStorageSerializationOptions(),
-		APIEnablement:        kubeoptions.NewAPIEnablementOptions(),
+		APIEnablement:        genericoptions.NewAPIEnablementOptions(),
 
 		EnableLogsHandler:      true,
 		EventTTL:               1 * time.Hour,

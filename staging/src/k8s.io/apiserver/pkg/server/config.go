@@ -57,6 +57,7 @@ import (
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
+	serverstore "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
@@ -174,6 +175,11 @@ type Config struct {
 	// EnableAPIResponseCompression indicates whether API Responses should support compression
 	// if the client requests it via Accept-Encoding
 	EnableAPIResponseCompression bool
+
+	// MergedResourceConfig indicates which groupVersion enabled and its resources enabled/disabled.
+	// This is composed of genericapiserver defaultAPIResourceConfig and those parsed from flags.
+	// If not specify any in flags, then genericapiserver will only enable defaultAPIResourceConfig.
+	MergedResourceConfig *serverstore.ResourceConfig
 
 	//===========================================================================
 	// values below here are targets for removal
