@@ -382,10 +382,7 @@ func (gb *GraphBuilder) addDependentToOwners(n *node, owners []metav1.OwnerRefer
 		ownerNode, ok := gb.uidToNode.Read(owner.UID)
 		if !ok {
 			// Create a "virtual" node in the graph for the owner if it doesn't
-			// exist in the graph yet. Then enqueue the virtual node into the
-			// attemptToDelete. The garbage processor will enqueue a virtual delete
-			// event to delete it from the graph if API server confirms this
-			// owner doesn't exist.
+			// exist in the graph yet.
 			ownerNode = &node{
 				identity: objectReference{
 					OwnerReference: owner,
@@ -395,9 +392,15 @@ func (gb *GraphBuilder) addDependentToOwners(n *node, owners []metav1.OwnerRefer
 			}
 			glog.V(5).Infof("add virtual node.identity: %s\n\n", ownerNode.identity)
 			gb.uidToNode.Write(ownerNode)
-			gb.attemptToDelete.Add(ownerNode)
 		}
 		ownerNode.addDependent(n)
+		if !ok {
+			// Enqueue the virtual node into attemptToDelete.
+			// The garbage processor will enqueue a virtual delete
+			// event to delete it from the graph if API server confirms this
+			// owner doesn't exist.
+			gb.attemptToDelete.Add(ownerNode)
+		}
 	}
 }
 
