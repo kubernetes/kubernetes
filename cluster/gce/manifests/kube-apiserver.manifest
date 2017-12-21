@@ -134,6 +134,12 @@
 {% set admission_controller_config_volume = "" -%}
 {% set image_policy_webhook_config_mount = "" -%}
 {% set image_policy_webhook_config_volume = "" -%}
+{% set image_policy_webhook_plugin_config_mount = "" -%}
+{% set image_policy_webhook_plugin_config_volume = "" -%}
+{% set validating_admission_webhook_config_mount = "" -%}
+{% set validating_admission_webhook_config_volume = "" -%}
+{% set mutating_admission_webhook_config_mount = "" -%}
+{% set mutating_admission_webhook_config_volume = "" -%}
 {% if grains.image_review_config is defined -%}
   {% set image_review_config = " --admission-control-config-file=" + grains.image_review_config -%}
   {% set admission_controller_config_mount = "{\"name\": \"admissioncontrollerconfigmount\",\"mountPath\": \"" + grains.image_review_config + "\", \"readOnly\": false}," -%}
@@ -260,6 +266,9 @@
         {{audit_webhook_config_mount}}
         {{admission_controller_config_mount}}
         {{image_policy_webhook_config_mount}}
+        {{image_policy_webhook_plugin_config_mount}}
+        {{validating_admission_webhook_config_mount}}
+        {{mutating_admission_webhook_config_mount}}
         { "name": "srvkube",
         "mountPath": "{{srv_kube_path}}",
         "readOnly": true},
@@ -299,6 +308,9 @@
   {{audit_webhook_config_volume}}
   {{admission_controller_config_volume}}
   {{image_policy_webhook_config_volume}}
+  {{image_policy_webhook_plugin_config_volume}}
+  {{validating_admission_webhook_config_volume}}
+  {{mutating_admission_webhook_config_volume}}
   { "name": "srvkube",
     "hostPath": {
         "path": "{{srv_kube_path}}"}

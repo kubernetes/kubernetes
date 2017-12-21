@@ -459,6 +459,14 @@ function create-master-pki {
     write-pki-data "${CA_KEY}" "${CA_KEY_PATH}"
   fi
 
+  if [[ -n "${WEBHOOK_CLIENT_KEY:-}" && -n "${WEBHOOK_CLIENT_CERT:-}" ]]; then
+    WEBHOOK_CLIENT_KEY_PATH="${pki_dir}/webhook_client.key"
+    write-pki-data "${WEBHOOK_CLIENT_KEY}" "${WEBHOOK_CLIENT_KEY_PATH}"
+
+    WEBHOOK_CLIENT_CERT_PATH="${pki_dir}/webhook_client.crt"
+    write-pki-data "${WEBHOOK_CLIENT_CERT}" "${WEBHOOK_CLIENT_CERT_PATH}"
+  fi
+
   if [[ -z "${APISERVER_SERVER_CERT:-}" || -z "${APISERVER_SERVER_KEY:-}" ]]; then
     APISERVER_SERVER_CERT="${MASTER_CERT}"
     APISERVER_SERVER_KEY="${MASTER_KEY}"
@@ -669,7 +677,39 @@ contexts:
 EOF
   fi
 
-if [[ -n "${GCP_IMAGE_VERIFICATION_URL:-}" ]]; then
+  if [[ -n "${WEBHOOK_CLIENT_KEY:-}" && -n "${WEBHOOK_CLIENT_CERT:-}" && -z "${GENERIC_ADMISSION_KUBECONFIG:-}" ]]; then
+    # This is the config file for admission webhooks
+    GENERIC_ADMISSION_KUBECONFIG="users:
+- name: '*'
+  user:
+    client-certificate: ${WEBHOOK_CLIENT_CERT_PATH}
+    client-key: ${WEBHOOK_CLIENT_KEY_PATH}"
+  fi
+
+  if [[ -n "${GENERIC_ADMISSION_KUBECONFIG:-}" ]]; then
+    # This is the config file for validating admission webhooks
+    cat <<EOF >/etc/validating_admission_webhook.config
+${GENERIC_ADMISSION_KUBECONFIG}
+EOF
+    VALIDATING_ADMISSION_WEBHOOK_PLUGIN="- name: ValidatingAdmissionWebhook
+  configuration:
+    kind: WebhookAdmission
+    apiVersion: apiserver.config.k8s.io/v1alpha1
+    kubeConfigFile: /etc/validating_admission_webhook.config"
+    # This is the config file for mutating admission webhooks
+    cat <<EOF >/etc/mutating_admission_webhook.config
+${GENERIC_ADMISSION_KUBECONFIG}
+EOF
+    MUTATING_ADMISSION_WEBHOOK_PLUGIN="- name: MutatingAdmissionWebhook
+  configuration:
+    kind: WebhookAdmission
+    apiVersion: apiserver.config.k8s.io/v1alpha1
+    kubeConfigFile: /etc/mutating_admission_webhook.config"
+    # Make sure these plugin configs are included in the admission control config file
+    USING_ADMISSION_CONTROL_CONFIG_PLUGINS=1
+  fi
+
+  if [[ -n "${GCP_IMAGE_VERIFICATION_URL:-}" ]]; then
     # This is the config file for the image review webhook.
     cat <<EOF >/etc/gcp_image_review.config
 clusters:
@@ -688,14 +728,29 @@ contexts:
     user: kube-apiserver
   name: webhook
 EOF
-    # This is the config for the image review admission controller.
-    cat <<EOF >/etc/admission_controller.config
+    cat <<EOF >/etc/image_policy_webhook.config
 imagePolicy:
   kubeConfigFile: /etc/gcp_image_review.config
   allowTTL: 30
   denyTTL: 30
   retryBackoff: 500
   defaultAllow: true
+EOF
+    IMAGE_POLICY_WEBHOOK_PLUGIN="- name: ImagePolicyWebhook
+  path: /etc/image_policy_webhook.config"
+    # Make sure this plugin config is included in the admission control config file
+    USING_ADMISSION_CONTROL_CONFIG_PLUGINS=1
+  fi
+
+  if [[ -n "${USING_ADMISSION_CONTROL_CONFIG_PLUGINS:-}" ]]; then
+    # This is the config for the admission controllers.
+    cat <<EOF >/etc/admission_controller.config
+kind: AdmissionConfiguration
+apiVersion: apiserver.k8s.io/v1alpha1
+plugins:
+${VALIDATING_ADMISSION_WEBHOOK_PLUGIN:-}
+${MUTATING_ADMISSION_WEBHOOK_PLUGIN:-}
+${IMAGE_POLICY_WEBHOOK_PLUGIN:-}
 EOF
   fi
 }
@@ -1656,16 +1711,35 @@ function start-kube-apiserver {
   local admission_controller_config_volume=""
   local image_policy_webhook_config_mount=""
   local image_policy_webhook_config_volume=""
+  local image_policy_webhook_plugin_config_mount=""
+  local image_policy_webhook_plugin_config_volume=""
+  local validating_admission_webhook_config_mount=""
+  local validating_admission_webhook_config_volume=""
+  local mutating_admission_webhook_config_mount=""
+  local mutating_admission_webhook_config_volume=""
   if [[ -n "${ADMISSION_CONTROL:-}" ]]; then
     params+=" --admission-control=${ADMISSION_CONTROL}"
     if [[ ${ADMISSION_CONTROL} == *"ImagePolicyWebhook"* ]]; then
-      params+=" --admission-control-config-file=/etc/admission_controller.config"
-      # Mount the file to configure admission controllers if ImagePolicyWebhook is set.
-      admission_controller_config_mount="{\"name\": \"admissioncontrollerconfigmount\",\"mountPath\": \"/etc/admission_controller.config\", \"readOnly\": false},"
-      admission_controller_config_volume="{\"name\": \"admissioncontrollerconfigmount\",\"hostPath\": {\"path\": \"/etc/admission_controller.config\", \"type\": \"FileOrCreate\"}},"
-      # Mount the file to configure the ImagePolicyWebhook's webhook.
+      # Mount the kubeconfig file to configure the ImagePolicyWebhook's webhook.
       image_policy_webhook_config_mount="{\"name\": \"imagepolicywebhookconfigmount\",\"mountPath\": \"/etc/gcp_image_review.config\", \"readOnly\": false},"
       image_policy_webhook_config_volume="{\"name\": \"imagepolicywebhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_image_review.config\", \"type\": \"FileOrCreate\"}},"
+      # Mount the file to configure the ImagePolicyWebhook plugin.
+      image_policy_webhook_plugin_config_mount="{\"name\": \"imagepolicywebhookpluginconfigmount\",\"mountPath\": \"/etc/image_policy_webhook.config\", \"readOnly\": false},"
+      image_policy_webhook_plugin_config_volume="{\"name\": \"imagepolicywebhookpluginconfigmount\",\"hostPath\": {\"path\": \"/etc/image_policy_webhook.config\", \"type\": \"FileOrCreate\"}},"
+    fi
+    if [[ -n "${WEBHOOK_CLIENT_KEY:-}" && -n "${WEBHOOK_CLIENT_CERT:-}" ]]; then
+      # Mount the file to configure the client certs kube-apiserver will use for ValidatingAdmissionWebhook.
+      validating_admission_webhook_config_mount="{\"name\": \"validatingadmissionwebhookconfigmount\",\"mountPath\": \"/etc/validating_admission_webhook.config\", \"readOnly\": false},"
+      validating_admission_webhook_config_volume="{\"name\": \"validatingadmissionwebhookconfigmount\",\"hostPath\": {\"path\": \"/etc/validating_admission_webhook.config\", \"type\": \"FileOrCreate\"}},"
+      # Mount the file to configure the client certs kube-apiserver will use for MutatingAdmissionWebhook.
+      mutating_admission_webhook_config_mount="{\"name\": \"mutatingadmissionwebhookconfigmount\",\"mountPath\": \"/etc/mutating_admission_webhook.config\", \"readOnly\": false},"
+      mutating_admission_webhook_config_volume="{\"name\": \"mutatingadmissionwebhookconfigmount\",\"hostPath\": {\"path\": \"/etc/mutating_admission_webhook.config\", \"type\": \"FileOrCreate\"}},"
+    fi
+    if [[ -n "${WEBHOOK_CLIENT_KEY:-}" && -n "${WEBHOOK_CLIENT_CERT:-}" || ${ADMISSION_CONTROL} == *"ImagePolicyWebhook"* ]]; then
+      params+=" --admission-control-config-file=/etc/admission_controller.config"
+      # Mount the file to configure admission controllers.
+      admission_controller_config_mount="{\"name\": \"admissioncontrollerconfigmount\",\"mountPath\": \"/etc/admission_controller.config\", \"readOnly\": false},"
+      admission_controller_config_volume="{\"name\": \"admissioncontrollerconfigmount\",\"hostPath\": {\"path\": \"/etc/admission_controller.config\", \"type\": \"FileOrCreate\"}},"
     fi
   fi
 
@@ -1782,6 +1856,12 @@ function start-kube-apiserver {
   sed -i -e "s@{{admission_controller_config_volume}}@${admission_controller_config_volume}@g" "${src_file}"
   sed -i -e "s@{{image_policy_webhook_config_mount}}@${image_policy_webhook_config_mount}@g" "${src_file}"
   sed -i -e "s@{{image_policy_webhook_config_volume}}@${image_policy_webhook_config_volume}@g" "${src_file}"
+  sed -i -e "s@{{image_policy_webhook_plugin_config_mount}}@${image_policy_webhook_plugin_config_mount}@g" "${src_file}"
+  sed -i -e "s@{{image_policy_webhook_plugin_config_volume}}@${image_policy_webhook_plugin_config_volume}@g" "${src_file}"
+  sed -i -e "s@{{validating_admission_webhook_config_mount}}@${validating_admission_webhook_config_mount}@g" "${src_file}"
+  sed -i -e "s@{{validating_admission_webhook_config_volume}}@${validating_admission_webhook_config_volume}@g" "${src_file}"
+  sed -i -e "s@{{mutating_admission_webhook_config_mount}}@${mutating_admission_webhook_config_mount}@g" "${src_file}"
+  sed -i -e "s@{{mutating_admission_webhook_config_volume}}@${mutating_admission_webhook_config_volume}@g" "${src_file}"
   cp "${src_file}" /etc/kubernetes/manifests
 }
 

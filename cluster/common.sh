@@ -546,6 +546,8 @@ function build-kube-master-certs {
   cat >$file <<EOF
 KUBEAPISERVER_CERT: $(yaml-quote ${KUBEAPISERVER_CERT_BASE64:-})
 KUBEAPISERVER_KEY: $(yaml-quote ${KUBEAPISERVER_KEY_BASE64:-})
+WEBHOOK_CLIENT_CERT: $(yaml-quote ${WEBHOOK_CLIENT_CERT_BASE64:-})
+WEBHOOK_CLIENT_KEY: $(yaml-quote ${WEBHOOK_CLIENT_KEY_BASE64:-})
 CA_KEY: $(yaml-quote ${CA_KEY_BASE64:-})
 AGGREGATOR_CA_KEY: $(yaml-quote ${AGGREGATOR_CA_KEY_BASE64:-})
 REQUESTHEADER_CA_CERT: $(yaml-quote ${REQUESTHEADER_CA_CERT_BASE64:-})
@@ -1015,6 +1017,8 @@ function create-certs {
   KUBECFG_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubecfg.key" | base64 | tr -d '\r\n')
   KUBEAPISERVER_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kube-apiserver.crt" | base64 | tr -d '\r\n')
   KUBEAPISERVER_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kube-apiserver.key" | base64 | tr -d '\r\n')
+  WEBHOOK_CLIENT_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/webhook-client.crt" | base64 | tr -d '\r\n')
+  WEBHOOK_CLIENT_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/webhook-client.key" | base64 | tr -d '\r\n')
 
   # Setting up an addition directory (beyond pki) as it is the simplest way to
   # ensure we get a different CA pair to sign the proxy-client certs and which
@@ -1087,6 +1091,13 @@ function generate-certs {
     mv "kubelet.pem" "pki/issued/kubelet.crt"
     rm -f "kubelet.csr"
 
+    # create the webhook client cert with the correct groups
+    # this cert will be presented by the kube-apiserver when calling validating and mutating admission webhooks
+    echo '{"CN":"webhook-client","names":[{"O":"system:kubeapi-server"}],"hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare webhook-client
+    mv "webhook-client-key.pem" "pki/private/webhook-client.key"
+    mv "webhook-client.pem" "pki/issued/webhook-client.crt"
+    rm -f "webhook-client.csr"
+
     # Make a superuser client cert with subject "O=system:masters, CN=kubecfg"
     ./easyrsa --dn-mode=org \
       --req-cn=kubecfg --req-org=system:masters \
@@ -1104,7 +1115,9 @@ function generate-certs {
     "${CERT_DIR}/pki/issued/kubecfg.crt" \
     "${CERT_DIR}/pki/private/kubecfg.key" \
     "${CERT_DIR}/pki/issued/kube-apiserver.crt" \
-    "${CERT_DIR}/pki/private/kube-apiserver.key"
+    "${CERT_DIR}/pki/private/kube-apiserver.key" \
+    "${CERT_DIR}/pki/issued/webhook-client.crt" \
+    "${CERT_DIR}/pki/private/webhook-client.key"
   do
     if [[ ! -s "${output_file}" ]]; then
       echo "Expected file ${output_file} not created" >&2
@@ -1327,6 +1340,8 @@ function parse-master-env() {
   CA_KEY_BASE64=$(get-env-val "${master_env}" "CA_KEY")
   KUBEAPISERVER_CERT_BASE64=$(get-env-val "${master_env}" "KUBEAPISERVER_CERT")
   KUBEAPISERVER_KEY_BASE64=$(get-env-val "${master_env}" "KUBEAPISERVER_KEY")
+  WEBHOOK_CLIENT_CERT_BASE64=$(get-env-val "${master_env}" "WEBHOOK_CLIENT_CERT")
+  WEBHOOK_CLIENT_KEY_BASE64=$(get-env-val "${master_env}" "WEBHOOK_CLIENT_KEY")
   EXTRA_DOCKER_OPTS=$(get-env-val "${master_env}" "EXTRA_DOCKER_OPTS")
   KUBELET_CERT_BASE64=$(get-env-val "${master_env}" "KUBELET_CERT")
   KUBELET_KEY_BASE64=$(get-env-val "${master_env}" "KUBELET_KEY")
