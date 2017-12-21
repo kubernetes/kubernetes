@@ -87,8 +87,9 @@ func (m *Stub) Start() error {
 
 // Stop stops the gRPC server
 func (m *Stub) Stop() error {
-	m.server.Stop()
 	close(m.stop)
+
+	m.server.Stop()
 
 	return m.cleanup()
 }
