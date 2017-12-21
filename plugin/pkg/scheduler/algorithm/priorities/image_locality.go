@@ -24,6 +24,13 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
+// This is a reasonable size range of all container images. 90%ile of images on dockerhub drops into this range.
+const (
+	mb         int64 = 1024 * 1024
+	minImgSize int64 = 23 * mb
+	maxImgSize int64 = 1000 * mb
+)
+
 // ImageLocalityPriorityMap is a priority function that favors nodes that already have requested pod container's images.
 // It will detect whether the requested images are present on a node, and then calculate a score ranging from 0 to 10
 // based on the total size of those images.

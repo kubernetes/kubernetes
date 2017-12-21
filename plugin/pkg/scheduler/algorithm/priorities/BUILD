@@ -19,6 +19,7 @@ go_library(
         "node_label.go",
         "node_prefer_avoid_pods.go",
         "reduce.go",
+        "resource_allocation.go",
         "resource_limits.go",
         "selector_spreading.go",
         "taint_toleration.go",
