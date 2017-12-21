@@ -397,7 +397,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 	// Alpha Dynamic Configuration Implementation;
 	// if the kubelet config controller is available, inject the latest to start the config and status sync loops
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && kubeDeps.KubeletConfigController != nil && !standaloneMode && !s.RunOnce {
-		kubeDeps.KubeletConfigController.StartSync(kubeDeps.KubeClient, string(nodeName))
+		kubeDeps.KubeletConfigController.StartSync(kubeDeps.KubeClient, kubeDeps.EventClient, string(nodeName))
 	}
 
 	if kubeDeps.Auth == nil {

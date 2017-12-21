@@ -24,10 +24,10 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
-
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint/store"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/configfiles"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
@@ -200,7 +200,7 @@ func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 // StartSync launches the controller's sync loops if `client` is non-nil and `nodeName` is non-empty.
 // It will always start the Node condition reporting loop, and will also start the dynamic conifg sync loops
 // if dynamic config is enabled on the controller. If `nodeName` is empty but `client` is non-nil, an error is logged.
-func (cc *Controller) StartSync(client clientset.Interface, nodeName string) {
+func (cc *Controller) StartSync(client clientset.Interface, eventClient v1core.EventsGetter, nodeName string) {
 	if client == nil {
 		utillog.Infof("nil client, will not start sync loops")
 		return
@@ -235,7 +235,7 @@ func (cc *Controller) StartSync(client clientset.Interface, nodeName string) {
 		go utilpanic.HandlePanic(func() {
 			utillog.Infof("starting config source sync loop")
 			wait.JitterUntil(func() {
-				cc.syncConfigSource(client, nodeName)
+				cc.syncConfigSource(client, eventClient, nodeName)
 			}, 10*time.Second, 0.2, true, wait.NeverStop)
 		})()
 	} else {

@@ -34,6 +34,8 @@ import (
 type RemoteConfigSource interface {
 	// UID returns the UID of the remote config source object
 	UID() string
+	// APIPath returns the API path to the remote resource, e.g. its SelfLink
+	APIPath() string
 	// Download downloads the remote config source object returns a Checkpoint backed by the object,
 	// or a sanitized failure reason and error if the download fails
 	Download(client clientset.Interface) (Checkpoint, string, error)
@@ -108,6 +110,13 @@ type remoteConfigMap struct {
 
 func (r *remoteConfigMap) UID() string {
 	return string(r.source.ConfigMapRef.UID)
+}
+
+const configMapAPIPathFmt = "/api/v1/namespaces/%s/configmaps/%s"
+
+func (r *remoteConfigMap) APIPath() string {
+	ref := r.source.ConfigMapRef
+	return fmt.Sprintf(configMapAPIPathFmt, ref.Namespace, ref.Name)
 }
 
 func (r *remoteConfigMap) Download(client clientset.Interface) (Checkpoint, string, error) {
