@@ -163,7 +163,7 @@ func (e *endpointImpl) Stop() error {
 	select {
 	case <-e.stopChan:
 		break
-	case <-time.After(5 * time.Second):
+	case <-time.After(1 * time.Second):
 		return fmt.Errorf("Could not stop endpoint %s", e.resourceName)
 	}
 
