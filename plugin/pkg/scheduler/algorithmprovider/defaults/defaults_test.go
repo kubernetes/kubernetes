@@ -78,7 +78,7 @@ func TestDefaultPredicates(t *testing.T) {
 		"CheckNodeDiskPressure",
 		"CheckNodeCondition",
 		"PodToleratesNodeTaints",
-		predicates.CheckVolumeBinding,
+		predicates.CheckVolumeBindingPred,
 	)
 
 	if expected := defaultPredicates(); !result.Equal(expected) {

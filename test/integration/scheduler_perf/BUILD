@@ -42,6 +42,7 @@ go_test(
     library = ":go_default_library",
     tags = ["integration"],
     deps = [
+        "//pkg/kubelet/apis:go_default_library",
         "//plugin/pkg/scheduler:go_default_library",
         "//test/integration/framework:go_default_library",
         "//test/utils:go_default_library",

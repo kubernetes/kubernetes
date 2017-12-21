@@ -139,10 +139,10 @@ func checkDockerConfig() error {
 		if _, err := os.Stat(bin); os.IsNotExist(err) {
 			continue
 		}
-		output, err := runCommand(bin)
-		if err != nil {
-			return err
-		}
+		// We don't check the return code because it's OK if the script returns
+		// a non-zero exit code just because the configs in the whitelist are
+		// missing.
+		output, _ := runCommand(bin)
 		for _, line := range strings.Split(output, "\n") {
 			if !strings.Contains(line, "missing") {
 				continue
