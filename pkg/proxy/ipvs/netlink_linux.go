@@ -21,17 +21,11 @@ package ipvs
 import (
 	"fmt"
 	"net"
-	"syscall"
-	// TODO: replace syscall with golang.org/x/sys/unix?
-	// The Go doc for syscall says:
-	// NOTE: This package is locked down.
-	// Code outside the standard Go repository should be migrated to use the corresponding package in the golang.org/x/sys repository.
-	// That is also where updates required by new systems or versions should be applied.
-	// See https://golang.org/s/go1.4-syscall for more information.
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 )
 
 type netlinkHandle struct {
@@ -55,7 +49,7 @@ func (h *netlinkHandle) EnsureAddressBind(address, devName string) (exist bool, 
 	}
 	if err := h.AddrAdd(dev, &netlink.Addr{IPNet: netlink.NewIPNet(addr)}); err != nil {
 		// "EEXIST" will be returned if the address is already bound to device
-		if err == syscall.Errno(syscall.EEXIST) {
+		if err == unix.EEXIST {
 			return true, nil
 		}
 		return false, fmt.Errorf("error bind address: %s to interface: %s, err: %v", address, devName, err)
@@ -136,9 +130,9 @@ func (h *netlinkHandle) GetLocalAddresses(filterDev string) (sets.String, error)
 	}
 
 	routeFilter := &netlink.Route{
-		Table:    syscall.RT_TABLE_LOCAL,
-		Type:     syscall.RTN_LOCAL,
-		Protocol: syscall.RTPROT_KERNEL,
+		Table:    unix.RT_TABLE_LOCAL,
+		Type:     unix.RTN_LOCAL,
+		Protocol: unix.RTPROT_KERNEL,
 	}
 	filterMask := netlink.RT_FILTER_TABLE | netlink.RT_FILTER_TYPE | netlink.RT_FILTER_PROTOCOL
 
