@@ -20,10 +20,12 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -72,6 +74,8 @@ type event struct {
 // uidToNode, a graph that caches the dependencies as we know, and enqueues
 // items to the attemptToDelete and attemptToOrphan.
 type GraphBuilder struct {
+	Debug *atomic.Value
+
 	restMapper meta.RESTMapper
 
 	// each monitor list/watches a resource, the results are funneled to the
@@ -159,6 +163,11 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 				obj:       obj,
 				gvk:       kind,
 			}
+			if gb.Debug != nil && gb.Debug.Load().(bool) {
+				if rc, ok := obj.(*v1.ReplicationController); ok {
+					glog.Infof("DEBUG: add %#v", rc.ObjectMeta)
+				}
+			}
 			gb.graphChanges.Add(event)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
@@ -169,6 +178,11 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 				obj:       newObj,
 				oldObj:    oldObj,
 				gvk:       kind,
+			}
+			if gb.Debug != nil && gb.Debug.Load().(bool) {
+				if rc, ok := newObj.(*v1.ReplicationController); ok {
+					glog.Infof("DEBUG: update %#v", rc.ObjectMeta)
+				}
 			}
 			gb.graphChanges.Add(event)
 		},
@@ -181,6 +195,11 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 				eventType: deleteEvent,
 				obj:       obj,
 				gvk:       kind,
+			}
+			if gb.Debug != nil && gb.Debug.Load().(bool) {
+				if rc, ok := obj.(*v1.ReplicationController); ok {
+					glog.Infof("DEBUG: delete %#v", rc.ObjectMeta)
+				}
 			}
 			gb.graphChanges.Add(event)
 		},
@@ -370,6 +389,11 @@ func DefaultIgnoredResources() map[schema.GroupResource]struct{} {
 }
 
 func (gb *GraphBuilder) enqueueChanges(e *event) {
+	if gb.Debug != nil && gb.Debug.Load().(bool) {
+		if rc, ok := e.obj.(*v1.ReplicationController); ok {
+			glog.Infof("DEBUG: enqueueChanges %#v", rc.ObjectMeta)
+		}
+	}
 	gb.graphChanges.Add(e)
 }
 
@@ -393,11 +417,17 @@ func (gb *GraphBuilder) addDependentToOwners(n *node, owners []metav1.OwnerRefer
 				},
 				dependents: make(map[*node]struct{}),
 			}
-			glog.V(5).Infof("add virtual node.identity: %s\n\n", ownerNode.identity)
+			glog.V(5).Infof("DEBUG: add virtual node.identity: %s\n\n", ownerNode.identity)
 			gb.uidToNode.Write(ownerNode)
 			gb.attemptToDelete.Add(ownerNode)
 		}
+		if !ok {
+			glog.V(5).Infof("DEBUG: -> addDependent %s to owner %s\n", n.identity, ownerNode.identity)
+		}
 		ownerNode.addDependent(n)
+		if !ok {
+			glog.V(5).Infof("DEBUG: <- addDependent %s to owner %s\n", n.identity, ownerNode.identity)
+		}
 	}
 }
 
