@@ -35,6 +35,7 @@ import (
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -102,6 +103,18 @@ func GetStaticPodSpecs(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.
 			Resources:     staticpodutil.ComponentResources("100m"),
 			Env:           getProxyEnvVars(),
 		}, mounts.GetVolumes(kubeadmconstants.KubeScheduler)),
+	}
+
+	// Some cloud providers need extra privileges for example to load node information from a config drive
+	// TODO: when we fully to external cloud providers and the api server and controller manager do not need
+	// to call out to cloud provider code, we can remove the support for the PrivilegedPods
+	if cfg.PrivilegedPods {
+		staticPodSpecs[kubeadmconstants.KubeAPIServer].Spec.Containers[0].SecurityContext = &v1.SecurityContext{
+			Privileged: utilpointer.BoolPtr(true),
+		}
+		staticPodSpecs[kubeadmconstants.KubeControllerManager].Spec.Containers[0].SecurityContext = &v1.SecurityContext{
+			Privileged: utilpointer.BoolPtr(true),
+		}
 	}
 
 	return staticPodSpecs

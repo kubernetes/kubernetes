@@ -39,6 +39,11 @@ type MasterConfiguration struct {
 	NodeName             string               `json:"nodeName"`
 	AuthorizationModes   []string             `json:"authorizationModes,omitempty"`
 
+	// Mark the controller and api server pods as privileged as some cloud
+	// controllers like openstack need escalated privileges under some conditions
+	// example - loading a config drive to fetch node information
+	PrivilegedPods bool `json:"privilegedPods"`
+
 	Token    string           `json:"token"`
 	TokenTTL *metav1.Duration `json:"tokenTTL,omitempty"`
 
