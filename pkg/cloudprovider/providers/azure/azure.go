@@ -181,6 +181,23 @@ type SecurityGroupsClient interface {
 	List(resourceGroupName string) (result network.SecurityGroupListResult, err error)
 }
 
+// VirtualMachineScaleSetsClient defines needed functions for azure compute.VirtualMachineScaleSetsClient
+type VirtualMachineScaleSetsClient interface {
+	CreateOrUpdate(resourceGroupName string, VMScaleSetName string, parameters compute.VirtualMachineScaleSet, cancel <-chan struct{}) (<-chan compute.VirtualMachineScaleSet, <-chan error)
+	Get(resourceGroupName string, VMScaleSetName string) (result compute.VirtualMachineScaleSet, err error)
+	List(resourceGroupName string) (result compute.VirtualMachineScaleSetListResult, err error)
+	ListNextResults(lastResults compute.VirtualMachineScaleSetListResult) (result compute.VirtualMachineScaleSetListResult, err error)
+	UpdateInstances(resourceGroupName string, VMScaleSetName string, VMInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs, cancel <-chan struct{}) (<-chan compute.OperationStatusResponse, <-chan error)
+}
+
+// VirtualMachineScaleSetVMsClient defines needed functions for azure compute.VirtualMachineScaleSetVMsClient
+type VirtualMachineScaleSetVMsClient interface {
+	Get(resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVM, err error)
+	GetInstanceView(resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVMInstanceView, err error)
+	List(resourceGroupName string, virtualMachineScaleSetName string, filter string, selectParameter string, expand string) (result compute.VirtualMachineScaleSetVMListResult, err error)
+	ListNextResults(lastResults compute.VirtualMachineScaleSetVMListResult) (result compute.VirtualMachineScaleSetVMListResult, err error)
+}
+
 // Cloud holds the config and clients
 type Cloud struct {
 	Config
@@ -201,8 +218,8 @@ type Cloud struct {
 	vmSet                    VMSet
 
 	// Clients for vmss.
-	VirtualMachineScaleSetsClient   compute.VirtualMachineScaleSetsClient
-	VirtualMachineScaleSetVMsClient compute.VirtualMachineScaleSetVMsClient
+	VirtualMachineScaleSetsClient   VirtualMachineScaleSetsClient
+	VirtualMachineScaleSetVMsClient VirtualMachineScaleSetVMsClient
 
 	*BlobDiskController
 	*ManagedDiskController
