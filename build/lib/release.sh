@@ -285,11 +285,7 @@ function kube::release::create_docker_images_for_server() {
     local images_dir="${RELEASE_IMAGES}/${arch}"
     mkdir -p "${images_dir}"
 
-    local -r docker_registry="k8s.gcr.io"
-    # TODO(thockin): Remove all traces of this after 1.10 release.
-    # The following is the old non-indirected registry name.  To ease the
-    # transition to the new name (above), we are double-tagging saved images.
-    local -r deprecated_registry="gcr.io/google_containers"
+    local -r docker_registry="gcr.io/google_containers"
     # Docker tags cannot contain '+'
     local docker_tag="${KUBE_GIT_VERSION/+/_}"
     if [[ -z "${docker_tag}" ]]; then
@@ -310,17 +306,14 @@ function kube::release::create_docker_images_for_server() {
       local docker_file_path="${docker_build_path}/Dockerfile"
       local binary_file_path="${binary_dir}/${binary_name}"
       local docker_image_tag="${docker_registry}"
-      local deprecated_image_tag="${deprecated_registry}"
       if [[ ${arch} == "amd64" ]]; then
         # If we are building a amd64 docker image, preserve the original
         # image name
         docker_image_tag+="/${binary_name}:${docker_tag}"
-        deprecated_image_tag+="/${binary_name}:${docker_tag}"
       else
         # If we are building a docker image for another architecture,
         # append the arch in the image tag
         docker_image_tag+="/${binary_name}-${arch}:${docker_tag}"
-        deprecated_image_tag+="/${binary_name}-${arch}:${docker_tag}"
       fi
 
 
@@ -332,8 +325,7 @@ function kube::release::create_docker_images_for_server() {
         printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > ${docker_file_path}
 
         "${DOCKER[@]}" build --pull -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
-        "${DOCKER[@]}" tag "${docker_image_tag}" ${deprecated_image_tag} >/dev/null
-        "${DOCKER[@]}" save "${docker_image_tag}" ${deprecated_image_tag} > "${binary_dir}/${binary_name}.tar"
+        "${DOCKER[@]}" save "${docker_image_tag}" > "${binary_dir}/${binary_name}.tar"
         echo "${docker_tag}" > ${binary_dir}/${binary_name}.docker_tag
         rm -rf ${docker_build_path}
         ln "${binary_dir}/${binary_name}.tar" "${images_dir}/"
@@ -352,7 +344,6 @@ function kube::release::create_docker_images_for_server() {
           # not a release
           kube::log::status "Deleting docker image ${docker_image_tag}"
           "${DOCKER[@]}" rmi ${docker_image_tag} &>/dev/null || true
-          "${DOCKER[@]}" rmi ${deprecated_image_tag} &>/dev/null || true
         fi
       ) &
     done

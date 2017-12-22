@@ -45,7 +45,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 		pollInterval   = 1 * time.Second
 		pollConsistent = 5 * time.Second
 		pollTimeout    = 1 * time.Minute
-		image          = "k8s.gcr.io/node-problem-detector:v0.4.1"
+		image          = "gcr.io/google_containers/node-problem-detector:v0.4.1"
 	)
 	f := framework.NewDefaultFramework("node-problem-detector")
 	var c clientset.Interface

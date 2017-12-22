@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: etcd
-        image: k8s.gcr.io/etcd-amd64:2.2.5
+        image: gcr.io/google_containers/etcd-amd64:2.2.5
         imagePullPolicy: Always
         ports:
         - containerPort: 2380

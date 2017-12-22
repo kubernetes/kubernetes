@@ -17,7 +17,7 @@ spec:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       containers:
-        - image: k8s.gcr.io/cpvpa-amd64:v0.6.0
+        - image: gcr.io/google_containers/cpvpa-amd64:v0.6.0
           name: autoscaler
           command:
             - /cpvpa

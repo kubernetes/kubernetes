@@ -13,7 +13,7 @@
 # limitations under the License.
 
 TAG = v1
-PREFIX = k8s.gcr.io
+PREFIX = gcr.io/google_containers
 IMAGE = example-dns-backend
 
 all: push

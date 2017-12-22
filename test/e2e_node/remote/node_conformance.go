@@ -53,7 +53,7 @@ func commandToString(c *exec.Cmd) string {
 
 // Image path constants.
 const (
-	conformanceRegistry         = "k8s.gcr.io"
+	conformanceRegistry         = "gcr.io/google_containers"
 	conformanceArch             = runtime.GOARCH
 	conformanceTarfile          = "node_conformance.tar"
 	conformanceTestBinary       = "e2e_node.test"

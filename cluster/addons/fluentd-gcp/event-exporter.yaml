@@ -47,12 +47,12 @@ spec:
       serviceAccountName: event-exporter-sa
       containers:
       - name: event-exporter
-        image: k8s.gcr.io/event-exporter:v0.1.7
+        image: gcr.io/google-containers/event-exporter:v0.1.7
         command:
         - '/event-exporter'
       # BEGIN_PROMETHEUS_TO_SD
       - name: prometheus-to-sd-exporter
-        image: k8s.gcr.io/prometheus-to-sd:v0.2.2
+        image: gcr.io/google-containers/prometheus-to-sd:v0.2.2
         command:
           - /monitor
           - --stackdriver-prefix={{ prometheus_to_sd_prefix }}/addons

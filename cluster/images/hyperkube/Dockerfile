@@ -16,7 +16,7 @@ FROM BASEIMAGE
 
 # Create symlinks for each hyperkube server
 # Also create symlinks to /usr/local/bin/ where the server image binaries live, so the hyperkube image may be
-# used instead of k8s.gcr.io/kube-* without any modifications.
+# used instead of gcr.io/google_containers/kube-* without any modifications.
 # TODO: replace manual symlink creation with --make-symlink command once
 # cross-building with qemu supports go binaries. See #28702
 # RUN /hyperkube --make-symlinks

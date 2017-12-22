@@ -96,7 +96,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,busybox
           kube-scheduler,busybox
           kube-aggregator,busybox
-          kube-proxy,k8s.gcr.io/debian-iptables-amd64:${debian_iptables_version}
+          kube-proxy,gcr.io/google-containers/debian-iptables-amd64:${debian_iptables_version}
         );;
     "arm")
         local targets=(
@@ -105,7 +105,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,arm32v7/busybox
           kube-scheduler,arm32v7/busybox
           kube-aggregator,arm32v7/busybox
-          kube-proxy,k8s.gcr.io/debian-iptables-arm:${debian_iptables_version}
+          kube-proxy,gcr.io/google-containers/debian-iptables-arm:${debian_iptables_version}
         );;
     "arm64")
         local targets=(
@@ -114,7 +114,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,arm64v8/busybox
           kube-scheduler,arm64v8/busybox
           kube-aggregator,arm64v8/busybox
-          kube-proxy,k8s.gcr.io/debian-iptables-arm64:${debian_iptables_version}
+          kube-proxy,gcr.io/google-containers/debian-iptables-arm64:${debian_iptables_version}
         );;
     "ppc64le")
         local targets=(
@@ -123,7 +123,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,ppc64le/busybox
           kube-scheduler,ppc64le/busybox
           kube-aggregator,ppc64le/busybox
-          kube-proxy,k8s.gcr.io/debian-iptables-ppc64le:${debian_iptables_version}
+          kube-proxy,gcr.io/google-containers/debian-iptables-ppc64le:${debian_iptables_version}
         );;
     "s390x")
         local targets=(
@@ -132,7 +132,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,s390x/busybox
           kube-scheduler,s390x/busybox
           kube-aggregator,s390x/busybox
-          kube-proxy,k8s.gcr.io/debian-iptables-s390x:${debian_iptables_version}
+          kube-proxy,gcr.io/google-containers/debian-iptables-s390x:${debian_iptables_version}
         );;
   esac
 

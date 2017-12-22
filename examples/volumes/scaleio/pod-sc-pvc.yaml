@@ -5,7 +5,7 @@ metadata:
 spec:
   containers:
     - name: pod-sio-small-container
-      image: k8s.gcr.io/test-webserver
+      image: gcr.io/google_containers/test-webserver
       volumeMounts:
       - mountPath: /test
         name: test-data

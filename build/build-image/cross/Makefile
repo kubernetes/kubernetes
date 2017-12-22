@@ -21,7 +21,7 @@ TAG=$(shell cat VERSION)
 all: push
 
 build:
-	docker build --pull -t k8s.gcr.io/$(IMAGE):$(TAG) .
+	docker build --pull -t gcr.io/google_containers/$(IMAGE):$(TAG) .
 
 push: build
-	gcloud docker -- push k8s.gcr.io/$(IMAGE):$(TAG)
+	gcloud docker -- push gcr.io/google_containers/$(IMAGE):$(TAG)

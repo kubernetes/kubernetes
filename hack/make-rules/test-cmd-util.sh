@@ -37,15 +37,15 @@ KUBELET_HEALTHZ_PORT=${KUBELET_HEALTHZ_PORT:-10248}
 CTLRMGR_PORT=${CTLRMGR_PORT:-10252}
 PROXY_HOST=127.0.0.1 # kubectl only serves on localhost.
 
-IMAGE_NGINX="k8s.gcr.io/nginx:1.7.9"
-IMAGE_DEPLOYMENT_R1="k8s.gcr.io/nginx:test-cmd"  # deployment-revision1.yaml
+IMAGE_NGINX="gcr.io/google-containers/nginx:1.7.9"
+IMAGE_DEPLOYMENT_R1="gcr.io/google-containers/nginx:test-cmd"  # deployment-revision1.yaml
 IMAGE_DEPLOYMENT_R2="$IMAGE_NGINX"  # deployment-revision2.yaml
-IMAGE_PERL="k8s.gcr.io/perl"
-IMAGE_PAUSE_V2="k8s.gcr.io/pause:2.0"
-IMAGE_DAEMONSET_R2="k8s.gcr.io/pause:latest"
-IMAGE_DAEMONSET_R2_2="k8s.gcr.io/nginx:test-cmd"  # rollingupdate-daemonset-rv2.yaml
-IMAGE_STATEFULSET_R1="k8s.gcr.io/nginx-slim:0.7"
-IMAGE_STATEFULSET_R2="k8s.gcr.io/nginx-slim:0.8"
+IMAGE_PERL="gcr.io/google-containers/perl"
+IMAGE_PAUSE_V2="gcr.io/google-containers/pause:2.0"
+IMAGE_DAEMONSET_R2="gcr.io/google-containers/pause:latest"
+IMAGE_DAEMONSET_R2_2="gcr.io/google-containers/nginx:test-cmd"  # rollingupdate-daemonset-rv2.yaml
+IMAGE_STATEFULSET_R1="gcr.io/google_containers/nginx-slim:0.7"
+IMAGE_STATEFULSET_R2="gcr.io/google_containers/nginx-slim:0.8"
 
 # Expose kubectl directly for readability
 PATH="${KUBE_OUTPUT_HOSTBIN}":$PATH
@@ -719,9 +719,9 @@ run_pod_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'changed-with-yaml:'
   ## Patch pod from JSON can change image
   # Command
-  kubectl patch "${kube_flags[@]}" -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "k8s.gcr.io/pause-amd64:3.0"}]}}'
-  # Post-condition: valid-pod POD has image k8s.gcr.io/pause-amd64:3.0
-  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'k8s.gcr.io/pause-amd64:3.0:'
+  kubectl patch "${kube_flags[@]}" -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "gcr.io/google_containers/pause-amd64:3.0"}]}}'
+  # Post-condition: valid-pod POD has image gcr.io/google_containers/pause-amd64:3.0
+  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'gcr.io/google_containers/pause-amd64:3.0:'
 
   ## If resourceVersion is specified in the patch, it will be treated as a precondition, i.e., if the resourceVersion is different from that is stored in the server, the Patch should be rejected
   ERROR_FILE="${KUBE_TEMP}/conflict-error"
@@ -802,13 +802,13 @@ __EOF__
   kubectl delete node node-v1-test "${kube_flags[@]}"
 
   ## kubectl edit can update the image field of a POD. tmp-editor.sh is a fake editor
-  echo -e "#!/bin/bash\n${SED} -i \"s/nginx/k8s.gcr.io\/serve_hostname/g\" \$1" > /tmp/tmp-editor.sh
+  echo -e "#!/bin/bash\n${SED} -i \"s/nginx/gcr.io\/google_containers\/serve_hostname/g\" \$1" > /tmp/tmp-editor.sh
   chmod +x /tmp/tmp-editor.sh
   # Pre-condition: valid-pod POD has image nginx
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
   [[ "$(EDITOR=/tmp/tmp-editor.sh kubectl edit "${kube_flags[@]}" pods/valid-pod --output-patch=true | grep Patch:)" ]]
-  # Post-condition: valid-pod POD has image k8s.gcr.io/serve_hostname
-  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'k8s.gcr.io/serve_hostname:'
+  # Post-condition: valid-pod POD has image gcr.io/google_containers/serve_hostname
+  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'gcr.io/google_containers/serve_hostname:'
   # cleaning
   rm /tmp/tmp-editor.sh
 
@@ -2746,7 +2746,7 @@ run_deployment_tests() {
   create_and_use_new_namespace
   kube::log::status "Testing deployments"
   # Test kubectl create deployment (using default - old generator)
-  kubectl create deployment test-nginx-extensions --image=k8s.gcr.io/nginx:test-cmd
+  kubectl create deployment test-nginx-extensions --image=gcr.io/google-containers/nginx:test-cmd
   # Post-Condition: Deployment "nginx" is created.
   kube::test::get_object_assert 'deploy test-nginx-extensions' "{{$container_name_field}}" 'nginx'
   # and old generator was used, iow. old defaults are applied
@@ -2761,7 +2761,7 @@ run_deployment_tests() {
   kubectl delete deployment test-nginx-extensions "${kube_flags[@]}"
 
   # Test kubectl create deployment
-  kubectl create deployment test-nginx-apps --image=k8s.gcr.io/nginx:test-cmd --generator=deployment-basic/apps.v1beta1
+  kubectl create deployment test-nginx-apps --image=gcr.io/google-containers/nginx:test-cmd --generator=deployment-basic/apps.v1beta1
   # Post-Condition: Deployment "nginx" is created.
   kube::test::get_object_assert 'deploy test-nginx-apps' "{{$container_name_field}}" 'nginx'
   # and new generator was used, iow. new defaults are applied
@@ -2806,7 +2806,7 @@ run_deployment_tests() {
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
   # Create deployment
-  kubectl create deployment nginx-deployment --image=k8s.gcr.io/nginx:test-cmd
+  kubectl create deployment nginx-deployment --image=gcr.io/google-containers/nginx:test-cmd
   # Wait for rs to come up.
   kube::test::wait_object_assert rs "{{range.items}}{{$rs_replicas_field}}{{end}}" '1'
   # Delete the deployment with cascade set to false.
@@ -3064,7 +3064,7 @@ run_rs_tests() {
   # Test set commands
   # Pre-condition: frontend replica set exists at generation 1
   kube::test::get_object_assert 'rs frontend' "{{${generation_field}}}" '1'
-  kubectl set image rs/frontend "${kube_flags[@]}" *=k8s.gcr.io/pause:test-cmd
+  kubectl set image rs/frontend "${kube_flags[@]}" *=gcr.io/google-containers/pause:test-cmd
   kube::test::get_object_assert 'rs frontend' "{{${generation_field}}}" '2'
   kubectl set env rs/frontend "${kube_flags[@]}" foo=bar
   kube::test::get_object_assert 'rs frontend' "{{${generation_field}}}" '3'
@@ -3151,7 +3151,7 @@ run_daemonset_tests() {
   # Template Generation should stay 1
   kube::test::get_object_assert 'daemonsets bind' "{{${template_generation_field}}}" '1'
   # Test set commands
-  kubectl set image daemonsets/bind "${kube_flags[@]}" *=k8s.gcr.io/pause:test-cmd
+  kubectl set image daemonsets/bind "${kube_flags[@]}" *=gcr.io/google-containers/pause:test-cmd
   kube::test::get_object_assert 'daemonsets bind' "{{${template_generation_field}}}" '2'
   kubectl set env daemonsets/bind "${kube_flags[@]}" foo=bar
   kube::test::get_object_assert 'daemonsets bind' "{{${template_generation_field}}}" '3'

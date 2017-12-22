@@ -47,10 +47,10 @@ const (
 // before test running so that the image pulling won't fail in actual test.
 var NodeImageWhiteList = sets.NewString(
 	"google/cadvisor:latest",
-	"k8s.gcr.io/stress:v1",
+	"gcr.io/google-containers/stress:v1",
 	busyboxImage,
-	"k8s.gcr.io/busybox@sha256:4bdd623e848417d96127e16037743f0cd8b528c026e9175e22a84f639eca58ff",
-	"k8s.gcr.io/node-problem-detector:v0.4.1",
+	"gcr.io/google_containers/busybox@sha256:4bdd623e848417d96127e16037743f0cd8b528c026e9175e22a84f639eca58ff",
+	"gcr.io/google_containers/node-problem-detector:v0.4.1",
 	imageutils.GetE2EImage(imageutils.NginxSlim),
 	imageutils.GetE2EImage(imageutils.ServeHostname),
 	imageutils.GetE2EImage(imageutils.Netexec),

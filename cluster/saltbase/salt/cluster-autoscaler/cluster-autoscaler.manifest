@@ -25,15 +25,15 @@
         "containers": [
             {
                 "name": "cluster-autoscaler",
-                "image": "k8s.gcr.io/cluster-autoscaler:v1.1.0",
+                "image": "gcr.io/google_containers/cluster-autoscaler:v1.1.0",
                 "livenessProbe": {
                     "httpGet": {
                         "path": "/health-check",
                         "port": 8085
-                    },
+		    },
                     "initialDelaySeconds": 600,
                     "periodSeconds": 60
-                },
+		},
                 "command": [
                     "./run.sh",
                     "--kubernetes=http://127.0.0.1:8080?inClusterConfig=f",
