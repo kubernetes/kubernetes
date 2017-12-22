@@ -27,13 +27,14 @@ import (
 )
 
 func ValidatePodDisruptionBudget(pdb *policy.PodDisruptionBudget) field.ErrorList {
-	allErrs := ValidatePodDisruptionBudgetSpec(pdb.Spec, field.NewPath("spec"))
+	allErrs := apivalidation.ValidateObjectMeta(&pdb.ObjectMeta, true, ValidatePodDisruptionBudgetName, field.NewPath("metadata"))
+	allErrs = ValidatePodDisruptionBudgetSpec(pdb.Spec, field.NewPath("spec"))
 	allErrs = append(allErrs, ValidatePodDisruptionBudgetStatus(pdb.Status, field.NewPath("status"))...)
 	return allErrs
 }
 
 func ValidatePodDisruptionBudgetUpdate(pdb, oldPdb *policy.PodDisruptionBudget) field.ErrorList {
-	allErrs := field.ErrorList{}
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&pdb.ObjectMeta, &oldPdb.ObjectMeta, field.NewPath("metadata"))
 
 	restoreGeneration := pdb.Generation
 	pdb.Generation = oldPdb.Generation
@@ -77,3 +78,6 @@ func ValidatePodDisruptionBudgetStatus(status policy.PodDisruptionBudgetStatus, 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ExpectedPods), fldPath.Child("expectedPods"))...)
 	return allErrs
 }
+
+// Validates that the given name can be used as a poddisruptionbudget name.
+var ValidatePodDisruptionBudgetName = apivalidation.NameIsDNSSubdomain
