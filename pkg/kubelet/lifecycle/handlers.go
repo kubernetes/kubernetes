@@ -27,10 +27,12 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/capabilities"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/security/apparmor"
+	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
 type HandlerRunner struct {
@@ -229,4 +231,133 @@ func noNewPrivsRequired(pod *v1.Pod) bool {
 		}
 	}
 	return false
+}
+
+func NewCapabilitiesAdmitHandler() PodAdmitHandler {
+	return &capabilitiesAdmitHandler{}
+}
+
+type capabilitiesAdmitHandler struct{}
+
+// Check whether we have the capabilities to run the specified pod.
+func (a *capabilitiesAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+	pod := attrs.Pod
+	if !capabilities.Get().AllowPrivileged {
+		for _, container := range pod.Spec.Containers {
+			if securitycontext.HasPrivilegedRequest(&container) {
+				return PodAdmitResult{
+					Admit:   false,
+					Reason:  "Capabilities",
+					Message: fmt.Sprintf("pod with UID %q specified privileged container, but is disallowed", pod.UID),
+				}
+			}
+		}
+		for _, container := range pod.Spec.InitContainers {
+			if securitycontext.HasPrivilegedRequest(&container) {
+				return PodAdmitResult{
+					Admit:   false,
+					Reason:  "Capabilities",
+					Message: fmt.Sprintf("pod with UID %q specified privileged container, but is disallowed", pod.UID),
+				}
+			}
+		}
+	}
+
+	if pod.Spec.HostNetwork {
+		allowed, err := allowHostNetwork(pod)
+		if err != nil {
+			return PodAdmitResult{
+				Admit:   false,
+				Reason:  "Capabilities",
+				Message: fmt.Sprintf("Cannot enforce Capabilities: %v", err),
+			}
+		}
+		if !allowed {
+			return PodAdmitResult{
+				Admit:   false,
+				Reason:  "Capabilities",
+				Message: fmt.Sprintf("pod with UID %q specified host networking, but is disallowed", pod.UID),
+			}
+		}
+	}
+
+	if pod.Spec.HostPID {
+		allowed, err := allowHostPID(pod)
+		if err != nil {
+			return PodAdmitResult{
+				Admit:   false,
+				Reason:  "Capabilities",
+				Message: fmt.Sprintf("Cannot enforce Capabilities: %v", err),
+			}
+		}
+		if !allowed {
+			return PodAdmitResult{
+				Admit:   false,
+				Reason:  "Capabilities",
+				Message: fmt.Sprintf("pod with UID %q specified host PID, but is disallowed", pod.UID),
+			}
+		}
+	}
+
+	if pod.Spec.HostIPC {
+		allowed, err := allowHostIPC(pod)
+		if err != nil {
+			return PodAdmitResult{
+				Admit:   false,
+				Reason:  "Capabilities",
+				Message: fmt.Sprintf("Cannot enforce Capabilities: %v", err),
+			}
+		}
+		if !allowed {
+			return PodAdmitResult{
+				Admit:   false,
+				Reason:  "Capabilities",
+				Message: fmt.Sprintf("pod with UID %q specified host ipc, but is disallowed", pod.UID),
+			}
+		}
+	}
+
+	return PodAdmitResult{Admit: true}
+}
+
+// Determined whether the specified pod is allowed to use host networking
+func allowHostNetwork(pod *v1.Pod) (bool, error) {
+	podSource, err := kubetypes.GetPodSource(pod)
+	if err != nil {
+		return false, err
+	}
+	for _, source := range capabilities.Get().PrivilegedSources.HostNetworkSources {
+		if source == podSource {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// Determined whether the specified pod is allowed to use host PID
+func allowHostPID(pod *v1.Pod) (bool, error) {
+	podSource, err := kubetypes.GetPodSource(pod)
+	if err != nil {
+		return false, err
+	}
+	for _, source := range capabilities.Get().PrivilegedSources.HostPIDSources {
+		if source == podSource {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// Determined whether the specified pod is allowed to use host ipc
+func allowHostIPC(pod *v1.Pod) (bool, error) {
+	podSource, err := kubetypes.GetPodSource(pod)
+	if err != nil {
+		return false, err
+	}
+	for _, source := range capabilities.Get().PrivilegedSources.HostIPCSources {
+		if source == podSource {
+			return true, nil
+		}
+	}
+	return false, nil
 }

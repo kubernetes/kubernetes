@@ -18,10 +18,12 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/lifecycle",
     deps = [
+        "//pkg/capabilities:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/security/apparmor:go_default_library",
+        "//pkg/securitycontext:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
