@@ -14,7 +14,7 @@ go_test(
         "util_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util",
+    importpath = "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util",
     deps = [
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -33,7 +33,7 @@ go_library(
         "topologies.go",
         "util.go",
     ],
-    importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util",
+    importpath = "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util",
     deps = [
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

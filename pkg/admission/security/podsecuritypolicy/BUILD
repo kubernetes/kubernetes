@@ -9,7 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["admission.go"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy",
+    importpath = "k8s.io/kubernetes/pkg/admission/security/podsecuritypolicy",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",
@@ -35,7 +35,7 @@ go_test(
     name = "go_default_test",
     srcs = ["admission_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy",
+    importpath = "k8s.io/kubernetes/pkg/admission/security/podsecuritypolicy",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",

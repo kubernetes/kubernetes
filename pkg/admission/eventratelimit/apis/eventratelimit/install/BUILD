@@ -8,10 +8,10 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["install.go"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit/install",
+    importpath = "k8s.io/kubernetes/pkg/admission/eventratelimit/apis/eventratelimit/install",
     deps = [
-        "//plugin/pkg/admission/eventratelimit/apis/eventratelimit:go_default_library",
-        "//plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1:go_default_library",
+        "//pkg/admission/eventratelimit/apis/eventratelimit:go_default_library",
+        "//pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

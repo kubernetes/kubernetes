@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["volume_binder.go"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/volumebinder",
+    importpath = "k8s.io/kubernetes/pkg/scheduler/volumebinder",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/controller/volume/persistentvolume:go_default_library",

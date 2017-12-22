@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["admission.go"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/persistentvolumeclaim/pvcprotection",
+    importpath = "k8s.io/kubernetes/pkg/admission/persistentvolumeclaim/pvcprotection",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/core:go_default_library",
@@ -22,7 +22,7 @@ go_test(
     name = "go_default_test",
     srcs = ["admission_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/persistentvolumeclaim/pvcprotection",
+    importpath = "k8s.io/kubernetes/pkg/admission/persistentvolumeclaim/pvcprotection",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",

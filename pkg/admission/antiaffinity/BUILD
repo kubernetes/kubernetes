@@ -12,7 +12,7 @@ go_library(
         "admission.go",
         "doc.go",
     ],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/antiaffinity",
+    importpath = "k8s.io/kubernetes/pkg/admission/antiaffinity",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
@@ -25,7 +25,7 @@ go_test(
     name = "go_default_test",
     srcs = ["admission_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/antiaffinity",
+    importpath = "k8s.io/kubernetes/pkg/admission/antiaffinity",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/kubelet/apis:go_default_library",

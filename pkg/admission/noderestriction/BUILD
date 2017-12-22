@@ -9,7 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["admission.go"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/noderestriction",
+    importpath = "k8s.io/kubernetes/pkg/admission/noderestriction",
     deps = [
         "//pkg/api/pod:go_default_library",
         "//pkg/apis/core:go_default_library",
@@ -32,7 +32,7 @@ go_test(
     name = "go_default_test",
     srcs = ["admission_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/noderestriction",
+    importpath = "k8s.io/kubernetes/pkg/admission/noderestriction",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/policy:go_default_library",

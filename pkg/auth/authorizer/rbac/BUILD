@@ -12,7 +12,7 @@ go_library(
         "rbac.go",
         "subject_locator.go",
     ],
-    importpath = "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac",
+    importpath = "k8s.io/kubernetes/pkg/auth/authorizer/rbac",
     deps = [
         "//pkg/apis/rbac:go_default_library",
         "//pkg/client/listers/rbac/internalversion:go_default_library",
@@ -32,11 +32,11 @@ go_test(
         "subject_locator_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac",
+    importpath = "k8s.io/kubernetes/pkg/auth/authorizer/rbac",
     deps = [
         "//pkg/apis/rbac:go_default_library",
+        "//pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
         "//pkg/registry/rbac/validation:go_default_library",
-        "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
@@ -54,7 +54,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:all-srcs",
+        "//pkg/auth/authorizer/rbac/bootstrappolicy:all-srcs",
     ],
     tags = ["automanaged"],
 )

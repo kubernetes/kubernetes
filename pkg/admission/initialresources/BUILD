@@ -15,7 +15,7 @@ go_library(
         "hawkular.go",
         "influxdb.go",
     ],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/initialresources",
+    importpath = "k8s.io/kubernetes/pkg/admission/initialresources",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//vendor/cloud.google.com/go/compute/metadata:go_default_library",
@@ -44,7 +44,7 @@ go_test(
         "influxdb_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/initialresources",
+    importpath = "k8s.io/kubernetes/pkg/admission/initialresources",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",

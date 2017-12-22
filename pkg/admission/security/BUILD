@@ -8,7 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["doc.go"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/security",
+    importpath = "k8s.io/kubernetes/pkg/admission/security",
 )
 
 filegroup(
@@ -22,7 +22,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//plugin/pkg/admission/security/podsecuritypolicy:all-srcs",
+        "//pkg/admission/security/podsecuritypolicy:all-srcs",
     ],
     tags = ["automanaged"],
 )

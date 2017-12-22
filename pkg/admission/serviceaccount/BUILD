@@ -12,7 +12,7 @@ go_library(
         "admission.go",
         "doc.go",
     ],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount",
+    importpath = "k8s.io/kubernetes/pkg/admission/serviceaccount",
     deps = [
         "//pkg/api/pod:go_default_library",
         "//pkg/apis/core:go_default_library",
@@ -36,7 +36,7 @@ go_test(
     name = "go_default_test",
     srcs = ["admission_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount",
+    importpath = "k8s.io/kubernetes/pkg/admission/serviceaccount",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",

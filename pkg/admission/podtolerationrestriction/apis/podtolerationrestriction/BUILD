@@ -13,7 +13,7 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction",
+    importpath = "k8s.io/kubernetes/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -33,9 +33,9 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/install:all-srcs",
-        "//plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/v1alpha1:all-srcs",
-        "//plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/validation:all-srcs",
+        "//pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/install:all-srcs",
+        "//pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/v1alpha1:all-srcs",
+        "//pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/validation:all-srcs",
     ],
     tags = ["automanaged"],
 )

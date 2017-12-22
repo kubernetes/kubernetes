@@ -91,7 +91,7 @@ go_library(
         "//pkg/kubelet/eviction/api:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/status:go_default_library",
-        "//plugin/pkg/scheduler/schedulercache:go_default_library",
+        "//pkg/scheduler/schedulercache:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",

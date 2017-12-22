@@ -12,7 +12,7 @@ go_library(
         "admission.go",
         "interfaces.go",
     ],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/limitranger",
+    importpath = "k8s.io/kubernetes/pkg/admission/limitranger",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
@@ -34,7 +34,7 @@ go_test(
     name = "go_default_test",
     srcs = ["admission_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/limitranger",
+    importpath = "k8s.io/kubernetes/pkg/admission/limitranger",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",

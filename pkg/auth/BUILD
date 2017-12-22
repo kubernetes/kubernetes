@@ -8,7 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["doc.go"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/auth",
+    importpath = "k8s.io/kubernetes/pkg/auth",
 )
 
 filegroup(
@@ -22,8 +22,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//plugin/pkg/auth/authenticator/token/bootstrap:all-srcs",
-        "//plugin/pkg/auth/authorizer:all-srcs",
+        "//pkg/auth/authenticator/token/bootstrap:all-srcs",
+        "//pkg/auth/authorizer:all-srcs",
     ],
     tags = ["automanaged"],
 )
