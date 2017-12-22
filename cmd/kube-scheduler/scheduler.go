@@ -20,9 +20,9 @@ import (
 	"os"
 
 	"k8s.io/apiserver/pkg/util/logs"
+	"k8s.io/kubernetes/cmd/kube-scheduler/app"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	_ "k8s.io/kubernetes/pkg/version/prometheus"        // for version metric registration
-	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
 )
 
 func main() {

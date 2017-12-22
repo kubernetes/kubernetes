@@ -8,7 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["server.go"],
-    importpath = "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app",
+    importpath = "k8s.io/kubernetes/cmd/kube-scheduler/app",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",

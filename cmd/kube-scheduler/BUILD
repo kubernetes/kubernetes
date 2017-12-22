@@ -18,11 +18,11 @@ go_binary(
 go_library(
     name = "go_default_library",
     srcs = ["scheduler.go"],
-    importpath = "k8s.io/kubernetes/plugin/cmd/kube-scheduler",
+    importpath = "k8s.io/kubernetes/cmd/kube-scheduler",
     deps = [
         "//pkg/client/metrics/prometheus:go_default_library",
         "//pkg/version/prometheus:go_default_library",
-        "//plugin/cmd/kube-scheduler/app:go_default_library",
+        "//cmd/kube-scheduler/app:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/logs:go_default_library",
     ],
 )
@@ -38,7 +38,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//plugin/cmd/kube-scheduler/app:all-srcs",
+        "//cmd/kube-scheduler/app:all-srcs",
     ],
     tags = ["automanaged"],
 )
