@@ -435,9 +435,13 @@ func (as *availabilitySet) GetInstanceTypeByNodeName(name string) (string, error
 
 // GetZoneByNodeName gets zone from instance view.
 func (as *availabilitySet) GetZoneByNodeName(name string) (cloudprovider.Zone, error) {
-	vm, err := as.VirtualMachinesClient.Get(as.ResourceGroup, name, compute.InstanceView)
+	vm, exists, err := as.getVirtualMachine(types.NodeName(name))
 	if err != nil {
 		return cloudprovider.Zone{}, err
+	}
+
+	if !exists {
+		return cloudprovider.Zone{}, cloudprovider.InstanceNotFound
 	}
 
 	failureDomain := strconv.Itoa(int(*vm.VirtualMachineProperties.InstanceView.PlatformFaultDomain))

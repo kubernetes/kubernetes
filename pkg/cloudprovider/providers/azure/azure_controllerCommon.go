@@ -134,6 +134,8 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 		}
 	} else {
 		glog.V(4).Infof("azureDisk - azure attach succeeded")
+		// Invalidate the cache right after updating
+		vmCache.Delete(vmName)
 	}
 	return err
 }
@@ -192,6 +194,8 @@ func (c *controllerCommon) DetachDiskByName(diskName, diskURI string, nodeName t
 		glog.Errorf("azureDisk - azure disk detach failed, err: %v", err)
 	} else {
 		glog.V(4).Infof("azureDisk - azure disk detach succeeded")
+		// Invalidate the cache right after updating
+		vmCache.Delete(vmName)
 	}
 	return err
 }
