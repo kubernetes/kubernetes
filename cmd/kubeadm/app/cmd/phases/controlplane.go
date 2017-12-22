@@ -82,7 +82,7 @@ func getControlPlaneSubCommands(outDir, defaultKubernetesVersion string) []*cobr
 
 	// This is used for unit testing only...
 	// If we wouldn't set this to something, the code would dynamically look up the version from the internet
-	// By setting this explicitely for tests workarounds that
+	// By setting this explicitly for tests workarounds that
 	if defaultKubernetesVersion != "" {
 		cfg.KubernetesVersion = defaultKubernetesVersion
 	}
@@ -164,7 +164,7 @@ func getControlPlaneSubCommands(outDir, defaultKubernetesVersion string) []*cobr
 // runCmdControlPlane creates a cobra.Command Run function, by composing the call to the given cmdFunc with necessary additional steps (e.g preparation of input parameters)
 func runCmdControlPlane(cmdFunc func(outDir string, cfg *kubeadmapi.MasterConfiguration) error, outDir, cfgPath *string, featureGatesString *string, cfg *kubeadmapiext.MasterConfiguration) func(cmd *cobra.Command, args []string) {
 
-	// the following statement build a clousure that wraps a call to a cmdFunc, binding
+	// the following statement build a closure that wraps a call to a cmdFunc, binding
 	// the function itself with the specific parameters of each sub command.
 	// Please note that specific parameter should be passed as value, while other parameters - passed as reference -
 	// are shared between sub commands and gets access to current value e.g. flags value.
