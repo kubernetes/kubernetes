@@ -89,7 +89,7 @@ func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, i
 	return set
 }
 
-func (set *IPSet) validateEntry(entry *utilipset.Entry) (bool, error) {
+func (set *IPSet) validateEntry(entry *utilipset.Entry) bool {
 	return entry.Validate(&set.IPSet)
 }
 

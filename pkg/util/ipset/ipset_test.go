@@ -603,7 +603,7 @@ func Test_validatePortRange(t *testing.T) {
 		},
 	}
 	for i := range testCases {
-		valid, _ := validatePortRange(testCases[i].portRange)
+		valid := validatePortRange(testCases[i].portRange)
 		if valid != testCases[i].valid {
 			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v], desc: %s", i, testCases[i].valid, valid, testCases[i].desc)
 		}
@@ -789,7 +789,7 @@ func TestValidateIPSet(t *testing.T) {
 		},
 	}
 	for i := range testCases {
-		valid, _ := testCases[i].ipset.Validate()
+		valid := testCases[i].ipset.Validate()
 		if valid != testCases[i].valid {
 			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v], desc: %s", i, testCases[i].valid, valid, testCases[i].desc)
 		}
@@ -1294,7 +1294,7 @@ func TestValidateEntry(t *testing.T) {
 		},
 	}
 	for i := range testCases {
-		valid, _ := testCases[i].entry.Validate(testCases[i].set)
+		valid := testCases[i].entry.Validate(testCases[i].set)
 		if valid != testCases[i].valid {
 			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v], desc: %s", i, testCases[i].valid, valid, testCases[i].entry)
 		}
