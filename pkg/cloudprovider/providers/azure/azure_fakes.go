@@ -625,3 +625,163 @@ func getRandomIPPtr() *string {
 	rand.Seed(time.Now().UnixNano())
 	return to.StringPtr(fmt.Sprintf("%d.%d.%d.%d", rand.Intn(256), rand.Intn(256), rand.Intn(256), rand.Intn(256)))
 }
+
+type fakeVirtualMachineScaleSetVMsClient struct {
+	mutex     *sync.Mutex
+	FakeStore map[string]map[string]compute.VirtualMachineScaleSetVM
+}
+
+func newFakeVirtualMachineScaleSetVMsClient() fakeVirtualMachineScaleSetVMsClient {
+	fVMC := fakeVirtualMachineScaleSetVMsClient{}
+	fVMC.FakeStore = make(map[string]map[string]compute.VirtualMachineScaleSetVM)
+	fVMC.mutex = &sync.Mutex{}
+
+	return fVMC
+}
+
+func (fVMC fakeVirtualMachineScaleSetVMsClient) List(resourceGroupName string, virtualMachineScaleSetName string, filter string, selectParameter string, expand string) (result compute.VirtualMachineScaleSetVMListResult, err error) {
+	fVMC.mutex.Lock()
+	defer fVMC.mutex.Unlock()
+
+	value := []compute.VirtualMachineScaleSetVM{}
+	if _, ok := fVMC.FakeStore[resourceGroupName]; ok {
+		for _, v := range fVMC.FakeStore[resourceGroupName] {
+			value = append(value, v)
+		}
+	}
+
+	result.Response.Response = &http.Response{
+		StatusCode: http.StatusOK,
+	}
+	result.NextLink = nil
+	result.Value = &value
+	return result, nil
+}
+
+func (fVMC fakeVirtualMachineScaleSetVMsClient) ListNextResults(lastResults compute.VirtualMachineScaleSetVMListResult) (result compute.VirtualMachineScaleSetVMListResult, err error) {
+	return result, nil
+}
+
+func (fVMC fakeVirtualMachineScaleSetVMsClient) Get(resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVM, err error) {
+	fVMC.mutex.Lock()
+	defer fVMC.mutex.Unlock()
+
+	vmKey := fmt.Sprintf("%s-%s", VMScaleSetName, instanceID)
+	if scaleSetMap, ok := fVMC.FakeStore[resourceGroupName]; ok {
+		if entity, ok := scaleSetMap[vmKey]; ok {
+			return entity, nil
+		}
+	}
+
+	return result, autorest.DetailedError{
+		StatusCode: http.StatusNotFound,
+		Message:    "No such VirtualMachineScaleSetVM",
+	}
+}
+
+func (fVMC fakeVirtualMachineScaleSetVMsClient) GetInstanceView(resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVMInstanceView, err error) {
+	_, err = fVMC.Get(resourceGroupName, VMScaleSetName, instanceID)
+	if err != nil {
+		return result, err
+	}
+
+	return result, nil
+}
+
+type fakeVirtualMachineScaleSetsClient struct {
+	mutex     *sync.Mutex
+	FakeStore map[string]map[string]compute.VirtualMachineScaleSet
+}
+
+func newFakeVirtualMachineScaleSetsClient() fakeVirtualMachineScaleSetsClient {
+	fVMSSC := fakeVirtualMachineScaleSetsClient{}
+	fVMSSC.FakeStore = make(map[string]map[string]compute.VirtualMachineScaleSet)
+	fVMSSC.mutex = &sync.Mutex{}
+
+	return fVMSSC
+}
+
+func (fVMSSC fakeVirtualMachineScaleSetsClient) CreateOrUpdate(resourceGroupName string, VMScaleSetName string, parameters compute.VirtualMachineScaleSet, cancel <-chan struct{}) (<-chan compute.VirtualMachineScaleSet, <-chan error) {
+	fVMSSC.mutex.Lock()
+	defer fVMSSC.mutex.Unlock()
+
+	resultChan := make(chan compute.VirtualMachineScaleSet, 1)
+	errChan := make(chan error, 1)
+	var result compute.VirtualMachineScaleSet
+	var err error
+	defer func() {
+		resultChan <- result
+		errChan <- err
+		close(resultChan)
+		close(errChan)
+	}()
+
+	if _, ok := fVMSSC.FakeStore[resourceGroupName]; !ok {
+		fVMSSC.FakeStore[resourceGroupName] = make(map[string]compute.VirtualMachineScaleSet)
+	}
+	fVMSSC.FakeStore[resourceGroupName][VMScaleSetName] = parameters
+	result = fVMSSC.FakeStore[resourceGroupName][VMScaleSetName]
+	result.Response.Response = &http.Response{
+		StatusCode: http.StatusOK,
+	}
+	err = nil
+	return resultChan, errChan
+}
+
+func (fVMSSC fakeVirtualMachineScaleSetsClient) Get(resourceGroupName string, VMScaleSetName string) (result compute.VirtualMachineScaleSet, err error) {
+	fVMSSC.mutex.Lock()
+	defer fVMSSC.mutex.Unlock()
+
+	if scaleSetMap, ok := fVMSSC.FakeStore[resourceGroupName]; ok {
+		if entity, ok := scaleSetMap[VMScaleSetName]; ok {
+			return entity, nil
+		}
+	}
+
+	return result, autorest.DetailedError{
+		StatusCode: http.StatusNotFound,
+		Message:    "No such ScaleSet",
+	}
+}
+
+func (fVMSSC fakeVirtualMachineScaleSetsClient) List(resourceGroupName string) (result compute.VirtualMachineScaleSetListResult, err error) {
+	fVMSSC.mutex.Lock()
+	defer fVMSSC.mutex.Unlock()
+
+	value := []compute.VirtualMachineScaleSet{}
+	if _, ok := fVMSSC.FakeStore[resourceGroupName]; ok {
+		for _, v := range fVMSSC.FakeStore[resourceGroupName] {
+			value = append(value, v)
+		}
+	}
+
+	result.Response.Response = &http.Response{
+		StatusCode: http.StatusOK,
+	}
+	result.NextLink = nil
+	result.Value = &value
+	return result, nil
+}
+
+func (fVMSSC fakeVirtualMachineScaleSetsClient) ListNextResults(lastResults compute.VirtualMachineScaleSetListResult) (result compute.VirtualMachineScaleSetListResult, err error) {
+	return result, nil
+}
+
+func (fVMSSC fakeVirtualMachineScaleSetsClient) UpdateInstances(resourceGroupName string, VMScaleSetName string, VMInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs, cancel <-chan struct{}) (<-chan compute.OperationStatusResponse, <-chan error) {
+	resultChan := make(chan compute.OperationStatusResponse, 1)
+	errChan := make(chan error, 1)
+	var result compute.OperationStatusResponse
+	var err error
+	defer func() {
+		resultChan <- result
+		errChan <- err
+		close(resultChan)
+		close(errChan)
+	}()
+
+	result.Response.Response = &http.Response{
+		StatusCode: http.StatusOK,
+	}
+	err = nil
+	return resultChan, errChan
+}

@@ -870,6 +870,8 @@ func getTestCloud() (az *Cloud) {
 	az.SecurityGroupsClient = newFakeAzureNSGClient()
 	az.VirtualMachinesClient = newFakeAzureVirtualMachinesClient()
 	az.InterfacesClient = newFakeAzureInterfacesClient()
+	az.VirtualMachineScaleSetsClient = newFakeVirtualMachineScaleSetsClient()
+	az.VirtualMachineScaleSetVMsClient = newFakeVirtualMachineScaleSetVMsClient()
 	az.vmSet = newAvailabilitySet(az)
 
 	return az
