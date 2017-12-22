@@ -20,10 +20,7 @@ package scheduler
 
 import (
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/golang/glog"
 
@@ -31,17 +28,8 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
-	"k8s.io/kubernetes/plugin/pkg/scheduler"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
-	"k8s.io/kubernetes/test/integration/framework"
 )
 
 type testConfig struct {
@@ -64,15 +52,15 @@ var (
 )
 
 const (
-	labelKey   = "test-label"
-	labelValue = "test-value"
+	labelKey   = "kubernetes.io/hostname"
+	labelValue = "node-1"
 	nodeName   = "node1"
 	podLimit   = 100
 	volsPerPod = 5
 )
 
 func TestVolumeBinding(t *testing.T) {
-	config := setup(t, "volume-scheduling")
+	config := setupNodes(t, "volume-scheduling", 1)
 	defer config.teardown()
 
 	cases := map[string]struct {
@@ -181,7 +169,7 @@ func TestVolumeBinding(t *testing.T) {
 
 // TestVolumeBindingStress creates <podLimit> pods, each with <volsPerPod> unbound PVCs.
 func TestVolumeBindingStress(t *testing.T) {
-	config := setup(t, "volume-binding-stress")
+	config := setupNodes(t, "volume-binding-stress", 1)
 	defer config.teardown()
 
 	// Create enough PVs and PVCs for all the pods
@@ -233,131 +221,6 @@ func TestVolumeBindingStress(t *testing.T) {
 	}
 
 	// TODO: validate events on Pods and PVCs
-}
-
-func setup(t *testing.T, nsName string) *testConfig {
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		<-h.Initialized
-		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
-	}))
-
-	// Enable feature gates
-	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true,PersistentLocalVolumes=true")
-
-	// Build clientset and informers for controllers.
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
-	informers := informers.NewSharedInformerFactory(clientset, time.Second)
-
-	// Start master
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, _, closeFn := framework.RunAMasterUsingServer(masterConfig, s, h)
-	ns := framework.CreateTestingNamespace(nsName, s, t).Name
-
-	controllerCh := make(chan struct{})
-
-	// Start PV controller for volume binding.
-	params := persistentvolume.ControllerParameters{
-		KubeClient:                clientset,
-		SyncPeriod:                time.Hour, // test shouldn't need to resync
-		VolumePlugins:             nil,       // TODO; need later for dynamic provisioning
-		Cloud:                     nil,
-		ClusterName:               "volume-test-cluster",
-		VolumeInformer:            informers.Core().V1().PersistentVolumes(),
-		ClaimInformer:             informers.Core().V1().PersistentVolumeClaims(),
-		ClassInformer:             informers.Storage().V1().StorageClasses(),
-		EventRecorder:             nil, // TODO: add one so we can test PV events
-		EnableDynamicProvisioning: true,
-	}
-	ctrl, err := persistentvolume.NewController(params)
-	if err != nil {
-		t.Fatalf("Failed to create PV controller: %v", err)
-	}
-	go ctrl.Run(controllerCh)
-
-	// Start scheduler
-	configurator := factory.NewConfigFactory(
-		v1.DefaultSchedulerName,
-		clientset,
-		informers.Core().V1().Nodes(),
-		informers.Core().V1().Pods(),
-		informers.Core().V1().PersistentVolumes(),
-		informers.Core().V1().PersistentVolumeClaims(),
-		informers.Core().V1().ReplicationControllers(),
-		informers.Extensions().V1beta1().ReplicaSets(),
-		informers.Apps().V1beta1().StatefulSets(),
-		informers.Core().V1().Services(),
-		informers.Policy().V1beta1().PodDisruptionBudgets(),
-		informers.Storage().V1().StorageClasses(),
-		v1.DefaultHardPodAffinitySymmetricWeight,
-		true, // Enable EqualCache by default.
-	)
-
-	sched, err := scheduler.NewFromConfigurator(configurator, func(cfg *scheduler.Config) {
-		cfg.StopEverything = controllerCh
-		cfg.Recorder = &record.FakeRecorder{}
-	})
-	if err != nil {
-		t.Fatalf("Failed to create scheduler: %v.", err)
-	}
-	go sched.Run()
-
-	// Waiting for all controller sync.
-	informers.Start(controllerCh)
-	informers.WaitForCacheSync(controllerCh)
-
-	// Create shared objects
-	// Create node
-	testNode := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   nodeName,
-			Labels: map[string]string{labelKey: labelValue},
-		},
-		Spec: v1.NodeSpec{Unschedulable: false},
-		Status: v1.NodeStatus{
-			Capacity: v1.ResourceList{
-				v1.ResourcePods: *resource.NewQuantity(podLimit, resource.DecimalSI),
-			},
-			Conditions: []v1.NodeCondition{
-				{
-					Type:              v1.NodeReady,
-					Status:            v1.ConditionTrue,
-					Reason:            fmt.Sprintf("schedulable condition"),
-					LastHeartbeatTime: metav1.Time{Time: time.Now()},
-				},
-			},
-		},
-	}
-	if _, err := clientset.CoreV1().Nodes().Create(testNode); err != nil {
-		t.Fatalf("Failed to create Node %q: %v", testNode.Name, err)
-	}
-
-	// Create SCs
-	scs := []*storagev1.StorageClass{
-		makeStorageClass(classWait, &modeWait),
-		makeStorageClass(classImmediate, &modeImmediate),
-	}
-	for _, sc := range scs {
-		if _, err := clientset.StorageV1().StorageClasses().Create(sc); err != nil {
-			t.Fatalf("Failed to create StorageClass %q: %v", sc.Name, err)
-		}
-	}
-
-	return &testConfig{
-		client: clientset,
-		ns:     ns,
-		stop:   controllerCh,
-		teardown: func() {
-			clientset.CoreV1().Pods(ns).DeleteCollection(nil, metav1.ListOptions{})
-			clientset.CoreV1().PersistentVolumeClaims(ns).DeleteCollection(nil, metav1.ListOptions{})
-			clientset.CoreV1().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
-			clientset.StorageV1().StorageClasses().DeleteCollection(nil, metav1.ListOptions{})
-			clientset.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
-			close(controllerCh)
-			closeFn()
-			utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false,LocalPersistentVolumes=false")
-		},
-	}
 }
 
 func makeStorageClass(name string, mode *storagev1.VolumeBindingMode) *storagev1.StorageClass {
