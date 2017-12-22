@@ -57,7 +57,6 @@ go_test(
     srcs = [
         "azure_loadbalancer_test.go",
         "azure_test.go",
-        "azure_util_test.go",
         "azure_wrap_test.go",
     ],
     library = ":go_default_library",
