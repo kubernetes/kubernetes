@@ -23,7 +23,7 @@ import (
 	"os"
 	"testing"
 
-	apps "k8s.io/api/apps/v1beta2"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -104,7 +104,7 @@ spec:
 status: {}
 `
 
-	testAPIServerDaemonSet = `apiVersion: apps/v1beta2
+	testAPIServerDaemonSet = `apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   creationTimestamp: null
@@ -265,7 +265,7 @@ spec:
 status: {}
 `
 
-	testControllerManagerDaemonSet = `apiVersion: apps/v1beta2
+	testControllerManagerDaemonSet = `apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   creationTimestamp: null
@@ -395,7 +395,7 @@ spec:
 status: {}
 `
 
-	testSchedulerDaemonSet = `apiVersion: apps/v1beta2
+	testSchedulerDaemonSet = `apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   creationTimestamp: null
