@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/auth/authorizer/rbac"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
@@ -52,7 +53,6 @@ import (
 	rolestore "k8s.io/kubernetes/pkg/registry/rbac/role/storage"
 	"k8s.io/kubernetes/pkg/registry/rbac/rolebinding"
 	rolebindingstore "k8s.io/kubernetes/pkg/registry/rbac/rolebinding/storage"
-	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 

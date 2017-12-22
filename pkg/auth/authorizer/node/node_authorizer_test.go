@@ -28,8 +28,8 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/auth/authorizer/rbac/bootstrappolicy"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
-	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
 func TestAuthorizer(t *testing.T) {

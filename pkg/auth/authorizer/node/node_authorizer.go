@@ -26,9 +26,9 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/auth/authorizer/rbac"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph/traverse"
 )

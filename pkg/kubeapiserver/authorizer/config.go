@@ -26,12 +26,12 @@ import (
 	"k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
+	"k8s.io/kubernetes/pkg/auth/authorizer/node"
+	"k8s.io/kubernetes/pkg/auth/authorizer/rbac"
+	"k8s.io/kubernetes/pkg/auth/authorizer/rbac/bootstrappolicy"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
-	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/node"
-	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
-	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
 type AuthorizationConfig struct {

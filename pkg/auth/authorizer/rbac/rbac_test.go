@@ -25,8 +25,8 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/auth/authorizer/rbac/bootstrappolicy"
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
-	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
 func newRule(verbs, apiGroups, resources, nonResourceURLs string) rbac.PolicyRule {
