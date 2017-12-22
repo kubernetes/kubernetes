@@ -136,10 +136,6 @@ func TestShouldBackupAPIServerCertAndKey(t *testing.T) {
 		Networking: kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
 		NodeName:   "test-node",
 	}
-	caCert, caKey, err := certsphase.NewCACertAndKey()
-	if err != nil {
-		t.Fatalf("failed creation of ca cert and key: %v", err)
-	}
 
 	for desc, test := range map[string]struct {
 		adjustedExpiry time.Duration
@@ -160,6 +156,10 @@ func TestShouldBackupAPIServerCertAndKey(t *testing.T) {
 			expected:       true,
 		},
 	} {
+		caCert, caKey, err := certsphase.NewCACertAndKey()
+		if err != nil {
+			t.Fatalf("failed creation of ca cert and key: %v", err)
+		}
 		caCert.NotBefore = caCert.NotBefore.Add(-test.adjustedExpiry).UTC()
 		apiCert, apiKey, err := certsphase.NewAPIServerCertAndKey(cfg, caCert, caKey)
 		if err != nil {
