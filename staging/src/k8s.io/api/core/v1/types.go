@@ -4698,11 +4698,13 @@ const (
 	ResourceQuotaScopeBestEffort ResourceQuotaScope = "BestEffort"
 	// Match all pod objects that do not have best effort quality of service
 	ResourceQuotaScopeNotBestEffort ResourceQuotaScope = "NotBestEffort"
+	// Match all pod objects that have priority class mentioned
+	ResourceQuotaScopePriorityClass ResourceQuotaScope = "PriorityClass"
 )
 
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota.
 type ResourceQuotaSpec struct {
-	// Hard is the set of desired hard limits for each named resource.
+	// hard is the set of desired hard limits for each named resource.
 	// More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/
 	// +optional
 	Hard ResourceList `json:"hard,omitempty" protobuf:"bytes,1,rep,name=hard,casttype=ResourceList,castkey=ResourceName"`
@@ -4710,7 +4712,47 @@ type ResourceQuotaSpec struct {
 	// If not specified, the quota matches all objects.
 	// +optional
 	Scopes []ResourceQuotaScope `json:"scopes,omitempty" protobuf:"bytes,2,rep,name=scopes,casttype=ResourceQuotaScope"`
+	// scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota
+	// but expressed using ScopeSelectorOperator in combination with possible values.
+	// For a resource to match, both scopes AND scopeSelector (if specified in spec), must be matched.
+	// +optional
+	ScopeSelector *ScopeSelector `json:"scopeSelector,omitempty" protobuf:"bytes,3,opt,name=scopeSelector"`
 }
+
+// A scope selector represents the AND of the selectors represented
+// by the scoped-resource selector requirements.
+type ScopeSelector struct {
+	// A list of scope selector requirements by scope of the resources.
+	// +optional
+	MatchExpressions []ScopedResourceSelectorRequirement `json:"matchExpressions,omitempty" protobuf:"bytes,1,rep,name=matchExpressions"`
+}
+
+// A scoped-resource selector requirement is a selector that contains values, a scope name, and an operator
+// that relates the scope name and values.
+type ScopedResourceSelectorRequirement struct {
+	// The name of the scope that the selector applies to.
+	ScopeName ResourceQuotaScope `json:"scopeName" protobuf:"bytes,1,opt,name=scopeName"`
+	// Represents a scope's relationship to a set of values.
+	// Valid operators are In, NotIn, Exists, DoesNotExist.
+	Operator ScopeSelectorOperator `json:"operator" protobuf:"bytes,2,opt,name=operator,casttype=ScopedResourceSelectorOperator"`
+	// An array of string values. If the operator is In or NotIn,
+	// the values array must be non-empty. If the operator is Exists or DoesNotExist,
+	// the values array must be empty.
+	// This array is replaced during a strategic merge patch.
+	// +optional
+	Values []string `json:"values,omitempty" protobuf:"bytes,3,rep,name=values"`
+}
+
+// A scope selector operator is the set of operators that can be used in
+// a scope selector requirement.
+type ScopeSelectorOperator string
+
+const (
+	ScopeSelectorOpIn           ScopeSelectorOperator = "In"
+	ScopeSelectorOpNotIn        ScopeSelectorOperator = "NotIn"
+	ScopeSelectorOpExists       ScopeSelectorOperator = "Exists"
+	ScopeSelectorOpDoesNotExist ScopeSelectorOperator = "DoesNotExist"
+)
 
 // ResourceQuotaStatus defines the enforced hard limits and observed use.
 type ResourceQuotaStatus struct {

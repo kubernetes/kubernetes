@@ -324,6 +324,13 @@ const (
 	//
 	// Enable probe based plugin watcher utility for discovering Kubelet plugins
 	KubeletPluginsWatcher utilfeature.Feature = "KubeletPluginsWatcher"
+
+	// owner: @vikaschoudhary16
+	// alpha: v1.11
+	//
+	//
+	// Enable resource quota scope selectors
+	ResourceQuotaScopeSelectors utilfeature.Feature = "ResourceQuotaScopeSelectors"
 )
 
 func init() {
@@ -379,6 +386,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	PodReadinessGates:                           {Default: false, PreRelease: utilfeature.Beta},
 	VolumeSubpathEnvExpansion:                   {Default: false, PreRelease: utilfeature.Alpha},
 	KubeletPluginsWatcher:                       {Default: false, PreRelease: utilfeature.Alpha},
+	ResourceQuotaScopeSelectors:                 {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

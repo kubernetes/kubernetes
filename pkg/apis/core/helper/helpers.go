@@ -103,6 +103,7 @@ var standardResourceQuotaScopes = sets.NewString(
 	string(core.ResourceQuotaScopeNotTerminating),
 	string(core.ResourceQuotaScopeBestEffort),
 	string(core.ResourceQuotaScopeNotBestEffort),
+	string(core.ResourceQuotaScopePriorityClass),
 )
 
 // IsStandardResourceQuotaScope returns true if the scope is a standard value
@@ -126,7 +127,7 @@ var podComputeQuotaResources = sets.NewString(
 // IsResourceQuotaScopeValidForResource returns true if the resource applies to the specified scope
 func IsResourceQuotaScopeValidForResource(scope core.ResourceQuotaScope, resource string) bool {
 	switch scope {
-	case core.ResourceQuotaScopeTerminating, core.ResourceQuotaScopeNotTerminating, core.ResourceQuotaScopeNotBestEffort:
+	case core.ResourceQuotaScopeTerminating, core.ResourceQuotaScopeNotTerminating, core.ResourceQuotaScopeNotBestEffort, core.ResourceQuotaScopePriorityClass:
 		return podObjectCountQuotaResources.Has(resource) || podComputeQuotaResources.Has(resource)
 	case core.ResourceQuotaScopeBestEffort:
 		return podObjectCountQuotaResources.Has(resource)
@@ -583,4 +584,29 @@ func PersistentVolumeClaimHasClass(claim *core.PersistentVolumeClaim) bool {
 	}
 
 	return false
+}
+
+// ScopedResourceSelectorRequirementsAsSelector converts the ScopedResourceSelectorRequirement api type into a struct that implements
+// labels.Selector.
+func ScopedResourceSelectorRequirementsAsSelector(ssr core.ScopedResourceSelectorRequirement) (labels.Selector, error) {
+	selector := labels.NewSelector()
+	var op selection.Operator
+	switch ssr.Operator {
+	case core.ScopeSelectorOpIn:
+		op = selection.In
+	case core.ScopeSelectorOpNotIn:
+		op = selection.NotIn
+	case core.ScopeSelectorOpExists:
+		op = selection.Exists
+	case core.ScopeSelectorOpDoesNotExist:
+		op = selection.DoesNotExist
+	default:
+		return nil, fmt.Errorf("%q is not a valid scope selector operator", ssr.Operator)
+	}
+	r, err := labels.NewRequirement(string(ssr.ScopeName), op, ssr.Values)
+	if err != nil {
+		return nil, err
+	}
+	selector = selector.Add(*r)
+	return selector, nil
 }

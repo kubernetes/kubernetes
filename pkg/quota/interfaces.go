@@ -31,7 +31,8 @@ type UsageStatsOptions struct {
 	// Scopes that must match counted objects
 	Scopes []api.ResourceQuotaScope
 	// Resources are the set of resources to include in the measurement
-	Resources []api.ResourceName
+	Resources     []api.ResourceName
+	ScopeSelector *api.ScopeSelector
 }
 
 // UsageStats is result of measuring observed resource use in the system
@@ -51,6 +52,10 @@ type Evaluator interface {
 	Handles(operation admission.Attributes) bool
 	// Matches returns true if the specified quota matches the input item
 	Matches(resourceQuota *api.ResourceQuota, item runtime.Object) (bool, error)
+	// MatchingScopes takes the input specified list of scopes and input object and returns the set of scopes that matches input object.
+	MatchingScopes(item runtime.Object, scopes []api.ScopedResourceSelectorRequirement) ([]api.ScopedResourceSelectorRequirement, error)
+	// UncoveredQuotaScopes takes the input matched scopes which are limited by configuration and the matched quota scopes. It returns the scopes which are in limited scopes but dont have a corresponding covering quota scope
+	UncoveredQuotaScopes(limitedScopes []api.ScopedResourceSelectorRequirement, matchedQuotaScopes []api.ScopedResourceSelectorRequirement) ([]api.ScopedResourceSelectorRequirement, error)
 	// MatchingResources takes the input specified list of resources and returns the set of resources evaluator matches.
 	MatchingResources(input []api.ResourceName) []api.ResourceName
 	// Usage returns the resource usage for the specified object
