@@ -65,7 +65,7 @@ const (
 	DefaultProxyBindAddressv4 = "0.0.0.0"
 	// DefaultProxyBindAddressv6 is the default bind address when the advertise address is v6
 	DefaultProxyBindAddressv6 = "::"
-	// KubeproxyKubeConfigFileName efines the file name for the kube-proxy's KubeConfig file
+	// KubeproxyKubeConfigFileName defines the file name for the kube-proxy's KubeConfig file
 	KubeproxyKubeConfigFileName = "/var/lib/kube-proxy/kubeconfig.conf"
 )
 
