@@ -1803,9 +1803,10 @@ func (ResourceQuotaList) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceQuotaSpec = map[string]string{
-	"":       "ResourceQuotaSpec defines the desired hard limits to enforce for Quota.",
-	"hard":   "Hard is the set of desired hard limits for each named resource. More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/",
-	"scopes": "A collection of filters that must match each object tracked by a quota. If not specified, the quota matches all objects.",
+	"":              "ResourceQuotaSpec defines the desired hard limits to enforce for Quota.",
+	"hard":          "hard is the set of desired hard limits for each named resource. More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/",
+	"scopes":        "A collection of filters that must match each object tracked by a quota. If not specified, the quota matches all objects.",
+	"scopeSelector": "scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota but expressed using ScopeSelectorOperator in combination with possible values. For a resource to match, both scopes AND scopeSelector (if specified in spec), must be matched.",
 }
 
 func (ResourceQuotaSpec) SwaggerDoc() map[string]string {
@@ -1878,6 +1879,26 @@ var map_ScaleIOVolumeSource = map[string]string{
 
 func (ScaleIOVolumeSource) SwaggerDoc() map[string]string {
 	return map_ScaleIOVolumeSource
+}
+
+var map_ScopeSelector = map[string]string{
+	"":                 "A scope selector represents the AND of the selectors represented by the scoped-resource selector requirements.",
+	"matchExpressions": "A list of scope selector requirements by scope of the resources.",
+}
+
+func (ScopeSelector) SwaggerDoc() map[string]string {
+	return map_ScopeSelector
+}
+
+var map_ScopedResourceSelectorRequirement = map[string]string{
+	"":          "A scoped-resource selector requirement is a selector that contains values, a scope name, and an operator that relates the scope name and values.",
+	"scopeName": "The name of the scope that the selector applies to.",
+	"operator":  "Represents a scope's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist.",
+	"values":    "An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
+}
+
+func (ScopedResourceSelectorRequirement) SwaggerDoc() map[string]string {
+	return map_ScopedResourceSelectorRequirement
 }
 
 var map_Secret = map[string]string{

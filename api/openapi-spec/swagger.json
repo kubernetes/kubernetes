@@ -80125,11 +80125,15 @@
     "description": "ResourceQuotaSpec defines the desired hard limits to enforce for Quota.",
     "properties": {
      "hard": {
-      "description": "Hard is the set of desired hard limits for each named resource. More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/",
+      "description": "hard is the set of desired hard limits for each named resource. More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/",
       "type": "object",
       "additionalProperties": {
        "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
       }
+     },
+     "scopeSelector": {
+      "description": "scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota but expressed using ScopeSelectorOperator in combination with possible values. For a resource to match, both scopes AND scopeSelector (if specified in spec), must be matched.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.ScopeSelector"
      },
      "scopes": {
       "description": "A collection of filters that must match each object tracked by a quota. If not specified, the quota matches all objects.",
@@ -80296,6 +80300,42 @@
      "volumeName": {
       "description": "The name of a volume already created in the ScaleIO system that is associated with this volume source.",
       "type": "string"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.ScopeSelector": {
+    "description": "A scope selector represents the AND of the selectors represented by the scoped-resource selector requirements.",
+    "properties": {
+     "matchExpressions": {
+      "description": "A list of scope selector requirements by scope of the resources.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.ScopedResourceSelectorRequirement"
+      }
+     }
+    }
+   },
+   "io.k8s.api.core.v1.ScopedResourceSelectorRequirement": {
+    "description": "A scoped-resource selector requirement is a selector that contains values, a scope name, and an operator that relates the scope name and values.",
+    "required": [
+     "scopeName",
+     "operator"
+    ],
+    "properties": {
+     "operator": {
+      "description": "Represents a scope's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist.",
+      "type": "string"
+     },
+     "scopeName": {
+      "description": "The name of the scope that the selector applies to.",
+      "type": "string"
+     },
+     "values": {
+      "description": "An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
      }
     }
    },

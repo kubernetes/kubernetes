@@ -4168,6 +4168,8 @@ const (
 	ResourceQuotaScopeBestEffort ResourceQuotaScope = "BestEffort"
 	// Match all pod objects that do not have best effort quality of service
 	ResourceQuotaScopeNotBestEffort ResourceQuotaScope = "NotBestEffort"
+	// Match all pod objects that have priority class mentioned
+	ResourceQuotaScopePriorityClass ResourceQuotaScope = "PriorityClass"
 )
 
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota
@@ -4179,7 +4181,46 @@ type ResourceQuotaSpec struct {
 	// If not specified, the quota matches all objects.
 	// +optional
 	Scopes []ResourceQuotaScope
+	// ScopeSelector is also a collection of filters like Scopes that must match each object tracked by a quota
+	// but expressed using ScopeSelectorOperator in combination with possible values.
+	// +optional
+	ScopeSelector *ScopeSelector
 }
+
+// A scope selector represents the AND of the selectors represented
+// by the scoped-resource selector terms.
+type ScopeSelector struct {
+	// A list of scope selector requirements by scope of the resources.
+	// +optional
+	MatchExpressions []ScopedResourceSelectorRequirement
+}
+
+// A scoped-resource selector requirement is a selector that contains values, a scope name, and an operator
+// that relates the scope name and values.
+type ScopedResourceSelectorRequirement struct {
+	// The name of the scope that the selector applies to.
+	ScopeName ResourceQuotaScope
+	// Represents a scope's relationship to a set of values.
+	// Valid operators are In, NotIn, Exists, DoesNotExist.
+	Operator ScopeSelectorOperator
+	// An array of string values. If the operator is In or NotIn,
+	// the values array must be non-empty. If the operator is Exists or DoesNotExist,
+	// the values array must be empty.
+	// This array is replaced during a strategic merge patch.
+	// +optional
+	Values []string
+}
+
+// A scope selector operator is the set of operators that can be used in
+// a scope selector requirement.
+type ScopeSelectorOperator string
+
+const (
+	ScopeSelectorOpIn           ScopeSelectorOperator = "In"
+	ScopeSelectorOpNotIn        ScopeSelectorOperator = "NotIn"
+	ScopeSelectorOpExists       ScopeSelectorOperator = "Exists"
+	ScopeSelectorOpDoesNotExist ScopeSelectorOperator = "DoesNotExist"
+)
 
 // ResourceQuotaStatus defines the enforced hard limits and observed use
 type ResourceQuotaStatus struct {

@@ -11508,6 +11508,18 @@ func TestValidateResourceQuota(t *testing.T) {
 		Scopes: []core.ResourceQuotaScope{core.ResourceQuotaScopeNotBestEffort},
 	}
 
+	scopeSelectorSpec := core.ResourceQuotaSpec{
+		ScopeSelector: &core.ScopeSelector{
+			MatchExpressions: []core.ScopedResourceSelectorRequirement{
+				{
+					ScopeName: core.ResourceQuotaScopePriorityClass,
+					Operator:  core.ScopeSelectorOpIn,
+					Values:    []string{"cluster-services"},
+				},
+			},
+		},
+	}
+
 	// storage is not yet supported as a quota tracked resource
 	invalidQuotaResourceSpec := core.ResourceQuotaSpec{
 		Hard: core.ResourceList{
@@ -11605,15 +11617,23 @@ func TestValidateResourceQuota(t *testing.T) {
 				Name:      "abc",
 				Namespace: "foo",
 			},
+			Spec: scopeSelectorSpec,
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "abc",
+				Namespace: "foo",
+			},
 			Spec: nonBestEffortSpec,
 		},
 	}
-
+	utilfeature.DefaultFeatureGate.Set("ResourceQuotaScopeSelectors=true")
 	for _, successCase := range successCases {
 		if errs := ValidateResourceQuota(&successCase); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
+	utilfeature.DefaultFeatureGate.Set("ResourceQuotaScopeSelectors=false")
 
 	errorCases := map[string]struct {
 		R core.ResourceQuota
@@ -11658,6 +11678,10 @@ func TestValidateResourceQuota(t *testing.T) {
 		"invalid-quota-scope-name": {
 			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidScopeNameSpec},
 			"unsupported scope",
+		},
+		"forbidden-quota-scope-selector": {
+			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: scopeSelectorSpec},
+			"feature-gate is disabled",
 		},
 	}
 	for k, v := range errorCases {

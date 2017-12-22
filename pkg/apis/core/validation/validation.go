@@ -4786,6 +4786,74 @@ func validateResourceQuotaScopes(resourceQuotaSpec *core.ResourceQuotaSpec, fld 
 	return allErrs
 }
 
+// validateScopedResourceSelectorRequirement tests that the match expressions has valid data
+func validateScopedResourceSelectorRequirement(resourceQuotaSpec *core.ResourceQuotaSpec, fld *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	hardLimits := sets.NewString()
+	for k := range resourceQuotaSpec.Hard {
+		hardLimits.Insert(string(k))
+	}
+	fldPath := fld.Child("matchExpressions")
+	scopeSet := sets.NewString()
+	for _, req := range resourceQuotaSpec.ScopeSelector.MatchExpressions {
+		if !helper.IsStandardResourceQuotaScope(string(req.ScopeName)) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("scopeName"), req.ScopeName, "unsupported scope"))
+		}
+		for _, k := range hardLimits.List() {
+			if helper.IsStandardQuotaResourceName(k) && !helper.IsResourceQuotaScopeValidForResource(req.ScopeName, k) {
+				allErrs = append(allErrs, field.Invalid(fldPath, resourceQuotaSpec.ScopeSelector, "unsupported scope applied to resource"))
+			}
+		}
+		switch req.ScopeName {
+		case core.ResourceQuotaScopeBestEffort, core.ResourceQuotaScopeNotBestEffort, core.ResourceQuotaScopeTerminating, core.ResourceQuotaScopeNotTerminating:
+			if req.Operator != core.ScopeSelectorOpExists {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), req.Operator,
+					"must be 'Exist' only operator when scope is any of ResourceQuotaScopeTerminating, ResourceQuotaScopeNotTerminating, ResourceQuotaScopeBestEffort and ResourceQuotaScopeNotBestEffort"))
+			}
+		}
+
+		switch req.Operator {
+		case core.ScopeSelectorOpIn, core.ScopeSelectorOpNotIn:
+			if len(req.Values) == 0 {
+				allErrs = append(allErrs, field.Required(fldPath.Child("values"),
+					"must be atleast one value when `operator` is 'In' or 'NotIn' for scope selector"))
+			}
+		case core.ScopeSelectorOpExists, core.ScopeSelectorOpDoesNotExist:
+			if len(req.Values) != 0 {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("values"), req.Values,
+					"must be no value when `operator` is 'Exist' or 'DoesNotExist' for scope selector"))
+			}
+		default:
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), req.Operator, "not a valid selector operator"))
+		}
+		scopeSet.Insert(string(req.ScopeName))
+	}
+	invalidScopePairs := []sets.String{
+		sets.NewString(string(core.ResourceQuotaScopeBestEffort), string(core.ResourceQuotaScopeNotBestEffort)),
+		sets.NewString(string(core.ResourceQuotaScopeTerminating), string(core.ResourceQuotaScopeNotTerminating)),
+	}
+	for _, invalidScopePair := range invalidScopePairs {
+		if scopeSet.HasAll(invalidScopePair.List()...) {
+			allErrs = append(allErrs, field.Invalid(fldPath, resourceQuotaSpec.Scopes, "conflicting scopes"))
+		}
+	}
+
+	return allErrs
+}
+
+// validateScopeSelector tests that the specified scope selector has valid data
+func validateScopeSelector(resourceQuotaSpec *core.ResourceQuotaSpec, fld *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if resourceQuotaSpec.ScopeSelector == nil {
+		return allErrs
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ResourceQuotaScopeSelectors) && resourceQuotaSpec.ScopeSelector != nil {
+		allErrs = append(allErrs, field.Forbidden(fld.Child("scopeSelector"), "ResourceQuotaScopeSelectors feature-gate is disabled"))
+	}
+	allErrs = append(allErrs, validateScopedResourceSelectorRequirement(resourceQuotaSpec, fld.Child("scopeSelector"))...)
+	return allErrs
+}
+
 // ValidateResourceQuota tests if required fields in the ResourceQuota are set.
 func ValidateResourceQuota(resourceQuota *core.ResourceQuota) field.ErrorList {
 	allErrs := ValidateObjectMeta(&resourceQuota.ObjectMeta, true, ValidateResourceQuotaName, field.NewPath("metadata"))
@@ -4825,6 +4893,7 @@ func ValidateResourceQuotaSpec(resourceQuotaSpec *core.ResourceQuotaSpec, fld *f
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
 	}
 	allErrs = append(allErrs, validateResourceQuotaScopes(resourceQuotaSpec, fld)...)
+	allErrs = append(allErrs, validateScopeSelector(resourceQuotaSpec, fld)...)
 
 	return allErrs
 }
