@@ -19,6 +19,7 @@ limitations under the License.
 package azure_dd
 
 import (
+	"fmt"
 	"path"
 	"strconv"
 	libstrings "strings"
@@ -43,6 +44,27 @@ func listAzureDiskPath(io ioHandler) []string {
 	}
 	glog.V(12).Infof("Azure sys disks paths: %v", azureDiskList)
 	return azureDiskList
+}
+
+// getDiskIDByPath get disk id by device name from /dev/disk/by-id
+func getDiskIDByPath(io ioHandler, devName string) (string, error) {
+	diskIDPath := "/dev/disk/by-id/"
+	dirs, err := io.ReadDir(diskIDPath)
+	if err == nil {
+		for _, f := range dirs {
+			diskPath := diskIDPath + f.Name()
+			link, linkErr := io.Readlink(diskPath)
+			if linkErr != nil {
+				glog.Warningf("azureDisk - read link (%s) error: %v", diskPath, linkErr)
+				continue
+			}
+			if libstrings.HasSuffix(link, devName) {
+				return diskPath, nil
+			}
+		}
+		return "", fmt.Errorf("device name(%s) is not found under %s", devName, diskIDPath)
+	}
+	return "", fmt.Errorf("read %s error: %v", diskIDPath, err)
 }
 
 func scsiHostRescan(io ioHandler, exec mount.Exec) {
@@ -129,15 +151,23 @@ func findDiskByLunWithConstraint(lun int, io ioHandler, azureDisks []string) (st
 				dir := path.Join(sys_path, name, "block")
 				if dev, err := io.ReadDir(dir); err == nil {
 					found := false
+					devName := dev[0].Name()
 					for _, diskName := range azureDisks {
-						glog.V(12).Infof("azure disk - validating disk %q with sys disk %q", dev[0].Name(), diskName)
-						if string(dev[0].Name()) == diskName {
+						glog.V(12).Infof("azureDisk - validating disk %q with sys disk %q", devName, diskName)
+						if string(devName) == diskName {
 							found = true
 							break
 						}
 					}
 					if !found {
-						return "/dev/" + dev[0].Name(), nil
+						diskPath, err := getDiskIDByPath(io, devName)
+						if err == nil {
+							glog.V(4).Infof("azureDisk - found %s by %s under /dev/disk/by-id", diskPath, devName)
+							return diskPath, nil
+						} else {
+							glog.Warningf("azureDisk - getDiskIDByPath by %s failed, error: %v", devName, err)
+							return "/dev/" + devName, nil
+						}
 					}
 				}
 			}
