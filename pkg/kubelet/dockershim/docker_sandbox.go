@@ -553,6 +553,9 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 
 	// Set port mappings.
 	exposedPorts, portBindings := makePortsAndBindings(c.GetPortMappings())
+	if hc.NetworkMode == "none" && len(portBindings) != 0 {
+		return nil, fmt.Errorf("does not support hostport mapping when using cni or kubenet as network plugins")
+	}
 	createConfig.Config.ExposedPorts = exposedPorts
 	hc.PortBindings = portBindings
 
