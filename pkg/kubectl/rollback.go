@@ -145,6 +145,10 @@ func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations m
 func watchRollbackEvent(w watch.Interface) string {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, os.Kill, syscall.SIGTERM)
+	defer func() {
+		signal.Stop(signals)
+		close(signals)
+	}()
 	for {
 		select {
 		case event, ok := <-w.ResultChan():
