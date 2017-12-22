@@ -10,7 +10,6 @@ go_library(
     srcs = [
         "configsync.go",
         "controller.go",
-        "rollback.go",
         "watch.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/kubeletconfig",

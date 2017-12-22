@@ -32,28 +32,27 @@ import (
 	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
 )
 
+// TODO(mtaufen): s/current/assigned, as this is more accurate e.g. if you are using lkg, you aren't currently using "current" :)
 const (
-	// CurDefaultMessage indicates the Kubelet is using it's current config, which is the default
-	CurDefaultMessage = "using current (default)"
-	// LkgDefaultMessage indicates the Kubelet is using it's last-known-good config, which is the default
-	LkgDefaultMessage = "using last-known-good (default)"
+	// NotDynamicLocalMessage indicates that the Kubelet is using its local config - we send this when dynamic Kubelet config is disabled by omitting the --dynamic-config-dir flag
+	NotDynamicLocalMessage = "using local config"
+	// NotDynamicLocalReason indicates that the Kubelet is using its local config - we send this when dynamic Kubelet config is disabled by omitting the --dynamic-config-dir flag
+	NotDynamicLocalReason = "dynamic config is currently disabled by omission of --dynamic-config-dir Kubelet flag"
 
-	// CurInitMessage indicates the Kubelet is using it's current config, which is from the init config files
-	CurInitMessage = "using current (init)"
-	// LkgInitMessage indicates the Kubelet is using it's last-known-good config, which is from the init config files
-	LkgInitMessage = "using last-known-good (init)"
+	// CurLocalMessage indicates that the Kubelet is using its local config, which consists of defaults, flags, and/or local files
+	CurLocalMessage = "using current (local)"
+	// LkgLocalMessage indicates that the Kubelet is using its local config, which consists of defaults, flags, and/or local files
+	LkgLocalMessage = "using last-known-good (local)"
 
-	// CurRemoteMessageFmt indicates the Kubelet is usin it's current config, which is from an API source
+	// CurRemoteMessageFmt indicates the Kubelet is using its current config, which is from an API source
 	CurRemoteMessageFmt = "using current (UID: %q)"
-	// LkgRemoteMessageFmt indicates the Kubelet is using it's last-known-good config, which is from an API source
+	// LkgRemoteMessageFmt indicates the Kubelet is using its last-known-good config, which is from an API source
 	LkgRemoteMessageFmt = "using last-known-good (UID: %q)"
 
-	// CurDefaultOKReason indicates that no init config files were provided
-	CurDefaultOKReason = "current is set to the local default, and no init config was provided"
-	// CurInitOKReason indicates that init config files were provided
-	CurInitOKReason = "current is set to the local default, and an init config was provided"
-	// CurRemoteOKReason indicates that the config referenced by Node.ConfigSource is currently passing all checks
-	CurRemoteOKReason = "passing all checks"
+	// CurLocalOkayReason indicates that the Kubelet is using its local config
+	CurLocalOkayReason = "when the config source is nil, the Kubelet uses its local config"
+	// CurRemoteOkayReason indicates that the config referenced by Node.ConfigSource is currently passing all checks
+	CurRemoteOkayReason = "passing all checks"
 
 	// CurFailLoadReasonFmt indicates that the Kubelet failed to load the current config checkpoint for an API source
 	CurFailLoadReasonFmt = "failed to load current (UID: %q)"
@@ -61,8 +60,6 @@ const (
 	CurFailParseReasonFmt = "failed to parse current (UID: %q)"
 	// CurFailValidateReasonFmt indicates that the Kubelet failed to validate the current config checkpoint for an API source
 	CurFailValidateReasonFmt = "failed to validate current (UID: %q)"
-	// CurFailCrashLoopReasonFmt indicates that the Kubelet experienced a crash loop while using the current config checkpoint for an API source
-	CurFailCrashLoopReasonFmt = "current failed trial period due to crash loop (UID: %q)"
 
 	// LkgFail*ReasonFmt reasons are currently used to print errors in the Kubelet log, but do not appear in Node.Status.Conditions
 
@@ -87,13 +84,13 @@ const (
 	// FailSyncReasonInformer is used when the informer fails to report the Node object
 	FailSyncReasonInformer = "failed to read Node from informer object cache"
 	// FailSyncReasonReset is used when we can't reset the local configuration references, e.g. due to filesystem issues
-	FailSyncReasonReset = "failed to reset to local (default or init) config"
+	FailSyncReasonReset = "failed to reset to local config"
 	// FailSyncReasonCheckpointExistenceFmt is used when we can't determine if a checkpoint already exists, e.g. due to filesystem issues
 	FailSyncReasonCheckpointExistenceFmt = "failed to determine whether object with UID %q was already checkpointed"
 	// FailSyncReasonSaveCheckpointFmt is used when we can't save a checkpoint, e.g. due to filesystem issues
 	FailSyncReasonSaveCheckpointFmt = "failed to save config checkpoint for object with UID %q"
 	// FailSyncReasonSetCurrentDefault is used when we can't set the current config checkpoint to the local default, e.g. due to filesystem issues
-	FailSyncReasonSetCurrentDefault = "failed to set current config checkpoint to default"
+	FailSyncReasonSetCurrentLocal = "failed to set current config checkpoint to local config"
 	// FailSyncReasonSetCurrentUIDFmt is used when we can't set the current config checkpoint to a checkpointed object, e.g. due to filesystem issues
 	FailSyncReasonSetCurrentUIDFmt = "failed to set current config checkpoint to object with UID %q"
 

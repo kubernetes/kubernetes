@@ -35,7 +35,7 @@ spec:
             cpu: 100m
             memory: 300Mi
           requests:
-            cpu: 100m
+            cpu: 50m
             memory: 100Mi
         ports:
         - containerPort: 8443

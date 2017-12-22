@@ -302,7 +302,7 @@ func newKubeletConfigMap(name string, internalKC *kubeletconfig.KubeletConfigura
 	framework.ExpectNoError(err)
 
 	cmap := &apiv1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: name},
+		ObjectMeta: metav1.ObjectMeta{GenerateName: name + "-"},
 		Data: map[string]string{
 			"kubelet": string(data),
 		},
