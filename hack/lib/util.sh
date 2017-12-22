@@ -475,10 +475,15 @@ kube::util::go_install_from_commit() {
 
   kube::util::ensure-temp-dir
   mkdir -p "${KUBE_TEMP}/go/src"
-  GOPATH="${KUBE_TEMP}/go" go get -d -u "${pkg}"
+  # TODO(spiffxp): remove this brittle workaround for go getting a package that doesn't exist at HEAD
+  repo=$(echo ${pkg} | cut -d/ -f1-3)
+  git clone "https://${repo}" "${KUBE_TEMP}/go/src/${repo}"
+  # GOPATH="${KUBE_TEMP}/go" go get -d -u "${pkg}"
   (
-    cd "${KUBE_TEMP}/go/src/${pkg}"
+    cd "${KUBE_TEMP}/go/src/${repo}"
+    git fetch # TODO(spiffxp): workaround
     git checkout -q "${commit}"
+    GOPATH="${KUBE_TEMP}/go" go get -d "${pkg}" #TODO(spiffxp): workaround
     GOPATH="${KUBE_TEMP}/go" go install "${pkg}"
   )
   PATH="${KUBE_TEMP}/go/bin:${PATH}"
