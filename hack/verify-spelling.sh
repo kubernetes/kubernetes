@@ -20,15 +20,12 @@ set -o pipefail
 export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+# Ensure that we find the binaries we build before anything else.
+export GOBIN="${KUBE_OUTPUT_BINPATH}"
+PATH="${GOBIN}:${PATH}"
+
 # Install tools we need, but only from vendor/...
-cd ${KUBE_ROOT}
 go install ./vendor/github.com/client9/misspell/cmd/misspell
-if ! which misspell >/dev/null 2>&1; then
-    echo "Can't find misspell - is your GOPATH 'bin' in your PATH?" >&2
-    echo "  GOPATH: ${GOPATH}" >&2
-    echo "  PATH:   ${PATH}" >&2
-    exit 1
-fi
 
 # Spell checking
 # All the skipping files are defined in hack/.spelling_failures
