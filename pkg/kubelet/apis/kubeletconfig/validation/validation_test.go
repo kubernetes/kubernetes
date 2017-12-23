@@ -47,6 +47,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		ReadOnlyPort:                0,
 		RegistryBurst:               10,
 		RegistryPullQPS:             5,
+		HairpinMode:                 kubeletconfig.PromiscuousBridge,
 	}
 	if allErrors := ValidateKubeletConfiguration(successCase); allErrors != nil {
 		t.Errorf("expect no errors got %v", allErrors)
@@ -75,8 +76,9 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		ReadOnlyPort:                -10,
 		RegistryBurst:               -10,
 		RegistryPullQPS:             -10,
+		HairpinMode:                 "foo",
 	}
-	if allErrors := ValidateKubeletConfiguration(errorCase); len(allErrors.(utilerrors.Aggregate).Errors()) != 21 {
-		t.Errorf("expect 21 errors got %v", len(allErrors.(utilerrors.Aggregate).Errors()))
+	if allErrors := ValidateKubeletConfiguration(errorCase); len(allErrors.(utilerrors.Aggregate).Errors()) != 22 {
+		t.Errorf("expect 22 errors got %v", len(allErrors.(utilerrors.Aggregate).Errors()))
 	}
 }
