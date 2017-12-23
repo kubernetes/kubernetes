@@ -15,9 +15,9 @@
 # Build the guestbook-go example
 
 # Usage:
-#   [VERSION=v3] [REGISTRY="k8s.gcr.io"] make build
+#   [VERSION=v3] [REGISTRY="gcr.io/google_containers"] make build
 VERSION?=v3
-REGISTRY?=k8s.gcr.io
+REGISTRY?=gcr.io/google_containers
 
 release: clean build push clean
 

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMAGE=k8s.gcr.io/python
+IMAGE=gcr.io/google_containers/python
 VERSION=v1
 
 .PHONY: build push

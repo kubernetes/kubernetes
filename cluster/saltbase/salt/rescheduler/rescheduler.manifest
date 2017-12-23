@@ -13,7 +13,7 @@ metadata:
 spec:
   hostNetwork: true
   containers:
-  - image: k8s.gcr.io/rescheduler:v0.3.1
+  - image: gcr.io/google-containers/rescheduler:v0.3.1
     name: rescheduler
     volumeMounts:
     - mountPath: /var/log/rescheduler.log

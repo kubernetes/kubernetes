@@ -23,7 +23,7 @@ import (
 	"os"
 	"testing"
 
-	apps "k8s.io/api/apps/v1beta2"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -66,7 +66,7 @@ spec:
     - --proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key
     - --authorization-mode=Node,RBAC
     - --etcd-servers=http://127.0.0.1:2379
-    image: k8s.gcr.io/kube-apiserver-amd64:v1.7.4
+    image: gcr.io/google_containers/kube-apiserver-amd64:v1.7.4
     livenessProbe:
       failureThreshold: 8
       httpGet:
@@ -104,7 +104,7 @@ spec:
 status: {}
 `
 
-	testAPIServerDaemonSet = `apiVersion: apps/v1beta2
+	testAPIServerDaemonSet = `apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   creationTimestamp: null
@@ -148,7 +148,7 @@ spec:
         - --proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key
         - --authorization-mode=Node,RBAC
         - --etcd-servers=http://127.0.0.1:2379
-        image: k8s.gcr.io/kube-apiserver-amd64:v1.7.4
+        image: gcr.io/google_containers/kube-apiserver-amd64:v1.7.4
         livenessProbe:
           failureThreshold: 8
           httpGet:
@@ -220,7 +220,7 @@ spec:
     - --cluster-signing-key-file=/etc/kubernetes/pki/ca.key
     - --address=127.0.0.1
     - --use-service-account-credentials=true
-    image: k8s.gcr.io/kube-controller-manager-amd64:v1.7.4
+    image: gcr.io/google_containers/kube-controller-manager-amd64:v1.7.4
     livenessProbe:
       failureThreshold: 8
       httpGet:
@@ -265,7 +265,7 @@ spec:
 status: {}
 `
 
-	testControllerManagerDaemonSet = `apiVersion: apps/v1beta2
+	testControllerManagerDaemonSet = `apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   creationTimestamp: null
@@ -295,7 +295,7 @@ spec:
         - --cluster-signing-key-file=/etc/kubernetes/pki/ca.key
         - --address=127.0.0.1
         - --use-service-account-credentials=true
-        image: k8s.gcr.io/kube-controller-manager-amd64:v1.7.4
+        image: gcr.io/google_containers/kube-controller-manager-amd64:v1.7.4
         livenessProbe:
           failureThreshold: 8
           httpGet:
@@ -368,7 +368,7 @@ spec:
     - --leader-elect=true
     - --kubeconfig=/etc/kubernetes/scheduler.conf
     - --address=127.0.0.1
-    image: k8s.gcr.io/kube-scheduler-amd64:v1.7.4
+    image: gcr.io/google_containers/kube-scheduler-amd64:v1.7.4
     livenessProbe:
       failureThreshold: 8
       httpGet:
@@ -395,7 +395,7 @@ spec:
 status: {}
 `
 
-	testSchedulerDaemonSet = `apiVersion: apps/v1beta2
+	testSchedulerDaemonSet = `apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   creationTimestamp: null
@@ -419,7 +419,7 @@ spec:
         - --leader-elect=true
         - --kubeconfig=/etc/kubernetes/scheduler.conf
         - --address=127.0.0.1
-        image: k8s.gcr.io/kube-scheduler-amd64:v1.7.4
+        image: gcr.io/google_containers/kube-scheduler-amd64:v1.7.4
         livenessProbe:
           failureThreshold: 8
           httpGet:
@@ -521,7 +521,7 @@ metadata:
   name: testpod
 spec:
   containers:
-    - image: k8s.gcr.io/busybox
+    - image: gcr.io/google_containers/busybox
 `,
 			expectError: false,
 		},
@@ -537,7 +537,7 @@ spec:
   "spec": {
     "containers": [
       {
-        "image": "k8s.gcr.io/busybox"
+        "image": "gcr.io/google_containers/busybox"
       }
     ]
   }
@@ -552,7 +552,7 @@ kind: Pod
 metadata:
   name: testpod
 spec:
-  - image: k8s.gcr.io/busybox
+  - image: gcr.io/google_containers/busybox
 `,
 			expectError: true,
 		},

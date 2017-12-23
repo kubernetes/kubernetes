@@ -337,7 +337,7 @@ func rollbackOldManifests(oldManifests map[string]string, origErr error, pathMgr
 			errs = append(errs, err)
 		}
 	}
-	// Let the user know there we're problems, but we tried to reçover
+	// Let the user know there were problems, but we tried to recover
 	return fmt.Errorf("couldn't upgrade control plane. kubeadm has tried to recover everything into the earlier state. Errors faced: %v", errs)
 }
 

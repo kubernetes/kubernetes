@@ -15,8 +15,8 @@
 # build Kubemark image from currently built binaries containing both 'real' master and Hollow Node.
 # This makefile assumes that the kubemark binary is present in this directory.
 
-REGISTRY ?= gcr.io
-PROJECT ?=
+REGISTRY?=gcr.io
+PROJECT?=google_containers
 
 all: gcloudpush
 

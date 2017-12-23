@@ -40,7 +40,7 @@ import (
 const (
 	// When these values are updated, also update cmd/kubelet/app/options/options.go
 	// A copy of these values exist in e2e/framework/util.go.
-	currentPodInfraContainerImageName    = "k8s.gcr.io/pause"
+	currentPodInfraContainerImageName    = "gcr.io/google_containers/pause"
 	currentPodInfraContainerImageVersion = "3.0"
 )
 

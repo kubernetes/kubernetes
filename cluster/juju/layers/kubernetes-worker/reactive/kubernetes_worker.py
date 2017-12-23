@@ -635,10 +635,10 @@ def launch_default_ingress_controller():
     addon_path = '/root/cdk/addons/{}'
 
     context['defaultbackend_image'] = \
-        "k8s.gcr.io/defaultbackend:1.4"
+        "gcr.io/google_containers/defaultbackend:1.4"
     if arch() == 's390x':
         context['defaultbackend_image'] = \
-            "k8s.gcr.io/defaultbackend-s390x:1.4"
+            "gcr.io/google_containers/defaultbackend-s390x:1.4"
 
     # Render the default http backend (404) replicationcontroller manifest
     manifest = addon_path.format('default-http-backend.yaml')
@@ -655,7 +655,7 @@ def launch_default_ingress_controller():
 
     # Render the ingress replication controller manifest
     context['ingress_image'] = \
-        "k8s.gcr.io/nginx-ingress-controller:0.9.0-beta.13"
+        "gcr.io/google_containers/nginx-ingress-controller:0.9.0-beta.13"
     if arch() == 's390x':
         context['ingress_image'] = \
             "docker.io/cdkbot/nginx-ingress-controller-s390x:0.9.0-beta.13"

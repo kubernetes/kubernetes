@@ -75,7 +75,7 @@ func ValidateClusterInfo(clusterinfo *clientcmdapi.Config) (*clientcmdapi.Cluste
 		clusterinfoCM, err = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsForbidden(err) {
-				// If the request is unauthorized, the cluster admin has not granted access to the cluster info configmap for unauthenicated users
+				// If the request is unauthorized, the cluster admin has not granted access to the cluster info configmap for unauthenticated users
 				// In that case, trust the cluster admin and do not refresh the cluster-info credentials
 				fmt.Printf("[discovery] Could not access the %s ConfigMap for refreshing the cluster-info information, but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo)
 				return true, nil

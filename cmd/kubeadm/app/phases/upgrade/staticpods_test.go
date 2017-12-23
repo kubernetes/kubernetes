@@ -61,7 +61,7 @@ etcd:
   image: ""
   keyFile: ""
 featureFlags: null
-imageRepository: k8s.gcr.io
+imageRepository: gcr.io/google_containers
 kubernetesVersion: %s
 networking:
   dnsDomain: cluster.local

@@ -170,10 +170,10 @@ func TestKubeConfigSubCommandsThatCreateFilesWithFlags(t *testing.T) {
 
 		outputdir := tmpdir
 
-		// Retrives ca cert for assertions
+		// Retrieves ca cert for assertions
 		caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(pkidir, kubeadmconstants.CACertAndKeyBaseName)
 		if err != nil {
-			t.Fatalf("couldn't retrive ca cert: %v", err)
+			t.Fatalf("couldn't retrieve ca cert: %v", err)
 		}
 
 		// Get subcommands working in the temporary directory
@@ -272,10 +272,10 @@ func TestKubeConfigSubCommandsThatCreateFilesWithConfigFile(t *testing.T) {
 		// Adds a pki folder with a ca certs to the temp folder
 		pkidir := testutil.SetupPkiDirWithCertificateAuthorithy(t, tmpdir)
 
-		// Retrives ca cert for assertions
+		// Retrieves ca cert for assertions
 		caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(pkidir, kubeadmconstants.CACertAndKeyBaseName)
 		if err != nil {
-			t.Fatalf("couldn't retrive ca cert: %v", err)
+			t.Fatalf("couldn't retrieve ca cert: %v", err)
 		}
 
 		// Adds a master configuration file
@@ -327,10 +327,10 @@ func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 
 	outputdir := tmpdir
 
-	// Retrives ca cert for assertions
+	// Retrieves ca cert for assertions
 	caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(pkidir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
-		t.Fatalf("couldn't retrive ca cert: %v", err)
+		t.Fatalf("couldn't retrieve ca cert: %v", err)
 	}
 
 	commonFlags := []string{

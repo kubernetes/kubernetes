@@ -15,13 +15,13 @@
 # Build the hyperkube image.
 #
 # Usage:
-#   [ARCH=amd64] [REGISTRY="k8s.gcr.io"] make (build|push) VERSION={some_released_version_of_kubernetes}
+#   [ARCH=amd64] [REGISTRY="gcr.io/google-containers"] make (build|push) VERSION={some_released_version_of_kubernetes}
 
-REGISTRY?=k8s.gcr.io
+REGISTRY?=gcr.io/google-containers
 ARCH?=amd64
 HYPERKUBE_BIN?=_output/dockerized/bin/linux/$(ARCH)/hyperkube
 
-BASEIMAGE=k8s.gcr.io/debian-hyperkube-base-$(ARCH):0.8
+BASEIMAGE=gcr.io/google-containers/debian-hyperkube-base-$(ARCH):0.8
 TEMP_DIR:=$(shell mktemp -d -t hyperkubeXXXXXX)
 
 all: build

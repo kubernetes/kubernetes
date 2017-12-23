@@ -44,7 +44,7 @@ SKIP=${SKIP:-""}
 TEST_ARGS=${TEST_ARGS:-""}
 
 # REGISTRY is the image registry for node test image.
-REGISTRY=${REGISTRY:-"k8s.gcr.io"}
+REGISTRY=${REGISTRY:-"gcr.io/google_containers"}
 
 # ARCH is the architecture of current machine, the script will use this to
 # select corresponding test container image.

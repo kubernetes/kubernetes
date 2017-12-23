@@ -461,7 +461,7 @@ func makePod(name, ns string, pvcs []string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:    "write-pod",
-					Image:   "k8s.gcr.io/busybox:1.24",
+					Image:   "gcr.io/google_containers/busybox:1.24",
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", "while true; do sleep 1; done"},
 				},

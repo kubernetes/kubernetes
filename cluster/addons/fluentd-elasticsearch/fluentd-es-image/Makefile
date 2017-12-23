@@ -14,7 +14,7 @@
 
 .PHONY:	build push
 
-PREFIX = k8s.gcr.io
+PREFIX = gcr.io/google-containers
 IMAGE = fluentd-elasticsearch
 TAG = v2.0.2
 

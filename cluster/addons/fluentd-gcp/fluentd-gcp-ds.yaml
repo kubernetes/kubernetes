@@ -27,7 +27,7 @@ spec:
       dnsPolicy: Default
       containers:
       - name: fluentd-gcp
-        image: k8s.gcr.io/fluentd-gcp:2.0.11
+        image: gcr.io/google-containers/fluentd-gcp:2.0.11
         env:
         - name: FLUENTD_ARGS
           value: --no-supervisor -q
@@ -82,7 +82,7 @@ spec:
               fi;
       # BEGIN_PROMETHEUS_TO_SD
       - name: prometheus-to-sd-exporter
-        image: k8s.gcr.io/prometheus-to-sd:v0.2.2
+        image: gcr.io/google-containers/prometheus-to-sd:v0.2.2
         command:
           - /monitor
           - --stackdriver-prefix={{ prometheus_to_sd_prefix }}/addons

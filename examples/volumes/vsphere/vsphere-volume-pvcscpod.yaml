@@ -5,7 +5,7 @@ metadata:
 spec:
   containers:
   - name: test-container
-    image: k8s.gcr.io/test-webserver
+    image: gcr.io/google_containers/test-webserver
     volumeMounts:
     - name: test-volume
       mountPath: /test-vmdk

@@ -81,7 +81,7 @@ for docker_file in "${KUBE_DOCKER_WRAPPED_BINARIES[@]}"; do
 done
 
 cat <<EOF >>"${docker_images_sls_file}"
-kube_docker_registry: '$(echo ${KUBE_DOCKER_REGISTRY:-k8s.gcr.io})'
+kube_docker_registry: '$(echo ${KUBE_DOCKER_REGISTRY:-gcr.io/google_containers})'
 EOF
 
 # TODO(zmerlynn): Forgive me, this is really gross. But in order to
@@ -89,13 +89,13 @@ EOF
 # have to templatize a couple of the add-ons anyways, manually
 # templatize the addon registry for regional support. When we get
 # better templating, we can fix this.
-readonly kube_addon_registry="${KUBE_ADDON_REGISTRY:-k8s.gcr.io}"
-if [[ "${kube_addon_registry}" != "k8s.gcr.io" ]]; then
+readonly kube_addon_registry="${KUBE_ADDON_REGISTRY:-gcr.io/google_containers}"
+if [[ "${kube_addon_registry}" != "gcr.io/google_containers" ]]; then
   find /srv/salt-new -name \*.yaml -or -name \*.yaml.in | \
-    xargs sed -ri "s@(image:\s.*)k8s.gcr.io@\1${kube_addon_registry}@"
+    xargs sed -ri "s@(image:\s.*)gcr.io/google_containers@\1${kube_addon_registry}@"
   # All the legacy .manifest files with hardcoded gcr.io are JSON.
   find /srv/salt-new -name \*.manifest -or -name \*.json | \
-    xargs sed -ri "s@(image\":\s+\")k8s.gcr.io@\1${kube_addon_registry}@"
+    xargs sed -ri "s@(image\":\s+\")gcr.io/google_containers@\1${kube_addon_registry}@"
 fi
 
 echo "+++ Swapping in new configs"

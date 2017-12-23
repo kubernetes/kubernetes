@@ -14,13 +14,13 @@ spec:
         cpu: 100m
       limits:
         cpu: 100m
-    image: k8s.gcr.io/busybox:1.24
+    image: gcr.io/google_containers/busybox:1.24
     # TODO: Replace this with a go script that pulls in parallel?
     # Currently it takes ~5m to pull all e2e images, so this is OK, and
     # fewer moving parts is always better.
     # TODO: Replace the hardcoded image list with an autogen list; the list is
     # currently hard-coded for static verification. It was generated via:
-    # grep -Iiroh "gcr.io/.*" "${KUBE_ROOT}/test/e2e" | \
+    # grep -Iiroh "gcr.io/google_.*" "${KUBE_ROOT}/test/e2e" | \
     #     sed -e "s/[,\")}]//g" | awk '{print $1}' | sort | uniq | tr '\n' ' '
     # We always want the subshell to exit 0 so this pod doesn't end up
     # blocking tests in an Error state.
@@ -29,52 +29,52 @@ spec:
     - -c
     - >
       for i in
-      k8s.gcr.io/alpine-with-bash:1.0
-      k8s.gcr.io/apparmor-loader:0.1
-      k8s.gcr.io/busybox:1.24
-      k8s.gcr.io/dnsutils:e2e
-      k8s.gcr.io/e2e-net-amd64:1.0
-      k8s.gcr.io/echoserver:1.6
-      k8s.gcr.io/eptest:0.1
-      k8s.gcr.io/fakegitserver:0.1
-      k8s.gcr.io/galera-install:0.1
-      k8s.gcr.io/hostexec:1.2
-      k8s.gcr.io/invalid-image:invalid-tag
-      k8s.gcr.io/iperf:e2e
-      k8s.gcr.io/jessie-dnsutils:e2e
-      k8s.gcr.io/k8s-dns-dnsmasq-amd64:1.14.5
-      k8s.gcr.io/liveness:e2e
-      k8s.gcr.io/logs-generator:v0.1.0
-      k8s.gcr.io/mounttest:0.8
-      k8s.gcr.io/mounttest-user:0.5
-      k8s.gcr.io/mysql-galera:e2e
-      k8s.gcr.io/mysql-healthz:1.0
-      k8s.gcr.io/netexec:1.4
-      k8s.gcr.io/netexec:1.5
-      k8s.gcr.io/netexec:1.7
-      k8s.gcr.io/nettest:1.7
-      k8s.gcr.io/nginx:1.7.9
-      k8s.gcr.io/nginx-ingress-controller:0.9.0-beta.1
-      k8s.gcr.io/nginx-slim:0.7
-      k8s.gcr.io/nginx-slim:0.8
-      k8s.gcr.io/node-problem-detector:v0.3.0
-      k8s.gcr.io/pause
-      k8s.gcr.io/porter:4524579c0eb935c056c8e75563b4e1eda31587e0
-      k8s.gcr.io/portforwardtester:1.2
-      k8s.gcr.io/redis-install-3.2.0:e2e
-      k8s.gcr.io/resource_consumer:beta4
-      k8s.gcr.io/resource_consumer/controller:beta4
+      gcr.io/google_containers/alpine-with-bash:1.0
+      gcr.io/google_containers/apparmor-loader:0.1
+      gcr.io/google_containers/busybox:1.24
+      gcr.io/google_containers/dnsutils:e2e
+      gcr.io/google_containers/e2e-net-amd64:1.0
+      gcr.io/google_containers/echoserver:1.6
+      gcr.io/google_containers/eptest:0.1
+      gcr.io/google_containers/fakegitserver:0.1
+      gcr.io/google_containers/galera-install:0.1
+      gcr.io/google_containers/hostexec:1.2
+      gcr.io/google_containers/invalid-image:invalid-tag
+      gcr.io/google_containers/iperf:e2e
+      gcr.io/google_containers/jessie-dnsutils:e2e
+      gcr.io/google_containers/k8s-dns-dnsmasq-amd64:1.14.5
+      gcr.io/google_containers/liveness:e2e
+      gcr.io/google_containers/logs-generator:v0.1.0
+      gcr.io/google_containers/mounttest:0.8
+      gcr.io/google_containers/mounttest-user:0.5
+      gcr.io/google_containers/mysql-galera:e2e
+      gcr.io/google_containers/mysql-healthz:1.0
+      gcr.io/google_containers/netexec:1.4
+      gcr.io/google_containers/netexec:1.5
+      gcr.io/google_containers/netexec:1.7
+      gcr.io/google_containers/nettest:1.7
+      gcr.io/google_containers/nginx:1.7.9
+      gcr.io/google_containers/nginx-ingress-controller:0.9.0-beta.1
+      gcr.io/google_containers/nginx-slim:0.7
+      gcr.io/google_containers/nginx-slim:0.8
+      gcr.io/google_containers/node-problem-detector:v0.3.0
+      gcr.io/google_containers/pause
+      gcr.io/google_containers/porter:4524579c0eb935c056c8e75563b4e1eda31587e0
+      gcr.io/google_containers/portforwardtester:1.2
+      gcr.io/google_containers/redis-install-3.2.0:e2e
+      gcr.io/google_containers/resource_consumer:beta4
+      gcr.io/google_containers/resource_consumer/controller:beta4
       gcr.io/kubernetes-e2e-test-images/serve-hostname-amd64:1.1
-      k8s.gcr.io/servicelb:0.1
-      k8s.gcr.io/test-webserver:e2e
-      k8s.gcr.io/update-demo:kitten
-      k8s.gcr.io/update-demo:nautilus
-      k8s.gcr.io/volume-ceph:0.1
-      k8s.gcr.io/volume-gluster:0.2
-      k8s.gcr.io/volume-iscsi:0.1
-      k8s.gcr.io/volume-nfs:0.8
-      k8s.gcr.io/volume-rbd:0.1
-      k8s.gcr.io/zookeeper-install-3.5.0-alpha:e2e
+      gcr.io/google_containers/servicelb:0.1
+      gcr.io/google_containers/test-webserver:e2e
+      gcr.io/google_containers/update-demo:kitten
+      gcr.io/google_containers/update-demo:nautilus
+      gcr.io/google_containers/volume-ceph:0.1
+      gcr.io/google_containers/volume-gluster:0.2
+      gcr.io/google_containers/volume-iscsi:0.1
+      gcr.io/google_containers/volume-nfs:0.8
+      gcr.io/google_containers/volume-rbd:0.1
+      gcr.io/google_containers/zookeeper-install-3.5.0-alpha:e2e
       gcr.io/google_samples/gb-redisslave:nonexistent
       ; do echo $(date '+%X') pulling $i; docker pull $i 1>/dev/null; done; exit 0;
     securityContext:
@@ -91,7 +91,7 @@ spec:
         cpu: 100m
       limits:
         cpu: 100m
-    image:  k8s.gcr.io/kube-nethealth-amd64:1.0
+    image:  gcr.io/google_containers/kube-nethealth-amd64:1.0
     command:
     - /bin/sh
     - -c

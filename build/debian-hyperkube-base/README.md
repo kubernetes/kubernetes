@@ -1,6 +1,6 @@
 ### debian-hyperkube-base
 
-Serves as the base image for `k8s.gcr.io/hyperkube-${ARCH}`
+Serves as the base image for `gcr.io/google-containers/hyperkube-${ARCH}`
 images.
 
 This image is compiled for multiple architectures.
@@ -12,19 +12,19 @@ If you're editing the Dockerfile or some other thing, please bump the `TAG` in t
 ```console
 # Build for linux/amd64 (default)
 $ make push ARCH=amd64
-# ---> k8s.gcr.io/debian-hyperkube-base-amd64:TAG
+# ---> gcr.io/google-containers/debian-hyperkube-base-amd64:TAG
 
 $ make push ARCH=arm
-# ---> k8s.gcr.io/debian-hyperkube-base-arm:TAG
+# ---> gcr.io/google-containers/debian-hyperkube-base-arm:TAG
 
 $ make push ARCH=arm64
-# ---> k8s.gcr.io/debian-hyperkube-base-arm64:TAG
+# ---> gcr.io/google-containers/debian-hyperkube-base-arm64:TAG
 
 $ make push ARCH=ppc64le
-# ---> k8s.gcr.io/debian-hyperkube-base-ppc64le:TAG
+# ---> gcr.io/google-containers/debian-hyperkube-base-ppc64le:TAG
 
 $ make push ARCH=s390x
-# ---> k8s.gcr.io/debian-hyperkube-base-s390x:TAG
+# ---> gcr.io/google-containers/debian-hyperkube-base-s390x:TAG
 ```
 
 If you don't want to push the images, run `make build` instead
