@@ -232,7 +232,7 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 		return options.watch(f, cmd, args)
 	}
 
-	r := f.NewBuilder().
+	b := f.NewBuilder().
 		Unstructured().
 		NamespaceParam(options.Namespace).DefaultNamespace().AllNamespaces(options.AllNamespaces).
 		FilenameParam(options.ExplicitNamespace, &options.FilenameOptions).
@@ -243,10 +243,13 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 		IncludeUninitialized(cmdutil.ShouldIncludeUninitialized(cmd, false)). // TODO: this needs to be better factored
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
-		Latest().
-		Flatten().
-		Do()
+		Latest()
 
+	if resource.MultipleTypesRequested(args) {
+		b = b.Flatten()
+	}
+
+	r := b.Do()
 	if options.IgnoreNotFound {
 		r.IgnoreErrors(kapierrors.IsNotFound)
 	}
@@ -576,8 +579,9 @@ func (options *GetOptions) printGeneric(printer printers.ResourcePrinter, r *res
 	}
 
 	var obj runtime.Object
-	if !singleItemImplied || len(infos) > 1 {
-		// we have more than one item, so coerce all items into a list
+	if singleItemImplied || (len(infos) == 1 && meta.IsListType(infos[0].Object)) {
+		obj = infos[0].Object
+	} else {
 		// we have more than one item, so coerce all items into a list.
 		// we don't want an *unstructured.Unstructured list yet, as we
 		// may be dealing with non-unstructured objects. Compose all items
@@ -604,8 +608,6 @@ func (options *GetOptions) printGeneric(printer printers.ResourcePrinter, r *res
 		}
 
 		obj = converted
-	} else {
-		obj = infos[0].Object
 	}
 
 	isList := meta.IsListType(obj)
