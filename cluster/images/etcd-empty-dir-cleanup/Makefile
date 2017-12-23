@@ -15,7 +15,7 @@
 .PHONY:	build push
 
 ETCD_VERSION = 3.0.14
-IMAGE = k8s.gcr.io/etcd-empty-dir-cleanup
+IMAGE = gcr.io/google-containers/etcd-empty-dir-cleanup
 TAG = 3.0.14.0
 
 clean:

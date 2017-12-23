@@ -23,7 +23,7 @@ import (
 
 const (
 	e2eRegistry     = "gcr.io/kubernetes-e2e-test-images"
-	gcRegistry      = "k8s.gcr.io"
+	gcRegistry      = "gcr.io/google-containers"
 	PrivateRegistry = "gcr.io/k8s-authenticated-test"
 	sampleRegistry  = "gcr.io/google-samples"
 )

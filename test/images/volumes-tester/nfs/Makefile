@@ -13,7 +13,7 @@
 # limitations under the License.
 
 TAG = 0.8
-PREFIX = k8s.gcr.io
+PREFIX = gcr.io/google_containers
 
 all: push
 

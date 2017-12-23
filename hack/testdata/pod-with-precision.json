@@ -9,7 +9,7 @@
       "containers": [
         {
           "name": "kubernetes-pause",
-          "image": "k8s.gcr.io/pause-amd64:3.0"
+          "image": "gcr.io/google_containers/pause-amd64:3.0"
         }
       ],
       "restartPolicy": "Never",

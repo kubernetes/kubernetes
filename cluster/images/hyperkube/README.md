@@ -10,23 +10,23 @@
 $ build/run.sh make cross
 
 # Build for linux/amd64 (default)
-# export REGISTRY=$HOST/$ORG to switch from k8s.gcr.io
+# export REGISTRY=$HOST/$ORG to switch from gcr.io/google_containers
 
 $ make push VERSION={target_version} ARCH=amd64
-# ---> k8s.gcr.io/hyperkube-amd64:VERSION
-# ---> k8s.gcr.io/hyperkube:VERSION (image with backwards-compatible naming)
+# ---> gcr.io/google_containers/hyperkube-amd64:VERSION
+# ---> gcr.io/google_containers/hyperkube:VERSION (image with backwards-compatible naming)
 
 $ make push VERSION={target_version} ARCH=arm
-# ---> k8s.gcr.io/hyperkube-arm:VERSION
+# ---> gcr.io/google_containers/hyperkube-arm:VERSION
 
 $ make push VERSION={target_version} ARCH=arm64
-# ---> k8s.gcr.io/hyperkube-arm64:VERSION
+# ---> gcr.io/google_containers/hyperkube-arm64:VERSION
 
 $ make push VERSION={target_version} ARCH=ppc64le
-# ---> k8s.gcr.io/hyperkube-ppc64le:VERSION
+# ---> gcr.io/google_containers/hyperkube-ppc64le:VERSION
 
 $ make push VERSION={target_version} ARCH=s390x
-# ---> k8s.gcr.io/hyperkube-s390x:VERSION
+# ---> gcr.io/google_containers/hyperkube-s390x:VERSION
 ```
 
 If you don't want to push the images, run `make` or `make build` instead

@@ -47,7 +47,7 @@ const (
 	// DefaultCertificatesDir defines default certificate directory
 	DefaultCertificatesDir = "/etc/kubernetes/pki"
 	// DefaultImageRepository defines default image registry
-	DefaultImageRepository = "k8s.gcr.io"
+	DefaultImageRepository = "gcr.io/google_containers"
 	// DefaultManifestsDir defines default manifests directory
 	DefaultManifestsDir = "/etc/kubernetes/manifests"
 

@@ -13,7 +13,7 @@ spec:
   terminationGracePeriodSeconds: 600
   hostNetwork: true
   containers:
-  - image: k8s.gcr.io/glbc:0.9.7
+  - image: gcr.io/google_containers/glbc:0.9.7
     livenessProbe:
       httpGet:
         path: /healthz

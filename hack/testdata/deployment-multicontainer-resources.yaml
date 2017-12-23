@@ -16,9 +16,9 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: k8s.gcr.io/nginx:test-cmd
+        image: gcr.io/google-containers/nginx:test-cmd
         ports:
         - containerPort: 80
       - name: perl
-        image: k8s.gcr.io/perl
+        image: gcr.io/google-containers/perl
       terminationGracePeriodSeconds: 0

@@ -160,7 +160,7 @@ if [ "${ETCD_API}" == "etcd2" ]; then
   echo "Starting etcd ${ETCD_VERSION} to restore data"
   image=$(docker run -d -v ${BACKUP_DIR}:/var/etcd/data \
     --net=host -p ${etcd_port}:${etcd_port} \
-    "k8s.gcr.io/etcd:${ETCD_VERSION}" /bin/sh -c \
+    "gcr.io/google_containers/etcd:${ETCD_VERSION}" /bin/sh -c \
     "/usr/local/bin/etcd --data-dir /var/etcd/data --force-new-cluster")
   if [ "$?" -ne "0" ]; then
     echo "Docker container didn't started correctly"
@@ -191,7 +191,7 @@ elif [ "${ETCD_API}" == "etcd3" ]; then
   # Run etcdctl snapshot restore command and wait until it is finished.
   # setting with --name in the etcd manifest file and then it seems to work.
   docker run -v ${BACKUP_DIR}:/var/tmp/backup --env ETCDCTL_API=3 \
-    "k8s.gcr.io/etcd:${ETCD_VERSION}" /bin/sh -c \
+    "gcr.io/google_containers/etcd:${ETCD_VERSION}" /bin/sh -c \
     "/usr/local/bin/etcdctl snapshot restore ${BACKUP_DIR}/${snapshot} --name ${NAME} --initial-cluster ${INITIAL_CLUSTER} --initial-advertise-peer-urls ${INITIAL_ADVERTISE_PEER_URLS}; mv /${NAME}.etcd/member /var/tmp/backup/"
   if [ "$?" -ne "0" ]; then
     echo "Docker container didn't started correctly"

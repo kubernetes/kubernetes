@@ -27,7 +27,7 @@ import (
 
 const (
 	// When these values are updated, also update test/e2e/framework/util.go
-	defaultPodSandboxImageName    = "k8s.gcr.io/pause"
+	defaultPodSandboxImageName    = "gcr.io/google_containers/pause"
 	defaultPodSandboxImageVersion = "3.0"
 	// From pkg/kubelet/rkt/rkt.go to avoid circular import
 	defaultRktAPIServiceEndpoint = "localhost:15441"

@@ -14,7 +14,7 @@
 
 all: build
 
-REGISTRY ?= k8s.gcr.io
+REGISTRY ?= gcr.io/google-containers
 IMAGE ?= debian-base
 BUILD_IMAGE ?= debian-build
 

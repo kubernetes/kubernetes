@@ -14,7 +14,7 @@
 
 .PHONY: all push push-legacy container clean orphan
 
-REGISTRY ?= k8s.gcr.io
+REGISTRY ?= gcr.io/google_containers
 IMAGE = $(REGISTRY)/pause-$(ARCH)
 LEGACY_AMD64_IMAGE = $(REGISTRY)/pause
 
@@ -27,7 +27,7 @@ ARCH ?= amd64
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
 CFLAGS = -Os -Wall -Werror -static -DVERSION=v$(TAG)-$(REV)
-KUBE_CROSS_IMAGE ?= k8s.gcr.io/kube-cross
+KUBE_CROSS_IMAGE ?= gcr.io/google_containers/kube-cross
 KUBE_CROSS_VERSION ?= $(shell cat ../build-image/cross/VERSION)
 
 BIN = pause
