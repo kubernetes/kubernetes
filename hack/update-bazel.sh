@@ -33,10 +33,7 @@ PATH="${GOBIN}:${PATH}"
 # Install tools we need, but only from vendor/...
 go install ./vendor/github.com/bazelbuild/bazel-gazelle/cmd/gazelle
 
-# The git commit sha1s here should match the values in $KUBE_ROOT/WORKSPACE.
-kube::util::go_install_from_commit \
-    github.com/kubernetes/repo-infra/kazel \
-    97099dccc8807e9159dc28f374a8f0602cab07e1
+go install ./vendor/github.com/kubernetes/repo-infra/kazel
 
 touch "${KUBE_ROOT}/vendor/BUILD"
 

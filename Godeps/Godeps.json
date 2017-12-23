@@ -8,6 +8,7 @@
 		"github.com/tools/godep",
 		"github.com/client9/misspell/cmd/misspell",
 		"github.com/bazelbuild/bazel-gazelle/cmd/gazelle",
+		"github.com/kubernetes/repo-infra/kazel",
 		"./..."
 	],
 	"Deps": [
@@ -2098,6 +2099,10 @@
 		{
 			"ImportPath": "github.com/kr/text",
 			"Rev": "6807e777504f54ad073ecef66747de158294b639"
+		},
+		{
+			"ImportPath": "github.com/kubernetes/repo-infra/kazel",
+			"Rev": "2a736b4fba317cf3038e3cbd06899b544b875fae"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/api",
