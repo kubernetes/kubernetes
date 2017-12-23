@@ -155,6 +155,8 @@ func (o *EditOptions) Validate() error {
 	return nil
 }
 
+// Run opens an editor via 'vi' for Linux or 'notepad' for Windows, and applies the changes when you
+// edit objects you can retrieve by the command line tool.
 func (o *EditOptions) Run() error {
 	edit := NewDefaultEditor(o.f.EditorEnvs())
 	// editFn is invoked for each edit session (once with a list for normal edit, once for each individual resource in a edit-on-create invocation)
@@ -440,6 +442,7 @@ func (o *EditOptions) annotationPatch(update *resource.Info) error {
 	return nil
 }
 
+// GetApplyPatch returns original content, a merge patch and a patch type.
 func GetApplyPatch(obj runtime.Object, codec runtime.Encoder) ([]byte, []byte, types.PatchType, error) {
 	beforeJSON, err := encodeToJson(codec, obj)
 	if err != nil {
