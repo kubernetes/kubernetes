@@ -238,10 +238,10 @@ func BenchmarkPopulationAllocation(b *testing.B) {
 func BenchmarkPopulationRetention(b *testing.B) {
 
 	// Run with:
-	// go test ./plugin/pkg/auth/authorizer/node -benchmem -bench . -run None -v -o node.test -timeout 300m
+	// go test ./pkg/auth/authorizer/node -benchmem -bench . -run None -v -o node.test -timeout 300m
 
 	// Evaluate retained memory with:
-	// go tool pprof --inuse_space node.test plugin/pkg/auth/authorizer/node/BenchmarkPopulationRetention.profile
+	// go tool pprof --inuse_space node.test pkg/auth/authorizer/node/BenchmarkPopulationRetention.profile
 	// list populate
 
 	opts := sampleDataOpts{

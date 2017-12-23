@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package factory can set up a scheduler. This code is here instead of
-// plugin/cmd/scheduler for both testability and reuse.
+// cmd/scheduler for both testability and reuse.
 package factory
 
 import (
@@ -565,7 +565,7 @@ func (c *configFactory) addPodToCache(obj interface{}) {
 	c.podQueue.AssignedPodAdded(pod)
 
 	// NOTE: Updating equivalence cache of addPodToCache has been
-	// handled optimistically in: plugin/pkg/scheduler/scheduler.go#assume()
+	// handled optimistically in: pkg/scheduler/scheduler.go#assume()
 }
 
 func (c *configFactory) updatePodInCache(oldObj, newObj interface{}) {

@@ -601,7 +601,7 @@ func TestZeroRequest(t *testing.T) {
 	const expectedPriority int = 25
 	for _, test := range tests {
 		// This should match the configuration in defaultPriorities() in
-		// plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go if you want
+		// pkg/scheduler/algorithmprovider/defaults/defaults.go if you want
 		// to test what's actually in production.
 		priorityConfigs := []algorithm.PriorityConfig{
 			{Map: algorithmpriorities.LeastRequestedPriorityMap, Weight: 1},

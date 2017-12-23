@@ -36,8 +36,8 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
+	"k8s.io/kubernetes/pkg/auth/authorizer/rbac/bootstrappolicy"
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
-	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
 // semanticRoles is a few enumerated roles for which the relationships are well established
