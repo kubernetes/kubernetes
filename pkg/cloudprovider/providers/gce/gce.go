@@ -211,9 +211,17 @@ func init() {
 		})
 }
 
-// Raw access to the underlying GCE service, probably should only be used for e2e tests
-func (g *GCECloud) GetComputeService() *compute.Service {
-	return g.service
+// Services is the set of all versions of the compute service.
+type Services struct {
+	// GA, Alpha, Beta versions of the compute API.
+	GA    *compute.Service
+	Alpha *computealpha.Service
+	Beta  *computebeta.Service
+}
+
+// ComputeServices returns access to the internal compute services.
+func (g *GCECloud) ComputeServices() *Services {
+	return &Services{g.service, g.serviceAlpha, g.serviceBeta}
 }
 
 // newGCECloud creates a new instance of GCECloud.
