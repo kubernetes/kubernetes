@@ -402,3 +402,8 @@ ROTATE_CERTIFICATES="${ROTATE_CERTIFICATES:-}"
 # The number of services that are allowed to sync concurrently. Will be passed
 # into kube-controller-manager via `--concurrent-service-syncs`
 CONCURRENT_SERVICE_SYNCS="${CONCURRENT_SERVICE_SYNCS:-}"
+
+# Flexvolume plugin directory
+VOLUME_PLUGIN_DIR="${VOLUME_PLUGIN_DIR:-/home/kubernetes/flexvolume}"
+# Indicates whether the plugin directory need to be made executable.
+REMOUNT_VOLUME_PLUGIN_DIR="${REMOUNT_VOLUME_PLUGIN_DIR:-true}"

@@ -763,10 +763,14 @@ EOF
 ROTATE_CERTIFICATES: $(yaml-quote ${ROTATE_CERTIFICATES})
 EOF
   fi
-  if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "gci" ]] ||
-     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
+  if [ -n "${VOLUME_PLUGIN_DIR:-}" ]; then
     cat >>$file <<EOF
-VOLUME_PLUGIN_DIR: $(yaml-quote ${VOLUME_PLUGIN_DIR:-/etc/srv/kubernetes/kubelet-plugins/volume/exec})
+VOLUME_PLUGIN_DIR: $(yaml-quote ${VOLUME_PLUGIN_DIR})
+EOF
+  fi
+  if [ -n "${REMOUNT_VOLUME_PLUGIN_DIR:-}" ]; then
+    cat >>$file <<EOF
+REMOUNT_VOLUME_PLUGIN_DIR: $(yaml-quote ${REMOUNT_VOLUME_PLUGIN_DIR})
 EOF
   fi
 
