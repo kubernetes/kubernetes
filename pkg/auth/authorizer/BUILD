@@ -22,6 +22,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/auth/authorizer/abac:all-srcs",
         "//pkg/auth/authorizer/node:all-srcs",
         "//pkg/auth/authorizer/rbac:all-srcs",
     ],
