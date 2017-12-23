@@ -36,12 +36,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -147,17 +149,29 @@ func checkErr(err error, handleErr func(string, int)) {
 		handleErr(MultilineError("Error in configuration: ", err), DefaultErrorExitCode)
 	default:
 		switch err := err.(type) {
-		case *meta.NoResourceMatchError:
+		case *NoResourceWithSuggestionError:
+			var msg string
+
 			switch {
 			case len(err.PartialResource.Group) > 0 && len(err.PartialResource.Version) > 0:
-				handleErr(fmt.Sprintf("the server doesn't have a resource type %q in group %q and version %q", err.PartialResource.Resource, err.PartialResource.Group, err.PartialResource.Version), DefaultErrorExitCode)
+				msg = fmt.Sprintf("the server doesn't have a resource type %q in group %q and version %q", err.PartialResource.Resource, err.PartialResource.Group, err.PartialResource.Version)
 			case len(err.PartialResource.Group) > 0:
-				handleErr(fmt.Sprintf("the server doesn't have a resource type %q in group %q", err.PartialResource.Resource, err.PartialResource.Group), DefaultErrorExitCode)
+				msg = fmt.Sprintf("the server doesn't have a resource type %q in group %q", err.PartialResource.Resource, err.PartialResource.Group)
 			case len(err.PartialResource.Version) > 0:
-				handleErr(fmt.Sprintf("the server doesn't have a resource type %q in version %q", err.PartialResource.Resource, err.PartialResource.Version), DefaultErrorExitCode)
+				msg = fmt.Sprintf("the server doesn't have a resource type %q in version %q", err.PartialResource.Resource, err.PartialResource.Version)
 			default:
-				handleErr(fmt.Sprintf("the server doesn't have a resource type %q", err.PartialResource.Resource), DefaultErrorExitCode)
+				msg = fmt.Sprintf("the server doesn't have a resource type %q", err.PartialResource.Resource)
 			}
+
+			if len(err.Suggestions) != 0 {
+				msg += "\n\nDid you mean this?\n\n"
+				for _, suggestion := range err.Suggestions {
+					msg += fmt.Sprintf("\t%s\n", suggestion)
+				}
+			}
+
+			handleErr(msg, DefaultErrorExitCode)
+
 		case utilerrors.Aggregate:
 			handleErr(MultipleErrors(``, err.Errors()), DefaultErrorExitCode)
 		case utilexec.ExitError:
@@ -833,4 +847,103 @@ func ShouldIncludeUninitialized(cmd *cobra.Command, includeUninitialized bool) b
 		shouldIncludeUninitialized = GetFlagBool(cmd, IncludeUninitializedFlag)
 	}
 	return shouldIncludeUninitialized
+}
+
+type resourceDiscover struct {
+	discoveryClient discovery.DiscoveryInterface
+}
+
+// getResources returns a set of tuples which holds short names for resources.
+// First the list of potential resources will be taken from the API server.
+// Next we will append the hardcoded list of resources - to be backward compatible with old servers.
+// NOTE that the list is ordered by group priority.
+func (d *resourceDiscover) getResources() ([]*metav1.APIResourceList, []kubectl.ResourceShortcuts, error) {
+	res := []kubectl.ResourceShortcuts{}
+	// get server resources
+	// This can return an error *and* the results it was able to find.  We don't need to fail on the error.
+	apiResList, err := d.discoveryClient.ServerResources()
+	if err != nil {
+		glog.V(1).Infof("Error loading discovery information: %v", err)
+	}
+
+	for _, apiResources := range apiResList {
+		gv, err := schema.ParseGroupVersion(apiResources.GroupVersion)
+		if err != nil {
+			glog.V(1).Infof("Unable to parse groupversion = %s due to = %s", apiResources.GroupVersion, err.Error())
+			continue
+		}
+		for _, apiRes := range apiResources.APIResources {
+			for _, shortName := range apiRes.ShortNames {
+				rs := kubectl.ResourceShortcuts{
+					ShortForm: schema.GroupResource{Group: gv.Group, Resource: shortName},
+					LongForm:  schema.GroupResource{Group: gv.Group, Resource: apiRes.Name},
+				}
+				res = append(res, rs)
+			}
+		}
+	}
+
+	// append hardcoded short forms at the end of the list
+	res = append(res, kubectl.ResourcesShortcutStatic...)
+
+	return apiResList, res, nil
+}
+
+func editDistance(s1, s2 string) int {
+	b1, b2 := []byte(s1), []byte(s2)
+	if len(b1) == 0 {
+		return len(b2)
+	}
+	if len(b2) == 0 {
+		return len(b1)
+	}
+
+	matrix := make([][]uint16, len(b1))
+	for i := 0; i < len(b1); i++ {
+		matrix[i] = make([]uint16, len(b2))
+	}
+
+	if b1[0] != b2[0] {
+		matrix[0][0] = 1
+	}
+
+	for i := 1; i < len(b1); i++ {
+		matrix[i][0] = matrix[i-1][0] + 1
+		if b1[i] == b2[0] {
+			matrix[i][0]--
+		}
+	}
+	for i := 1; i < len(b2); i++ {
+		matrix[0][i] = matrix[0][i-1] + 1
+		if b1[0] == b2[i] {
+			matrix[0][i]--
+		}
+	}
+
+	for i := 1; i < len(b1); i++ {
+		for j := 1; j < len(b2); j++ {
+			if b1[i] == b2[j] {
+				matrix[i][j] = matrix[i-1][j-1]
+			} else {
+				matrix[i][j] = min(matrix[i-1][j], matrix[i][j-1], matrix[i-1][j-1]) + 1
+			}
+		}
+	}
+
+	return int(matrix[len(b1)-1][len(b2)-1])
+}
+
+func min(num ...uint16) uint16 {
+	if len(num) == 0 {
+		return 0
+	}
+
+	min := num[0]
+	for _, n := range num[1:] {
+		if n < min {
+			min = n
+		}
+	}
+
+	return min
 }

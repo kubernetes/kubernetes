@@ -100,8 +100,14 @@ func (f *ring1Factory) objectLoader() (meta.RESTMapper, runtime.ObjectTyper, err
 	mapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.VersionInterfacesFunc(interfaces))
 	// TODO: should this also indicate it recognizes typed objects?
 	typer := discovery.NewUnstructuredObjectTyper(groupResources, legacyscheme.Scheme)
+
 	expander := NewShortcutExpander(mapper, discoveryClient)
-	return expander, typer, err
+	suggestionMapper := &suggestionRESTMapper{
+		resourceDiscover: expander.resourceDiscover,
+		delegate:         expander,
+	}
+
+	return suggestionMapper, typer, err
 }
 
 func (f *ring1Factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {

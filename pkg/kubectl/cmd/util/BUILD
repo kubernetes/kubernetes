@@ -16,6 +16,7 @@ go_library(
         "helpers.go",
         "printing.go",
         "shortcut_restmapper.go",
+        "suggestion_restmapper.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util",
     visibility = [
@@ -94,6 +95,7 @@ go_test(
         "factory_test.go",
         "helpers_test.go",
         "shortcut_restmapper_test.go",
+        "suggestion_restmapper_test.go",
     ],
     data = [
         "//api/swagger-spec",
