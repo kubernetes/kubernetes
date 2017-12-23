@@ -32,8 +32,8 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["helpers_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/api/resource",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",

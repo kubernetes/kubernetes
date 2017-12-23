@@ -13,8 +13,8 @@ go_test(
         "range_allocator_test.go",
         "timeout_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/controller/node/ipam",
-    library = ":go_default_library",
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/controller/node/ipam/cidrset:go_default_library",

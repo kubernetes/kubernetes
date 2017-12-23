@@ -18,10 +18,39 @@ go_library(
         "plugins.go",
         "util.go",
         "volume.go",
-        "volume_unsupported.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "volume_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "volume_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "volume_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "volume_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
             "volume_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "volume_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "volume_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "volume_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "volume_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "volume_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "volume_unsupported.go",
         ],
         "//conditions:default": [],
     }),
@@ -53,8 +82,8 @@ go_test(
         "plugins_test.go",
         "util_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/volume",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/util/slice:go_default_library",
@@ -73,7 +102,7 @@ go_test(
     srcs = [
         "metrics_statfs_test.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "metrics_du_test.go",
         ],
         "//conditions:default": [],
@@ -84,7 +113,7 @@ go_test(
         "//pkg/volume/testing:go_default_library",
         "//vendor/k8s.io/client-go/util/testing:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "//conditions:default": [],

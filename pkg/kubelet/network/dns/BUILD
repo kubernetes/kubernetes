@@ -21,8 +21,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["dns_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/network/dns",
-    library = ":go_default_library",
     deps = [
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

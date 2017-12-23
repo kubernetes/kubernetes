@@ -3,8 +3,6 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "bolt_unix.go",
-        "boltsync_unix.go",
         "bucket.go",
         "cursor.go",
         "db.go",
@@ -15,21 +13,78 @@ go_library(
         "page.go",
         "tx.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
-            "bolt_amd64.go",
+        "@io_bazel_rules_go//go/platform:android": [
+            "bolt_unix.go",
+            "boltsync_unix.go",
         ],
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "bolt_amd64.go",
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "bolt_unix.go",
+            "boltsync_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "bolt_unix.go",
+            "boltsync_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "bolt_unix.go",
+            "boltsync_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
             "bolt_linux.go",
+            "bolt_unix.go",
         ],
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
-            "bolt_amd64.go",
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "bolt_unix.go",
+            "boltsync_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "bolt_unix.go",
+            "boltsync_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "bolt_openbsd.go",
+            "bolt_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "bolt_unix_solaris.go",
+            "boltsync_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
             "bolt_windows.go",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "@io_bazel_rules_go//go/platform:386": [
+            "bolt_386.go",
+        ],
+        "@io_bazel_rules_go//go/platform:amd64": [
+            "bolt_amd64.go",
+        ],
+        "@io_bazel_rules_go//go/platform:arm": [
+            "bolt_arm.go",
+        ],
+        "@io_bazel_rules_go//go/platform:arm64": [
+            "bolt_arm64.go",
+        ],
+        "@io_bazel_rules_go//go/platform:ppc64": [
+            "bolt_ppc64.go",
+        ],
+        "@io_bazel_rules_go//go/platform:ppc64le": [
+            "bolt_ppc64le.go",
+        ],
+        "@io_bazel_rules_go//go/platform:s390x": [
+            "bolt_s390x.go",
         ],
         "//conditions:default": [],
     }),
     importpath = "github.com/boltdb/bolt",
     visibility = ["//visibility:public"],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

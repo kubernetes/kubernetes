@@ -58,8 +58,8 @@ go_test(
         "dryrunclient_test.go",
         "init_dryrun_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient",
-    library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/rbac/v1:go_default_library",

@@ -48,8 +48,8 @@ go_test(
 go_test(
     name = "go_default_test",
     srcs = ["until_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apimachinery/pkg/watch",
-    library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",

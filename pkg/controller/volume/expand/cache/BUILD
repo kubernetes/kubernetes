@@ -39,8 +39,8 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["volume_resize_map_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/controller/volume/expand/cache",
-    library = ":go_default_library",
     deps = [
         "//pkg/volume/util/types:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

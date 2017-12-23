@@ -5,7 +5,7 @@ go_library(
     srcs = [
         "metrics.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:windows": [
             "proxier.go",
         ],
         "//conditions:default": [],
@@ -15,7 +15,7 @@ go_library(
     deps = [
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/api/service:go_default_library",
             "//pkg/apis/core:go_default_library",
             "//pkg/apis/core/helper:go_default_library",

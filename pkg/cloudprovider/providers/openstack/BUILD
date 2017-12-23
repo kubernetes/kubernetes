@@ -72,8 +72,8 @@ go_test(
         "openstack_routes_test.go",
         "openstack_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/openstack",
-    library = ":go_default_library",
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud:go_default_library",

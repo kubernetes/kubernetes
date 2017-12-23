@@ -3,10 +3,21 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "nl_unspecified.go",
         "syscall.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "nl_unspecified.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "nl_unspecified.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "nl_unspecified.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "nl_unspecified.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
             "addr_linux.go",
             "bridge_linux.go",
             "conntrack_linux.go",
@@ -22,12 +33,30 @@ go_library(
             "xfrm_policy_linux.go",
             "xfrm_state_linux.go",
         ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "nl_unspecified.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "nl_unspecified.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "nl_unspecified.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "nl_unspecified.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "nl_unspecified.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "nl_unspecified.go",
+        ],
         "//conditions:default": [],
     }),
     importpath = "github.com/vishvananda/netlink/nl",
     visibility = ["//visibility:public"],
     deps = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/vishvananda/netns:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],

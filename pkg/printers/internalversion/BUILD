@@ -13,8 +13,8 @@ go_test(
         "printers_test.go",
         "sorted_resource_name_list_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/printers/internalversion",
-    library = ":go_default_library",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",

@@ -10,20 +10,68 @@ go_library(
     name = "go_default_library",
     srcs = [
         "kubenet.go",
-        "kubenet_unsupported.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "kubenet_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "kubenet_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "kubenet_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "kubenet_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
             "kubenet_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "kubenet_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "kubenet_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "kubenet_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "kubenet_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "kubenet_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "kubenet_unsupported.go",
         ],
         "//conditions:default": [],
     }),
     importpath = "k8s.io/kubernetes/pkg/kubelet/network/kubenet",
-    deps = [
-        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
-        "//pkg/kubelet/container:go_default_library",
-        "//pkg/kubelet/network:go_default_library",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+    deps = select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+            "//pkg/kubelet/container:go_default_library",
+            "//pkg/kubelet/network:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+            "//pkg/kubelet/container:go_default_library",
+            "//pkg/kubelet/network:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+            "//pkg/kubelet/container:go_default_library",
+            "//pkg/kubelet/network:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+            "//pkg/kubelet/container:go_default_library",
+            "//pkg/kubelet/network:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+            "//pkg/kubelet/container:go_default_library",
+            "//pkg/kubelet/network:go_default_library",
             "//pkg/kubelet/network/hostport:go_default_library",
             "//pkg/util/bandwidth:go_default_library",
             "//pkg/util/dbus:go_default_library",
@@ -42,6 +90,36 @@ go_library(
             "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
             "//vendor/k8s.io/utils/exec:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+            "//pkg/kubelet/container:go_default_library",
+            "//pkg/kubelet/network:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+            "//pkg/kubelet/container:go_default_library",
+            "//pkg/kubelet/network:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+            "//pkg/kubelet/container:go_default_library",
+            "//pkg/kubelet/network:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+            "//pkg/kubelet/container:go_default_library",
+            "//pkg/kubelet/network:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+            "//pkg/kubelet/container:go_default_library",
+            "//pkg/kubelet/network:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+            "//pkg/kubelet/container:go_default_library",
+            "//pkg/kubelet/network:go_default_library",
+        ],
         "//conditions:default": [],
     }),
 )
@@ -49,15 +127,15 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "kubenet_linux_test.go",
         ],
         "//conditions:default": [],
     }),
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/network/kubenet",
-    library = ":go_default_library",
     deps = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/kubelet/apis/kubeletconfig:go_default_library",
             "//pkg/kubelet/container:go_default_library",
             "//pkg/kubelet/network:go_default_library",

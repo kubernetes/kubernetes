@@ -98,8 +98,8 @@ go_test(
         "gce_util_test.go",
         "metrics_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/gce",
-    library = ":go_default_library",
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/kubelet/apis:go_default_library",

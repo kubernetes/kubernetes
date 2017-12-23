@@ -72,8 +72,8 @@ go_test(
         "serving_test.go",
     ],
     data = glob(["testdata/**"]),
+    embed = [":go_default_library"],
     importpath = "k8s.io/apiserver/pkg/server/options",
-    library = ":go_default_library",
     deps = [
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

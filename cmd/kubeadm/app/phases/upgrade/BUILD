@@ -75,8 +75,8 @@ go_test(
         "prepull_test.go",
         "staticpods_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade",
-    library = ":go_default_library",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",

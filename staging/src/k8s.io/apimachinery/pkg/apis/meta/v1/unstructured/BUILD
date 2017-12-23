@@ -12,8 +12,8 @@ go_test(
         "helpers_test.go",
         "unstructured_list_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
-    library = ":go_default_library",
     deps = [
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",

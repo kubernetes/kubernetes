@@ -27,8 +27,8 @@ go_test(
         "accessors_test.go",
         "util_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/securitycontext",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

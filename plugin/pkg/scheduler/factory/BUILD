@@ -62,8 +62,8 @@ go_test(
         "factory_test.go",
         "plugins_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/factory",
-    library = ":go_default_library",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testing:go_default_library",

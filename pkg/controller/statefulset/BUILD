@@ -54,8 +54,8 @@ go_test(
         "stateful_set_test.go",
         "stateful_set_utils_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/controller/statefulset",
-    library = ":go_default_library",
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/apps/install:go_default_library",

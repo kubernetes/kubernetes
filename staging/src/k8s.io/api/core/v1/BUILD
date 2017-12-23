@@ -12,8 +12,8 @@ go_test(
         "taint_test.go",
         "toleration_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/api/core/v1",
-    library = ":go_default_library",
 )
 
 go_library(

@@ -46,8 +46,8 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["daemonset_expansion_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",

@@ -16,8 +16,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["chaosclient_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/client/chaosclient",
-    library = ":go_default_library",
 )
 
 filegroup(

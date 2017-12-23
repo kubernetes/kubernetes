@@ -28,8 +28,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["helpers_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/apis/componentconfig",
-    library = ":go_default_library",
     deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
 )
 

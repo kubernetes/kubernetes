@@ -35,8 +35,8 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["validation_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/validation",
-    library = ":go_default_library",
     deps = [
         "//pkg/proxy/apis/kubeproxyconfig:go_default_library",
         "//pkg/util/pointer:go_default_library",

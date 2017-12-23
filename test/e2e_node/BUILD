@@ -19,7 +19,7 @@ go_library(
         "simple_mount.go",
         "util.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "benchmark_util.go",
             "node_problem_detector_linux.go",
             "resource_collector.go",
@@ -58,7 +58,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/api/v1/node:go_default_library",
             "//pkg/util/procfs:go_default_library",
             "//test/e2e/perftype:go_default_library",
@@ -103,7 +103,7 @@ go_test(
         "summary_test.go",
         "volume_manager_test.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "container_manager_test.go",
             "density_test.go",
             "node_container_manager_test.go",
@@ -112,8 +112,8 @@ go_test(
         ],
         "//conditions:default": [],
     }),
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/test/e2e_node",
-    library = ":go_default_library",
     tags = ["e2e"],
     deps = [
         "//pkg/api/v1/node:go_default_library",
@@ -164,7 +164,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//test/e2e/framework/metrics:go_default_library",
             "//test/utils:go_default_library",
             "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",

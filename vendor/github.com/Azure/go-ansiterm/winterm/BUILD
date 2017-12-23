@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:windows": [
             "ansi.go",
             "api.go",
             "attr_translation.go",
@@ -18,7 +18,7 @@ go_library(
     importpath = "github.com/Azure/go-ansiterm/winterm",
     visibility = ["//visibility:public"],
     deps = select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:windows": [
             "//vendor/github.com/Azure/go-ansiterm:go_default_library",
             "//vendor/github.com/sirupsen/logrus:go_default_library",
         ],

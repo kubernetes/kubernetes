@@ -20,8 +20,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["results_manager_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/prober/results",
-    library = ":go_default_library",
     deps = [
         "//pkg/kubelet/container:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

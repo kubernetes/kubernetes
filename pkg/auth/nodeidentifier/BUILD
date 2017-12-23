@@ -19,8 +19,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["default_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/auth/nodeidentifier",
-    library = ":go_default_library",
     deps = ["//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
 )
 
