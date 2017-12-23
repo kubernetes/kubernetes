@@ -65,8 +65,8 @@ go_test(
         "azure_util_test.go",
         "azure_wrap_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/azure",
-    library = ":go_default_library",
     deps = [
         "//pkg/api/v1/service:go_default_library",
         "//pkg/kubelet/apis:go_default_library",

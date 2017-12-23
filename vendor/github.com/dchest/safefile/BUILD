@@ -3,10 +3,40 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "rename.go",
         "safefile.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "rename.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "rename.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "rename.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "rename.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "rename.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "rename.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "rename.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "rename.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "rename_nonatomic.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "rename.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "rename.go",
             "rename_nonatomic.go",
         ],
         "//conditions:default": [],

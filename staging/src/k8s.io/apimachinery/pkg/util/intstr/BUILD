@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["intstr_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apimachinery/pkg/util/intstr",
-    library = ":go_default_library",
     deps = ["//vendor/github.com/ghodss/yaml:go_default_library"],
 )
 

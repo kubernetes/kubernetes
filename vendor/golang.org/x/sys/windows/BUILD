@@ -5,8 +5,7 @@ go_library(
     srcs = [
         "mksyscall.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
-            "asm_windows_amd64.s",
+        "@io_bazel_rules_go//go/platform:windows": [
             "dll_windows.go",
             "env_unset.go",
             "env_windows.go",
@@ -20,8 +19,17 @@ go_library(
             "syscall.go",
             "syscall_windows.go",
             "types_windows.go",
-            "types_windows_amd64.go",
             "zsyscall_windows.go",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "@io_bazel_rules_go//go/platform:windows_386": [
+            "asm_windows_386.s",
+            "types_windows_386.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "asm_windows_amd64.s",
+            "types_windows_amd64.go",
         ],
         "//conditions:default": [],
     }),

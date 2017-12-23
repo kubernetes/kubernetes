@@ -32,7 +32,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["fake_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/proxy/ipvs/testing",
-    library = ":go_default_library",
     deps = ["//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library"],
 )

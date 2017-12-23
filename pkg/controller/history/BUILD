@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["controller_history_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/controller/history",
-    library = ":go_default_library",
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/controller:go_default_library",

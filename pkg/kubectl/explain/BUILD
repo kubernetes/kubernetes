@@ -47,8 +47,8 @@ go_test(
         "typename_test.go",
     ],
     data = ["test-swagger.json"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubectl/explain",
-    library = ":go_default_library",
     deps = [
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",

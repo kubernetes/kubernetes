@@ -48,8 +48,8 @@ go_test(
         "node_controller_test.go",
         "pvlcontroller_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/controller/cloud",
-    library = ":go_default_library",
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/fake:go_default_library",

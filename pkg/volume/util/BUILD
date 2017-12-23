@@ -11,23 +11,67 @@ go_library(
     srcs = [
         "atomic_writer.go",
         "device_util.go",
-        "device_util_unsupported.go",
         "doc.go",
         "error.go",
         "finalizer.go",
-        "fs_unsupported.go",
         "io_util.go",
         "metrics.go",
         "util.go",
-        "util_unsupported.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
-            "fs.go",
+        "@io_bazel_rules_go//go/platform:android": [
+            "device_util_unsupported.go",
+            "fs_unsupported.go",
+            "util_unsupported.go",
         ],
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "device_util_unsupported.go",
+            "fs.go",
+            "util_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "device_util_unsupported.go",
+            "fs_unsupported.go",
+            "util_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "device_util_unsupported.go",
+            "fs_unsupported.go",
+            "util_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
             "device_util_linux.go",
             "fs.go",
             "util_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "device_util_unsupported.go",
+            "fs_unsupported.go",
+            "util_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "device_util_unsupported.go",
+            "fs_unsupported.go",
+            "util_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "device_util_unsupported.go",
+            "fs_unsupported.go",
+            "util_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "device_util_unsupported.go",
+            "fs_unsupported.go",
+            "util_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "device_util_unsupported.go",
+            "fs_unsupported.go",
+            "util_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "device_util_unsupported.go",
+            "fs_unsupported.go",
+            "util_unsupported.go",
         ],
         "//conditions:default": [],
     }),
@@ -41,7 +85,6 @@ go_library(
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/storage/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -49,11 +92,40 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
-            "//vendor/golang.org/x/sys/unix:go_default_library",
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:darwin": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
         "//conditions:default": [],
     }),
@@ -64,14 +136,14 @@ go_test(
     srcs = [
         "util_test.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "atomic_writer_test.go",
             "device_util_linux_test.go",
         ],
         "//conditions:default": [],
     }),
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/volume/util",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/core/install:go_default_library",
         "//pkg/apis/core/v1/helper:go_default_library",
@@ -79,7 +151,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/k8s.io/client-go/util/testing:go_default_library",
         ],
         "//conditions:default": [],
