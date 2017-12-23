@@ -7,6 +7,7 @@
 		"github.com/jteeuwen/go-bindata/go-bindata",
 		"github.com/tools/godep",
 		"github.com/client9/misspell/cmd/misspell",
+		"github.com/bazelbuild/bazel-gazelle/cmd/gazelle",
 		"./..."
 	],
 	"Deps": [
@@ -329,6 +330,71 @@
 			"ImportPath": "github.com/aws/aws-sdk-go/service/sts",
 			"Comment": "v1.12.7",
 			"Rev": "760741802ad40f49ae9fc4a69ef6706d2527d62e"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/bazel-gazelle/cmd/gazelle",
+			"Comment": "0.10.1",
+			"Rev": "ff4d67f395b3f4d1dc9810eeceb61585fea252cb"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/config",
+			"Comment": "0.10.1",
+			"Rev": "ff4d67f395b3f4d1dc9810eeceb61585fea252cb"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/label",
+			"Comment": "0.10.1",
+			"Rev": "ff4d67f395b3f4d1dc9810eeceb61585fea252cb"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/merger",
+			"Comment": "0.10.1",
+			"Rev": "ff4d67f395b3f4d1dc9810eeceb61585fea252cb"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/packages",
+			"Comment": "0.10.1",
+			"Rev": "ff4d67f395b3f4d1dc9810eeceb61585fea252cb"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/pathtools",
+			"Comment": "0.10.1",
+			"Rev": "ff4d67f395b3f4d1dc9810eeceb61585fea252cb"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/repos",
+			"Comment": "0.10.1",
+			"Rev": "ff4d67f395b3f4d1dc9810eeceb61585fea252cb"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/resolve",
+			"Comment": "0.10.1",
+			"Rev": "ff4d67f395b3f4d1dc9810eeceb61585fea252cb"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/rules",
+			"Comment": "0.10.1",
+			"Rev": "ff4d67f395b3f4d1dc9810eeceb61585fea252cb"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/version",
+			"Comment": "0.10.1",
+			"Rev": "ff4d67f395b3f4d1dc9810eeceb61585fea252cb"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/wspace",
+			"Comment": "0.10.1",
+			"Rev": "ff4d67f395b3f4d1dc9810eeceb61585fea252cb"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/buildtools/build",
+			"Comment": "0.6.0-60-g1a9c38e",
+			"Rev": "1a9c38e0df9397d033a1ca535596de5a7c1cf18f"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/buildtools/tables",
+			"Comment": "0.6.0-60-g1a9c38e",
+			"Rev": "1a9c38e0df9397d033a1ca535596de5a7c1cf18f"
 		},
 		{
 			"ImportPath": "github.com/beorn7/perks/quantile",
@@ -2448,14 +2514,9 @@
 			"Rev": "ca53cad383cad2479bbba7f7a1a05797ec1386e4"
 		},
 		{
-			"ImportPath": "github.com/pelletier/go-buffruneio",
-			"Comment": "v0.1.0",
-			"Rev": "df1e16fde7fc330a0ca68167c23bf7ed6ac31d6d"
-		},
-		{
 			"ImportPath": "github.com/pelletier/go-toml",
-			"Comment": "v0.3.5-10-g0049ab3",
-			"Rev": "0049ab3dc4c4c70a9eee23087437b69c0dde2130"
+			"Comment": "v1.0.1",
+			"Rev": "16398bac157da96aa88f98a2df640c7f32af1da2"
 		},
 		{
 			"ImportPath": "github.com/peterbourgon/diskv",

@@ -135,5 +135,6 @@ func isDigit(r rune) bool {
 
 func isHexDigit(r rune) bool {
 	return isDigit(r) ||
-		r == 'A' || r == 'B' || r == 'C' || r == 'D' || r == 'E' || r == 'F'
+		(r >= 'a' && r <= 'f') ||
+		(r >= 'A' && r <= 'F')
 }
