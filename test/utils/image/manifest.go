@@ -69,7 +69,7 @@ var (
 	JessieDnsutils           = ImageConfig{e2eRegistry, "jessie-dnsutils", "1.0", true}
 	Kitten                   = ImageConfig{e2eRegistry, "kitten", "1.0", true}
 	Liveness                 = ImageConfig{e2eRegistry, "liveness", "1.0", true}
-	LogsGenerator            = ImageConfig{gcRegistry, "logs-generator", "v0.1.0", false}
+	LogsGenerator            = ImageConfig{e2eRegistry, "logs-generator", "1.0", true}
 	Mounttest                = ImageConfig{e2eRegistry, "mounttest", "1.0", true}
 	MounttestUser            = ImageConfig{e2eRegistry, "mounttest-user", "1.0", true}
 	Nautilus                 = ImageConfig{e2eRegistry, "nautilus", "1.0", true}
@@ -83,7 +83,7 @@ var (
 	NoSnatTestProxy          = ImageConfig{e2eRegistry, "no-snat-test-proxy", "1.0", true}
 	NWayHTTP                 = ImageConfig{e2eRegistry, "n-way-http", "1.0", true}
 	// When these values are updated, also update cmd/kubelet/app/options/options.go
-	Pause               = ImageConfig{gcRegistry, "pause", "3.0", false}
+	Pause               = ImageConfig{gcRegistry, "pause", "3.0", true}
 	Porter              = ImageConfig{e2eRegistry, "porter", "1.0", true}
 	PortForwardTester   = ImageConfig{e2eRegistry, "port-forward-tester", "1.0", true}
 	Redis               = ImageConfig{e2eRegistry, "redis", "1.0", true}
