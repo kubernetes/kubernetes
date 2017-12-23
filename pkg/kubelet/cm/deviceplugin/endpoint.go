@@ -164,7 +164,11 @@ func (e *endpointImpl) run() {
 		}
 
 		e.mutex.Lock()
-		e.devices = devices
+		// NOTE: Return a copy of 'devices' instead of returning a direct reference to local 'devices'
+		e.devices = make(map[string]pluginapi.Device)
+		for _, d := range devices {
+			e.devices[d.ID] = d
+		}
 		e.mutex.Unlock()
 
 		e.callback(e.resourceName, added, updated, deleted)
