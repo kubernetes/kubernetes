@@ -49,11 +49,11 @@ func TestCanSupport(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/git-repo")
+	plug, err := plugMgr.FindPluginByName(gitRepoPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if plug.GetPluginName() != "kubernetes.io/git-repo" {
+	if plug.GetPluginName() != gitRepoPluginName {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
 	if !plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{GitRepo: &v1.GitRepoVolumeSource{}}}}) {
@@ -227,7 +227,7 @@ func doTestPlugin(scenario struct {
 	defer os.RemoveAll(rootDir)
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/git-repo")
+	plug, err := plugMgr.FindPluginByName(gitRepoPluginName)
 	if err != nil {
 		allErrs = append(allErrs,
 			fmt.Errorf("Can't find the plugin by name"))

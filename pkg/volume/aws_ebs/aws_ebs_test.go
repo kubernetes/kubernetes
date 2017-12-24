@@ -42,11 +42,11 @@ func TestCanSupport(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/aws-ebs")
+	plug, err := plugMgr.FindPluginByName(awsElasticBlockStorePluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if plug.GetPluginName() != "kubernetes.io/aws-ebs" {
+	if plug.GetPluginName() != awsElasticBlockStorePluginName {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
 	if !plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{}}}}) {
@@ -66,7 +66,7 @@ func TestGetAccessModes(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/aws-ebs")
+	plug, err := plugMgr.FindPersistentPluginByName(awsElasticBlockStorePluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -106,7 +106,7 @@ func TestPlugin(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/aws-ebs")
+	plug, err := plugMgr.FindPluginByName(awsElasticBlockStorePluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -270,7 +270,7 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/aws-ebs")
+	plug, err := plugMgr.FindPluginByName(awsElasticBlockStorePluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}

@@ -37,11 +37,11 @@ func TestCanSupport(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/cephfs")
+	plug, err := plugMgr.FindPluginByName(cephfsPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if plug.GetPluginName() != "kubernetes.io/cephfs" {
+	if plug.GetPluginName() != cephfsPluginName {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
 	if plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{}}}) {
@@ -60,7 +60,7 @@ func TestPlugin(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/cephfs")
+	plug, err := plugMgr.FindPluginByName(cephfsPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -123,7 +123,7 @@ func TestConstructVolumeSpec(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/cephfs")
+	plug, err := plugMgr.FindPluginByName(cephfsPluginName)
 	if err != nil {
 		t.Errorf("can't find cephfs plugin by name")
 	}

@@ -45,11 +45,11 @@ func TestCanSupport(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/azure-file")
+	plug, err := plugMgr.FindPluginByName(azureFilePluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if plug.GetPluginName() != "kubernetes.io/azure-file" {
+	if plug.GetPluginName() != azureFilePluginName {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
 	if !plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{AzureFile: &v1.AzureFileVolumeSource{}}}}) {
@@ -69,7 +69,7 @@ func TestGetAccessModes(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/azure-file")
+	plug, err := plugMgr.FindPersistentPluginByName(azureFilePluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -126,7 +126,7 @@ func testPlugin(t *testing.T, tmpDir string, volumeHost volume.VolumeHost) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumeHost)
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/azure-file")
+	plug, err := plugMgr.FindPluginByName(azureFilePluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -255,7 +255,7 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/azure-file")
+	plug, err := plugMgr.FindPluginByName(azureFilePluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
