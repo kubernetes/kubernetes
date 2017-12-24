@@ -1,0 +1,32 @@
+apiVersion: extensions/v1beta2
+kind: Deployment
+metadata:
+  name: registry
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: registry
+    spec:
+      containers:
+      - name: registry
+        image: registry
+        resources:
+          limits:
+            cpu: 100m
+            memory: 100Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        ports:
+        - containerPort: 5000
+          name: registry
+          protocol: TCP
+        volumeMounts:
+        - name: image-store
+          mountPath: /var/lib/registry
+      volumes:
+      - name: image-store
+        persistentVolumeClaim:
+          claimName: kube-registry-pvc
