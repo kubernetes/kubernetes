@@ -31,12 +31,10 @@ other situations:
 
 <!-- BEGIN MUNGE: EXAMPLE registry-pv.yaml.in -->
 ```yaml
-kind: PersistentVolume
 apiVersion: v1
+kind: PersistentVolume
 metadata:
-  name: kube-system-kube-registry-pv
-  labels:
-    kubernetes.io/cluster-service: "true"
+  name: kube-registry
 spec:
 {% if pillar.get('cluster_registry_disk_type', '') == 'gce' %}
   capacity:
@@ -46,6 +44,16 @@ spec:
   gcePersistentDisk:
     pdName: "{{ pillar['cluster_registry_disk_name'] }}"
     fsType: "ext4"
+{% endif %}
+{% if pillar.get('cluster_registry_disk_type', '') == 'nfs' %}
+  capacity:
+    storage: {{ pillar['cluster_registry_disk_size'] }}
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Recycle
+  nfs:
+    path: "{{ pillar['cluster_registry_path'] }}"
+    server: "{{ pillar['cluster_registry_disk_ip'] }}"
 {% endif %}
 ```
 <!-- END MUNGE: EXAMPLE registry-pv.yaml.in -->
@@ -75,10 +83,7 @@ with the `salt` template:
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: kube-registry-pvc
-  namespace: kube-system
-  labels:
-    kubernetes.io/cluster-service: "true"
+  name: kube-registry
 spec:
   accessModes:
     - ReadWriteOnce
@@ -97,54 +102,42 @@ gives you the right to use this storage until you release the claim.
 
 Now we can run a Docker registry:
 
-<!-- BEGIN MUNGE: EXAMPLE registry-rc.yaml -->
+<!-- BEGIN MUNGE: EXAMPLE registry.yaml -->
 ```yaml
-apiVersion: v1
-kind: ReplicationController
+apiVersion: extensions/v1beta2
+kind: Deployment
 metadata:
-  name: kube-registry-v0
-  namespace: kube-system
-  labels:
-    k8s-app: kube-registry-upstream
-    version: v0
-    kubernetes.io/cluster-service: "true"
+  name: registry
 spec:
   replicas: 1
-  selector:
-    k8s-app: kube-registry-upstream
-    version: v0
   template:
     metadata:
       labels:
-        k8s-app: kube-registry-upstream
-        version: v0
-        kubernetes.io/cluster-service: "true"
+        app: registry
     spec:
       containers:
       - name: registry
-        image: registry:2
+        image: registry
         resources:
           limits:
             cpu: 100m
             memory: 100Mi
-        env:
-        - name: REGISTRY_HTTP_ADDR
-          value: :5000
-        - name: REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY
-          value: /var/lib/registry
-        volumeMounts:
-        - name: image-store
-          mountPath: /var/lib/registry
+          requests:
+            cpu: 100m
+            memory: 100Mi
         ports:
         - containerPort: 5000
           name: registry
           protocol: TCP
+        volumeMounts:
+        - name: image-store
+          mountPath: /var/lib/registry
       volumes:
       - name: image-store
         persistentVolumeClaim:
           claimName: kube-registry-pvc
 ```
-<!-- END MUNGE: EXAMPLE registry-rc.yaml -->
+<!-- END MUNGE: EXAMPLE registry.yaml -->
 
 ## Expose the registry in the cluster
 
@@ -152,22 +145,19 @@ Now that we have a registry `Pod` running, we can expose it as a Service:
 
 <!-- BEGIN MUNGE: EXAMPLE registry-svc.yaml -->
 ```yaml
-apiVersion: v1
 kind: Service
+apiVersion: v1
 metadata:
-  name: kube-registry
-  namespace: kube-system
-  labels:
-    k8s-app: kube-registry-upstream
-    kubernetes.io/cluster-service: "true"
-    kubernetes.io/name: "KubeRegistry"
+  name: registry
 spec:
   selector:
-    k8s-app: kube-registry-upstream
+    app: registry
   ports:
-  - name: registry
-    port: 5000
-    protocol: TCP
+    - protocol: TCP
+      port: 5000
+      name: registry
+  type: LoadBalancer
+
 ```
 <!-- END MUNGE: EXAMPLE registry-svc.yaml -->
 
