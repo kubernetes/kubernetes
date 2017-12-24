@@ -8,8 +8,8 @@ load(
 
 go_binary(
     name = "no-snat-test-proxy",
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/test/images/no-snat-test-proxy",
-    library = ":go_default_library",
 )
 
 go_library(

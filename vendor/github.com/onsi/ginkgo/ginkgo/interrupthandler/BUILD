@@ -5,13 +5,28 @@ go_library(
     srcs = [
         "interrupt_handler.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+        "@io_bazel_rules_go//go/platform:darwin": [
             "sigquit_swallower_unix.go",
         ],
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:dragonfly": [
             "sigquit_swallower_unix.go",
         ],
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "sigquit_swallower_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "sigquit_swallower_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "sigquit_swallower_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "sigquit_swallower_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "sigquit_swallower_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
             "sigquit_swallower_windows.go",
         ],
         "//conditions:default": [],

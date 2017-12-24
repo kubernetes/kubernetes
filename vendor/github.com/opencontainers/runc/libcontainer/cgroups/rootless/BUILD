@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "rootless.go",
         ],
         "//conditions:default": [],
@@ -11,7 +11,7 @@ go_library(
     importpath = "github.com/opencontainers/runc/libcontainer/cgroups/rootless",
     visibility = ["//visibility:public"],
     deps = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",

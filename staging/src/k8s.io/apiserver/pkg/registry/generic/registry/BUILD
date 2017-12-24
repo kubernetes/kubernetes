@@ -12,8 +12,8 @@ go_test(
         "decorated_watcher_test.go",
         "store_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apiserver/pkg/registry/generic/registry",
-    library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

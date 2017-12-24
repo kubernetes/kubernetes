@@ -1,15 +1,15 @@
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "441e560e947d8011f064bd7348d86940d6b6131ae7d7c4425a538e8d9f884274",
-    strip_prefix = "rules_go-c72631a220406c4fae276861ee286aaec82c5af2",
-    urls = ["https://github.com/bazelbuild/rules_go/archive/c72631a220406c4fae276861ee286aaec82c5af2.tar.gz"],
+    sha256 = "e8c7f1fda9ee482745a5b35e8314ac3ae744d4ba30f3e6de28148fd166044306",
+    strip_prefix = "rules_go-737df20c53499fd84b67f04c6ca9ccdee2e77089",
+    urls = ["https://github.com/bazelbuild/rules_go/archive/737df20c53499fd84b67f04c6ca9ccdee2e77089.tar.gz"],
 )
 
 http_archive(
     name = "io_kubernetes_build",
-    sha256 = "89788eb30f10258ae0c6ab8b8625a28cb4c101fba93a8a6725ba227bb778ff27",
-    strip_prefix = "repo-infra-653485c1a6d554513266d55683da451bd41f7d65",
-    urls = ["https://github.com/kubernetes/repo-infra/archive/653485c1a6d554513266d55683da451bd41f7d65.tar.gz"],
+    sha256 = "cf138e48871629345548b4aaf23101314b5621c1bdbe45c4e75edb45b08891f0",
+    strip_prefix = "repo-infra-1fb0a3ff0cc5308a6d8e2f3f9c57d1f2f940354e",
+    urls = ["https://github.com/kubernetes/repo-infra/archive/1fb0a3ff0cc5308a6d8e2f3f9c57d1f2f940354e.tar.gz"],
 )
 
 ETCD_VERSION = "3.1.10"
@@ -41,33 +41,15 @@ http_archive(
 
 load("@io_kubernetes_build//defs:bazel_version.bzl", "check_version")
 
-check_version("0.6.0")
+check_version("0.8.0")
 
 load("@io_bazel_rules_go//go:def.bzl", "go_rules_dependencies", "go_register_toolchains", "go_download_sdk")
 load("@io_bazel_rules_docker//docker:docker.bzl", "docker_repositories", "docker_pull")
 
 go_rules_dependencies()
 
-# The upstream version of rules_go is broken in a number of ways. Until it's fixed, explicitly download and use go1.9.2 ourselves.
-go_download_sdk(
-    name = "go_sdk",
-    sdks = {
-        "darwin_amd64": ("go1.9.2.darwin-amd64.tar.gz", "73fd5840d55f5566d8db6c0ffdd187577e8ebe650c783f68bd27cbf95bde6743"),
-        "linux_386": ("go1.9.2.linux-386.tar.gz", "574b2c4b1a248e58ef7d1f825beda15429610a2316d9cbd3096d8d3fa8c0bc1a"),
-        "linux_amd64": ("go1.9.2.linux-amd64.tar.gz", "de874549d9a8d8d8062be05808509c09a88a248e77ec14eb77453530829ac02b"),
-        "linux_armv6l": ("go1.9.2.linux-armv6l.tar.gz", "8a6758c8d390e28ef2bcea511f62dcb43056f38c1addc06a8bc996741987e7bb"),
-        "windows_386": ("go1.9.2.windows-386.zip", "35d3be5d7b97c6d11ffb76c1b19e20a824e427805ee918e82c08a2e5793eda20"),
-        "windows_amd64": ("go1.9.2.windows-amd64.zip", "682ec3626a9c45b657c2456e35cadad119057408d37f334c6c24d88389c2164c"),
-        "freebsd_386": ("go1.9.2.freebsd-386.tar.gz", "809dcb0a8457c8d0abf954f20311a1ee353486d0ae3f921e9478189721d37677"),
-        "freebsd_amd64": ("go1.9.2.freebsd-amd64.tar.gz", "8be985c3e251c8e007fa6ecd0189bc53e65cc519f4464ddf19fa11f7ed251134"),
-        "linux_arm64": ("go1.9.2.linux-arm64.tar.gz", "0016ac65ad8340c84f51bc11dbb24ee8265b0a4597dbfdf8d91776fc187456fa"),
-        "linux_ppc64le": ("go1.9.2.linux-ppc64le.tar.gz", "adb440b2b6ae9e448c253a20836d8e8aa4236f731d87717d9c7b241998dc7f9d"),
-        "linux_s390x": ("go1.9.2.linux-s390x.tar.gz", "a7137b4fbdec126823a12a4b696eeee2f04ec616e9fb8a54654c51d5884c1345"),
-    },
-)
-
 go_register_toolchains(
-    go_version = "overridden by go_download_sdk",
+    go_version = "1.9.2",
 )
 
 docker_repositories()

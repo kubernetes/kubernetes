@@ -8,8 +8,8 @@ load(
 
 go_binary(
     name = "nonewprivs",
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/test/images/nonewprivs",
-    library = ":go_default_library",
 )
 
 go_library(

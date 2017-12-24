@@ -9,14 +9,9 @@ load("//pkg/version:def.bzl", "version_x_defs")
 
 go_binary(
     name = "kube-controller-manager",
-    gc_linkopts = [
-        "-linkmode",
-        "external",
-        "-extldflags",
-        "-static",
-    ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/cmd/kube-controller-manager",
-    library = ":go_default_library",
+    pure = "on",
     x_defs = version_x_defs(),
 )
 

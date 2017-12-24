@@ -69,8 +69,8 @@ go_test(
         "etcd_test.go",
         "kubeconfig_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases",
-    library = ":go_default_library",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/install:go_default_library",

@@ -36,8 +36,8 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["storage_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/registry/networking/networkpolicy/storage",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/networking:go_default_library",

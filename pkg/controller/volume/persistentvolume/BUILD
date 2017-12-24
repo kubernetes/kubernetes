@@ -71,8 +71,8 @@ go_test(
         "scheduler_binder_cache_test.go",
         "scheduler_binder_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/controller/volume/persistentvolume",
-    library = ":go_default_library",
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/apis/core:go_default_library",

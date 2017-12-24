@@ -5,7 +5,7 @@ go_library(
     srcs = [
         "windows.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:windows": [
             "ansi_reader.go",
             "ansi_writer.go",
             "console.go",
@@ -18,7 +18,7 @@ go_library(
         "//vendor/github.com/Azure/go-ansiterm:go_default_library",
         "//vendor/github.com/sirupsen/logrus:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:windows": [
             "//vendor/github.com/Azure/go-ansiterm/winterm:go_default_library",
         ],
         "//conditions:default": [],

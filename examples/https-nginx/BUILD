@@ -8,8 +8,8 @@ load(
 
 go_binary(
     name = "https-nginx",
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/examples/https-nginx",
-    library = ":go_default_library",
 )
 
 go_library(

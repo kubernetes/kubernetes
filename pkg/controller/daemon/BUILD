@@ -65,8 +65,8 @@ go_test(
         "daemon_controller_test.go",
         "update_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/controller/daemon",
-    library = ":go_default_library",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",

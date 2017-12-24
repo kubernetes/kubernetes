@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["clusterinfo_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

@@ -61,8 +61,8 @@ go_test(
         "use_context_test.go",
         "view_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/config",
-    library = ":go_default_library",
     deps = [
         "//pkg/kubectl/cmd/util:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",

@@ -36,8 +36,8 @@ go_test(
         "taint_test.go",
         "toleration_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/apis/core",
-    library = ":go_default_library",
 )
 
 filegroup(

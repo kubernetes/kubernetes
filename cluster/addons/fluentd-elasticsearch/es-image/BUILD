@@ -8,8 +8,8 @@ load(
 
 go_binary(
     name = "es-image",
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/cluster/addons/fluentd-elasticsearch/es-image",
-    library = ":go_default_library",
 )
 
 go_library(

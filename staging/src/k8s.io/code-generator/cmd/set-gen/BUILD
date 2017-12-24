@@ -8,8 +8,8 @@ load(
 
 go_binary(
     name = "set-gen",
+    embed = [":go_default_library"],
     importpath = "k8s.io/code-generator/cmd/set-gen",
-    library = ":go_default_library",
 )
 
 exports_files([

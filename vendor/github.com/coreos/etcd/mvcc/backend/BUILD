@@ -5,12 +5,41 @@ go_library(
     srcs = [
         "backend.go",
         "batch_tx.go",
-        "boltoption_default.go",
         "doc.go",
         "metrics.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "boltoption_default.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "boltoption_default.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "boltoption_default.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "boltoption_default.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
             "boltoption_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "boltoption_default.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "boltoption_default.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "boltoption_default.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "boltoption_default.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "boltoption_default.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "boltoption_default.go",
         ],
         "//conditions:default": [],
     }),

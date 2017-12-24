@@ -29,8 +29,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["plugins_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/network/testing",
-    library = ":go_default_library",
     deps = [
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/container:go_default_library",

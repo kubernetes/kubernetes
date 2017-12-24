@@ -18,8 +18,8 @@ go_test(
         "time_test.go",
         "types_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apimachinery/pkg/apis/meta/v1",
-    library = ":go_default_library",
     deps = [
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/json-iterator/go:go_default_library",

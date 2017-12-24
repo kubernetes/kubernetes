@@ -14,24 +14,66 @@ go_library(
         "docker_checkpoint.go",
         "docker_container.go",
         "docker_image.go",
-        "docker_image_unsupported.go",
         "docker_sandbox.go",
         "docker_service.go",
-        "docker_stats_unsupported.go",
         "docker_streaming.go",
         "exec.go",
         "helpers.go",
-        "helpers_unsupported.go",
         "naming.go",
         "security_context.go",
         "selinux_util.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "docker_image_unsupported.go",
+            "docker_stats_unsupported.go",
+            "helpers_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "docker_image_unsupported.go",
+            "docker_stats_unsupported.go",
+            "helpers_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "docker_image_unsupported.go",
+            "docker_stats_unsupported.go",
+            "helpers_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "docker_image_unsupported.go",
+            "docker_stats_unsupported.go",
+            "helpers_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
             "docker_image_linux.go",
             "docker_stats_linux.go",
             "helpers_linux.go",
         ],
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "docker_image_unsupported.go",
+            "docker_stats_unsupported.go",
+            "helpers_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "docker_image_unsupported.go",
+            "docker_stats_unsupported.go",
+            "helpers_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "docker_image_unsupported.go",
+            "docker_stats_unsupported.go",
+            "helpers_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "docker_image_unsupported.go",
+            "docker_stats_unsupported.go",
+            "helpers_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "docker_image_unsupported.go",
+            "docker_stats_unsupported.go",
+            "helpers_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
             "docker_image_windows.go",
             "docker_stats_windows.go",
             "helpers_windows.go",
@@ -95,15 +137,15 @@ go_test(
         "security_context_test.go",
         "selinux_util_test.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "helpers_linux_test.go",
         ],
         "//conditions:default": [],
     }),
     data = [
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim",
-    library = ":go_default_library",
     deps = [
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/container:go_default_library",

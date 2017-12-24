@@ -40,8 +40,8 @@ go_test(
         "template_test.go",
         "version_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/util",
-    library = ":go_default_library",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",

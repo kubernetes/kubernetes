@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "util.go",
         "util_cgo.go",
+        "util_stub.go",
     ],
     cgo = True,
     importpath = "github.com/coreos/go-systemd/util",
