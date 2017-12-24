@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta2
+apiVersion: extensions/v1
 kind: Deployment
 metadata:
   name: registry
