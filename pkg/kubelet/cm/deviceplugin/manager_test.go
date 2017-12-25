@@ -24,7 +24,6 @@ import (
 	"reflect"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -68,36 +67,29 @@ func TestDevicePluginReRegistration(t *testing.T) {
 		{ID: "Dev3", Health: pluginapi.Healthy},
 	}
 
-	callbackCount := 0
-	callbackChan := make(chan int)
-	var stopping int32
-	stopping = 0
+	expCallbackCount := int32(0)
+	callbackCount := int32(0)
+	callbackChan := make(chan int32)
 	callback := func(n string, a, u, r []pluginapi.Device) {
-		// Should be called three times, one for each plugin registration, till we are stopping.
-		if callbackCount > 2 && atomic.LoadInt32(&stopping) <= 0 {
+		callbackCount++
+		if callbackCount > atomic.LoadInt32(&expCallbackCount) {
 			t.FailNow()
 		}
-		callbackCount++
 		callbackChan <- callbackCount
 	}
 	m, p1 := setup(t, devs, callback)
+	atomic.StoreInt32(&expCallbackCount, 1)
 	p1.Register(socketName, testResourceName)
 	// Wait for the first callback to be issued.
 
 	<-callbackChan
-	// Wait till the endpoint is added to the manager.
-	for i := 0; i < 20; i++ {
-		if len(m.Devices()) > 0 {
-			break
-		}
-		time.Sleep(1)
-	}
 	devices := m.Devices()
 	require.Equal(t, 2, len(devices[testResourceName]), "Devices are not updated.")
 
 	p2 := NewDevicePluginStub(devs, pluginSocketName+".new")
 	err := p2.Start()
 	require.NoError(t, err)
+	atomic.StoreInt32(&expCallbackCount, 2)
 	p2.Register(socketName, testResourceName)
 	// Wait for the second callback to be issued.
 	<-callbackChan
@@ -109,20 +101,17 @@ func TestDevicePluginReRegistration(t *testing.T) {
 	p3 := NewDevicePluginStub(devsForRegistration, pluginSocketName+".third")
 	err = p3.Start()
 	require.NoError(t, err)
+	atomic.StoreInt32(&expCallbackCount, 3)
 	p3.Register(socketName, testResourceName)
 	// Wait for the second callback to be issued.
 	<-callbackChan
 
 	devices3 := m.Devices()
 	require.Equal(t, 1, len(devices3[testResourceName]), "Devices of plugin previously registered should be removed.")
-	// Wait long enough to catch unexpected callbacks.
-	time.Sleep(5 * time.Second)
-
-	atomic.StoreInt32(&stopping, 1)
 	p2.Stop()
 	p3.Stop()
 	cleanup(t, m, p1)
-
+	close(callbackChan)
 }
 
 func setup(t *testing.T, devs []*pluginapi.Device, callback monitorCallback) (Manager, *Stub) {
