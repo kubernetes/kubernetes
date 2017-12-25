@@ -68,15 +68,12 @@ go_test(
     deps = [
         "//pkg/api/install:go_default_library",
         "//pkg/api/v1/helper:go_default_library",
+        "//pkg/util/mount:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "//vendor/k8s.io/client-go/util/testing:go_default_library",
-        ],
-        "//conditions:default": [],
-    }),
+        "//vendor/k8s.io/client-go/util/testing:go_default_library",
+    ],
 )
 
 filegroup(
