@@ -591,6 +591,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			ReadOnlyPort:                utilpointer.Int32Ptr(0),
 			RegistryBurst:               10,
 			RegistryPullQPS:             utilpointer.Int32Ptr(5),
+			HairpinMode:                 "promiscuous-bridge",
 		},
 	}
 	if allErrors := ValidateKubeletConfiguration(successCase, nil); len(allErrors) != 0 {
