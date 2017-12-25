@@ -54,61 +54,96 @@ func TestRun(t *testing.T) {
 		{ID: "AThirdDeviceId", Health: pluginapi.Healthy},
 	}
 
+	umap := make(map[string]*pluginapi.Device)
+	for _, d := range updated {
+		umap[d.ID] = d
+	}
+
+	callbackChan := make(chan int)
+	callbackCount := 0
+
 	p, e := esetup(t, devs, socket, "mock", func(n string, a, u, r []pluginapi.Device) {
-		require.Len(t, a, 1)
-		require.Len(t, u, 1)
-		require.Len(t, r, 1)
+		if callbackCount == 0 {
+			require.Len(t, a, 2)
+			require.Len(t, u, 0)
+			require.Len(t, r, 0)
+		} else if callbackCount == 1 {
+			require.Len(t, a, 1)
+			require.Len(t, u, 1)
+			require.Len(t, r, 1)
 
-		require.Equal(t, a[0].ID, updated[1].ID)
+			require.Equal(t, a[0].ID, updated[1].ID)
 
-		require.Equal(t, u[0].ID, updated[0].ID)
-		require.Equal(t, u[0].Health, updated[0].Health)
+			require.Equal(t, u[0].ID, updated[0].ID)
+			require.Equal(t, u[0].Health, updated[0].Health)
 
-		require.Equal(t, r[0].ID, devs[1].ID)
+			require.Equal(t, r[0].ID, devs[1].ID)
+		}
+
+		callbackCount++
+		if callbackChan != nil {
+			callbackChan <- callbackCount
+		}
 	})
+
 	defer ecleanup(t, p, e)
 
-	go e.run()
+	go e.Run()
+
+	select {
+	case <-callbackChan:
+		break
+	case <-time.After(time.Second):
+		t.FailNow()
+	}
+
+	// Ensure we have recieved the devices
+	resp, err := e.Allocate([]string{e.Store().Devices()[0].ID})
+	require.NotNil(t, resp)
+	require.NoError(t, err)
+
 	p.Update(updated)
-	time.Sleep(time.Second)
+	select {
+	case <-callbackChan:
+		break
+	case <-time.After(time.Second):
+		t.FailNow()
+	}
 
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
-
-	require.Len(t, e.devices, 2)
-	for _, dref := range updated {
-		d, ok := e.devices[dref.ID]
+	require.Len(t, e.Store().Devices(), 2)
+	require.Len(t, e.Store().HealthyDevices(), 1)
+	edevs := e.Store().Devices()
+	for _, d := range edevs {
+		dref, ok := umap[d.ID]
 
 		require.True(t, ok)
 		require.Equal(t, d.ID, dref.ID)
 		require.Equal(t, d.Health, dref.Health)
 	}
 
+	close(callbackChan)
+	callbackChan = nil
 }
 
-func TestGetDevices(t *testing.T) {
-	e := endpointImpl{
-		devices: map[string]pluginapi.Device{
-			"ADeviceId": {ID: "ADeviceId", Health: pluginapi.Healthy},
-		},
-	}
-	devs := e.getDevices()
-	require.Len(t, devs, 1)
-}
+func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback managerCallback) (*StubDevicePlugin, *endpointImpl) {
+	p := NewStubDevicePlugin(devs, socket)
+	require.NoError(t, p.Start())
 
-func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback monitorCallback) (*Stub, *endpointImpl) {
-	p := NewDevicePluginStub(devs, socket)
-
-	err := p.Start()
-	require.NoError(t, err)
-
-	e, err := newEndpointImpl(socket, "mock", make(map[string]pluginapi.Device), func(n string, a, u, r []pluginapi.Device) {})
+	dStore := newDeviceStoreImpl(callback)
+	e, err := newEndpointWithStore(socket, resourceName, dStore)
 	require.NoError(t, err)
 
 	return p, e
 }
 
-func ecleanup(t *testing.T, p *Stub, e *endpointImpl) {
+func newTestEndpoint(resourceName string) endpoint {
+	return &endpointImpl{
+		resourceName: resourceName,
+		devStore:     newDeviceStoreImpl(nil),
+	}
+}
+
+func ecleanup(t *testing.T, p *StubDevicePlugin, e *endpointImpl) {
+	e.Stop()
 	p.Stop()
-	e.stop()
 }
