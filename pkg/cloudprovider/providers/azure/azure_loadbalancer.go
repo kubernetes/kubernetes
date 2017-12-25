@@ -753,12 +753,18 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 
 			// Remove backend pools from vmSets. This is required for virtual machine scale sets before removing the LB.
 			vmSetName := az.mapLoadBalancerNameToVMSet(lbName, clusterName)
-			az.vmSet.EnsureBackendPoolDeleted(lbBackendPoolID, vmSetName)
+			glog.V(10).Infof("EnsureBackendPoolDeleted(%s, %s): start", lbBackendPoolID, vmSetName)
+			err := az.vmSet.EnsureBackendPoolDeleted(lbBackendPoolID, vmSetName)
+			if err != nil {
+				glog.Errorf("EnsureBackendPoolDeleted(%s, %s) failed: %v", lbBackendPoolID, vmSetName, err)
+				return nil, err
+			}
+			glog.V(10).Infof("EnsureBackendPoolDeleted(%s, %s): end", lbBackendPoolID, vmSetName)
 
 			// Remove the LB.
 			az.operationPollRateLimiter.Accept()
 			glog.V(10).Infof("LoadBalancerClient.Delete(%q): start", lbName)
-			err := az.DeleteLBWithRetry(lbName)
+			err = az.DeleteLBWithRetry(lbName)
 			if err != nil {
 				glog.V(2).Infof("delete(%s) abort backoff: lb(%s) - deleting; no remaining frontendipconfigs", serviceName, lbName)
 				return nil, err
