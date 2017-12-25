@@ -45,21 +45,20 @@ import (
 // ActivePodsFunc is a function that returns a list of pods to reconcile.
 type ActivePodsFunc func() []*v1.Pod
 
-// monitorCallback is the function called when a device's health state changes,
+// managerCallback is the function called when a device's health state changes,
 // or new devices are reported, or old devices are deleted.
 // Updated contains the most recent state of the Device.
-type monitorCallback func(resourceName string, added, updated, deleted []pluginapi.Device)
+type managerCallback func(resourceName string, added, updated, deleted []pluginapi.Device)
 
 // ManagerImpl is the structure in charge of managing Device Plugins.
 type ManagerImpl struct {
 	socketname string
 	socketdir  string
 
-	endpoints map[string]endpoint // Key is ResourceName
-	mutex     sync.Mutex
+	// interface handling all Endpoint operations
+	endpointHandler endpointHandler
 
-	server *grpc.Server
-
+	mutex sync.Mutex
 	// activePods is a method for listing active pods on the node
 	// so the amount of pluginResources requested by existing pods
 	// could be counted when updating allocated devices
@@ -68,10 +67,6 @@ type ManagerImpl struct {
 	// sourcesReady provides the readiness of kubelet configuration sources such as apiserver update readiness.
 	// We use it to determine when we can purge inactive pods from checkpointed state.
 	sourcesReady config.SourcesReady
-
-	// callback is used for updating devices' states in one time call.
-	// e.g. a new device is advertised, two old devices are deleted and a running device fails.
-	callback monitorCallback
 
 	// allDevices contains all of registered resourceNames and their exported device IDs.
 	allDevices map[string]sets.String
@@ -82,6 +77,8 @@ type ManagerImpl struct {
 	// podDevices contains pod to allocated device mapping.
 	podDevices podDevices
 	store      utilstore.Store
+
+	server *grpc.Server
 }
 
 type sourcesReadyStub struct{}
@@ -103,14 +100,13 @@ func newManagerImpl(socketPath string) (*ManagerImpl, error) {
 
 	dir, file := filepath.Split(socketPath)
 	manager := &ManagerImpl{
-		endpoints:        make(map[string]endpoint),
-		socketname:       file,
-		socketdir:        dir,
+		socketname: file,
+		socketdir:  dir,
+
 		allDevices:       make(map[string]sets.String),
 		allocatedDevices: make(map[string]sets.String),
 		podDevices:       make(podDevices),
 	}
-	manager.callback = manager.genericDeviceUpdateCallback
 
 	// The following structs are populated with real implementations in manager.Start()
 	// Before that, initializes them to perform no-op operations.
@@ -122,12 +118,15 @@ func newManagerImpl(socketPath string) (*ManagerImpl, error) {
 		return nil, fmt.Errorf("failed to initialize device plugin checkpointing store: %+v", err)
 	}
 
+	manager.endpointHandler = newEndpointHandlerImpl(manager.genericDeviceUpdateCallback)
+
 	return manager, nil
 }
 
 func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, added, updated, deleted []pluginapi.Device) {
 	kept := append(updated, added...)
 	m.mutex.Lock()
+
 	if _, ok := m.allDevices[resourceName]; !ok {
 		m.allDevices[resourceName] = sets.NewString()
 	}
@@ -143,6 +142,7 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, added, up
 	for _, dev := range deleted {
 		m.allDevices[resourceName].Delete(dev.ID)
 	}
+
 	m.mutex.Unlock()
 	m.writeCheckpoint()
 }
@@ -231,16 +231,7 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 // Devices is the map of devices that are known by the Device
 // Plugin manager with the kind of the devices as key
 func (m *ManagerImpl) Devices() map[string][]pluginapi.Device {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	devs := make(map[string][]pluginapi.Device)
-	for k, e := range m.endpoints {
-		glog.V(3).Infof("Endpoint: %+v: %p", k, e)
-		devs[k] = e.getDevices()
-	}
-
-	return devs
+	return m.endpointHandler.Devices()
 }
 
 // Allocate is the call that you can use to allocate a set of devices
@@ -290,83 +281,23 @@ func (m *ManagerImpl) Register(ctx context.Context, r *pluginapi.RegisterRequest
 		return &pluginapi.Empty{}, fmt.Errorf(errorString)
 	}
 
-	// TODO: for now, always accepts newest device plugin. Later may consider to
-	// add some policies here, e.g., verify whether an old device plugin with the
-	// same resource name is still alive to determine whether we want to accept
-	// the new registration.
-	go m.addEndpoint(r)
+	socketPath := filepath.Join(m.socketdir, r.Endpoint)
+	err := m.endpointHandler.NewEndpoint(r.ResourceName, socketPath)
+	if err != nil {
+		return &pluginapi.Empty{}, err
+	}
 
 	return &pluginapi.Empty{}, nil
 }
 
 // Stop is the function that can stop the gRPC server.
 func (m *ManagerImpl) Stop() error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	for _, e := range m.endpoints {
-		e.stop()
-	}
+	// Stop endpoints
+	m.endpointHandler.Stop()
 
+	// Stop gRPC
 	m.server.Stop()
 	return nil
-}
-
-func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
-	existingDevs := make(map[string]pluginapi.Device)
-	m.mutex.Lock()
-	old, ok := m.endpoints[r.ResourceName]
-	if ok && old != nil {
-		// Pass devices of previous endpoint into re-registered one,
-		// to avoid potential orphaned devices upon re-registration
-		devices := make(map[string]pluginapi.Device)
-		for _, device := range old.getDevices() {
-			devices[device.ID] = device
-		}
-		existingDevs = devices
-	}
-	m.mutex.Unlock()
-
-	socketPath := filepath.Join(m.socketdir, r.Endpoint)
-	e, err := newEndpointImpl(socketPath, r.ResourceName, existingDevs, m.callback)
-	if err != nil {
-		glog.Errorf("Failed to dial device plugin with request %v: %v", r, err)
-		return
-	}
-
-	m.mutex.Lock()
-	// Check for potential re-registration during the initialization of new endpoint,
-	// and skip updating if re-registration happens.
-	// TODO: simplify the part once we have a better way to handle registered devices
-	ext := m.endpoints[r.ResourceName]
-	if ext != old {
-		glog.Warningf("Some other endpoint %v is added while endpoint %v is initialized", ext, e)
-		m.mutex.Unlock()
-		e.stop()
-		return
-	}
-	// Associates the newly created endpoint with the corresponding resource name.
-	// Stops existing endpoint if there is any.
-	m.endpoints[r.ResourceName] = e
-	glog.V(2).Infof("Registered endpoint %v", e)
-	m.mutex.Unlock()
-
-	if old != nil {
-		old.stop()
-	}
-
-	go func() {
-		e.run()
-		e.stop()
-
-		m.mutex.Lock()
-		if old, ok := m.endpoints[r.ResourceName]; ok && old == e {
-			glog.V(2).Infof("Delete resource for endpoint %v", e)
-			delete(m.endpoints, r.ResourceName)
-		}
-
-		glog.V(2).Infof("Unregistered endpoint %v", e)
-		m.mutex.Unlock()
-	}()
 }
 
 // GetCapacity is expected to be called when Kubelet updates its node status.
@@ -380,25 +311,28 @@ func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
 // cm.UpdatePluginResource() run during predicate Admit guarantees we adjust nodeinfo
 // capacity for already allocated pods so that they can continue to run. However, new pods
 // requiring device plugin resources will not be scheduled till device plugin re-registers.
-func (m *ManagerImpl) GetCapacity() (v1.ResourceList, []string) {
+func (m *ManagerImpl) GetCapacity() (capacity v1.ResourceList, deleted []string) {
 	needsUpdateCheckpoint := false
-	var capacity = v1.ResourceList{}
-	var deletedResources []string
+	capacity = v1.ResourceList{}
+
 	m.mutex.Lock()
-	for resourceName, devices := range m.allDevices {
-		if _, ok := m.endpoints[resourceName]; !ok {
-			delete(m.allDevices, resourceName)
-			deletedResources = append(deletedResources, resourceName)
+	for res, devices := range m.allDevices {
+		if _, ok := m.endpointHandler.Endpoint(res); !ok {
+			delete(m.allDevices, res)
+			deleted = append(deleted, res)
+
 			needsUpdateCheckpoint = true
 		} else {
-			capacity[v1.ResourceName(resourceName)] = *resource.NewQuantity(int64(devices.Len()), resource.DecimalSI)
+			capacity[v1.ResourceName(res)] = *resource.NewQuantity(int64(devices.Len()), resource.DecimalSI)
 		}
 	}
 	m.mutex.Unlock()
+
 	if needsUpdateCheckpoint {
 		m.writeCheckpoint()
 	}
-	return capacity, deletedResources
+
+	return capacity, deleted
 }
 
 // checkpointData struct is used to store pod to device allocation information
@@ -590,9 +524,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		// in real use as the result of this. Should also consider to parallize device
 		// plugin Allocate grpc calls if it becomes common that a container may require
 		// resources from multiple device plugins.
-		m.mutex.Lock()
-		e, ok := m.endpoints[resource]
-		m.mutex.Unlock()
+		e, ok := m.endpointHandler.Endpoint(resource)
 		if !ok {
 			m.mutex.Lock()
 			m.allocatedDevices = m.podDevices.devices()
@@ -602,7 +534,8 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 
 		devs := allocDevices.UnsortedList()
 		glog.V(3).Infof("Making allocation request for devices %v for device plugin %s", devs, resource)
-		resp, err := e.allocate(devs)
+
+		resp, err := e.Allocate(devs)
 		metrics.DevicePluginAllocationLatency.WithLabelValues(resource).Observe(metrics.SinceInMicroseconds(startRPCTime))
 		if err != nil {
 			// In case of allocation failure, we want to restore m.allocatedDevices

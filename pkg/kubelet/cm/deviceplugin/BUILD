@@ -10,7 +10,10 @@ go_library(
     name = "go_default_library",
     srcs = [
         "device_plugin_stub.go",
+        "device_store.go",
         "endpoint.go",
+        "endpoint_handler.go",
+        "endpoint_store_shim.go",
         "manager.go",
         "manager_stub.go",
         "pod_devices.go",
@@ -52,6 +55,10 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = [
+        "device_store_test.go",
+        "endpoint_handler_test.go",
+        "endpoint_store_shim_test.go",
+        "endpoint_store_test.go",
         "endpoint_test.go",
         "manager_test.go",
     ],

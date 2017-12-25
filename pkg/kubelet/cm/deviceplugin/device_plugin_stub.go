@@ -21,6 +21,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"path/filepath"
 	"time"
 
 	"golang.org/x/net/context"
@@ -58,6 +59,9 @@ func (m *Stub) Start() error {
 		return err
 	}
 
+	dir, _ := filepath.Split(m.socket)
+	os.MkdirAll(dir, 0755)
+
 	sock, err := net.Listen("unix", m.socket)
 	if err != nil {
 		return err
@@ -73,6 +77,7 @@ func (m *Stub) Start() error {
 		if len(services) > 1 {
 			break
 		}
+
 		time.Sleep(1 * time.Second)
 	}
 	log.Println("Starting to serve on", m.socket)
@@ -82,8 +87,9 @@ func (m *Stub) Start() error {
 
 // Stop stops the gRPC server
 func (m *Stub) Stop() error {
-	m.server.Stop()
 	close(m.stop)
+
+	m.server.Stop()
 
 	return m.cleanup()
 }
