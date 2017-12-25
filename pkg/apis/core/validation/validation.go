@@ -1232,6 +1232,10 @@ func validateFlexVolumeSource(fv *core.FlexVolumeSource, fldPath *field.Path) fi
 	allErrs := field.ErrorList{}
 	if len(fv.Driver) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("driver"), ""))
+	} else {
+		for _, msg := range validation.IsQualifiedName(fv.Driver) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("driver"), fv.Driver, msg))
+		}
 	}
 
 	// Make sure user-specified options don't use kubernetes namespaces
@@ -1253,6 +1257,10 @@ func validateFlexPersistentVolumeSource(fv *core.FlexPersistentVolumeSource, fld
 	allErrs := field.ErrorList{}
 	if len(fv.Driver) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("driver"), ""))
+	} else {
+		for _, msg := range validation.IsQualifiedName(fv.Driver) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("driver"), fv.Driver, msg))
+		}
 	}
 
 	// Make sure user-specified options don't use kubernetes namespaces

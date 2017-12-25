@@ -12070,6 +12070,10 @@ func TestValidateFlexVolumeSource(t *testing.T) {
 			source:       &core.FlexVolumeSource{Driver: ""},
 			expectedErrs: map[string]string{"driver": "Required value"},
 		},
+		"invalid driver name": {
+			source:       &core.FlexVolumeSource{Driver: "apple/banana:orange"},
+			expectedErrs: map[string]string{"driver": "name part must consist of alphanumeric characters"},
+		},
 		"reserved option keys": {
 			source: &core.FlexVolumeSource{
 				Driver: "foo",
