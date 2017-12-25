@@ -269,27 +269,26 @@ func TestCheckpoint(t *testing.T) {
 	as.Nil(err)
 	defer os.RemoveAll(tmpDir)
 	testManager := &ManagerImpl{
-		socketdir:        tmpDir,
-		allDevices:       make(map[string]sets.String),
-		allocatedDevices: make(map[string]sets.String),
-		podDevices:       make(podDevices),
+		socketdir:  tmpDir,
+		allDevices: make(map[string]sets.String),
+		allocation: newAllocation(),
 	}
-	testManager.store, _ = utilstore.NewFileStore("/tmp/", utilfs.DefaultFs{})
+	testManager.store, _ = utilstore.NewFileStore("/tmp", utilfs.DefaultFs{})
 
-	testManager.podDevices.insert("pod1", "con1", resourceName1,
+	testManager.allocation.insert("pod1", "con1", resourceName1,
 		constructDevices([]string{"dev1", "dev2"}),
 		constructAllocResp(map[string]string{"/dev/r1dev1": "/dev/r1dev1", "/dev/r1dev2": "/dev/r1dev2"},
 			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
-	testManager.podDevices.insert("pod1", "con1", resourceName2,
+	testManager.allocation.insert("pod1", "con1", resourceName2,
 		constructDevices([]string{"dev1", "dev2"}),
 		constructAllocResp(map[string]string{"/dev/r2dev1": "/dev/r2dev1", "/dev/r2dev2": "/dev/r2dev2"},
 			map[string]string{"/home/r2lib1": "/usr/r2lib1"},
 			map[string]string{"r2devices": "dev1 dev2"}))
-	testManager.podDevices.insert("pod1", "con2", resourceName1,
+	testManager.allocation.insert("pod1", "con2", resourceName1,
 		constructDevices([]string{"dev3"}),
 		constructAllocResp(map[string]string{"/dev/r1dev3": "/dev/r1dev3"},
 			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
-	testManager.podDevices.insert("pod2", "con1", resourceName1,
+	testManager.allocation.insert("pod2", "con1", resourceName1,
 		constructDevices([]string{"dev4"}),
 		constructAllocResp(map[string]string{"/dev/r1dev4": "/dev/r1dev4"},
 			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
@@ -304,33 +303,31 @@ func TestCheckpoint(t *testing.T) {
 	testManager.allDevices[resourceName2].Insert("dev1")
 	testManager.allDevices[resourceName2].Insert("dev2")
 
-	expectedPodDevices := testManager.podDevices
-	expectedAllocatedDevices := testManager.podDevices.devices()
+	allocation := testManager.allocation
 	expectedAllDevices := testManager.allDevices
 
 	err = testManager.writeCheckpoint()
 
 	as.Nil(err)
-	testManager.podDevices = make(podDevices)
+	testManager.allocation = newAllocation()
 	err = testManager.readCheckpoint()
 	as.Nil(err)
 
-	as.Equal(len(expectedPodDevices), len(testManager.podDevices))
-	for podUID, containerDevices := range expectedPodDevices {
-		for conName, resources := range containerDevices {
-			for resource := range resources {
+	as.Equal(len(allocation.pods()), len(testManager.allocation.pods()))
+	for p, cmap := range allocation.allocations() {
+		for c, dmap := range cmap {
+			for r := range dmap {
 				as.True(reflect.DeepEqual(
-					expectedPodDevices.containerDevices(podUID, conName, resource),
-					testManager.podDevices.containerDevices(podUID, conName, resource)))
-				opts1 := expectedPodDevices.deviceRunContainerOptions(podUID, conName)
-				opts2 := testManager.podDevices.deviceRunContainerOptions(podUID, conName)
+					allocation.devicesByContainer(p, c, r),
+					testManager.allocation.devicesByContainer(p, c, r)))
+				opts1 := allocation.collectRunOptions(p, c)
+				opts2 := testManager.allocation.collectRunOptions(p, c)
 				as.Equal(len(opts1.Envs), len(opts2.Envs))
 				as.Equal(len(opts1.Mounts), len(opts2.Mounts))
 				as.Equal(len(opts1.Devices), len(opts2.Devices))
 			}
 		}
 	}
-	as.True(reflect.DeepEqual(expectedAllocatedDevices, testManager.allocatedDevices))
 	as.True(reflect.DeepEqual(expectedAllDevices, testManager.allDevices))
 }
 
@@ -386,14 +383,13 @@ func makePod(requests v1.ResourceList) *v1.Pod {
 func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestResource) *ManagerImpl {
 	monitorCallback := func(resourceName string, added, updated, deleted []pluginapi.Device) {}
 	testManager := &ManagerImpl{
-		socketdir:        tmpDir,
-		callback:         monitorCallback,
-		allDevices:       make(map[string]sets.String),
-		allocatedDevices: make(map[string]sets.String),
-		endpoints:        make(map[string]endpoint),
-		podDevices:       make(podDevices),
-		activePods:       activePods,
-		sourcesReady:     &sourcesReadyStub{},
+		socketdir:    tmpDir,
+		callback:     monitorCallback,
+		allDevices:   make(map[string]sets.String),
+		endpoints:    make(map[string]endpoint),
+		allocation:   newAllocation(),
+		activePods:   activePods,
+		sourcesReady: &sourcesReadyStub{},
 	}
 	testManager.store, _ = utilstore.NewFileStore("/tmp/", utilfs.DefaultFs{})
 	for _, res := range testRes {
@@ -546,7 +542,7 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 			expectedContainerOptsLen:  nil,
 			expectedAllocatedResName1: 2,
 			expectedAllocatedResName2: 1,
-			expErr: fmt.Errorf("requested number of devices unavailable for domain1.com/resource1. Requested: 1, Available: 0"),
+			expErr: fmt.Errorf("insufficient resource domain1.com/resource1: requested=1, available=0"),
 		},
 		{
 			description:               "Successfull allocation of all available Res1 resources and Res2 resources",
@@ -575,8 +571,8 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 			as.Equal(len(runContainerOpts.Mounts), testCase.expectedContainerOptsLen[1])
 			as.Equal(len(runContainerOpts.Envs), testCase.expectedContainerOptsLen[2])
 		}
-		as.Equal(testCase.expectedAllocatedResName1, testManager.allocatedDevices[res1.resourceName].Len())
-		as.Equal(testCase.expectedAllocatedResName2, testManager.allocatedDevices[res2.resourceName].Len())
+		as.Equal(testCase.expectedAllocatedResName1, testManager.allocation.devices()[res1.resourceName].Len())
+		as.Equal(testCase.expectedAllocatedResName2, testManager.allocation.devices()[res2.resourceName].Len())
 	}
 
 }
@@ -660,10 +656,10 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 	initCont2 := podWithPluginResourcesInInitContainers.Spec.InitContainers[1].Name
 	normalCont1 := podWithPluginResourcesInInitContainers.Spec.Containers[0].Name
 	normalCont2 := podWithPluginResourcesInInitContainers.Spec.Containers[1].Name
-	initCont1Devices := testManager.podDevices.containerDevices(podUID, initCont1, res1.resourceName)
-	initCont2Devices := testManager.podDevices.containerDevices(podUID, initCont2, res1.resourceName)
-	normalCont1Devices := testManager.podDevices.containerDevices(podUID, normalCont1, res1.resourceName)
-	normalCont2Devices := testManager.podDevices.containerDevices(podUID, normalCont2, res1.resourceName)
+	initCont1Devices := testManager.allocation.devicesByContainer(podUID, initCont1, res1.resourceName)
+	initCont2Devices := testManager.allocation.devicesByContainer(podUID, initCont2, res1.resourceName)
+	normalCont1Devices := testManager.allocation.devicesByContainer(podUID, normalCont1, res1.resourceName)
+	normalCont2Devices := testManager.allocation.devicesByContainer(podUID, normalCont2, res1.resourceName)
 	as.True(initCont2Devices.IsSuperset(initCont1Devices))
 	as.True(initCont2Devices.IsSuperset(normalCont1Devices))
 	as.True(initCont2Devices.IsSuperset(normalCont2Devices))
@@ -672,26 +668,18 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 
 func TestSanitizeNodeAllocatable(t *testing.T) {
 	resourceName1 := "domain1.com/resource1"
-	devID1 := "dev1"
-
 	resourceName2 := "domain2.com/resource2"
-	devID2 := "dev2"
 
 	as := assert.New(t)
 	monitorCallback := func(resourceName string, added, updated, deleted []pluginapi.Device) {}
-
 	testManager := &ManagerImpl{
-		callback:         monitorCallback,
-		allDevices:       make(map[string]sets.String),
-		allocatedDevices: make(map[string]sets.String),
-		podDevices:       make(podDevices),
+		callback:   monitorCallback,
+		allDevices: make(map[string]sets.String),
+		allocation: newAllocation(),
 	}
 	testManager.store, _ = utilstore.NewFileStore("/tmp/", utilfs.DefaultFs{})
-	// require one of resource1 and one of resource2
-	testManager.allocatedDevices[resourceName1] = sets.NewString()
-	testManager.allocatedDevices[resourceName1].Insert(devID1)
-	testManager.allocatedDevices[resourceName2] = sets.NewString()
-	testManager.allocatedDevices[resourceName2].Insert(devID2)
+	testManager.allocation.insert("p1", "c1", resourceName1, constructDevices([]string{"dev1", "dev2"}), nil)
+	testManager.allocation.insert("p1", "c2", resourceName2, constructDevices([]string{"dev3"}), nil)
 
 	cachedNode := &v1.Node{
 		Status: v1.NodeStatus{
@@ -704,11 +692,11 @@ func TestSanitizeNodeAllocatable(t *testing.T) {
 	nodeInfo := &schedulercache.NodeInfo{}
 	nodeInfo.SetNode(cachedNode)
 
-	testManager.sanitizeNodeAllocatable(nodeInfo)
+	testManager.sanitizeNodeAllocatable(nodeInfo, "p1")
 
 	allocatableScalarResources := nodeInfo.AllocatableResource().ScalarResources
 	// allocatable in nodeInfo is less than needed, should update
-	as.Equal(1, int(allocatableScalarResources[v1.ResourceName(resourceName1)]))
+	as.Equal(2, int(allocatableScalarResources[v1.ResourceName(resourceName1)]))
 	// allocatable in nodeInfo is more than needed, should skip updating
 	as.Equal(2, int(allocatableScalarResources[v1.ResourceName(resourceName2)]))
 }

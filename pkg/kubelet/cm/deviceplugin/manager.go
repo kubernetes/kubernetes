@@ -76,12 +76,11 @@ type ManagerImpl struct {
 	// allDevices contains all of registered resourceNames and their exported device IDs.
 	allDevices map[string]sets.String
 
-	// allocatedDevices contains allocated deviceIds, keyed by resourceName.
-	allocatedDevices map[string]sets.String
+	// allocation contains pod to allocated device mapping.
+	allocation devAllocation
 
-	// podDevices contains pod to allocated device mapping.
-	podDevices podDevices
-	store      utilstore.Store
+	// store is used for backing checkpoint data
+	store utilstore.Store
 }
 
 type sourcesReadyStub struct{}
@@ -103,13 +102,13 @@ func newManagerImpl(socketPath string) (*ManagerImpl, error) {
 
 	dir, file := filepath.Split(socketPath)
 	manager := &ManagerImpl{
-		endpoints:        make(map[string]endpoint),
-		socketname:       file,
-		socketdir:        dir,
-		allDevices:       make(map[string]sets.String),
-		allocatedDevices: make(map[string]sets.String),
-		podDevices:       make(podDevices),
+		endpoints:  make(map[string]endpoint),
+		socketname: file,
+		socketdir:  dir,
+		allDevices: make(map[string]sets.String),
 	}
+
+	manager.allocation = newAllocation()
 	manager.callback = manager.genericDeviceUpdateCallback
 
 	// The following structs are populated with real implementations in manager.Start()
@@ -189,15 +188,15 @@ func (m *ManagerImpl) checkpointFile() string {
 }
 
 // Start starts the Device Plugin Manager amd start initialization of
-// podDevices and allocatedDevices information from checkpoint-ed state and
-// starts device plugin registration service.
+// allocation information from checkpoint-ed state and starts device plugin
+// registration service.
 func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady) error {
 	glog.V(2).Infof("Starting Device Plugin manager")
 
 	m.activePods = activePods
 	m.sourcesReady = sourcesReady
 
-	// Loads in allocatedDevices information from disk.
+	// load checkpoint
 	err := m.readCheckpoint()
 	if err != nil {
 		glog.Warningf("Continue after failing to read checkpoint file. Device allocation info may NOT be up-to-date. Err: %v", err)
@@ -241,37 +240,6 @@ func (m *ManagerImpl) Devices() map[string][]pluginapi.Device {
 	}
 
 	return devs
-}
-
-// Allocate is the call that you can use to allocate a set of devices
-// from the registered device plugins.
-func (m *ManagerImpl) Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
-	pod := attrs.Pod
-	devicesToReuse := make(map[string]sets.String)
-	// TODO: Reuse devices between init containers and regular containers.
-	for _, container := range pod.Spec.InitContainers {
-		if err := m.allocateContainerResources(pod, &container, devicesToReuse); err != nil {
-			return err
-		}
-		m.podDevices.addContainerAllocatedResources(string(pod.UID), container.Name, devicesToReuse)
-	}
-	for _, container := range pod.Spec.Containers {
-		if err := m.allocateContainerResources(pod, &container, devicesToReuse); err != nil {
-			return err
-		}
-		m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, devicesToReuse)
-	}
-
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	// quick return if no pluginResources requested
-	if _, podRequireDevicePluginResource := m.podDevices[string(pod.UID)]; !podRequireDevicePluginResource {
-		return nil
-	}
-
-	m.sanitizeNodeAllocatable(node)
-	return nil
 }
 
 // Register registers a device plugin.
@@ -413,7 +381,7 @@ type checkpointData struct {
 func (m *ManagerImpl) writeCheckpoint() error {
 	m.mutex.Lock()
 	data := checkpointData{
-		PodDeviceEntries:  m.podDevices.toCheckpointData(),
+		PodDeviceEntries:  m.allocation.toCheckpointData(),
 		RegisteredDevices: make(map[string][]string),
 	}
 	for resource, devices := range m.allDevices {
@@ -432,8 +400,7 @@ func (m *ManagerImpl) writeCheckpoint() error {
 	return nil
 }
 
-// Reads device to container allocation information from disk, and populates
-// m.allocatedDevices accordingly.
+// Reads device to container allocation information from disk
 func (m *ManagerImpl) readCheckpoint() error {
 	content, err := m.store.Read(kubeletDevicePluginCheckpoint)
 	if err != nil {
@@ -442,7 +409,7 @@ func (m *ManagerImpl) readCheckpoint() error {
 		}
 		return fmt.Errorf("failed to read checkpoint file %q: %v", kubeletDevicePluginCheckpoint, err)
 	}
-	glog.V(4).Infof("Read checkpoint file %s\n", kubeletDevicePluginCheckpoint)
+	glog.V(4).Infof("read checkpoint file %s\n", kubeletDevicePluginCheckpoint)
 	var data checkpointData
 	if err := json.Unmarshal(content, &data); err != nil {
 		return fmt.Errorf("failed to unmarshal deviceplugin checkpoint data: %v", err)
@@ -450,8 +417,7 @@ func (m *ManagerImpl) readCheckpoint() error {
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	m.podDevices.fromCheckpointData(data.PodDeviceEntries)
-	m.allocatedDevices = m.podDevices.devices()
+	m.allocation.fromCheckpointData(data.PodDeviceEntries)
 	for resource, devices := range data.RegisteredDevices {
 		m.allDevices[resource] = sets.NewString()
 		for _, dev := range devices {
@@ -461,166 +427,107 @@ func (m *ManagerImpl) readCheckpoint() error {
 	return nil
 }
 
-// updateAllocatedDevices gets a list of active pods and then frees any Devices that are bound to
-// terminated pods. Returns error on failure.
-func (m *ManagerImpl) updateAllocatedDevices(activePods []*v1.Pod) {
-	if !m.sourcesReady.AllReady() {
-		return
-	}
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	activePodUids := sets.NewString()
-	for _, pod := range activePods {
-		activePodUids.Insert(string(pod.UID))
-	}
-	allocatedPodUids := m.podDevices.pods()
-	podsToBeRemoved := allocatedPodUids.Difference(activePodUids)
-	if len(podsToBeRemoved) <= 0 {
-		return
-	}
-	glog.V(3).Infof("pods to be removed: %v", podsToBeRemoved.List())
-	m.podDevices.delete(podsToBeRemoved.List())
-	// Regenerated allocatedDevices after we update pod allocation information.
-	m.allocatedDevices = m.podDevices.devices()
-}
+// Allocate allocates a set of device resources for the Pod given.
+// TODO: invoke endpoint handler to lock it during device allocation.
+func (m *ManagerImpl) Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
+	var err error
+	pod := attrs.Pod
 
-// Returns list of device Ids we need to allocate with Allocate rpc call.
-// Returns empty list in case we don't need to issue the Allocate rpc call.
-func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, required int, reusableDevices sets.String) (sets.String, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	needed := required
-	// Gets list of devices that have already been allocated.
-	// This can happen if a container restarts for example.
-	devices := m.podDevices.containerDevices(podUID, contName, resource)
-	if devices != nil {
-		glog.V(3).Infof("Found pre-allocated devices for resource %s container %q in Pod %q: %v", resource, contName, podUID, devices.List())
-		needed = needed - devices.Len()
-		// A pod's resource is not expected to change once admitted by the API server,
-		// so just fail loudly here. We can revisit this part if this no longer holds.
-		if needed != 0 {
-			return nil, fmt.Errorf("pod %v container %v changed request for resource %v from %v to %v", podUID, contName, resource, devices.Len(), required)
+	// Purge allocations by active Pods
+	if m.sourcesReady.AllReady() {
+		activePods := sets.NewString()
+		for _, p := range m.activePods() {
+			activePods.Insert(string(p.UID))
+		}
+		m.allocation.purge(activePods)
+	}
+
+	devicesKnown := m.snapshotAllDevices()
+	request, _ := m.getPodRequests(pod, devicesKnown)
+	reservation, err := m.allocation.reserve(devicesKnown, request)
+	if err != nil {
+		return err
+	}
+
+	// device allocation requests are issued on a per-container, per-resource basis
+	for container, rmap := range reservation {
+		for resource, dinfo := range rmap {
+			ep, ok := m.endpoints[resource]
+			if !ok {
+				err = fmt.Errorf("device endpoint for resource %s disappeared", resource)
+				break
+			}
+			startRPCTime := time.Now()
+			resp, err := ep.allocate(dinfo.ids.List())
+			metrics.DevicePluginAllocationLatency.WithLabelValues(resource).Observe(metrics.SinceInMicroseconds(startRPCTime))
+			if err != nil {
+				break
+			}
+			reservation[container][resource] = deviceInfo{
+				status:    dinfo.status,
+				ids:       dinfo.ids,
+				allocResp: resp,
+			}
 		}
 	}
-	if needed == 0 {
-		// No change, no work.
-		return nil, nil
+	if err != nil {
+		m.allocation.rollback(string(pod.UID))
+		return err
 	}
-	glog.V(3).Infof("Needs to allocate %v %v for pod %q container %q", needed, resource, podUID, contName)
-	// Needs to allocate additional devices.
-	if _, ok := m.allDevices[resource]; !ok {
-		return nil, fmt.Errorf("can't allocate unregistered device %v", resource)
-	}
-	devices = sets.NewString()
-	// Allocates from reusableDevices list first.
-	for device := range reusableDevices {
-		devices.Insert(device)
-		needed--
-		if needed == 0 {
-			return devices, nil
-		}
-	}
-	// Needs to allocate additional devices.
-	if m.allocatedDevices[resource] == nil {
-		m.allocatedDevices[resource] = sets.NewString()
-	}
-	// Gets Devices in use.
-	devicesInUse := m.allocatedDevices[resource]
-	// Gets a list of available devices.
-	available := m.allDevices[resource].Difference(devicesInUse)
-	if int(available.Len()) < needed {
-		return nil, fmt.Errorf("requested number of devices unavailable for %s. Requested: %d, Available: %d", resource, needed, available.Len())
-	}
-	allocated := available.UnsortedList()[:needed]
-	// Updates m.allocatedDevices with allocated devices to prevent them
-	// from being allocated to other pods/containers, given that we are
-	// not holding lock during the rpc call.
-	for _, device := range allocated {
-		m.allocatedDevices[resource].Insert(device)
-		devices.Insert(device)
-	}
-	return devices, nil
+
+	m.mutex.Lock()
+	m.allocation.confirm(string(pod.UID), reservation)
+	m.sanitizeNodeAllocatable(node, string(pod.UID))
+	m.mutex.Unlock()
+	m.writeCheckpoint()
+	return nil
 }
 
-// allocateContainerResources attempts to allocate all of required device
-// plugin resources for the input container, issues an Allocate rpc request
-// for each new device resource requirement, processes their AllocateResponses,
-// and updates the cached containerDevices on success.
-func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Container, devicesToReuse map[string]sets.String) error {
-	podUID := string(pod.UID)
-	contName := container.Name
-	allocatedDevicesUpdated := false
-	// NOTE: Skipping the Resources.Limits is safe here because:
-	// 1. If container Spec mentions Limits only, implicitly Requests, equal to Limits, will get added to the Spec.
-	// 2. If container Spec mentions Limits, which are greater than or less than Requests, will fail at validation.
+// snapshotAllDevices creates a snapshot of all devices known to the manager
+// at the time of Pod creation i.e. device allocation.
+func (m *ManagerImpl) snapshotAllDevices() map[string]sets.String {
+	snapshot := make(map[string]sets.String)
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	for r, dset := range m.allDevices {
+		devs := dset.UnsortedList()
+		snapshot[r] = sets.NewString(devs...)
+	}
+	return snapshot
+}
+
+// getPodRequests summarizes the device resource requests from the given Pod.
+func (m *ManagerImpl) getPodRequests(pod *v1.Pod, devices map[string]sets.String) (*allocRequest, error) {
+	req := &allocRequest{
+		pod:        string(pod.UID),
+		inits:      make(map[string]map[string]int),
+		containers: make(map[string]map[string]int),
+	}
+	for _, c := range pod.Spec.InitContainers {
+		req.inits[c.Name] = m.getContainerRequest(&c, devices)
+	}
+
+	for _, c := range pod.Spec.Containers {
+		req.containers[c.Name] = m.getContainerRequest(&c, devices)
+	}
+	return req, nil
+}
+
+// getContainerRequest returns device resource requests in a map.
+// We filter the requests (defaulted to limits) by resources known to the
+// device plugin manager
+func (m *ManagerImpl) getContainerRequest(container *v1.Container, devices map[string]sets.String) map[string]int {
+	req := make(map[string]int)
 	for k, v := range container.Resources.Requests {
 		resource := string(k)
-		needed := int(v.Value())
-		glog.V(3).Infof("needs %d %s", needed, resource)
-		_, registeredResource := m.allDevices[resource]
-		_, allocatedResource := m.allocatedDevices[resource]
-		// Continues if this is neither an active device plugin resource nor
-		// a resource we have previously allocated.
-		if !registeredResource && !allocatedResource {
+		count := int(v.Value())
+		if _, found := devices[resource]; !found {
 			continue
 		}
-		// Updates allocatedDevices to garbage collect any stranded resources
-		// before doing the device plugin allocation.
-		if !allocatedDevicesUpdated {
-			m.updateAllocatedDevices(m.activePods())
-			allocatedDevicesUpdated = true
-		}
-		allocDevices, err := m.devicesToAllocate(podUID, contName, resource, needed, devicesToReuse[resource])
-		if err != nil {
-			return err
-		}
-		if allocDevices == nil || len(allocDevices) <= 0 {
-			continue
-		}
-		startRPCTime := time.Now()
-		// devicePluginManager.Allocate involves RPC calls to device plugin, which
-		// could be heavy-weight. Therefore we want to perform this operation outside
-		// mutex lock. Note if Allocate call fails, we may leave container resources
-		// partially allocated for the failed container. We rely on updateAllocatedDevices()
-		// to garbage collect these resources later. Another side effect is that if
-		// we have X resource A and Y resource B in total, and two containers, container1
-		// and container2 both require X resource A and Y resource B. Both allocation
-		// requests may fail if we serve them in mixed order.
-		// TODO: may revisit this part later if we see inefficient resource allocation
-		// in real use as the result of this. Should also consider to parallize device
-		// plugin Allocate grpc calls if it becomes common that a container may require
-		// resources from multiple device plugins.
-		m.mutex.Lock()
-		e, ok := m.endpoints[resource]
-		m.mutex.Unlock()
-		if !ok {
-			m.mutex.Lock()
-			m.allocatedDevices = m.podDevices.devices()
-			m.mutex.Unlock()
-			return fmt.Errorf("Unknown Device Plugin %s", resource)
-		}
-
-		devs := allocDevices.UnsortedList()
-		glog.V(3).Infof("Making allocation request for devices %v for device plugin %s", devs, resource)
-		resp, err := e.allocate(devs)
-		metrics.DevicePluginAllocationLatency.WithLabelValues(resource).Observe(metrics.SinceInMicroseconds(startRPCTime))
-		if err != nil {
-			// In case of allocation failure, we want to restore m.allocatedDevices
-			// to the actual allocated state from m.podDevices.
-			m.mutex.Lock()
-			m.allocatedDevices = m.podDevices.devices()
-			m.mutex.Unlock()
-			return err
-		}
-
-		// Update internal cached podDevices state.
-		m.mutex.Lock()
-		m.podDevices.insert(podUID, contName, resource, allocDevices, resp)
-		m.mutex.Unlock()
+		req[resource] = count
 	}
-
-	// Checkpoints device to container allocation information.
-	return m.writeCheckpoint()
+	return req
 }
 
 // GetDeviceRunContainerOptions checks whether we have cached containerDevices
@@ -629,33 +536,38 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Container) *DeviceRunContainerOptions {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	return m.podDevices.deviceRunContainerOptions(string(pod.UID), container.Name)
+	return m.allocation.collectRunOptions(string(pod.UID), container.Name)
 }
 
-// sanitizeNodeAllocatable scans through allocatedDevices in the device manager
+// sanitizeNodeAllocatable scans through allocated devices in the device manager
 // and if necessary, updates allocatableResource in nodeInfo to at least equal to
 // the allocated capacity. This allows pods that have already been scheduled on
 // the node to pass GeneralPredicates admission checking even upon device plugin failure.
-func (m *ManagerImpl) sanitizeNodeAllocatable(node *schedulercache.NodeInfo) {
-	var newAllocatableResource *schedulercache.Resource
-	allocatableResource := node.AllocatableResource()
-	if allocatableResource.ScalarResources == nil {
-		allocatableResource.ScalarResources = make(map[v1.ResourceName]int64)
+func (m *ManagerImpl) sanitizeNodeAllocatable(node *schedulercache.NodeInfo, pod string) {
+	// quick return if no resources allocated
+	if !m.allocation.hasPod(pod) {
+		return
 	}
-	for resource, devices := range m.allocatedDevices {
-		needed := devices.Len()
-		quant, ok := allocatableResource.ScalarResources[v1.ResourceName(resource)]
-		if ok && int(quant) >= needed {
+
+	var newAllocatable *schedulercache.Resource
+	allocatable := node.AllocatableResource()
+	if allocatable.ScalarResources == nil {
+		allocatable.ScalarResources = make(map[v1.ResourceName]int64)
+	}
+	for res, devs := range m.allocation.devices() {
+		allocated := devs.Len()
+		quant, ok := allocatable.ScalarResources[v1.ResourceName(res)]
+		if ok && int(quant) >= allocated {
 			continue
 		}
 		// Needs to update nodeInfo.AllocatableResource to make sure
 		// NodeInfo.allocatableResource at least equal to the capacity already allocated.
-		if newAllocatableResource == nil {
-			newAllocatableResource = allocatableResource.Clone()
+		if newAllocatable == nil {
+			newAllocatable = allocatable.Clone()
 		}
-		newAllocatableResource.ScalarResources[v1.ResourceName(resource)] = int64(needed)
+		newAllocatable.ScalarResources[v1.ResourceName(res)] = int64(allocated)
 	}
-	if newAllocatableResource != nil {
-		node.SetAllocatableResource(newAllocatableResource)
+	if newAllocatable != nil {
+		node.SetAllocatableResource(newAllocatable)
 	}
 }
