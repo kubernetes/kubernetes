@@ -1,5 +1,5 @@
 kind: Service
-apiVersion: v1
+apiVersion: apps/v1
 metadata:
   name: registry
 spec:
