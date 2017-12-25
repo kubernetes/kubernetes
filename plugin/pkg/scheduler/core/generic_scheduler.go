@@ -64,7 +64,7 @@ const (
 	// The scheduler uses the annotation to find that the pod shouldn't preempt more pods
 	// when it gets to the head of scheduling queue again.
 	// See podEligibleToPreemptOthers() for more information.
-	NominatedNodeAnnotationKey = "NominatedNodeName"
+	NominatedNodeAnnotationKey = "scheduler.kubernetes.io/nominated-node-name"
 )
 
 // Error returns detailed information of why the pod failed to fit on each node
