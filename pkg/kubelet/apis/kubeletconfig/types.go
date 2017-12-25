@@ -192,7 +192,7 @@ type KubeletConfiguration struct {
 	//   "promiscuous-bridge": make the container bridge promiscuous.
 	//   "hairpin-veth":       set the hairpin flag on container veth interfaces.
 	//   "none":               do nothing.
-	// Generally, one must set --hairpin-mode=veth-flag to achieve hairpin NAT,
+	// Generally, one must set --hairpin-mode=hairpin-veth to achieve hairpin NAT,
 	// because promiscous-bridge assumes the existence of a container bridge named cbr0.
 	HairpinMode string
 	// maxPods is the number of pods that can run on this Kubelet.
