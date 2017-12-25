@@ -525,9 +525,12 @@ func (eac ExtraArgsCheck) Check() (warnings, errors []error) {
 		warnings = append(warnings, argsCheck("kube-controller-manager", eac.ControllerManagerExtraArgs, flags)...)
 	}
 	if len(eac.SchedulerExtraArgs) > 0 {
-		command := schedulerapp.NewSchedulerCommand()
+		opts, err := schedulerapp.NewOptions()
+		if err != nil {
+			warnings = append(warnings, err)
+		}
 		flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-		flags.AddFlagSet(command.Flags())
+		opts.AddFlags(flags)
 		warnings = append(warnings, argsCheck("kube-scheduler", eac.SchedulerExtraArgs, flags)...)
 	}
 	return warnings, nil
