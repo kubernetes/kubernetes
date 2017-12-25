@@ -13,6 +13,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater",
     deps = [
+        "//pkg/util/node:go_default_library",
         "//pkg/controller/volume/attachdetach/cache:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
