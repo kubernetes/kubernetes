@@ -1,0 +1,13 @@
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+   name: ceph
+provisioner: kubernetes.io/rbd
+# parameters:
+#  monitors: # Please type in the monitors for your ceph cluster
+#  adminId: # Please type int adminId for your ceph cluster
+#  adminSecretName: # Please type int adminSecretName for your ceph cluster at kubernetes Secret
+#  pool: # Please enter the pool that you assigned to kubernetes in ceph
+#  userId: # Please enter the userId that you assigned to kubernetes in ceph
+#  userSecretName: # Please enter userSecretName that you assigned to kubernetes in ceph at kubernetes Secret
