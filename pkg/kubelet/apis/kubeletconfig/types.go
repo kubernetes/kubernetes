@@ -131,6 +131,9 @@ type KubeletConfiguration struct {
 	// oomScoreAdj is The oom-score-adj value for kubelet process. Values
 	// must be within the range [-1000, 1000].
 	OOMScoreAdj int32
+	// cloudProvider is the provider for cloud services.
+	// +optional
+	CloudProvider string
 	// clusterDomain is the DNS domain for this cluster. If set, kubelet will
 	// configure all containers to search this domain in addition to the
 	// host's search domains.
