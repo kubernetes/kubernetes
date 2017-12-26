@@ -76,7 +76,7 @@ func (c *Config) buildGlobalOptions() []string {
 
 // getConfig gets configurations from the rkt API service
 // and merge it with the existing config. The merge rule is
-// that the fields in the provided config will override the
+// that the fields in the provided config will be overridden by the
 // result that get from the rkt api service.
 func (r *Runtime) getConfig(cfg *Config) (*Config, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), r.requestTimeout)
