@@ -32,9 +32,9 @@ import (
 	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
+	"github.com/google/cadvisor/gpu"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/info/v2"
-	"github.com/google/cadvisor/gpu"
 	"github.com/google/cadvisor/summary"
 	"github.com/google/cadvisor/utils/cpuload"
 
@@ -306,7 +306,7 @@ func (c *containerData) GetProcessList(cadvisorContainer string, inHostNamespace
 	return processes, nil
 }
 
-func newContainerData(containerName string, memoryCache *memory.InMemoryCache, handler container.ContainerHandler, logUsage bool, collectorManager collector.CollectorManager, maxHousekeepingInterval time.Duration, allowDynamicHousekeeping bool,gpuMonitor gpu.GPUMonitor) (*containerData, error) {
+func newContainerData(containerName string, memoryCache *memory.InMemoryCache, handler container.ContainerHandler, logUsage bool, collectorManager collector.CollectorManager, maxHousekeepingInterval time.Duration, allowDynamicHousekeeping bool, gpuMonitor gpu.GPUMonitor) (*containerData, error) {
 	if memoryCache == nil {
 		return nil, fmt.Errorf("nil memory storage")
 	}
@@ -525,40 +525,42 @@ func (c *containerData) updateStats() error {
 	}
 
 	// get docker container pid here
-    if c.handler.Type() == container.ContainerTypeDocker{
-		pids, _ := c.handler.ListProcesses(1)
-        for _, pid := range pids {
+	if c.handler.Type() == container.ContainerTypeDocker {
+		pids, _ := c.handler.ListProcesses(container.ListRecursive)
+		for _, pid := range pids {
 			fbSize := c.gpuMonitor.GetGPUFbSize(strconv.Itoa(pid))
-			// this process does not use gpu 
-			if fbSize==nil{
+			// this process does not use gpu
+			if fbSize == nil {
 				continue
 			}
 
 			gpuStats := info.GpuStats{
-				SMUtils: make(map[string]string),
+				SMUtils:  make(map[string]string),
 				MemUtils: make(map[string]string),
-				FBSize: make(map[string]string),
+				EncUtils: make(map[string]string),
+				DecUtils: make(map[string]string),
+				FBSize:   make(map[string]string),
 			}
 
 			for k, v := range fbSize {
-				gpuStats.FBSize[k]+=v
+				gpuStats.FBSize[k] += v
 			}
 
 			gpuUtil := c.gpuMonitor.GetGPUUtil(strconv.Itoa(pid))
 
-			if gpuUtil !=nil {
-				for k,v := range gpuUtil{
-					gpuStats.SMUtils[k]+=v[0]
-					gpuStats.MemUtils[k]+=v[1]
+			if gpuUtil != nil {
+				for k, v := range gpuUtil {
+					gpuStats.SMUtils[k] += v[0]
+					gpuStats.MemUtils[k] += v[1]
+					gpuStats.EncUtils[k] += v[2]
+					gpuStats.DecUtils[k] += v[3]
 				}
 			}
 
 			stats.GPU = gpuStats
-		}	
+		}
 
 	}
-	
-	
 
 	if c.loadReader != nil {
 		// TODO(vmarmol): Cache this path.

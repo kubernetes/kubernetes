@@ -17,11 +17,10 @@ package metrics
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"time"
 
 	info "github.com/google/cadvisor/info/v1"
-
-	"strconv"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -87,6 +86,7 @@ func ioValues(ioStats []info.PerDiskStats, ioType string, ioValueFn func(uint64)
 
 func gpuValues(mm map[string]string) metricValues {
 	values := make(metricValues, 0, len(mm))
+
 	for k, v := range mm {
 		i, _ := strconv.ParseFloat(v, 64)
 		values = append(values, metricValue{
@@ -94,6 +94,7 @@ func gpuValues(mm map[string]string) metricValues {
 			labels: []string{k},
 		})
 	}
+
 	return values
 }
 
@@ -638,6 +639,24 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
 					return gpuValues(s.GPU.MemUtils)
+				},
+			},
+			{
+				name:        "container_gpu_enc_util",
+				help:        "container gpu enc utilitization",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"device"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return gpuValues(s.GPU.EncUtils)
+				},
+			},
+			{
+				name:        "container_gpu_dec_util",
+				help:        "container gpu dec utilitization",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"device"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return gpuValues(s.GPU.DecUtils)
 				},
 			},
 			{
