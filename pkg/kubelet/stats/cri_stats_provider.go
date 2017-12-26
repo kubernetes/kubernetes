@@ -17,6 +17,7 @@ limitations under the License.
 package stats
 
 import (
+	"errors"
 	"fmt"
 	"path"
 	"sort"
@@ -185,17 +186,18 @@ func (p *criStatsProvider) ImageFsStats() (*statsapi.FsStats, error) {
 			UsedBytes:  &fs.UsedBytes.Value,
 			InodesUsed: &fs.InodesUsed.Value,
 		}
-		imageFsInfo := p.getFsInfo(fs.StorageId)
-		if imageFsInfo != nil {
-			// The image filesystem UUID is unknown to the local node or
-			// there's an error on retrieving the stats. In these cases, we
-			// omit those stats and return the best-effort partial result. See
-			// https://github.com/kubernetes/heapster/issues/1793.
-			s.AvailableBytes = &imageFsInfo.Available
-			s.CapacityBytes = &imageFsInfo.Capacity
-			s.InodesFree = imageFsInfo.InodesFree
-			s.Inodes = imageFsInfo.Inodes
+		imageFsInfo, err := p.getFsInfo(fs.StorageId)
+		if err != nil {
+			return nil, fmt.Errorf("imageFs information is unavailable: %v", err)
 		}
+		// The image filesystem UUID is unknown to the local node or
+		// there's an error on retrieving the stats. In these cases, we
+		// omit those stats and return the best-effort partial result. See
+		// https://github.com/kubernetes/heapster/issues/1793.
+		s.AvailableBytes = &imageFsInfo.Available
+		s.CapacityBytes = &imageFsInfo.Capacity
+		s.InodesFree = imageFsInfo.InodesFree
+		s.Inodes = imageFsInfo.Inodes
 		return s, nil
 	}
 
@@ -205,10 +207,11 @@ func (p *criStatsProvider) ImageFsStats() (*statsapi.FsStats, error) {
 // getFsInfo returns the information of the filesystem with the specified
 // storageID. If any error occurs, this function logs the error and returns
 // nil.
-func (p *criStatsProvider) getFsInfo(storageID *runtimeapi.StorageIdentifier) *cadvisorapiv2.FsInfo {
+func (p *criStatsProvider) getFsInfo(storageID *runtimeapi.StorageIdentifier) (*cadvisorapiv2.FsInfo, error) {
 	if storageID == nil {
-		glog.V(2).Infof("Failed to get filesystem info: storageID is nil.")
-		return nil
+		msg := "failed to get filesystem info: storageID is nil"
+		glog.V(2).Infof(msg)
+		return nil, errors.New(msg)
 	}
 	fsInfo, err := p.cadvisor.GetFsInfoByFsUUID(storageID.Uuid)
 	if err != nil {
@@ -218,9 +221,9 @@ func (p *criStatsProvider) getFsInfo(storageID *runtimeapi.StorageIdentifier) *c
 		} else {
 			glog.Error(msg)
 		}
-		return nil
+		return nil, errors.New(msg)
 	}
-	return &fsInfo
+	return &fsInfo, nil
 }
 
 // buildPodStats returns a PodStats that identifies the Pod managing cinfo
@@ -311,7 +314,7 @@ func (p *criStatsProvider) makeContainerStats(
 	if storageID != nil {
 		imageFsInfo, found := uuidToFsInfo[*storageID]
 		if !found {
-			imageFsInfo = p.getFsInfo(storageID)
+			imageFsInfo, _ = p.getFsInfo(storageID)
 			uuidToFsInfo[*storageID] = imageFsInfo
 		}
 		if imageFsInfo != nil {
