@@ -100,5 +100,13 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 				val, kubetypes.NodeAllocatableEnforcementKey, kubetypes.SystemReservedEnforcementKey, kubetypes.KubeReservedEnforcementKey))
 		}
 	}
+	switch kc.HairpinMode {
+	case kubeletconfig.HairpinNone:
+	case kubeletconfig.HairpinVeth:
+	case kubeletconfig.PromiscuousBridge:
+	default:
+		allErrors = append(allErrors, fmt.Errorf("Invalid option %q specified for HairpinMode (--hairpin-mode) setting. Valid options are %q, %q or %q",
+			kc.HairpinMode, kubeletconfig.HairpinNone, kubeletconfig.HairpinVeth, kubeletconfig.PromiscuousBridge))
+	}
 	return utilerrors.NewAggregate(allErrors)
 }
