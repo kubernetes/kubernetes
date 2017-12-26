@@ -1,3 +1,17 @@
+// Copyright 2017 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //Package cmd uses raw cmd to get the per-pid gpu sm util and mem util
 package cmd
 
@@ -6,24 +20,25 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 	"sync"
+	"time"
+
 	"github.com/golang/glog"
 )
 
 type CMDGPUMonitor struct {
-	utillock sync.RWMutex
+	utillock   sync.RWMutex
 	fbSizelock sync.RWMutex
-	// GPUUtils first key is pid, second key is device id, value is two-elemet util slice, first element is sm util
-	// second element is mem util
+	// GPUUtils first key is pid, second key is device id, value is four-elemet util slice, first element is sm util
+	// second element is mem util, third element is enc util, fourth element is dec util.
 	GPUUtils map[string]map[string][]string
 	// GPUFBSize first key is pid, second key is device id, value is fb size(unit is MB)
 	GPUFBSize map[string]map[string]string
 }
 
-func NewGPUMonitor() *CMDGPUMonitor{
+func NewGPUMonitor() *CMDGPUMonitor {
 	return &CMDGPUMonitor{
-		GPUUtils: make(map[string]map[string][]string),
+		GPUUtils:  make(map[string]map[string][]string),
 		GPUFBSize: make(map[string]map[string]string),
 	}
 }
@@ -38,8 +53,8 @@ func (self *CMDGPUMonitor) isCmdExist() bool {
 	return true
 }
 
-// SetGPUUtils runs nvidia-smi command and set per pid sm util and mem util
-func (self *CMDGPUMonitor) setGPUUtils() (error) {
+// SetGPUUtils runs nvidia-smi command and set per pid sm/mem/enc/dec utilizations
+func (self *CMDGPUMonitor) setGPUUtils() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 
 	defer cancel()
@@ -75,9 +90,9 @@ func (self *CMDGPUMonitor) setGPUUtils() (error) {
 		13       -     -     -     -     -     -   -
 		14       -     -     -     -     -     -   -
 		15 1426541     C    66    26     0     0   python */
-	
+
 	newPids := make(map[string]struct{})
-    self.utillock.Lock()
+	self.utillock.Lock()
 
 	for c, line := range strings.Split(string(out), "\n") {
 		vals := strings.Fields(line)
@@ -100,21 +115,22 @@ func (self *CMDGPUMonitor) setGPUUtils() (error) {
 
 		if len(utilmap[vals[0]]) == 0 {
 			// new device util metric
-			utilmap[vals[0]] = make([]string,2,2)
-			
+			utilmap[vals[0]] = make([]string, 4, 4)
+
 		}
-		utilmap[vals[0]][0]=vals[3]
-	    utilmap[vals[0]][1]=vals[4]
-		
+		utilmap[vals[0]][0] = vals[3]
+		utilmap[vals[0]][1] = vals[4]
+		utilmap[vals[0]][2] = vals[5]
+		utilmap[vals[0]][3] = vals[6]
+
 	}
 
-    //delete none-exist entry
-	for pid := range self.GPUUtils{
-		if _, ok := newPids[pid]; !ok{
-			delete(self.GPUUtils,pid)
+	//delete none-exist entry
+	for pid := range self.GPUUtils {
+		if _, ok := newPids[pid]; !ok {
+			delete(self.GPUUtils, pid)
 		}
 	}
-
 
 	self.utillock.Unlock()
 
@@ -158,7 +174,7 @@ func (self *CMDGPUMonitor) setGPUFBSize() error {
 	   13       -     -     -   -
 	   14       -     -     -   -
 	   15       -     -     -   - */
-    newPids := make(map[string]struct{})
+	newPids := make(map[string]struct{})
 	self.fbSizelock.Lock()
 
 	for c, line := range strings.Split(string(out), "\n") {
@@ -171,32 +187,31 @@ func (self *CMDGPUMonitor) setGPUFBSize() error {
 			continue
 		}
 
-		newPids[vals[1]]= struct{}{}
+		newPids[vals[1]] = struct{}{}
 
 		fbmap, ok := self.GPUFBSize[vals[1]]
 
-		if !ok{
+		if !ok {
 			// a new process emerge
 			self.GPUFBSize[vals[1]] = make(map[string]string)
 			fbmap, _ = self.GPUFBSize[vals[1]]
 		}
 
-		fbmap[vals[0]]=vals[3]
+		fbmap[vals[0]] = vals[3]
 	}
 
-	for pid := range self.GPUFBSize{
-		if _, ok := newPids[pid]; !ok{
-			delete(self.GPUFBSize,pid)
+	for pid := range self.GPUFBSize {
+		if _, ok := newPids[pid]; !ok {
+			delete(self.GPUFBSize, pid)
 		}
 	}
-
 
 	self.fbSizelock.Unlock()
 
 	return nil
 }
 
-func (self *CMDGPUMonitor) Start(){
+func (self *CMDGPUMonitor) Start() {
 
 	if !self.isCmdExist() {
 		glog.Warning("there is no nvidia-smi command in the PATH")
@@ -204,36 +219,36 @@ func (self *CMDGPUMonitor) Start(){
 	}
 
 	glog.V(3).Info("Start monitoring GPU")
-    
+
 	// get gpu info every 10 seconds
-	ticker := time.Tick(10*time.Second)
+	ticker := time.Tick(10 * time.Second)
 
 	for {
 		select {
-			case t := <- ticker:
+		case t := <-ticker:
 			start := time.Now()
 
 			// do the collecting
 			wg := sync.WaitGroup{}
-            wg.Add(2)
+			wg.Add(2)
 
-			go func(){
+			go func() {
 				self.setGPUUtils()
 				wg.Done()
 			}()
 
-			go func(){
+			go func() {
 				self.setGPUFBSize()
 				wg.Done()
 			}()
 
 			wg.Wait()
-			glog.Infof("gpu map %v %v",self.GPUFBSize,self.GPUUtils)
-			
+			glog.Infof("gpu map %v %v", self.GPUFBSize, self.GPUUtils)
+
 			duration := time.Since(start)
 
-			if duration >= 2 * time.Second{
-				glog.V(3).Infof("GPU monitoring(%d) took %s",t.Unix(),duration)
+			if duration >= 2*time.Second {
+				glog.V(3).Infof("GPU monitoring(%d) took %s", t.Unix(), duration)
 			}
 		}
 	}
@@ -243,19 +258,18 @@ func (self *CMDGPUMonitor) GetGPUFbSize(pid string) map[string]string {
 	self.fbSizelock.RLock()
 	defer self.fbSizelock.RUnlock()
 
-	if res, ok := self.GPUFBSize[pid]; ok{
+	if res, ok := self.GPUFBSize[pid]; ok {
 		return res
 	}
 
 	return nil
 }
 
-
 func (self *CMDGPUMonitor) GetGPUUtil(pid string) map[string][]string {
 	self.utillock.RLock()
 	defer self.utillock.RUnlock()
 
-	if res, ok := self.GPUUtils[pid]; ok{
+	if res, ok := self.GPUUtils[pid]; ok {
 		return res
 	}
 
