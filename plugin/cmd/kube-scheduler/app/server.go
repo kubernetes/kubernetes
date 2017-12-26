@@ -70,6 +70,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -103,36 +104,36 @@ type Options struct {
 }
 
 // AddFlags adds flags for a specific SchedulerServer to the specified FlagSet
-func AddFlags(options *Options, fs *pflag.FlagSet) {
-	fs.StringVar(&options.ConfigFile, "config", options.ConfigFile, "The path to the configuration file.")
+func (o *Options) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, "The path to the configuration file.")
 
 	// All flags below here are deprecated and will eventually be removed.
 
-	fs.Int32Var(&options.healthzPort, "port", ports.SchedulerPort, "The port that the scheduler's http service runs on")
-	fs.StringVar(&options.healthzAddress, "address", options.healthzAddress, "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
-	fs.StringVar(&options.algorithmProvider, "algorithm-provider", options.algorithmProvider, "The scheduling algorithm provider to use, one of: "+factory.ListAlgorithmProviders())
-	fs.StringVar(&options.policyConfigFile, "policy-config-file", options.policyConfigFile, "File with scheduler policy configuration. This file is used if policy ConfigMap is not provided or --use-legacy-policy-config==true")
+	fs.Int32Var(&o.healthzPort, "port", ports.SchedulerPort, "The port that the scheduler's http service runs on")
+	fs.StringVar(&o.healthzAddress, "address", o.healthzAddress, "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
+	fs.StringVar(&o.algorithmProvider, "algorithm-provider", o.algorithmProvider, "The scheduling algorithm provider to use, one of: "+factory.ListAlgorithmProviders())
+	fs.StringVar(&o.policyConfigFile, "policy-config-file", o.policyConfigFile, "File with scheduler policy configuration. This file is used if policy ConfigMap is not provided or --use-legacy-policy-config==true")
 	usage := fmt.Sprintf("Name of the ConfigMap object that contains scheduler's policy configuration. It must exist in the system namespace before scheduler initialization if --use-legacy-policy-config==false. The config must be provided as the value of an element in 'Data' map with the key='%v'", componentconfig.SchedulerPolicyConfigMapKey)
-	fs.StringVar(&options.policyConfigMapName, "policy-configmap", options.policyConfigMapName, usage)
-	fs.StringVar(&options.policyConfigMapNamespace, "policy-configmap-namespace", options.policyConfigMapNamespace, "The namespace where policy ConfigMap is located. The system namespace will be used if this is not provided or is empty.")
-	fs.BoolVar(&options.useLegacyPolicyConfig, "use-legacy-policy-config", false, "When set to true, scheduler will ignore policy ConfigMap and uses policy config file")
-	fs.BoolVar(&options.config.EnableProfiling, "profiling", options.config.EnableProfiling, "Enable profiling via web interface host:port/debug/pprof/")
-	fs.BoolVar(&options.config.EnableContentionProfiling, "contention-profiling", options.config.EnableContentionProfiling, "Enable lock contention profiling, if profiling is enabled")
-	fs.StringVar(&options.master, "master", options.master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
-	fs.StringVar(&options.config.ClientConnection.KubeConfigFile, "kubeconfig", options.config.ClientConnection.KubeConfigFile, "Path to kubeconfig file with authorization and master location information.")
-	fs.StringVar(&options.config.ClientConnection.ContentType, "kube-api-content-type", options.config.ClientConnection.ContentType, "Content type of requests sent to apiserver.")
-	fs.Float32Var(&options.config.ClientConnection.QPS, "kube-api-qps", options.config.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver")
-	fs.Int32Var(&options.config.ClientConnection.Burst, "kube-api-burst", options.config.ClientConnection.Burst, "Burst to use while talking with kubernetes apiserver")
-	fs.StringVar(&options.config.SchedulerName, "scheduler-name", options.config.SchedulerName, "Name of the scheduler, used to select which pods will be processed by this scheduler, based on pod's \"spec.SchedulerName\".")
-	fs.StringVar(&options.config.LeaderElection.LockObjectNamespace, "lock-object-namespace", options.config.LeaderElection.LockObjectNamespace, "Define the namespace of the lock object.")
-	fs.StringVar(&options.config.LeaderElection.LockObjectName, "lock-object-name", options.config.LeaderElection.LockObjectName, "Define the name of the lock object.")
-	fs.Int32Var(&options.config.HardPodAffinitySymmetricWeight, "hard-pod-affinity-symmetric-weight", options.config.HardPodAffinitySymmetricWeight,
+	fs.StringVar(&o.policyConfigMapName, "policy-configmap", o.policyConfigMapName, usage)
+	fs.StringVar(&o.policyConfigMapNamespace, "policy-configmap-namespace", o.policyConfigMapNamespace, "The namespace where policy ConfigMap is located. The system namespace will be used if this is not provided or is empty.")
+	fs.BoolVar(&o.useLegacyPolicyConfig, "use-legacy-policy-config", false, "When set to true, scheduler will ignore policy ConfigMap and uses policy config file")
+	fs.BoolVar(&o.config.EnableProfiling, "profiling", o.config.EnableProfiling, "Enable profiling via web interface host:port/debug/pprof/")
+	fs.BoolVar(&o.config.EnableContentionProfiling, "contention-profiling", o.config.EnableContentionProfiling, "Enable lock contention profiling, if profiling is enabled")
+	fs.StringVar(&o.master, "master", o.master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
+	fs.StringVar(&o.config.ClientConnection.KubeConfigFile, "kubeconfig", o.config.ClientConnection.KubeConfigFile, "Path to kubeconfig file with authorization and master location information.")
+	fs.StringVar(&o.config.ClientConnection.ContentType, "kube-api-content-type", o.config.ClientConnection.ContentType, "Content type of requests sent to apiserver.")
+	fs.Float32Var(&o.config.ClientConnection.QPS, "kube-api-qps", o.config.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver")
+	fs.Int32Var(&o.config.ClientConnection.Burst, "kube-api-burst", o.config.ClientConnection.Burst, "Burst to use while talking with kubernetes apiserver")
+	fs.StringVar(&o.config.SchedulerName, "scheduler-name", o.config.SchedulerName, "Name of the scheduler, used to select which pods will be processed by this scheduler, based on pod's \"spec.SchedulerName\".")
+	fs.StringVar(&o.config.LeaderElection.LockObjectNamespace, "lock-object-namespace", o.config.LeaderElection.LockObjectNamespace, "Define the namespace of the lock object.")
+	fs.StringVar(&o.config.LeaderElection.LockObjectName, "lock-object-name", o.config.LeaderElection.LockObjectName, "Define the name of the lock object.")
+	fs.Int32Var(&o.config.HardPodAffinitySymmetricWeight, "hard-pod-affinity-symmetric-weight", o.config.HardPodAffinitySymmetricWeight,
 		"RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule corresponding "+
 			"to every RequiredDuringScheduling affinity rule. --hard-pod-affinity-symmetric-weight represents the weight of implicit PreferredDuringScheduling affinity rule.")
 	fs.MarkDeprecated("hard-pod-affinity-symmetric-weight", "This option was moved to the policy configuration file")
-	fs.StringVar(&options.config.FailureDomains, "failure-domains", options.config.FailureDomains, "Indicate the \"all topologies\" set for an empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.")
+	fs.StringVar(&o.config.FailureDomains, "failure-domains", o.config.FailureDomains, "Indicate the \"all topologies\" set for an empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.")
 	fs.MarkDeprecated("failure-domains", "Doesn't have any effect. Will be removed in future version.")
-	leaderelectionconfig.BindFlags(&options.config.LeaderElection.LeaderElectionConfiguration, fs)
+	leaderelectionconfig.BindFlags(&o.config.LeaderElection.LeaderElectionConfiguration, fs)
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }
 
@@ -342,8 +343,8 @@ through the API as necessary.`,
 		glog.Fatalf("unable to apply config defaults: %v", err)
 	}
 
-	flags := cmd.Flags()
-	AddFlags(opts, flags)
+	opts.AddFlags(pflag.CommandLine)
+	utilflag.InitFlags()
 
 	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
 

@@ -25,101 +25,43 @@ import (
 
 func TestGetKubeDNSVersion(t *testing.T) {
 	var tests = []struct {
-		k8sVersion, expected string
+		k8sVersion string
+		dns        string
+		expected   string
 	}{
 		{
-			k8sVersion: "v1.7.0",
-			expected:   "1.14.5",
+			k8sVersion: "v1.9.0",
+			dns:        kubeadmconstants.KubeDNS,
+			expected:   kubeDNSv190AndAboveVersion,
 		},
 		{
-			k8sVersion: "v1.7.1",
-			expected:   "1.14.5",
-		},
-		{
-			k8sVersion: "v1.7.2",
-			expected:   "1.14.5",
-		},
-		{
-			k8sVersion: "v1.7.3",
-			expected:   "1.14.5",
-		},
-		{
-			k8sVersion: "v1.8.0-alpha.2",
-			expected:   "1.14.5",
-		},
-		{
-			k8sVersion: "v1.8.0",
-			expected:   "1.14.5",
+			k8sVersion: "v1.10.0",
+			dns:        kubeadmconstants.KubeDNS,
+			expected:   kubeDNSv190AndAboveVersion,
 		},
 		{
 			k8sVersion: "v1.9.0",
-			expected:   "1.14.7",
+			dns:        kubeadmconstants.CoreDNS,
+			expected:   coreDNSVersion,
+		},
+		{
+			k8sVersion: "v1.10.0",
+			dns:        kubeadmconstants.CoreDNS,
+			expected:   coreDNSVersion,
 		},
 	}
 	for _, rt := range tests {
-
 		k8sVersion, err := version.ParseSemantic(rt.k8sVersion)
 		if err != nil {
 			t.Fatalf("couldn't parse kubernetes version %q: %v", rt.k8sVersion, err)
 		}
 
-		actualDNSVersion := GetDNSVersion(k8sVersion, kubeadmconstants.KubeDNS)
+		actualDNSVersion := GetDNSVersion(k8sVersion, rt.dns)
 		if actualDNSVersion != rt.expected {
 			t.Errorf(
 				"failed GetDNSVersion:\n\texpected: %s\n\t  actual: %s",
 				rt.expected,
 				actualDNSVersion,
-			)
-		}
-	}
-}
-
-func TestGetKubeDNSProbeType(t *testing.T) {
-	var tests = []struct {
-		k8sVersion, expected string
-	}{
-		{
-			k8sVersion: "v1.7.0",
-			expected:   "A",
-		},
-		{
-			k8sVersion: "v1.7.1",
-			expected:   "A",
-		},
-		{
-			k8sVersion: "v1.7.2",
-			expected:   "A",
-		},
-		{
-			k8sVersion: "v1.7.3",
-			expected:   "A",
-		},
-		{
-			k8sVersion: "v1.8.0-alpha.2",
-			expected:   "A",
-		},
-		{
-			k8sVersion: "v1.8.0",
-			expected:   "A",
-		},
-		{
-			k8sVersion: "v1.9.0",
-			expected:   "SRV",
-		},
-	}
-	for _, rt := range tests {
-
-		k8sVersion, err := version.ParseSemantic(rt.k8sVersion)
-		if err != nil {
-			t.Fatalf("couldn't parse kubernetes version %q: %v", rt.k8sVersion, err)
-		}
-
-		actualDNSProbeType := GetKubeDNSProbeType(k8sVersion)
-		if actualDNSProbeType != rt.expected {
-			t.Errorf(
-				"failed GetKubeDNSProbeType:\n\texpected: %s\n\t  actual: %s",
-				rt.expected,
-				actualDNSProbeType,
 			)
 		}
 	}
