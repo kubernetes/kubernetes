@@ -24,13 +24,15 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 )
 
 func TestBasic(t *testing.T) {
 	fakeRecorder := &record.FakeRecorder{}
 	mockCadvisor := &cadvisortest.Fake{}
 	node := &v1.ObjectReference{}
-	oomWatcher := NewOOMWatcher(mockCadvisor, fakeRecorder)
+	containerManager := cm.NewStubContainerManager()
+	oomWatcher := NewOOMWatcher(mockCadvisor, fakeRecorder, containerManager)
 	assert.NoError(t, oomWatcher.Start(node))
 
 	// TODO: Improve this test once cadvisor exports events.EventChannel as an interface
