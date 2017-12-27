@@ -19,6 +19,7 @@ package main
 import (
 	"os"
 
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	_ "k8s.io/kubernetes/pkg/version/prometheus"        // for version metric registration
@@ -28,6 +29,7 @@ import (
 func main() {
 	command := app.NewSchedulerCommand()
 
+	utilflag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 

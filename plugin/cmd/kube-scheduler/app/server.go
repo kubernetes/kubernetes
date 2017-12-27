@@ -68,11 +68,9 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
-
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // SchedulerServer has all the context and params needed to run a Scheduler
@@ -344,7 +342,6 @@ through the API as necessary.`,
 	}
 
 	opts.AddFlags(pflag.CommandLine)
-	utilflag.InitFlags()
 
 	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
 
