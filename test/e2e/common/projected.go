@@ -1517,7 +1517,7 @@ func projectedDownwardAPIVolumePodForUpdateTest(name string, labels, annotations
 		{
 			Name:    "client-container",
 			Image:   mountImage,
-			Command: []string{"/mounttest", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
+			Command: []string{"/mounttest", "--break_on_expected_content=false", "--retry_time=1200", "--file_content_in_loop=" + filePath},
 			VolumeMounts: []v1.VolumeMount{
 				{
 					Name:      "podinfo",
