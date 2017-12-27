@@ -17,38 +17,23 @@ limitations under the License.
 package main
 
 import (
-	"flag"
-
-	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
 )
 
 // NewScheduler creates a new hyperkube Server object that includes the
 // description and flags.
 func NewScheduler() *Server {
-	healthz.DefaultHealthz()
-
-	command := app.NewSchedulerCommand()
+	opts, _ := app.NewOptions()
 
 	hks := Server{
 		name:            "scheduler",
 		AlternativeName: "kube-scheduler",
 		SimpleUsage:     "scheduler",
-		Long:            command.Long,
+		Long:            "Implements a Kubernetes scheduler.  This will assign pods to kubelets based on capacity and constraints.",
+		Run: func(_ *Server, _ []string, stopCh <-chan struct{}) error {
+			return opts.Run(stopCh)
+		},
 	}
-
-	serverFlags := hks.Flags()
-	serverFlags.AddFlagSet(command.Flags())
-
-	// FIXME this is here because hyperkube does its own flag parsing, and we need
-	// the command to know about the go flag set. Remove this once hyperkube is
-	// refactored to use cobra throughout.
-	command.Flags().AddGoFlagSet(flag.CommandLine)
-
-	hks.Run = func(_ *Server, args []string, stopCh <-chan struct{}) error {
-		command.SetArgs(args)
-		return command.Execute()
-	}
-
+	opts.AddFlags(hks.Flags())
 	return &hks
 }
