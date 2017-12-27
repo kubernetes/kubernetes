@@ -26,6 +26,8 @@ import (
 
 	"crypto/rsa"
 
+	"github.com/golang/glog"
+
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
@@ -60,6 +62,7 @@ type kubeConfigSpec struct {
 // to establish the control plane, including also the admin kubeconfig file.
 // If kubeconfig files already exists, they are used only if evaluated equal; otherwise an error is returned.
 func CreateInitKubeConfigFiles(outDir string, cfg *kubeadmapi.MasterConfiguration) error {
+	glog.V(1).Infoln("creating all kubeconfig files")
 	return createKubeConfigFiles(
 		outDir,
 		cfg,
@@ -73,24 +76,28 @@ func CreateInitKubeConfigFiles(outDir string, cfg *kubeadmapi.MasterConfiguratio
 // CreateAdminKubeConfigFile create a kubeconfig file for the admin to use and for kubeadm itself.
 // If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
 func CreateAdminKubeConfigFile(outDir string, cfg *kubeadmapi.MasterConfiguration) error {
+	glog.V(1).Infoln("create a kubeconfig file for the admin and for kubeadm itself")
 	return createKubeConfigFiles(outDir, cfg, kubeadmconstants.AdminKubeConfigFileName)
 }
 
 // CreateKubeletKubeConfigFile create a kubeconfig file for the Kubelet to use.
 // If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
 func CreateKubeletKubeConfigFile(outDir string, cfg *kubeadmapi.MasterConfiguration) error {
+	glog.V(1).Infoln("creating a kubeconfig file for the Kubelet")
 	return createKubeConfigFiles(outDir, cfg, kubeadmconstants.KubeletKubeConfigFileName)
 }
 
 // CreateControllerManagerKubeConfigFile create a kubeconfig file for the ControllerManager to use.
 // If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
 func CreateControllerManagerKubeConfigFile(outDir string, cfg *kubeadmapi.MasterConfiguration) error {
+	glog.V(1).Infoln("creating kubeconfig file for the ControllerManager")
 	return createKubeConfigFiles(outDir, cfg, kubeadmconstants.ControllerManagerKubeConfigFileName)
 }
 
 // CreateSchedulerKubeConfigFile create a create a kubeconfig file for the Scheduler to use.
 // If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
 func CreateSchedulerKubeConfigFile(outDir string, cfg *kubeadmapi.MasterConfiguration) error {
+	glog.V(1).Infoln("creating kubeconfig file for Scheduler")
 	return createKubeConfigFiles(outDir, cfg, kubeadmconstants.SchedulerKubeConfigFileName)
 }
 

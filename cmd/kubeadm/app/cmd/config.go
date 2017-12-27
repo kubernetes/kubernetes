@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/golang/glog"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
@@ -89,6 +90,7 @@ func NewCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
 			The configuration is located in the %q namespace in the %q ConfigMap.
 		`), metav1.NamespaceSystem, constants.MasterConfigurationConfigMap),
 		Run: func(cmd *cobra.Command, args []string) {
+			glog.V(1).Infoln("[config] retrieving ClientSet from file")
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
@@ -117,12 +119,15 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 				kubeadmutil.CheckErr(fmt.Errorf("The --config flag is mandatory"))
 			}
 
+			glog.V(1).Infoln("[config] retrieving ClientSet from file")
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
 			// The default configuration is empty; everything should come from the file on disk
+			glog.V(1).Infoln("[config] creating empty default configuration")
 			defaultcfg := &kubeadmapiext.MasterConfiguration{}
 			// Upload the configuration using the file; don't care about the defaultcfg really
+			glog.V(1).Infof("[config] uploading configuration")
 			err = uploadConfiguration(client, cfgPath, defaultcfg)
 			kubeadmutil.CheckErr(err)
 		},
@@ -150,15 +155,17 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 		`), metav1.NamespaceSystem, constants.MasterConfigurationConfigMap),
 		Run: func(cmd *cobra.Command, args []string) {
 			var err error
+			glog.V(1).Infoln("[config] creating new FeatureGates")
 			if cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
 				kubeadmutil.CheckErr(err)
 			}
-
+			glog.V(1).Infoln("[config] retrieving ClientSet from file")
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
 			// Default both statically and dynamically, convert to internal API type, and validate everything
 			// The cfgPath argument is unset here as we shouldn't load a config file from disk, just go with cfg
+			glog.V(1).Infof("[config] uploading configuration")
 			err = uploadConfiguration(client, "", cfg)
 			kubeadmutil.CheckErr(err)
 		},
@@ -170,6 +177,7 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 // RunConfigView gets the configuration persisted in the cluster
 func RunConfigView(out io.Writer, client clientset.Interface) error {
 
+	glog.V(1).Infoln("[config] getting the cluster configuration")
 	cfgConfigMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.MasterConfigurationConfigMap, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -184,6 +192,7 @@ func uploadConfiguration(client clientset.Interface, cfgPath string, defaultcfg 
 
 	// Default both statically and dynamically, convert to internal API type, and validate everything
 	// First argument is unset here as we shouldn't load a config file from disk
+	glog.V(1).Infoln("[config] converting to internal API type")
 	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, defaultcfg)
 	if err != nil {
 		return err

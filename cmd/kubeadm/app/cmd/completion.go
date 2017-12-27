@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/golang/glog"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
@@ -133,6 +134,7 @@ func RunCompletion(out io.Writer, boilerPlate string, cmd *cobra.Command, args [
 }
 
 func runCompletionBash(out io.Writer, kubeadm *cobra.Command) error {
+	glog.V(1).Infoln("[completion] writing completion code for Bash")
 	return kubeadm.GenBashCompletion(out)
 }
 
@@ -278,10 +280,12 @@ __kubeadm_convert_bash_to_zsh() {
 	-e "s/\\\$(type${RWORD}/\$(__kubeadm_type/g" \
 	<<'BASH_COMPLETION_EOF'
 `
+	glog.V(1).Infoln("[completion] writing completion code for Zsh")
 	out.Write([]byte(zshInitialization))
 
 	buf := new(bytes.Buffer)
 	kubeadm.GenBashCompletion(buf)
+	glog.V(1).Infoln("[completion] writing completion code for Bash")
 	out.Write(buf.Bytes())
 
 	zshTail := `

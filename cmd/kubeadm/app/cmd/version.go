@@ -22,6 +22,7 @@ import (
 	"io"
 
 	"github.com/ghodss/yaml"
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
@@ -53,6 +54,7 @@ func NewCmdVersion(out io.Writer) *cobra.Command {
 // RunVersion provides the version information of kubeadm in format depending on arguments
 // specified in cobra.Command.
 func RunVersion(out io.Writer, cmd *cobra.Command) error {
+	glog.V(1).Infoln("[version] retrieving version info")
 	clientVersion := version.Get()
 	v := Version{
 		ClientVersion: &clientVersion,

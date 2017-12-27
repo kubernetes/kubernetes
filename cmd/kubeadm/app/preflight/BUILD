@@ -63,6 +63,7 @@ go_library(
         "//test/e2e_node/system:go_default_library",
         "//vendor/github.com/PuerkitoBio/purell:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",

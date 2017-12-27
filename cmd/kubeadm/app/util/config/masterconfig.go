@@ -21,6 +21,8 @@ import (
 	"io/ioutil"
 	"net"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -91,10 +93,12 @@ func TryLoadMasterConfiguration(cfgPath string, cfg *kubeadmapiext.MasterConfigu
 // Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
 // Lastly, the internal config is validated and returned.
 func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiext.MasterConfiguration) (*kubeadmapi.MasterConfiguration, error) {
+	glog.V(1).Infoln("configuring files and defaults to internal config")
 	internalcfg := &kubeadmapi.MasterConfiguration{}
 
 	// Loads configuration from config file, if provided
 	// Nb. --config overrides command line flags
+	glog.V(1).Infoln("attempting to load configuration from config file")
 	if err := TryLoadMasterConfiguration(cfgPath, defaultversionedcfg); err != nil {
 		return nil, err
 	}

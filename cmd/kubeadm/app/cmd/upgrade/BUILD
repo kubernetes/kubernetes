@@ -28,6 +28,7 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/client-go/discovery/fake:go_default_library",

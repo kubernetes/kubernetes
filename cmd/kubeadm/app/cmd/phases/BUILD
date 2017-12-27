@@ -48,6 +48,7 @@ go_library(
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/util/normalizer:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
