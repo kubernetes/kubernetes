@@ -35,9 +35,15 @@ spec:
       - name: dev
         hostPath:
           path: /dev
+      - name: varlog
+        hostPath:
+          path: /var/log
       containers:
       - image: "gcr.io/google-containers/nvidia-gpu-device-plugin@sha256:0e79da6998a61257585e0d3fb5848240129f0fa5b4ad972dfed4049448093c33"
-        command: ["/usr/bin/nvidia-gpu-device-plugin", "-logtostderr"]
+        command:
+        - /bin/sh
+        - -c
+        - /usr/bin/nvidia-gpu-device-plugin --logtostderr >>/var/log/nvidia-gpu-device-plugin.log 2>&1
         name: nvidia-gpu-device-plugin
         resources:
           requests:
@@ -53,3 +59,6 @@ spec:
           mountPath: /device-plugin
         - name: dev
           mountPath: /dev
+        - mountPath: /var/log
+          name: varlog
+          readOnly: false
