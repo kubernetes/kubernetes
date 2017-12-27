@@ -17,7 +17,6 @@ limitations under the License.
 package storage
 
 import (
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"path"
@@ -26,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ghodss/yaml"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -118,8 +118,8 @@ const (
 	// volumeConfigName is the configmap passed to bootstrapper and provisioner
 	volumeConfigName = "local-volume-config"
 	// bootstrapper and provisioner images used for e2e tests
-	bootstrapperImageName = "quay.io/external_storage/local-volume-provisioner-bootstrap:v1.0.1"
-	provisionerImageName  = "quay.io/external_storage/local-volume-provisioner:v1.0.1"
+	bootstrapperImageName = "quay.io/external_storage/local-volume-provisioner-bootstrap:v2.0.0"
+	provisionerImageName  = "quay.io/external_storage/local-volume-provisioner:v2.0.0"
 	// provisioner daemonSetName name, must match the one defined in bootstrapper
 	daemonSetName = "local-volume-provisioner"
 	// provisioner node/pv cluster role binding, must match the one defined in bootstrapper
@@ -959,12 +959,24 @@ func deleteClusterRoleBinding(config *localTestConfig) {
 }
 
 func createVolumeConfigMap(config *localTestConfig) {
-	mountConfig := struct {
-		HostDir string `json:"hostDir"`
-	}{
-		HostDir: path.Join(hostBase, discoveryDir),
+	// MountConfig and ProvisionerConfiguration from
+	// https://github.com/kubernetes-incubator/external-storage/blob/master/local-volume/provisioner/pkg/common/common.go
+	type MountConfig struct {
+		// The hostpath directory
+		HostDir string `json:"hostDir" yaml:"hostDir"`
 	}
-	data, err := json.Marshal(&mountConfig)
+	type ProvisionerConfiguration struct {
+		// StorageClassConfig defines configuration of Provisioner's storage classes
+		StorageClassConfig map[string]MountConfig `json:"storageClassMap" yaml:"storageClassMap"`
+	}
+	var provisionerConfig ProvisionerConfiguration
+	provisionerConfig.StorageClassConfig = map[string]MountConfig{
+		config.scName: {
+			HostDir: path.Join(hostBase, discoveryDir),
+		},
+	}
+
+	data, err := yaml.Marshal(&provisionerConfig.StorageClassConfig)
 	Expect(err).NotTo(HaveOccurred())
 
 	configMap := v1.ConfigMap{
@@ -977,7 +989,7 @@ func createVolumeConfigMap(config *localTestConfig) {
 			Namespace: config.ns,
 		},
 		Data: map[string]string{
-			config.scName: string(data),
+			"storageClassMap": string(data),
 		},
 	}
 	_, err = config.client.CoreV1().ConfigMaps(config.ns).Create(&configMap)
