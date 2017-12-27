@@ -117,6 +117,11 @@ func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts Po
 // Complete completes all the required options for port-forward cmd.
 func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
+	o.PortForwardProtocol = cmdutil.GetFlagString(cmd, "protocol")
+	if len(o.PortForwardProtocol) == 0 {
+		o.PortForwardProtocol = api.PortForwardProtocolTypeTcp4
+	}
+
 	o.PodName = cmdutil.GetFlagString(cmd, "pod")
 	if len(o.PodName) == 0 && len(args) == 0 {
 		return cmdutil.UsageErrorf(cmd, "POD is required for port-forward")

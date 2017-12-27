@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 type fakeDialer struct {
@@ -77,7 +78,7 @@ func TestParsePortsAndNew(t *testing.T) {
 		dialer := &fakeDialer{}
 		expectedStopChan := make(chan struct{})
 		readyChan := make(chan struct{})
-		pf, err := New(dialer, test.input, expectedStopChan, readyChan, os.Stdout, os.Stderr)
+		pf, err := New(dialer, api.PortForwardProtocolTypeTcp4, test.input, expectedStopChan, readyChan, os.Stdout, os.Stderr)
 		haveError = err != nil
 		if e, a := test.expectNewError, haveError; e != a {
 			t.Fatalf("%d: New: error expected=%t, got %t: %s", i, e, a, err)

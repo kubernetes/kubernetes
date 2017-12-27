@@ -11,7 +11,10 @@ go_test(
     srcs = ["portforward_test.go"],
     embed = [":go_default_library"],
     importpath = "k8s.io/client-go/tools/portforward",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/util/httpstream:go_default_library"],
+    deps = [
+        "//pkg/apis/core:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/httpstream:go_default_library",
+    ],
 )
 
 go_library(
@@ -19,6 +22,8 @@ go_library(
     srcs = [
         "doc.go",
         "portforward.go",
+        "tcp_portforward.go",
+        "udp_portforward.go",
     ],
     importpath = "k8s.io/client-go/tools/portforward",
     deps = [

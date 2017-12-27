@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net"
 	"os/exec"
 	"strings"
 	"time"
@@ -29,7 +30,9 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/tools/remotecommand"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
@@ -69,10 +72,12 @@ func (r *streamingRuntime) Attach(containerID string, in io.Reader, out, errw io
 
 //need udp
 func (r *streamingRuntime) PortForward(podSandboxID string, protocol string, port int32, stream io.ReadWriteCloser) error {
+	glog.V(3).Infof("haha: into func (r *streamingRuntime) PortForward(podSandboxID string, protocol string, port int32, stream io.ReadWriteCloser) error ")
+
 	if port < 0 || port > math.MaxUint16 {
 		return fmt.Errorf("invalid port %d", port)
 	}
-	if protocol != "TCP4" && protocol != "UDP" {
+	if protocol != api.PortForwardProtocolTypeTcp4 && protocol != api.PortForwardProtocolTypeUdp4 {
 		return fmt.Errorf("invalid or not supported protocol %s", protocol)
 	}
 	return portForward(r.client, podSandboxID, protocol, port, stream)
@@ -163,23 +168,13 @@ func attachContainer(client libdocker.Interface, containerID string, stdin io.Re
 	return client.AttachToContainer(containerID, opts, sopts)
 }
 
-func portForward(client libdocker.Interface, podSandboxID string, protocol string, port int32, stream io.ReadWriteCloser) error {
-	container, err := client.InspectContainer(podSandboxID)
-	if err != nil {
-		return err
-	}
-
-	if !container.State.Running {
-		return fmt.Errorf("container not running (%s)", container.ID)
-	}
-
-	containerPid := container.State.Pid
+func protForwardTcp(containerPid int, port int32, stream io.ReadWriteCloser) error {
 	socatPath, lookupErr := exec.LookPath("socat")
 	if lookupErr != nil {
 		return fmt.Errorf("unable to do port forwarding: socat not found.")
 	}
 
-	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", socatPath, "-", fmt.Sprintf("%s:localhost:%d", protocol, port)}
+	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", socatPath, "-", fmt.Sprintf("TCP4:localhost:%d", port)}
 
 	nsenterPath, lookupErr := exec.LookPath("nsenter")
 	if lookupErr != nil {
@@ -218,4 +213,85 @@ func portForward(client libdocker.Interface, podSandboxID string, protocol strin
 	}
 
 	return nil
+}
+
+func portForwardUdp(containerPid int, port int32, stream io.ReadWriteCloser) error {
+	unixDomainSocketPath := "/tmp/my.sock"
+	unixDomainSocketPath1 := "/tmp/1.sock"
+	socatPath, lookupErr := exec.LookPath("socat")
+	if lookupErr != nil {
+		return fmt.Errorf("unable to do port forwarding: socat not found.")
+	}
+
+	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", socatPath,
+	fmt.Sprintf("UNIX-RECVFROM:%s,fork", unixDomainSocketPath), fmt.Sprintf("UDP:localhost:%d", port)}
+
+	nsenterPath, lookupErr := exec.LookPath("nsenter")
+	if lookupErr != nil {
+		return fmt.Errorf("unable to do port forwarding: nsenter not found.")
+	}
+
+	commandString := fmt.Sprintf("%s %s", nsenterPath, strings.Join(args, " "))
+	glog.V(3).Infof("haha: executing port forwarding command: %s", commandString)
+
+	command := exec.Command(nsenterPath, args...)
+	command.Stdout = stream
+
+	stderr := new(bytes.Buffer)
+	command.Stderr = stderr
+	glog.V(3).Infof("haha:  args are %s\n", args)
+
+	go func() error {
+		err := command.Run();
+		if err != nil {
+			glog.V(3).Infof("haha: execute went error \n")
+			return fmt.Errorf("%v: %s", err, stderr.String())
+		}
+		return nil
+	}()
+
+	time.Sleep(3*time.Second)
+
+	a, err := net.ResolveUnixAddr("unixgram", unixDomainSocketPath)
+	if err != nil {
+		return err
+	}
+
+	b, err := net.ResolveUnixAddr("unixgram", unixDomainSocketPath1)
+	if err != nil {
+		return err
+	}
+
+	//read stream from spdy, send buf to socat, then receive from socat send back to spdy
+	connUDP, err := net.DialUnix("unixgram", b, a)
+	if err != nil {
+		glog.V(3).Infof("haha: dial went error %s\n", err)
+		return err
+	}
+	glog.V(3).Infof("haha:  dial unixgram success\n")
+	portforward.ReadFromStreamAndSendToUDP(stream, connUDP)
+
+
+	return nil
+}
+
+func portForward(client libdocker.Interface, podSandboxID string, protocol string, port int32, stream io.ReadWriteCloser) error {
+	container, err := client.InspectContainer(podSandboxID)
+	if err != nil {
+		return err
+	}
+
+	if !container.State.Running {
+		return fmt.Errorf("container not running (%s)", container.ID)
+	}
+
+	containerPid := container.State.Pid
+
+	glog.V(3).Infof("haha: portForward | the protocol is %s", protocol)
+	if protocol == api.PortForwardProtocolTypeUdp4 ||
+		protocol == api.PortForwardProtocolTypeUdp6 {
+		return portForwardUdp(containerPid, port, stream)
+	}
+
+	return protForwardTcp(containerPid, port, stream)
 }
