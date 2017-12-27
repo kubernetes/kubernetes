@@ -290,7 +290,7 @@ func (o *Options) ApplyDefaults(in *componentconfig.KubeSchedulerConfiguration) 
 	return out, nil
 }
 
-func (o *Options) Run() error {
+func (o *Options) Run(stop <-chan struct{}) error {
 	config := o.config
 
 	if len(o.ConfigFile) > 0 {
@@ -310,7 +310,6 @@ func (o *Options) Run() error {
 		return err
 	}
 
-	stop := make(chan struct{})
 	return server.Run(stop)
 }
 
@@ -321,6 +320,7 @@ func NewSchedulerCommand() *cobra.Command {
 		glog.Fatalf("unable to initialize command options: %v", err)
 	}
 
+	stopCh := make(chan struct{})
 	cmd := &cobra.Command{
 		Use: "kube-scheduler",
 		Long: `The Kubernetes scheduler is a policy-rich, topology-aware,
@@ -334,7 +334,7 @@ through the API as necessary.`,
 			verflag.PrintAndExitIfRequested()
 			cmdutil.CheckErr(opts.Complete())
 			cmdutil.CheckErr(opts.Validate(args))
-			cmdutil.CheckErr(opts.Run())
+			cmdutil.CheckErr(opts.Run(stopCh))
 		},
 	}
 
@@ -547,7 +547,7 @@ func createClients(config componentconfig.ClientConnectionConfiguration, masterO
 }
 
 // Run runs the SchedulerServer. This should never exit.
-func (s *SchedulerServer) Run(stop chan struct{}) error {
+func (s *SchedulerServer) Run(stop <-chan struct{}) error {
 	// To help debugging, immediately log version
 	glog.Infof("Version: %+v", version.Get())
 
