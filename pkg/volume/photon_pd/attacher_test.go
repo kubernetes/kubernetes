@@ -191,7 +191,7 @@ func createVolSpec(name string, readOnly bool) *volume.Spec {
 		Volume: &v1.Volume{
 			VolumeSource: v1.VolumeSource{
 				PhotonPersistentDisk: &v1.PhotonPersistentDiskVolumeSource{
-					PdID: name,
+					PDID: name,
 				},
 			},
 		},
@@ -204,7 +204,7 @@ func createPVSpec(name string, readOnly bool) *volume.Spec {
 			Spec: v1.PersistentVolumeSpec{
 				PersistentVolumeSource: v1.PersistentVolumeSource{
 					PhotonPersistentDisk: &v1.PhotonPersistentDiskVolumeSource{
-						PdID: name,
+						PDID: name,
 					},
 				},
 			},

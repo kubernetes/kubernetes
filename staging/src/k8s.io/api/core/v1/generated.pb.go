@@ -6602,8 +6602,8 @@ func (m *PhotonPersistentDiskVolumeSource) MarshalTo(dAtA []byte) (int, error) {
 	_ = l
 	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(dAtA, i, uint64(len(m.PdID)))
-	i += copy(dAtA[i:], m.PdID)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.PDID)))
+	i += copy(dAtA[i:], m.PDID)
 	dAtA[i] = 0x12
 	i++
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.FSType)))
@@ -12515,7 +12515,7 @@ func (m *PersistentVolumeStatus) Size() (n int) {
 func (m *PhotonPersistentDiskVolumeSource) Size() (n int) {
 	var l int
 	_ = l
-	l = len(m.PdID)
+	l = len(m.PDID)
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.FSType)
 	n += 1 + l + sovGenerated(uint64(l))
@@ -15511,7 +15511,7 @@ func (this *PhotonPersistentDiskVolumeSource) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&PhotonPersistentDiskVolumeSource{`,
-		`PdID:` + fmt.Sprintf("%v", this.PdID) + `,`,
+		`PDID:` + fmt.Sprintf("%v", this.PDID) + `,`,
 		`FSType:` + fmt.Sprintf("%v", this.FSType) + `,`,
 		`}`,
 	}, "")
@@ -35518,7 +35518,7 @@ func (m *PhotonPersistentDiskVolumeSource) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field PdID", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field PDID", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -35543,7 +35543,7 @@ func (m *PhotonPersistentDiskVolumeSource) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.PdID = string(dAtA[iNdEx:postIndex])
+			m.PDID = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {

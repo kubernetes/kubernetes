@@ -67,7 +67,7 @@ func (plugin *photonPersistentDiskPlugin) GetVolumeName(spec *volume.Spec) (stri
 		return "", err
 	}
 
-	return volumeSource.PdID, nil
+	return volumeSource.PDID, nil
 }
 
 func (plugin *photonPersistentDiskPlugin) CanSupport(spec *volume.Spec) bool {
@@ -102,7 +102,7 @@ func (plugin *photonPersistentDiskPlugin) newMounterInternal(spec *volume.Spec, 
 		return nil, err
 	}
 
-	pdID := vvol.PdID
+	pdID := vvol.PDID
 	fsType := vvol.FSType
 
 	return &photonPersistentDiskMounter{
@@ -141,7 +141,7 @@ func (plugin *photonPersistentDiskPlugin) ConstructVolumeSpec(volumeSpecName, mo
 		Name: volumeSpecName,
 		VolumeSource: v1.VolumeSource{
 			PhotonPersistentDisk: &v1.PhotonPersistentDiskVolumeSource{
-				PdID: pdID,
+				PDID: pdID,
 			},
 		},
 	}
@@ -310,7 +310,7 @@ func (plugin *photonPersistentDiskPlugin) newDeleterInternal(spec *volume.Spec, 
 	return &photonPersistentDiskDeleter{
 		&photonPersistentDisk{
 			volName: spec.Name(),
-			pdID:    spec.PersistentVolume.Spec.PhotonPersistentDisk.PdID,
+			pdID:    spec.PersistentVolume.Spec.PhotonPersistentDisk.PDID,
 			manager: manager,
 			plugin:  plugin,
 		}}, nil
@@ -371,7 +371,7 @@ func (p *photonPersistentDiskProvisioner) Provision() (*v1.PersistentVolume, err
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				PhotonPersistentDisk: &v1.PhotonPersistentDiskVolumeSource{
-					PdID:   pdID,
+					PDID:   pdID,
 					FSType: fstype,
 				},
 			},
