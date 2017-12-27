@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -55,7 +56,7 @@ func New() *Generator {
 	sourceTree := args.DefaultSourceTree()
 	common := args.GeneratorArgs{
 		OutputBase:       sourceTree,
-		GoHeaderFilePath: filepath.Join(sourceTree, "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt"),
+		GoHeaderFilePath: filepath.Join(sourceTree, util.BoilerplatePath()),
 	}
 	defaultProtoImport := filepath.Join(sourceTree, "k8s.io", "kubernetes", "vendor", "github.com", "gogo", "protobuf", "protobuf")
 	cwd, err := os.Getwd()
