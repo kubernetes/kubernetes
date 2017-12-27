@@ -234,8 +234,8 @@ var _ = utils.SIGDescribe("Volumes", func() {
 					Volume: v1.VolumeSource{
 						RBD: &v1.RBDVolumeSource{
 							CephMonitors: []string{serverIP},
-							RBDPool:      "rbd",
-							RBDImage:     "foo",
+							Pool:         "rbd",
+							Image:        "foo",
 							RadosUser:    "admin",
 							SecretRef: &v1.LocalObjectReference{
 								Name: config.Prefix + "-secret",

@@ -1077,8 +1077,8 @@ type GlusterfsVolumeSource struct {
 type RBDVolumeSource struct {
 	// Required: CephMonitors is a collection of Ceph monitors
 	CephMonitors []string
-	// Required: RBDImage is the rados image name
-	RBDImage string
+	// Required: Image is the rados image name
+	Image string
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
@@ -1087,7 +1087,7 @@ type RBDVolumeSource struct {
 	FSType string
 	// Optional: RadosPool is the rados pool name,default is rbd
 	// +optional
-	RBDPool string
+	Pool string
 	// Optional: RBDUser is the rados user name, default is admin
 	// +optional
 	RadosUser string
@@ -1108,8 +1108,8 @@ type RBDVolumeSource struct {
 type RBDPersistentVolumeSource struct {
 	// Required: CephMonitors is a collection of Ceph monitors
 	CephMonitors []string
-	// Required: RBDImage is the rados image name
-	RBDImage string
+	// Required: Image is the rados image name
+	Image string
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
@@ -1118,7 +1118,7 @@ type RBDPersistentVolumeSource struct {
 	FSType string
 	// Optional: RadosPool is the rados pool name,default is rbd
 	// +optional
-	RBDPool string
+	Pool string
 	// Optional: RBDUser is the rados user name, default is admin
 	// +optional
 	RadosUser string

@@ -8040,16 +8040,16 @@ func (m *RBDPersistentVolumeSource) MarshalTo(dAtA []byte) (int, error) {
 	}
 	dAtA[i] = 0x12
 	i++
-	i = encodeVarintGenerated(dAtA, i, uint64(len(m.RBDImage)))
-	i += copy(dAtA[i:], m.RBDImage)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Image)))
+	i += copy(dAtA[i:], m.Image)
 	dAtA[i] = 0x1a
 	i++
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.FSType)))
 	i += copy(dAtA[i:], m.FSType)
 	dAtA[i] = 0x22
 	i++
-	i = encodeVarintGenerated(dAtA, i, uint64(len(m.RBDPool)))
-	i += copy(dAtA[i:], m.RBDPool)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Pool)))
+	i += copy(dAtA[i:], m.Pool)
 	dAtA[i] = 0x2a
 	i++
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.RadosUser)))
@@ -8111,16 +8111,16 @@ func (m *RBDVolumeSource) MarshalTo(dAtA []byte) (int, error) {
 	}
 	dAtA[i] = 0x12
 	i++
-	i = encodeVarintGenerated(dAtA, i, uint64(len(m.RBDImage)))
-	i += copy(dAtA[i:], m.RBDImage)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Image)))
+	i += copy(dAtA[i:], m.Image)
 	dAtA[i] = 0x1a
 	i++
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.FSType)))
 	i += copy(dAtA[i:], m.FSType)
 	dAtA[i] = 0x22
 	i++
-	i = encodeVarintGenerated(dAtA, i, uint64(len(m.RBDPool)))
-	i += copy(dAtA[i:], m.RBDPool)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Pool)))
+	i += copy(dAtA[i:], m.Pool)
 	dAtA[i] = 0x2a
 	i++
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.RadosUser)))
@@ -13038,11 +13038,11 @@ func (m *RBDPersistentVolumeSource) Size() (n int) {
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
-	l = len(m.RBDImage)
+	l = len(m.Image)
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.FSType)
 	n += 1 + l + sovGenerated(uint64(l))
-	l = len(m.RBDPool)
+	l = len(m.Pool)
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.RadosUser)
 	n += 1 + l + sovGenerated(uint64(l))
@@ -13065,11 +13065,11 @@ func (m *RBDVolumeSource) Size() (n int) {
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
-	l = len(m.RBDImage)
+	l = len(m.Image)
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.FSType)
 	n += 1 + l + sovGenerated(uint64(l))
-	l = len(m.RBDPool)
+	l = len(m.Pool)
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.RadosUser)
 	n += 1 + l + sovGenerated(uint64(l))
@@ -15902,9 +15902,9 @@ func (this *RBDPersistentVolumeSource) String() string {
 	}
 	s := strings.Join([]string{`&RBDPersistentVolumeSource{`,
 		`CephMonitors:` + fmt.Sprintf("%v", this.CephMonitors) + `,`,
-		`RBDImage:` + fmt.Sprintf("%v", this.RBDImage) + `,`,
+		`Image:` + fmt.Sprintf("%v", this.Image) + `,`,
 		`FSType:` + fmt.Sprintf("%v", this.FSType) + `,`,
-		`RBDPool:` + fmt.Sprintf("%v", this.RBDPool) + `,`,
+		`Pool:` + fmt.Sprintf("%v", this.Pool) + `,`,
 		`RadosUser:` + fmt.Sprintf("%v", this.RadosUser) + `,`,
 		`Keyring:` + fmt.Sprintf("%v", this.Keyring) + `,`,
 		`SecretRef:` + strings.Replace(fmt.Sprintf("%v", this.SecretRef), "SecretReference", "SecretReference", 1) + `,`,
@@ -15919,9 +15919,9 @@ func (this *RBDVolumeSource) String() string {
 	}
 	s := strings.Join([]string{`&RBDVolumeSource{`,
 		`CephMonitors:` + fmt.Sprintf("%v", this.CephMonitors) + `,`,
-		`RBDImage:` + fmt.Sprintf("%v", this.RBDImage) + `,`,
+		`Image:` + fmt.Sprintf("%v", this.Image) + `,`,
 		`FSType:` + fmt.Sprintf("%v", this.FSType) + `,`,
-		`RBDPool:` + fmt.Sprintf("%v", this.RBDPool) + `,`,
+		`Pool:` + fmt.Sprintf("%v", this.Pool) + `,`,
 		`RadosUser:` + fmt.Sprintf("%v", this.RadosUser) + `,`,
 		`Keyring:` + fmt.Sprintf("%v", this.Keyring) + `,`,
 		`SecretRef:` + strings.Replace(fmt.Sprintf("%v", this.SecretRef), "LocalObjectReference", "LocalObjectReference", 1) + `,`,
@@ -40385,7 +40385,7 @@ func (m *RBDPersistentVolumeSource) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field RBDImage", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Image", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -40410,7 +40410,7 @@ func (m *RBDPersistentVolumeSource) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.RBDImage = string(dAtA[iNdEx:postIndex])
+			m.Image = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
@@ -40443,7 +40443,7 @@ func (m *RBDPersistentVolumeSource) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 4:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field RBDPool", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Pool", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -40468,7 +40468,7 @@ func (m *RBDPersistentVolumeSource) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.RBDPool = string(dAtA[iNdEx:postIndex])
+			m.Pool = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 5:
 			if wireType != 2 {
@@ -40662,7 +40662,7 @@ func (m *RBDVolumeSource) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field RBDImage", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Image", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -40687,7 +40687,7 @@ func (m *RBDVolumeSource) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.RBDImage = string(dAtA[iNdEx:postIndex])
+			m.Image = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
@@ -40720,7 +40720,7 @@ func (m *RBDVolumeSource) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 4:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field RBDPool", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Pool", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -40745,7 +40745,7 @@ func (m *RBDVolumeSource) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.RBDPool = string(dAtA[iNdEx:postIndex])
+			m.Pool = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 5:
 			if wireType != 2 {

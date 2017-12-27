@@ -1187,7 +1187,7 @@ func validateRBDVolumeSource(rbd *core.RBDVolumeSource, fldPath *field.Path) fie
 	if len(rbd.CephMonitors) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("monitors"), ""))
 	}
-	if len(rbd.RBDImage) == 0 {
+	if len(rbd.Image) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("image"), ""))
 	}
 	return allErrs
@@ -1198,7 +1198,7 @@ func validateRBDPersistentVolumeSource(rbd *core.RBDPersistentVolumeSource, fldP
 	if len(rbd.CephMonitors) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("monitors"), ""))
 	}
-	if len(rbd.RBDImage) == 0 {
+	if len(rbd.Image) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("image"), ""))
 	}
 	return allErrs

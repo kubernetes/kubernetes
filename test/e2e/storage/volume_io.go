@@ -409,8 +409,8 @@ var _ = utils.SIGDescribe("Volume plugin streaming [Slow]", func() {
 			volSource = v1.VolumeSource{
 				RBD: &v1.RBDVolumeSource{
 					CephMonitors: []string{serverIP},
-					RBDPool:      "rbd",
-					RBDImage:     "foo",
+					Pool:         "rbd",
+					Image:        "foo",
 					RadosUser:    "admin",
 					SecretRef: &v1.LocalObjectReference{
 						Name: name,

@@ -823,7 +823,7 @@ type RBDVolumeSource struct {
 	CephMonitors []string `json:"monitors" protobuf:"bytes,1,rep,name=monitors"`
 	// The rados image name.
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
-	RBDImage string `json:"image" protobuf:"bytes,2,opt,name=image"`
+	Image string `json:"image" protobuf:"bytes,2,opt,name=image"`
 	// Filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
 	// Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
@@ -835,7 +835,7 @@ type RBDVolumeSource struct {
 	// Default is rbd.
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
 	// +optional
-	RBDPool string `json:"pool,omitempty" protobuf:"bytes,4,opt,name=pool"`
+	Pool string `json:"pool,omitempty" protobuf:"bytes,4,opt,name=pool"`
 	// The rados user name.
 	// Default is admin.
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
@@ -867,7 +867,7 @@ type RBDPersistentVolumeSource struct {
 	CephMonitors []string `json:"monitors" protobuf:"bytes,1,rep,name=monitors"`
 	// The rados image name.
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
-	RBDImage string `json:"image" protobuf:"bytes,2,opt,name=image"`
+	Image string `json:"image" protobuf:"bytes,2,opt,name=image"`
 	// Filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
 	// Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
@@ -879,7 +879,7 @@ type RBDPersistentVolumeSource struct {
 	// Default is rbd.
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
 	// +optional
-	RBDPool string `json:"pool,omitempty" protobuf:"bytes,4,opt,name=pool"`
+	Pool string `json:"pool,omitempty" protobuf:"bytes,4,opt,name=pool"`
 	// The rados user name.
 	// Default is admin.
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it

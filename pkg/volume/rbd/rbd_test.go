@@ -310,8 +310,8 @@ func TestPlugin(t *testing.T) {
 			VolumeSource: v1.VolumeSource{
 				RBD: &v1.RBDVolumeSource{
 					CephMonitors: []string{"a", "b"},
-					RBDPool:      "pool1",
-					RBDImage:     "image1",
+					Pool:         "pool1",
+					Image:        "image1",
 					FSType:       "ext4",
 				},
 			},
@@ -337,8 +337,8 @@ func TestPlugin(t *testing.T) {
 				PersistentVolumeSource: v1.PersistentVolumeSource{
 					RBD: &v1.RBDPersistentVolumeSource{
 						CephMonitors: []string{"a", "b"},
-						RBDPool:      "pool2",
-						RBDImage:     "image2",
+						Pool:         "pool2",
+						Image:        "image2",
 						FSType:       "ext4",
 					},
 				},
@@ -377,7 +377,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				RBD: &v1.RBDPersistentVolumeSource{
 					CephMonitors: []string{"a", "b"},
-					RBDImage:     "bar",
+					Image:        "bar",
 					FSType:       "ext4",
 				},
 			},
@@ -429,7 +429,7 @@ func TestGetSecretNameAndNamespace(t *testing.T) {
 				PersistentVolumeSource: v1.PersistentVolumeSource{
 					RBD: &v1.RBDPersistentVolumeSource{
 						CephMonitors: []string{"a", "b"},
-						RBDImage:     "bar",
+						Image:        "bar",
 						FSType:       "ext4",
 					},
 				},

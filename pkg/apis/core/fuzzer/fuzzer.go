@@ -350,9 +350,9 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			s.Type = core.SecretTypeOpaque
 		},
 		func(r *core.RBDVolumeSource, c fuzz.Continue) {
-			r.RBDPool = c.RandString()
-			if r.RBDPool == "" {
-				r.RBDPool = "rbd"
+			r.Pool = c.RandString()
+			if r.Pool == "" {
+				r.Pool = "rbd"
 			}
 			r.RadosUser = c.RandString()
 			if r.RadosUser == "" {
@@ -364,9 +364,9 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 		},
 		func(r *core.RBDPersistentVolumeSource, c fuzz.Continue) {
-			r.RBDPool = c.RandString()
-			if r.RBDPool == "" {
-				r.RBDPool = "rbd"
+			r.Pool = c.RandString()
+			if r.Pool == "" {
+				r.Pool = "rbd"
 			}
 			r.RadosUser = c.RandString()
 			if r.RadosUser == "" {
