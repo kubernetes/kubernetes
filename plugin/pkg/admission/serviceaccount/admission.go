@@ -342,7 +342,7 @@ func (s *serviceAccount) getServiceAccountTokens(serviceAccount *api.ServiceAcco
 			continue
 		}
 
-		if serviceaccount.InternalIsServiceAccountToken(secret, serviceAccount) {
+		if serviceaccount.IsServiceAccountToken(secret, serviceAccount) {
 			tokens = append(tokens, secret)
 		}
 	}
