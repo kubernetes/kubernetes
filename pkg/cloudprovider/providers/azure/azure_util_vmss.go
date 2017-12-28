@@ -76,15 +76,17 @@ type scaleSet struct {
 	cacheMutex sync.Mutex
 	// A local cache of scale sets. The key is scale set name and the value is a
 	// list of virtual machines belonging to the scale set.
-	cache map[string][]scaleSetVMInfo
+	cache                     map[string][]scaleSetVMInfo
+	availabilitySetNodesCache sets.String
 }
 
 // newScaleSet creates a new scaleSet.
 func newScaleSet(az *Cloud) VMSet {
 	ss := &scaleSet{
-		Cloud:           az,
-		availabilitySet: newAvailabilitySet(az),
-		cache:           make(map[string][]scaleSetVMInfo),
+		Cloud:                     az,
+		availabilitySet:           newAvailabilitySet(az),
+		availabilitySetNodesCache: sets.NewString(),
+		cache: make(map[string][]scaleSetVMInfo),
 	}
 
 	go wait.Until(func() {
@@ -179,6 +181,11 @@ func (ss *scaleSet) getCachedVirtualMachine(nodeName string) (scaleSetVMInfo, er
 		return vm, nil
 	}
 
+	// Known node not managed by scale sets.
+	if ss.availabilitySetNodesCache.Has(nodeName) {
+		return scaleSetVMInfo{}, cloudprovider.InstanceNotFound
+	}
+
 	// Update cache and try again.
 	if err = ss.updateCache(); err != nil {
 		return scaleSetVMInfo{}, err
@@ -188,6 +195,8 @@ func (ss *scaleSet) getCachedVirtualMachine(nodeName string) (scaleSetVMInfo, er
 		return vm, nil
 	}
 
+	// Node still not found, assuming it is not managed by scale sets.
+	ss.availabilitySetNodesCache.Insert(nodeName)
 	return scaleSetVMInfo{}, cloudprovider.InstanceNotFound
 }
 

@@ -132,7 +132,7 @@ type Config struct {
 	MaximumLoadBalancerRuleCount int `json:"maximumLoadBalancerRuleCount"`
 }
 
-// VirtualMachinesClient defines needed functions for azure network.VirtualMachinesClient
+// VirtualMachinesClient defines needed functions for azure compute.VirtualMachinesClient
 type VirtualMachinesClient interface {
 	CreateOrUpdate(resourceGroupName string, VMName string, parameters compute.VirtualMachine, cancel <-chan struct{}) (<-chan compute.VirtualMachine, <-chan error)
 	Get(resourceGroupName string, VMName string, expand compute.InstanceViewTypes) (result compute.VirtualMachine, err error)
