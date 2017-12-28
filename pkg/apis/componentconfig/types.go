@@ -33,7 +33,7 @@ type ClientConnectionConfiguration struct {
 	// cps controls the number of queries per second allowed for this connection.
 	QPS float32
 	// burst allows extra queries to accumulate when a client is exceeding its rate.
-	Burst int32
+	Burst int
 }
 
 // SchedulerPolicyConfigMapKey defines the key of the element in the
