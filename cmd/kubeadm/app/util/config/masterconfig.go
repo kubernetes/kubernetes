@@ -37,9 +37,14 @@ import (
 // SetInitDynamicDefaults checks and sets configuration values for Master node
 func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 
+	// validate cfg.API.AdvertiseAddress.
+	addressIP := net.ParseIP(cfg.API.AdvertiseAddress)
+	if addressIP == nil && cfg.API.AdvertiseAddress != "" {
+		return fmt.Errorf("couldn't use \"%s\" as \"apiserver-advertise-address\", must be ipv4 or ipv6 address", cfg.API.AdvertiseAddress)
+	}
 	// Choose the right address for the API Server to advertise. If the advertise address is localhost or 0.0.0.0, the default interface's IP address is used
 	// This is the same logic as the API Server uses
-	ip, err := netutil.ChooseBindAddress(net.ParseIP(cfg.API.AdvertiseAddress))
+	ip, err := netutil.ChooseBindAddress(addressIP)
 	if err != nil {
 		return err
 	}
