@@ -1254,6 +1254,10 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 		return volumetypes.GeneratedOperations{}, fmt.Errorf("Error finding plugin for expanding volume: %q with error %v", pvcWithResizeRequest.QualifiedName(), err)
 	}
 
+	if volumePlugin == nil {
+		return volumetypes.GeneratedOperations{}, fmt.Errorf("Error finding an expandable plugin for expanding volume: %q", pvcWithResizeRequest.QualifiedName())
+	}
+
 	expandVolumeFunc := func() (error, error) {
 		newSize := pvcWithResizeRequest.ExpectedSize
 		pvSize := pvcWithResizeRequest.PersistentVolume.Spec.Capacity[v1.ResourceStorage]
