@@ -57,16 +57,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	var httpCode int
 	var requestInfo *request.RequestInfo
-	defer func() {
-		responseLength := 0
-		if rw, ok := w.(*metrics.ResponseWriterDelegator); ok {
-			responseLength = rw.ContentLength()
-			if httpCode == 0 {
-				httpCode = rw.Status()
-			}
-		}
-		metrics.Record(req, requestInfo, w.Header().Get("Content-Type"), httpCode, responseLength, time.Now().Sub(reqStart))
-	}()
+	defer RecordMetrics(w, req, requestInfo, httpCode, reqStart)
 
 	ctx, ok := r.Mapper.Get(req)
 	if !ok {
@@ -282,4 +273,15 @@ func singleJoiningSlash(a, b string) string {
 		return a + "/" + b
 	}
 	return a + b
+}
+
+func RecordMetrics(w http.ResponseWriter, req *http.Request, requestInfo *request.RequestInfo, httpCode int, reqStart time.Time) {
+	responseLength := 0
+	if rw, ok := w.(*metrics.ResponseWriterDelegator); ok {
+		responseLength = rw.ContentLength()
+		if httpCode == 0 {
+			httpCode = rw.Status()
+		}
+	}
+	metrics.Record(req, requestInfo, w.Header().Get("Content-Type"), httpCode, responseLength, time.Now().Sub(reqStart))
 }
