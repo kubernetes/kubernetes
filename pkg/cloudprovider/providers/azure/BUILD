@@ -64,9 +64,11 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "azure_backoff_test.go",
         "azure_cache_test.go",
         "azure_loadbalancer_test.go",
         "azure_metrics_test.go",
+        "azure_standard_test.go",
         "azure_test.go",
         "azure_vmss_test.go",
         "azure_wrap_test.go",
