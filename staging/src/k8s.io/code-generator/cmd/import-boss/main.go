@@ -73,7 +73,6 @@ func main() {
 	arguments.InputDirs = []string{
 		"k8s.io/kubernetes/pkg/...",
 		"k8s.io/kubernetes/cmd/...",
-		"k8s.io/kubernetes/plugin/...",
 	}
 
 	if err := arguments.Execute(

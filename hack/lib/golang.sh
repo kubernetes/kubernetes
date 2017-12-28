@@ -26,12 +26,12 @@ kube::golang::server_targets() {
     cmd/kube-apiserver
     cmd/kube-controller-manager
     cmd/cloud-controller-manager
-    cmd/kubelet
+    cmd/kube-scheduler
     cmd/kubeadm
+    cmd/kubelet
     cmd/hyperkube
     vendor/k8s.io/kube-aggregator
     vendor/k8s.io/apiextensions-apiserver
-    plugin/cmd/kube-scheduler
     cluster/gce/gci/mounter
   )
   echo "${targets[@]}"

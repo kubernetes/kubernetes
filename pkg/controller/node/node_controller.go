@@ -51,11 +51,11 @@ import (
 	nodesync "k8s.io/kubernetes/pkg/controller/node/ipam/sync"
 	"k8s.io/kubernetes/pkg/controller/node/scheduler"
 	"k8s.io/kubernetes/pkg/controller/node/util"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 func init() {
