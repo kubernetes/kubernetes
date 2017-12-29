@@ -243,11 +243,11 @@ function set-preferred-region() {
   else
     KUBE_ADDON_REGISTRY="gcr.io/google_containers"
   fi
-
-  if [[ "${ENABLE_DOCKER_REGISTRY_CACHE:-}" == "true" ]]; then
-    DOCKER_REGISTRY_MIRROR_URL="https://${preferred}-mirror.gcr.io"
-  fi
 }
+
+if [[ "${ENABLE_DOCKER_REGISTRY_CACHE:-}" == "true" ]]; then
+  DOCKER_REGISTRY_MIRROR_URL="https://mirror.gcr.io"
+fi
 
 # Take the local tar files and upload them to Google Storage.  They will then be
 # downloaded by the master as part of the start up script for the master.
@@ -1532,7 +1532,7 @@ function check-cluster() {
           -H "Authorization: Bearer ${KUBE_BEARER_TOKEN}" \
           ${secure} \
           --max-time 5 --fail \
-          "https://${KUBE_MASTER_IP}/api/v1/pods" > "${curl_out}" 2>&1; do
+          "https://${KUBE_MASTER_IP}/api/v1/pods?limit=100" > "${curl_out}" 2>&1; do
       local elapsed=$(($(date +%s) - ${start_time}))
       if [[ ${elapsed} -gt ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} ]]; then
           echo -e "${color_red}Cluster failed to initialize within ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} seconds.${color_norm}" >&2
