@@ -164,20 +164,20 @@ func (ss *scaleSet) getCachedVirtualMachine(nodeName string) (scaleSetVMInfo, er
 	ss.cacheMutex.Lock()
 	defer ss.cacheMutex.Unlock()
 
-	getVMFromCache := func(nodeName string) (scaleSetVMInfo, error) {
+	getVMFromCache := func(nodeName string) (scaleSetVMInfo, bool) {
 		for scaleSetName := range ss.cache {
 			for _, vm := range ss.cache[scaleSetName] {
 				if vm.NodeName == nodeName {
-					return vm, nil
+					return vm, true
 				}
 			}
 		}
 
-		return scaleSetVMInfo{}, cloudprovider.InstanceNotFound
+		return scaleSetVMInfo{}, false
 	}
 
-	vm, err := getVMFromCache(nodeName)
-	if err == nil {
+	vm, found := getVMFromCache(nodeName)
+	if found {
 		return vm, nil
 	}
 
@@ -187,11 +187,11 @@ func (ss *scaleSet) getCachedVirtualMachine(nodeName string) (scaleSetVMInfo, er
 	}
 
 	// Update cache and try again.
-	if err = ss.updateCache(); err != nil {
+	if err := ss.updateCache(); err != nil {
 		return scaleSetVMInfo{}, err
 	}
-	vm, err = getVMFromCache(nodeName)
-	if err == nil {
+	vm, found = getVMFromCache(nodeName)
+	if found {
 		return vm, nil
 	}
 
@@ -204,35 +204,35 @@ func (ss *scaleSet) getCachedVirtualMachineByInstanceID(scaleSetName, instanceID
 	ss.cacheMutex.Lock()
 	defer ss.cacheMutex.Unlock()
 
-	getVMByID := func(scaleSetName, instanceID string) (scaleSetVMInfo, error) {
+	getVMByID := func(scaleSetName, instanceID string) (scaleSetVMInfo, bool) {
 		vms, ok := ss.cache[scaleSetName]
 		if !ok {
 			glog.V(4).Infof("scale set (%s) not found", scaleSetName)
-			return scaleSetVMInfo{}, cloudprovider.InstanceNotFound
+			return scaleSetVMInfo{}, false
 		}
 
 		for _, vm := range vms {
 			if vm.InstanceID == instanceID {
 				glog.V(4).Infof("getCachedVirtualMachineByInstanceID gets vm (%s) by instanceID (%s) within scale set (%s)", vm.NodeName, instanceID, scaleSetName)
-				return vm, nil
+				return vm, true
 			}
 		}
 
 		glog.V(4).Infof("instanceID (%s) not found in scale set (%s)", instanceID, scaleSetName)
-		return scaleSetVMInfo{}, cloudprovider.InstanceNotFound
+		return scaleSetVMInfo{}, false
 	}
 
-	vm, err := getVMByID(scaleSetName, instanceID)
-	if err == nil {
+	vm, found := getVMByID(scaleSetName, instanceID)
+	if found {
 		return vm, nil
 	}
 
 	// Update cache and try again.
-	if err = ss.updateCache(); err != nil {
+	if err := ss.updateCache(); err != nil {
 		return scaleSetVMInfo{}, err
 	}
-	vm, err = getVMByID(scaleSetName, instanceID)
-	if err == nil {
+	vm, found = getVMByID(scaleSetName, instanceID)
+	if found {
 		return vm, nil
 	}
 
@@ -407,7 +407,7 @@ func (ss *scaleSet) listScaleSetsWithRetry() ([]string, error) {
 		return nil, backoffError
 	}
 
-	appendResults := (result.Value != nil && len(*result.Value) > 1)
+	appendResults := (result.Value != nil && len(*result.Value) > 0)
 	for appendResults {
 		for _, scaleSet := range *result.Value {
 			allScaleSets = append(allScaleSets, *scaleSet.Name)
@@ -431,7 +431,7 @@ func (ss *scaleSet) listScaleSetsWithRetry() ([]string, error) {
 				return nil, backoffError
 			}
 
-			appendResults = (result.Value != nil && len(*result.Value) > 1)
+			appendResults = (result.Value != nil && len(*result.Value) > 0)
 		}
 
 	}
@@ -461,7 +461,7 @@ func (ss *scaleSet) listScaleSetVMsWithRetry(scaleSetName string) ([]compute.Vir
 		return nil, backoffError
 	}
 
-	appendResults := (result.Value != nil && len(*result.Value) > 1)
+	appendResults := (result.Value != nil && len(*result.Value) > 0)
 	for appendResults {
 		allVMs = append(allVMs, *result.Value...)
 		appendResults = false
@@ -483,7 +483,7 @@ func (ss *scaleSet) listScaleSetVMsWithRetry(scaleSetName string) ([]compute.Vir
 				return nil, backoffError
 			}
 
-			appendResults = (result.Value != nil && len(*result.Value) > 1)
+			appendResults = (result.Value != nil && len(*result.Value) > 0)
 		}
 
 	}
