@@ -273,7 +273,9 @@ func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName s
 	netConf, cniNet := network.NetworkConfig, network.CNIConfig
 	glog.V(4).Infof("About to del CNI network %v (type=%v)", netConf.Name, netConf.Plugins[0].Network.Type)
 	err = cniNet.DelNetworkList(netConf, rt)
-	if err != nil {
+	// The pod may not get deleted successfully at the first time.
+	// Ignore "no such file or directory" error in case the network has already been deleted in previous attempts.
+	if err != nil && !strings.Contains(err.Error(), "no such file or directory") {
 		glog.Errorf("Error deleting network: %v", err)
 		return err
 	}
