@@ -17,6 +17,7 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -92,11 +93,11 @@ func (c *csiMountMgr) CanMount() error {
 	return nil
 }
 
-func (c *csiMountMgr) SetUp(fsGroup *int64) error {
-	return c.SetUpAt(c.GetPath(), fsGroup)
+func (c *csiMountMgr) SetUp(ctx context.Context, fsGroup *int64) error {
+	return c.SetUpAt(ctx, c.GetPath(), fsGroup)
 }
 
-func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
+func (c *csiMountMgr) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	glog.V(4).Infof(log("Mounter.SetUpAt(%s)", dir))
 
 	mounted, err := isDirMounted(c.plugin, dir)
@@ -231,10 +232,10 @@ func (c *csiMountMgr) GetAttributes() volume.Attributes {
 // volume.Unmounter methods
 var _ volume.Unmounter = &csiMountMgr{}
 
-func (c *csiMountMgr) TearDown() error {
-	return c.TearDownAt(c.GetPath())
+func (c *csiMountMgr) TearDown(ctx context.Context) error {
+	return c.TearDownAt(ctx, c.GetPath())
 }
-func (c *csiMountMgr) TearDownAt(dir string) error {
+func (c *csiMountMgr) TearDownAt(ctx context.Context, dir string) error {
 	glog.V(4).Infof(log("Unmounter.TearDown(%s)", dir))
 
 	// is dir even mounted ?

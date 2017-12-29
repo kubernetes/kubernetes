@@ -17,6 +17,7 @@ limitations under the License.
 package eviction
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
@@ -920,7 +921,7 @@ type fakeSummaryProvider struct {
 	result *statsapi.Summary
 }
 
-func (f *fakeSummaryProvider) Get(updateStats bool) (*statsapi.Summary, error) {
+func (f *fakeSummaryProvider) Get(ctx context.Context, updateStats bool) (*statsapi.Summary, error) {
 	return f.result, nil
 }
 
@@ -946,6 +947,8 @@ func newPodStats(pod *v1.Pod, containerWorkingSetBytes int64) statsapi.PodStats 
 }
 
 func TestMakeSignalObservations(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	podMaker := func(name, namespace, uid string, numContainers int) *v1.Pod {
 		pod := &v1.Pod{}
 		pod.Name = name
@@ -1011,7 +1014,7 @@ func TestMakeSignalObservations(t *testing.T) {
 	if res.CmpInt64(int64(allocatableMemoryCapacity)) != 0 {
 		t.Errorf("Expected Threshold %v to be equal to value %v", res.Value(), allocatableMemoryCapacity)
 	}
-	actualObservations, statsFunc, err := makeSignalObservations(provider, capacityProvider, pods)
+	actualObservations, statsFunc, err := makeSignalObservations(ctx, provider, capacityProvider, pods)
 	if err != nil {
 		t.Errorf("Unexpected err: %v", err)
 	}

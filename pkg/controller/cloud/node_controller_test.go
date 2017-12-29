@@ -17,6 +17,7 @@ limitations under the License.
 package cloud
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -120,6 +121,8 @@ func TestEnsureNodeExistsByProviderIDOrNodeName(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			fc := &fakecloud.FakeCloud{
 				Exists:             tc.existsByNodeName,
 				ExistsByProviderID: tc.existsByProviderID,
@@ -128,7 +131,7 @@ func TestEnsureNodeExistsByProviderIDOrNodeName(t *testing.T) {
 			}
 
 			instances, _ := fc.Instances()
-			exists, err := ensureNodeExistsByProviderIDOrExternalID(instances, tc.node)
+			exists, err := ensureNodeExistsByProviderIDOrExternalID(ctx, instances, tc.node)
 			assert.NoError(t, err)
 			assert.EqualValues(t, tc.expectedCalls, fc.Calls,
 				"expected cloud provider methods `%v` to be called but `%v` was called ",
@@ -891,6 +894,9 @@ func TestNodeAddressesChangeDetected(t *testing.T) {
 // This test checks that a node with the external cloud provider taint is cloudprovider initialized and
 // and node addresses will not be updated when node isn't present according to the cloudprovider
 func TestNodeAddressesNotUpdate(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	fnh := &testutil.FakeNodeHandler{
 		Existing: []*v1.Node{
 			{
@@ -950,7 +956,7 @@ func TestNodeAddressesNotUpdate(t *testing.T) {
 		cloud:        fakeCloud,
 	}
 
-	cloudNodeController.updateNodeAddress(fnh.Existing[0], fakeCloud)
+	cloudNodeController.updateNodeAddress(ctx, fnh.Existing[0], fakeCloud)
 
 	if len(fnh.UpdatedNodes) != 0 {
 		t.Errorf("Node was not correctly updated, the updated len(nodes) got: %v, wanted=0", len(fnh.UpdatedNodes))

@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -35,6 +36,8 @@ import (
 // TestRemoveContainer tests removing the container and its corresponding container logs.
 func TestRemoveContainer(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
@@ -53,7 +56,7 @@ func TestRemoveContainer(t *testing.T) {
 	}
 
 	// Create fake sandbox and container
-	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
+	_, fakeContainers := makeAndSetFakePod(t, ctx, m, fakeRuntime, pod)
 	assert.Equal(t, len(fakeContainers), 1)
 
 	containerId := fakeContainers[0].Id
@@ -203,11 +206,11 @@ func TestToKubeContainerStatus(t *testing.T) {
 	}
 }
 
-func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int) *runtimeapi.ContainerConfig {
+func makeExpectedConfig(m *kubeGenericRuntimeManager, ctx context.Context, pod *v1.Pod, containerIndex int) *runtimeapi.ContainerConfig {
 	container := &pod.Spec.Containers[containerIndex]
 	podIP := ""
 	restartCount := 0
-	opts, _ := m.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP)
+	opts, _ := m.runtimeHelper.GenerateRunContainerOptions(ctx, pod, container, podIP)
 	containerLogsPath := buildContainerLogsPath(container.Name, restartCount)
 	restartCountUint32 := uint32(restartCount)
 	envs := make([]*runtimeapi.KeyValue, len(opts.Envs))
@@ -238,6 +241,8 @@ func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerInde
 func TestGenerateContainerConfig(t *testing.T) {
 	_, imageService, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -258,8 +263,8 @@ func TestGenerateContainerConfig(t *testing.T) {
 		},
 	}
 
-	expectedConfig := makeExpectedConfig(m, pod, 0)
-	containerConfig, err := m.generateContainerConfig(&pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image, kubecontainer.ContainerTypeRegular)
+	expectedConfig := makeExpectedConfig(m, ctx, pod, 0)
+	containerConfig, err := m.generateContainerConfig(ctx, &pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image, kubecontainer.ContainerTypeRegular)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedConfig, containerConfig, "generate container config for kubelet runtime v1.")
 
@@ -288,7 +293,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 		},
 	}
 
-	_, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, kubecontainer.ContainerTypeRegular)
+	_, err = m.generateContainerConfig(ctx, &podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, kubecontainer.ContainerTypeRegular)
 	assert.Error(t, err)
 
 	imageId, _ := imageService.PullImage(&runtimeapi.ImageSpec{Image: "busybox"}, nil)
@@ -300,14 +305,15 @@ func TestGenerateContainerConfig(t *testing.T) {
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsUser = nil
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsNonRoot = &runAsNonRootTrue
 
-	_, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, kubecontainer.ContainerTypeRegular)
+	_, err = m.generateContainerConfig(ctx, &podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, kubecontainer.ContainerTypeRegular)
 	assert.Error(t, err, "RunAsNonRoot should fail for non-numeric username")
 }
 
 func TestLifeCycleHook(t *testing.T) {
-
 	// Setup
 	fakeRuntime, _, m, _ := createTestRuntimeManager()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	gracePeriod := int64(30)
 	cID := kubecontainer.ContainerID{
@@ -405,7 +411,7 @@ func TestLifeCycleHook(t *testing.T) {
 	t.Run("PostStart-CmdExe", func(t *testing.T) {
 
 		// Fake all the things you need before trying to create a container
-		fakeSandBox, _ := makeAndSetFakePod(t, m, fakeRuntime, testPod)
+		fakeSandBox, _ := makeAndSetFakePod(t, ctx, m, fakeRuntime, testPod)
 		fakeSandBoxConfig, _ := m.generatePodSandboxConfig(testPod, 0)
 		testPod.Spec.Containers[0].Lifecycle = cmdPostStart
 		testContainer := &testPod.Spec.Containers[0]
@@ -424,7 +430,7 @@ func TestLifeCycleHook(t *testing.T) {
 		}
 
 		// Now try to create a container, which should in turn invoke PostStart Hook
-		_, err := m.startContainer(fakeSandBox.Id, fakeSandBoxConfig, testContainer, testPod, fakePodStatus, nil, "", kubecontainer.ContainerTypeRegular)
+		_, err := m.startContainer(ctx, fakeSandBox.Id, fakeSandBoxConfig, testContainer, testPod, fakePodStatus, nil, "", kubecontainer.ContainerTypeRegular)
 		if err != nil {
 			t.Errorf("startContainer erro =%v", err)
 		}

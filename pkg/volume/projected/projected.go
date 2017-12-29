@@ -17,6 +17,7 @@ limitations under the License.
 package projected
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -46,8 +47,8 @@ const (
 
 type projectedPlugin struct {
 	host         volume.VolumeHost
-	getSecret    func(namespace, name string) (*v1.Secret, error)
-	getConfigMap func(namespace, name string) (*v1.ConfigMap, error)
+	getSecret    func(ctx context.Context, namespace, name string) (*v1.Secret, error)
+	getConfigMap func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error)
 }
 
 var _ volume.VolumePlugin = &projectedPlugin{}
@@ -177,22 +178,22 @@ func (s *projectedVolumeMounter) CanMount() error {
 	return nil
 }
 
-func (s *projectedVolumeMounter) SetUp(fsGroup *int64) error {
-	return s.SetUpAt(s.GetPath(), fsGroup)
+func (s *projectedVolumeMounter) SetUp(ctx context.Context, fsGroup *int64) error {
+	return s.SetUpAt(ctx, s.GetPath(), fsGroup)
 }
 
-func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (s *projectedVolumeMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	glog.V(3).Infof("Setting up volume %v for pod %v at %v", s.volName, s.pod.UID, dir)
 
 	wrapped, err := s.plugin.host.NewWrapperMounter(s.volName, wrappedVolumeSpec(), s.pod, *s.opts)
 	if err != nil {
 		return err
 	}
-	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
+	if err := wrapped.SetUpAt(ctx, dir, fsGroup); err != nil {
 		return err
 	}
 
-	data, err := s.collectData()
+	data, err := s.collectData(ctx)
 	if err != nil {
 		glog.Errorf("Error preparing data for projected volume %v for pod %v/%v: %s", s.volName, s.pod.Namespace, s.pod.Name, err.Error())
 		return err
@@ -220,7 +221,7 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	return nil
 }
 
-func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjection, error) {
+func (s *projectedVolumeMounter) collectData(ctx context.Context) (map[string]volumeutil.FileProjection, error) {
 	if s.source.DefaultMode == nil {
 		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
 	}
@@ -235,7 +236,7 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 	for _, source := range s.source.Sources {
 		if source.Secret != nil {
 			optional := source.Secret.Optional != nil && *source.Secret.Optional
-			secretapi, err := s.plugin.getSecret(s.pod.Namespace, source.Secret.Name)
+			secretapi, err := s.plugin.getSecret(ctx, s.pod.Namespace, source.Secret.Name)
 			if err != nil {
 				if !(errors.IsNotFound(err) && optional) {
 					glog.Errorf("Couldn't get secret %v/%v: %v", s.pod.Namespace, source.Secret.Name, err)
@@ -260,7 +261,7 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 			}
 		} else if source.ConfigMap != nil {
 			optional := source.ConfigMap.Optional != nil && *source.ConfigMap.Optional
-			configMap, err := s.plugin.getConfigMap(s.pod.Namespace, source.ConfigMap.Name)
+			configMap, err := s.plugin.getConfigMap(ctx, s.pod.Namespace, source.ConfigMap.Name)
 			if err != nil {
 				if !(errors.IsNotFound(err) && optional) {
 					glog.Errorf("Couldn't get configMap %v/%v: %v", s.pod.Namespace, source.ConfigMap.Name, err)
@@ -309,18 +310,18 @@ type projectedVolumeUnmounter struct {
 
 var _ volume.Unmounter = &projectedVolumeUnmounter{}
 
-func (c *projectedVolumeUnmounter) TearDown() error {
-	return c.TearDownAt(c.GetPath())
+func (c *projectedVolumeUnmounter) TearDown(ctx context.Context) error {
+	return c.TearDownAt(ctx, c.GetPath())
 }
 
-func (c *projectedVolumeUnmounter) TearDownAt(dir string) error {
+func (c *projectedVolumeUnmounter) TearDownAt(ctx context.Context, dir string) error {
 	glog.V(3).Infof("Tearing down volume %v for pod %v at %v", c.volName, c.podUID, dir)
 
 	wrapped, err := c.plugin.host.NewWrapperUnmounter(c.volName, wrappedVolumeSpec(), c.podUID)
 	if err != nil {
 		return err
 	}
-	return wrapped.TearDownAt(dir)
+	return wrapped.TearDownAt(ctx, dir)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.ProjectedVolumeSource, bool, error) {

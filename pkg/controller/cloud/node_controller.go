@@ -17,6 +17,7 @@ limitations under the License.
 package cloud
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -122,6 +123,9 @@ func (cnc *CloudNodeController) Run() {
 
 // UpdateNodeStatus updates the node status, such as node addresses
 func (cnc *CloudNodeController) UpdateNodeStatus() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	instances, ok := cnc.cloud.Instances()
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("failed to get instances from cloud provider"))
@@ -135,12 +139,12 @@ func (cnc *CloudNodeController) UpdateNodeStatus() {
 	}
 
 	for i := range nodes.Items {
-		cnc.updateNodeAddress(&nodes.Items[i], instances)
+		cnc.updateNodeAddress(ctx, &nodes.Items[i], instances)
 	}
 }
 
 // UpdateNodeAddress updates the nodeAddress of a single node
-func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloudprovider.Instances) {
+func (cnc *CloudNodeController) updateNodeAddress(ctx context.Context, node *v1.Node, instances cloudprovider.Instances) {
 	// Do not process nodes that are still tainted
 	cloudTaint := getCloudTaint(node.Spec.Taints)
 	if cloudTaint != nil {
@@ -148,7 +152,7 @@ func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloud
 		return
 	}
 	// Node that isn't present according to the cloud provider shouldn't have its address updated
-	exists, err := ensureNodeExistsByProviderIDOrExternalID(instances, node)
+	exists, err := ensureNodeExistsByProviderIDOrExternalID(ctx, instances, node)
 	if err != nil {
 		// Continue to update node address when not sure the node is not exists
 		glog.Errorf("%v", err)
@@ -157,7 +161,7 @@ func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloud
 		return
 	}
 
-	nodeAddresses, err := getNodeAddressesByProviderIDOrName(instances, node)
+	nodeAddresses, err := getNodeAddressesByProviderIDOrName(ctx, instances, node)
 	if err != nil {
 		glog.Errorf("%v", err)
 		return
@@ -201,6 +205,8 @@ func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloud
 // Monitor node queries the cloudprovider for non-ready nodes and deletes them
 // if they cannot be found in the cloud provider
 func (cnc *CloudNodeController) MonitorNode() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	instances, ok := cnc.cloud.Instances()
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("failed to get instances from cloud provider"))
@@ -241,7 +247,7 @@ func (cnc *CloudNodeController) MonitorNode() {
 			if currentReadyCondition.Status != v1.ConditionTrue {
 				// Check with the cloud provider to see if the node still exists. If it
 				// doesn't, delete the node immediately.
-				exists, err := ensureNodeExistsByProviderIDOrExternalID(instances, node)
+				exists, err := ensureNodeExistsByProviderIDOrExternalID(ctx, instances, node)
 				if err != nil {
 					glog.Errorf("Error getting data for node %s from cloud: %v", node.Name, err)
 					continue
@@ -293,13 +299,15 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 	}
 
 	err := clientretry.RetryOnConflict(UpdateNodeSpecBackoff, func() error {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		curNode, err := cnc.kubeClient.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 
 		if curNode.Spec.ProviderID == "" {
-			providerID, err := cloudprovider.GetInstanceProviderID(cnc.cloud, types.NodeName(curNode.Name))
+			providerID, err := cloudprovider.GetInstanceProviderID(cnc.cloud, ctx, types.NodeName(curNode.Name))
 			if err == nil {
 				curNode.Spec.ProviderID = providerID
 			} else {
@@ -310,7 +318,7 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 			}
 		}
 
-		nodeAddresses, err := getNodeAddressesByProviderIDOrName(instances, curNode)
+		nodeAddresses, err := getNodeAddressesByProviderIDOrName(ctx, instances, curNode)
 		if err != nil {
 			glog.Errorf("%v", err)
 			return nil
@@ -325,7 +333,7 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 			}
 		}
 
-		if instanceType, err := getInstanceTypeByProviderIDOrName(instances, curNode); err != nil {
+		if instanceType, err := getInstanceTypeByProviderIDOrName(ctx, instances, curNode); err != nil {
 			glog.Errorf("%v", err)
 			return err
 		} else if instanceType != "" {
@@ -347,7 +355,7 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 		}
 
 		if zones, ok := cnc.cloud.Zones(); ok {
-			zone, err := getZoneByProviderIDOrName(zones, curNode)
+			zone, err := getZoneByProviderIDOrName(ctx, zones, curNode)
 			if err != nil {
 				return fmt.Errorf("failed to get zone from cloud provider: %v", err)
 			}
@@ -369,7 +377,7 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 		}
 		// After adding, call UpdateNodeAddress to set the CloudProvider provided IPAddresses
 		// So that users do not see any significant delay in IP addresses being filled into the node
-		cnc.updateNodeAddress(curNode, instances)
+		cnc.updateNodeAddress(ctx, curNode, instances)
 		return nil
 	})
 	if err != nil {
@@ -401,11 +409,11 @@ func excludeTaintFromList(taints []v1.Taint, toExclude v1.Taint) []v1.Taint {
 }
 
 // ensureNodeExistsByProviderIDOrExternalID first checks if the instance exists by the provider id and then by calling external id with node name
-func ensureNodeExistsByProviderIDOrExternalID(instances cloudprovider.Instances, node *v1.Node) (bool, error) {
-	exists, err := instances.InstanceExistsByProviderID(node.Spec.ProviderID)
+func ensureNodeExistsByProviderIDOrExternalID(ctx context.Context, instances cloudprovider.Instances, node *v1.Node) (bool, error) {
+	exists, err := instances.InstanceExistsByProviderID(ctx, node.Spec.ProviderID)
 	if err != nil {
 		providerIDErr := err
-		_, err = instances.ExternalID(types.NodeName(node.Name))
+		_, err = instances.ExternalID(ctx, types.NodeName(node.Name))
 		if err == nil {
 			return true, nil
 		}
@@ -419,11 +427,11 @@ func ensureNodeExistsByProviderIDOrExternalID(instances cloudprovider.Instances,
 	return exists, nil
 }
 
-func getNodeAddressesByProviderIDOrName(instances cloudprovider.Instances, node *v1.Node) ([]v1.NodeAddress, error) {
-	nodeAddresses, err := instances.NodeAddressesByProviderID(node.Spec.ProviderID)
+func getNodeAddressesByProviderIDOrName(ctx context.Context, instances cloudprovider.Instances, node *v1.Node) ([]v1.NodeAddress, error) {
+	nodeAddresses, err := instances.NodeAddressesByProviderID(ctx, node.Spec.ProviderID)
 	if err != nil {
 		providerIDErr := err
-		nodeAddresses, err = instances.NodeAddresses(types.NodeName(node.Name))
+		nodeAddresses, err = instances.NodeAddresses(ctx, types.NodeName(node.Name))
 		if err != nil {
 			return nil, fmt.Errorf("NodeAddress: Error fetching by providerID: %v Error fetching by NodeName: %v", providerIDErr, err)
 		}
@@ -466,11 +474,11 @@ func ensureNodeProvidedIPExists(node *v1.Node, nodeAddresses []v1.NodeAddress) (
 	return nodeIP, nodeIPExists
 }
 
-func getInstanceTypeByProviderIDOrName(instances cloudprovider.Instances, node *v1.Node) (string, error) {
-	instanceType, err := instances.InstanceTypeByProviderID(node.Spec.ProviderID)
+func getInstanceTypeByProviderIDOrName(ctx context.Context, instances cloudprovider.Instances, node *v1.Node) (string, error) {
+	instanceType, err := instances.InstanceTypeByProviderID(ctx, node.Spec.ProviderID)
 	if err != nil {
 		providerIDErr := err
-		instanceType, err = instances.InstanceType(types.NodeName(node.Name))
+		instanceType, err = instances.InstanceType(ctx, types.NodeName(node.Name))
 		if err != nil {
 			return "", fmt.Errorf("InstanceType: Error fetching by providerID: %v Error fetching by NodeName: %v", providerIDErr, err)
 		}
@@ -480,11 +488,11 @@ func getInstanceTypeByProviderIDOrName(instances cloudprovider.Instances, node *
 
 // getZoneByProviderIDorName will attempt to get the zone of node using its providerID
 // then it's name. If both attempts fail, an error is returned
-func getZoneByProviderIDOrName(zones cloudprovider.Zones, node *v1.Node) (cloudprovider.Zone, error) {
-	zone, err := zones.GetZoneByProviderID(node.Spec.ProviderID)
+func getZoneByProviderIDOrName(ctx context.Context, zones cloudprovider.Zones, node *v1.Node) (cloudprovider.Zone, error) {
+	zone, err := zones.GetZoneByProviderID(ctx, node.Spec.ProviderID)
 	if err != nil {
 		providerIDErr := err
-		zone, err = zones.GetZoneByNodeName(types.NodeName(node.Name))
+		zone, err = zones.GetZoneByNodeName(ctx, types.NodeName(node.Name))
 		if err != nil {
 			return cloudprovider.Zone{}, fmt.Errorf("Zone: Error fetching by providerID: %v Error fetching by NodeName: %v", providerIDErr, err)
 		}

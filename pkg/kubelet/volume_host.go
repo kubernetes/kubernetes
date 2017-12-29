@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"runtime"
@@ -165,8 +166,8 @@ func (kvh *kubeletVolumeHost) GetHostName() string {
 	return kvh.kubelet.hostname
 }
 
-func (kvh *kubeletVolumeHost) GetHostIP() (net.IP, error) {
-	return kvh.kubelet.GetHostIP()
+func (kvh *kubeletVolumeHost) GetHostIP(ctx context.Context) (net.IP, error) {
+	return kvh.kubelet.GetHostIP(ctx)
 }
 
 func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
@@ -177,16 +178,16 @@ func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 	return node.Status.Allocatable, nil
 }
 
-func (kvh *kubeletVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
+func (kvh *kubeletVolumeHost) GetSecretFunc() func(ctx context.Context, namespace, name string) (*v1.Secret, error) {
 	return kvh.secretManager.GetSecret
 }
 
-func (kvh *kubeletVolumeHost) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
+func (kvh *kubeletVolumeHost) GetConfigMapFunc() func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
 	return kvh.configMapManager.GetConfigMap
 }
 
-func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
-	node, err := kvh.kubelet.GetNode()
+func (kvh *kubeletVolumeHost) GetNodeLabels(ctx context.Context) (map[string]string, error) {
+	node, err := kvh.kubelet.GetNode(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}

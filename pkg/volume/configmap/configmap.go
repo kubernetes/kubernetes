@@ -19,6 +19,7 @@ package configmap
 import (
 	"fmt"
 
+	"context"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -43,7 +44,7 @@ const (
 // configMapPlugin implements the VolumePlugin interface.
 type configMapPlugin struct {
 	host         volume.VolumeHost
-	getConfigMap func(namespace, name string) (*v1.ConfigMap, error)
+	getConfigMap func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error)
 }
 
 var _ volume.VolumePlugin = &configMapPlugin{}
@@ -149,7 +150,7 @@ type configMapVolumeMounter struct {
 	source       v1.ConfigMapVolumeSource
 	pod          v1.Pod
 	opts         *volume.VolumeOptions
-	getConfigMap func(namespace, name string) (*v1.ConfigMap, error)
+	getConfigMap func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error)
 }
 
 var _ volume.Mounter = &configMapVolumeMounter{}
@@ -179,11 +180,11 @@ func (b *configMapVolumeMounter) CanMount() error {
 	return nil
 }
 
-func (b *configMapVolumeMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *configMapVolumeMounter) SetUp(ctx context.Context, fsGroup *int64) error {
+	return b.SetUpAt(ctx, b.GetPath(), fsGroup)
 }
 
-func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *configMapVolumeMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	glog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
@@ -191,12 +192,12 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if err != nil {
 		return err
 	}
-	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
+	if err := wrapped.SetUpAt(ctx, dir, fsGroup); err != nil {
 		return err
 	}
 
 	optional := b.source.Optional != nil && *b.source.Optional
-	configMap, err := b.getConfigMap(b.pod.Namespace, b.source.Name)
+	configMap, err := b.getConfigMap(ctx, b.pod.Namespace, b.source.Name)
 	if err != nil {
 		if !(errors.IsNotFound(err) && optional) {
 			glog.Errorf("Couldn't get configMap %v/%v: %v", b.pod.Namespace, b.source.Name, err)
@@ -298,12 +299,12 @@ type configMapVolumeUnmounter struct {
 
 var _ volume.Unmounter = &configMapVolumeUnmounter{}
 
-func (c *configMapVolumeUnmounter) TearDown() error {
-	return c.TearDownAt(c.GetPath())
+func (c *configMapVolumeUnmounter) TearDown(ctx context.Context) error {
+	return c.TearDownAt(ctx, c.GetPath())
 }
 
-func (c *configMapVolumeUnmounter) TearDownAt(dir string) error {
-	return volume.UnmountViaEmptyDir(dir, c.plugin.host, c.volName, wrappedVolumeSpec(), c.podUID)
+func (c *configMapVolumeUnmounter) TearDownAt(ctx context.Context, dir string) error {
+	return volume.UnmountViaEmptyDir(ctx, dir, c.plugin.host, c.volName, wrappedVolumeSpec(), c.podUID)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.ConfigMapVolumeSource, bool) {

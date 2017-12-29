@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -33,6 +34,8 @@ import (
 func TestSandboxGC(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	podStateProvider := m.containerGC.podStateProvider.(*fakePodStateProvider)
 	makeGCSandbox := func(pod *v1.Pod, attempt uint32, state runtimeapi.PodSandboxState, withPodStateProvider bool, createdAt int64) sandboxTemplate {
@@ -140,7 +143,7 @@ func TestSandboxGC(t *testing.T) {
 	} {
 		t.Logf("TestCase #%d: %+v", c, test)
 		fakeSandboxes := makeFakePodSandboxes(t, m, test.sandboxes)
-		fakeContainers := makeFakeContainers(t, m, test.containers)
+		fakeContainers := makeFakeContainers(t, ctx, m, test.containers)
 		fakeRuntime.SetFakeSandboxes(fakeSandboxes)
 		fakeRuntime.SetFakeContainers(fakeContainers)
 
@@ -160,6 +163,8 @@ func TestSandboxGC(t *testing.T) {
 func TestContainerGC(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	podStateProvider := m.containerGC.podStateProvider.(*fakePodStateProvider)
 	makeGCContainer := func(podName, containerName string, attempt int, createdAt int64, state runtimeapi.ContainerState) containerTemplate {
@@ -338,7 +343,7 @@ func TestContainerGC(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase #%d: %+v", c, test)
-		fakeContainers := makeFakeContainers(t, m, test.containers)
+		fakeContainers := makeFakeContainers(t, ctx, m, test.containers)
 		fakeRuntime.SetFakeContainers(fakeContainers)
 
 		if test.policy == nil {

@@ -17,6 +17,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -31,6 +32,8 @@ import (
 )
 
 func TestSummaryProvider(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	var (
 		podStats = []statsapi.PodStats{
 			{
@@ -75,7 +78,7 @@ func TestSummaryProvider(t *testing.T) {
 		On("GetCgroupStats", "/kubelet", false).Return(cgroupStatsMap["/kubelet"].cs, cgroupStatsMap["/kubelet"].ns, nil)
 
 	provider := NewSummaryProvider(mockStatsProvider)
-	summary, err := provider.Get(true)
+	summary, err := provider.Get(ctx, true)
 	assert.NoError(err)
 
 	assert.Equal(summary.Node.NodeName, "test-node")

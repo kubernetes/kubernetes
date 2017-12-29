@@ -17,6 +17,7 @@ limitations under the License.
 package local
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -195,12 +196,12 @@ func (m *localVolumeMounter) CanMount() error {
 }
 
 // SetUp bind mounts the directory to the volume path
-func (m *localVolumeMounter) SetUp(fsGroup *int64) error {
-	return m.SetUpAt(m.GetPath(), fsGroup)
+func (m *localVolumeMounter) SetUp(ctx context.Context, fsGroup *int64) error {
+	return m.SetUpAt(ctx, m.GetPath(), fsGroup)
 }
 
 // SetUpAt bind mounts the directory to the volume path and sets up volume ownership
-func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (m *localVolumeMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	m.plugin.volumeLocks.LockKey(m.globalPath)
 	defer m.plugin.volumeLocks.UnlockKey(m.globalPath)
 
@@ -298,12 +299,12 @@ type localVolumeUnmounter struct {
 var _ volume.Unmounter = &localVolumeUnmounter{}
 
 // TearDown unmounts the bind mount
-func (u *localVolumeUnmounter) TearDown() error {
-	return u.TearDownAt(u.GetPath())
+func (u *localVolumeUnmounter) TearDown(ctx context.Context) error {
+	return u.TearDownAt(ctx, u.GetPath())
 }
 
 // TearDownAt unmounts the bind mount
-func (u *localVolumeUnmounter) TearDownAt(dir string) error {
+func (u *localVolumeUnmounter) TearDownAt(ctx context.Context, dir string) error {
 	glog.V(4).Infof("Unmounting volume %q at path %q\n", u.volName, dir)
 	return util.UnmountMountPoint(dir, u.mounter, true) /* extensiveMountPointCheck = true */
 }

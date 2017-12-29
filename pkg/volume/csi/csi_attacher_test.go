@@ -17,6 +17,7 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -52,6 +53,8 @@ func makeTestAttachment(attachID, nodeName, pvName string) *storage.VolumeAttach
 func TestAttacherAttach(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t)
 	defer os.RemoveAll(tmpDir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	attacher, err := plug.NewAttacher()
 	if err != nil {
@@ -113,15 +116,15 @@ func TestAttacherAttach(t *testing.T) {
 		t.Logf("test case: %s", tc.name)
 		spec := volume.NewSpecFromPersistentVolume(makeTestPV(fmt.Sprintf("test-pv%d", i), 10, tc.driverName, tc.volumeName), false)
 
-		go func(id, nodename string, fail bool) {
-			attachID, err := csiAttacher.Attach(spec, types.NodeName(nodename))
+		go func(ctx context.Context, id, nodename string, fail bool) {
+			attachID, err := csiAttacher.Attach(ctx, spec, types.NodeName(nodename))
 			if !fail && err != nil {
 				t.Errorf("expecting no failure, but got err: %v", err)
 			}
 			if attachID != id && !fail {
 				t.Errorf("expecting attachID %v, got %v", id, attachID)
 			}
-		}(tc.attachID, tc.nodeName, tc.shouldFail)
+		}(ctx, tc.attachID, tc.nodeName, tc.shouldFail)
 
 		// update attachment to avoid long waitForAttachment
 		ticker := time.NewTicker(10 * time.Millisecond)
@@ -212,6 +215,8 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 func TestAttacherVolumesAreAttached(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t)
 	defer os.RemoveAll(tmpDir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	attacher, err := plug.NewAttacher()
 	if err != nil {
@@ -246,7 +251,7 @@ func TestAttacherVolumesAreAttached(t *testing.T) {
 		}
 
 		// retrieve attached status
-		stats, err := csiAttacher.VolumesAreAttached(specs, types.NodeName(nodeName))
+		stats, err := csiAttacher.VolumesAreAttached(ctx, specs, types.NodeName(nodeName))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -270,6 +275,8 @@ func TestAttacherVolumesAreAttached(t *testing.T) {
 func TestAttacherDetach(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t)
 	defer os.RemoveAll(tmpDir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	attacher, err := plug.NewAttacher()
 	if err != nil {
@@ -300,7 +307,7 @@ func TestAttacherDetach(t *testing.T) {
 		if err != nil {
 			t.Errorf("test case %s failed: %v", tc.name, err)
 		}
-		err = csiAttacher.Detach(volumeName, types.NodeName(nodeName))
+		err = csiAttacher.Detach(ctx, volumeName, types.NodeName(nodeName))
 		if tc.shouldFail && err == nil {
 			t.Fatal("expecting failure, but err = nil")
 		}

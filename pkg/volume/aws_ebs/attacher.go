@@ -17,6 +17,7 @@ limitations under the License.
 package aws_ebs
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -59,7 +60,7 @@ func (plugin *awsElasticBlockStorePlugin) GetDeviceMountRefs(deviceMountPath str
 	return mount.GetMountRefs(mounter, deviceMountPath)
 }
 
-func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
+func (attacher *awsElasticBlockStoreAttacher) Attach(ctx context.Context, spec *volume.Spec, nodeName types.NodeName) (string, error) {
 	volumeSource, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -78,7 +79,7 @@ func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, nodeName
 	return devicePath, nil
 }
 
-func (attacher *awsElasticBlockStoreAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (attacher *awsElasticBlockStoreAttacher) VolumesAreAttached(ctx context.Context, specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
 
 	glog.Warningf("Attacher.VolumesAreAttached called for node %q - Please use BulkVerifyVolumes for AWS", nodeName)
 	volumeNodeMap := map[types.NodeName][]*volume.Spec{
@@ -253,7 +254,7 @@ func (plugin *awsElasticBlockStorePlugin) NewDetacher() (volume.Detacher, error)
 	}, nil
 }
 
-func (detacher *awsElasticBlockStoreDetacher) Detach(volumeName string, nodeName types.NodeName) error {
+func (detacher *awsElasticBlockStoreDetacher) Detach(ctx context.Context, volumeName string, nodeName types.NodeName) error {
 	volumeID := aws.KubernetesVolumeID(path.Base(volumeName))
 
 	if _, err := detacher.awsVolumes.DetachDisk(volumeID, nodeName); err != nil {

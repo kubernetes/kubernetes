@@ -17,6 +17,7 @@ limitations under the License.
 package openstack
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -457,7 +458,7 @@ func (lbaas *LbaasV2) createLoadBalancer(service *v1.Service, name string, inter
 	return loadbalancer, nil
 }
 
-func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
+func (lbaas *LbaasV2) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	loadbalancer, err := getLoadbalancerByName(lbaas.lb, loadBalancerName)
 	if err == ErrNotFound {
@@ -619,7 +620,7 @@ func getFloatingNetworkIdForLB(client *gophercloud.ServiceClient) (string, error
 // a list of regions (from config) and query/create loadbalancers in
 // each region.
 
-func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
+func (lbaas *LbaasV2) EnsureLoadBalancer(ctx context.Context, clusterName string, apiService *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", clusterName, apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, nodes, apiService.Annotations)
 
 	if len(nodes) == 0 {
@@ -956,7 +957,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		err := lbaas.ensureSecurityGroup(clusterName, apiService, nodes, loadbalancer)
 		if err != nil {
 			// cleanup what was created so far
-			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
+			_ = lbaas.EnsureLoadBalancerDeleted(ctx, clusterName, apiService)
 			return status, err
 		}
 	}
@@ -1138,7 +1139,7 @@ func (lbaas *LbaasV2) ensureSecurityGroup(clusterName string, apiService *v1.Ser
 	return nil
 }
 
-func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
+func (lbaas *LbaasV2) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v)", clusterName, loadBalancerName, nodes)
 
@@ -1358,7 +1359,7 @@ func (lbaas *LbaasV2) updateSecurityGroup(clusterName string, apiService *v1.Ser
 	return nil
 }
 
-func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
+func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	glog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v)", clusterName, loadBalancerName)
 
@@ -1524,7 +1525,6 @@ func (lbaas *LbaasV2) EnsureSecurityGroupDeleted(clusterName string, service *v1
 				RemoteGroupID: lbSecGroupID,
 			}
 			secGroupRules, err := getSecurityGroupRules(lbaas.network, opts)
-
 			if err != nil && !isNotFound(err) {
 				msg := fmt.Sprintf("Error finding rules for remote group id %s in security group id %s: %v", lbSecGroupID, nodeSecurityGroupID, err)
 				return fmt.Errorf(msg)

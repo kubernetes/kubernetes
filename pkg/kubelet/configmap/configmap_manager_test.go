@@ -17,6 +17,7 @@ limitations under the License.
 package configmap
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -36,8 +37,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func checkConfigMap(t *testing.T, store *configMapStore, ns, name string, shouldExist bool) {
-	_, err := store.Get(ns, name)
+func checkConfigMap(t *testing.T, ctx context.Context, store *configMapStore, ns, name string, shouldExist bool) {
+	_, err := store.Get(ctx, ns, name)
 	if shouldExist && err != nil {
 		t.Errorf("unexpected actions: %#v", err)
 	}
@@ -46,12 +47,14 @@ func checkConfigMap(t *testing.T, store *configMapStore, ns, name string, should
 	}
 }
 
-func noObjectTTL() (time.Duration, bool) {
+func noObjectTTL(ctx context.Context) (time.Duration, bool) {
 	return time.Duration(0), false
 }
 
 func TestConfigMapStore(t *testing.T) {
 	fakeClient := &fake.Clientset{}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	store := newConfigMapStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
 	store.Add("ns1", "name1")
 	store.Add("ns2", "name2")
@@ -65,11 +68,11 @@ func TestConfigMapStore(t *testing.T) {
 	actions := fakeClient.Actions()
 	assert.Equal(t, 0, len(actions), "unexpected actions: %#v", actions)
 	// Should issue Get request
-	store.Get("ns1", "name1")
+	store.Get(ctx, "ns1", "name1")
 	// Shouldn't issue Get request, as configMap is not registered
-	store.Get("ns2", "name2")
+	store.Get(ctx, "ns2", "name2")
 	// Should issue Get request
-	store.Get("ns3", "name3")
+	store.Get(ctx, "ns3", "name3")
 
 	actions = fakeClient.Actions()
 	assert.Equal(t, 2, len(actions), "unexpected actions: %#v", actions)
@@ -78,14 +81,16 @@ func TestConfigMapStore(t *testing.T) {
 		assert.True(t, a.Matches("get", "configmaps"), "unexpected actions: %#v", a)
 	}
 
-	checkConfigMap(t, store, "ns1", "name1", true)
-	checkConfigMap(t, store, "ns2", "name2", false)
-	checkConfigMap(t, store, "ns3", "name3", true)
-	checkConfigMap(t, store, "ns4", "name4", false)
+	checkConfigMap(t, ctx, store, "ns1", "name1", true)
+	checkConfigMap(t, ctx, store, "ns2", "name2", false)
+	checkConfigMap(t, ctx, store, "ns3", "name3", true)
+	checkConfigMap(t, ctx, store, "ns4", "name4", false)
 }
 
 func TestConfigMapStoreDeletingConfigMap(t *testing.T) {
 	fakeClient := &fake.Clientset{}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	store := newConfigMapStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
 	store.Add("ns", "name")
 
@@ -93,7 +98,7 @@ func TestConfigMapStoreDeletingConfigMap(t *testing.T) {
 	fakeClient.AddReactor("get", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
 		return true, result, nil
 	})
-	configMap, err := store.Get("ns", "name")
+	configMap, err := store.Get(ctx, "ns", "name")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -104,7 +109,7 @@ func TestConfigMapStoreDeletingConfigMap(t *testing.T) {
 	fakeClient.PrependReactor("get", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
 		return true, &v1.ConfigMap{}, apierrors.NewNotFound(v1.Resource("configMap"), "name")
 	})
-	configMap, err = store.Get("ns", "name")
+	configMap, err = store.Get(ctx, "ns", "name")
 	if err == nil || !apierrors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -115,6 +120,8 @@ func TestConfigMapStoreDeletingConfigMap(t *testing.T) {
 
 func TestConfigMapStoreGetAlwaysRefresh(t *testing.T) {
 	fakeClient := &fake.Clientset{}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	fakeClock := clock.NewFakeClock(time.Now())
 	store := newConfigMapStore(fakeClient, fakeClock, noObjectTTL, 0)
 
@@ -127,7 +134,7 @@ func TestConfigMapStoreGetAlwaysRefresh(t *testing.T) {
 	wg.Add(100)
 	for i := 0; i < 100; i++ {
 		go func(i int) {
-			store.Get(fmt.Sprintf("ns-%d", i%10), fmt.Sprintf("name-%d", i%10))
+			store.Get(ctx, fmt.Sprintf("ns-%d", i%10), fmt.Sprintf("name-%d", i%10))
 			wg.Done()
 		}(i)
 	}
@@ -142,6 +149,8 @@ func TestConfigMapStoreGetAlwaysRefresh(t *testing.T) {
 
 func TestConfigMapStoreGetNeverRefresh(t *testing.T) {
 	fakeClient := &fake.Clientset{}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	fakeClock := clock.NewFakeClock(time.Now())
 	store := newConfigMapStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
 
@@ -154,7 +163,7 @@ func TestConfigMapStoreGetNeverRefresh(t *testing.T) {
 	wg.Add(100)
 	for i := 0; i < 100; i++ {
 		go func(i int) {
-			store.Get(fmt.Sprintf("ns-%d", i%10), fmt.Sprintf("name-%d", i%10))
+			store.Get(ctx, fmt.Sprintf("ns-%d", i%10), fmt.Sprintf("name-%d", i%10))
 			wg.Done()
 		}(i)
 	}
@@ -167,39 +176,41 @@ func TestConfigMapStoreGetNeverRefresh(t *testing.T) {
 func TestCustomTTL(t *testing.T) {
 	ttl := time.Duration(0)
 	ttlExists := false
-	customTTL := func() (time.Duration, bool) {
+	customTTL := func(ctx context.Context) (time.Duration, bool) {
 		return ttl, ttlExists
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	fakeClient := &fake.Clientset{}
 	fakeClock := clock.NewFakeClock(time.Time{})
 	store := newConfigMapStore(fakeClient, fakeClock, customTTL, time.Minute)
 
 	store.Add("ns", "name")
-	store.Get("ns", "name")
+	store.Get(ctx, "ns", "name")
 	fakeClient.ClearActions()
 
 	// Set 0-ttl and see if that works.
 	ttl = time.Duration(0)
 	ttlExists = true
-	store.Get("ns", "name")
+	store.Get(ctx, "ns", "name")
 	actions := fakeClient.Actions()
 	assert.Equal(t, 1, len(actions), "unexpected actions: %#v", actions)
 	fakeClient.ClearActions()
 
 	// Set 5-minute ttl and see if this works.
 	ttl = time.Duration(5) * time.Minute
-	store.Get("ns", "name")
+	store.Get(ctx, "ns", "name")
 	actions = fakeClient.Actions()
 	assert.Equal(t, 0, len(actions), "unexpected actions: %#v", actions)
 	// Still no effect after 4 minutes.
 	fakeClock.Step(4 * time.Minute)
-	store.Get("ns", "name")
+	store.Get(ctx, "ns", "name")
 	actions = fakeClient.Actions()
 	assert.Equal(t, 0, len(actions), "unexpected actions: %#v", actions)
 	// Now it should have an effect.
 	fakeClock.Step(time.Minute)
-	store.Get("ns", "name")
+	store.Get(ctx, "ns", "name")
 	actions = fakeClient.Actions()
 	assert.Equal(t, 1, len(actions), "unexpected actions: %#v", actions)
 	fakeClient.ClearActions()
@@ -207,17 +218,19 @@ func TestCustomTTL(t *testing.T) {
 	// Now remove the custom ttl and see if that works.
 	ttlExists = false
 	fakeClock.Step(55 * time.Second)
-	store.Get("ns", "name")
+	store.Get(ctx, "ns", "name")
 	actions = fakeClient.Actions()
 	assert.Equal(t, 0, len(actions), "unexpected actions: %#v", actions)
 	// Pass the minute and it should be triggered now.
 	fakeClock.Step(5 * time.Second)
-	store.Get("ns", "name")
+	store.Get(ctx, "ns", "name")
 	actions = fakeClient.Actions()
 	assert.Equal(t, 1, len(actions), "unexpected actions: %#v", actions)
 }
 
 func TestParseNodeAnnotation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	testCases := []struct {
 		node   *v1.Node
 		err    error
@@ -277,8 +290,8 @@ func TestParseNodeAnnotation(t *testing.T) {
 		},
 	}
 	for i, testCase := range testCases {
-		getNode := func() (*v1.Node, error) { return testCase.node, testCase.err }
-		ttl, exists := GetObjectTTLFromNodeFunc(getNode)()
+		getNode := func(ctx context.Context) (*v1.Node, error) { return testCase.node, testCase.err }
+		ttl, exists := GetObjectTTLFromNodeFunc(getNode)(ctx)
 		if exists != testCase.exists {
 			t.Errorf("%d: incorrect parsing: %t", i, exists)
 			continue
@@ -350,6 +363,8 @@ func podWithConfigMaps(ns, podName string, toAttach configMapsToAttach) *v1.Pod 
 
 func TestCacheInvalidation(t *testing.T) {
 	fakeClient := &fake.Clientset{}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	fakeClock := clock.NewFakeClock(time.Now())
 	store := newConfigMapStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
 	manager := &cachingConfigMapManager{
@@ -366,9 +381,9 @@ func TestCacheInvalidation(t *testing.T) {
 	}
 	manager.RegisterPod(podWithConfigMaps("ns1", "name1", s1))
 	// Fetch both configMaps - this should triggger get operations.
-	store.Get("ns1", "s1")
-	store.Get("ns1", "s10")
-	store.Get("ns1", "s2")
+	store.Get(ctx, "ns1", "s1")
+	store.Get(ctx, "ns1", "s10")
+	store.Get(ctx, "ns1", "s2")
 	actions := fakeClient.Actions()
 	assert.Equal(t, 3, len(actions), "unexpected actions: %#v", actions)
 	fakeClient.ClearActions()
@@ -383,10 +398,10 @@ func TestCacheInvalidation(t *testing.T) {
 	}
 	manager.RegisterPod(podWithConfigMaps("ns1", "name1", s2))
 	// All configMaps should be invalidated - this should trigger get operations.
-	store.Get("ns1", "s1")
-	store.Get("ns1", "s2")
-	store.Get("ns1", "s20")
-	store.Get("ns1", "s3")
+	store.Get(ctx, "ns1", "s1")
+	store.Get(ctx, "ns1", "s2")
+	store.Get(ctx, "ns1", "s20")
+	store.Get(ctx, "ns1", "s3")
 	actions = fakeClient.Actions()
 	assert.Equal(t, 4, len(actions), "unexpected actions: %#v", actions)
 	fakeClient.ClearActions()
@@ -394,11 +409,11 @@ func TestCacheInvalidation(t *testing.T) {
 	// Create a new pod that is refencing the first three configMaps - those should
 	// be invalidated.
 	manager.RegisterPod(podWithConfigMaps("ns1", "name2", s1))
-	store.Get("ns1", "s1")
-	store.Get("ns1", "s10")
-	store.Get("ns1", "s2")
-	store.Get("ns1", "s20")
-	store.Get("ns1", "s3")
+	store.Get(ctx, "ns1", "s1")
+	store.Get(ctx, "ns1", "s10")
+	store.Get(ctx, "ns1", "s2")
+	store.Get(ctx, "ns1", "s20")
+	store.Get(ctx, "ns1", "s3")
 	actions = fakeClient.Actions()
 	assert.Equal(t, 3, len(actions), "unexpected actions: %#v", actions)
 	fakeClient.ClearActions()
@@ -490,6 +505,8 @@ func TestCacheRefcounts(t *testing.T) {
 
 func TestCachingConfigMapManager(t *testing.T) {
 	fakeClient := &fake.Clientset{}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	configMapStore := newConfigMapStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
 	manager := &cachingConfigMapManager{
 		configMapStore: configMapStore,
@@ -543,7 +560,7 @@ func TestCachingConfigMapManager(t *testing.T) {
 
 	for _, ns := range []string{"ns1", "ns2", "ns3"} {
 		for _, configMap := range []string{"s1", "s2", "s3", "s4", "s5", "s6", "s20", "s40", "s50"} {
-			checkConfigMap(t, configMapStore, ns, configMap, shouldExist(ns, configMap))
+			checkConfigMap(t, ctx, configMapStore, ns, configMap, shouldExist(ns, configMap))
 		}
 	}
 }

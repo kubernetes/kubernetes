@@ -17,6 +17,7 @@ limitations under the License.
 package quobyte
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -74,7 +75,7 @@ func TestGetAccessModes(t *testing.T) {
 	}
 }
 
-func doTestPlugin(t *testing.T, spec *volume.Spec) {
+func doTestPlugin(ctx context.Context, t *testing.T, spec *volume.Spec) {
 	tmpDir, err := utiltesting.MkTmpdir("quobyte_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
@@ -101,7 +102,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if volumePath != fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/root#root@vol", tmpDir) {
 		t.Errorf("Got unexpected path: %s expected: %s", volumePath, fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/root#root@vol", tmpDir))
 	}
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(ctx, nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	unmounter, err := plug.(*quobytePlugin).newUnmounterInternal("vol", types.UID("poduid"), &mount.FakeMounter{})
@@ -111,23 +112,27 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if unmounter == nil {
 		t.Error("Got a nil unmounter")
 	}
-	if err := unmounter.TearDown(); err != nil {
+	if err := unmounter.TearDown(ctx); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	// We don't need to check tear down, we don't unmount quobyte
 }
 
 func TestPluginVolume(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	vol := &v1.Volume{
 		Name: "vol1",
 		VolumeSource: v1.VolumeSource{
 			Quobyte: &v1.QuobyteVolumeSource{Registry: "reg:7861", Volume: "vol", ReadOnly: false, User: "root", Group: "root"},
 		},
 	}
-	doTestPlugin(t, volume.NewSpecFromVolume(vol))
+	doTestPlugin(ctx, t, volume.NewSpecFromVolume(vol))
 }
 
 func TestPluginPersistentVolume(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	vol := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "vol1",
@@ -139,7 +144,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 	}
 
-	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false))
+	doTestPlugin(ctx, t, volume.NewSpecFromPersistentVolume(vol, false))
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {

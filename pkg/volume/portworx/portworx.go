@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 
+	"context"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -263,12 +264,12 @@ func (b *portworxVolumeMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *portworxVolumeMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *portworxVolumeMounter) SetUp(ctx context.Context, fsGroup *int64) error {
+	return b.SetUpAt(ctx, b.GetPath(), fsGroup)
 }
 
 // SetUpAt attaches the disk and bind mounts to the volume path.
-func (b *portworxVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *portworxVolumeMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.Infof("Portworx Volume set up. Dir: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
@@ -314,13 +315,13 @@ var _ volume.Unmounter = &portworxVolumeUnmounter{}
 
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
-func (c *portworxVolumeUnmounter) TearDown() error {
-	return c.TearDownAt(c.GetPath())
+func (c *portworxVolumeUnmounter) TearDown(ctx context.Context) error {
+	return c.TearDownAt(ctx, c.GetPath())
 }
 
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
-func (c *portworxVolumeUnmounter) TearDownAt(dir string) error {
+func (c *portworxVolumeUnmounter) TearDownAt(ctx context.Context, dir string) error {
 	glog.Infof("Portworx Volume TearDown of %s", dir)
 
 	if err := c.manager.UnmountVolume(c, dir); err != nil {

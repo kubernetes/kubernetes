@@ -26,6 +26,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"context"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -335,7 +336,7 @@ func (b *storageosMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *storageosMounter) SetUp(fsGroup *int64) error {
+func (b *storageosMounter) SetUp(ctx context.Context, fsGroup *int64) error {
 	// Need a namespace to find the volume, try pod's namespace if not set.
 	if b.volNamespace == "" {
 		glog.V(2).Infof("Setting StorageOS volume namespace to pod namespace: %s", b.podNamespace)
@@ -358,11 +359,11 @@ func (b *storageosMounter) SetUp(fsGroup *int64) error {
 	glog.V(4).Infof("Successfully mounted StorageOS volume %s into global mount directory", b.volName)
 
 	// Bind mount the volume into the pod
-	return b.SetUpAt(b.GetPath(), fsGroup)
+	return b.SetUpAt(ctx, b.GetPath(), fsGroup)
 }
 
 // SetUp bind mounts the disk global mount to the give volume path.
-func (b *storageosMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *storageosMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("StorageOS volume set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
@@ -479,7 +480,7 @@ func (b *storageosUnmounter) GetPath() string {
 
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
-func (b *storageosUnmounter) TearDown() error {
+func (b *storageosUnmounter) TearDown(ctx context.Context) error {
 	if len(b.volNamespace) == 0 || len(b.volName) == 0 {
 		glog.Warningf("volNamespace: %q, volName: %q not set, skipping TearDown", b.volNamespace, b.volName)
 		return fmt.Errorf("pvName not specified for TearDown, waiting for next sync loop")
@@ -487,7 +488,7 @@ func (b *storageosUnmounter) TearDown() error {
 	// Unmount from pod
 	mountPath := b.GetPath()
 
-	err := b.TearDownAt(mountPath)
+	err := b.TearDownAt(ctx, mountPath)
 	if err != nil {
 		glog.Errorf("Unmount from pod failed: %v", err)
 		return err
@@ -502,7 +503,7 @@ func (b *storageosUnmounter) TearDown() error {
 	}
 
 	// Unmount from plugin's disk global mount dir.
-	err = b.TearDownAt(globalPDPath)
+	err = b.TearDownAt(ctx, globalPDPath)
 	if err != nil {
 		glog.Errorf("Detach failed during unmount: %v", err)
 		return err
@@ -522,7 +523,7 @@ func (b *storageosUnmounter) TearDown() error {
 
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
-func (b *storageosUnmounter) TearDownAt(dir string) error {
+func (b *storageosUnmounter) TearDownAt(ctx context.Context, dir string) error {
 	if err := util.UnmountPath(dir, b.mounter); err != nil {
 		glog.V(4).Infof("Unmounted StorageOS volume %s failed with: %v", b.pvName, err)
 	}

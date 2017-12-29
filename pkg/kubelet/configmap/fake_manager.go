@@ -17,6 +17,8 @@ limitations under the License.
 package configmap
 
 import (
+	"context"
+
 	"k8s.io/api/core/v1"
 )
 
@@ -29,7 +31,7 @@ func NewFakeManager() Manager {
 	return &fakeManager{}
 }
 
-func (s *fakeManager) GetConfigMap(namespace, name string) (*v1.ConfigMap, error) {
+func (s *fakeManager) GetConfigMap(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
 	return nil, nil
 }
 

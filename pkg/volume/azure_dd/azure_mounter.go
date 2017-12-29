@@ -17,6 +17,7 @@ limitations under the License.
 package azure_dd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"runtime"
@@ -61,15 +62,15 @@ func (m *azureDiskMounter) CanMount() error {
 	return nil
 }
 
-func (m *azureDiskMounter) SetUp(fsGroup *int64) error {
-	return m.SetUpAt(m.GetPath(), fsGroup)
+func (m *azureDiskMounter) SetUp(ctx context.Context, fsGroup *int64) error {
+	return m.SetUpAt(ctx, m.GetPath(), fsGroup)
 }
 
 func (m *azureDiskMounter) GetPath() string {
 	return getPath(m.dataDisk.podUID, m.dataDisk.volumeName, m.plugin.host)
 }
 
-func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (m *azureDiskMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	mounter := m.plugin.host.GetMounter(m.plugin.GetPluginName())
 	volumeSource, err := getVolumeSource(m.spec)
 
@@ -167,11 +168,11 @@ func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	return nil
 }
 
-func (u *azureDiskUnmounter) TearDown() error {
-	return u.TearDownAt(u.GetPath())
+func (u *azureDiskUnmounter) TearDown(ctx context.Context) error {
+	return u.TearDownAt(ctx, u.GetPath())
 }
 
-func (u *azureDiskUnmounter) TearDownAt(dir string) error {
+func (u *azureDiskUnmounter) TearDownAt(ctx context.Context, dir string) error {
 	if pathExists, pathErr := util.PathExists(dir); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {

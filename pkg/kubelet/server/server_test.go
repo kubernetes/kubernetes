@@ -18,6 +18,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -166,8 +167,8 @@ func (fk *fakeKubelet) StreamingConnectionIdleTimeout() time.Duration {
 }
 
 // Unused functions
-func (_ *fakeKubelet) GetNode() (*v1.Node, error)   { return nil, nil }
-func (_ *fakeKubelet) GetNodeConfig() cm.NodeConfig { return cm.NodeConfig{} }
+func (_ *fakeKubelet) GetNode(ctx context.Context) (*v1.Node, error) { return nil, nil }
+func (_ *fakeKubelet) GetNodeConfig() cm.NodeConfig                  { return cm.NodeConfig{} }
 
 func (fk *fakeKubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool) {
 	return map[string]volume.Volume{}, true

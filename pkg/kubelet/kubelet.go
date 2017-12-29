@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -357,6 +358,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	hostname := nodeutil.GetHostname(hostnameOverride)
 	// Query the cloud provider for our node name, default to hostname
 	nodeName := types.NodeName(hostname)
@@ -369,7 +372,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			return nil, fmt.Errorf("failed to get instances from cloud provider")
 		}
 
-		nodeName, err = instances.CurrentNodeName(hostname)
+		nodeName, err = instances.CurrentNodeName(ctx, hostname)
 		if err != nil {
 			return nil, fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
 		}
@@ -377,7 +380,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
-			nodeAddresses, err := instances.NodeAddresses(nodeName)
+			nodeAddresses, err := instances.NodeAddresses(ctx, nodeName)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get the addresses of the current instance from the cloud provider: %v", err)
 			}
@@ -1407,6 +1410,8 @@ func (kl *Kubelet) GetKubeClient() clientset.Interface {
 // the most accurate information possible about an error situation to aid debugging.
 // Callers should not throw an event if this operation returns an error.
 func (kl *Kubelet) syncPod(o syncPodOptions) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	// pull out the required options
 	pod := o.pod
 	mirrorPod := o.mirrorPod
@@ -1572,7 +1577,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 			}
 		}
 		if mirrorPod == nil || deleted {
-			node, err := kl.GetNode()
+			node, err := kl.GetNode(ctx)
 			if err != nil || node.DeletionTimestamp != nil {
 				glog.V(4).Infof("No need to create a mirror pod, since node %q has been removed from the cluster", kl.nodeName)
 			} else {
@@ -1602,10 +1607,10 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// Fetch the pull secrets for the pod
-	pullSecrets := kl.getPullSecretsForPod(pod)
+	pullSecrets := kl.getPullSecretsForPod(ctx, pod)
 
 	// Call the container runtime's SyncPod callback
-	result := kl.containerRuntime.SyncPod(pod, apiPodStatus, podStatus, pullSecrets, kl.backOff)
+	result := kl.containerRuntime.SyncPod(ctx, pod, apiPodStatus, podStatus, pullSecrets, kl.backOff)
 	kl.reasonCache.Update(pod.UID, result)
 	if err := result.Error(); err != nil {
 		// Do not record an event here, as we keep all event logging for sync pod failures

@@ -17,6 +17,7 @@ limitations under the License.
 package aws_ebs
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -80,6 +81,8 @@ func TestAttachDetach(t *testing.T) {
 	spec := createVolSpec(diskName, readOnly)
 	attachError := errors.New("Fake attach error")
 	detachError := errors.New("Fake detach error")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	tests := []testcase{
 		// Successful Attach call
 		{
@@ -87,7 +90,7 @@ func TestAttachDetach(t *testing.T) {
 			attach: attachCall{diskName, nodeName, readOnly, "/dev/sda", nil},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, nodeName)
+				return attacher.Attach(ctx, spec, nodeName)
 			},
 			expectedDevice: "/dev/sda",
 		},
@@ -98,7 +101,7 @@ func TestAttachDetach(t *testing.T) {
 			attach: attachCall{diskName, nodeName, readOnly, "", attachError},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, nodeName)
+				return attacher.Attach(ctx, spec, nodeName)
 			},
 			expectedError: attachError,
 		},
@@ -110,7 +113,7 @@ func TestAttachDetach(t *testing.T) {
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
 				mountPath := "/mnt/" + string(diskName)
-				return "", detacher.Detach(mountPath, nodeName)
+				return "", detacher.Detach(ctx, mountPath, nodeName)
 			},
 		},
 		// Detach fails
@@ -120,7 +123,7 @@ func TestAttachDetach(t *testing.T) {
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
 				mountPath := "/mnt/" + string(diskName)
-				return "", detacher.Detach(mountPath, nodeName)
+				return "", detacher.Detach(ctx, mountPath, nodeName)
 			},
 			expectedError: detachError,
 		},

@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"strings"
@@ -103,6 +104,8 @@ func TestLoadBalancerExternalServiceModeSelection(t *testing.T) {
 }
 
 func testLoadBalancerServiceDefaultModeSelection(t *testing.T, isInternal bool) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	az := getTestCloud()
 	const vmCount = 8
 	const availabilitySetCount = 4
@@ -121,7 +124,7 @@ func testLoadBalancerServiceDefaultModeSelection(t *testing.T, isInternal bool) 
 			svc = getTestService(svcName, v1.ProtocolTCP, 8081)
 		}
 
-		lbStatus, err := az.EnsureLoadBalancer(testClusterName, &svc, clusterResources.nodes)
+		lbStatus, err := az.EnsureLoadBalancer(ctx, testClusterName, &svc, clusterResources.nodes)
 		if err != nil {
 			t.Errorf("Unexpected error: %q", err)
 		}
@@ -156,6 +159,8 @@ func testLoadBalancerServiceDefaultModeSelection(t *testing.T, isInternal bool) 
 // Validate even distribution of external services across load balancers
 // based on number of availability sets
 func testLoadBalancerServiceAutoModeSelection(t *testing.T, isInternal bool) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	az := getTestCloud()
 	const vmCount = 8
 	const availabilitySetCount = 4
@@ -174,7 +179,7 @@ func testLoadBalancerServiceAutoModeSelection(t *testing.T, isInternal bool) {
 			svc = getTestService(svcName, v1.ProtocolTCP, 8081)
 		}
 		setLoadBalancerAutoModeAnnotation(&svc)
-		lbStatus, err := az.EnsureLoadBalancer(testClusterName, &svc, clusterResources.nodes)
+		lbStatus, err := az.EnsureLoadBalancer(ctx, testClusterName, &svc, clusterResources.nodes)
 		if err != nil {
 			t.Errorf("Unexpected error: %q", err)
 		}
@@ -215,6 +220,8 @@ func testLoadBalancerServiceAutoModeSelection(t *testing.T, isInternal bool) {
 // services will be assigned load balancers that are part of the provided availability sets
 // specified in service annotation
 func testLoadBalancerServicesSpecifiedSelection(t *testing.T, isInternal bool) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	az := getTestCloud()
 	const vmCount = 8
 	const availabilitySetCount = 4
@@ -237,7 +244,7 @@ func testLoadBalancerServicesSpecifiedSelection(t *testing.T, isInternal bool) {
 		lbMode := fmt.Sprintf("%s,%s", selectedAvailabilitySetName1, selectedAvailabilitySetName2)
 		setLoadBalancerModeAnnotation(&svc, lbMode)
 
-		lbStatus, err := az.EnsureLoadBalancer(testClusterName, &svc, clusterResources.nodes)
+		lbStatus, err := az.EnsureLoadBalancer(ctx, testClusterName, &svc, clusterResources.nodes)
 		if err != nil {
 			t.Errorf("Unexpected error: %q", err)
 		}
@@ -256,6 +263,8 @@ func testLoadBalancerServicesSpecifiedSelection(t *testing.T, isInternal bool) {
 }
 
 func testLoadBalancerMaxRulesServices(t *testing.T, isInternal bool) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	az := getTestCloud()
 	const vmCount = 1
 	const availabilitySetCount = 1
@@ -275,7 +284,7 @@ func testLoadBalancerMaxRulesServices(t *testing.T, isInternal bool) {
 			svc = getTestService(svcName, v1.ProtocolTCP, 8081)
 		}
 
-		lbStatus, err := az.EnsureLoadBalancer(testClusterName, &svc, clusterResources.nodes)
+		lbStatus, err := az.EnsureLoadBalancer(ctx, testClusterName, &svc, clusterResources.nodes)
 		if err != nil {
 			t.Errorf("Unexpected error: %q", err)
 		}
@@ -301,7 +310,7 @@ func testLoadBalancerMaxRulesServices(t *testing.T, isInternal bool) {
 	} else {
 		svc = getTestService(svcName, v1.ProtocolTCP, 8081)
 	}
-	_, err := az.EnsureLoadBalancer(testClusterName, &svc, clusterResources.nodes)
+	_, err := az.EnsureLoadBalancer(ctx, testClusterName, &svc, clusterResources.nodes)
 	if err == nil {
 		t.Errorf("Expect any new service to fail as max limit in lb has reached")
 	} else {
@@ -314,6 +323,8 @@ func testLoadBalancerMaxRulesServices(t *testing.T, isInternal bool) {
 
 // Validate service deletion in lb auto selection mode
 func testLoadBalancerServiceAutoModeDeleteSelection(t *testing.T, isInternal bool) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	az := getTestCloud()
 	const vmCount = 8
 	const availabilitySetCount = 4
@@ -332,7 +343,7 @@ func testLoadBalancerServiceAutoModeDeleteSelection(t *testing.T, isInternal boo
 			svc = getTestService(svcName, v1.ProtocolTCP, 8081)
 		}
 		setLoadBalancerAutoModeAnnotation(&svc)
-		lbStatus, err := az.EnsureLoadBalancer(testClusterName, &svc, clusterResources.nodes)
+		lbStatus, err := az.EnsureLoadBalancer(ctx, testClusterName, &svc, clusterResources.nodes)
 		if err != nil {
 			t.Errorf("Unexpected error: %q", err)
 		}
@@ -361,7 +372,7 @@ func testLoadBalancerServiceAutoModeDeleteSelection(t *testing.T, isInternal boo
 			t.Errorf("Unexpected number of LB's: Expected (%d) Found (%d)", expectedNumOfLB, lbCount)
 		}
 
-		err := az.EnsureLoadBalancerDeleted(testClusterName, &svc)
+		err := az.EnsureLoadBalancerDeleted(ctx, testClusterName, &svc)
 		if err != nil {
 			t.Errorf("Unexpected error: %q", err)
 		}

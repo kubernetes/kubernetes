@@ -17,6 +17,7 @@ limitations under the License.
 package flexvolume
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -33,7 +34,7 @@ type flexVolumeDetacher struct {
 var _ volume.Detacher = &flexVolumeDetacher{}
 
 // Detach is part of the volume.Detacher interface.
-func (d *flexVolumeDetacher) Detach(volumeName string, hostName types.NodeName) error {
+func (d *flexVolumeDetacher) Detach(ctx context.Context, volumeName string, hostName types.NodeName) error {
 
 	call := d.plugin.NewDriverCall(detachCmd)
 	call.Append(volumeName)
@@ -41,7 +42,7 @@ func (d *flexVolumeDetacher) Detach(volumeName string, hostName types.NodeName) 
 
 	_, err := call.Run()
 	if isCmdNotSupportedErr(err) {
-		return (*detacherDefaults)(d).Detach(volumeName, hostName)
+		return (*detacherDefaults)(d).Detach(ctx, volumeName, hostName)
 	}
 	return err
 }

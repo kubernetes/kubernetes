@@ -17,6 +17,7 @@ limitations under the License.
 package volume
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -287,22 +288,22 @@ type VolumeHost interface {
 	GetHostName() string
 
 	// Returns host IP or nil in the case of error.
-	GetHostIP() (net.IP, error)
+	GetHostIP(ctx context.Context) (net.IP, error)
 
 	// Returns node allocatable.
 	GetNodeAllocatable() (v1.ResourceList, error)
 
 	// Returns a function that returns a secret.
-	GetSecretFunc() func(namespace, name string) (*v1.Secret, error)
+	GetSecretFunc() func(ctx context.Context, namespace, name string) (*v1.Secret, error)
 
 	// Returns a function that returns a configmap.
-	GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error)
+	GetConfigMapFunc() func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error)
 
 	// Returns an interface that should be used to execute any utilities in volume plugins
 	GetExec(pluginName string) mount.Exec
 
 	// Returns the labels on the node
-	GetNodeLabels() (map[string]string, error)
+	GetNodeLabels(ctx context.Context) (map[string]string, error)
 
 	// Returns the name of the node
 	GetNodeName() types.NodeName

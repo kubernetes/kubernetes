@@ -17,6 +17,7 @@ limitations under the License.
 package scaleio
 
 import (
+	"context"
 	"encoding/gob"
 	"errors"
 	"fmt"
@@ -233,8 +234,8 @@ func attachSecret(plug *sioPlugin, namespace string, configData map[string]strin
 }
 
 // attachSdcGuid injects the sdc guid node label value into config
-func attachSdcGuid(plug *sioPlugin, conf map[string]string) error {
-	guid, err := getSdcGuidLabel(plug)
+func attachSdcGuid(plug *sioPlugin, ctx context.Context, conf map[string]string) error {
+	guid, err := getSdcGuidLabel(plug, ctx)
 	if err != nil {
 		return err
 	}
@@ -244,8 +245,8 @@ func attachSdcGuid(plug *sioPlugin, conf map[string]string) error {
 
 // getSdcGuidLabel fetches the scaleio.sdcGuid node label
 // associated with the node executing this code.
-func getSdcGuidLabel(plug *sioPlugin) (string, error) {
-	nodeLabels, err := plug.host.GetNodeLabels()
+func getSdcGuidLabel(plug *sioPlugin, ctx context.Context) (string, error) {
+	nodeLabels, err := plug.host.GetNodeLabels(ctx)
 	if err != nil {
 		return "", err
 	}

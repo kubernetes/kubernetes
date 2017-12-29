@@ -26,6 +26,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"context"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -262,7 +263,7 @@ func (expc *expandController) GetHostName() string {
 	return ""
 }
 
-func (expc *expandController) GetHostIP() (net.IP, error) {
+func (expc *expandController) GetHostIP(ctx context.Context) (net.IP, error) {
 	return nil, fmt.Errorf("GetHostIP not supported by expand controller's VolumeHost implementation")
 }
 
@@ -270,19 +271,19 @@ func (expc *expandController) GetNodeAllocatable() (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }
 
-func (expc *expandController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
-	return func(_, _ string) (*v1.Secret, error) {
+func (expc *expandController) GetSecretFunc() func(ctx context.Context, namespace, name string) (*v1.Secret, error) {
+	return func(_ context.Context, _, _ string) (*v1.Secret, error) {
 		return nil, fmt.Errorf("GetSecret unsupported in expandController")
 	}
 }
 
-func (expc *expandController) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
-	return func(_, _ string) (*v1.ConfigMap, error) {
+func (expc *expandController) GetConfigMapFunc() func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
+	return func(_ context.Context, _, _ string) (*v1.ConfigMap, error) {
 		return nil, fmt.Errorf("GetConfigMap unsupported in expandController")
 	}
 }
 
-func (expc *expandController) GetNodeLabels() (map[string]string, error) {
+func (expc *expandController) GetNodeLabels(ctx context.Context) (map[string]string, error) {
 	return nil, fmt.Errorf("GetNodeLabels unsupported in expandController")
 }
 

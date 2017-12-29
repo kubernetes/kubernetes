@@ -340,6 +340,8 @@ func (m mockFlockerClient) UpdatePrimaryForDataset(primaryUUID, datasetID string
 /*
 TODO: reenable after refactor
 func TestSetUpAtInternal(t *testing.T) {
+    ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	const dir = "dir"
 	mockPath := "expected-to-be-set-properly" // package var
 	expectedPath := mockPath
@@ -357,7 +359,7 @@ func TestSetUpAtInternal(t *testing.T) {
 	b := flockerVolumeMounter{flockerVolume: &flockerVolume{pod: pod, plugin: plug.(*flockerPlugin)}}
 	b.client = newMockFlockerClient("dataset-id", "primary-uid", mockPath)
 
-	assert.NoError(b.SetUpAt(dir, nil))
+	assert.NoError(b.SetUpAt(ctx, dir, nil))
 	assert.Equal(expectedPath, b.flocker.path)
 }
 */

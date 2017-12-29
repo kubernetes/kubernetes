@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -153,7 +154,7 @@ func (f *fakeVolumeHost) GetHostName() string {
 }
 
 // Returns host IP or nil in the case of error.
-func (f *fakeVolumeHost) GetHostIP() (net.IP, error) {
+func (f *fakeVolumeHost) GetHostIP(ctx context.Context) (net.IP, error) {
 	return nil, fmt.Errorf("GetHostIP() not implemented")
 }
 
@@ -161,8 +162,8 @@ func (f *fakeVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }
 
-func (f *fakeVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
-	return func(namespace, name string) (*v1.Secret, error) {
+func (f *fakeVolumeHost) GetSecretFunc() func(ctx context.Context, namespace, name string) (*v1.Secret, error) {
+	return func(ctx context.Context, namespace, name string) (*v1.Secret, error) {
 		return f.kubeClient.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
 	}
 }
@@ -171,13 +172,13 @@ func (f *fakeVolumeHost) GetExec(pluginName string) mount.Exec {
 	return f.exec
 }
 
-func (f *fakeVolumeHost) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
-	return func(namespace, name string) (*v1.ConfigMap, error) {
+func (f *fakeVolumeHost) GetConfigMapFunc() func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
+	return func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
 		return f.kubeClient.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
 	}
 }
 
-func (f *fakeVolumeHost) GetNodeLabels() (map[string]string, error) {
+func (f *fakeVolumeHost) GetNodeLabels(ctx context.Context) (map[string]string, error) {
 	if f.nodeLabels == nil {
 		f.nodeLabels = map[string]string{"test-label": "test-value"}
 	}
@@ -499,11 +500,11 @@ func (fv *FakeVolume) CanMount() error {
 	return nil
 }
 
-func (fv *FakeVolume) SetUp(fsGroup *int64) error {
+func (fv *FakeVolume) SetUp(ctx context.Context, fsGroup *int64) error {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.SetUpCallCount++
-	return fv.SetUpAt(fv.getPath(), fsGroup)
+	return fv.SetUpAt(ctx, fv.getPath(), fsGroup)
 }
 
 func (fv *FakeVolume) GetSetUpCallCount() int {
@@ -512,7 +513,7 @@ func (fv *FakeVolume) GetSetUpCallCount() int {
 	return fv.SetUpCallCount
 }
 
-func (fv *FakeVolume) SetUpAt(dir string, fsGroup *int64) error {
+func (fv *FakeVolume) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	return os.MkdirAll(dir, 0750)
 }
 
@@ -526,11 +527,11 @@ func (fv *FakeVolume) getPath() string {
 	return path.Join(fv.Plugin.Host.GetPodVolumeDir(fv.PodUID, utilstrings.EscapeQualifiedNameForDisk(fv.Plugin.PluginName), fv.VolName))
 }
 
-func (fv *FakeVolume) TearDown() error {
+func (fv *FakeVolume) TearDown(ctx context.Context) error {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.TearDownCallCount++
-	return fv.TearDownAt(fv.getPath())
+	return fv.TearDownAt(ctx, fv.getPath())
 }
 
 func (fv *FakeVolume) GetTearDownCallCount() int {
@@ -539,7 +540,7 @@ func (fv *FakeVolume) GetTearDownCallCount() int {
 	return fv.TearDownCallCount
 }
 
-func (fv *FakeVolume) TearDownAt(dir string) error {
+func (fv *FakeVolume) TearDownAt(ctx context.Context, dir string) error {
 	return os.RemoveAll(dir)
 }
 
@@ -613,7 +614,7 @@ func (fv *FakeVolume) GetTearDownDeviceCallCount() int {
 	return fv.TearDownDeviceCallCount
 }
 
-func (fv *FakeVolume) Attach(spec *Spec, nodeName types.NodeName) (string, error) {
+func (fv *FakeVolume) Attach(ctx context.Context, spec *Spec, nodeName types.NodeName) (string, error) {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.AttachCallCount++
@@ -659,14 +660,14 @@ func (fv *FakeVolume) GetMountDeviceCallCount() int {
 	return fv.MountDeviceCallCount
 }
 
-func (fv *FakeVolume) Detach(volumeName string, nodeName types.NodeName) error {
+func (fv *FakeVolume) Detach(ctx context.Context, volumeName string, nodeName types.NodeName) error {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.DetachCallCount++
 	return nil
 }
 
-func (fv *FakeVolume) VolumesAreAttached(spec []*Spec, nodeName types.NodeName) (map[*Spec]bool, error) {
+func (fv *FakeVolume) VolumesAreAttached(ctx context.Context, spec []*Spec, nodeName types.NodeName) (map[*Spec]bool, error) {
 	fv.Lock()
 	defer fv.Unlock()
 	return nil, nil

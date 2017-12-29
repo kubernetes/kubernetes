@@ -17,6 +17,7 @@ limitations under the License.
 package downwardapi
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"sort"
@@ -167,11 +168,11 @@ func (b *downwardAPIVolumeMounter) CanMount() error {
 // This function is not idempotent by design. We want the data to be refreshed periodically.
 // The internal sync interval of kubelet will drive the refresh of data.
 // TODO: Add volume specific ticker and refresh loop
-func (b *downwardAPIVolumeMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *downwardAPIVolumeMounter) SetUp(ctx context.Context, fsGroup *int64) error {
+	return b.SetUpAt(ctx, b.GetPath(), fsGroup)
 }
 
-func (b *downwardAPIVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *downwardAPIVolumeMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	glog.V(3).Infof("Setting up a downwardAPI volume %v for pod %v/%v at %v", b.volName, b.pod.Namespace, b.pod.Name, dir)
 	// Wrap EmptyDir. Here we rely on the idempotency of the wrapped plugin to avoid repeatedly mounting
 	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), b.pod, *b.opts)
@@ -179,7 +180,7 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		glog.Errorf("Couldn't setup downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
 		return err
 	}
-	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
+	if err := wrapped.SetUpAt(ctx, dir, fsGroup); err != nil {
 		glog.Errorf("Unable to setup downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
 		return err
 	}
@@ -278,12 +279,12 @@ type downwardAPIVolumeUnmounter struct {
 // downwardAPIVolumeUnmounter implements volume.Unmounter interface
 var _ volume.Unmounter = &downwardAPIVolumeUnmounter{}
 
-func (c *downwardAPIVolumeUnmounter) TearDown() error {
-	return c.TearDownAt(c.GetPath())
+func (c *downwardAPIVolumeUnmounter) TearDown(ctx context.Context) error {
+	return c.TearDownAt(ctx, c.GetPath())
 }
 
-func (c *downwardAPIVolumeUnmounter) TearDownAt(dir string) error {
-	return volume.UnmountViaEmptyDir(dir, c.plugin.host, c.volName, wrappedVolumeSpec(), c.podUID)
+func (c *downwardAPIVolumeUnmounter) TearDownAt(ctx context.Context, dir string) error {
+	return volume.UnmountViaEmptyDir(ctx, dir, c.plugin.host, c.volName, wrappedVolumeSpec(), c.podUID)
 }
 
 func (b *downwardAPIVolumeMounter) getMetaDir() string {

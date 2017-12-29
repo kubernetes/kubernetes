@@ -17,10 +17,13 @@ limitations under the License.
 package flexvolume
 
 import (
+	"context"
 	"testing"
 )
 
 func TestDetach(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	plugin, _ := testPlugin()
 	plugin.runner = fakeRunner(
 		assertDriverCall(t, notSupportedOutput(), detachCmd,
@@ -28,7 +31,7 @@ func TestDetach(t *testing.T) {
 	)
 
 	d, _ := plugin.NewDetacher()
-	d.Detach("sdx", "localhost")
+	d.Detach(ctx, "sdx", "localhost")
 }
 
 func TestUnmountDevice(t *testing.T) {

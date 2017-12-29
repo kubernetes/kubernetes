@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	"context"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -402,11 +403,11 @@ func (b *fcDiskMounter) CanMount() error {
 	return nil
 }
 
-func (b *fcDiskMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *fcDiskMounter) SetUp(ctx context.Context, fsGroup *int64) error {
+	return b.SetUpAt(ctx, b.GetPath(), fsGroup)
 }
 
-func (b *fcDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *fcDiskMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
 	err := diskSetUp(b.manager, *b, dir, b.mounter, fsGroup)
 	if err != nil {
@@ -425,11 +426,11 @@ var _ volume.Unmounter = &fcDiskUnmounter{}
 
 // Unmounts the bind mount, and detaches the disk only if the disk
 // resource was the last reference to that disk on the kubelet.
-func (c *fcDiskUnmounter) TearDown() error {
-	return c.TearDownAt(c.GetPath())
+func (c *fcDiskUnmounter) TearDown(ctx context.Context) error {
+	return c.TearDownAt(ctx, c.GetPath())
 }
 
-func (c *fcDiskUnmounter) TearDownAt(dir string) error {
+func (c *fcDiskUnmounter) TearDownAt(ctx context.Context, dir string) error {
 	return util.UnmountPath(dir, c.mounter)
 }
 

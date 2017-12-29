@@ -17,6 +17,8 @@ limitations under the License.
 package secret
 
 import (
+	"context"
+
 	"k8s.io/api/core/v1"
 )
 
@@ -29,7 +31,7 @@ func NewFakeManager() Manager {
 	return &fakeManager{}
 }
 
-func (s *fakeManager) GetSecret(namespace, name string) (*v1.Secret, error) {
+func (s *fakeManager) GetSecret(ctx context.Context, namespace, name string) (*v1.Secret, error) {
 	return nil, nil
 }
 

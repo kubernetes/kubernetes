@@ -17,6 +17,7 @@ limitations under the License.
 package service
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
@@ -126,9 +127,11 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 		},
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	for _, item := range table {
 		controller, cloud, client := newController()
-		err := controller.createLoadBalancerIfNeeded("foo/bar", item.service)
+		err := controller.createLoadBalancerIfNeeded(ctx, "foo/bar", item.service)
 		if !item.expectErr && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		} else if item.expectErr && err == nil {
@@ -243,6 +246,8 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 			},
 		},
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	for _, item := range table {
 		controller, cloud, _ := newController()
 
@@ -250,7 +255,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		for _, service := range item.services {
 			services = append(services, service)
 		}
-		if err := controller.updateLoadBalancerHosts(services, nodes); err != nil {
+		if err := controller.updateLoadBalancerHosts(ctx, services, nodes); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if !reflect.DeepEqual(item.expectedUpdateCalls, cloud.UpdateCalls) {
@@ -384,10 +389,12 @@ func TestProcessServiceUpdate(t *testing.T) {
 		},
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	for _, tc := range testCases {
 		newSvc := tc.updateFn(tc.svc)
 		svcCache := controller.cache.getOrCreate(tc.key)
-		obtErr := controller.processServiceUpdate(svcCache, newSvc, tc.key)
+		obtErr := controller.processServiceUpdate(ctx, svcCache, newSvc, tc.key)
 		if err := tc.expectedFn(newSvc, obtErr); err != nil {
 			t.Errorf("%v processServiceUpdate() %v", tc.testName, err)
 		}
@@ -458,10 +465,12 @@ func TestSyncService(t *testing.T) {
 		},
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	for _, tc := range testCases {
 
 		tc.updateFn()
-		obtainedErr := controller.syncService(tc.key)
+		obtainedErr := controller.syncService(ctx, tc.key)
 
 		//expected matches obtained ??.
 		if exp := tc.expectedFn(obtainedErr); exp != nil {
@@ -543,12 +552,13 @@ func TestProcessServiceDeletion(t *testing.T) {
 			},
 		},
 	}
-
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	for _, tc := range testCases {
 		//Create a new controller.
 		controller, cloud, _ = newController()
 		tc.updateFn(controller)
-		obtainedErr := controller.processServiceDeletion(svcKey)
+		obtainedErr := controller.processServiceDeletion(ctx, svcKey)
 		if err := tc.expectedFn(obtainedErr); err != nil {
 			t.Errorf("%v processServiceDeletion() %v", tc.testName, err)
 		}

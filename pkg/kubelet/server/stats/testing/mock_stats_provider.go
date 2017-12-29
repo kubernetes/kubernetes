@@ -16,7 +16,10 @@ limitations under the License.
 
 package testing
 
-import cm "k8s.io/kubernetes/pkg/kubelet/cm"
+import (
+	"context"
+	cm "k8s.io/kubernetes/pkg/kubelet/cm"
+)
 import corev1 "k8s.io/api/core/v1"
 import mock "github.com/stretchr/testify/mock"
 
@@ -89,7 +92,7 @@ func (_m *StatsProvider) GetContainerInfo(podFullName string, uid types.UID, con
 }
 
 // GetNode provides a mock function with given fields:
-func (_m *StatsProvider) GetNode() (*corev1.Node, error) {
+func (_m *StatsProvider) GetNode(ctx context.Context) (*corev1.Node, error) {
 	ret := _m.Called()
 
 	var r0 *corev1.Node

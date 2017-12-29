@@ -20,6 +20,7 @@ limitations under the License.
 package reconciler
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -127,8 +128,10 @@ func (rc *reconciler) updateSyncTime() {
 }
 
 func (rc *reconciler) syncStates() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	volumesPerNode := rc.actualStateOfWorld.GetAttachedVolumesPerNode()
-	rc.attacherDetacher.VerifyVolumesAreAttached(volumesPerNode, rc.actualStateOfWorld)
+	rc.attacherDetacher.VerifyVolumesAreAttached(ctx, volumesPerNode, rc.actualStateOfWorld)
 }
 
 // isMultiAttachForbidden checks if attaching this volume to multiple nodes is definitely not allowed/possible.
@@ -174,6 +177,8 @@ func (rc *reconciler) isMultiAttachForbidden(volumeSpec *volume.Spec) bool {
 func (rc *reconciler) reconcile() {
 	// Detaches are triggered before attaches so that volumes referenced by
 	// pods that are rescheduled to a different node are detached first.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// Ensure volumes that should be detached are detached.
 	for _, attachedVolume := range rc.actualStateOfWorld.GetAttachedVolumes() {
@@ -225,7 +230,7 @@ func (rc *reconciler) reconcile() {
 			// If timeout is true, skip verifySafeToDetach check
 			glog.V(5).Infof(attachedVolume.GenerateMsgDetailed("Starting attacherDetacher.DetachVolume", ""))
 			verifySafeToDetach := !timeout
-			err = rc.attacherDetacher.DetachVolume(attachedVolume.AttachedVolume, verifySafeToDetach, rc.actualStateOfWorld)
+			err = rc.attacherDetacher.DetachVolume(ctx, attachedVolume.AttachedVolume, verifySafeToDetach, rc.actualStateOfWorld)
 			if err == nil {
 				if !timeout {
 					glog.Infof(attachedVolume.GenerateMsgDetailed("attacherDetacher.DetachVolume started", ""))
@@ -241,7 +246,7 @@ func (rc *reconciler) reconcile() {
 		}
 	}
 
-	rc.attachDesiredVolumes()
+	rc.attachDesiredVolumes(ctx)
 
 	// Update Node Status
 	err := rc.nodeStatusUpdater.UpdateNodeStatuses()
@@ -250,7 +255,7 @@ func (rc *reconciler) reconcile() {
 	}
 }
 
-func (rc *reconciler) attachDesiredVolumes() {
+func (rc *reconciler) attachDesiredVolumes(ctx context.Context) {
 	// Ensure volumes that should be attached are attached.
 	for _, volumeToAttach := range rc.desiredStateOfWorld.GetVolumesToAttach() {
 		if rc.actualStateOfWorld.VolumeNodeExists(volumeToAttach.VolumeName, volumeToAttach.NodeName) {
@@ -282,7 +287,7 @@ func (rc *reconciler) attachDesiredVolumes() {
 
 		// Volume/Node doesn't exist, spawn a goroutine to attach it
 		glog.V(5).Infof(volumeToAttach.GenerateMsgDetailed("Starting attacherDetacher.AttachVolume", ""))
-		err := rc.attacherDetacher.AttachVolume(volumeToAttach.VolumeToAttach, rc.actualStateOfWorld)
+		err := rc.attacherDetacher.AttachVolume(ctx, volumeToAttach.VolumeToAttach, rc.actualStateOfWorld)
 		if err == nil {
 			glog.Infof(volumeToAttach.GenerateMsgDetailed("attacherDetacher.AttachVolume started", ""))
 		}

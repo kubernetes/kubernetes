@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 
+	"context"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -321,12 +322,12 @@ func (b *cinderVolumeMounter) CanMount() error {
 	return nil
 }
 
-func (b *cinderVolumeMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *cinderVolumeMounter) SetUp(ctx context.Context, fsGroup *int64) error {
+	return b.SetUpAt(ctx, b.GetPath(), fsGroup)
 }
 
 // SetUp bind mounts to the volume path.
-func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *cinderVolumeMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	glog.V(5).Infof("Cinder SetUp %s to %s", b.pdName, dir)
 
 	b.plugin.volumeLocks.LockKey(b.pdName)
@@ -407,13 +408,13 @@ type cinderVolumeUnmounter struct {
 
 var _ volume.Unmounter = &cinderVolumeUnmounter{}
 
-func (c *cinderVolumeUnmounter) TearDown() error {
-	return c.TearDownAt(c.GetPath())
+func (c *cinderVolumeUnmounter) TearDown(ctx context.Context) error {
+	return c.TearDownAt(ctx, c.GetPath())
 }
 
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
-func (c *cinderVolumeUnmounter) TearDownAt(dir string) error {
+func (c *cinderVolumeUnmounter) TearDownAt(ctx context.Context, dir string) error {
 	if pathExists, pathErr := util.PathExists(dir); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {

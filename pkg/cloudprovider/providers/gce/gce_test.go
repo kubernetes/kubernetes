@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"encoding/json"
 	"reflect"
 	"strings"
@@ -84,6 +85,8 @@ network-name = my-network
 }
 
 func TestGetRegion(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	zoneName := "us-central1-b"
 	regionName, err := GetGCERegion(zoneName)
 	if err != nil {
@@ -100,7 +103,7 @@ func TestGetRegion(t *testing.T) {
 	if !ok {
 		t.Fatalf("Unexpected missing zones impl")
 	}
-	zone, err := zones.GetZone()
+	zone, err := zones.GetZone(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
@@ -266,6 +269,8 @@ func TestSplitProviderID(t *testing.T) {
 }
 
 func TestGetZoneByProviderID(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	tests := []struct {
 		providerID string
 
@@ -305,7 +310,7 @@ func TestGetZoneByProviderID(t *testing.T) {
 		region:    "us-central1",
 	}
 	for _, test := range tests {
-		zone, err := gce.GetZoneByProviderID(test.providerID)
+		zone, err := gce.GetZoneByProviderID(ctx, test.providerID)
 		if (err != nil) != test.fail {
 			t.Errorf("Expected to fail=%t, provider ID %v, tests %s", test.fail, test, test.description)
 		}

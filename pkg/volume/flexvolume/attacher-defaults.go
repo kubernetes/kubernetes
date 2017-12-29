@@ -17,6 +17,7 @@ limitations under the License.
 package flexvolume
 
 import (
+	"context"
 	"time"
 
 	"github.com/golang/glog"
@@ -29,7 +30,7 @@ import (
 type attacherDefaults flexVolumeAttacher
 
 // Attach is part of the volume.Attacher interface
-func (a *attacherDefaults) Attach(spec *volume.Spec, hostName types.NodeName) (string, error) {
+func (a *attacherDefaults) Attach(ctx context.Context, spec *volume.Spec, hostName types.NodeName) (string, error) {
 	glog.Warning(logPrefix(a.plugin.flexVolumePlugin), "using default Attach for volume ", spec.Name, ", host ", hostName)
 	return "", nil
 }

@@ -18,6 +18,7 @@ package csi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -89,6 +90,8 @@ func TestMounterGetPath(t *testing.T) {
 func TestMounterSetUp(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t)
 	defer os.RemoveAll(tmpDir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	fakeClient := fakeclient.NewSimpleClientset()
 	host := volumetest.NewFakeVolumeHostWithNodeName(
 		tmpDir,
@@ -140,8 +143,8 @@ func TestMounterSetUp(t *testing.T) {
 		t.Fatalf("failed to setup VolumeAttachment: %v", err)
 	}
 
-	// Mounter.SetUp()
-	if err := csiMounter.SetUp(nil); err != nil {
+	// Mounter.SetUp(ctx)
+	if err := csiMounter.SetUp(ctx, nil); err != nil {
 		t.Fatalf("mounter.Setup failed: %v", err)
 	}
 	path := csiMounter.GetPath()
@@ -163,6 +166,8 @@ func TestMounterSetUp(t *testing.T) {
 func TestUnmounterTeardown(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t)
 	defer os.RemoveAll(tmpDir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 
@@ -189,7 +194,7 @@ func TestUnmounterTeardown(t *testing.T) {
 		t.Fatalf("failed to save volume data: %v", err)
 	}
 
-	err = csiUnmounter.TearDownAt(dir)
+	err = csiUnmounter.TearDownAt(ctx, dir)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package eviction
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strconv"
@@ -711,9 +712,9 @@ func (a byEvictionPriority) Less(i, j int) bool {
 }
 
 // makeSignalObservations derives observations using the specified summary provider.
-func makeSignalObservations(summaryProvider stats.SummaryProvider, capacityProvider CapacityProvider, pods []*v1.Pod) (signalObservations, statsFunc, error) {
+func makeSignalObservations(ctx context.Context, summaryProvider stats.SummaryProvider, capacityProvider CapacityProvider, pods []*v1.Pod) (signalObservations, statsFunc, error) {
 	updateStats := true
-	summary, err := summaryProvider.Get(updateStats)
+	summary, err := summaryProvider.Get(ctx, updateStats)
 	if err != nil {
 		return nil, nil, err
 	}

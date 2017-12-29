@@ -17,6 +17,7 @@ limitations under the License.
 package fc
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -55,11 +56,11 @@ func (plugin *fcPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, er
 	return mount.GetMountRefs(mounter, deviceMountPath)
 }
 
-func (attacher *fcAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
+func (attacher *fcAttacher) Attach(ctx context.Context, spec *volume.Spec, nodeName types.NodeName) (string, error) {
 	return "", nil
 }
 
-func (attacher *fcAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (attacher *fcAttacher) VolumesAreAttached(ctx context.Context, specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
 	volumesAttachedCheck := make(map[*volume.Spec]bool)
 	for _, spec := range specs {
 		volumesAttachedCheck[spec] = true
@@ -137,7 +138,7 @@ func (plugin *fcPlugin) NewDetacher() (volume.Detacher, error) {
 	}, nil
 }
 
-func (detacher *fcDetacher) Detach(volumeName string, nodeName types.NodeName) error {
+func (detacher *fcDetacher) Detach(ctx context.Context, volumeName string, nodeName types.NodeName) error {
 	return nil
 }
 

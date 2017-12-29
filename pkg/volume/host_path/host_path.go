@@ -21,6 +21,7 @@ import (
 	"os"
 	"regexp"
 
+	"context"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -217,7 +218,7 @@ func (b *hostPathMounter) CanMount() error {
 }
 
 // SetUp does nothing.
-func (b *hostPathMounter) SetUp(fsGroup *int64) error {
+func (b *hostPathMounter) SetUp(ctx context.Context, fsGroup *int64) error {
 	err := validation.ValidatePathNoBacksteps(b.GetPath())
 	if err != nil {
 		return fmt.Errorf("invalid HostPath `%s`: %v", b.GetPath(), err)
@@ -230,7 +231,7 @@ func (b *hostPathMounter) SetUp(fsGroup *int64) error {
 }
 
 // SetUpAt does not make sense for host paths - probably programmer error.
-func (b *hostPathMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *hostPathMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	return fmt.Errorf("SetUpAt() does not make sense for host paths")
 }
 
@@ -245,12 +246,12 @@ type hostPathUnmounter struct {
 var _ volume.Unmounter = &hostPathUnmounter{}
 
 // TearDown does nothing.
-func (c *hostPathUnmounter) TearDown() error {
+func (c *hostPathUnmounter) TearDown(ctx context.Context) error {
 	return nil
 }
 
 // TearDownAt does not make sense for host paths - probably programmer error.
-func (c *hostPathUnmounter) TearDownAt(dir string) error {
+func (c *hostPathUnmounter) TearDownAt(ctx context.Context, dir string) error {
 	return fmt.Errorf("TearDownAt() does not make sense for host paths")
 }
 

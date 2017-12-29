@@ -19,6 +19,7 @@ limitations under the License.
 package empty_dir
 
 import (
+	"context"
 	"os"
 	"path"
 	"testing"
@@ -105,6 +106,8 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
 	defer os.RemoveAll(basePath)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	var (
 		volumePath  = path.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/test-volume")
@@ -163,7 +166,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		t.Errorf("Got unexpected path: %s", volPath)
 	}
 
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(ctx, nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 
@@ -210,7 +213,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 	}
 
 	// Tear down the volume
-	if err := unmounter.TearDown(); err != nil {
+	if err := unmounter.TearDown(ctx); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(volPath); err == nil {

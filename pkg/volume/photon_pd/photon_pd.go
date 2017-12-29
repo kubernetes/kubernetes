@@ -21,6 +21,7 @@ import (
 	"os"
 	"path"
 
+	"context"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -194,12 +195,12 @@ func (b *photonPersistentDiskMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *photonPersistentDiskMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *photonPersistentDiskMounter) SetUp(ctx context.Context, fsGroup *int64) error {
+	return b.SetUpAt(ctx, b.GetPath(), fsGroup)
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *photonPersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *photonPersistentDiskMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	glog.V(4).Infof("Photon Persistent Disk setup %s to %s", b.pdID, dir)
 
 	// TODO: handle failed mounts here.
@@ -261,8 +262,8 @@ type photonPersistentDiskUnmounter struct {
 
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
-func (c *photonPersistentDiskUnmounter) TearDown() error {
-	err := c.TearDownAt(c.GetPath())
+func (c *photonPersistentDiskUnmounter) TearDown(ctx context.Context) error {
+	err := c.TearDownAt(ctx, c.GetPath())
 	if err != nil {
 		return err
 	}
@@ -273,7 +274,7 @@ func (c *photonPersistentDiskUnmounter) TearDown() error {
 
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
-func (c *photonPersistentDiskUnmounter) TearDownAt(dir string) error {
+func (c *photonPersistentDiskUnmounter) TearDownAt(ctx context.Context, dir string) error {
 	return util.UnmountPath(dir, c.mounter)
 }
 

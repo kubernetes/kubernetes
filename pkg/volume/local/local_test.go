@@ -17,6 +17,7 @@ limitations under the License.
 package local
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -135,6 +136,8 @@ func TestGetVolumeName(t *testing.T) {
 func TestInvalidLocalPath(t *testing.T) {
 	tmpDir, plug := getPlugin(t)
 	defer os.RemoveAll(tmpDir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, err := plug.NewMounter(getTestVolume(false, "/no/backsteps/allowed/.."), pod, volume.VolumeOptions{})
@@ -142,7 +145,7 @@ func TestInvalidLocalPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = mounter.SetUp(nil)
+	err = mounter.SetUp(ctx, nil)
 	expectedMsg := "invalid path: /no/backsteps/allowed/.. must not contain '..'"
 	if err.Error() != expectedMsg {
 		t.Fatalf("expected error `%s` but got `%s`", expectedMsg, err)
@@ -152,6 +155,8 @@ func TestInvalidLocalPath(t *testing.T) {
 func TestMountUnmount(t *testing.T) {
 	tmpDir, plug := getPlugin(t)
 	defer os.RemoveAll(tmpDir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, err := plug.NewMounter(getTestVolume(false, tmpDir), pod, volume.VolumeOptions{})
@@ -168,7 +173,7 @@ func TestMountUnmount(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(ctx, nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {
@@ -187,7 +192,7 @@ func TestMountUnmount(t *testing.T) {
 		t.Fatalf("Got a nil Unmounter")
 	}
 
-	if err := unmounter.TearDown(); err != nil {
+	if err := unmounter.TearDown(ctx); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err == nil {
@@ -197,7 +202,7 @@ func TestMountUnmount(t *testing.T) {
 	}
 }
 
-func testFSGroupMount(plug volume.VolumePlugin, pod *v1.Pod, tmpDir string, fsGroup int64) error {
+func testFSGroupMount(ctx context.Context, plug volume.VolumePlugin, pod *v1.Pod, tmpDir string, fsGroup int64) error {
 	mounter, err := plug.NewMounter(getTestVolume(false, tmpDir), pod, volume.VolumeOptions{})
 	if err != nil {
 		return err
@@ -212,7 +217,7 @@ func testFSGroupMount(plug volume.VolumePlugin, pod *v1.Pod, tmpDir string, fsGr
 		return fmt.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := mounter.SetUp(&fsGroup); err != nil {
+	if err := mounter.SetUp(ctx, &fsGroup); err != nil {
 		return err
 	}
 	return nil
@@ -221,6 +226,8 @@ func testFSGroupMount(plug volume.VolumePlugin, pod *v1.Pod, tmpDir string, fsGr
 func TestFSGroupMount(t *testing.T) {
 	tmpDir, plug := getPlugin(t)
 	defer os.RemoveAll(tmpDir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	info, err := os.Stat(tmpDir)
 	if err != nil {
 		t.Errorf("Error getting stats for %s (%v)", tmpDir, err)
@@ -239,11 +246,11 @@ func TestFSGroupMount(t *testing.T) {
 	pod2.Spec.SecurityContext = &v1.PodSecurityContext{
 		FSGroup: &fsGroup2,
 	}
-	err = testFSGroupMount(plug, pod1, tmpDir, fsGroup1)
+	err = testFSGroupMount(ctx, plug, pod1, tmpDir, fsGroup1)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
-	err = testFSGroupMount(plug, pod2, tmpDir, fsGroup2)
+	err = testFSGroupMount(ctx, plug, pod2, tmpDir, fsGroup2)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package gce_pd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -68,7 +69,7 @@ func (plugin *gcePersistentDiskPlugin) GetDeviceMountRefs(deviceMountPath string
 // Callers are responsible for retrying on failure.
 // Callers are responsible for thread safety between concurrent attach and
 // detach operations.
-func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
+func (attacher *gcePersistentDiskAttacher) Attach(ctx context.Context, spec *volume.Spec, nodeName types.NodeName) (string, error) {
 	volumeSource, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -97,7 +98,7 @@ func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, nodeName ty
 	return path.Join(diskByIdPath, diskGooglePrefix+pdName), nil
 }
 
-func (attacher *gcePersistentDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (attacher *gcePersistentDiskAttacher) VolumesAreAttached(ctx context.Context, specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
 	volumesAttachedCheck := make(map[*volume.Spec]bool)
 	volumePdNameMap := make(map[string]*volume.Spec)
 	pdNameList := []string{}
@@ -247,7 +248,7 @@ func (plugin *gcePersistentDiskPlugin) NewDetacher() (volume.Detacher, error) {
 // Callers are responsible for retrying on failure.
 // Callers are responsible for thread safety between concurrent attach and detach
 // operations.
-func (detacher *gcePersistentDiskDetacher) Detach(volumeName string, nodeName types.NodeName) error {
+func (detacher *gcePersistentDiskDetacher) Detach(ctx context.Context, volumeName string, nodeName types.NodeName) error {
 	pdName := path.Base(volumeName)
 
 	attached, err := detacher.gceDisks.DiskIsAttached(pdName, nodeName)

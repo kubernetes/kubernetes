@@ -25,6 +25,7 @@ different pods.
 package nestedpendingoperations
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -127,7 +128,7 @@ func (grm *nestedPendingOperations) Run(
 			})
 	}
 
-	go func() (eventErr, detailedErr error) {
+	go func(ctx context.Context) (eventErr, detailedErr error) {
 		// Handle unhandled panics (very unlikely)
 		defer k8sRuntime.HandleCrash()
 		// Handle completion of and error, if any, from operationFunc()
@@ -140,8 +141,8 @@ func (grm *nestedPendingOperations) Run(
 		}
 		// Handle panic, if any, from operationFunc()
 		defer k8sRuntime.RecoverFromPanic(&detailedErr)
-		return generatedOperations.OperationFunc()
-	}()
+		return generatedOperations.OperationFunc(ctx)
+	}(context.TODO())
 
 	return nil
 }

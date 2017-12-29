@@ -17,6 +17,7 @@ limitations under the License.
 package nestedpendingoperations
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -47,7 +48,7 @@ func Test_NewGoRoutineMap_Positive_SingleOp(t *testing.T) {
 	// Arrange
 	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
-	operation := func() (error, error) { return nil, nil }
+	operation := func(ctx context.Context) (error, error) { return nil, nil }
 
 	// Act
 	err := grm.Run(volumeName, "" /* operationSubName */, types.GeneratedOperations{OperationFunc: operation})
@@ -63,7 +64,7 @@ func Test_NewGoRoutineMap_Positive_TwoOps(t *testing.T) {
 	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
 	volume1Name := v1.UniqueVolumeName("volume1-name")
 	volume2Name := v1.UniqueVolumeName("volume2-name")
-	operation := func() (error, error) { return nil, nil }
+	operation := func(ctx context.Context) (error, error) { return nil, nil }
 
 	// Act
 	err1 := grm.Run(volume1Name, "" /* operationSubName */, types.GeneratedOperations{OperationFunc: operation})
@@ -85,7 +86,7 @@ func Test_NewGoRoutineMap_Positive_TwoSubOps(t *testing.T) {
 	volumeName := v1.UniqueVolumeName("volume-name")
 	operation1PodName := types.UniquePodName("operation1-podname")
 	operation2PodName := types.UniquePodName("operation2-podname")
-	operation := func() (error, error) { return nil, nil }
+	operation := func(ctx context.Context) (error, error) { return nil, nil }
 
 	// Act
 	err1 := grm.Run(volumeName, operation1PodName, types.GeneratedOperations{OperationFunc: operation})
@@ -105,7 +106,7 @@ func Test_NewGoRoutineMap_Positive_SingleOpWithExpBackoff(t *testing.T) {
 	// Arrange
 	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
-	operation := func() (error, error) { return nil, nil }
+	operation := func(ctx context.Context) (error, error) { return nil, nil }
 
 	// Act
 	err := grm.Run(volumeName, "" /* operationSubName */, types.GeneratedOperations{OperationFunc: operation})
@@ -522,28 +523,28 @@ func Test_NewGoRoutineMap_Positive_WaitWithExpBackoff(t *testing.T) {
 	}
 }
 
-func generateCallbackFunc(done chan<- interface{}) func() (error, error) {
-	return func() (error, error) {
+func generateCallbackFunc(done chan<- interface{}) func(ctx context.Context) (error, error) {
+	return func(ctx context.Context) (error, error) {
 		done <- true
 		return nil, nil
 	}
 }
 
-func generateWaitFunc(done <-chan interface{}) func() (error, error) {
-	return func() (error, error) {
+func generateWaitFunc(done <-chan interface{}) func(ctx context.Context) (error, error) {
+	return func(ctx context.Context) (error, error) {
 		<-done
 		return nil, nil
 	}
 }
 
-func generatePanicFunc() func() (error, error) {
-	return func() (error, error) {
+func generatePanicFunc() func(ctx context.Context) (error, error) {
+	return func(ctx context.Context) (error, error) {
 		panic("testing panic")
 	}
 }
 
-func generateNoopFunc() func() (error, error) {
-	return func() (error, error) { return nil, nil }
+func generateNoopFunc() func(ctx context.Context) (error, error) {
+	return func(ctx context.Context) (error, error) { return nil, nil }
 }
 
 func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.ConditionFunc) error {

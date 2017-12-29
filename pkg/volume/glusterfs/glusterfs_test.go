@@ -17,6 +17,7 @@ limitations under the License.
 package glusterfs
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"reflect"
@@ -84,6 +85,8 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
@@ -106,7 +109,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if volumePath != expectedPath {
 		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, volumePath)
 	}
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(ctx, nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(volumePath); err != nil {
@@ -123,7 +126,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if unmounter == nil {
 		t.Error("Got a nil Unmounter")
 	}
-	if err := unmounter.TearDown(); err != nil {
+	if err := unmounter.TearDown(ctx); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(volumePath); err == nil {

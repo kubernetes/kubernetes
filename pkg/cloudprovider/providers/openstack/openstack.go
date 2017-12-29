@@ -17,6 +17,7 @@ limitations under the License.
 package openstack
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -590,7 +591,7 @@ func (os *OpenStack) Zones() (cloudprovider.Zones, bool) {
 	return os, true
 }
 
-func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
+func (os *OpenStack) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 	md, err := getMetadata(os.metadataOpts.SearchOrder)
 	if err != nil {
 		return cloudprovider.Zone{}, err
@@ -607,7 +608,7 @@ func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
 // GetZoneByProviderID implements Zones.GetZoneByProviderID
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
-func (os *OpenStack) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
+func (os *OpenStack) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
 	instanceID, err := instanceIDFromProviderID(providerID)
 	if err != nil {
 		return cloudprovider.Zone{}, err
@@ -634,7 +635,7 @@ func (os *OpenStack) GetZoneByProviderID(providerID string) (cloudprovider.Zone,
 // GetZoneByNodeName implements Zones.GetZoneByNodeName
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
-func (os *OpenStack) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
+func (os *OpenStack) GetZoneByNodeName(ctx context.Context, nodeName types.NodeName) (cloudprovider.Zone, error) {
 	compute, err := os.NewComputeV2()
 	if err != nil {
 		return cloudprovider.Zone{}, err

@@ -36,7 +36,7 @@ func newRoutesMetricContext(request string) *metricContext {
 }
 
 // ListRoutes in the cloud environment.
-func (gce *GCECloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
+func (gce *GCECloud) ListRoutes(ctx context.Context, clusterName string) ([]*cloudprovider.Route, error) {
 	mc := newRoutesMetricContext("list")
 	prefix := truncateClusterName(clusterName)
 	f := filter.Regexp("name", prefix+"-.*").AndRegexp("network", gce.NetworkURL()).AndRegexp("description", k8sNodeRouteTag)
@@ -59,7 +59,7 @@ func (gce *GCECloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, err
 }
 
 // CreateRoute in the cloud environment.
-func (gce *GCECloud) CreateRoute(clusterName string, nameHint string, route *cloudprovider.Route) error {
+func (gce *GCECloud) CreateRoute(ctx context.Context, clusterName string, nameHint string, route *cloudprovider.Route) error {
 	mc := newRoutesMetricContext("create")
 
 	targetInstance, err := gce.getInstanceByName(mapNodeNameToInstanceName(route.TargetNode))
@@ -83,7 +83,7 @@ func (gce *GCECloud) CreateRoute(clusterName string, nameHint string, route *clo
 }
 
 // DeleteRoute from the cloud environment.
-func (gce *GCECloud) DeleteRoute(clusterName string, route *cloudprovider.Route) error {
+func (gce *GCECloud) DeleteRoute(ctx context.Context, clusterName string, route *cloudprovider.Route) error {
 	mc := newRoutesMetricContext("delete")
 	return mc.Observe(gce.c.Routes().Delete(context.Background(), meta.GlobalKey(route.Name)))
 }

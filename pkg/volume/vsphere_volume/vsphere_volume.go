@@ -22,6 +22,7 @@ import (
 	"path"
 	"strings"
 
+	"context"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -193,8 +194,8 @@ func (b *vsphereVolumeMounter) GetAttributes() volume.Attributes {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *vsphereVolumeMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *vsphereVolumeMounter) SetUp(ctx context.Context, fsGroup *int64) error {
+	return b.SetUpAt(ctx, b.GetPath(), fsGroup)
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)
@@ -205,7 +206,7 @@ func (b *vsphereVolumeMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *vsphereVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *vsphereVolumeMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	glog.V(5).Infof("vSphere volume setup %s to %s", b.volPath, dir)
 
 	// TODO: handle failed mounts here.
@@ -267,13 +268,13 @@ type vsphereVolumeUnmounter struct {
 
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
-func (v *vsphereVolumeUnmounter) TearDown() error {
-	return v.TearDownAt(v.GetPath())
+func (v *vsphereVolumeUnmounter) TearDown(ctx context.Context) error {
+	return v.TearDownAt(ctx, v.GetPath())
 }
 
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
-func (v *vsphereVolumeUnmounter) TearDownAt(dir string) error {
+func (v *vsphereVolumeUnmounter) TearDownAt(ctx context.Context, dir string) error {
 	return util.UnmountPath(dir, v.mounter)
 }
 

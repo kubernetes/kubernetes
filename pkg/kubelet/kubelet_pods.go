@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -430,7 +431,7 @@ func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) string {
 
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
 // the container runtime to set parameters for launching a container.
-func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
+func (kl *Kubelet) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
 	opts, err := kl.containerManager.GetResources(pod, container)
 	if err != nil {
 		return nil, err
@@ -470,7 +471,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 	}
 	opts.Mounts = append(opts.Mounts, mounts...)
 
-	envs, err := kl.makeEnvironmentVariables(pod, container, podIP)
+	envs, err := kl.makeEnvironmentVariables(ctx, pod, container, podIP)
 	if err != nil {
 		return nil, err
 	}
@@ -553,7 +554,7 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 }
 
 // Make the environment variables for a pod in the given namespace.
-func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container, podIP string) ([]kubecontainer.EnvVar, error) {
+func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, container *v1.Container, podIP string) ([]kubecontainer.EnvVar, error) {
 	var result []kubecontainer.EnvVar
 	// Note:  These are added to the docker Config, but are not included in the checksum computed
 	// by kubecontainer.HashContainer(...).  That way, we can still determine whether an
@@ -588,7 +589,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					return result, fmt.Errorf("Couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
 				}
 				optional := cm.Optional != nil && *cm.Optional
-				configMap, err = kl.configMapManager.GetConfigMap(pod.Namespace, name)
+				configMap, err = kl.configMapManager.GetConfigMap(ctx, pod.Namespace, name)
 				if err != nil {
 					if errors.IsNotFound(err) && optional {
 						// ignore error when marked optional
@@ -623,7 +624,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					return result, fmt.Errorf("Couldn't get secret %v/%v, no kubeClient defined", pod.Namespace, name)
 				}
 				optional := s.Optional != nil && *s.Optional
-				secret, err = kl.secretManager.GetSecret(pod.Namespace, name)
+				secret, err = kl.secretManager.GetSecret(ctx, pod.Namespace, name)
 				if err != nil {
 					if errors.IsNotFound(err) && optional {
 						// ignore error when marked optional
@@ -696,7 +697,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					if kl.kubeClient == nil {
 						return result, fmt.Errorf("Couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
 					}
-					configMap, err = kl.configMapManager.GetConfigMap(pod.Namespace, name)
+					configMap, err = kl.configMapManager.GetConfigMap(ctx, pod.Namespace, name)
 					if err != nil {
 						if errors.IsNotFound(err) && optional {
 							// ignore error when marked optional
@@ -723,7 +724,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					if kl.kubeClient == nil {
 						return result, fmt.Errorf("Couldn't get secret %v/%v, no kubeClient defined", pod.Namespace, name)
 					}
-					secret, err = kl.secretManager.GetSecret(pod.Namespace, name)
+					secret, err = kl.secretManager.GetSecret(ctx, pod.Namespace, name)
 					if err != nil {
 						if errors.IsNotFound(err) && optional {
 							// ignore error when marked optional
@@ -844,11 +845,11 @@ func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
 
 // getPullSecretsForPod inspects the Pod and retrieves the referenced pull
 // secrets.
-func (kl *Kubelet) getPullSecretsForPod(pod *v1.Pod) []v1.Secret {
+func (kl *Kubelet) getPullSecretsForPod(ctx context.Context, pod *v1.Pod) []v1.Secret {
 	pullSecrets := []v1.Secret{}
 
 	for _, secretRef := range pod.Spec.ImagePullSecrets {
-		secret, err := kl.secretManager.GetSecret(pod.Namespace, secretRef.Name)
+		secret, err := kl.secretManager.GetSecret(ctx, pod.Namespace, secretRef.Name)
 		if err != nil {
 			glog.Warningf("Unable to retrieve pull secret %s/%s for %s/%s due to %v.  The image pull may not succeed.", pod.Namespace, secretRef.Name, pod.Namespace, pod.Name, err)
 			continue

@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/url"
@@ -240,7 +241,7 @@ func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
 	return pods, f.Err
 }
 
-func (f *FakeRuntime) SyncPod(pod *v1.Pod, _ v1.PodStatus, _ *PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff) (result PodSyncResult) {
+func (f *FakeRuntime) SyncPod(ctx context.Context, pod *v1.Pod, _ v1.PodStatus, _ *PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff) (result PodSyncResult) {
 	f.Lock()
 	defer f.Unlock()
 

@@ -20,6 +20,7 @@ limitations under the License.
 package reconciler
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -171,6 +172,8 @@ func (rc *reconciler) reconcile() {
 	// pod is unmounted from the first pod before being mounted to the new
 	// pod.
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	// Ensure volumes that should be unmounted are unmounted.
 	for _, mountedVolume := range rc.actualStateOfWorld.GetMountedVolumes() {
 		if !rc.desiredStateOfWorld.PodExistsInVolume(mountedVolume.PodName, mountedVolume.VolumeName) {
@@ -225,7 +228,7 @@ func (rc *reconciler) reconcile() {
 					NodeName:   rc.nodeName,
 				}
 				glog.V(12).Infof(volumeToAttach.GenerateMsgDetailed("Starting operationExecutor.AttachVolume", ""))
-				err := rc.operationExecutor.AttachVolume(volumeToAttach, rc.actualStateOfWorld)
+				err := rc.operationExecutor.AttachVolume(ctx, volumeToAttach, rc.actualStateOfWorld)
 				if err != nil &&
 					!nestedpendingoperations.IsAlreadyExists(err) &&
 					!exponentialbackoff.IsExponentialBackoff(err) {
@@ -249,7 +252,7 @@ func (rc *reconciler) reconcile() {
 				glog.Errorf(volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.NewVolumeHandler for MountVolume failed"), err).Error())
 				continue
 			}
-			err = volumeHandler.MountVolumeHandler(rc.waitForAttachTimeout, volumeToMount.VolumeToMount, rc.actualStateOfWorld, isRemount, remountingLogStr)
+			err = volumeHandler.MountVolumeHandler(ctx, rc.waitForAttachTimeout, volumeToMount.VolumeToMount, rc.actualStateOfWorld, isRemount, remountingLogStr)
 			if err != nil &&
 				!nestedpendingoperations.IsAlreadyExists(err) &&
 				!exponentialbackoff.IsExponentialBackoff(err) {
@@ -299,7 +302,7 @@ func (rc *reconciler) reconcile() {
 					// Only detach if kubelet detach is enabled
 					glog.V(12).Infof(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.DetachVolume", ""))
 					err := rc.operationExecutor.DetachVolume(
-						attachedVolume.AttachedVolume, false /* verifySafeToDetach */, rc.actualStateOfWorld)
+						ctx, attachedVolume.AttachedVolume, false /* verifySafeToDetach */, rc.actualStateOfWorld)
 					if err != nil &&
 						!nestedpendingoperations.IsAlreadyExists(err) &&
 						!exponentialbackoff.IsExponentialBackoff(err) {

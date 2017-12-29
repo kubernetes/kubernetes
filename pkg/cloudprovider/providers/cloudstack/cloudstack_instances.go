@@ -17,6 +17,7 @@ limitations under the License.
 package cloudstack
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -28,7 +29,7 @@ import (
 )
 
 // NodeAddresses returns the addresses of the specified instance.
-func (cs *CSCloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
+func (cs *CSCloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error) {
 	instance, count, err := cs.client.VirtualMachine.GetVirtualMachineByName(
 		string(name),
 		cloudstack.WithProject(cs.projectID),
@@ -44,7 +45,7 @@ func (cs *CSCloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) 
 }
 
 // NodeAddressesByProviderID returns the addresses of the specified instance.
-func (cs *CSCloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
+func (cs *CSCloud) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
 	instance, count, err := cs.client.VirtualMachine.GetVirtualMachineByID(
 		providerID,
 		cloudstack.WithProject(cs.projectID),
@@ -80,12 +81,12 @@ func (cs *CSCloud) nodeAddresses(instance *cloudstack.VirtualMachine) ([]v1.Node
 }
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (cs *CSCloud) ExternalID(name types.NodeName) (string, error) {
-	return cs.InstanceID(name)
+func (cs *CSCloud) ExternalID(ctx context.Context, name types.NodeName) (string, error) {
+	return cs.InstanceID(ctx, name)
 }
 
 // InstanceID returns the cloud provider ID of the specified instance.
-func (cs *CSCloud) InstanceID(name types.NodeName) (string, error) {
+func (cs *CSCloud) InstanceID(ctx context.Context, name types.NodeName) (string, error) {
 	instance, count, err := cs.client.VirtualMachine.GetVirtualMachineByName(
 		string(name),
 		cloudstack.WithProject(cs.projectID),
@@ -101,7 +102,7 @@ func (cs *CSCloud) InstanceID(name types.NodeName) (string, error) {
 }
 
 // InstanceType returns the type of the specified instance.
-func (cs *CSCloud) InstanceType(name types.NodeName) (string, error) {
+func (cs *CSCloud) InstanceType(ctx context.Context, name types.NodeName) (string, error) {
 	instance, count, err := cs.client.VirtualMachine.GetVirtualMachineByName(
 		string(name),
 		cloudstack.WithProject(cs.projectID),
@@ -117,7 +118,7 @@ func (cs *CSCloud) InstanceType(name types.NodeName) (string, error) {
 }
 
 // InstanceTypeByProviderID returns the type of the specified instance.
-func (cs *CSCloud) InstanceTypeByProviderID(providerID string) (string, error) {
+func (cs *CSCloud) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
 	instance, count, err := cs.client.VirtualMachine.GetVirtualMachineByID(
 		providerID,
 		cloudstack.WithProject(cs.projectID),
@@ -133,17 +134,17 @@ func (cs *CSCloud) InstanceTypeByProviderID(providerID string) (string, error) {
 }
 
 // AddSSHKeyToAllInstances is currently not implemented.
-func (cs *CSCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+func (cs *CSCloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
 	return errors.New("AddSSHKeyToAllInstances not implemented")
 }
 
 // CurrentNodeName returns the name of the node we are currently running on.
-func (cs *CSCloud) CurrentNodeName(hostname string) (types.NodeName, error) {
+func (cs *CSCloud) CurrentNodeName(ctx context.Context, hostname string) (types.NodeName, error) {
 	return types.NodeName(hostname), nil
 }
 
 // InstanceExistsByProviderID returns if the instance still exists.
-func (cs *CSCloud) InstanceExistsByProviderID(providerID string) (bool, error) {
+func (cs *CSCloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
 	_, count, err := cs.client.VirtualMachine.GetVirtualMachineByID(
 		providerID,
 		cloudstack.WithProject(cs.projectID),

@@ -26,6 +26,7 @@ import (
 	dstrings "strings"
 	"sync"
 
+	"context"
 	"github.com/golang/glog"
 	gcli "github.com/heketi/heketi/client/api/go-client"
 	gapi "github.com/heketi/heketi/pkg/glusterfs/api"
@@ -250,11 +251,11 @@ func (b *glusterfsMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *glusterfsMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *glusterfsMounter) SetUp(ctx context.Context, fsGroup *int64) error {
+	return b.SetUpAt(ctx, b.GetPath(), fsGroup)
 }
 
-func (b *glusterfsMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *glusterfsMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("mount setup: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
@@ -287,11 +288,11 @@ type glusterfsUnmounter struct {
 
 var _ volume.Unmounter = &glusterfsUnmounter{}
 
-func (c *glusterfsUnmounter) TearDown() error {
-	return c.TearDownAt(c.GetPath())
+func (c *glusterfsUnmounter) TearDown(ctx context.Context) error {
+	return c.TearDownAt(ctx, c.GetPath())
 }
 
-func (c *glusterfsUnmounter) TearDownAt(dir string) error {
+func (c *glusterfsUnmounter) TearDownAt(ctx context.Context, dir string) error {
 	return volutil.UnmountPath(dir, c.mounter)
 }
 

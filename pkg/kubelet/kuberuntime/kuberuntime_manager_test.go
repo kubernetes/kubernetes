@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"reflect"
 	"sort"
 	"testing"
@@ -79,7 +80,7 @@ type containerTemplate struct {
 
 // makeAndSetFakePod is a helper function to create and set one fake sandbox for a pod and
 // one fake container for each of its container.
-func makeAndSetFakePod(t *testing.T, m *kubeGenericRuntimeManager, fakeRuntime *apitest.FakeRuntimeService,
+func makeAndSetFakePod(t *testing.T, ctx context.Context, m *kubeGenericRuntimeManager, fakeRuntime *apitest.FakeRuntimeService,
 	pod *v1.Pod) (*apitest.FakePodSandbox, []*apitest.FakeContainer) {
 	sandbox := makeFakePodSandbox(t, m, sandboxTemplate{
 		pod:       pod,
@@ -97,10 +98,10 @@ func makeAndSetFakePod(t *testing.T, m *kubeGenericRuntimeManager, fakeRuntime *
 		}
 	}
 	for i := range pod.Spec.Containers {
-		containers = append(containers, makeFakeContainer(t, m, newTemplate(&pod.Spec.Containers[i])))
+		containers = append(containers, makeFakeContainer(t, ctx, m, newTemplate(&pod.Spec.Containers[i])))
 	}
 	for i := range pod.Spec.InitContainers {
-		containers = append(containers, makeFakeContainer(t, m, newTemplate(&pod.Spec.InitContainers[i])))
+		containers = append(containers, makeFakeContainer(t, ctx, m, newTemplate(&pod.Spec.InitContainers[i])))
 	}
 
 	fakeRuntime.SetFakeSandboxes([]*apitest.FakePodSandbox{sandbox})
@@ -139,11 +140,11 @@ func makeFakePodSandboxes(t *testing.T, m *kubeGenericRuntimeManager, templates 
 }
 
 // makeFakeContainer creates a fake container based on a container template.
-func makeFakeContainer(t *testing.T, m *kubeGenericRuntimeManager, template containerTemplate) *apitest.FakeContainer {
+func makeFakeContainer(t *testing.T, ctx context.Context, m *kubeGenericRuntimeManager, template containerTemplate) *apitest.FakeContainer {
 	sandboxConfig, err := m.generatePodSandboxConfig(template.pod, template.sandboxAttempt)
 	assert.NoError(t, err, "generatePodSandboxConfig for container template %+v", template)
 
-	containerConfig, err := m.generateContainerConfig(template.container, template.pod, template.attempt, "", template.container.Image, template.containerType)
+	containerConfig, err := m.generateContainerConfig(ctx, template.container, template.pod, template.attempt, "", template.container.Image, template.containerType)
 	assert.NoError(t, err, "generateContainerConfig for container template %+v", template)
 
 	podSandboxID := apitest.BuildSandboxName(sandboxConfig.Metadata)
@@ -166,10 +167,10 @@ func makeFakeContainer(t *testing.T, m *kubeGenericRuntimeManager, template cont
 
 // makeFakeContainers creates a group of fake containers based on the container templates.
 // The function guarantees the order of the fake containers is the same with the templates.
-func makeFakeContainers(t *testing.T, m *kubeGenericRuntimeManager, templates []containerTemplate) []*apitest.FakeContainer {
+func makeFakeContainers(t *testing.T, ctx context.Context, m *kubeGenericRuntimeManager, templates []containerTemplate) []*apitest.FakeContainer {
 	var fakeContainers []*apitest.FakeContainer
 	for _, template := range templates {
-		fakeContainers = append(fakeContainers, makeFakeContainer(t, m, template))
+		fakeContainers = append(fakeContainers, makeFakeContainer(t, ctx, m, template))
 	}
 	return fakeContainers
 }
@@ -278,6 +279,8 @@ func TestContainerRuntimeType(t *testing.T) {
 func TestGetPodStatus(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	containers := []v1.Container{
 		{
@@ -303,7 +306,7 @@ func TestGetPodStatus(t *testing.T) {
 	}
 
 	// Set fake sandbox and faked containers to fakeRuntime.
-	makeAndSetFakePod(t, m, fakeRuntime, pod)
+	makeAndSetFakePod(t, ctx, m, fakeRuntime, pod)
 
 	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
@@ -316,6 +319,8 @@ func TestGetPodStatus(t *testing.T) {
 func TestGetPods(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -338,7 +343,7 @@ func TestGetPods(t *testing.T) {
 	}
 
 	// Set fake sandbox and fake containers to fakeRuntime.
-	fakeSandbox, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
+	fakeSandbox, fakeContainers := makeAndSetFakePod(t, ctx, m, fakeRuntime, pod)
 
 	// Convert the fakeContainers to kubecontainer.Container
 	containers := make([]*kubecontainer.Container, len(fakeContainers))
@@ -392,6 +397,8 @@ func TestGetPods(t *testing.T) {
 func TestGetPodContainerID(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -413,7 +420,7 @@ func TestGetPodContainerID(t *testing.T) {
 		},
 	}
 	// Set fake sandbox and fake containers to fakeRuntime.
-	fakeSandbox, _ := makeAndSetFakePod(t, m, fakeRuntime, pod)
+	fakeSandbox, _ := makeAndSetFakePod(t, ctx, m, fakeRuntime, pod)
 
 	// Convert fakeSandbox to kubecontainer.Container
 	sandbox, err := m.sandboxToKubeContainer(&runtimeapi.PodSandbox{
@@ -439,6 +446,8 @@ func TestGetPodContainerID(t *testing.T) {
 func TestGetNetNS(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -461,7 +470,7 @@ func TestGetNetNS(t *testing.T) {
 	}
 
 	// Set fake sandbox and fake containers to fakeRuntime.
-	sandbox, _ := makeAndSetFakePod(t, m, fakeRuntime, pod)
+	sandbox, _ := makeAndSetFakePod(t, ctx, m, fakeRuntime, pod)
 
 	actual, err := m.GetNetNS(kubecontainer.ContainerID{ID: sandbox.Id})
 	assert.Equal(t, "", actual)
@@ -471,6 +480,8 @@ func TestGetNetNS(t *testing.T) {
 func TestKillPod(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -493,7 +504,7 @@ func TestKillPod(t *testing.T) {
 	}
 
 	// Set fake sandbox and fake containers to fakeRuntime.
-	fakeSandbox, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
+	fakeSandbox, fakeContainers := makeAndSetFakePod(t, ctx, m, fakeRuntime, pod)
 
 	// Convert the fakeContainers to kubecontainer.Container
 	containers := make([]*kubecontainer.Container, len(fakeContainers))
@@ -542,6 +553,8 @@ func TestKillPod(t *testing.T) {
 func TestSyncPod(t *testing.T) {
 	fakeRuntime, fakeImage, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	containers := []v1.Container{
 		{
@@ -567,7 +580,7 @@ func TestSyncPod(t *testing.T) {
 	}
 
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-	result := m.SyncPod(pod, v1.PodStatus{}, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
+	result := m.SyncPod(ctx, pod, v1.PodStatus{}, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	assert.Equal(t, 2, len(fakeRuntime.Containers))
 	assert.Equal(t, 2, len(fakeImage.Images))
@@ -583,6 +596,8 @@ func TestSyncPod(t *testing.T) {
 func TestPruneInitContainers(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	init1 := makeTestContainer("init1", "busybox")
 	init2 := makeTestContainer("init2", "busybox")
@@ -604,7 +619,7 @@ func TestPruneInitContainers(t *testing.T) {
 		{pod: pod, container: &init2, attempt: 0, createdAt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
 		{pod: pod, container: &init1, attempt: 0, createdAt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
 	}
-	fakes := makeFakeContainers(t, m, templates)
+	fakes := makeFakeContainers(t, ctx, m, templates)
 	fakeRuntime.SetFakeContainers(fakes)
 	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
@@ -619,6 +634,8 @@ func TestPruneInitContainers(t *testing.T) {
 func TestSyncPodWithInitContainers(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	initContainers := []v1.Container{
 		{
@@ -656,7 +673,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// 1. should only create the init container.
 	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result := m.SyncPod(pod, v1.PodStatus{}, podStatus, []v1.Secret{}, backOff)
+	result := m.SyncPod(ctx, pod, v1.PodStatus{}, podStatus, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	expected := []*cRecord{
 		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
@@ -666,7 +683,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// 2. should not create app container because init container is still running.
 	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(pod, v1.PodStatus{}, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(ctx, pod, v1.PodStatus{}, podStatus, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	verifyContainerStatuses(t, fakeRuntime, expected, "init container still running; do nothing")
 
@@ -681,7 +698,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// Sync again.
 	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(pod, v1.PodStatus{}, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(ctx, pod, v1.PodStatus{}, podStatus, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	expected = []*cRecord{
 		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
@@ -696,7 +713,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// Sync again.
 	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(pod, v1.PodStatus{}, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(ctx, pod, v1.PodStatus{}, podStatus, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	expected = []*cRecord{
 		// The first init container instance is purged and no longer visible.

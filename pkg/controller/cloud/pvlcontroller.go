@@ -17,6 +17,7 @@ limitations under the License.
 package cloud
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -53,7 +54,7 @@ type PersistentVolumeLabelController struct {
 	pvlIndexer    cache.Indexer
 	volumeLister  corelisters.PersistentVolumeLister
 
-	syncHandler func(key string) error
+	syncHandler func(ctx context.Context, key string) error
 
 	// queue is where incoming work is placed to de-dup and to allow "easy" rate limited requeues on errors
 	queue workqueue.RateLimitingInterface
@@ -124,14 +125,16 @@ func (pvlc *PersistentVolumeLabelController) Run(threadiness int, stopCh <-chan 
 }
 
 func (pvlc *PersistentVolumeLabelController) runWorker() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	// hot loop until we're told to stop.  processNextWorkItem will automatically wait until there's work
 	// available, so we don't worry about secondary waits
-	for pvlc.processNextWorkItem() {
+	for pvlc.processNextWorkItem(ctx) {
 	}
 }
 
 // processNextWorkItem deals with one key off the queue.  It returns false when it's time to quit.
-func (pvlc *PersistentVolumeLabelController) processNextWorkItem() bool {
+func (pvlc *PersistentVolumeLabelController) processNextWorkItem(ctx context.Context) bool {
 	// pull the next work item from queue.  It should be a key we use to lookup something in a cache
 	keyObj, quit := pvlc.queue.Get()
 	if quit {
@@ -142,7 +145,7 @@ func (pvlc *PersistentVolumeLabelController) processNextWorkItem() bool {
 
 	key := keyObj.(string)
 	// do your work on the key.  This method will contains your "do stuff" logic
-	err := pvlc.syncHandler(key)
+	err := pvlc.syncHandler(ctx, key)
 	if err == nil {
 		// if you had no error, tell the queue to stop tracking history for your key.  This will
 		// reset things like failure counts for per-item rate limiting
@@ -165,7 +168,7 @@ func (pvlc *PersistentVolumeLabelController) processNextWorkItem() bool {
 
 // AddLabels adds appropriate labels to persistent volumes and sets the
 // volume as available if successful.
-func (pvlc *PersistentVolumeLabelController) addLabels(key string) error {
+func (pvlc *PersistentVolumeLabelController) addLabels(ctx context.Context, key string) error {
 	_, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		return fmt.Errorf("error getting name of volume %q to get volume from informer: %v", key, err)
@@ -177,15 +180,15 @@ func (pvlc *PersistentVolumeLabelController) addLabels(key string) error {
 		return fmt.Errorf("error getting volume %s from informer: %v", name, err)
 	}
 
-	return pvlc.addLabelsToVolume(volume)
+	return pvlc.addLabelsToVolume(ctx, volume)
 }
 
-func (pvlc *PersistentVolumeLabelController) addLabelsToVolume(vol *v1.PersistentVolume) error {
+func (pvlc *PersistentVolumeLabelController) addLabelsToVolume(ctx context.Context, vol *v1.PersistentVolume) error {
 	var volumeLabels map[string]string
 	// Only add labels if the next pending initializer.
 	if needsInitialization(vol.Initializers, initializerName) {
 		if labeler, ok := (pvlc.cloud).(cloudprovider.PVLabeler); ok {
-			labels, err := labeler.GetLabelsForVolume(vol)
+			labels, err := labeler.GetLabelsForVolume(ctx, vol)
 			if err != nil {
 				return fmt.Errorf("error querying volume %v: %v", vol.Spec, err)
 			}

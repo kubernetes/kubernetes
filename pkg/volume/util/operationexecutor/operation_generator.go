@@ -17,6 +17,7 @@ limitations under the License.
 package operationexecutor
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -84,19 +85,19 @@ func NewOperationGenerator(kubeClient clientset.Interface,
 // OperationGenerator interface that extracts out the functions from operation_executor to make it dependency injectable
 type OperationGenerator interface {
 	// Generates the MountVolume function needed to perform the mount of a volume plugin
-	GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater, isRemount bool) (volumetypes.GeneratedOperations, error)
+	GenerateMountVolumeFunc(ctx context.Context, waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater, isRemount bool) (volumetypes.GeneratedOperations, error)
 
 	// Generates the UnmountVolume function needed to perform the unmount of a volume plugin
 	GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error)
 
 	// Generates the AttachVolume function needed to perform attach of a volume plugin
-	GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
+	GenerateAttachVolumeFunc(ctx context.Context, volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
 
 	// Generates the DetachVolume function needed to perform the detach of a volume plugin
-	GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
+	GenerateDetachVolumeFunc(ctx context.Context, volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
 
 	// Generates the VolumesAreAttached function needed to verify if volume plugins are attached
-	GenerateVolumesAreAttachedFunc(attachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
+	GenerateVolumesAreAttachedFunc(ctx context.Context, attachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
 
 	// Generates the UnMountDevice function needed to perform the unmount of a device
 	GenerateUnmountDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter mount.Interface) (volumetypes.GeneratedOperations, error)
@@ -105,7 +106,7 @@ type OperationGenerator interface {
 	GenerateVerifyControllerAttachedVolumeFunc(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
 
 	// Generates the MapVolume function needed to perform the map of a volume plugin
-	GenerateMapVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error)
+	GenerateMapVolumeFunc(ctx context.Context, waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error)
 
 	// Generates the UnmapVolume function needed to perform the unmap of a volume plugin
 	GenerateUnmapVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error)
@@ -125,6 +126,7 @@ type OperationGenerator interface {
 }
 
 func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
+	ctx context.Context,
 	attachedVolumes []AttachedVolume,
 	nodeName types.NodeName,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
@@ -155,8 +157,7 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 		volumeSpecMap[volumeAttached.VolumeSpec] = volumeAttached.VolumeName
 	}
 
-	volumesAreAttachedFunc := func() (error, error) {
-
+	volumesAreAttachedFunc := func(ctx context.Context) (error, error) {
 		// For each volume plugin, pass the list of volume specs to VolumesAreAttached to check
 		// whether the volumes are still attached.
 		for pluginName, volumesSpecs := range volumesPerPlugin {
@@ -179,7 +180,7 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 				continue
 			}
 
-			attached, areAttachedErr := volumeAttacher.VolumesAreAttached(volumesSpecs, nodeName)
+			attached, areAttachedErr := volumeAttacher.VolumesAreAttached(ctx, volumesSpecs, nodeName)
 			if areAttachedErr != nil {
 				glog.Errorf(
 					"VolumesAreAttached failed for checking on node %q with: %v",
@@ -212,7 +213,7 @@ func (og *operationGenerator) GenerateBulkVolumeVerifyFunc(
 	volumeSpecMap map[*volume.Spec]v1.UniqueVolumeName,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
 
-	bulkVolumeVerifyFunc := func() (error, error) {
+	bulkVolumeVerifyFunc := func(ctx context.Context) (error, error) {
 		attachableVolumePlugin, err :=
 			og.volumePluginMgr.FindAttachablePluginByName(pluginName)
 		if err != nil || attachableVolumePlugin == nil {
@@ -279,6 +280,7 @@ func (og *operationGenerator) GenerateBulkVolumeVerifyFunc(
 }
 
 func (og *operationGenerator) GenerateAttachVolumeFunc(
+	ctx context.Context,
 	volumeToAttach VolumeToAttach,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
 	// Get attacher plugin
@@ -303,10 +305,10 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 		return volumetypes.GeneratedOperations{}, volumeToAttach.GenerateErrorDetailed("AttachVolume.NewAttacher failed", newAttacherErr)
 	}
 
-	attachVolumeFunc := func() (error, error) {
+	attachVolumeFunc := func(ctx context.Context) (error, error) {
 		// Execute attach
 		devicePath, attachErr := volumeAttacher.Attach(
-			volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
+			ctx, volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
 
 		if attachErr != nil {
 			if derr, ok := attachErr.(*util.DanglingAttachError); ok {
@@ -355,6 +357,7 @@ func (og *operationGenerator) GetVolumePluginMgr() *volume.VolumePluginMgr {
 }
 
 func (og *operationGenerator) GenerateDetachVolumeFunc(
+	ctx context.Context,
 	volumeToDetach AttachedVolume,
 	verifySafeToDetach bool,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
@@ -399,13 +402,13 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.NewDetacher failed", err)
 	}
 
-	getVolumePluginMgrFunc := func() (error, error) {
+	getVolumePluginMgrFunc := func(ctx context.Context) (error, error) {
 		var err error
 		if verifySafeToDetach {
 			err = og.verifyVolumeIsSafeToDetach(volumeToDetach)
 		}
 		if err == nil {
-			err = volumeDetacher.Detach(volumeName, volumeToDetach.NodeName)
+			err = volumeDetacher.Detach(ctx, volumeName, volumeToDetach.NodeName)
 		}
 		if err != nil {
 			// On failure, add volume back to ReportAsAttached list
@@ -431,6 +434,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 }
 
 func (og *operationGenerator) GenerateMountVolumeFunc(
+	ctx context.Context,
 	waitForAttachTimeout time.Duration,
 	volumeToMount VolumeToMount,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
@@ -442,7 +446,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("MountVolume.FindPluginBySpec failed", err)
 	}
 
-	affinityErr := checkNodeAffinity(og, volumeToMount, volumePlugin)
+	affinityErr := checkNodeAffinity(ctx, og, volumeToMount, volumePlugin)
 	if affinityErr != nil {
 		eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.NodeAffinity check failed", affinityErr)
 		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, eventErr.Error())
@@ -481,7 +485,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		fsGroup = volumeToMount.Pod.Spec.SecurityContext.FSGroup
 	}
 
-	mountVolumeFunc := func() (error, error) {
+	mountVolumeFunc := func(ctx context.Context) (error, error) {
 		if volumeAttacher != nil {
 			// Wait for attachable volumes to finish attaching
 			glog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.WaitForAttach entering", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath)))
@@ -541,7 +545,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		}
 
 		// Execute mount
-		mountErr := volumeMounter.SetUp(fsGroup)
+		mountErr := volumeMounter.SetUp(ctx, fsGroup)
 		if mountErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return volumeToMount.GenerateError("MountVolume.SetUp failed", mountErr)
@@ -666,9 +670,9 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 		return volumetypes.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmountVolume.NewUnmounter failed", newUnmounterErr)
 	}
 
-	unmountVolumeFunc := func() (error, error) {
+	unmountVolumeFunc := func(ctx context.Context) (error, error) {
 		// Execute unmount
-		unmountErr := volumeUnmounter.TearDown()
+		unmountErr := volumeUnmounter.TearDown(ctx)
 		if unmountErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return volumeToUnmount.GenerateError("UnmountVolume.TearDown failed", unmountErr)
@@ -723,7 +727,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.NewAttacher failed", err)
 	}
 
-	unmountDeviceFunc := func() (error, error) {
+	unmountDeviceFunc := func(ctx context.Context) (error, error) {
 		deviceMountPath, err :=
 			volumeAttacher.GetDeviceMountPath(deviceToDetach.VolumeSpec)
 		if err != nil {
@@ -789,6 +793,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 // will be realased once no one uses the device.
 // If all steps are completed, the volume is marked as mounted.
 func (og *operationGenerator) GenerateMapVolumeFunc(
+	ctx context.Context,
 	waitForAttachTimeout time.Duration,
 	volumeToMount VolumeToMount,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
@@ -803,7 +808,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 	if blockVolumePlugin == nil {
 		return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("MapVolume.FindMapperPluginBySpec failed to find BlockVolumeMapper plugin. Volume plugin is nil.", nil)
 	}
-	affinityErr := checkNodeAffinity(og, volumeToMount, blockVolumePlugin)
+	affinityErr := checkNodeAffinity(ctx, og, volumeToMount, blockVolumePlugin)
 	if affinityErr != nil {
 		eventErr, detailedErr := volumeToMount.GenerateError("MapVolume.NodeAffinity check failed", affinityErr)
 		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, eventErr.Error())
@@ -827,7 +832,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		volumeAttacher, _ = attachableVolumePlugin.NewAttacher()
 	}
 
-	mapVolumeFunc := func() (error, error) {
+	mapVolumeFunc := func(ctx context.Context) (error, error) {
 		var devicePath string
 		if volumeAttacher != nil {
 			// Wait for attachable volumes to finish attaching
@@ -959,7 +964,7 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 		return volumetypes.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmapVolume.NewUnmapper failed", newUnmapperErr)
 	}
 
-	unmapVolumeFunc := func() (error, error) {
+	unmapVolumeFunc := func(ctx context.Context) (error, error) {
 		// Try to unmap volumeName symlink under pod device map path dir
 		// pods/{podUid}/volumeDevices/{escapeQualifiedPluginName}/{volumeName}
 		podDeviceUnmapPath, volName := blockVolumeUnmapper.GetPodDeviceMapPath()
@@ -1050,7 +1055,7 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.NewUnmapper failed", newUnmapperErr)
 	}
 
-	unmapDeviceFunc := func() (error, error) {
+	unmapDeviceFunc := func(ctx context.Context) (error, error) {
 		// Search under globalMapPath dir if all symbolic links from pods have been removed already.
 		// If symbolick links are there, pods may still refer the volume.
 		globalMapPath, err :=
@@ -1140,7 +1145,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 		return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("VerifyControllerAttachedVolume.FindPluginBySpec failed", err)
 	}
 
-	verifyControllerAttachedVolumeFunc := func() (error, error) {
+	verifyControllerAttachedVolumeFunc := func(ctx context.Context) (error, error) {
 		if !volumeToMount.PluginIsAttachable {
 			// If the volume does not implement the attacher interface, it is
 			// assumed to be attached and the actual state of the world is
@@ -1254,7 +1259,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 		return volumetypes.GeneratedOperations{}, fmt.Errorf("Can not find plugin for expanding volume: %q", pvcWithResizeRequest.QualifiedName())
 	}
 
-	expandVolumeFunc := func() (error, error) {
+	expandVolumeFunc := func(ctx context.Context) (error, error) {
 		newSize := pvcWithResizeRequest.ExpectedSize
 		pvSize := pvcWithResizeRequest.PersistentVolume.Spec.Capacity[v1.ResourceStorage]
 		if pvSize.Cmp(newSize) < 0 {
@@ -1321,14 +1326,14 @@ func checkMountOptionSupport(og *operationGenerator, volumeToMount VolumeToMount
 
 // checkNodeAffinity looks at the PV node affinity, and checks if the node has the same corresponding labels
 // This ensures that we don't mount a volume that doesn't belong to this node
-func checkNodeAffinity(og *operationGenerator, volumeToMount VolumeToMount, plugin volume.VolumePlugin) error {
+func checkNodeAffinity(ctx context.Context, og *operationGenerator, volumeToMount VolumeToMount, plugin volume.VolumePlugin) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PersistentLocalVolumes) {
 		return nil
 	}
 
 	pv := volumeToMount.VolumeSpec.PersistentVolume
 	if pv != nil {
-		nodeLabels, err := og.volumePluginMgr.Host.GetNodeLabels()
+		nodeLabels, err := og.volumePluginMgr.Host.GetNodeLabels(ctx)
 		if err != nil {
 			return err
 		}

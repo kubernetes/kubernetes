@@ -17,6 +17,7 @@ limitations under the License.
 package configmap
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"sync"
@@ -40,7 +41,7 @@ const (
 
 type Manager interface {
 	// Get configmap by configmap namespace and name.
-	GetConfigMap(namespace, name string) (*v1.ConfigMap, error)
+	GetConfigMap(ctx context.Context, namespace, name string) (*v1.ConfigMap, error)
 
 	// WARNING: Register/UnregisterPod functions should be efficient,
 	// i.e. should not block on network operations.
@@ -63,7 +64,7 @@ func NewSimpleConfigMapManager(kubeClient clientset.Interface) Manager {
 	return &simpleConfigMapManager{kubeClient: kubeClient}
 }
 
-func (s *simpleConfigMapManager) GetConfigMap(namespace, name string) (*v1.ConfigMap, error) {
+func (s *simpleConfigMapManager) GetConfigMap(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
 	return s.kubeClient.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
 }
 
@@ -73,7 +74,7 @@ func (s *simpleConfigMapManager) RegisterPod(pod *v1.Pod) {
 func (s *simpleConfigMapManager) UnregisterPod(pod *v1.Pod) {
 }
 
-type GetObjectTTLFunc func() (time.Duration, bool)
+type GetObjectTTLFunc func(ctx context.Context) (time.Duration, bool)
 
 type objectKey struct {
 	namespace string
@@ -160,9 +161,9 @@ func (s *configMapStore) Delete(namespace, name string) {
 	}
 }
 
-func GetObjectTTLFromNodeFunc(getNode func() (*v1.Node, error)) GetObjectTTLFunc {
-	return func() (time.Duration, bool) {
-		node, err := getNode()
+func GetObjectTTLFromNodeFunc(getNode func(ctx context.Context) (*v1.Node, error)) GetObjectTTLFunc {
+	return func(ctx context.Context) (time.Duration, bool) {
+		node, err := getNode(ctx)
 		if err != nil {
 			return time.Duration(0), false
 		}
@@ -177,15 +178,15 @@ func GetObjectTTLFromNodeFunc(getNode func() (*v1.Node, error)) GetObjectTTLFunc
 	}
 }
 
-func (s *configMapStore) isConfigMapFresh(data *configMapData) bool {
+func (s *configMapStore) isConfigMapFresh(ctx context.Context, data *configMapData) bool {
 	configMapTTL := s.defaultTTL
-	if ttl, ok := s.getTTL(); ok {
+	if ttl, ok := s.getTTL(ctx); ok {
 		configMapTTL = ttl
 	}
 	return s.clock.Now().Before(data.lastUpdateTime.Add(configMapTTL))
 }
 
-func (s *configMapStore) Get(namespace, name string) (*v1.ConfigMap, error) {
+func (s *configMapStore) Get(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
 	key := objectKey{namespace: namespace, name: name}
 
 	data := func() *configMapData {
@@ -208,7 +209,7 @@ func (s *configMapStore) Get(namespace, name string) (*v1.ConfigMap, error) {
 	// needed and return data.
 	data.Lock()
 	defer data.Unlock()
-	if data.err != nil || !s.isConfigMapFresh(data) {
+	if data.err != nil || !s.isConfigMapFresh(ctx, data) {
 		opts := metav1.GetOptions{}
 		if data.configMap != nil && data.err == nil {
 			// This is just a periodic refresh of a configmap we successfully fetched previously.
@@ -256,8 +257,8 @@ func NewCachingConfigMapManager(kubeClient clientset.Interface, getTTL GetObject
 	return csm
 }
 
-func (c *cachingConfigMapManager) GetConfigMap(namespace, name string) (*v1.ConfigMap, error) {
-	return c.configMapStore.Get(namespace, name)
+func (c *cachingConfigMapManager) GetConfigMap(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
+	return c.configMapStore.Get(ctx, namespace, name)
 }
 
 func getConfigMapNames(pod *v1.Pod) sets.String {

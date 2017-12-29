@@ -686,7 +686,7 @@ func (r *Runtime) makePodManifest(pod *v1.Pod, podIP string, pullSecrets []v1.Se
 	}
 
 	for _, c := range pod.Spec.Containers {
-		err := r.newAppcRuntimeApp(pod, podIP, c, requiresPrivileged, pullSecrets, manifest)
+		err := r.newAppcRuntimeApp(ctx, pod, podIP, c, requiresPrivileged, pullSecrets, manifest)
 		if err != nil {
 			return nil, err
 		}
@@ -808,7 +808,7 @@ func (r *Runtime) makeContainerLogMount(opts *kubecontainer.RunContainerOptions,
 	return &mnt, nil
 }
 
-func (r *Runtime) newAppcRuntimeApp(pod *v1.Pod, podIP string, c v1.Container, requiresPrivileged bool, pullSecrets []v1.Secret, manifest *appcschema.PodManifest) error {
+func (r *Runtime) newAppcRuntimeApp(ctx context.Context, pod *v1.Pod, podIP string, c v1.Container, requiresPrivileged bool, pullSecrets []v1.Secret, manifest *appcschema.PodManifest) error {
 	var annotations appctypes.Annotations = []appctypes.Annotation{
 		{
 			Name:  *appctypes.MustACIdentifier(k8sRktContainerHashAnno),
@@ -842,7 +842,7 @@ func (r *Runtime) newAppcRuntimeApp(pod *v1.Pod, podIP string, c v1.Container, r
 	}
 
 	// TODO: determine how this should be handled for rkt
-	opts, err := r.runtimeHelper.GenerateRunContainerOptions(pod, &c, podIP)
+	opts, err := r.runtimeHelper.GenerateRunContainerOptions(ctx, pod, &c, podIP)
 	if err != nil {
 		return err
 	}
@@ -869,12 +869,12 @@ func (r *Runtime) newAppcRuntimeApp(pod *v1.Pod, podIP string, c v1.Container, r
 	}
 
 	supplementalGids := r.runtimeHelper.GetExtraSupplementalGroupsForPod(pod)
-	ctx := securitycontext.DetermineEffectiveSecurityContext(pod, &c)
+	sctx := securitycontext.DetermineEffectiveSecurityContext(pod, &c)
 
 	volumes, mountPoints := convertKubeMounts(mounts)
 	containerPorts, hostPorts := convertKubePortMappings(opts.PortMappings)
 
-	if err := setApp(imgManifest, &c, mountPoints, containerPorts, opts.Envs, ctx, pod.Spec.SecurityContext, supplementalGids); err != nil {
+	if err := setApp(imgManifest, &c, mountPoints, containerPorts, opts.Envs, sctx, pod.Spec.SecurityContext, supplementalGids); err != nil {
 		return err
 	}
 
@@ -1804,7 +1804,7 @@ func (r *Runtime) Status() (*kubecontainer.RuntimeStatus, error) {
 }
 
 // SyncPod syncs the running pod to match the specified desired pod.
-func (r *Runtime) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
+func (r *Runtime) SyncPod(ctx context.Context, pod *v1.Pod, _ v1.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
 	var err error
 	defer func() {
 		if err != nil {

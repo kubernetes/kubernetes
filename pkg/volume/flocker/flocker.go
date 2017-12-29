@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 
+	"context"
 	flockerapi "github.com/clusterhq/flocker-go"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -232,8 +233,8 @@ func (b *flockerVolumeMounter) GetPath() string {
 }
 
 // SetUp bind mounts the disk global mount to the volume path.
-func (b *flockerVolumeMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *flockerVolumeMounter) SetUp(ctx context.Context, fsGroup *int64) error {
+	return b.SetUpAt(ctx, b.GetPath(), fsGroup)
 }
 
 // newFlockerClient uses environment variables and pod attributes to return a
@@ -253,9 +254,9 @@ func (p *flockerPlugin) newFlockerClient(hostIP string) (*flockerapi.Client, err
 	return c, err
 }
 
-func (b *flockerVolumeMounter) newFlockerClient() (*flockerapi.Client, error) {
+func (b *flockerVolumeMounter) newFlockerClient(ctx context.Context) (*flockerapi.Client, error) {
 
-	hostIP, err := b.plugin.host.GetHostIP()
+	hostIP, err := b.plugin.host.GetHostIP(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -274,10 +275,10 @@ control service:
    need to update the Primary UUID for this volume.
 5. Wait until the Primary UUID was updated or timeout.
 */
-func (b *flockerVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *flockerVolumeMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	var err error
 	if b.flockerClient == nil {
-		b.flockerClient, err = b.newFlockerClient()
+		b.flockerClient, err = b.newFlockerClient(ctx)
 		if err != nil {
 			return err
 		}
@@ -424,12 +425,12 @@ func (c *flockerVolumeUnmounter) GetPath() string {
 
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
-func (c *flockerVolumeUnmounter) TearDown() error {
-	return c.TearDownAt(c.GetPath())
+func (c *flockerVolumeUnmounter) TearDown(ctx context.Context) error {
+	return c.TearDownAt(ctx, c.GetPath())
 }
 
 // TearDownAt unmounts the bind mount
-func (c *flockerVolumeUnmounter) TearDownAt(dir string) error {
+func (c *flockerVolumeUnmounter) TearDownAt(ctx context.Context, dir string) error {
 	return util.UnmountPath(dir, c.mounter)
 }
 

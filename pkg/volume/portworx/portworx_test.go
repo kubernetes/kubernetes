@@ -17,6 +17,7 @@ limitations under the License.
 package portworx
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -125,6 +126,8 @@ func TestPlugin(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
@@ -158,7 +161,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(ctx, nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {
@@ -185,7 +188,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got a nil Unmounter")
 	}
 
-	if err := unmounter.TearDown(); err != nil {
+	if err := unmounter.TearDown(ctx); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 

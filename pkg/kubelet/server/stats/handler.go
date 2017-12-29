@@ -17,6 +17,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -70,7 +71,7 @@ type StatsProvider interface {
 	// namespace.
 	GetPodByName(namespace, name string) (*v1.Pod, bool)
 	// GetNode returns the spec of the local node.
-	GetNode() (*v1.Node, error)
+	GetNode(ctx context.Context) (*v1.Node, error)
 	// GetNodeConfig returns the configuration of the local node.
 	GetNodeConfig() cm.NodeConfig
 	// ListVolumesForPod returns the stats of the volume used by the pod with
@@ -185,7 +186,7 @@ func (h *handler) handleStats(request *restful.Request, response *restful.Respon
 func (h *handler) handleSummary(request *restful.Request, response *restful.Response) {
 	// external calls to the summary API use cached stats
 	forceStatsUpdate := false
-	summary, err := h.summaryProvider.Get(forceStatsUpdate)
+	summary, err := h.summaryProvider.Get(request.Request.Context(), forceStatsUpdate)
 	if err != nil {
 		handleError(response, "/stats/summary", err)
 	} else {

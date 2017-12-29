@@ -17,6 +17,7 @@ limitations under the License.
 package flexvolume
 
 import (
+	"context"
 	"time"
 
 	"github.com/golang/glog"
@@ -32,7 +33,7 @@ type flexVolumeAttacher struct {
 var _ volume.Attacher = &flexVolumeAttacher{}
 
 // Attach is part of the volume.Attacher interface
-func (a *flexVolumeAttacher) Attach(spec *volume.Spec, hostName types.NodeName) (string, error) {
+func (a *flexVolumeAttacher) Attach(ctx context.Context, spec *volume.Spec, hostName types.NodeName) (string, error) {
 
 	call := a.plugin.NewDriverCall(attachCmd)
 	call.AppendSpec(spec, a.plugin.host, nil)
@@ -40,7 +41,7 @@ func (a *flexVolumeAttacher) Attach(spec *volume.Spec, hostName types.NodeName) 
 
 	status, err := call.Run()
 	if isCmdNotSupportedErr(err) {
-		return (*attacherDefaults)(a).Attach(spec, hostName)
+		return (*attacherDefaults)(a).Attach(ctx, spec, hostName)
 	} else if err != nil {
 		return "", err
 	}
@@ -96,7 +97,7 @@ func (a *flexVolumeAttacher) MountDevice(spec *volume.Spec, devicePath string, d
 	return err
 }
 
-func (a *flexVolumeAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (a *flexVolumeAttacher) VolumesAreAttached(ctx context.Context, specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
 	volumesAttachedCheck := make(map[*volume.Spec]bool)
 	for _, spec := range specs {
 		volumesAttachedCheck[spec] = true

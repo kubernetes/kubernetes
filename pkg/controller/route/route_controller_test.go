@@ -17,6 +17,7 @@ limitations under the License.
 package route
 
 import (
+	"context"
 	"net"
 	"testing"
 	"time"
@@ -224,6 +225,8 @@ func TestReconcile(t *testing.T) {
 			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
 		},
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	for i, testCase := range testCases {
 		cloud := &fakecloud.FakeCloud{RouteMap: make(map[string]*fakecloud.FakeRoute)}
 		for _, route := range testCase.initialRoutes {
@@ -240,7 +243,7 @@ func TestReconcile(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(testCase.clientset, controller.NoResyncPeriodFunc())
 		rc := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidr)
 		rc.nodeListerSynced = alwaysReady
-		if err := rc.reconcile(testCase.nodes, testCase.initialRoutes); err != nil {
+		if err := rc.reconcile(ctx, testCase.nodes, testCase.initialRoutes); err != nil {
 			t.Errorf("%d. Error from rc.reconcile(): %v", i, err)
 		}
 		for _, action := range testCase.clientset.Actions() {
@@ -279,7 +282,7 @@ func TestReconcile(t *testing.T) {
 		for {
 			select {
 			case <-tick.C:
-				if finalRoutes, err = routes.ListRoutes(cluster); err == nil && routeListEqual(finalRoutes, testCase.expectedRoutes) {
+				if finalRoutes, err = routes.ListRoutes(ctx, cluster); err == nil && routeListEqual(finalRoutes, testCase.expectedRoutes) {
 					break poll
 				}
 			case <-timeoutChan:

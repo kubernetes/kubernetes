@@ -17,6 +17,7 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"context"
 	"fmt"
 	"net"
 
@@ -81,7 +82,7 @@ func (ctrl *PersistentVolumeController) GetHostName() string {
 	return ""
 }
 
-func (ctrl *PersistentVolumeController) GetHostIP() (net.IP, error) {
+func (ctrl *PersistentVolumeController) GetHostIP(ctx context.Context) (net.IP, error) {
 	return nil, fmt.Errorf("PersistentVolumeController.GetHostIP() is not implemented")
 }
 
@@ -89,14 +90,14 @@ func (ctrl *PersistentVolumeController) GetNodeAllocatable() (v1.ResourceList, e
 	return v1.ResourceList{}, nil
 }
 
-func (adc *PersistentVolumeController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
-	return func(_, _ string) (*v1.Secret, error) {
+func (adc *PersistentVolumeController) GetSecretFunc() func(ctx context.Context, namespace, name string) (*v1.Secret, error) {
+	return func(_ context.Context, _, _ string) (*v1.Secret, error) {
 		return nil, fmt.Errorf("GetSecret unsupported in PersistentVolumeController")
 	}
 }
 
-func (adc *PersistentVolumeController) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
-	return func(_, _ string) (*v1.ConfigMap, error) {
+func (adc *PersistentVolumeController) GetConfigMapFunc() func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
+	return func(_ context.Context, _, _ string) (*v1.ConfigMap, error) {
 		return nil, fmt.Errorf("GetConfigMap unsupported in PersistentVolumeController")
 	}
 }
@@ -105,7 +106,7 @@ func (adc *PersistentVolumeController) GetExec(pluginName string) mount.Exec {
 	return mount.NewOsExec()
 }
 
-func (ctrl *PersistentVolumeController) GetNodeLabels() (map[string]string, error) {
+func (ctrl *PersistentVolumeController) GetNodeLabels(ctx context.Context) (map[string]string, error) {
 	return nil, fmt.Errorf("GetNodeLabels() unsupported in PersistentVolumeController")
 }
 
