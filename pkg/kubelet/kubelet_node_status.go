@@ -61,9 +61,6 @@ const (
 // to call multiple times, but not concurrently (kl.registrationCompleted is
 // not locked).
 func (kl *Kubelet) registerWithAPIServer() {
-	if kl.registrationCompleted {
-		return
-	}
 	step := 100 * time.Millisecond
 
 	for {
@@ -360,8 +357,8 @@ func (kl *Kubelet) syncNodeStatus() {
 	if kl.kubeClient == nil || kl.heartbeatClient == nil {
 		return
 	}
-	if kl.registerNode {
-		// This will exit immediately if it doesn't need to do anything.
+	// Register to apiserver only on the first start when registerNode is true.
+	if kl.registerNode && !kl.registrationCompleted{
 		kl.registerWithAPIServer()
 	}
 	if err := kl.updateNodeStatus(); err != nil {
