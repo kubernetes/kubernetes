@@ -41,6 +41,25 @@ func TestUnstructuredList(t *testing.T) {
 	assert.Equal(t, "test", val)
 }
 
+// Ensure UnstructuredContent() returns a deep copy of the contents
+func TestUnstructuredListContent(t *testing.T) {
+	obj := map[string]interface{}{
+		"a": "b",
+	}
+	item := Unstructured{
+		Object: obj,
+	}
+	list := &UnstructuredList{
+		Items: []Unstructured{item},
+	}
+
+	content := list.UnstructuredContent()
+	retObjs := content["items"].([]interface{})
+	retObj := retObjs[0].(map[string]interface{})
+	retObj["a"] = "c"
+	assert.Equal(t, "b", obj["a"])
+}
+
 func TestNilDeletionTimestamp(t *testing.T) {
 	var u Unstructured
 	del := u.GetDeletionTimestamp()

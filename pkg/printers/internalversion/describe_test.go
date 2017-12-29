@@ -1782,14 +1782,14 @@ URL:	http://localhost
 				"name":              "MyName",
 				"namespace":         "MyNamespace",
 				"creationTimestamp": "2017-04-01T00:00:00Z",
-				"resourceVersion":   123,
+				"resourceVersion":   int64(123),
 				"uid":               "00000000-0000-0000-0000-000000000001",
 				"dummy3":            "present",
 			},
 			"items": []interface{}{
 				map[string]interface{}{
 					"itemBool": true,
-					"itemInt":  42,
+					"itemInt":  int64(42),
 				},
 			},
 			"url":    "http://localhost",
