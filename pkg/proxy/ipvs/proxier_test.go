@@ -2408,3 +2408,111 @@ func Test_endpointsToEndpointsMap(t *testing.T) {
 		}
 	}
 }
+
+func Test_syncService(t *testing.T) {
+	testCases := []struct {
+		oldVirtualServer *utilipvs.VirtualServer
+		svcName          string
+		newVirtualServer *utilipvs.VirtualServer
+		bindAddr         bool
+	}{
+		{
+			// case 0, old virtual server is same as new virtual server
+			oldVirtualServer: &utilipvs.VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  string(api.ProtocolTCP),
+				Port:      80,
+				Scheduler: "rr",
+				Flags:     utilipvs.FlagHashed,
+			},
+			svcName: "foo",
+			newVirtualServer: &utilipvs.VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  string(api.ProtocolTCP),
+				Port:      80,
+				Scheduler: "rr",
+				Flags:     utilipvs.FlagHashed,
+			},
+			bindAddr: false,
+		},
+		{
+			// case 1, old virtual server is different from new virtual server
+			oldVirtualServer: &utilipvs.VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  string(api.ProtocolTCP),
+				Port:      8080,
+				Scheduler: "rr",
+				Flags:     utilipvs.FlagHashed,
+			},
+			svcName: "bar",
+			newVirtualServer: &utilipvs.VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  string(api.ProtocolTCP),
+				Port:      8080,
+				Scheduler: "rr",
+				Flags:     utilipvs.FlagPersistent,
+			},
+			bindAddr: false,
+		},
+		{
+			// case 2, old virtual server is different from new virtual server
+			oldVirtualServer: &utilipvs.VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  string(api.ProtocolTCP),
+				Port:      8080,
+				Scheduler: "rr",
+				Flags:     utilipvs.FlagHashed,
+			},
+			svcName: "bar",
+			newVirtualServer: &utilipvs.VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  string(api.ProtocolTCP),
+				Port:      8080,
+				Scheduler: "wlc",
+				Flags:     utilipvs.FlagHashed,
+			},
+			bindAddr: false,
+		},
+		{
+			// case 3, old virtual server is nil, and create new virtual server
+			oldVirtualServer: nil,
+			svcName:          "baz",
+			newVirtualServer: &utilipvs.VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  string(api.ProtocolUDP),
+				Port:      53,
+				Scheduler: "rr",
+				Flags:     utilipvs.FlagHashed,
+			},
+			bindAddr: true,
+		},
+	}
+
+	for i := range testCases {
+		ipt := iptablestest.NewFake()
+		ipvs := ipvstest.NewFake()
+		ipset := ipsettest.NewFake(testIPSetVersion)
+		proxier := NewFakeProxier(ipt, ipvs, ipset, nil)
+
+		if testCases[i].oldVirtualServer != nil {
+			if err := proxier.ipvs.AddVirtualServer(testCases[i].oldVirtualServer); err != nil {
+				t.Errorf("Case [%d], unexpected add IPVS virtual server error: %v", i, err)
+			}
+		}
+		if err := proxier.syncService(testCases[i].svcName, testCases[i].newVirtualServer, testCases[i].bindAddr); err != nil {
+			t.Errorf("Case [%d], unexpected sync IPVS virutal server error: %v", i, err)
+		}
+		// check
+		list, err := proxier.ipvs.GetVirtualServers()
+		if err != nil {
+			t.Errorf("Case [%d], unexpected list IPVS virtual server error: %v", i, err)
+		}
+		if len(list) != 1 {
+			t.Errorf("Case [%d], expect %d virtual servers, got %d", i, 1, len(list))
+			continue
+		}
+		if !list[0].Equal(testCases[i].newVirtualServer) {
+			t.Errorf("Case [%d], unexpected mismatch, expect: %#v, got: %#v", i, testCases[i].newVirtualServer, list[0])
+		}
+	}
+}
