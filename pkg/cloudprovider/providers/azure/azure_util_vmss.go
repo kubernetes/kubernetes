@@ -160,11 +160,13 @@ func (ss *scaleSet) updateCache() error {
 }
 
 // getCachedVirtualMachine gets virtualMachine by nodeName from cache.
+// It returns cloudprovider.InstanceNotFound if node does not belong to any scale sets.
 func (ss *scaleSet) getCachedVirtualMachine(nodeName string) (scaleSetVMInfo, error) {
 	ss.cacheMutex.Lock()
 	defer ss.cacheMutex.Unlock()
 
 	getVMFromCache := func(nodeName string) (scaleSetVMInfo, bool) {
+		glog.V(8).Infof("Getting scaleSetVMInfo for %q from cache %v", nodeName, ss.cache)
 		for scaleSetName := range ss.cache {
 			for _, vm := range ss.cache[scaleSetName] {
 				if vm.NodeName == nodeName {
@@ -183,11 +185,13 @@ func (ss *scaleSet) getCachedVirtualMachine(nodeName string) (scaleSetVMInfo, er
 
 	// Known node not managed by scale sets.
 	if ss.availabilitySetNodesCache.Has(nodeName) {
+		glog.V(10).Infof("Found node %q in availabilitySetNodesCache", nodeName)
 		return scaleSetVMInfo{}, cloudprovider.InstanceNotFound
 	}
 
 	// Update cache and try again.
 	if err := ss.updateCache(); err != nil {
+		glog.Errorf("updateCache failed with error: %v", err)
 		return scaleSetVMInfo{}, err
 	}
 	vm, found = getVMFromCache(nodeName)
@@ -196,15 +200,19 @@ func (ss *scaleSet) getCachedVirtualMachine(nodeName string) (scaleSetVMInfo, er
 	}
 
 	// Node still not found, assuming it is not managed by scale sets.
+	glog.V(8).Infof("Node %q doesn't belong to any scale sets, adding it to availabilitySetNodesCache", nodeName)
 	ss.availabilitySetNodesCache.Insert(nodeName)
 	return scaleSetVMInfo{}, cloudprovider.InstanceNotFound
 }
 
+// getCachedVirtualMachineByInstanceID gets scaleSetVMInfo from cache.
+// The node must belong to one of scale sets.
 func (ss *scaleSet) getCachedVirtualMachineByInstanceID(scaleSetName, instanceID string) (scaleSetVMInfo, error) {
 	ss.cacheMutex.Lock()
 	defer ss.cacheMutex.Unlock()
 
 	getVMByID := func(scaleSetName, instanceID string) (scaleSetVMInfo, bool) {
+		glog.V(8).Infof("Getting scaleSetVMInfo with scaleSetName: %q and instanceID %q from cache %v", scaleSetName, instanceID, ss.cache)
 		vms, ok := ss.cache[scaleSetName]
 		if !ok {
 			glog.V(4).Infof("scale set (%s) not found", scaleSetName)
@@ -229,6 +237,7 @@ func (ss *scaleSet) getCachedVirtualMachineByInstanceID(scaleSetName, instanceID
 
 	// Update cache and try again.
 	if err := ss.updateCache(); err != nil {
+		glog.Errorf("updateCache failed with error: %v", err)
 		return scaleSetVMInfo{}, err
 	}
 	vm, found = getVMByID(scaleSetName, instanceID)
