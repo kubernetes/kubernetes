@@ -1589,7 +1589,7 @@ func (proxier *Proxier) syncService(svcName string, vs *utilipvs.VirtualServer, 
 			// IPVS service was changed, update the existing one
 			// During updates, service VIP will not go down
 			glog.V(3).Infof("IPVS service %s was changed", svcName)
-			if err := proxier.ipvs.UpdateVirtualServer(appliedVirtualServer); err != nil {
+			if err := proxier.ipvs.UpdateVirtualServer(vs); err != nil {
 				glog.Errorf("Failed to update IPVS service, err:%v", err)
 				return err
 			}
