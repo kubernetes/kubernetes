@@ -2536,3 +2536,159 @@ func TestCanCombineSharedAndPrivateRulesInSameGroup(t *testing.T) {
 // func TestIfServiceIsEditedFromSharedRuleToOwnRuleThenItIsRemovedFromSharedRuleAndOwnRuleIsCreated(t *testing.T) {
 // 	t.Error()
 // }
+
+type route struct {
+	path, response string
+}
+
+func getTestServer(t *testing.T, routes ...route) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for _, route := range routes {
+			if r.URL.Path == route.path {
+				fmt.Fprint(w, route.response)
+				return
+			}
+		}
+		t.Errorf("Unexpected request %s to test HTTP service", r.URL.Path)
+	}))
+}
+
+func getMetadataService(server *httptest.Server) *InstanceMetadata {
+	serverURL := server.URL
+	if !strings.HasSuffix(serverURL, "/") {
+		serverURL = serverURL + "/" // production URL will end in '/' so test URL should too
+	}
+	metadata := &InstanceMetadata{
+		baseURL: serverURL,
+	}
+	return metadata
+}
+
+func (az *Cloud) useMetadataService(server *httptest.Server) {
+	metadata := getMetadataService(server)
+	az.UseInstanceMetadata = true
+	az.metadata = metadata
+}
+
+func TestWhenGettingInstanceTypeOfLocalNodeItUsesTheMetadataServiceIfPossible(t *testing.T) {
+	vmName := "node-123"
+	vmSize := "STANDARD_D4_V2"
+
+	server := getTestServer(t,
+		route{"/instance/compute/name", vmName},
+		route{"/instance/compute/vmSize", vmSize},
+	)
+	defer server.Close()
+
+	az := getTestCloud()
+	az.useMetadataService(server)
+
+	instanceType, err := az.InstanceType(mapVMNameToNodeName(vmName))
+
+	if err != nil {
+		t.Errorf("Unexpected error: %q", err)
+	}
+	if instanceType != vmSize {
+		t.Errorf("Expected instance type %s but got %s", vmSize, instanceType)
+	}
+}
+
+func findAddress(addressType v1.NodeAddressType, addresses []v1.NodeAddress) (string, error) {
+	for _, address := range addresses {
+		if address.Type == addressType {
+			return address.Address, nil
+		}
+	}
+	return "", fmt.Errorf("Expected to find address of type %s but did not", addressType)
+}
+
+func TestWhenGettingNodeAddressesItUsesTheMetadataServiceIfPossible(t *testing.T) {
+	ipAddress1 := "12.34.56.78"
+	ipAddress2 := "123.134.156.178"
+	ipAddressResponse := fmt.Sprintf("{ \"privateIPAddress\": \"%s\", \"publicIPAddress\": \"%s\" }", ipAddress1, ipAddress2)
+
+	server := getTestServer(t,
+		route{"/instance/network/interface/0/ipv4/ipAddress/0", ipAddressResponse},
+	)
+	defer server.Close()
+
+	az := getTestCloud()
+	az.useMetadataService(server)
+
+	nodeAddresses, err := az.NodeAddresses(mapVMNameToNodeName("foo"))
+
+	if err != nil {
+		t.Errorf("Unexpected error: %q", err)
+	}
+
+	internalIP, err := findAddress(v1.NodeInternalIP, nodeAddresses)
+	if err != nil {
+		t.Error("Expected internal IP address but didn't get one")
+	}
+	if internalIP != ipAddress1 {
+		t.Errorf("Expected internal IP address %s but got %s", ipAddress1, internalIP)
+	}
+
+	externalIP, err := findAddress(v1.NodeExternalIP, nodeAddresses)
+	if err != nil {
+		t.Error("Expected external IP address but didn't get one")
+	}
+	if externalIP != ipAddress2 {
+		t.Errorf("Expected external IP address %s but got %s", ipAddress2, externalIP)
+	}
+}
+
+func TestWhenGettingNodeAddressesFromMetadataServiceItHandlesMissingPublicIP(t *testing.T) {
+	ipAddress := "12.34.56.78"
+	ipAddressResponse := fmt.Sprintf("{ \"privateIPAddress\": \"%s\" }", ipAddress)
+
+	server := getTestServer(t,
+		route{"/instance/network/interface/0/ipv4/ipAddress/0", ipAddressResponse},
+	)
+	defer server.Close()
+
+	az := getTestCloud()
+	az.useMetadataService(server)
+
+	nodeAddresses, err := az.NodeAddresses(mapVMNameToNodeName("foo"))
+
+	if err != nil {
+		t.Errorf("Unexpected error: %q", err)
+	}
+
+	internalIP, err := findAddress(v1.NodeInternalIP, nodeAddresses)
+	if err != nil {
+		t.Error("Expected internal IP address but didn't get one")
+	}
+	if internalIP != ipAddress {
+		t.Errorf("Expected node address %s but got %s", ipAddress, nodeAddresses[0].Address)
+	}
+
+	_, err = findAddress(v1.NodeExternalIP, nodeAddresses)
+	if err == nil {
+		t.Error("Expected to not get a public IP address but did get one")
+	}
+}
+
+func TestWhenGettingInstanceIDItUsesTheMetadataServiceIfPossible(t *testing.T) {
+	vmName := "node-123"
+	vmID := "abcdef123456-9876-1234-ababab"
+
+	server := getTestServer(t,
+		route{"/instance/compute/name", vmName},
+		route{"/instance/compute/vmId", vmID},
+	)
+	defer server.Close()
+
+	az := getTestCloud()
+	az.useMetadataService(server)
+
+	instanceID, err := az.InstanceID(mapVMNameToNodeName(vmName))
+
+	if err != nil {
+		t.Errorf("Unexpected error: %q", err)
+	}
+	if instanceID != vmID {
+		t.Errorf("Expected instance ID %s but got %s", vmID, instanceID)
+	}
+}
