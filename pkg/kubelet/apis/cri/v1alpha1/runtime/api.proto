@@ -554,6 +554,8 @@ message LinuxContainerConfig {
     LinuxContainerResources resources = 1;
     // LinuxContainerSecurityContext configuration for the container.
     LinuxContainerSecurityContext security_context = 2;
+    // Upper limit of number of pids per container
+    int64 max_pids = 3;
 }
 
 // ContainerMetadata holds all necessary information for building the container
