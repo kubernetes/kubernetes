@@ -30,6 +30,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // StatefulPodControlInterface defines the interface that StatefulSetController uses to create, update, and delete Pods,
@@ -172,14 +173,14 @@ func (spc *realStatefulPodControl) recordClaimEvent(verb string, set *apps.State
 	}
 }
 
-// createPersistentVolumeClaims creates all of the required PersistentVolumeClaims for pod, which mush be a member of
+// createPersistentVolumeClaims creates all of the required PersistentVolumeClaims for pod, which must be a member of
 // set. If all of the claims for Pod are successfully created, the returned error is nil. If creation fails, this method
 // may be called again until no error is returned, indicating the PersistentVolumeClaims for pod are consistent with
 // set's Spec.
 func (spc *realStatefulPodControl) createPersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) error {
 	var errs []error
 	for _, claim := range getPersistentVolumeClaims(set, pod) {
-		_, err := spc.pvcLister.PersistentVolumeClaims(claim.Namespace).Get(claim.Name)
+		currentClaim, err := spc.pvcLister.PersistentVolumeClaims(claim.Namespace).Get(claim.Name)
 		switch {
 		case apierrors.IsNotFound(err):
 			_, err := spc.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(&claim)
@@ -192,8 +193,33 @@ func (spc *realStatefulPodControl) createPersistentVolumeClaims(set *apps.Statef
 		case err != nil:
 			errs = append(errs, fmt.Errorf("Failed to retrieve PVC %s: %s", claim.Name, err))
 			spc.recordClaimEvent("create", set, pod, &claim, err)
+		default:
+			// When err is nil ,check resource requirements and accessmodes, update if necessary
+			changed := false
+			// Because statefulSet object could be created without AccessModes, we need check out the length of AccessModes
+			// When the length of AccessModes is zero, we do nothing.
+			if len(claim.Spec.AccessModes) > 0 {
+				if len(claim.Spec.AccessModes) != len(currentClaim.Spec.AccessModes) {
+					changed = true
+					currentClaim.Spec.AccessModes = claim.Spec.AccessModes
+				} else if !volume.AccessModesContainedInAll(claim.Spec.AccessModes, currentClaim.Spec.AccessModes) {
+					changed = true
+					currentClaim.Spec.AccessModes = claim.Spec.AccessModes
+				}
+				if storage, ok := claim.Spec.Resources.Requests[v1.ResourceStorage]; ok {
+					if currentStorage, check := currentClaim.Spec.Resources.Requests[v1.ResourceStorage]; check && storage.Cmp(currentStorage) != 0 {
+						changed = true
+						currentClaim.Spec.Resources.Requests[v1.ResourceStorage] = claim.Spec.Resources.Requests[v1.ResourceStorage]
+					}
+				}
+				if changed {
+					_, err := spc.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(currentClaim)
+					if err != nil {
+						errs = append(errs, fmt.Errorf("Failed to update PVC %s: %s", claim.Name, err))
+					}
+				}
+			}
 		}
-		// TODO: Check resource requirements and accessmodes, update if necessary
 	}
 	return errorutils.NewAggregate(errs)
 }

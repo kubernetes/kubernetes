@@ -374,9 +374,8 @@ func TestStatefulPodControlUpdatePodConflictSuccess(t *testing.T) {
 		if !conflict {
 			conflict = true
 			return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), pod.Name, errors.New("conflict"))
-		} else {
-			return true, update.GetObject(), nil
 		}
+		return true, update.GetObject(), nil
 	})
 	pod.Name = "goo-0"
 	if err := control.UpdateStatefulPod(set, pod); err != nil {
