@@ -1769,6 +1769,8 @@ Features for this release were tracked via the use of the [kubernetes/features](
   ([#41449](https://github.com/kubernetes/kubernetes/pull/41449),
   [@zmerlynn](https://github.com/zmerlynn))
 * Kubelet: Remove the PLEG health check from /healthz, Kubelet will now report
+  ([#37865](https://github.com/kubernetes/kubernetes/pull/37865),
+  [@yujuhong](https://github.com/yujuhong))
 * NodeNotReady on failed PLEG health check.
   ([#41569](https://github.com/kubernetes/kubernetes/pull/41569),
   [@yujuhong](https://github.com/yujuhong))
