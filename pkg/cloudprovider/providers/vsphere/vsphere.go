@@ -217,7 +217,7 @@ func (vs *VSphere) Initialize(clientBuilder controller.ControllerClientBuilder) 
 
 	// Only on controller node it is required to register listeners.
 	// Register callbacks for node updates
-	client := clientBuilder.ClientOrDie("vSphere-cloud-provider")
+	client := clientBuilder.ClientOrDie("vsphere-cloud-provider")
 	factory := informers.NewSharedInformerFactory(client, 5*time.Minute)
 	nodeInformer := factory.Core().V1().Nodes()
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
