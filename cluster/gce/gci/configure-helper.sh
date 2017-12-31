@@ -114,7 +114,7 @@ function get-local-disk-num() {
 function safe-block-symlink(){
   local device="${1}"
   local symdir="${2}"
-  
+
   mkdir -p "${symdir}"
 
   get-or-generate-uuid "${device}"
@@ -188,11 +188,11 @@ function unique-uuid-bind-mount(){
   # Trigger udev refresh so that newly formatted devices are propagated in by-uuid
   udevadm control --reload-rules
   udevadm trigger
-  udevadm settle 
+  udevadm settle
 
   # grep the exact match of actual device, prevents substring matching
   local myuuid=$(ls -l /dev/disk/by-uuid/ | grep "/${actual_device}$" | tr -s ' ' | cut -d ' ' -f 9)
-  # myuuid should be the uuid of the device as found in /dev/disk/by-uuid/ 
+  # myuuid should be the uuid of the device as found in /dev/disk/by-uuid/
   if [[ -z "${myuuid}" ]]; then
     echo "Failed to get a uuid for device ${actual_device} when mounting." >&2
     exit 2
@@ -224,7 +224,7 @@ function mount-ext(){
   local devicenum="${2}"
   local interface="${3}"
   local format="${4}"
-  
+
 
   if [[ -z "${devicenum}" ]]; then
     echo "Failed to get the local disk number for device ${ssd}" >&2
@@ -1491,8 +1491,6 @@ function remove-salt-config-comments {
 #   CLOUD_CONFIG_MOUNT
 #   DOCKER_REGISTRY
 function start-kube-apiserver {
-  # FEATURE_GATES="${FEATURE_GATES},CustomResourceValidation=true" # mtaufen: hack to get the API server to start up with validation enabled
-
   echo "Start kubernetes api-server"
   prepare-log-file /var/log/kube-apiserver.log
   prepare-log-file /var/log/kube-apiserver-audit.log

@@ -36,6 +36,7 @@ import (
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
@@ -43,6 +44,7 @@ import (
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
 	nodecontroller "k8s.io/kubernetes/pkg/controller/node"
 	"k8s.io/kubernetes/pkg/controller/node/ipam"
+	nodeconfigcontroller "k8s.io/kubernetes/pkg/controller/nodeconfig"
 	"k8s.io/kubernetes/pkg/controller/podgc"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
@@ -77,6 +79,33 @@ func startServiceController(ctx ControllerContext) (bool, error) {
 	return true, nil
 }
 
+func startNodeConfigController(ctx ControllerContext) (bool, error) {
+	// we need a JSON client, because CRD doesn't support protobuf
+	var jsonClientConfig restclient.Config
+	if builder, ok := ctx.ClientBuilder.(controller.SimpleControllerClientBuilder); ok {
+		jsonClientConfig = *builder.ClientConfig
+		// TODO(mtaufen): I'm not reaaaally sure what the implications of using SAControllerClientBuilder are
+	} else if builder, ok := ctx.ClientBuilder.(controller.SAControllerClientBuilder); ok {
+		jsonClientConfig = *builder.ClientConfig
+	} else {
+		return false, fmt.Errorf("couldn't construct json client for nodeconfig controller")
+	}
+	jsonClientConfig.ContentType = "application/json"
+
+	nc, err := nodeconfigcontroller.NewNodeConfigController(
+		ctx.InformerFactory.Core().V1().Nodes(),
+		ctx.ClientBuilder.ClientOrDie("node-controller"),
+		&jsonClientConfig,
+		ctx.Options.NodeMonitorPeriod.Duration,
+		ResyncPeriod(&ctx.Options)(),
+	)
+	if err != nil {
+		return true, err
+	}
+	go nc.Run(ctx.Stop)
+	return true, nil
+}
+
 func startNodeController(ctx ControllerContext) (bool, error) {
 	var clusterCIDR *net.IPNet = nil
 	var serviceCIDR *net.IPNet = nil
@@ -100,7 +129,6 @@ func startNodeController(ctx ControllerContext) (bool, error) {
 	nodeController, err := nodecontroller.NewNodeController(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Nodes(),
-		ctx.NodeConfigInformerFactory.Nodeconfig().V1alpha1().NodeConfigSourcePools(),
 		ctx.InformerFactory.Extensions().V1beta1().DaemonSets(),
 		ctx.Cloud,
 		ctx.ClientBuilder.ClientOrDie("node-controller"),

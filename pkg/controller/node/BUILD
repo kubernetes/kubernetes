@@ -46,7 +46,6 @@ go_library(
         "doc.go",
         "metrics.go",
         "node_controller.go",
-        "nodeconfigsourcepool.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/node",
     deps = [
@@ -55,9 +54,6 @@ go_library(
         "//pkg/controller:go_default_library",
         "//pkg/controller/node/ipam:go_default_library",
         "//pkg/controller/node/ipam/sync:go_default_library",
-        "//pkg/controller/node/nodeconfig/client-go/informers/externalversions/nodeconfig/v1alpha1:go_default_library",
-        "//pkg/controller/node/nodeconfig/client-go/listers/nodeconfig/v1alpha1:go_default_library",
-        "//pkg/controller/node/nodeconfig/v1alpha1:go_default_library",
         "//pkg/controller/node/scheduler:go_default_library",
         "//pkg/controller/node/util:go_default_library",
         "//pkg/util/metrics:go_default_library",
