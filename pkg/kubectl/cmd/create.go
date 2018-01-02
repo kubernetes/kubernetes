@@ -278,8 +278,8 @@ func createAndRefresh(info *resource.Info) error {
 
 // NameFromCommandArgs is a utility function for commands that assume the first argument is a resource name
 func NameFromCommandArgs(cmd *cobra.Command, args []string) (string, error) {
-	if len(args) == 0 {
-		return "", cmdutil.UsageErrorf(cmd, "NAME is required")
+	if len(args) != 1 {
+		return "", cmdutil.UsageErrorf(cmd, "exactly one NAME is required, got %d", len(args))
 	}
 	return args[0], nil
 }
