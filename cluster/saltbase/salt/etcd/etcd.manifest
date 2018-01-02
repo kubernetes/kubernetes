@@ -22,6 +22,7 @@
 {% if pillar.get('storage_backend', 'etcd3') == 'etcd3' -%}
   {% set quota_bytes = '--quota-backend-bytes=4294967296' -%}
 {% endif -%}
+{% set liveness_probe_initial_delay = pillar.get('etcd_liveness_probe_initial_delay', 15) -%}
 {% set srv_kube_path = "/srv/kubernetes" -%}
 
 {
@@ -67,7 +68,7 @@
         "port": {{ port }},
         "path": "/health"
       },
-      "initialDelaySeconds": 15,
+      "initialDelaySeconds": {{ liveness_probe_initial_delay }},
       "timeoutSeconds": 15
     },
     "ports": [
