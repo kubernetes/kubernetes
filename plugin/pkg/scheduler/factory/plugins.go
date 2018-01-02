@@ -135,7 +135,7 @@ func RemovePredicateKeyFromAlgoProvider(providerName, key string) error {
 	return nil
 }
 
-// RemovePredicateKeyFromAlgoProvider removes a fit predicate key from all algorithmProviders which in algorithmProviderMap.
+// RemovePredicateKeyFromAlgorithmProviderMap removes a fit predicate key from all algorithmProviders which in algorithmProviderMap.
 func RemovePredicateKeyFromAlgorithmProviderMap(key string) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
