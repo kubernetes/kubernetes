@@ -53,8 +53,6 @@ const (
 	kubeRuntimeAPIVersion = "0.1.0"
 	// The root directory for pod logs
 	podLogsRootDirectory = "/var/log/pods"
-	// A minimal shutdown window for avoiding unnecessary SIGKILLs
-	minimumGracePeriodInSeconds = 2
 
 	// The expiration time of version cache.
 	versionCacheTTL = 60 * time.Second
