@@ -40,7 +40,6 @@ import (
 
 const (
 	checkpointsDir = "checkpoints"
-	initConfigDir  = "init"
 )
 
 // Controller is the controller which, among other things:
@@ -74,19 +73,19 @@ type Controller struct {
 }
 
 // NewController constructs a new Controller object and returns it. Directory paths must be absolute.
-// If the `initConfigDir` is an empty string, skips trying to load the init config.
+// If the `kubeletConfigFile` is an empty string, skips trying to load the kubelet config file.
 // If the `dynamicConfigDir` is an empty string, skips trying to load checkpoints or download new config,
 // but will still sync the ConfigOK condition if you call StartSync with a non-nil client.
 func NewController(defaultConfig *kubeletconfig.KubeletConfiguration,
-	initConfigDir string,
+	kubeletConfigFile string,
 	dynamicConfigDir string) (*Controller, error) {
 	var err error
 
 	fs := utilfs.DefaultFs{}
 
 	var fileLoader configfiles.Loader
-	if len(initConfigDir) > 0 {
-		fileLoader, err = configfiles.NewFsLoader(fs, initConfigDir)
+	if len(kubeletConfigFile) > 0 {
+		fileLoader, err = configfiles.NewFsLoader(fs, kubeletConfigFile)
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +115,7 @@ func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 	local, err := cc.loadLocalConfig()
 	if err != nil {
 		return nil, err
-	} // Assert: the default and init configs are both valid
+	} // Assert: the default and file configs are both valid
 
 	// if dynamic config is disabled, we just stop here
 	if !cc.dynamicConfig {
