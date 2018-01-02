@@ -249,6 +249,10 @@ type ControllerContext struct {
 	// ClientBuilder will provide a client for this controller to use
 	ClientBuilder controller.ControllerClientBuilder
 
+	// TODO(mtaufen): did this because I tried to use ClientBuilder and system:anonymous can't list my CRD
+	// rootClientBuilder is the client for informers
+	rootClientBuilder controller.ControllerClientBuilder
+
 	// InformerFactory gives access to informers for the controller.
 	InformerFactory informers.SharedInformerFactory
 
@@ -321,6 +325,7 @@ func KnownControllers() []string {
 var ControllersDisabledByDefault = sets.NewString(
 	"bootstrapsigner",
 	"tokencleaner",
+	// TODO(mtaufen): consider disabling the nodeconfig controller by default?
 )
 
 const (
@@ -450,6 +455,7 @@ func CreateControllerContext(s *options.CMServer, rootClientBuilder, clientBuild
 
 	ctx := ControllerContext{
 		ClientBuilder:      clientBuilder,
+		rootClientBuilder:  rootClientBuilder,
 		InformerFactory:    sharedInformers,
 		Options:            *s,
 		AvailableResources: availableResources,

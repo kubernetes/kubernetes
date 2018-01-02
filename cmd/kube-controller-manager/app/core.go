@@ -82,10 +82,10 @@ func startServiceController(ctx ControllerContext) (bool, error) {
 func startNodeConfigController(ctx ControllerContext) (bool, error) {
 	// we need a JSON client, because CRD doesn't support protobuf
 	var jsonClientConfig restclient.Config
-	if builder, ok := ctx.ClientBuilder.(controller.SimpleControllerClientBuilder); ok {
+	if builder, ok := ctx.rootClientBuilder.(controller.SimpleControllerClientBuilder); ok {
 		jsonClientConfig = *builder.ClientConfig
 		// TODO(mtaufen): I'm not reaaaally sure what the implications of using SAControllerClientBuilder are
-	} else if builder, ok := ctx.ClientBuilder.(controller.SAControllerClientBuilder); ok {
+	} else if builder, ok := ctx.rootClientBuilder.(controller.SAControllerClientBuilder); ok {
 		jsonClientConfig = *builder.ClientConfig
 	} else {
 		return false, fmt.Errorf("couldn't construct json client for nodeconfig controller")
